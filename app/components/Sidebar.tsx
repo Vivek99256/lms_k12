@@ -25,7 +25,7 @@ export default function Sidebar() {
 
   return (
     <div 
-      className={`${isCollapsed ? 'w-[104px]' : 'w-[280px]'} h-screen p-4 shrink-0 flex flex-col transition-[width] duration-700 ease-in-out relative group z-50`}
+      className={`${isCollapsed ? 'w-[104px]' : 'w-[280px]'} h-full p-4 shrink-0 flex flex-col transition-[width] duration-700 ease-in-out relative group z-50`}
     >
       <div className="bg-white/80 backdrop-blur-xl w-full h-full rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-200/50 flex flex-col overflow-hidden relative">
         

@@ -77,3 +77,14 @@ body {
   background: var(--accent-gradient);
   transition: width 0.3s ease;
 }
+
+/* Hide scrollbar utility (used in Sidebar) */
+.scrollbar-hide {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;     /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;             /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
+}

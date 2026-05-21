@@ -17,7 +17,7 @@ const subjects = [
 
 export default function SubjectsPage() {
   return (
-    <div className="flex h-screen bg-[#F8FAFC]">
+    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Header />
