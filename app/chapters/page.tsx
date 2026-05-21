@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { FileText, Download, Play, CheckCircle2, Clock, BookOpen } from 'lucide-react';
+import Link from 'next/link';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 
@@ -162,11 +163,39 @@ export default function ChapterView() {
                 )}
 
                 {activeTab === 'Resources' && <div>Additional videos and links will appear here.</div>}
-                {activeTab === 'Quiz' && <div>Quiz component coming soon.</div>}
+                {activeTab === 'Quiz' && (
+                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><FileText size={18} className="text-blue-500" /> Available Assessments</h3>
+                    
+                    <div className="group flex flex-col md:flex-row md:items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl mb-8 shadow-sm hover:shadow-md hover:border-blue-200 transition-all gap-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+                      
+                      <div className="flex items-center gap-4 relative z-10 flex-1 min-w-0">
+                        <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-md shadow-blue-500/30">
+                          <CheckCircle2 size={26} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-gray-900 text-lg group-hover:text-blue-600 transition-colors truncate">Chapter {activeChapterIndex + 1}: Assessment</div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 mt-1.5 font-medium">
+                            <span className="flex items-center gap-1 shrink-0"><Clock size={14} className="text-gray-400" /> 15 Minutes</span>
+                            <span className="flex items-center gap-1 shrink-0"><FileText size={14} className="text-gray-400" /> 5 Questions</span>
+                            <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-md border border-emerald-100 shrink-0">Passing: 60%</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="relative z-10 shrink-0 mt-2 md:mt-0">
+                        <Link href="/quiz/take" className="flex items-center justify-center gap-2 px-8 py-3 text-sm font-bold bg-[#0D6EFD] text-white rounded-xl shadow-md shadow-blue-500/30 hover:-translate-y-0.5 hover:bg-blue-700 transition-all w-full md:w-auto">
+                          Start Quiz <Play size={16} className="fill-white" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-10 flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-50">
                   <button className="flex-1 py-3 rounded-xl bg-white border border-gray-200 font-semibold text-gray-700 text-sm hover:bg-gray-50 hover:border-gray-300 transition-all">Mark Complete</button>
-                  <button className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm shadow-md shadow-blue-500/30 hover:bg-blue-700 transition-all hover:-translate-y-0.5">Take Quiz</button>
+                  <Link href="/quiz/take" className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm shadow-md shadow-blue-500/30 hover:bg-blue-700 transition-all hover:-translate-y-0.5 text-center block">Take Quiz</Link>
                   <button className="flex-1 py-3 rounded-xl bg-white border border-gray-200 font-semibold text-gray-700 text-sm hover:bg-gray-50 hover:border-gray-300 transition-all">Download Notes</button>
                 </div>
               </div>

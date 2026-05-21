@@ -17,7 +17,7 @@ export default function Sidebar() {
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
     { icon: BookOpen, label: 'Subjects', href: '/subjects' },
     { icon: Calendar, label: 'Planning', href: '#' },
-    { icon: FileText, label: 'Assessments', href: '#' },
+    { icon: FileText, label: 'Quiz', href: '/quiz' },
     { icon: BarChart3, label: 'Analytics', href: '#' },
     { icon: MessageCircle, label: 'Messages', href: '#' },
     { icon: Settings, label: 'Settings', href: '#' },
