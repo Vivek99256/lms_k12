@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FileText, Download, Play, CheckCircle2, Clock, BookOpen } from 'lucide-react';
+import { FileText, Download, Play, CheckCircle2, Clock, BookOpen, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -63,6 +63,15 @@ export default function ChapterView() {
         <Header />
 
         <div className="flex-1 overflow-auto p-8">
+          {/* Back Button */}
+          <Link
+            href="/subjects"
+            className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-blue-600 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 px-4 py-2 rounded-xl transition-all mb-5 shadow-sm group"
+          >
+            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+            Back to Subjects
+          </Link>
+
           {/* Breadcrumb */}
           <div className="text-sm text-gray-500 mb-1">Science • Chapter {activeChapterIndex + 1}</div>
           <h1 className="text-3xl font-semibold tracking-tight">Chapter {activeChapterIndex + 1}: {chapters[activeChapterIndex].title}</h1>
