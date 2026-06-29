@@ -1,10 +1,38 @@
 'use client';
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BookOpen, Calendar, FileText, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Dashboard() {
+   const [sessionData, setSessionData] = useState({
+    url: "",
+    token: "",
+    subInstituteId: "",
+    orgType: "",
+    userId: "",
+    userProfile: "",
+  });
+    useEffect(() => {
+    const userData = localStorage.getItem("userData");
+    // console.log("Retrieved userData from localStorage:", userData);
+    if (userData) {
+      try {
+        const parseData = JSON.parse(userData);
+        // console.log("Parsed userData:", parseData);
+        setSessionData({
+          url: parseData.host_name || "",
+          token: parseData.token || "",
+          subInstituteId: parseData.sub_institute_id || "",
+          orgType: parseData.org_type || "",
+          userId: parseData.user_id || "",
+          userProfile: parseData.user_profile || "User",
+        });
+       
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+      }
+    }
+  }, []);
   const { user } = useAuth();
   const stats = [
     { title: "Total Subjects", value: "06", growth: "+2", icon: BookOpen },
@@ -28,7 +56,7 @@ export default function Dashboard() {
   return (
     <div className="flex-1 overflow-auto p-8">
       <div className="mb-8">
-          <h1 className="text-4xl font-semibold tracking-tight text-black">Welcome back, {user?.name || "Teacher"}! 👋</h1>
+          <h1 className="text-4xl font-semibold tracking-tight text-black">Welcome back {sessionData.userProfile}, {user?.name || "Teacher"}! 👋</h1>
         <p className="text-gray-600 mt-1 text-lg">Here&apos;s what&apos;s happening in your classroom today.</p>
       </div>
 
