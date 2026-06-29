@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { BookOpen, Calendar, FileText, BarChart3 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import Header from '../components/Header';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const stats = [
     { title: "Total Subjects", value: "06", growth: "+2", icon: BookOpen },
     { title: "Total Chapters", value: "28", growth: "+4", icon: Calendar },
@@ -26,17 +26,11 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
-      <Sidebar />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        
-        <div className="flex-1 overflow-auto p-8">
-          <div className="mb-8">
-            <h1 className="text-4xl font-semibold tracking-tight text-black">Welcome back, Teacher! 👋</h1>
-            <p className="text-gray-600 mt-1 text-lg">Here's what's happening in your classroom today.</p>
-          </div>
+    <div className="flex-1 overflow-auto p-8">
+      <div className="mb-8">
+          <h1 className="text-4xl font-semibold tracking-tight text-black">Welcome back, {user?.name || "Teacher"}! 👋</h1>
+        <p className="text-gray-600 mt-1 text-lg">Here&apos;s what&apos;s happening in your classroom today.</p>
+      </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {stats.map((stat, idx) => {
@@ -115,9 +109,7 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
-          </div>
         </div>
       </div>
-    </div>
-  );
+    );
 }

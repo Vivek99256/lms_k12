@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { BookOpen, Search, Plus, Trash2, CheckCircle2, ArrowRight, Settings, AlignLeft, Layers, Save, HelpCircle, AlertCircle, PlayCircle, Loader2 } from 'lucide-react';
-import Sidebar from '../../components/Sidebar';
-import Header from '../../components/Header';
+import { BookOpen, Plus, Trash2, CheckCircle2, Settings, Layers, Save, AlertCircle, PlayCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -46,9 +44,9 @@ export default function CreateQuizPage() {
     ]);
   };
 
-  const updateQuestion = (index: number, field: string, value: any) => {
+  const updateQuestion = (index: number, field: string, value: string | number) => {
     const updated = [...questions];
-    (updated[index] as any)[field] = value;
+    (updated[index] as unknown as Record<string, string | number>)[field] = value;
     setQuestions(updated);
   };
 
@@ -74,12 +72,7 @@ export default function CreateQuizPage() {
   };
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        
-        <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto">
           {/* Top Bar */}
           <div className="bg-white border-b border-gray-100 sticky top-0 z-10 px-8 py-5 flex items-center justify-between">
             <div>
@@ -296,7 +289,5 @@ export default function CreateQuizPage() {
 
           </div>
         </div>
-      </div>
-    </div>
   );
 }

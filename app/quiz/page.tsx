@@ -2,18 +2,11 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { BrainCircuit, Sparkles, Clock, Target, Award, Bell } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import Header from '../components/Header';
+import { BrainCircuit, Sparkles, Clock, Target, Award } from 'lucide-react';
 
 export default function QuizPage() {
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Header />
-        
-        <div className="flex-1 overflow-y-auto relative p-8">
+    <div className="flex-1 overflow-y-auto relative p-8">
           <div className="min-h-full flex items-center justify-center">
           {/* Background Decorative Elements */}
           <div className="absolute top-20 left-10 w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" style={{ animationDuration: '4s' }}></div>
@@ -45,7 +38,7 @@ export default function QuizPage() {
             </h1>
             
             <p className="text-gray-500 text-lg mb-12 max-w-xl leading-relaxed">
-              We're crafting a next-generation assessment experience. Get ready for gamified quizzes, real-time analytics, and personalized learning paths designed to make learning engaging.
+              We&apos;re crafting a next-generation assessment experience. Get ready for gamified quizzes, real-time analytics, and personalized learning paths designed to make learning engaging.
             </p>
 
             {/* Feature Highlights */}
@@ -55,7 +48,7 @@ export default function QuizPage() {
                   <Target size={24} />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-1">Adaptive Learning</h3>
-                <p className="text-sm text-gray-500 text-center leading-relaxed">Questions that adapt to every student's learning pace</p>
+                 <p className="text-sm text-gray-500 text-center leading-relaxed">Questions that adapt to every student&apos;s learning pace</p>
               </div>
               <div className="flex flex-col items-center p-6 rounded-3xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
                 <div className="w-12 h-12 bg-purple-50 text-purple-500 rounded-2xl flex items-center justify-center mb-4">
@@ -82,7 +75,5 @@ export default function QuizPage() {
           </div>
         </div>
       </div>
-    </div>
-  </div>
   );
 }

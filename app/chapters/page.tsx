@@ -3,8 +3,6 @@
 import React, { useState } from 'react';
 import { FileText, Download, Play, CheckCircle2, Clock, BookOpen, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import Sidebar from '../components/Sidebar';
-import Header from '../components/Header';
 
 export default function ChapterView() {
   const [activeTab, setActiveTab] = useState<'Overview' | 'Content' | 'Resources' | 'Quiz'>('Overview');
@@ -57,12 +55,7 @@ export default function ChapterView() {
   const activeChapter = chapters[activeChapterIndex];
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-
-        <div className="flex-1 overflow-auto p-8">
+    <div className="flex-1 overflow-auto p-8">
           {/* Back Button */}
           <Link
             href="/subjects"
@@ -256,10 +249,8 @@ export default function ChapterView() {
                 />
                 <button className="mt-3 w-full text-sm py-3 rounded-xl bg-gray-900 hover:bg-gray-800 transition-colors text-white font-semibold">Save Note</button>
               </div>
-            </div>
           </div>
         </div>
       </div>
-    </div>
   );
 }
