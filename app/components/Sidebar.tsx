@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, BookOpen, Calendar, FileText, BarChart3, 
-  MessageCircle, Settings, Menu
+  MessageCircle, Settings, Menu,   ClipboardList, UserPlus, FileCheck
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -15,6 +15,9 @@ export default function Sidebar() {
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
     { icon: BookOpen, label: 'Subjects', href: '/subjects' },
+    { icon: ClipboardList, label: 'Admission Inquiry', href: '/admission-Inquiry' },
+    { icon: UserPlus, label: 'Admission Registration', href: '/admissions/registration' },
+    { icon: FileCheck, label: 'Admission Confirmation', href: '/admissions/confirmation' },
     { icon: Calendar, label: 'Planning', href: '#' },
     { icon: FileText, label: 'Quiz', href: '/quiz' },
     { icon: BarChart3, label: 'Analytics', href: '#' },
