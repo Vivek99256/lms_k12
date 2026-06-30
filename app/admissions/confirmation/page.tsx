@@ -34,14 +34,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
 import { Badge } from '@/components/ui/badge';
 
@@ -472,42 +464,41 @@ export default function AdmissionConfirmationPage() {
                   </SelectContent>
                 </Select>
 
-                {/* Export Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
-                    >
-                      <FileDown className="mr-2 h-3.5 w-3.5" />
-                      Export
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Export As
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-xs cursor-pointer">
-                      <FileText className="mr-2 h-3.5 w-3.5 text-rose-500" />
-                      Export as PDF
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-xs cursor-pointer">
-                      <Table2 className="mr-2 h-3.5 w-3.5 text-emerald-500" />
-                      Export as CSV
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-xs cursor-pointer">
-                      <FileSpreadsheet className="mr-2 h-3.5 w-3.5 text-blue-500" />
-                      Export as Excel
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-xs cursor-pointer">
-                      <Printer className="mr-2 h-3.5 w-3.5 text-slate-500" />
-                      Print
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {/* Action Buttons */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
+                  >
+                    <FileText className="mr-2 h-3.5 w-3.5 text-rose-500" />
+                    PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
+                  >
+                    <Table2 className="mr-2 h-3.5 w-3.5 text-emerald-500" />
+                    CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
+                  >
+                    <FileSpreadsheet className="mr-2 h-3.5 w-3.5 text-blue-500" />
+                    Excel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
+                  >
+                    <Printer className="mr-2 h-3.5 w-3.5 text-slate-500" />
+                    Print
+                  </Button>
+                </div>
               </div>
             </div>
           </CardHeader>
