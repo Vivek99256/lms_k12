@@ -1,6 +1,6 @@
 import { 
   LayoutDashboard, BookOpen, Calendar, FileText, BarChart3, 
-  MessageCircle, Settings
+  MessageCircle, Settings, ClipboardList, UserPlus, FileCheck
 } from 'lucide-react';
 
 export interface Level3Item {
@@ -24,6 +24,9 @@ export interface MenuItem {
 
 export const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
+  { icon: ClipboardList, label: 'Admission Inquiry', href: '/admission-Inquiry' },
+  { icon: UserPlus, label: 'Admission Registration', href: '/admissions/registration' },
+  { icon: FileCheck, label: 'Admission Confirmation', href: '/admissions/confirmation' },
   { 
     icon: BookOpen, 
     label: 'Subjects', 
