@@ -94,7 +94,7 @@ export default function AdmissionEnquiryPage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-1 rounded-full bg-gradient-to-b from-[#0D6EFD] to-[#7ED957]" />
-                <h1 className="text-2xl font-bold tracking-tight text-gray-900">Admission Inquiry</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900">Admission Enquiry</h1>
               </div>
               <p className="ml-3 text-sm text-gray-500">
                 Fill in the details below to submit a new admission enquiry.
