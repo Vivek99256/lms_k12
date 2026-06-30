@@ -111,7 +111,7 @@ export default function AdmissionEnquiryPage() {
             </div>
           </CardHeader>
 
-          <CardContent className="min-h-0 flex-1 overflow-auto p-5 md:p-6 lg:p-8">
+          <CardContent className="min-h-0 flex-1 overflow-auto p-5 md:p-6 lg:p-8 scrollbar-hide">
             <form className="space-y-5">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 <FormField icon={ClipboardList} label="Enquiry Number" htmlFor="enquiryNumber">
