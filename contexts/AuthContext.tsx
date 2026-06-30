@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import {API_BASE_URL} from '../app/components/utils/api_url';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -35,17 +36,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = useCallback(async (email: string, _password: string) => {
-    await new Promise((res) => setTimeout(res, 500));
-    const trimmed = email.trim();
-    if (trimmed) {
-      const userData = { name: trimmed.split('@')[0], email: trimmed };
-      setUser(userData);
-      setIsAuthenticated(true);
-      localStorage.setItem('auth', JSON.stringify(userData));
-      return true;
+  const login = useCallback(async (email: string, password: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/api-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, type: 'API' }),
+      });
+      const data = await res.json();
+      if (res.ok && data) {
+        const userData = {
+          name: data.name || email.split('@')[0],
+          email: data.email || email,
+          avatar: data.avatar,
+        };
+        setUser(userData);
+        setIsAuthenticated(true);
+        localStorage.setItem('auth', JSON.stringify(userData));
+        localStorage.setItem('userData', JSON.stringify(data.data || {}));
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
-    return false;
   }, []);
 
   const logout = useCallback(() => {
