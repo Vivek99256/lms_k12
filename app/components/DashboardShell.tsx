@@ -20,22 +20,29 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <Header onToggleChatbot={toggleChatbot} isChatbotOpen={isChatbotOpen} />
-        <div className="flex-1 flex overflow-hidden">
-          <main className={`flex-1 overflow-auto transition-all duration-300 scrollbar-hide ${isChatbotOpen ? 'w-[85%]' : 'w-full'}`}>
-            {showSubheader && (
-              <div className="px-6 pt-4">
-                <Level3Subheader items={level3Menu!.items} parentLabel={level3Menu!.parentLabel} />
-              </div>
-            )}
-            {children}
-          </main>
-          {isChatbotOpen && (
-            <div className="w-[15%] min-w-[320px] overflow-hidden">
-              <ChatbotPanel onToggleChatbot={toggleChatbot} />
+        <div className={`flex-1 min-h-0 overflow-hidden flex flex-col lg:flex-row ${isChatbotOpen ? 'gap-4' : 'gap-0'} p-4 pt-4`}>
+          <main className="min-w-0 flex-1 overflow-hidden rounded-[28px]">
+            <div className="h-full min-h-0 overflow-auto scrollbar-hide">
+              {showSubheader && (
+                <div className="px-6 pt-4">
+                  <Level3Subheader items={level3Menu!.items} parentLabel={level3Menu!.parentLabel} />
+                </div>
+              )}
+              {children}
             </div>
-          )}
+          </main>
+          <div
+            className={`min-h-0 overflow-hidden transition-[width,opacity] duration-500 ease-in-out ${
+              isChatbotOpen
+                ? 'w-full lg:w-[clamp(320px,24vw,440px)] opacity-100'
+                : 'w-0 opacity-0 pointer-events-none'
+            }`}
+            aria-hidden={!isChatbotOpen}
+          >
+            <ChatbotPanel onToggleChatbot={toggleChatbot} />
+          </div>
         </div>
       </div>
     </div>

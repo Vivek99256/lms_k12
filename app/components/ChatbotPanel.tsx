@@ -80,7 +80,7 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   );
 
   const messagesList = (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
       {messages.map((msg) => (
         <div
           key={msg.id}
@@ -141,10 +141,12 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   );
 
   return (
-    <aside className="h-[95%] bg-white/90 backdrop-blur-xl border-l border-gray-200/50 flex flex-col  mt-[15px] mr-[15px] rounded-[28px] w-auto">
-      {header}
-      {messagesList}
-      {footer}
+    <aside className="h-full w-full overflow-hidden rounded-[28px] border border-gray-200/50 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
+      <div className="flex h-full min-h-0 flex-col">
+        {header}
+        {messagesList}
+        {footer}
+      </div>
     </aside>
   );
 }
