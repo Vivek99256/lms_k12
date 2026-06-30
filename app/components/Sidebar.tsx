@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { 
   LayoutDashboard, BookOpen, Calendar, FileText, BarChart3, 
-  MessageCircle, Settings, Menu
+  MessageCircle, Settings, Menu,   ClipboardList, UserPlus, FileCheck
 } from 'lucide-react';
 import { menuItems as sharedMenuItems, MenuItem } from '@/app/data/menuItems';
 
@@ -18,6 +18,20 @@ interface FlyoutState {
 export default function Sidebar() {
   const pathname = usePathname() || '';
   const router = useRouter();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const menuItems = [
+    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
+    { icon: BookOpen, label: 'Subjects', href: '/subjects' },
+    { icon: ClipboardList, label: 'Admission Inquiry', href: '/admission-Inquiry' },
+    { icon: UserPlus, label: 'Admission Registration', href: '/admissions/registration' },
+    { icon: FileCheck, label: 'Admission Confirmation', href: '/admissions/confirmation' },
+    { icon: Calendar, label: 'Planning', href: '#' },
+    { icon: FileText, label: 'Quiz', href: '/quiz' },
+    { icon: BarChart3, label: 'Analytics', href: '#' },
+    { icon: MessageCircle, label: 'Messages', href: '#' },
+    { icon: Settings, label: 'Settings', href: '#' },
+  ];
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [flyoutState, setFlyoutState] = useState<FlyoutState | null>(null);
   const flyoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
