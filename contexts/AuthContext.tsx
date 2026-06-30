@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import {API_BASE_URL} from '../app/components/utils/api_url';
 
 interface AuthContextType {
@@ -8,6 +8,13 @@ interface AuthContextType {
   user: { name: string; email: string; avatar?: string } | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  menuContext: {
+    sub_institute_id: number;
+    user_id: number;
+    user_profile_name: string;
+    user_profile_id: number;
+    client_id: number;
+  } | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -24,17 +31,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => getStoredAuth().isAuth);
   const [user, setUser] = useState<{ name: string; email: string; avatar?: string } | null>(() => getStoredAuth().user);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('auth');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setIsAuthenticated(true);
-        setUser(parsed);
-      } catch {}
-    }
-  }, []);
+  const [menuContext, setMenuContext] = useState<{
+    sub_institute_id: number;
+    user_id: number;
+    user_profile_name: string;
+    user_profile_id: number;
+    client_id: number;
+  } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = localStorage.getItem('menuContext');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return null;
+  });
 
   const login = useCallback(async (email: string, password: string) => {
     try {
@@ -45,6 +55,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await res.json();
       if (res.ok && data) {
+        function getValue(obj: unknown, key: string): unknown {
+          if (!obj || typeof obj !== 'object') return undefined;
+          return (obj as Record<string, unknown>)[key];
+        }
+
+        const payload = data.data || data;
+        const ctx = {
+          sub_institute_id: Number(getValue(payload, 'sub_institute_id') ?? getValue(payload, 'subInstituteId') ?? 0),
+          user_id: Number(getValue(payload, 'user_id') ?? getValue(payload, 'userId') ?? 0),
+          user_profile_name: String(getValue(payload, 'user_profile_name') ?? getValue(payload, 'userProfileName') ?? getValue(payload, 'user_profile') ?? ''),
+          user_profile_id: Number(getValue(payload, 'user_profile_id') ?? getValue(payload, 'userProfileId') ?? 0),
+          client_id: Number(getValue(payload, 'client_id') ?? getValue(payload, 'clientId') ?? 0),
+        };
+        setMenuContext(ctx);
+        localStorage.setItem('menuContext', JSON.stringify(ctx));
+
         const userData = {
           name: data.name || email.split('@')[0],
           email: data.email || email,
@@ -65,11 +91,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     setIsAuthenticated(false);
     setUser(null);
+    setMenuContext(null);
     localStorage.removeItem('auth');
+    localStorage.removeItem('menuContext');
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, menuContext }}>
       {children}
     </AuthContext.Provider>
   );
@@ -83,6 +111,7 @@ export function useAuth() {
       user: null,
       login: async () => false,
       logout: () => {},
+      menuContext: null,
     };
   }
   return context;

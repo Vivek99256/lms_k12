@@ -2,21 +2,32 @@ import {
   LayoutDashboard, BookOpen, Calendar, FileText, BarChart3, 
   MessageCircle, Settings, ClipboardList, UserPlus, FileCheck
 } from 'lucide-react';
+import type { ComponentType } from 'react';
+
+export type MenuIcon = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
 
 export interface Level3Item {
+  id?: number | string;
+  parentId?: number | string;
+  menuType?: string | null;
   label: string;
   href: string;
 }
 
 export interface SubmenuItem {
+  id?: number | string;
+  parentId?: number | string;
+  menuType?: string | null;
   label: string;
   href: string;
-  icon?: any;
+  icon?: MenuIcon;
   submenus?: Level3Item[];
 }
 
 export interface MenuItem {
-  icon: any;
+  id?: number | string;
+  menuType?: string | null;
+  icon: MenuIcon;
   label: string;
   href?: string;
   submenus?: SubmenuItem[];
@@ -98,15 +109,15 @@ export const menuItems: MenuItem[] = [
   },
 ];
 
-export function getCurrentLevel3Menu(pathname: string): { parentLabel: string; items: Level3Item[] } | null {
-  for (const item of menuItems) {
-    if (item.submenus && item.href) {
-      for (const submenu of item.submenus) {
-        if (submenu.submenus && submenu.submenus.length > 0 && pathname.startsWith(submenu.href)) {
-          return { parentLabel: submenu.label, items: submenu.submenus };
-        }
-      }
-    }
-  }
-  return null;
-}
+export function getCurrentLevel3Menu(pathname: string, items: MenuItem[] = menuItems): { parentLabel: string; items: Level3Item[] } | null {
+   for (const item of items) {
+     if (item.submenus && item.href) {
+       for (const submenu of item.submenus) {
+         if (submenu.submenus && submenu.submenus.length > 0 && pathname.startsWith(submenu.href)) {
+           return { parentLabel: submenu.label, items: submenu.submenus };
+         }
+       }
+     }
+   }
+   return null;
+ }
