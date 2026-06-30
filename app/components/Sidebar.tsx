@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { 
   LayoutDashboard, BookOpen, Calendar, FileText, BarChart3, 
-  MessageCircle, Settings, Menu,   ClipboardList, UserPlus, FileCheck
+  MessageCircle, Settings, Menu
 } from 'lucide-react';
 import { menuItems as sharedMenuItems, MenuItem } from '@/app/data/menuItems';
 
@@ -18,7 +18,7 @@ interface FlyoutState {
 export default function Sidebar() {
   const pathname = usePathname() || '';
   const router = useRouter();
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [flyoutState, setFlyoutState] = useState<FlyoutState | null>(null);
   const flyoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sidebarLeaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
