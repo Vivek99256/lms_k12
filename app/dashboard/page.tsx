@@ -1,4 +1,4 @@
-'use client';
+'use client';//comment for env upload
 import React, { useEffect, useState } from 'react';
 import { BookOpen, Calendar, FileText, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
