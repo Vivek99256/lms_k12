@@ -34,10 +34,7 @@ export interface MenuItem {
 }
 
 export const menuItems: MenuItem[] = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-  { icon: ClipboardList, label: 'Admission Enquiry', href: '/admission-Enquiry' },
-  { icon: UserPlus, label: 'Admission Registration', href: '/admissions/registration' },
-  { icon: FileCheck, label: 'Admission Confirmation', href: '/admissions/confirmation' },
+
   { 
     icon: BookOpen, 
     label: 'Subjects', 

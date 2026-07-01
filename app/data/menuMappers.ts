@@ -80,8 +80,11 @@ export function resolveRoute(link: string | null): string {
   const clean = link.trim();
   if (clean === 'javascript:void(0);' || clean === 'javascript:void(0)') return '#';
   const lower = clean.toLowerCase();
-  if (lower.startsWith('/')) return clean;
   if (ROUTE_MAP[lower]) return ROUTE_MAP[lower];
+  if (lower === '/admission-enquiry') return '/admission-enquiry';
+  if (lower === '/admission-registration') return '/admission-registration';
+  if (lower === '/admission-confirmation') return '/admission-confirmation';
+  if (lower.startsWith('/')) return clean;
   const fallback = lower
     .replace(/\.index$/i, '')
     .replace(/\./g, '/')

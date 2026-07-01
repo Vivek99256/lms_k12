@@ -22,11 +22,14 @@ interface Level2PanelState {
 }
 
 function itemMatchesPath(item: MenuItem, pathname: string) {
-  if (item.href && item.href !== '#' && pathname.startsWith(item.href)) return true;
+  const currentPath = pathname.toLowerCase();
+  const normalizeHref = (href?: string) => (href ?? '').toLowerCase();
+
+  if (item.href && item.href !== '#' && currentPath.startsWith(normalizeHref(item.href))) return true;
 
   return Boolean(item.submenus?.some((submenu) => {
-    if (submenu.href !== '#' && pathname.startsWith(submenu.href)) return true;
-    return submenu.submenus?.some((level3) => level3.href !== '#' && pathname === level3.href);
+    if (submenu.href !== '#' && currentPath.startsWith(normalizeHref(submenu.href))) return true;
+    return submenu.submenus?.some((level3) => level3.href !== '#' && currentPath === normalizeHref(level3.href));
   }));
 }
 
