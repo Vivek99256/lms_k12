@@ -20,7 +20,7 @@ function readAcademicSession() {
       if (Array.isArray(data.academicTerms)) {
         for (const item of data.academicTerms) {
           const syear = item.syear != null ? String(item.syear) : null;
-          const termName = item.short_name || item.title || null;
+          const termName =  item.title || null;
           if (syear && !years.includes(syear)) years.push(syear);
           if (termName && !terms.includes(termName)) terms.push(termName);
         }
