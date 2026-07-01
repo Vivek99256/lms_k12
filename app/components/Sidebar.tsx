@@ -60,7 +60,13 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
       const stored = localStorage.getItem('userData');
       if (stored) {
         const parsed = JSON.parse(stored);
-        return parsed.logo || null;
+        console.log('Sidebar logoUrl from localStorage:', parsed.logo);
+        if (parsed.logo) {
+          if (parsed.logo.startsWith('http')) return parsed.logo;
+          const base = parsed.host_name || '';
+          return base ? `${base}/admin_dep/images/${parsed.logo}` : null;
+        }
+        return null;
       }
     } catch {}
     return null;
