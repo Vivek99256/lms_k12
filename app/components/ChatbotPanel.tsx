@@ -141,8 +141,8 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   );
 
   return (
-    <aside className="h-full w-full overflow-hidden rounded-[28px] border border-gray-200/50 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
-      <div className="flex h-full min-h-0 flex-col">
+    <aside className="h-full w-full overflow-hidden rounded-[28px] border border-gray-200/50 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl mt-[10px]">
+      <div className="flex h-full min-h-0 flex-col ">
         {header}
         {messagesList}
         {footer}
