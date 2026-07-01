@@ -1,23 +1,103 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+
+function readAcademicSession() {
+  if (typeof window === 'undefined') return null;
+
+  const storageKeys = ['userData', 'menuContext', 'auth', 'sessionData', 'sessiondata', 'user_data', 'session', 'academicSession', 'academicData'];
+  for (const key of storageKeys) {
+    const stored = localStorage.getItem(key);
+    if (!stored) continue;
+    try {
+      const data = JSON.parse(stored);
+      const terms: string[] = [];
+      const years: string[] = [];
+
+      if (Array.isArray(data.academicTerms)) {
+        for (const item of data.academicTerms) {
+          const syear = item.syear != null ? String(item.syear) : null;
+          const termName = item.short_name || item.title || null;
+          if (syear && !years.includes(syear)) years.push(syear);
+          if (termName && !terms.includes(termName)) terms.push(termName);
+        }
+      }
+
+      if (Array.isArray(data.academicYears)) {
+        for (const item of data.academicYears) {
+          const syear = item.syear != null ? String(item.syear) : null;
+          if (syear && !years.includes(syear)) years.push(syear);
+        }
+      }
+
+      if (years.length > 0 || terms.length > 0) {
+        console.log('[Header] academic session from key:', key, { years, terms });
+        return {
+          years: years.length > 0 ? years : [],
+          terms: terms.length > 0 ? terms : [],
+          selectedYear: years.length > 0 ? years[0] : '',
+          selectedTerm: terms.length > 0 ? terms[0] : '',
+        };
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
 
 export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleChatbot: () => void; isChatbotOpen: boolean }) {
   const { user, logout } = useAuth();
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showTermDropdown, setShowTermDropdown] = useState(false);
-  const [selectedYear, setSelectedYear] = useState('2024-2025');
-  const [selectedTerm, setSelectedTerm] = useState('Term 1');
+
+  const [selectedYear, setSelectedYear] = useState<string>(() => {
+    const academic = readAcademicSession();
+    return academic?.selectedYear || '2024-2025';
+  });
+
+  const [selectedTerm, setSelectedTerm] = useState<string>(() => {
+    const academic = readAcademicSession();
+    return academic?.selectedTerm || 'Term 1';
+  });
+
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    const academic = readAcademicSession();
+    console.log('Session Data:', academic);
+    const timeout = setTimeout(() => {
+      if (academic) {
+        setSelectedYear((current) => academic.selectedYear || current);
+        setSelectedTerm((current) => academic.selectedTerm || current);
+      }
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, []);
+
   const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
   const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);
 
-  const years = ['2024-2025', '2023-2024', '2022-2023'];
-  const terms = ['Term 1', 'Term 2', 'Term 3', 'Term 4'];
+  const academic = readAcademicSession();
+  const logoUrl = (() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = localStorage.getItem('userData');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed.logo || null;
+      }
+    } catch {}
+    return null;
+  })();
+  const years = academic?.years && academic.years.length > 0 ? academic.years : ['2024-2025', '2023-2024', '2022-2023'];
+  const displayYears = years.includes(selectedYear) ? years : [selectedYear, ...years];
 
-  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const terms = academic?.terms && academic.terms.length > 0 ? academic.terms : ['Term 1', 'Term 2', 'Term 3', 'Term 4'];
+  const displayTerms = terms.includes(selectedTerm) ? terms : [selectedTerm, ...terms];
 
   const handleYearToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -101,8 +181,8 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
           <ChevronDown size={14} className={`text-gray-400 transition-transform ${showTermDropdown ? 'rotate-180' : ''}`} />
         </button>
 
-        {renderDropdown(showYearDropdown, yearPosition, setSelectedYear, years, selectedYear)}
-        {renderDropdown(showTermDropdown, termPosition, setSelectedTerm, terms, selectedTerm)}
+        {renderDropdown(showYearDropdown, yearPosition, setSelectedYear, displayYears, selectedYear)}
+        {renderDropdown(showTermDropdown, termPosition, setSelectedTerm, displayTerms, selectedTerm)}
 
         <button
           onClick={onToggleChatbot}
@@ -122,9 +202,13 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
         </div>
 
         <div className="flex items-center gap-3 cursor-pointer">
-          <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
-            {user?.name?.charAt(0).toUpperCase() || 'S'}
-          </div>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain" />
+          ) : (
+            <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
+              {user?.name?.charAt(0).toUpperCase() || 'S'}
+            </div>
+          )}
           <span className="font-medium text-sm flex items-center gap-1">{user?.name || 'Sarah Patel'} <ChevronDown size={14} /></span>
         </div>
         <button
