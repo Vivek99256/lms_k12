@@ -35,7 +35,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
-import { Badge } from '@/components/ui/badge';
+import {
+  exportRowsAsCsv,
+  exportRowsAsExcel,
+  exportRowsAsPdf,
+  openPrintPreview,
+} from '@/lib/table-export';
 
 type SortDirection = 'asc' | 'desc' | null;
 type SortField = string;
@@ -215,41 +220,16 @@ const mockData: ConfirmationRecord[] = [
   },
 ];
 
-const statusConfig: Record<
-  string,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }
-> = {
-  approved: {
-    label: 'Approved',
-    variant: 'default',
-    className: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
-  },
-  pending: {
-    label: 'Pending',
-    variant: 'secondary',
-    className: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
-  },
-  'under-review': {
-    label: 'Under Review',
-    variant: 'outline',
-    className: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
-  },
-  rejected: {
-    label: 'Rejected',
-    variant: 'destructive',
-    className: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100',
-  },
-};
-
 type ColumnDef = {
   key: string;
   label: string;
   sortable?: boolean;
   width?: string;
+  align?: 'left' | 'center' | 'right';
 };
 
 const columns: ColumnDef[] = [
-  { key: 'action', label: 'Action', sortable: false, width: '70px' },
+  { key: 'action', label: 'Action', sortable: false, width: '70px', align: 'center' },
   { key: 'id', label: 'Id', sortable: true, width: '100px' },
   { key: 'enquiryNumber', label: 'Enquiry Number', sortable: true },
   { key: 'inquiryDate', label: 'Enquiry Date', sortable: true },
@@ -260,11 +240,13 @@ const columns: ColumnDef[] = [
   { key: 'mobile', label: 'Mobile', sortable: true },
   { key: 'email', label: 'Email', sortable: true },
   { key: 'dateOfBirth', label: 'Date of Birth', sortable: true },
-  { key: 'age', label: 'Age', sortable: true, width: '60px' },
+  { key: 'age', label: 'Age', sortable: true, width: '60px', align: 'center' },
   { key: 'admissionStandard', label: 'Admission Standard', sortable: true },
   { key: 'enquiryRemark', label: 'Enquiry Remark', sortable: true },
   { key: 'motherName', label: 'Mother Name', sortable: true },
 ];
+
+const exportColumns = columns.filter((column) => column.key !== 'action');
 
 export default function AdmissionConfirmationPage() {
   const router = useRouter();
@@ -332,6 +314,68 @@ export default function AdmissionConfirmationPage() {
   const startEntry = (currentPage - 1) * parseInt(entriesPerPage) + 1;
   const endEntry = Math.min(currentPage * parseInt(entriesPerPage), totalEntries);
   const paginatedData = filteredAndSortedData.slice(startEntry - 1, endEntry);
+
+  const visibleExportRows = useMemo(
+    () =>
+      paginatedData.map((record) => ({
+        id: record.id,
+        enquiryNumber: record.enquiryNumber,
+        admissionDate: format(parseISO(record.admissionDate), 'dd MMM yyyy'),
+        registrationNumber: record.registrationNumber,
+        inquiryDate: format(parseISO(record.inquiryDate), 'dd MMM yyyy'),
+        followUpDate: format(parseISO(record.followUpDate), 'dd MMM yyyy'),
+        action: 'Follow Up',
+        firstName: record.firstName,
+        middleName: record.middleName,
+        lastName: record.lastName,
+        mobile: record.mobile,
+        email: record.email,
+        dateOfBirth: format(parseISO(record.dateOfBirth), 'dd MMM yyyy'),
+        age: record.age,
+        admissionStandard: record.admissionStandard,
+        enquiryRemark: record.enquiryRemark,
+        motherName: record.motherName,
+      })),
+    [paginatedData]
+  );
+
+  const exportSubtitle = `Showing records ${totalEntries === 0 ? 0 : startEntry} to ${endEntry} of ${totalEntries}`;
+
+  const handlePdfExport = () => {
+    exportRowsAsPdf({
+      filename: 'admission-confirmation-current-view.pdf',
+      title: 'Admission Confirmation',
+      subtitle: exportSubtitle,
+      columns: exportColumns,
+      rows: visibleExportRows,
+    });
+  };
+
+  const handleCsvExport = () => {
+    exportRowsAsCsv({
+      filename: 'admission-confirmation-current-view.csv',
+      columns: exportColumns,
+      rows: visibleExportRows,
+    });
+  };
+
+  const handleExcelExport = () => {
+    exportRowsAsExcel({
+      filename: 'admission-confirmation-current-view.xls',
+      title: 'Admission Confirmation',
+      columns: exportColumns,
+      rows: visibleExportRows,
+    });
+  };
+
+  const handlePrint = () => {
+    openPrintPreview({
+      title: 'Admission Confirmation',
+      subtitle: exportSubtitle,
+      columns: exportColumns,
+      rows: visibleExportRows,
+    });
+  };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -469,6 +513,7 @@ export default function AdmissionConfirmationPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handlePdfExport}
                     className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
                   >
                     <FileText className="mr-2 h-3.5 w-3.5 text-rose-500" />
@@ -477,6 +522,7 @@ export default function AdmissionConfirmationPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handleCsvExport}
                     className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
                   >
                     <Table2 className="mr-2 h-3.5 w-3.5 text-emerald-500" />
@@ -485,6 +531,7 @@ export default function AdmissionConfirmationPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handleExcelExport}
                     className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
                   >
                     <FileSpreadsheet className="mr-2 h-3.5 w-3.5 text-blue-500" />
@@ -493,6 +540,7 @@ export default function AdmissionConfirmationPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handlePrint}
                     className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
                   >
                     <Printer className="mr-2 h-3.5 w-3.5 text-slate-500" />
@@ -543,7 +591,6 @@ export default function AdmissionConfirmationPage() {
                     </TableRow>
                   ) : (
                     paginatedData.map((record) => {
-                      const status = statusConfig[record.status];
                       return (
                         <TableRow
                           key={record.id}

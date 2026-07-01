@@ -20,7 +20,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -37,7 +36,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { Badge } from '@/components/ui/badge';
+import {
+  exportRowsAsCsv,
+  exportRowsAsExcel,
+  exportRowsAsPdf,
+  openPrintPreview,
+} from '@/lib/table-export';
 
 type SortDirection = 'asc' | 'desc' | null;
 type SortField = string;
@@ -280,59 +284,16 @@ const mockData: RegistrationRecord[] = [
   },
 ];
 
-const statusConfig: Record<
-  string,
-  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }
-> = {
-  approved: {
-    label: 'Approved',
-    variant: 'default',
-    className: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
-  },
-  pending: {
-    label: 'Pending',
-    variant: 'secondary',
-    className: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
-  },
-  'under-review': {
-    label: 'Under Review',
-    variant: 'outline',
-    className: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
-  },
-  rejected: {
-    label: 'Rejected',
-    variant: 'destructive',
-    className: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100',
-  },
-};
-
-const standards = [
-  'Nursery',
-  'LKG',
-  'UKG',
-  '1st',
-  '2nd',
-  '3rd',
-  '4th',
-  '5th',
-  '6th',
-  '7th',
-  '8th',
-  '9th',
-  '10th',
-  '11th',
-  '12th',
-];
-
 type ColumnDef = {
   key: string;
   label: string;
   sortable?: boolean;
   width?: string;
+  align?: 'left' | 'center' | 'right';
 };
 
 const columns: ColumnDef[] = [
-  { key: 'action', label: 'Action', sortable: false, width: '60px' },
+  { key: 'action', label: 'Action', sortable: false, width: '60px', align: 'center' },
   { key: 'id', label: 'Id', sortable: true, width: '90px' },
   { key: 'enquiryNumber', label: 'Enquiry Number', sortable: true },
   { key: 'admissionDate', label: 'Admission Date', sortable: true },
@@ -345,9 +306,11 @@ const columns: ColumnDef[] = [
   { key: 'mobile', label: 'Mobile', sortable: true },
   { key: 'email', label: 'Email', sortable: true },
   { key: 'dateOfBirth', label: 'Date of Birth', sortable: true },
-  { key: 'age', label: 'Age', sortable: true, width: '60px' },
+  { key: 'age', label: 'Age', sortable: true, width: '60px', align: 'center' },
   { key: 'admissionStandard', label: 'Admission Standard', sortable: true },
 ];
+
+const exportColumns = columns.filter((column) => column.key !== 'action');
 
 export default function AdmissionRegistrationPage() {
   const router = useRouter();
@@ -400,8 +363,8 @@ export default function AdmissionRegistrationPage() {
 
     if (sortField && sortDirection) {
       data.sort((a, b) => {
-        const aVal = (a as any)[sortField];
-        const bVal = (b as any)[sortField];
+        const aVal = a[sortField as keyof RegistrationRecord];
+        const bVal = b[sortField as keyof RegistrationRecord];
         if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
         if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
         return 0;
@@ -416,6 +379,66 @@ export default function AdmissionRegistrationPage() {
   const startEntry = (currentPage - 1) * parseInt(entriesPerPage) + 1;
   const endEntry = Math.min(currentPage * parseInt(entriesPerPage), totalEntries);
   const paginatedData = filteredAndSortedData.slice(startEntry - 1, endEntry);
+
+  const visibleExportRows = useMemo(
+    () =>
+      paginatedData.map((record) => ({
+        id: record.id,
+        enquiryNumber: record.enquiryNumber,
+        admissionDate: format(parseISO(record.admissionDate), 'dd MMM yyyy'),
+        registrationNumber: record.registrationNumber,
+        inquiryDate: format(parseISO(record.inquiryDate), 'dd MMM yyyy'),
+        followUpDate: format(parseISO(record.followUpDate), 'dd MMM yyyy'),
+        action: 'Edit',
+        firstName: record.firstName,
+        middleName: record.middleName,
+        lastName: record.lastName,
+        mobile: record.mobile,
+        email: record.email,
+        dateOfBirth: format(parseISO(record.dateOfBirth), 'dd MMM yyyy'),
+        age: record.age,
+        admissionStandard: record.admissionStandard,
+      })),
+    [paginatedData]
+  );
+
+  const exportSubtitle = `Showing records ${totalEntries === 0 ? 0 : startEntry} to ${endEntry} of ${totalEntries}`;
+
+  const handlePdfExport = () => {
+    exportRowsAsPdf({
+      filename: 'admission-registration-current-view.pdf',
+      title: 'Admission Registration',
+      subtitle: exportSubtitle,
+      columns: exportColumns,
+      rows: visibleExportRows,
+    });
+  };
+
+  const handleCsvExport = () => {
+    exportRowsAsCsv({
+      filename: 'admission-registration-current-view.csv',
+      columns: exportColumns,
+      rows: visibleExportRows,
+    });
+  };
+
+  const handleExcelExport = () => {
+    exportRowsAsExcel({
+      filename: 'admission-registration-current-view.xls',
+      title: 'Admission Registration',
+      columns: exportColumns,
+      rows: visibleExportRows,
+    });
+  };
+
+  const handlePrint = () => {
+    openPrintPreview({
+      title: 'Admission Registration',
+      subtitle: exportSubtitle,
+      columns: exportColumns,
+      rows: visibleExportRows,
+    });
+  };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -561,6 +584,7 @@ export default function AdmissionRegistrationPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handlePdfExport}
                     className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
                   >
                     <FileText className="mr-2 h-3.5 w-3.5 text-rose-500" />
@@ -569,6 +593,7 @@ export default function AdmissionRegistrationPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handleCsvExport}
                     className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
                   >
                     <Table2 className="mr-2 h-3.5 w-3.5 text-emerald-500" />
@@ -577,6 +602,7 @@ export default function AdmissionRegistrationPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handleExcelExport}
                     className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
                   >
                     <FileSpreadsheet className="mr-2 h-3.5 w-3.5 text-blue-500" />
@@ -585,6 +611,7 @@ export default function AdmissionRegistrationPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handlePrint}
                     className="h-9 rounded-lg border-slate-200 bg-white shadow-sm text-xs font-medium"
                   >
                     <Printer className="mr-2 h-3.5 w-3.5 text-slate-500" />
@@ -629,13 +656,12 @@ export default function AdmissionRegistrationPage() {
                       >
                         <div className="flex flex-col items-center justify-center gap-2">
                           <Search className="h-8 w-8 text-slate-300" />
-                          <p>No records found matching "{searchQuery}"</p>
+                          <p>No records found matching &quot;{searchQuery}&quot;</p>
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : (
                     paginatedData.map((record) => {
-                      const status = statusConfig[record.status];
                       return (
                         <TableRow
                           key={record.id}
