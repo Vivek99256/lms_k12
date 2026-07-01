@@ -5,6 +5,7 @@ import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
 import Level3Subheader from '@/app/components/Level3Subheader';
+import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import { getCurrentLevel3Menu } from '@/app/data/menuItems';
 import { usePathname } from 'next/navigation';
 
@@ -44,6 +45,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             <ChatbotPanel onToggleChatbot={toggleChatbot} />
           </div>
         </div>
+        <RightFloatingToolbar isChatbotOpen={isChatbotOpen} />
       </div>
     </div>
   );

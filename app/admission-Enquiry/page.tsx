@@ -153,33 +153,35 @@ export default function AdmissionEnquiryPage() {
                   </Select>
                 </FormField>
 
-                <FormField icon={Baby} label="Date of Birth" htmlFor="dob">
-                  <Popover>
-                    <PopoverTrigger>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          'h-10 w-full justify-start rounded-lg border-gray-200 bg-gray-50/50 text-left font-normal transition-colors hover:bg-white',
-                          !date && 'text-muted-foreground'
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4 text-[#0D6EFD]" />
-                        {date ? format(date, 'dd MMM yyyy') : 'Pick a date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={handleDateChange}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date('1900-01-01')
-                        }
-                        captionLayout="dropdown"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </FormField>
+<FormField icon={Baby} label="Date of Birth" htmlFor="dob">
+                   <Popover>
+                     <PopoverTrigger
+                       render={
+                         <Button
+                           variant="outline"
+                           className={cn(
+                             'h-10 w-full justify-start rounded-lg border-gray-200 bg-gray-50/50 text-left font-normal transition-colors hover:bg-white',
+                             !date && 'text-muted-foreground'
+                           )}
+                         >
+                           <CalendarIcon className="mr-2 h-4 w-4 text-[#0D6EFD]" />
+                           {date ? format(date, 'dd MMM yyyy') : 'Pick a date'}
+                         </Button>
+                       }
+                     />
+                     <PopoverContent className="w-auto p-0" align="start">
+                       <Calendar
+                         mode="single"
+                         selected={date}
+                         onSelect={handleDateChange}
+                         disabled={(date) =>
+                           date > new Date() || date < new Date('1900-01-01')
+                         }
+                         captionLayout="dropdown"
+                       />
+                     </PopoverContent>
+                   </Popover>
+                 </FormField>
 
                 <FormField icon={Baby} label="Age" htmlFor="age">
                   <Input id="age" value={age} readOnly placeholder="Auto-calculated" className="h-10 rounded-lg border-gray-200 bg-gray-50/50 transition-colors focus:bg-white" />
