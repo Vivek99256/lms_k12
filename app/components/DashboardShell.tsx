@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
+import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
 import { getCurrentLevel3Menu, type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights } from '@/app/hooks/useMenuRights';
@@ -104,6 +105,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </div>
           )}
         </div>
+        <RightFloatingToolbar isChatbotOpen={isChatbotOpen} />
       </div>
     </div>
   );
