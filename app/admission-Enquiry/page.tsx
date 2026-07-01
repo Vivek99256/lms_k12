@@ -85,7 +85,7 @@ export default function AdmissionEnquiryPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-6">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-6 mt-[10px]">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-gray-200/60 bg-white/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         <div className="h-1.5 bg-gradient-to-r from-[#0D6EFD] via-blue-500 to-[#7ED957]" />
 
