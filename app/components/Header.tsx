@@ -88,7 +88,13 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
       const stored = localStorage.getItem('userData');
       if (stored) {
         const parsed = JSON.parse(stored);
-        return parsed.logo || null;
+        console.log('Header logoUrl from localStorage:', parsed.logo);
+        if (parsed.logo) {
+          if (parsed.logo.startsWith('http')) return parsed.logo;
+          const base = parsed.host_name || '';
+          return base ? `${base}/admin_dep/images/${parsed.logo}` : null;
+        }
+        return null;
       }
     } catch {}
     return null;
@@ -203,7 +209,16 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
 
         <div className="flex items-center gap-3 cursor-pointer">
           {logoUrl ? (
-            <img src={logoUrl} alt="Logo" className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain" />
+            <img 
+              src={logoUrl} 
+              alt="Logo" 
+              className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain" 
+              onError={(e) => {
+                console.error('Header logo failed to load:', logoUrl);
+                e.currentTarget.style.display = 'none';
+              }}
+              onLoad={() => console.log('Header logo loaded:', logoUrl)}
+            />
           ) : (
             <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
               {user?.name?.charAt(0).toUpperCase() || 'S'}

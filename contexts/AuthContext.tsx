@@ -106,11 +106,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
         localStorage.setItem('auth', JSON.stringify(userData));
         const sessionPayload = { ...(data.data || data || {}), ...(data.academicTerms ? { academicTerms: data.academicTerms } : {}), ...(data.academicYears ? { academicYears: data.academicYears } : {}) };
+        console.log('AuthContext sessionPayload before logo transform:', sessionPayload);
         if (sessionPayload.logo) {
           (sessionPayload as Record<string, unknown>).logo = `${(sessionPayload as Record<string, unknown>).host_name || ''}/admin_dep/images/${sessionPayload.logo}`;
         }
+        console.log('AuthContext sessionPayload after logo transform:', sessionPayload);
         localStorage.setItem('userData', JSON.stringify(sessionPayload));
-        console.log('Session Data on Save:', sessionPayload);
+        console.log('AuthContext saved to localStorage:', localStorage.getItem('userData'));
         setAcademicTerms(Array.isArray(data.academicTerms) ? data.academicTerms : []);
         setAcademicYears(Array.isArray(data.academicYears) ? data.academicYears : []);
         return true;
