@@ -1,5 +1,6 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -200,7 +201,7 @@ export default function RightFloatingToolbar({ isChatbotOpen }: { isChatbotOpen:
     return null;
   }
 
-  return (
+  const toolbar = (
     <div
       ref={containerRef}
       className="pointer-events-none fixed bottom-4 right-3 z-[70] flex items-end md:bottom-auto md:right-4 md:top-1/2 md:-translate-y-1/2 md:items-center"
@@ -264,4 +265,10 @@ export default function RightFloatingToolbar({ isChatbotOpen }: { isChatbotOpen:
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') {
+    return toolbar;
+  }
+
+  return createPortal(toolbar, document.body);
 }

@@ -18,7 +18,7 @@ interface Level3SubheaderProps {
 
 export default function Level3Subheader({ items, parentLabel, masterItems = [] }: Level3SubheaderProps) {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = (usePathname() || '').toLowerCase();
   const [showMasterDropdown, setShowMasterDropdown] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -127,7 +127,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [] }
             onScroll={checkScrollability}
           >
             {items.map((item, idx) => {
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href.toLowerCase();
               return (
                 <button
                   key={idx}
