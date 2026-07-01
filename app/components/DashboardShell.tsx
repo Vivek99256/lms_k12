@@ -99,7 +99,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             {children}
           </main>
           {isChatbotOpen && (
-            <div className="w-[15%] min-w-[320px] overflow-hidden">
+            <div className="w-[15%] min-w-[320px] overflow-hidden mt-[10px]">
               <ChatbotPanel onToggleChatbot={toggleChatbot} />
             </div>
           )}

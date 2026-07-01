@@ -15,6 +15,8 @@ interface AuthContextType {
     user_profile_id: number;
     client_id: number;
   } | null;
+  academicTerms: Array<Record<string, unknown>>;
+  academicYears: Array<Record<string, unknown>>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -44,6 +46,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (stored) return JSON.parse(stored);
     } catch {}
     return null;
+  });
+
+  const [academicTerms, setAcademicTerms] = useState<Array<Record<string, unknown>>>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('userData');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed.academicTerms)) return parsed.academicTerms;
+      }
+    } catch {}
+    return [];
+  });
+
+  const [academicYears, setAcademicYears] = useState<Array<Record<string, unknown>>>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('userData');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed.academicYears)) return parsed.academicYears;
+      }
+    } catch {}
+    return [];
   });
 
   const login = useCallback(async (email: string, password: string) => {
@@ -79,7 +105,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData);
         setIsAuthenticated(true);
         localStorage.setItem('auth', JSON.stringify(userData));
-        localStorage.setItem('userData', JSON.stringify(data.data || {}));
+        const sessionPayload = { ...(data.data || data || {}), ...(data.academicTerms ? { academicTerms: data.academicTerms } : {}), ...(data.academicYears ? { academicYears: data.academicYears } : {}) };
+        if (sessionPayload.logo) {
+          (sessionPayload as Record<string, unknown>).logo = `${(sessionPayload as Record<string, unknown>).host_name || ''}/admin_dep/images/${sessionPayload.logo}`;
+        }
+        localStorage.setItem('userData', JSON.stringify(sessionPayload));
+        console.log('Session Data on Save:', sessionPayload);
+        setAcademicTerms(Array.isArray(data.academicTerms) ? data.academicTerms : []);
+        setAcademicYears(Array.isArray(data.academicYears) ? data.academicYears : []);
         return true;
       }
       return false;
@@ -92,12 +125,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(false);
     setUser(null);
     setMenuContext(null);
+    setAcademicTerms([]);
+    setAcademicYears([]);
     localStorage.removeItem('auth');
     localStorage.removeItem('menuContext');
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, menuContext }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, menuContext, academicTerms, academicYears }}>
       {children}
     </AuthContext.Provider>
   );
@@ -112,6 +147,8 @@ export function useAuth() {
       login: async () => false,
       logout: () => {},
       menuContext: null,
+      academicTerms: [],
+      academicYears: [],
     };
   }
   return context;
