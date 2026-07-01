@@ -103,16 +103,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               <ChatbotPanel onToggleChatbot={toggleChatbot} />
             </div>
           )}
-          <div
-            className={`min-h-0 overflow-hidden transition-[width,opacity] duration-500 ease-in-out ${
-              isChatbotOpen
-                ? 'w-full lg:w-[clamp(320px,24vw,440px)] opacity-100'
-                : 'w-0 opacity-0 pointer-events-none'
-            }`}
-            aria-hidden={!isChatbotOpen}
-          >
-            <ChatbotPanel onToggleChatbot={toggleChatbot} />
-          </div>
         </div>
       </div>
     </div>
