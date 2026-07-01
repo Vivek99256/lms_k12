@@ -400,7 +400,7 @@ export default function AdmissionConfirmationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
+    <div className="min-h-screen ">
       <div className="mx-auto max-w-[1600px] space-y-6 p-4 md:p-6 lg:p-8">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

@@ -85,16 +85,15 @@ export default function AdmissionEnquiryPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-6 mt-[10px]">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-gray-200/60 bg-white/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <div className="h-1.5 bg-gradient-to-r from-[#0D6EFD] via-blue-500 to-[#7ED957]" />
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-6 mt-[10px] ml-[15px] mt-[-15px]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px]">
 
         <Card className="flex min-h-0 flex-1 flex-col overflow-hidden border-0 bg-transparent shadow-none">
           <CardHeader className="shrink-0 bg-gradient-to-br from-gray-50/80 to-white pb-6 pt-6">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-1 rounded-full bg-gradient-to-b from-[#0D6EFD] to-[#7ED957]" />
-                <h1 className="text-2xl font-bold tracking-tight text-gray-900">Admission Enquiry</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900">Admission Inquiry</h1>
               </div>
               <p className="ml-3 text-sm text-gray-500">
                 Fill in the details below to submit a new admission enquiry.
