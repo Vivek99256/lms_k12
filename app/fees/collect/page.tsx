@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Banknote, Filter, Loader2, Phone, Search, UserRound, GraduationCap, BookOpen, Users } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { Banknote, Filter, Loader2, Phone, Search, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,22 +37,6 @@ type StudentFeeRow = {
   standard: string;
   section: string;
   pendingFees: number;
-};
-
-type FeesListResponse = {
-  standards?: unknown[];
-  divisions?: unknown[];
-  sections?: unknown[];
-  levels?: unknown[];
-  students?: unknown[];
-  data?: {
-    standards?: unknown[];
-    divisions?: unknown[];
-    sections?: unknown[];
-    levels?: unknown[];
-    students?: unknown[];
-  };
-  message?: string;
 };
 
 const currencyFormatter = new Intl.NumberFormat('en-IN', {
@@ -130,21 +115,25 @@ export default function FeesCollectPage() {
       }
 
       try {
-        const form = new FormData();
-        form.append('sub_institute_id', subInstituteId);
-        form.append('user_token', token);
-        form.append('type', 'API');
+        const form = new URLSearchParams();
+        form.append('sub_institute_id', String(subInstituteId));
+        form.append('token', String(token));
 
         const res = await fetch(`${hostName.replace(/\/$/, '')}/get_adminAcademicSection`, {
           method: 'POST',
-          body: form,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: form.toString(),
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load academic sections`);
 
         const payload = await res.json();
         const source = payload.data ?? payload;
-        const fetchedLevels = toOptions(source.levels ?? source.sections ?? source.standards);
+        const items = Array.isArray(source) ? source : (source.levels ?? source.sections ?? source.standards ?? []);
+        const fetchedLevels = toOptions(items);
 
         if (!cancelled) {
           setLevels(fetchedLevels.length > 0 ? fetchedLevels : dummyLevels);
@@ -163,6 +152,144 @@ export default function FeesCollectPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchStandards = async () => {
+      if (!level) {
+        setStandards([]);
+        setStandard('');
+        return;
+      }
+
+      let token = '';
+      let subInstituteId = '';
+      let hostName = '';
+
+      if (typeof window !== 'undefined') {
+        try {
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+          const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+
+          token = readString(userData.user_token ?? userData.token);
+          subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
+          hostName = readString(userData.host_name);
+        } catch {}
+      }
+
+      if (!hostName || !token || !subInstituteId) {
+        setStandards([]);
+        return;
+      }
+
+      try {
+        const form = new URLSearchParams();
+        form.append('sub_institute_id', String(subInstituteId));
+        form.append('grade_id', String(level));
+        form.append('token', String(token));
+
+        const res = await fetch(`${hostName.replace(/\/$/, '')}/get_adminStandard`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: form.toString(),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load standards`);
+
+        const payload = await res.json();
+        const source = payload.data ?? payload;
+        const items = Array.isArray(source) ? source : [];
+        const fetchedStandards = toOptions(items);
+
+        if (!cancelled) {
+          setStandards(fetchedStandards.length > 0 ? fetchedStandards : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setStandards([]);
+        }
+      }
+    };
+
+    fetchStandards();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [level]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchDivisions = async () => {
+      if (!standard) {
+        setDivisions([]);
+        setDivision('');
+        return;
+      }
+
+      let token = '';
+      let subInstituteId = '';
+      let hostName = '';
+
+      if (typeof window !== 'undefined') {
+        try {
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+          const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+
+          token = readString(userData.user_token ?? userData.token);
+          subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
+          hostName = readString(userData.host_name);
+        } catch {}
+      }
+
+      if (!hostName || !token || !subInstituteId) {
+        setDivisions([]);
+        return;
+      }
+
+      try {
+        const form = new URLSearchParams();
+        form.append('sub_institute_id', String(subInstituteId));
+        form.append('standard_id', String(standard));
+        form.append('token', String(token));
+
+        const res = await fetch(`${hostName.replace(/\/$/, '')}/get_adminDivision`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: form.toString(),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load divisions`);
+
+        const payload = await res.json();
+        const source = payload.data ?? payload;
+        const items = Array.isArray(source) ? source : [];
+        const fetchedDivisions = toOptions(items);
+
+        if (!cancelled) {
+          setDivisions(fetchedDivisions.length > 0 ? fetchedDivisions : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setDivisions([]);
+        }
+      }
+    };
+
+    fetchDivisions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [standard]);
 
   const loadDummyStudents = useCallback((isSearch = false) => {
     const queryName = studentName.trim().toLowerCase();
@@ -195,38 +322,56 @@ export default function FeesCollectPage() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/fees/collect/students`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
-        },
-          body: JSON.stringify({
-            type: 'API',
-            sub_institute_id: session.subInstituteId,
-            academic_year_id: session.academicYearId,
-            user_id: session.userId,
-            standard_id: standard,
-            division_id: division,
-            level_id: level,
-            student_name: studentName,
-            gr_no: grNo,
-            mobile,
-            include_inactive: includeInactive ? 1 : 0,
-          }),
-      });
+      let token = '';
+      let subInstituteId = '';
+      let hostName = '';
 
-      const payload = (await response.json()) as FeesListResponse;
+      if (typeof window !== 'undefined') {
+        try {
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+          const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
 
-      if (!response.ok) {
-        throw new Error(payload.message || 'Unable to load student fees list.');
+          token = readString(userData.user_token ?? userData.token);
+          subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
+          hostName = readString(userData.host_name);
+        } catch {}
       }
 
+      const academicYearId = readString(localStorage.getItem('selectedAcademicYear') || session.academicYearId);
+
+      if (!hostName || !token || !subInstituteId) {
+        setError('Showing dummy data because session data is missing.');
+        loadDummyStudents(isSearch);
+        return;
+      }
+
+      const form = new URLSearchParams();
+      form.append('sub_institute_id', String(subInstituteId));
+      form.append('syear', String(academicYearId));
+      form.append('grade', String(level));
+      form.append('standard', String(standard));
+      form.append('division', String(division));
+      form.append('type', 'API');
+
+      const res = await fetch(`${hostName.replace(/\/$/, '')}/fees/fees_collect/show_student`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: form.toString(),
+      });
+
+      if (!res.ok) {
+        const errorPayload = await res.json().catch(() => ({}));
+        throw new Error((errorPayload as Record<string, unknown>).message ? String(errorPayload.message) : `HTTP ${res.status}: Unable to load students`);
+      }
+
+      const payload = await res.json();
       const source = payload.data ?? payload;
-      setStandards(toOptions(source.standards));
-      setDivisions(toOptions(source.divisions ?? source.sections));
-      setLevels(toOptions(source.levels));
-      setStudents(toStudentRows(source.students));
+      const items = Array.isArray(source) ? source : (source.stu_data ?? source.students ?? []);
+
+      setStudents(toStudentRows(items));
       setSearched(isSearch);
     } catch (fetchError) {
       const message = fetchError instanceof Error ? fetchError.message : 'Unable to load student fees list.';
@@ -235,7 +380,7 @@ export default function FeesCollectPage() {
     } finally {
       setLoading(false);
     }
-  }, [division, grNo, includeInactive, level, loadDummyStudents, mobile, session, standard, studentName]);
+  }, [division, level, loadDummyStudents, session, standard]);
 
   const totalPending = students.reduce((total, student) => total + student.pendingFees, 0);
 
@@ -277,6 +422,16 @@ export default function FeesCollectPage() {
                 <Select value={level} onValueChange={(value) => setLevel(value ?? '')}>
                   <SelectTrigger variant="soft">
                     <SelectValue placeholder="Select section" />
+              <Field label="Search Section">
+                <Select value={level} onValueChange={(value) => { setLevel(value ?? ''); setStandard(''); setDivision(''); }}>
+                  <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
+                    <SelectValue placeholder="Select section">
+                      {(selectedValue) => {
+                        if (!selectedValue) return 'Select section';
+                        const option = levels.find((l) => l.id === selectedValue);
+                        return option?.label ?? selectedValue;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {levels.map((item) => (
@@ -290,6 +445,16 @@ export default function FeesCollectPage() {
                 <Select value={standard} onValueChange={(value) => setStandard(value ?? '')}>
                   <SelectTrigger variant="soft">
                     <SelectValue placeholder="Select standard" />
+              <Field label="Search Standard">
+                <Select value={standard} onValueChange={(value) => { setStandard(value ?? ''); setDivision(''); }}>
+                  <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
+                    <SelectValue placeholder="Select standard">
+                      {(selectedValue) => {
+                        if (!selectedValue) return 'Select standard';
+                        const option = standards.find((s) => s.id === selectedValue);
+                        return option?.label ?? selectedValue;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {standards.map((item) => (
@@ -303,6 +468,14 @@ export default function FeesCollectPage() {
                 <Select value={division} onValueChange={(value) => setDivision(value ?? '')}>
                   <SelectTrigger variant="soft">
                     <SelectValue placeholder="Select division" />
+                  <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
+                    <SelectValue placeholder="Select division">
+                      {(selectedValue) => {
+                        if (!selectedValue) return 'Select division';
+                        const option = divisions.find((d) => d.id === selectedValue);
+                        return option?.label ?? selectedValue;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {divisions.map((item) => (
@@ -449,7 +622,7 @@ function getSessionContext(): SessionContext {
       token: readString(userData.user_token ?? userData.token),
       subInstituteId: readString(userData.sub_institute_id ?? menuContext.sub_institute_id),
       userId: readString(userData.user_id ?? menuContext.user_id),
-      academicYearId: readString(userData.academic_year_id ?? userData.academicYearId),
+      academicYearId: readString(localStorage.getItem('selectedAcademicYear') || (userData.academic_year_id ?? userData.academicYearId)),
       hostName: readString(userData.host_name),
     };
   } catch {
@@ -473,13 +646,17 @@ function toStudentRows(items: unknown): StudentFeeRow[] {
 
   return items.map((item) => {
     const record = asRecord(item);
+    const firstName = readString(record.first_name);
+    const middleName = readString(record.middle_name);
+    const lastName = readString(record.last_name);
+    const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
     return {
       id: readString(record.id ?? record.student_id ?? record.studentId ?? record.unique_id),
-      name: readString(record.student_name ?? record.name ?? record.full_name),
-      grNo: readString(record.gr_no ?? record.grNo ?? record.gr_number),
+      name: readString(record.student_name ?? record.name ?? record.full_name ?? fullName),
+      grNo: readString(record.gr_no ?? record.grNo ?? record.gr_number ?? record.enrollment_no),
       standard: readString(record.standard ?? record.standard_name ?? record.class_name),
       section: readString(record.section ?? record.section_name ?? record.division ?? record.division_name),
-      pendingFees: readNumber(record.pending_fees ?? record.pendingFees ?? record.remaining ?? record.balance),
+      pendingFees: readNumber(record.pending_fees ?? record.pendingFees ?? record.remaining ?? record.balance ?? record.bkoff),
     };
   }).filter((student) => student.id);
 }
