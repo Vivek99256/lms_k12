@@ -1,0 +1,36 @@
+<!-- @dsCard group="Brand" viewport="700x200" name="Logo & wordmark" subtitle="Primary lockup, monogram, and reversed on brand" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-default); font-family: var(--font-sans); }
+  .row { display: flex; align-items: center; gap: 40px; flex-wrap: wrap; }
+  .lockup { display: inline-flex; align-items: center; gap: 12px; }
+  .wm { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--content-primary); }
+  .wm em { font-style: normal; color: var(--action-primary); }
+  .onbrand { display: inline-flex; align-items: center; gap: 12px; padding: 16px 20px; background: var(--action-primary); border-radius: 12px; }
+  .onbrand .wm { color: #fff; }
+  .onbrand .wm em { color: var(--color-brand-200); }
+  .cap { font-size: 11px; color: var(--content-tertiary); margin-top: 8px; font-family: var(--font-mono); }
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+  <div class="row">
+    <div>
+      <div class="lockup"><img src="../assets/logo.svg" width="40" height="40" alt="" /><span class="wm">Edu<em>ERP</em></span></div>
+      <div class="cap">Primary lockup</div>
+    </div>
+    <div>
+      <img src="../assets/logo.svg" width="48" height="48" alt="EduERP monogram" />
+      <div class="cap">Monogram</div>
+    </div>
+    <div>
+      <div class="onbrand"><img src="../assets/logo.svg" width="32" height="32" alt="" style="background:#fff;border-radius:8px;padding:2px" /><span class="wm">Edu<em>ERP</em></span></div>
+      <div class="cap">On brand</div>
+    </div>
+  </div>
+  <p style="font-size:12px;color:var(--content-tertiary);margin-top:20px;max-width:60ch">Placeholder mark — no logo file was supplied with the source spec. The graduation-cap glyph is from Lucide (ISC). Replace <code>assets/logo.svg</code> with the institution's official logo.</p>
+</body>
+</html>

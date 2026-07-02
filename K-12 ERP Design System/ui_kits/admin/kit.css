@@ -1,0 +1,102 @@
+/* Layout-only CSS for the Admin UI kit shell. All colors/spacing via DS tokens. */
+.kit-app {
+  position: relative;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--surface-canvas);
+  color: var(--content-primary);
+  font-family: var(--font-sans);
+}
+.kit-sidebar { flex-shrink: 0; height: 100%; }
+.kit-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.kit-content { flex: 1; overflow-y: auto; overscroll-behavior: contain; container-type: inline-size; }
+
+/* Command-palette trigger (fake search box that opens Cmd+K) */
+.kit-cmdk-trigger {
+  display: flex; align-items: center; gap: 10px; flex: 1; max-width: var(--field-max-md);
+  height: 38px; padding: 0 8px 0 12px;
+  background: var(--surface-default); border: 1px solid var(--border-default); border-radius: var(--radius-control);
+  color: var(--content-tertiary); font-family: var(--font-sans); font-size: var(--text-body-sm-size); cursor: text;
+  transition: border-color var(--motion-micro-duration) var(--motion-micro-ease), box-shadow var(--motion-micro-duration) var(--motion-micro-ease);
+}
+.kit-cmdk-trigger:hover { border-color: var(--border-strong); box-shadow: var(--shadow-xs); }
+.kit-cmdk-trigger__label { flex: 1; text-align: left; }
+.kit-cmdk-trigger kbd { font-family: var(--font-mono); font-size: 11px; color: var(--content-secondary); background: var(--surface-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1px 6px; }
+
+/* Module sub-nav bar wrapper (pinned above the scrolling content) */
+.kit-modulebar-wrap { flex-shrink: 0; padding: 12px 24px 0; background: var(--surface-canvas); }
+
+/* Collapsed assistant rail — an in-flow strip flush to the right edge. Being in
+   flow (not absolutely positioned) it reserves its own width, so it never hovers
+   over table rows, action menus or pagination. */
+.kit-railcol {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding-inline: 8px;
+  background: var(--surface-default);
+  border-inline-start: var(--border-width-thin) solid var(--border-subtle);
+}
+.kit-railcol .ds-assist-rail { border: 0; box-shadow: none; background: transparent; padding: 0; gap: 2px; }
+
+/* Brand */
+.kit-brand { display: flex; align-items: center; gap: 10px; padding: 4px; }
+.ds-sidebar.is-collapsed .kit-brand { justify-content: center; gap: 0; padding: 4px 0; }
+.ds-sidebar.is-collapsed .kit-side-foot { justify-content: center; }
+.kit-brand__wm { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; color: var(--content-primary); }
+.kit-brand__wm em { font-style: normal; color: var(--action-primary); }
+
+.kit-side-foot { display: flex; align-items: center; gap: 10px; padding: 4px; }
+.kit-side-foot__name { font-size: var(--text-body-sm-size); font-weight: 500; color: var(--content-primary); }
+.kit-side-foot__role { font-size: var(--text-caption-size); color: var(--content-tertiary); }
+
+.kit-ctx { font-weight: 600; color: var(--content-primary); font-size: var(--text-body-sm-size); }
+.kit-bell { position: relative; display: inline-flex; }
+.kit-bell__dot { position: absolute; top: 6px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--feedback-error-solid); border: 1.5px solid var(--surface-default); }
+.kit-pop-head { padding: 10px 14px; font-weight: 600; font-size: var(--text-body-sm-size); border-bottom: 1px solid var(--border-subtle); }
+
+/* Page scaffold */
+.kit-page { max-width: 1280px; margin: 0 auto; padding: 24px 32px 48px; display: flex; flex-direction: column; gap: 20px; }
+.kit-pagehead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.kit-subtitle { font-size: var(--text-body-sm-size); color: var(--content-secondary); margin: 4px 0 0; }
+
+.kit-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.kit-kpis--3 { grid-template-columns: repeat(3, 1fr); }
+.kit-grid-2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; }
+.kit-grid-detail { display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+.kit-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.kit-grid-2 > *, .kit-grid-detail > * { min-width: 0; }
+.kit-card-wrap { }
+.kit-toolbar { }
+
+.kit-detailhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.kit-detailhead__id { display: flex; align-items: center; gap: 16px; }
+
+/* Quick actions */
+.kit-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.kit-quick__btn { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--surface-default); border: 1px solid var(--border-subtle); border-radius: var(--radius-surface); font: 500 var(--text-body-sm-size)/1.2 var(--font-sans); color: var(--content-primary); cursor: pointer; text-align: left; transition: background-color 100ms, border-color 100ms; }
+.kit-quick__btn:hover { background: var(--surface-hover); border-color: var(--border-default); }
+.kit-quick__ic { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-control); flex-shrink: 0; }
+
+/* Content reflows to the ACTUAL content width (container query) so the middle
+   stays responsive when the assistant dock is open, not just at small viewports. */
+@container (max-width: 1100px) {
+  .kit-kpis, .kit-kpis--3 { grid-template-columns: repeat(2, 1fr); }
+  .kit-grid-2, .kit-grid-detail { grid-template-columns: 1fr; }
+}
+@container (max-width: 720px) {
+  .kit-kpis, .kit-kpis--3 { grid-template-columns: 1fr; }
+  .kit-quick { grid-template-columns: 1fr; }
+  .kit-page { padding: 20px 16px 40px; }
+}
+
+/* Top bar collapses gracefully so it never overflows when the dock is open on a
+   narrower screen: search folds to an icon, the tenant/context label hides. */
+@media (max-width: 1240px) {
+  .kit-cmdk-trigger { flex: 0 0 auto; max-width: none; padding: 0; width: 38px; justify-content: center; }
+  .kit-cmdk-trigger__label, .kit-cmdk-trigger kbd { display: none; }
+}
+@media (max-width: 1080px) {
+  .kit-ctx { display: none; }
+  .kit-app .ds-assist { width: 320px; }
+}

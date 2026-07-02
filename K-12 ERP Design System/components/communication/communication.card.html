@@ -1,0 +1,39 @@
+<!-- @dsCard group="Components" viewport="700x360" name="Communication" subtitle="NotificationItem, CommentThread" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .lbl { width: 100%; font: 600 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--content-tertiary); margin-bottom: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div id="root"></div>
+<script type="text/babel">
+const { NotificationItem, CommentThread } = window.EduERPDesignSystem_d63b75;
+
+function Demo(){
+  return (<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+    <div style={{border:"1px solid var(--border-subtle)",borderRadius:8,overflow:"hidden"}}>
+      <NotificationItem type="fee" unread title="Fee payment received" body="₹12,500 from Meera Sharma." timestamp="10m ago" onOpen={()=>{}} onDismiss={()=>{}} />
+      <NotificationItem type="admission" unread title="New admission enquiry" body="Grade 9 · via website" timestamp="1h ago" onOpen={()=>{}} onDismiss={()=>{}} />
+      <NotificationItem type="transport" title="Route 4 delayed" body="Bus running 15 min late." timestamp="Yesterday" onOpen={()=>{}} />
+    </div>
+    <CommentThread onSubmit={()=>{}} comments={[{id:"1",author:"Rahul K.",body:"Documents verified. Proceeding to approval.",timestamp:"2h ago"},{id:"2",author:"Meera S.",body:"Thank you!",timestamp:"1h ago"}]} />
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

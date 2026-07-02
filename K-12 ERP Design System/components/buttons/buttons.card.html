@@ -1,0 +1,58 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Buttons" subtitle="Button, IconButton, ButtonGroup, SplitButton — variants, sizes, states" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .lbl { width: 100%; font: var(--font-weight-semibold) 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--content-tertiary); margin-bottom: 2px; }
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div id="root"></div>
+<script type="text/babel">
+const { Button, IconButton, ButtonGroup, SplitButton } = window.EduERPDesignSystem_d63b75;
+function Demo() {
+  return (
+    <div>
+      <div className="row"><span className="lbl">Variants</span>
+        <Button variant="primary" iconStart="plus">Add student</Button>
+        <Button variant="secondary">Secondary</Button>
+        <Button variant="tertiary">Tertiary</Button>
+        <Button variant="danger" iconStart="trash-2">Delete</Button>
+        <Button variant="ghost" iconStart="filter">Filter</Button>
+        <Button variant="link">Learn more</Button>
+      </div>
+      <div className="row"><span className="lbl">Sizes &amp; states</span>
+        <Button variant="primary" size="sm">Small</Button>
+        <Button variant="primary" size="md">Medium</Button>
+        <Button variant="primary" size="lg">Large</Button>
+        <Button variant="primary" loading>Saving…</Button>
+        <Button variant="primary" disabled>Disabled</Button>
+      </div>
+      <div className="row"><span className="lbl">Icon buttons · groups · split</span>
+        <IconButton icon="pencil" label="Edit" />
+        <IconButton icon="trash-2" label="Delete" variant="danger" />
+        <IconButton icon="more-vertical" label="More" variant="ghost" />
+        <ButtonGroup variant="attached" label="View">
+          <IconButton icon="list" label="List" />
+          <IconButton icon="grid-3x3" label="Grid" />
+          <IconButton icon="rows-3" label="Board" />
+        </ButtonGroup>
+        <SplitButton onClick={()=>{}} items={[{label:"Export PDF",icon:"file-text"},{label:"Export Excel",icon:"table"}]}>Export</SplitButton>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

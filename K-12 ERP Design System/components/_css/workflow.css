@@ -1,0 +1,73 @@
+/* =============================================================================
+   COMPONENT CSS — Workflow group (ApprovalCard, TimelineItem, ActivityFeed,
+   AuditEntry)
+   ============================================================================= */
+
+/* ---- ApprovalCard ---- */
+.ds-approval {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  padding: var(--inset-md);
+  background: var(--surface-default);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-surface);
+}
+.ds-approval__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.ds-approval__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.ds-approval__who { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.ds-approval__title { font-size: var(--text-body-sm-size); font-weight: var(--font-weight-semibold); color: var(--content-primary); }
+.ds-approval__sub { font-size: var(--text-caption-size); color: var(--content-secondary); }
+.ds-approval__meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin: 0; }
+.ds-approval__meta div { display: flex; flex-direction: column; gap: 1px; }
+.ds-approval__meta dt { font-size: var(--font-size-2xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); color: var(--content-tertiary); }
+.ds-approval__meta dd { margin: 0; font-size: var(--text-body-sm-size); color: var(--content-primary); font-weight: var(--font-weight-medium); }
+.ds-approval__actions { display: flex; align-items: center; gap: var(--inline-sm); flex-shrink: 0; }
+
+/* ---- Timeline ---- */
+.ds-timeline { list-style: none; margin: 0; padding: 0; }
+.ds-timeline-item { position: relative; display: flex; gap: var(--space-3); padding-bottom: var(--space-5); }
+.ds-timeline-item::before {
+  content: ""; position: absolute; inset-block-start: 22px; inset-block-end: 0; inset-inline-start: 10px;
+  width: 2px; background: var(--border-subtle);
+}
+.ds-timeline-item.is-last { padding-bottom: 0; }
+.ds-timeline-item.is-last::before { display: none; }
+.ds-timeline-item__marker {
+  position: relative; z-index: 1; flex-shrink: 0;
+  width: 22px; height: 22px; border-radius: var(--radius-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-subtle); color: var(--content-tertiary);
+  border: 2px solid var(--surface-default);
+}
+.ds-timeline-item.is-success .ds-timeline-item__marker { background: var(--feedback-success-surface); color: var(--feedback-success-content); }
+.ds-timeline-item.is-warning .ds-timeline-item__marker { background: var(--feedback-warning-surface); color: var(--feedback-warning-content); }
+.ds-timeline-item.is-error .ds-timeline-item__marker { background: var(--feedback-error-surface); color: var(--feedback-error-content); }
+.ds-timeline-item.is-info .ds-timeline-item__marker { background: var(--feedback-info-surface); color: var(--feedback-info-content); }
+.ds-timeline-item__content { flex: 1; min-width: 0; padding-top: 1px; }
+.ds-timeline-item__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.ds-timeline-item__title { font-size: var(--text-body-sm-size); font-weight: var(--font-weight-medium); color: var(--content-primary); }
+.ds-timeline-item__time { font-size: var(--text-caption-size); color: var(--content-tertiary); white-space: nowrap; }
+.ds-timeline-item__actor { font-size: var(--text-caption-size); color: var(--content-secondary); }
+.ds-timeline-item__body { margin-top: var(--space-1); font-size: var(--text-body-sm-size); color: var(--content-secondary); }
+
+/* ---- ActivityFeed ---- */
+.ds-activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ds-activity__item { display: flex; gap: var(--space-3); padding: var(--space-2-5) 0; border-bottom: var(--border-width-thin) solid var(--border-subtle); }
+.ds-activity__item:last-child { border-bottom: 0; }
+.ds-activity__content { min-width: 0; }
+.ds-activity__text { font-size: var(--text-body-sm-size); color: var(--content-secondary); }
+.ds-activity__actor { font-weight: var(--font-weight-semibold); color: var(--content-primary); }
+.ds-activity__target { font-weight: var(--font-weight-medium); color: var(--action-content); }
+.ds-activity__time { font-size: var(--text-caption-size); color: var(--content-tertiary); }
+
+/* ---- AuditEntry ---- */
+.ds-audit { border-bottom: var(--border-width-thin) solid var(--border-subtle); font-variant-numeric: tabular-nums; }
+.ds-audit__row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2-5) var(--space-1); font-size: var(--text-body-sm-size); }
+.ds-audit__row[role="button"] { cursor: pointer; }
+.ds-audit__caret { color: var(--content-tertiary); }
+.ds-audit__actor { font-weight: var(--font-weight-medium); color: var(--content-primary); }
+.ds-audit__target { color: var(--content-secondary); }
+.ds-audit__time { margin-inline-start: auto; font-size: var(--text-caption-size); color: var(--content-tertiary); white-space: nowrap; }
+.ds-audit__detail { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin: 0; padding: var(--space-2) var(--space-6) var(--space-3); background: var(--surface-subtle); }
+.ds-audit__detail div { display: flex; flex-direction: column; gap: 1px; }
+.ds-audit__detail dt { font-size: var(--font-size-2xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); color: var(--content-tertiary); }
+.ds-audit__detail dd { margin: 0; font-size: var(--text-caption-size); color: var(--content-primary); }

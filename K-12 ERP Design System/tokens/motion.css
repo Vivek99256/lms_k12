@@ -1,0 +1,55 @@
+/* =============================================================================
+   MOTION — durations, easing curves, semantic transition intents.
+   Consumers must honor prefers-reduced-motion (fall back to instant).
+   Source: 02_design_tokens.yaml
+   ============================================================================= */
+
+:root {
+  /* ---- Durations ---- */
+  --duration-instant: 0ms; /* @kind other */
+  --duration-fast: 100ms; /* @kind other */
+  --duration-quick: 150ms; /* @kind other */
+  --duration-normal: 200ms; /* @kind other */
+  --duration-moderate: 300ms; /* @kind other */
+  --duration-slow: 400ms; /* @kind other */
+  --duration-slower: 600ms; /* @kind other */
+
+  /* ---- Easing curves ---- */
+  --ease-linear: cubic-bezier(0, 0, 1, 1); /* @kind other */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1); /* @kind other */  /* default UI transitions */
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1); /* @kind other */  /* premium out-quint — hover/enter */
+  --ease-decelerate: cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */    /* entering elements — iOS deceleration */
+  --ease-accelerate: cubic-bezier(0.3, 0, 1, 1); /* @kind other */  /* exiting elements */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1); /* @kind other */  /* tactile press-release overshoot */
+  --ease-spring-soft: cubic-bezier(0.34, 1.2, 0.6, 1); /* @kind other */  /* gentle overshoot — toggles, cards */
+
+  /* ---- Press feedback (tactile scale on active) ---- */
+  --press-scale: 0.97; /* @kind other */      /* buttons, chips, menu items */
+  --press-scale-sm: 0.98; /* @kind other */   /* dense/small controls */
+  --press-scale-lg: 0.96; /* @kind other */   /* large tap targets, cards */
+
+  /* ---- Semantic intents (duration paired with easing) ---- */
+  --motion-micro-duration: var(--duration-quick); /* @kind other */      /* hover/press/focus */
+  --motion-micro-ease: var(--ease-emphasized); /* @kind other */
+  --motion-press-duration: var(--duration-fast); /* @kind other */       /* press-down (fast in) */
+  --motion-press-ease: var(--ease-standard); /* @kind other */
+  --motion-release-duration: var(--duration-moderate); /* @kind other */ /* spring-back on release */
+  --motion-release-ease: var(--ease-spring); /* @kind other */
+  --motion-enter-duration: var(--duration-normal); /* @kind other */    /* appearing */
+  --motion-enter-ease: var(--ease-decelerate); /* @kind other */
+  --motion-exit-duration: var(--duration-quick); /* @kind other */     /* leaving */
+  --motion-exit-ease: var(--ease-accelerate); /* @kind other */
+  --motion-overlay-duration: var(--duration-moderate); /* @kind other */  /* dialogs, drawers */
+  --motion-overlay-ease: var(--ease-emphasized); /* @kind other */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms; /* @kind other */
+    --duration-quick: 0ms; /* @kind other */
+    --duration-normal: 0ms; /* @kind other */
+    --duration-moderate: 0ms; /* @kind other */
+    --duration-slow: 0ms; /* @kind other */
+    --duration-slower: 0ms; /* @kind other */
+  }
+}

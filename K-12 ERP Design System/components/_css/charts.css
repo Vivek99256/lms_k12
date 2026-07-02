@@ -1,0 +1,33 @@
+/* =============================================================================
+   COMPONENT CSS — Charts group (Sparkline, Chart, ChartLegend, ChartTile)
+   ============================================================================= */
+
+.ds-sparkline { display: inline-block; vertical-align: middle; }
+
+.ds-chart { width: 100%; min-width: 0; }
+.ds-chart svg { display: block; width: 100%; max-width: 100%; height: auto; }
+.ds-chart--donut { display: flex; align-items: center; justify-content: center; }
+
+/* ---- ChartLegend ---- */
+.ds-chart-legend { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.ds-chart-legend--vertical { flex-direction: column; gap: var(--space-2); }
+.ds-chart-legend__item { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-caption-size); color: var(--content-secondary); }
+.ds-chart-legend__swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.ds-chart-legend__value { font-weight: var(--font-weight-semibold); color: var(--content-primary); font-variant-numeric: tabular-nums; }
+
+/* ---- ChartTile ---- */
+.ds-chart-tile {
+  display: flex; flex-direction: column; min-width: 0;
+  background: var(--surface-default);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-raised);
+  padding: var(--inset-md);
+}
+.ds-chart-tile__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.ds-chart-tile__titles { display: flex; flex-direction: column; gap: 1px; }
+.ds-chart-tile__title { font-size: var(--text-body-size); font-weight: var(--font-weight-semibold); color: var(--content-primary); }
+.ds-chart-tile__subtitle { font-size: var(--text-caption-size); color: var(--content-secondary); }
+.ds-chart-tile__actions { display: flex; align-items: center; gap: var(--inline-sm); flex-shrink: 0; }
+.ds-chart-tile__body { flex: 1; min-height: 0; }
+.ds-chart-tile__legend { margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--border-width-thin) solid var(--border-subtle); }

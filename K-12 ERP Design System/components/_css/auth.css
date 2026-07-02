@@ -1,0 +1,48 @@
+/* =============================================================================
+   COMPONENT CSS — Authentication group (AuthForm, OtpInput,
+   PasswordStrengthMeter)
+   ============================================================================= */
+
+/* ---- AuthForm ---- */
+.ds-auth {
+  display: flex; flex-direction: column; gap: var(--space-5);
+  width: 100%; max-width: 400px;
+  padding: var(--space-8);
+  background: var(--surface-default);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-raised);
+}
+.ds-auth__brand { display: flex; justify-content: center; }
+.ds-auth__head { text-align: center; display: flex; flex-direction: column; gap: var(--space-1); }
+.ds-auth__title { font-size: var(--text-h2-size); font-weight: var(--font-weight-semibold); color: var(--content-primary); }
+.ds-auth__subtitle { font-size: var(--text-body-sm-size); color: var(--content-secondary); }
+.ds-auth__fields { display: flex; flex-direction: column; gap: var(--space-4); }
+.ds-auth__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.ds-auth__link { font-size: var(--text-body-sm-size); color: var(--action-content); }
+.ds-auth__footer { text-align: center; font-size: var(--text-body-sm-size); color: var(--content-secondary); }
+
+/* ---- OtpInput ---- */
+.ds-otp { display: inline-flex; gap: var(--space-2); }
+.ds-otp__box {
+  width: 44px; height: 52px; text-align: center;
+  font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold);
+  color: var(--content-primary); font-variant-numeric: tabular-nums;
+  background: var(--surface-default);
+  border: var(--border-width-thin) solid var(--border-default);
+  border-radius: var(--radius-control);
+  outline: 0;
+}
+.ds-otp__box:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 22%, transparent); }
+
+/* ---- PasswordStrengthMeter ---- */
+.ds-pw-meter { display: flex; flex-direction: column; gap: var(--space-1); }
+.ds-pw-meter__bars { display: flex; gap: 4px; }
+.ds-pw-meter__bar { flex: 1; height: 4px; border-radius: var(--radius-full); background: var(--surface-active); transition: background-color var(--motion-micro-duration) var(--motion-micro-ease); }
+.ds-pw-meter__bar.is-vweak, .ds-pw-meter__bar.is-weak { background: var(--feedback-error-solid); }
+.ds-pw-meter__bar.is-fair { background: var(--feedback-warning-solid); }
+.ds-pw-meter__bar.is-good, .ds-pw-meter__bar.is-strong { background: var(--feedback-success-solid); }
+.ds-pw-meter__label { font-size: var(--text-caption-size); color: var(--content-tertiary); }
+.ds-pw-meter__label.is-vweak, .ds-pw-meter__label.is-weak { color: var(--feedback-error-content); }
+.ds-pw-meter__label.is-fair { color: var(--feedback-warning-content); }
+.ds-pw-meter__label.is-good, .ds-pw-meter__label.is-strong { color: var(--feedback-success-content); }

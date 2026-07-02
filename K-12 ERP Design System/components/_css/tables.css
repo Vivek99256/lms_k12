@@ -1,0 +1,62 @@
+/* =============================================================================
+   COMPONENT CSS — DataTable + shared skeleton primitive
+   ============================================================================= */
+
+.ds-table-wrap {
+  width: 100%;
+  overflow: auto;
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-surface);
+  background: var(--surface-default);
+}
+.ds-table { width: 100%; border-collapse: collapse; font-size: var(--text-body-sm-size); }
+.ds-table__cell {
+  padding: var(--row-inset-y) var(--space-4);
+  text-align: start;
+  vertical-align: middle;
+  height: var(--row-height);
+}
+.ds-table__cell--end { text-align: end; }
+.ds-table__cell--check { width: 44px; padding-inline: var(--space-3); }
+
+.ds-table thead th {
+  background: var(--surface-subtle);
+  color: var(--content-secondary);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-caption-size);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: var(--border-width-thin) solid var(--border-default);
+}
+.ds-table-wrap--sticky thead th { position: sticky; inset-block-start: 0; z-index: var(--z-raised); }
+.ds-table__th-inner { display: inline-flex; align-items: center; gap: var(--space-1); }
+.ds-table__th.is-sortable { cursor: pointer; user-select: none; }
+.ds-table__th.is-sortable:hover { color: var(--content-primary); }
+.ds-table__sort { color: var(--content-tertiary); }
+.ds-table__sort.is-active { color: var(--action-content); }
+
+.ds-table__row { border-bottom: var(--border-width-thin) solid var(--border-subtle); }
+.ds-table__row:last-child { border-bottom: 0; }
+.ds-table__row:nth-child(even) { background: color-mix(in srgb, var(--surface-subtle) 45%, transparent); }
+.ds-table__row.is-clickable { cursor: pointer; }
+.ds-table__row:hover { background: var(--surface-hover); }
+.ds-table__row.is-selected { background: var(--surface-selected); }
+.ds-table__cell { color: var(--content-primary); }
+
+.ds-table__empty { padding: var(--section-sm) var(--space-4); text-align: center; }
+.ds-table__empty-inner { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); color: var(--content-tertiary); }
+.ds-table__empty-title { font-size: var(--text-body-size); font-weight: var(--font-weight-semibold); color: var(--content-secondary); margin-top: var(--space-2); }
+.ds-table__empty-text { font-size: var(--text-body-sm-size); color: var(--content-tertiary); }
+
+/* ---- Skeleton (shared primitive, also used by Skeleton component) ---- */
+.ds-skel {
+  display: block;
+  background: linear-gradient(90deg, var(--surface-subtle) 25%, var(--surface-active) 37%, var(--surface-subtle) 63%);
+  background-size: 400% 100%;
+  border-radius: var(--radius-sm);
+  animation: ds-shimmer 1.4s ease infinite;
+}
+.ds-skel--text { height: 12px; border-radius: var(--radius-full); }
+@keyframes ds-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .ds-skel { animation: none; } }

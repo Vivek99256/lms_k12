@@ -1,0 +1,47 @@
+<!-- @dsCard group="Components" viewport="700x320" name="Cards" subtitle="Card, MetricCard, SectionPanel" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .lbl { width: 100%; font: 600 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--content-tertiary); margin-bottom: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div id="root"></div>
+<script type="text/babel">
+const { Card, MetricCard, SectionPanel, Button, DescriptionList } = window.EduERPDesignSystem_d63b75;
+
+function Demo(){
+  return (<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+    <MetricCard label="Students" value="1,284" icon="users" trend={{direction:"up",value:"+24",label:"this term"}} />
+    <MetricCard label="Fees collected" value="₹18.4L" icon="wallet" trend={{direction:"up",value:"+8.2%",label:"vs last month"}} />
+    <MetricCard label="Attendance" value="94.2%" icon="calendar-check" trend={{direction:"down",value:"-1.1%",label:"vs last week"}} />
+    <div style={{gridColumn:"1 / 3"}}>
+      <SectionPanel title="Guardian details" description="Primary contact" actions={<Button variant="tertiary" size="sm" iconStart="pencil">Edit</Button>}>
+        <DescriptionList columns={2} items={[{term:"Name",value:"Meera Sharma"},{term:"Relation",value:"Mother"},{term:"Phone",value:"+91 98••• •••21"},{term:"Email",value:"meera@example.com"}]} />
+      </SectionPanel>
+    </div>
+    <Card title="Quick actions">
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        <Button variant="secondary" fullWidth iconStart="user-plus">New admission</Button>
+        <Button variant="secondary" fullWidth iconStart="receipt">Collect fee</Button>
+      </div>
+    </Card>
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

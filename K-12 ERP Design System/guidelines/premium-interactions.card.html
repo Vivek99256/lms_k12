@@ -1,0 +1,113 @@
+<!-- @dsCard group="Motion" viewport="760x520" name="Premium Interactions" subtitle="Live: press-spring, hover-lift, toggle physics, focus & menu motion — hover and click to feel it" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="../styles.css" />
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); color: var(--content-primary); }
+  .board { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .panel {
+    background: var(--surface-default);
+    border: var(--border-width-thin) solid var(--border-subtle);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-raised);
+    padding: 16px;
+  }
+  .panel__title { display: flex; align-items: center; gap: 8px; font: var(--font-weight-semibold) 11px/1 var(--font-sans); letter-spacing: .07em; text-transform: uppercase; color: var(--content-tertiary); margin-bottom: 14px; }
+  .panel__title .k { margin-inline-start: auto; text-transform: none; letter-spacing: 0; font-weight: var(--font-weight-medium); color: var(--content-placeholder); font-size: 10px; }
+  .cluster { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .hint { display:flex; align-items:center; gap:8px; margin-bottom: 16px; font-size: var(--text-body-sm-size); color: var(--content-secondary); }
+  .hint b { color: var(--content-primary); font-weight: var(--font-weight-semibold); }
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div id="root"></div>
+<script type="text/babel">
+const NS = window.EduERPDesignSystem_d63b75;
+const { Button, IconButton, Toggle, Checkbox, RadioGroup, SegmentedControl, Card, MetricCard, TextField, Menu, ButtonGroup } = NS;
+
+function Panel({ title, k, children }) {
+  return (
+    <div className="panel">
+      <div className="panel__title"><span>{title}</span>{k && <span className="k">{k}</span>}</div>
+      {children}
+    </div>
+  );
+}
+
+function Demo() {
+  const [seg, setSeg] = React.useState("term");
+  return (
+    <div>
+      <div className="hint">
+        <span style={{color:"var(--action-content)"}}>◆</span>
+        <span><b>Hover</b> and <b>press</b> everything below — depth, spring-back, and lift now respond to touch. Motion honors <b>reduced-motion</b>.</span>
+      </div>
+      <div className="board">
+        <Panel title="Buttons" k="press = spring-back">
+          <div className="cluster">
+            <Button variant="primary" iconStart="plus">Add student</Button>
+            <Button variant="secondary">Secondary</Button>
+            <Button variant="danger" iconStart="trash-2">Delete</Button>
+          </div>
+          <div className="cluster" style={{ marginTop: 12 }}>
+            <ButtonGroup variant="attached" label="View">
+              <IconButton icon="list" label="List" />
+              <IconButton icon="grid-3x3" label="Grid" />
+              <IconButton icon="rows-3" label="Board" />
+            </ButtonGroup>
+            <Menu align="start" trigger={<Button variant="secondary" iconEnd="chevron-down">Actions</Button>}
+              items={[
+                { label: "Export PDF", icon: "file-text" },
+                { label: "Duplicate", icon: "copy" },
+                { divider: true },
+                { label: "Delete", icon: "trash-2", danger: true },
+              ]} />
+          </div>
+        </Panel>
+
+        <Panel title="Switches" k="thumb physics">
+          <div className="col">
+            <Toggle label="Email notifications" defaultChecked />
+            <Toggle label="SMS to parents" />
+            <div className="cluster" style={{ gap: 18 }}>
+              <Checkbox label="Selected" defaultChecked />
+              <Checkbox label="Mixed" indeterminate />
+            </div>
+            <RadioGroup label="" orientation="horizontal" defaultValue="m"
+              options={[{ value: "m", label: "Male" }, { value: "f", label: "Female" }, { value: "o", label: "Other" }]} />
+          </div>
+        </Panel>
+
+        <Panel title="Segmented & focus" k="tab · ring">
+          <div className="col">
+            <SegmentedControl value={seg} onChange={setSeg}
+              options={[{ value: "term", label: "Term" }, { value: "month", label: "Month" }, { value: "week", label: "Week" }]} />
+            <TextField label="Search students" placeholder="Name, roll no, class…" iconStart="search" />
+          </div>
+        </Panel>
+
+        <Panel title="Cards" k="hover = lift">
+          <div className="col">
+            <Card title="Grade 9 · Section A" variant="interactive" onClick={() => {}}>
+              <div style={{ fontSize: "var(--text-body-sm-size)", color: "var(--content-secondary)" }}>42 students · 94% attendance</div>
+            </Card>
+            <MetricCard label="Fees collected" value="₹18.4L" icon="wallet" trend={{ direction: "up", value: "+8.2%", label: "vs last month" }} />
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>
