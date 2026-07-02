@@ -1,0 +1,45 @@
+<!-- @dsCard group="Components" viewport="760x420" name="Navigation" subtitle="Breadcrumb, Tabs, Stepper, Pagination, Menu, TreeView" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .lbl { width: 100%; font: 600 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--content-tertiary); margin-bottom: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div id="root"></div>
+<script type="text/babel">
+const { Breadcrumb, Tabs, Stepper, Pagination, Menu, TreeView, IconButton } = window.EduERPDesignSystem_d63b75;
+
+function Demo(){
+  const [tab,setTab]=React.useState("overview");
+  const [page,setPage]=React.useState(3);
+  return (<div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <Breadcrumb items={[{label:"Students",href:"#"},{label:"Grade 9 - A",href:"#"},{label:"Aarav Sharma"}]} />
+    <Tabs activeId={tab} onChange={setTab} tabs={[{id:"overview",label:"Overview"},{id:"fees",label:"Fees",badge:2},{id:"attendance",label:"Attendance"},{id:"documents",label:"Documents"}]} />
+    <Stepper current={1} steps={[{label:"Enquiry"},{label:"Application",description:"Docs & fees"},{label:"Verification"},{label:"Confirmation"}]} />
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <TreeView activeId="grading" defaultExpanded={["academics"]} nodes={[{id:"academics",label:"Academics",icon:"book-open",children:[{id:"grading",label:"Grading scheme"},{id:"terms",label:"Terms & sessions"}]},{id:"fees",label:"Fees setup",icon:"wallet"}]} />
+      <div>
+        <Menu align="start" trigger={<IconButton icon="more-vertical" label="More actions" />} items={[{label:"View",icon:"eye"},{label:"Edit",icon:"pencil"},{divider:true},{label:"Delete",icon:"trash-2",danger:true}]} />
+      </div>
+    </div>
+    <Pagination page={page} pageCount={12} pageSize={25} total={287} onPageChange={setPage} onPageSizeChange={()=>{}} />
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

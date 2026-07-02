@@ -1,0 +1,91 @@
+/* =============================================================================
+   COMPONENT CSS — Uploads (FileUpload) + calendar/document display
+   (CalendarGrid, AgendaList, DocumentPreview). EventChip included here.
+   ============================================================================= */
+
+/* ---- FileUpload ---- */
+.ds-upload { display: flex; flex-direction: column; gap: var(--space-3); }
+.ds-upload__zone {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
+  padding: var(--space-8) var(--space-4); text-align: center;
+  background: var(--surface-sunken);
+  border: 1.5px dashed var(--border-default);
+  border-radius: var(--radius-surface);
+  cursor: pointer;
+  transition: border-color var(--motion-micro-duration) var(--motion-micro-ease), background-color var(--motion-micro-duration) var(--motion-micro-ease);
+}
+.ds-upload__zone:hover, .ds-upload__zone.is-drag { border-color: var(--action-primary); background: var(--surface-selected); }
+.ds-upload__icon { color: var(--content-tertiary); }
+.ds-upload__title { font-size: var(--text-body-sm-size); color: var(--content-secondary); }
+.ds-upload__link { color: var(--action-content); font-weight: var(--font-weight-medium); }
+.ds-upload__hint { font-size: var(--text-caption-size); color: var(--content-tertiary); }
+.ds-upload__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.ds-upload__file {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-thin) solid var(--border-subtle); border-radius: var(--radius-control);
+}
+.ds-upload__file-icon { color: var(--content-tertiary); flex-shrink: 0; }
+.ds-upload__file-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ds-upload__file-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.ds-upload__file-name { font-size: var(--text-body-sm-size); color: var(--content-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-upload__file-size { font-size: var(--text-caption-size); color: var(--content-tertiary); flex-shrink: 0; }
+.ds-upload__file-error { font-size: var(--text-caption-size); color: var(--feedback-error-content); }
+.ds-upload__ok { color: var(--feedback-success-content); flex-shrink: 0; }
+
+/* ---- EventChip ---- */
+.ds-event-chip {
+  display: flex; align-items: center; gap: var(--space-1-5);
+  width: 100%; padding: 2px 6px;
+  font-size: var(--font-size-2xs); font-family: var(--font-sans); text-align: start;
+  background: var(--surface-subtle); color: var(--content-primary);
+  border: 0; border-radius: var(--radius-sm);
+  border-inline-start: 2px solid var(--_accent, var(--action-primary));
+  white-space: nowrap; overflow: hidden;
+}
+.ds-event-chip.is-interactive { cursor: pointer; }
+.ds-event-chip.is-interactive:hover { background: var(--surface-hover); }
+.ds-event-chip.is-allday { color: #fff; border-inline-start: 0; }
+.ds-event-chip__dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.ds-event-chip__title { overflow: hidden; text-overflow: ellipsis; font-weight: var(--font-weight-medium); }
+.ds-event-chip__time { margin-inline-start: auto; color: var(--content-tertiary); font-variant-numeric: tabular-nums; }
+.ds-event-chip.is-allday .ds-event-chip__time { color: rgba(255,255,255,0.8); }
+
+/* ---- CalendarGrid ---- */
+.ds-calendar-grid { border: var(--border-width-thin) solid var(--border-subtle); border-radius: var(--radius-surface); overflow: hidden; background: var(--surface-default); }
+.ds-calendar-grid__dow { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--surface-subtle); border-bottom: var(--border-width-thin) solid var(--border-subtle); }
+.ds-calendar-grid__dowcell { padding: var(--space-2); text-align: center; font-size: var(--text-caption-size); font-weight: var(--font-weight-semibold); color: var(--content-secondary); }
+.ds-calendar-grid__body { display: grid; grid-template-columns: repeat(7, 1fr); }
+.ds-calendar-grid__cell {
+  min-height: 96px; padding: var(--space-1-5); display: flex; flex-direction: column; gap: var(--space-1);
+  border-inline-end: var(--border-width-hairline) solid var(--border-subtle);
+  border-block-end: var(--border-width-hairline) solid var(--border-subtle);
+}
+.ds-calendar-grid__cell:nth-child(7n) { border-inline-end: 0; }
+.ds-calendar-grid__cell.is-empty { background: var(--surface-subtle); }
+.ds-calendar-grid__cell[onclick], .ds-calendar-grid__cell:not(.is-empty) { cursor: pointer; }
+.ds-calendar-grid__cell:not(.is-empty):hover { background: var(--surface-hover); }
+.ds-calendar-grid__date { font-size: var(--text-caption-size); font-weight: var(--font-weight-medium); color: var(--content-secondary); align-self: flex-start; padding: 1px; }
+.ds-calendar-grid__cell.is-today .ds-calendar-grid__date { background: var(--action-primary); color: var(--content-on-brand); border-radius: var(--radius-full); min-width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; }
+.ds-calendar-grid__events { display: flex; flex-direction: column; gap: 2px; }
+.ds-calendar-grid__more { font-size: var(--font-size-2xs); color: var(--content-tertiary); padding-inline: 4px; }
+
+/* ---- AgendaList ---- */
+.ds-agenda { display: flex; flex-direction: column; }
+.ds-agenda__group { display: flex; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: var(--border-width-thin) solid var(--border-subtle); }
+.ds-agenda__date { flex-shrink: 0; width: 44px; text-align: center; }
+.ds-agenda__day { display: block; font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--content-primary); line-height: 1; }
+.ds-agenda__weekday { font-size: var(--font-size-2xs); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); color: var(--content-tertiary); }
+.ds-agenda__events { flex: 1; display: flex; flex-direction: column; gap: var(--space-2); }
+.ds-agenda__event { display: flex; align-items: center; gap: var(--space-3); }
+.ds-agenda__time { flex-shrink: 0; width: 60px; font-size: var(--text-caption-size); color: var(--content-secondary); font-variant-numeric: tabular-nums; }
+
+/* ---- DocumentPreview ---- */
+.ds-doc-preview { display: flex; flex-direction: column; border: var(--border-width-thin) solid var(--border-subtle); border-radius: var(--radius-surface); overflow: hidden; background: var(--surface-default); }
+.ds-doc-preview__toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-bottom: var(--border-width-thin) solid var(--border-subtle); background: var(--surface-subtle); }
+.ds-doc-preview__name { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-body-sm-size); font-weight: var(--font-weight-medium); color: var(--content-primary); min-width: 0; }
+.ds-doc-preview__tools { display: inline-flex; align-items: center; gap: var(--space-1); }
+.ds-doc-preview__pages { font-size: var(--text-caption-size); color: var(--content-secondary); font-variant-numeric: tabular-nums; margin-inline-end: var(--space-1); }
+.ds-doc-preview__stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: var(--space-6); background: var(--surface-sunken); min-height: 200px; }
+.ds-doc-preview__page { max-width: 100%; max-height: 400px; box-shadow: var(--shadow-md); border-radius: var(--radius-sm); }
+.ds-doc-preview__placeholder { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); color: var(--content-tertiary); font-size: var(--text-body-sm-size); }

@@ -1,0 +1,106 @@
+/* =============================================================================
+   COMPONENT CSS — Inputs group (field wrapper, TextField, Textarea,
+   SearchInput, DatePicker + calendar)
+   ============================================================================= */
+
+/* ---- Field wrapper (label + control + message) ---- */
+.ds-field { display: flex; flex-direction: column; gap: var(--stack-xs); }
+.ds-field__label {
+  font-size: var(--text-label-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-label-lh);
+  color: var(--content-primary);
+}
+.ds-field__req { color: var(--feedback-error-content); }
+.ds-field__msg {
+  display: flex; align-items: center; gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-caption-size);
+  color: var(--content-secondary);
+}
+.ds-field__msg--error { color: var(--feedback-error-content); }
+.ds-field__foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.ds-field__count { font-size: var(--text-caption-size); color: var(--content-tertiary); font-variant-numeric: tabular-nums; }
+
+/* ---- Input shell ---- */
+.ds-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-md);
+  padding-inline: var(--space-3);
+  background: var(--surface-default);
+  border: var(--border-width-thin) solid var(--border-default);
+  border-radius: var(--radius-control);
+  color: var(--content-primary);
+  transition: border-color var(--motion-micro-duration) var(--motion-micro-ease), box-shadow var(--motion-micro-duration) var(--motion-micro-ease);
+}
+.ds-input--sm { height: var(--control-sm); padding-inline: var(--space-2-5); }
+.ds-input--lg { height: var(--control-lg); }
+.ds-input:hover:not(.is-disabled):not(.is-readonly):not(:focus-within) { border-color: var(--border-strong); }
+.ds-input:focus-within { border-color: var(--border-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 20%, transparent), var(--shadow-xs); }
+.ds-input.is-invalid { border-color: var(--feedback-error-solid); }
+.ds-input.is-invalid:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--feedback-error-solid) 22%, transparent); }
+.ds-input.is-disabled { background: var(--surface-disabled); opacity: var(--opacity-disabled); cursor: not-allowed; }
+.ds-input.is-readonly { background: var(--surface-subtle); }
+.ds-input__icon { color: var(--content-tertiary); flex-shrink: 0; }
+.ds-input__control {
+  flex: 1; min-width: 0;
+  border: 0; outline: 0; background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-body-sm-size);
+  color: var(--content-primary);
+  padding: 0;
+}
+.ds-input__control::placeholder { color: var(--content-placeholder); }
+.ds-input__control:disabled { cursor: not-allowed; }
+.ds-input__control[type="search"]::-webkit-search-decoration,
+.ds-input__control[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+.ds-input__affix-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; flex-shrink: 0;
+  color: var(--content-tertiary); background: transparent; border: 0;
+  border-radius: var(--radius-sm); cursor: pointer;
+}
+.ds-input__affix-btn:hover { color: var(--content-primary); background: var(--surface-hover); }
+
+/* Textarea shell overrides */
+.ds-input--textarea { height: auto; align-items: stretch; padding: var(--space-2-5) var(--space-3); }
+.ds-input--textarea .ds-input__control { resize: vertical; line-height: var(--line-height-normal); min-height: calc(1.5em * 3); }
+
+/* ---- SearchInput ---- */
+.ds-search__spinner {
+  width: 15px; height: 15px; flex-shrink: 0;
+  border: 2px solid var(--border-default);
+  border-right-color: var(--action-primary);
+  border-radius: 50%;
+  animation: ds-spin var(--duration-slower) linear infinite;
+}
+
+/* ---- DatePicker + Calendar ---- */
+.ds-datepicker { position: relative; }
+.ds-datepicker .ds-input { cursor: pointer; }
+.ds-calendar {
+  position: absolute; inset-block-start: calc(100% + 4px); inset-inline-start: 0;
+  width: 268px; padding: var(--space-3);
+  background: var(--surface-default);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-overlay);
+  box-shadow: var(--shadow-popover);
+  z-index: var(--z-popover);
+}
+.ds-calendar__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
+.ds-calendar__title { font-size: var(--text-label-size); font-weight: var(--font-weight-semibold); color: var(--content-primary); }
+.ds-calendar__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.ds-calendar__dow { margin-bottom: var(--space-1); }
+.ds-calendar__dowcell { text-align: center; font-size: var(--font-size-2xs); font-weight: var(--font-weight-semibold); color: var(--content-tertiary); padding: 4px 0; }
+.ds-calendar__day {
+  aspect-ratio: 1; display: inline-flex; align-items: center; justify-content: center;
+  font-size: var(--text-body-sm-size); color: var(--content-primary);
+  background: transparent; border: 0; border-radius: var(--radius-sm); cursor: pointer;
+  transition: background-color var(--motion-micro-duration) var(--motion-micro-ease), transform var(--motion-release-duration) var(--motion-release-ease);
+}
+.ds-calendar__day:hover { background: var(--surface-hover); }
+.ds-calendar__day:active { transform: scale(var(--press-scale)); }
+.ds-calendar__day.is-today { font-weight: var(--font-weight-semibold); color: var(--action-content); }
+.ds-calendar__day.is-selected { background: var(--action-primary); color: var(--content-on-brand); }

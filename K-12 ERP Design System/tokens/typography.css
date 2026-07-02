@@ -1,0 +1,91 @@
+/* =============================================================================
+   TYPOGRAPHY — families, modular scale, line-heights, tracking, weights,
+   plus semantic type-role composites.
+   Fonts: Inter (sans/display) + JetBrains Mono (code). Loaded in fonts.css.
+   Source: 02_design_tokens.yaml
+   ============================================================================= */
+
+:root {
+  /* ---- Families ---- */
+  --font-sans:    "Inter", "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  --font-display: "Inter", "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  /* ---- Type scale (rem, ~1.125–1.2 modular) ---- */
+  --font-size-2xs: 0.6875rem;  /* 11px — dense table meta, captions */
+  --font-size-xs:  0.75rem;    /* 12px */
+  --font-size-sm:  0.875rem;   /* 14px — default dense/body-compact */
+  --font-size-md:  1rem;       /* 16px — base body */
+  --font-size-lg:  1.125rem;   /* 18px */
+  --font-size-xl:  1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;     /* 24px */
+  --font-size-3xl: 1.875rem;   /* 30px */
+  --font-size-4xl: 2.25rem;    /* 36px */
+  --font-size-5xl: 3rem;       /* 48px */
+  --font-size-6xl: 3.75rem;    /* 60px */
+
+  /* ---- Line heights ---- */
+  --line-height-none:    1;
+  --line-height-tight:   1.2;
+  --line-height-snug:    1.35;
+  --line-height-normal:  1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose:   1.8;
+
+  /* ---- Letter spacing ---- */
+  --letter-spacing-tighter: -0.02em;
+  --letter-spacing-tight:   -0.01em;
+  --letter-spacing-normal:  0em;
+  --letter-spacing-wide:    0.01em;
+  --letter-spacing-wider:   0.02em;
+  --letter-spacing-widest:  0.06em;  /* all-caps overlines */
+
+  /* ---- Weights ---- */
+  --font-weight-regular:   400;
+  --font-weight-medium:    500;
+  --font-weight-semibold:  600;
+  --font-weight-bold:      700;
+  --font-weight-extrabold: 800;
+
+  /* ---- Semantic type roles (size / line-height / weight / tracking) ---- */
+  --text-display-size: var(--font-size-4xl);
+  --text-display-lh:   var(--line-height-tight);
+  --text-display-wt:   var(--font-weight-bold);
+  --text-display-ls:   var(--letter-spacing-tight);
+
+  --text-h1-size: var(--font-size-3xl);
+  --text-h1-lh:   var(--line-height-tight);
+  --text-h1-wt:   var(--font-weight-semibold);
+  --text-h1-ls:   var(--letter-spacing-tight);
+
+  --text-h2-size: var(--font-size-2xl);
+  --text-h2-lh:   var(--line-height-snug);
+  --text-h2-wt:   var(--font-weight-semibold);
+  --text-h2-ls:   var(--letter-spacing-normal);
+
+  --text-h3-size: var(--font-size-xl);
+  --text-h3-lh:   var(--line-height-snug);
+  --text-h3-wt:   var(--font-weight-semibold);
+  --text-h3-ls:   var(--letter-spacing-normal);
+
+  --text-body-lg-size: var(--font-size-lg);
+  --text-body-lg-lh:   var(--line-height-normal);
+
+  --text-body-size: var(--font-size-md);
+  --text-body-lh:   var(--line-height-normal);
+
+  --text-body-sm-size: var(--font-size-sm);
+  --text-body-sm-lh:   var(--line-height-normal);
+
+  --text-label-size: var(--font-size-sm);
+  --text-label-lh:   var(--line-height-snug);
+  --text-label-wt:   var(--font-weight-medium);
+
+  --text-caption-size: var(--font-size-xs);
+  --text-caption-lh:   var(--line-height-snug);
+
+  --text-overline-size: var(--font-size-2xs);
+  --text-overline-lh:   var(--line-height-snug);
+  --text-overline-wt:   var(--font-weight-semibold);
+  --text-overline-ls:   var(--letter-spacing-widest);
+}

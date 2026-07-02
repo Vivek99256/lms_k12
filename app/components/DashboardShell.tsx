@@ -1,12 +1,12 @@
 ﻿'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
 import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
-import { getCurrentLevel3Menu, type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
+import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights } from '@/app/hooks/useMenuRights';
 import { usePathname } from 'next/navigation';
 
@@ -26,16 +26,54 @@ function isMasterMenu(item: { menuType?: string | null }) {
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '';
   const { menuItems, loading, error, refetch } = useMenuRights();
-  const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(null);
+  const hasLoadedRef = useRef(false);
+
+  const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('selectedMenuBranch');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.level1Key && parsed?.level2Key) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (selectedBranch) {
+      localStorage.setItem('selectedMenuBranch', JSON.stringify(selectedBranch));
+    } else {
+      localStorage.removeItem('selectedMenuBranch');
+    }
+  }, [selectedBranch]);
   const [isChatbotOpen, setIsChatbotOpen] = useState(true);
+
+  useEffect(() => {
+    if (!hasLoadedRef.current && selectedBranch && menuItems.length > 1) {
+      const selectedLevel1 = menuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key);
+      const selectedLevel2 = selectedLevel1?.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key);
+      if (!selectedLevel2?.submenus?.length) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setSelectedBranch(null);
+        return;
+      }
+    }
+    if (menuItems.length > 0) {
+      hasLoadedRef.current = true;
+    }
+  }, [menuItems, selectedBranch]);
 
   const toggleChatbot = () => setIsChatbotOpen((prev) => !prev);
 
   const handleLevel1Select = (item: MenuItem) => {
-    const level1Key = getMenuKey(item);
-    setSelectedBranch((current) => (
-      current?.level1Key === level1Key ? current : null
-    ));
+    setSelectedBranch((current) => {
+      const key = getMenuKey(item);
+      return current?.level1Key === key ? { level1Key: key, level2Key: '' } : { level1Key: key, level2Key: '' };
+    });
   };
 
   const handleLevel2Select = (submenu: SubmenuItem, parent: MenuItem) => {
@@ -46,8 +84,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   };
 
   const selectedL1 = useMemo(() => {
-    if (!selectedBranch) return null;
-    return menuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key);
+    if (!selectedBranch?.level1Key) return null;
+    return menuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key) ?? null;
   }, [menuItems, selectedBranch]);
 
   const masterMenuItems = useMemo(() => {
@@ -57,21 +95,33 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const isMasterSelected = isMasterMenu(selectedL1 || {});
 
-  const selectedLevel3Menu = useMemo(() => {
-    if (!selectedBranch) return null;
+  const selectedL2 = useMemo(() => {
+    if (!selectedBranch || !selectedL1 || !selectedBranch.level2Key) return null;
+    return selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key) ?? null;
+  }, [selectedBranch, selectedL1]);
 
-    const selectedLevel1 = menuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key);
-    const selectedLevel2 = selectedLevel1?.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key);
+  const searchLevel3FromMenu = (items: MenuItem[], path: string): { parentLabel: string; items: Level3Item[] } | null => {
+    if (!path || !items.length) return null;
+    for (const item of items) {
+      if (item.submenus && item.href && !item.href.startsWith('#')) {
+        for (const submenu of item.submenus) {
+          const submenuHref = (submenu.href || '').toLowerCase();
+          if (submenu.submenus?.length && submenuHref !== '#' && path.startsWith(submenuHref)) {
+            return { parentLabel: submenu.label, items: submenu.submenus as Level3Item[] };
+          }
+        }
+      }
+    }
+    return null;
+  };
 
-    if (!selectedLevel2?.submenus?.length) return null;
+  const level3Menu = (() => {
+    if (selectedL2?.submenus?.length) {
+      return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
+    }
+    return searchLevel3FromMenu(menuItems, pathname);
+  })();
 
-    return {
-      parentLabel: selectedLevel2.label,
-      items: selectedLevel2.submenus as Level3Item[],
-    };
-  }, [menuItems, selectedBranch]);
-
-  const level3Menu = selectedLevel3Menu ?? getCurrentLevel3Menu(pathname, menuItems);
   const showSubheader = Boolean(level3Menu?.items.length || (isMasterSelected && masterMenuItems.length > 0));
 
   return (

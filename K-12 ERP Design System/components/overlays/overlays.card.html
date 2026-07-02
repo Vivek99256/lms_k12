@@ -1,0 +1,46 @@
+<!-- @dsCard group="Components" viewport="700x360" name="Overlays" subtitle="Modal, ConfirmationDialog, Drawer, Popover, Tooltip" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .lbl { width: 100%; font: 600 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--content-tertiary); margin-bottom: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div id="root"></div>
+<script type="text/babel">
+const { Button, IconButton, Popover, Tooltip, Select } = window.EduERPDesignSystem_d63b75;
+
+function Demo(){
+  return (<div>
+    <div className="row"><span className="lbl">Popover &amp; tooltip (inline, non-blocking)</span>
+      <Popover trigger={<Button variant="secondary" iconStart="filter">Filters</Button>}>
+        {({close})=>(<div style={{padding:12,display:"flex",flexDirection:"column",gap:10,width:220}}>
+          <Select label="Class" options={[{value:"9",label:"Grade 9"},{value:"10",label:"Grade 10"}]} />
+          <Button variant="primary" size="sm" onClick={close}>Apply</Button>
+        </div>)}
+      </Popover>
+      <Tooltip label="Export to Excel"><IconButton icon="download" label="Export" /></Tooltip>
+      <Tooltip label="Print report"><IconButton icon="printer" label="Print" /></Tooltip>
+    </div>
+    <div style={{marginTop:8,padding:16,border:"1px dashed var(--border-default)",borderRadius:8,color:"var(--content-secondary)",fontSize:13}}>
+      Modal, ConfirmationDialog and Drawer render as full-screen overlays — they are exercised in the UI kit. See <b>components/overlays/*.prompt.md</b> for usage.
+    </div>
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

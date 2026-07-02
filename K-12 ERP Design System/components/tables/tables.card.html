@@ -1,0 +1,47 @@
+<!-- @dsCard group="Components" viewport="900x360" name="Data table" subtitle="Sortable, selectable, sticky header, states" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .lbl { width: 100%; font: 600 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--content-tertiary); margin-bottom: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div id="root"></div>
+<script type="text/babel">
+const { DataTable, Badge } = window.EduERPDesignSystem_d63b75;
+
+function Demo(){
+  const [sel,setSel]=React.useState([2]);
+  const [sk,setSk]=React.useState("name"); const [sd,setSd]=React.useState("asc");
+  const rows=[
+    {id:1,name:"Aarav Sharma",cls:"Grade 9 - A",status:"Active",due:"₹0"},
+    {id:2,name:"Diya Patel",cls:"Grade 9 - A",status:"Fees due",due:"₹12,500"},
+    {id:3,name:"Kabir Singh",cls:"Grade 9 - B",status:"Active",due:"₹0"},
+    {id:4,name:"Ananya Rao",cls:"Grade 10 - A",status:"Inactive",due:"₹2,500"},
+  ];
+  const sv={Active:"success","Fees due":"warning",Inactive:"neutral"};
+  return (<div data-density="cozy"><DataTable selectable selectedKeys={sel} onSelectionChange={setSel} sortKey={sk} sortDir={sd} onSort={(k,d)=>{setSk(k);setSd(d);}}
+    columns={[
+      {key:"name",header:"Student",sortable:true},
+      {key:"cls",header:"Class"},
+      {key:"status",header:"Status",render:r=><Badge variant={sv[r.status]} dot>{r.status}</Badge>},
+      {key:"due",header:"Balance due",align:"end",sortable:true},
+    ]} data={rows} /></div>);
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

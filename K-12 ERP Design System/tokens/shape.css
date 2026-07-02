@@ -1,0 +1,94 @@
+/* =============================================================================
+   SHAPE — radius, border widths, shadows/elevation, sizing, icon, opacity.
+   Source: 02_design_tokens.yaml
+   ============================================================================= */
+
+:root {
+  /* ---- Radius ---- */
+  --radius-none: 0;
+  --radius-xs:   2px;
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-2xl:  16px;
+  --radius-3xl:  24px;
+  --radius-full: 9999px;
+  /* semantic */
+  --radius-control: var(--radius-md);   /* inputs, selects, segmented */
+  --radius-button:  var(--radius-xl);   /* buttons — pill-leaning rounded (not full stadium) */
+  --radius-surface: var(--radius-lg);   /* cards, panels */
+  --radius-overlay: var(--radius-xl);   /* dialogs, popovers, sheets */
+  --radius-pill:    var(--radius-full);
+  --radius-focus:   var(--radius-md);
+
+  /* ---- Border widths ---- */
+  --border-width-0: 0; /* @kind other */
+  --border-width-hairline: 1px; /* @kind other */
+  --border-width-thin: 1px; /* @kind other */
+  --border-width-medium: 1.5px; /* @kind other */
+  --border-width-thick: 2px; /* @kind other */
+  --border-width-heavy: 4px; /* @kind other */
+
+  /* ---- Shadows (elevation) — layered, low-opacity, cool-slate tint ---- */
+  --shadow-none: none;
+  --shadow-xs:   0 1px 1.5px rgba(15, 23, 42, 0.06);
+  --shadow-sm:   0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 4px -1px rgba(15, 23, 42, 0.05);
+  --shadow-md:   0 2px 4px -1px rgba(15, 23, 42, 0.06), 0 6px 12px -2px rgba(15, 23, 42, 0.08);
+  --shadow-lg:   0 4px 8px -2px rgba(15, 23, 42, 0.06), 0 12px 24px -4px rgba(15, 23, 42, 0.10);
+  --shadow-xl:   0 8px 16px -4px rgba(15, 23, 42, 0.08), 0 20px 36px -6px rgba(15, 23, 42, 0.12);
+  --shadow-2xl:  0 12px 24px -6px rgba(15, 23, 42, 0.10), 0 32px 56px -12px rgba(15, 23, 42, 0.20);
+  --shadow-inner: inset 0 1px 2px 0 rgba(15, 23, 42, 0.06);
+  /* hairline ring — crisp premium edge for borderless surfaces (menus, buttons) */
+  --ring-hairline: 0 0 0 1px rgba(15, 23, 42, 0.06);
+  /* semantic elevation */
+  --shadow-flat:     var(--shadow-none);
+  --shadow-raised:   var(--shadow-sm);   /* cards */
+  --shadow-sticky:   var(--shadow-md);   /* sticky headers/toolbars */
+  --shadow-dropdown: var(--ring-hairline), var(--shadow-lg);   /* menus, selects */
+  --shadow-popover:  var(--ring-hairline), var(--shadow-lg);   /* popovers, tooltips-with-body */
+  --shadow-overlay:  var(--shadow-xl);   /* dialogs, drawers */
+  --shadow-modal:    var(--ring-hairline), var(--shadow-2xl);  /* centered modals */
+
+  /* ---- Control elevation (buttons, chips) — tactile depth ---- */
+  --shadow-btn:            0 1px 1px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-btn-hover:      0 1px 2px rgba(15, 23, 42, 0.06), 0 3px 6px -1px rgba(15, 23, 42, 0.10);
+  --shadow-btn-primary:    inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(30, 27, 75, 0.24), 0 2px 6px -1px rgba(30, 27, 75, 0.28);
+  --shadow-btn-primary-hover: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 4px rgba(30, 27, 75, 0.26), 0 5px 12px -2px rgba(30, 27, 75, 0.34);
+
+  /* ---- Sizing (interactive dimensions) ---- */
+  --target-min: 24px; /* @kind spacing */  /* WCAG 2.2 AA minimum */
+  --target-default: 40px; /* @kind spacing */
+  --target-large: 48px; /* @kind spacing */
+  --control-xs: 24px; /* @kind spacing */
+  --control-sm: 32px; /* @kind spacing */
+  --control-md: 40px; /* @kind spacing */
+  --control-lg: 48px; /* @kind spacing */
+  --field-max-sm: 20rem; /* @kind spacing */
+  --field-max-md: 28rem; /* @kind spacing */
+  --field-max-lg: 40rem; /* @kind spacing */
+
+  /* ---- Icon ---- */
+  --icon-2xs: 12px; /* @kind spacing */
+  --icon-xs: 14px; /* @kind spacing */
+  --icon-sm: 16px; /* @kind spacing */  /* inline w/ body-sm, dense tables */
+  --icon-md: 20px; /* @kind spacing */  /* default */
+  --icon-lg: 24px; /* @kind spacing */
+  --icon-xl: 32px; /* @kind spacing */
+  --icon-2xl: 40px; /* @kind spacing */
+  --icon-stroke-thin: 1.5px; /* @kind other */
+  --icon-stroke-regular: 1.75px; /* @kind other */
+  --icon-stroke-bold: 2px; /* @kind other */
+
+  /* ---- Opacity ---- */
+  --opacity-disabled: 0.40; /* @kind other */
+  --opacity-muted: 0.60; /* @kind other */
+  --opacity-hover-overlay: 0.10; /* @kind other */
+  --opacity-active-overlay: 0.20; /* @kind other */
+  --opacity-backdrop: 0.50; /* @kind other */
+  --opacity-loading: 0.60; /* @kind other */
+
+  /* ---- Focus ring (composite; WCAG 2.2 focus-appearance) ---- */
+  --focus-ring-width: var(--border-width-thick); /* @kind other */ /* 2px */
+  --focus-ring-off: var(--space-0-5); /* @kind other */          /* 2px gap */
+}

@@ -1,0 +1,22 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Border roles" subtitle="Dividers & outlines" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; padding: 20px; background: var(--surface-default); font-family: var(--font-sans); color: var(--content-primary); }
+  .swatches { display: flex; gap: 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-subtle); }
+  .sw { flex: 1; height: 64px; display: flex; align-items: flex-end; padding: 5px; }
+  .sw span { font: 600 9px/1.2 var(--font-mono); }
+  .tokrow { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--border-subtle); border-radius: 8px; font-size: 12px; color: var(--content-secondary); background: var(--surface-default); }
+  .dot { width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0; border: 1px solid rgba(0,0,0,.08); }
+  .mono { font-family: var(--font-mono); font-size: 11px; color: var(--content-tertiary); }
+  
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div class="tokrow"><div class="chip"><span class="dot" style="background:var(--border-subtle);border-color:var(--border-strong)"></span><span>Subtle<br><span class="mono">--border-subtle</span></span></div><div class="chip"><span class="dot" style="background:var(--border-default);border-color:var(--border-strong)"></span><span>Default<br><span class="mono">--border-default</span></span></div><div class="chip"><span class="dot" style="background:var(--border-strong);border-color:var(--border-strong)"></span><span>Strong<br><span class="mono">--border-strong</span></span></div><div class="chip"><span class="dot" style="background:var(--border-focus);"></span><span>Focus<br><span class="mono">--border-focus</span></span></div></div>
+</body>
+</html>

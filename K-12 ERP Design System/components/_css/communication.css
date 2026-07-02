@@ -1,0 +1,110 @@
+/* =============================================================================
+   COMPONENT CSS — Communication group (NotificationItem, CommentThread)
+   ============================================================================= */
+
+/* ---- NotificationItem ---- */
+.ds-notif {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  padding: var(--space-3) var(--inset-md);
+  border-bottom: var(--border-width-thin) solid var(--border-subtle);
+  background: var(--surface-default);
+}
+.ds-notif.is-interactive { cursor: pointer; }
+.ds-notif.is-interactive:hover { background: var(--surface-hover); }
+.ds-notif.is-unread { background: var(--surface-selected); }
+.ds-notif.is-unread:hover { background: color-mix(in srgb, var(--surface-selected) 70%, var(--surface-hover)); }
+.ds-notif__icon {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: var(--radius-full);
+  background: var(--surface-subtle); color: var(--content-secondary);
+}
+.ds-notif.is-unread .ds-notif__icon { background: var(--action-subtle); color: var(--action-content); }
+.ds-notif__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ds-notif__title { font-size: var(--text-body-sm-size); color: var(--content-primary); }
+.ds-notif.is-unread .ds-notif__title { font-weight: var(--font-weight-semibold); }
+.ds-notif__text { font-size: var(--text-caption-size); color: var(--content-secondary); }
+.ds-notif__time { font-size: var(--text-caption-size); color: var(--content-tertiary); }
+.ds-notif__dot { flex-shrink: 0; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--action-primary); }
+.ds-notif__dismiss { flex-shrink: 0; }
+
+/* ---- CommentThread ---- */
+.ds-comments { display: flex; flex-direction: column; gap: var(--space-4); }
+.ds-comments__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.ds-comments__item { display: flex; gap: var(--space-3); }
+.ds-comments__bubble { flex: 1; min-width: 0; padding: var(--space-2) var(--space-3); background: var(--surface-subtle); border-radius: var(--radius-surface); }
+.ds-comments__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); margin-bottom: 2px; }
+.ds-comments__author { font-size: var(--text-body-sm-size); font-weight: var(--font-weight-semibold); color: var(--content-primary); }
+.ds-comments__time { font-size: var(--text-caption-size); color: var(--content-tertiary); }
+.ds-comments__text { font-size: var(--text-body-sm-size); color: var(--content-secondary); }
+.ds-comments__composer { display: flex; flex-direction: column; gap: var(--space-2); }
+.ds-comments__composer-actions { display: flex; justify-content: flex-end; }
+
+/* ---- AssistantPanel (docked AI copilot / agent surface) ---- */
+.ds-assist {
+  display: flex; flex-direction: column; width: 360px; height: 100%;
+  background: var(--surface-default);
+  border-inline-start: var(--border-width-thin) solid var(--border-subtle);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ds-assist { animation: ds-assist-in var(--motion-overlay-duration) var(--motion-overlay-ease); }
+}
+@keyframes ds-assist-in { from { transform: translateX(12px); } to { transform: none; } }
+.ds-assist__head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: var(--border-width-thin) solid var(--border-subtle); }
+.ds-assist__avatar { position: relative; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-full); background: var(--action-primary); color: var(--content-on-brand); box-shadow: var(--shadow-btn-primary); }
+.ds-assist__idtext { flex: 1; min-width: 0; }
+.ds-assist__title { font-size: var(--text-body-sm-size); font-weight: var(--font-weight-semibold); color: var(--content-primary); }
+.ds-assist__status { display: inline-flex; align-items: center; gap: var(--space-1-5); font-size: var(--text-caption-size); color: var(--content-secondary); }
+.ds-assist__status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--feedback-success-solid); }
+.ds-assist__actions { display: flex; align-items: center; gap: 2px; }
+.ds-assist__thread { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.ds-assist__msg { display: flex; flex-direction: column; gap: 4px; max-width: 88%; }
+.ds-assist__msg--assistant { align-self: flex-start; align-items: flex-start; }
+.ds-assist__msg--user { align-self: flex-end; align-items: flex-end; }
+.ds-assist__bubble { padding: var(--space-2-5) var(--space-3); font-size: var(--text-body-sm-size); line-height: var(--line-height-normal); border-radius: 16px; }
+.ds-assist__msg--assistant .ds-assist__bubble { background: var(--surface-subtle); color: var(--content-primary); border-end-start-radius: 5px; }
+.ds-assist__msg--user .ds-assist__bubble { background: var(--action-primary); color: var(--content-on-brand); border-end-end-radius: 5px; }
+.ds-assist__time { font-size: var(--font-size-2xs); color: var(--content-tertiary); padding-inline: var(--space-1); }
+.ds-assist__typing { align-self: flex-start; display: inline-flex; gap: 4px; padding: var(--space-3); background: var(--surface-subtle); border-radius: 16px; border-end-start-radius: 5px; }
+.ds-assist__typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--content-tertiary); animation: ds-assist-bounce 1.2s infinite ease-in-out; }
+.ds-assist__typing span:nth-child(2) { animation-delay: 0.15s; }
+.ds-assist__typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ds-assist-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.45; } 30% { transform: translateY(-4px); opacity: 1; } }
+.ds-assist__suggest { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-1); }
+.ds-assist__chip {
+  display: inline-flex; align-items: center; gap: var(--space-1-5);
+  padding: var(--space-1-5) var(--space-3);
+  background: var(--surface-default); border: var(--border-width-thin) solid var(--border-default); border-radius: var(--radius-full);
+  font-family: var(--font-sans); font-size: var(--text-caption-size); font-weight: var(--font-weight-medium); color: var(--action-content);
+  cursor: pointer;
+  transition: background-color var(--motion-micro-duration) var(--motion-micro-ease), border-color var(--motion-micro-duration) var(--motion-micro-ease), transform var(--motion-release-duration) var(--motion-release-ease);
+}
+.ds-assist__chip:hover { background: var(--action-subtle); border-color: var(--action-primary); }
+.ds-assist__chip:active { transform: scale(var(--press-scale-sm)); }
+.ds-assist__composer { padding: var(--space-3); border-top: var(--border-width-thin) solid var(--border-subtle); }
+.ds-assist__inputwrap {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  border: var(--border-width-thin) solid var(--border-default); border-radius: var(--radius-overlay);
+  padding: var(--space-2-5) var(--space-2-5) var(--space-2);
+  background: var(--surface-default);
+  transition: border-color var(--motion-micro-duration) var(--motion-micro-ease), box-shadow var(--motion-micro-duration) var(--motion-micro-ease);
+}
+.ds-assist__inputwrap:focus-within { border-color: var(--border-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 20%, transparent); }
+.ds-assist__textarea { width: 100%; border: 0; outline: none; resize: none; background: transparent; font-family: var(--font-sans); font-size: var(--text-body-sm-size); color: var(--content-primary); line-height: var(--line-height-normal); max-height: 120px; }
+.ds-assist__textarea::placeholder { color: var(--content-tertiary); }
+.ds-assist__composer-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.ds-assist__composer-tools { display: flex; align-items: center; gap: 2px; }
+.ds-assist__send { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: var(--radius-full); background: var(--action-primary); color: var(--content-on-brand); cursor: pointer; box-shadow: var(--shadow-btn-primary); transition: background-color var(--motion-micro-duration) var(--motion-micro-ease), transform var(--motion-release-duration) var(--motion-release-ease); }
+.ds-assist__send:hover:not(:disabled) { background: var(--action-primary-hover); }
+.ds-assist__send:active:not(:disabled) { transform: scale(var(--press-scale)); }
+.ds-assist__send:disabled { background: var(--surface-active); color: var(--content-disabled); box-shadow: none; cursor: not-allowed; }
+
+/* ---- AssistantLauncher (floating agent rail / collapsed dock) ---- */
+.ds-assist-rail { display: inline-flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-1-5); background: var(--surface-default); border: var(--border-width-thin) solid var(--border-subtle); border-radius: var(--radius-full); box-shadow: var(--shadow-dropdown); }
+.ds-assist-rail__btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--content-secondary); cursor: pointer; transition: background-color var(--motion-micro-duration) var(--motion-micro-ease), color var(--motion-micro-duration) var(--motion-micro-ease), transform var(--motion-release-duration) var(--motion-release-ease); }
+.ds-assist-rail__btn:hover { background: var(--surface-hover); color: var(--content-primary); }
+.ds-assist-rail__btn:active { transform: scale(var(--press-scale)); }
+.ds-assist-rail__btn.is-active { background: var(--surface-selected); color: var(--action-content); }
+.ds-assist-rail__btn.is-primary { background: var(--action-primary); color: var(--content-on-brand); box-shadow: var(--shadow-btn-primary); }
+.ds-assist-rail__btn.is-primary:hover { background: var(--action-primary-hover); }
+.ds-assist-rail__divider { width: 22px; height: 1px; background: var(--border-subtle); margin-block: 2px; }
+.ds-assist-rail__dot { position: absolute; top: 7px; inset-inline-end: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--feedback-error-solid); border: 1.5px solid var(--surface-default); }

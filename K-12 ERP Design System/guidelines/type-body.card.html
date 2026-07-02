@@ -1,0 +1,30 @@
+<!-- @dsCard group="Type" viewport="700x230" name="Body, label & caption" subtitle="The daily-use reading styles" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; padding: 20px; background: var(--surface-default); font-family: var(--font-sans); color: var(--content-primary); }
+  .swatches { display: flex; gap: 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-subtle); }
+  .sw { flex: 1; height: 64px; display: flex; align-items: flex-end; padding: 5px; }
+  .sw span { font: 600 9px/1.2 var(--font-mono); }
+  .tokrow { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--border-subtle); border-radius: 8px; font-size: 12px; color: var(--content-secondary); background: var(--surface-default); }
+  .dot { width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0; border: 1px solid rgba(0,0,0,.08); }
+  .mono { font-family: var(--font-mono); font-size: 11px; color: var(--content-tertiary); }
+  
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:560px">
+    <div class="ds-body-lg">Body large — 18px. Used for lead paragraphs and parent-facing summaries.</div>
+    <div class="ds-body">Body — 16px base. The default reading size for content.</div>
+    <div class="ds-body-sm">Body small — 14px. Dense tables, forms, and secondary copy.</div>
+    <div class="ds-label">Label — 14 / Medium — form field labels</div>
+    <div class="ds-caption">Caption — 12px — helper text & metadata</div>
+    <div class="ds-overline">Overline — 11 / uppercase / wide tracking</div>
+  </div>
+</body>
+</html>
