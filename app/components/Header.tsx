@@ -64,6 +64,12 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
     return academic?.selectedTerm || 'Term 1';
   });
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedAcademicYear', selectedYear);
+    }
+  }, [selectedYear]);
+
   const mountedRef = useRef(false);
   useEffect(() => {
     mountedRef.current = true;
