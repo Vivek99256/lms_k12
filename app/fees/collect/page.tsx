@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Banknote, Filter, Loader2, Phone, Search, UserRound } from 'lucide-react';
+import { Banknote, Filter, Loader2, Phone, Search, UserRound, GraduationCap, BookOpen, Users } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -265,17 +265,17 @@ export default function FeesCollectPage() {
               Search Section
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-5">
+          <CardContent className="p-6">
             <form
-              className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
+              className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 fetchStudents(true);
               }}
             >
-              <Field label="Search Section">
+              <Field label="Search Section" icon={<GraduationCap size={12} />}>
                 <Select value={level} onValueChange={(value) => setLevel(value ?? '')}>
-                  <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
+                  <SelectTrigger variant="soft">
                     <SelectValue placeholder="Select section" />
                   </SelectTrigger>
                   <SelectContent>
@@ -286,9 +286,9 @@ export default function FeesCollectPage() {
                 </Select>
               </Field>
 
-              <Field label="Search Standard">
+              <Field label="Search Standard" icon={<BookOpen size={12} />}>
                 <Select value={standard} onValueChange={(value) => setStandard(value ?? '')}>
-                  <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
+                  <SelectTrigger variant="soft">
                     <SelectValue placeholder="Select standard" />
                   </SelectTrigger>
                   <SelectContent>
@@ -299,9 +299,9 @@ export default function FeesCollectPage() {
                 </Select>
               </Field>
 
-              <Field label="Search Division">
+              <Field label="Search Division" icon={<Users size={12} />}>
                 <Select value={division} onValueChange={(value) => setDivision(value ?? '')}>
-                  <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
+                  <SelectTrigger variant="soft">
                     <SelectValue placeholder="Select division" />
                   </SelectTrigger>
                   <SelectContent>
@@ -312,35 +312,33 @@ export default function FeesCollectPage() {
                 </Select>
               </Field>
 
-              
-
-              <Field label="Student Name">
+              <Field label="Student Name" icon={<UserRound size={14} className="text-slate-400" />}>
                 <div className="relative">
                   <UserRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input value={studentName} onChange={(event) => setStudentName(event.target.value)} placeholder="Enter student name" className="h-10 rounded-lg border-slate-200 bg-slate-50/70 pl-9 text-sm" />
+                  <Input value={studentName} onChange={(event) => setStudentName(event.target.value)} placeholder="Enter student name" className="h-10 rounded-xl border-slate-200 bg-slate-50/70 pl-9 text-sm transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                 </div>
               </Field>
 
-              <Field label="GR No.">
-                <Input value={grNo} onChange={(event) => setGrNo(event.target.value)} placeholder="Enter GR number" className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
+              <Field label="GR No." icon={<Search size={14} className="text-slate-400" />}>
+                <Input value={grNo} onChange={(event) => setGrNo(event.target.value)} placeholder="Enter GR number" className="h-10 rounded-xl border-slate-200 bg-slate-50/70 text-sm transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
               </Field>
 
-              <Field label="Mobile">
+              <Field label="Mobile" icon={<Phone size={14} className="text-slate-400" />}>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input value={mobile} onChange={(event) => setMobile(event.target.value)} placeholder="Enter mobile number" className="h-10 rounded-lg border-slate-200 bg-slate-50/70 pl-9 text-sm" />
+                  <Input value={mobile} onChange={(event) => setMobile(event.target.value)} placeholder="Enter mobile number" className="h-10 rounded-xl border-slate-200 bg-slate-50/70 pl-9 text-sm transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                 </div>
               </Field>
 
               <div className="flex items-end">
-                <label className="flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/70 px-3 text-sm font-medium text-slate-700">
+                <label className="flex h-10 w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
                   <input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-[#0D6EFD]" />
                   In-active Students
                 </label>
               </div>
 
-              <div className="flex items-end md:col-span-2">
-                <Button type="submit" disabled={loading} className="h-10 w-full rounded-lg bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90 md:w-auto md:px-6">
+              <div className="flex items-end">
+                <Button type="submit" disabled={loading} className="h-10 w-full rounded-xl bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90 shadow-md shadow-blue-500/20 transition-all hover:shadow-lg hover:shadow-blue-500/30 md:w-auto md:px-6">
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
                   Search Student
                 </Button>
@@ -349,10 +347,15 @@ export default function FeesCollectPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 bg-white shadow-sm">
-          <CardHeader className="border-b border-slate-100 px-5 py-4">
-            <CardTitle className="text-base font-bold text-slate-800">Student List</CardTitle>
-          </CardHeader>
+         <Card className="border-slate-200/80 bg-white shadow-sm">
+           <CardHeader className="border-b border-slate-100 px-6 py-5">
+             <CardTitle className="flex items-center gap-2.5 text-base font-bold text-slate-800">
+               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-[#0D6EFD]">
+                 <Users className="h-4 w-4" />
+               </div>
+               Student List
+             </CardTitle>
+           </CardHeader>
           <CardContent className="p-0">
             {error && (
               <div className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm text-rose-700">{error}</div>
@@ -421,10 +424,13 @@ export default function FeesCollectPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, icon }: { label: string; children: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</Label>
+      <Label className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+        {icon && <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-slate-100 text-slate-500 [&_svg]:size-3">{icon}</span>}
+        {label}
+      </Label>
       {children}
     </div>
   );
