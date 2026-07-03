@@ -6,6 +6,7 @@ import {
 import type { ComponentType } from 'react';
 import { MenuItem, SubmenuItem, Level3Item } from './menuItems';
 import { createMdIcon } from '@/app/components/MdIcon';
+import { mapApiLinkToRoute } from './routeMapper';
 
 export interface ApiMenuItem {
   id: number;
@@ -80,21 +81,18 @@ const ROUTE_MAP: Record<string, string> = {
  };
 
 export function resolveRoute(link: string | null): string {
-  if (!link) return '/';
+  if (!link) return '/dashboard';
   const clean = link.trim();
   if (clean === 'javascript:void(0);' || clean === 'javascript:void(0)') return '#';
   const lower = clean.toLowerCase();
   if (ROUTE_MAP[lower]) return ROUTE_MAP[lower];
-  if (lower === '/admission-enquiry') return '/admission-enquiry';
-  if (lower === '/admission-registration') return '/admission-registration';
-  if (lower === '/admission-confirmation') return '/admission-confirmation';
+  if (lower === '/admission-enquiry') return '/admission-Enquiry';
+  if (lower === '/admission-registration') return '/admissions/registration';
+  if (lower === '/admission-confirmation') return '/admissions/confirmation';
   if (lower.startsWith('/')) return clean;
-  const fallback = lower
-    .replace(/\.index$/i, '')
-    .replace(/\./g, '/')
-    .replace(/_/g, '-')
-    .replace(/\/+$/g, '');
-  return '/' + fallback;
+  
+  // Use the new route mapper for better link handling
+  return mapApiLinkToRoute(link);
 }
 
 function isApiMenuItem(value: unknown): value is ApiMenuItem {
