@@ -76,6 +76,7 @@ function resolveIcon(iconStr: string | null, level: number): MenuIcon {
 const ROUTE_MAP: Record<string, string> = {
    'dashboard.index': '/dashboard',
    'student.index': '/students',
+   'student.search_student': '/students/search_student',
    'fees_collect.index': '/fees/collect',
    'institute.index': '/institute',
  };
@@ -190,6 +191,7 @@ export function buildMenuTree(
               menuType: l3.menu_type,
               label: l3.name || l3.menu_title || l3.site_map_name,
               href: resolveRoute(l3.link),
+              link: l3.link,
             }));
           return {
             id: sub.id,

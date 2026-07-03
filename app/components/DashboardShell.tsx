@@ -119,7 +119,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
     }
-    return searchLevel3FromMenu(menuItems, pathname);
+    const found = searchLevel3FromMenu(menuItems, pathname);
+    return found;
   })();
 
   const showSubheader = Boolean(level3Menu?.items.length || (isMasterSelected && masterMenuItems.length > 0));

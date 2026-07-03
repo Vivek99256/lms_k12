@@ -5,11 +5,11 @@
 
 // Map of API link paths to Next.js app routes
 export const API_ROUTE_MAP: Record<string, string> = {
-  // Search/Edit Student
-  'student/search_student/': '/search_student',
-  'student/search_student': '/search_student',
-  'search_student/': '/search_student',
-  'search_student': '/search_student',
+  // Search/Edit Student - maps to /students/search_student
+  'student/search_student/': '/students/search_student',
+  'student/search_student': '/students/search_student',
+  'search_student/': '/students/search_student',
+  'search_student': '/students/search_student',
   
   // Admission routes
   'admission-enquiry': '/admission-Enquiry',

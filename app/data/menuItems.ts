@@ -9,6 +9,7 @@ export interface Level3Item {
   menuType?: string | null;
   label: string;
   href: string;
+  link?: string | null;
 }
 
 export interface SubmenuItem {

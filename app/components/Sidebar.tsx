@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { ChevronRight, Menu, RefreshCw } from 'lucide-react';
 import { MenuItem, SubmenuItem } from '@/app/data/menuItems';
-import { Level3Item } from '@/app/data/menuItems';
 
 interface SidebarProps {
   menuItems: MenuItem[];
@@ -18,13 +17,6 @@ interface SidebarProps {
 
 interface Level2PanelState {
   item: MenuItem;
-  top: number;
-  left: number;
-}
-
-interface Level3PanelState {
-  parent: MenuItem;
-  submenu: SubmenuItem;
   top: number;
   left: number;
 }
@@ -46,7 +38,6 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [level2Panel, setLevel2Panel] = useState<Level2PanelState | null>(null);
-  const [level3Panel, setLevel3Panel] = useState<Level3PanelState | null>(null);
   const panelCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sidebarLeaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -61,24 +52,6 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
     const rect = element.getBoundingClientRect();
     setLevel2Panel({
       item,
-      top: Math.max(16, rect.top),
-      left: rect.right + 8,
-    });
-    setLevel3Panel(null);
-  };
-
-  const openLevel3Panel = (submenu: SubmenuItem, parent: MenuItem, element: HTMLElement) => {
-    if (!submenu.submenus?.length) return;
-
-    if (panelCloseTimeoutRef.current) {
-      clearTimeout(panelCloseTimeoutRef.current);
-      panelCloseTimeoutRef.current = null;
-    }
-
-    const rect = element.getBoundingClientRect();
-    setLevel3Panel({
-      parent,
-      submenu,
       top: Math.max(16, rect.top),
       left: rect.right + 8,
     });
@@ -140,20 +113,18 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest('[data-level2-panel]') && !target.closest('[data-level3-panel]') && !target.closest('[data-menu-item]')) {
+      if (!target.closest('[data-level2-panel]') && !target.closest('[data-menu-item]')) {
         setLevel2Panel(null);
-        setLevel3Panel(null);
       }
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setLevel2Panel(null);
-        setLevel3Panel(null);
       }
     };
 
-    if (level2Panel || level3Panel) {
+    if (level2Panel) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
       return () => {
@@ -161,7 +132,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
         document.removeEventListener('keydown', handleKeyDown);
       };
     }
-  }, [level2Panel, level3Panel]);
+  }, [level2Panel]);
 
   const handleLevel1Click = (item: MenuItem, element: HTMLElement) => {
     onLevel1Select(item);
@@ -176,35 +147,14 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
     }
   };
 
-  const handleLevel2Click = (submenu: SubmenuItem, element?: HTMLElement) => {
+  const handleLevel2Click = (submenu: SubmenuItem) => {
     if (!level2Panel) return;
 
     onLevel2Select(submenu, level2Panel.item);
-
-    // If has level 3 items, show level 3 panel
-    if (submenu.submenus?.length) {
-      if (element) {
-        openLevel3Panel(submenu, level2Panel.item, element);
-      }
-      return;
-    }
-
     setLevel2Panel(null);
-    setLevel3Panel(null);
 
     if (submenu.href && submenu.href !== '#') {
       router.push(submenu.href);
-    }
-  };
-
-  const handleLevel3Click = (level3Item: Level3Item) => {
-    if (!level3Panel) return;
-
-    setLevel2Panel(null);
-    setLevel3Panel(null);
-
-    if (level3Item.href && level3Item.href !== '#') {
-      router.push(level3Item.href);
     }
   };
 
@@ -402,7 +352,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
                 <button
                   key={`${submenu.label}-${subIndex}`}
                   type="button"
-                  onClick={(e) => handleLevel2Click(submenu, e.currentTarget as HTMLElement)}
+                  onClick={() => handleLevel2Click(submenu)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer text-left
                     ${isSubActive
                       ? 'text-[#0D6EFD] bg-blue-50/80'
@@ -418,54 +368,6 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
                       +{submenu.submenus!.length}
                     </span>
                   )}
-                </button>
-              );
-            })}
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Level 3 Panel */}
-      {level3Panel && typeof document !== 'undefined' && createPortal(
-        <div
-          data-level3-panel
-          className="fixed bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-200/50 py-3"
-          style={{
-            top: `${level3Panel.top}px`,
-            left: `${level3Panel.left}px`,
-            width: '240px',
-            maxHeight: 'min(520px, calc(100vh - 32px))',
-            zIndex: 99999,
-          }}
-          onMouseEnter={() => {
-            cancelPanelClose();
-            if (sidebarLeaveTimeoutRef.current) clearTimeout(sidebarLeaveTimeoutRef.current);
-          }}
-          onMouseLeave={() => {
-            schedulePanelClose();
-          }}
-        >
-          <div className="px-4 py-2 mb-1">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Level 3 Menu</p>
-            <h3 className="text-sm font-bold text-gray-900 truncate">{level3Panel.submenu.label}</h3>
-          </div>
-          <div className="overflow-y-auto max-h-[440px] px-2 pb-1">
-            {level3Panel.submenu.submenus?.map((level3Item, l3Index) => {
-              const isL3Active = level3Item.href !== '#' && (pathname.startsWith(level3Item.href) || pathname === level3Item.href);
-
-              return (
-                <button
-                  key={`${level3Item.label}-${l3Index}`}
-                  type="button"
-                  onClick={() => handleLevel3Click(level3Item)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer text-left
-                    ${isL3Active
-                      ? 'text-[#0D6EFD] bg-blue-50/80'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/80'
-                    }`}
-                >
-                  <span className="min-w-0 flex-1 truncate">{level3Item.label}</span>
                 </button>
               );
             })}
