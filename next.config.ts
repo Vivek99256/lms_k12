@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
         source: '/admission-confirmation',
         destination: '/admissions/confirmation',
       },
+      {
+        source: '/course-master/lesson-plan/:courseId/assessment',
+        destination: '/course-master/lesson-plan/:courseId?view=assessment',
+      },
     ];
   },
 };

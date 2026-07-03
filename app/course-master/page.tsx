@@ -103,6 +103,13 @@ export default function CourseMasterPage() {
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  const getCourseRoutes = (courseId: string) => ({
+    chapters: `/course-master/${courseId}/chapters`,
+    lessonPlan: `/course-master/lesson-plan/${courseId}`,
+    curriculum: `/course-master/lesson-plan/${courseId}/curriculum`,
+    assessment: `/course-master/lesson-plan/${courseId}/assessment`,
+  });
+
   const generateTopics = (course: Course): string[] => {
     const base = course.title.split(' ').slice(0, 3).join(' ');
     return Array.from({ length: course.chapters }, (_, i) => {
@@ -340,12 +347,14 @@ export default function CourseMasterPage() {
           >
             {filteredCourses.map((course) => {
               const IconComponent = ICON_MAP[course.icon] || BookOpen;
+              const routes = getCourseRoutes(course.id);
 
               return (
                 <div
                   key={course.id}
+                  onClick={() => router.push(routes.chapters)}
                   className={cn(
-                    'group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 hover:border-slate-300',
+                    'group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 hover:border-slate-300 cursor-pointer',
                     viewMode === 'list'
                       ? 'flex flex-col lg:flex-row lg:items-center'
                       : 'flex flex-col'
@@ -367,12 +376,12 @@ export default function CourseMasterPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <h3 className="truncate text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
-                                {course.title}
-                              </h3>
-                              <p className="mt-0.5 text-xs text-slate-500">{course.code}</p>
-                            </div>
+                              <div className="min-w-0">
+                                <h3 className="truncate text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
+                                  {course.title}
+                                </h3>
+                                <p className="mt-0.5 text-xs text-slate-500">{course.code}</p>
+                              </div>
                             <div className="more-menu-container relative shrink-0">
                               <button
                                 onClick={(e) => {
@@ -409,7 +418,8 @@ export default function CourseMasterPage() {
 
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 const section = getSectionFromClassGrade(course.classGrade);
                                 setSectionFilter(section);
                                 setStandardFilter('all');
@@ -442,23 +452,35 @@ export default function CourseMasterPage() {
                     )}>
                       <div className="flex flex-wrap items-center justify-center gap-2">
                         <button
-                          onClick={() => router.push(`/course-master/lesson-plan/${course.id}`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(routes.lessonPlan);
+                          }}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-all"
                         >
                           <ClipboardList size={12} />
                           Lesson Planning
                         </button>
-                        <button className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-all">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(routes.assessment);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-all"
+                        >
                           <FileCheck size={12} />
                           Assessment
                         </button>
-<button
-                           onClick={() => router.push(`/course-master/lesson-plan/${course.id}/curriculum`)}
-                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-all"
-                         >
-                           <GraduationCap size={12} />
-                           Curriculum
-                         </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(routes.curriculum);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-all"
+                        >
+                          <GraduationCap size={12} />
+                          Curriculum
+                        </button>
                       </div>
                     </div>
                   </div>
