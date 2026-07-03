@@ -1,7 +1,4 @@
-import { 
-  LayoutDashboard, BookOpen, Calendar, FileText, BarChart3, 
-  MessageCircle, Settings, ClipboardList, UserPlus, FileCheck
-} from 'lucide-react';
+import { BookOpen, Calendar, FileText, BarChart3, MessageCircle, Settings } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 export type MenuIcon = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;

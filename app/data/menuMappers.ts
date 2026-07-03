@@ -1,10 +1,11 @@
 import {
-  LayoutDashboard, School, User, Banknote, Calendar, FileText,
+  LayoutDashboard, User, Banknote, Calendar, FileText,
   BarChart3, MessageSquare, Settings, BookOpen, ClipboardList,
   UserPlus, FileCheck, Menu
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { MenuItem, SubmenuItem, Level3Item } from './menuItems';
+import { createMdIcon } from '@/app/components/MdIcon';
 
 export interface ApiMenuItem {
   id: number;
@@ -38,7 +39,6 @@ type ApiMenuGroup = Record<string, ApiMenuItem[] | ApiMenuItem | Record<string, 
 export type ApiMenuGroups = Record<string, ApiMenuGroup | ApiMenuItem[] | ApiMenuItem>;
 
 const ICON_MAP: Record<string, MenuIcon> = {
-  school: School,
   'mdi mdi-account fa-fw': User,
   'mdi mdi-cash-100 fa-fw': Banknote,
   calendar: Calendar,
@@ -64,6 +64,10 @@ function resolveIcon(iconStr: string | null, level: number): MenuIcon {
 
   const partial = Object.keys(ICON_MAP).find(k => key.includes(k));
   if (partial) return ICON_MAP[partial];
+
+  // Use MDI icon for any icon string (converts "school" to "mdi mdi-school")
+  const mdiIcon = createMdIcon(iconStr);
+  if (mdiIcon) return mdiIcon;
 
   return level === 1 ? LayoutDashboard : level === 2 ? BookOpen : FileText;
 }
