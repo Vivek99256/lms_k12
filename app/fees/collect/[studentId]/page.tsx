@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Banknote, CalendarDays, ChevronDown, History, Loader2, Printer, Save } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
@@ -22,6 +22,7 @@ type SessionContext = {
   subInstituteId: string;
   userId: string;
   academicYearId: string;
+  hostName: string;
 };
 
 type StudentInfo = {
@@ -65,23 +66,47 @@ type SelectOption = {
 
 type CollectionResponse = {
   student?: unknown;
+  stu_data?: unknown;
   fee_summary?: unknown;
   summary?: unknown;
+  total_fees?: unknown;
+  final_fee?: unknown;
+  final_fee_name?: unknown;
   unpaid_months?: unknown;
   months?: unknown;
   banks?: unknown;
+  bank_data?: unknown;
+  payment_modes?: unknown;
+  cheque_return_charges?: unknown;
   data?: {
     student?: unknown;
+    stu_data?: unknown;
     fee_summary?: unknown;
     summary?: unknown;
+    total_fees?: unknown;
+    final_fee?: unknown;
+    final_fee_name?: unknown;
     unpaid_months?: unknown;
     months?: unknown;
     banks?: unknown;
+    bank_data?: unknown;
+    payment_modes?: unknown;
+    cheque_return_charges?: unknown;
   };
   message?: string;
 };
 
-const paymentModes = [
+type ReceiptResponse = {
+  data?: unknown;
+  paper?: string;
+  css?: string;
+  html?: unknown;
+  receipt?: unknown;
+  receipt_html?: unknown;
+  message?: string;
+};
+
+const defaultPaymentModes = [
   { id: 'Cash', label: 'Cash' },
   { id: 'Cheque', label: 'Cheque' },
   { id: 'Online', label: 'Online' },
@@ -253,11 +278,13 @@ export default function FeesCollectionStudentPage() {
   const params = useParams<{ studentId: string }>();
   const studentId = params.studentId;
   const [session] = useState(getSessionContext);
+  const receiptRef = useRef<HTMLDivElement | null>(null);
 
   const [student, setStudent] = useState<StudentInfo | null>(null);
   const [summaryRows, setSummaryRows] = useState<SummaryRow[]>([]);
   const [months, setMonths] = useState<FeeMonth[]>([]);
   const [banks, setBanks] = useState<SelectOption[]>([]);
+  const [paymentModes, setPaymentModes] = useState<SelectOption[]>(defaultPaymentModes);
   const [selectedMonthIds, setSelectedMonthIds] = useState<string[]>([]);
   const [expandedMonthId, setExpandedMonthId] = useState<string | null>(null);
   const [remarks, setRemarks] = useState('');
@@ -273,6 +300,8 @@ export default function FeesCollectionStudentPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [collectionData, setCollectionData] = useState<CollectionResponse | null>(null);
+  const [receiptHtml, setReceiptHtml] = useState('');
 
   const loadDummyCollection = useCallback((message?: string) => {
     const fallback = dummyCollections[studentId] ?? dummyCollections['1020'];
@@ -281,11 +310,33 @@ export default function FeesCollectionStudentPage() {
     setSummaryRows(fallback.summaryRows);
     setMonths(fallback.months);
     setBanks(dummyBanks);
+    setPaymentModes(defaultPaymentModes);
+    setCollectionData(null);
+    setReceiptHtml('');
     setSelectedMonthIds(fallback.months.map((month) => month.id));
     setExpandedMonthId(fallback.months[0]?.id ?? null);
     setError(message ? `${message} Showing dummy data.` : 'Showing dummy data.');
     setLoading(false);
   }, [studentId]);
+
+  const applyCollectionData = useCallback((payload: CollectionResponse) => {
+    const source = payload.data ?? payload;
+    const loadedMonths = toMonths(
+      source.total_fees ?? source.unpaid_months ?? source.months,
+      source.final_fee,
+      source.final_fee_name
+    );
+
+    setStudent(toStudentInfo(source.stu_data ?? source.student));
+    setSummaryRows(toSummaryRows(source.total_fees ?? source.fee_summary ?? source.summary));
+    setMonths(loadedMonths);
+    setBanks(toOptions(source.bank_data ?? source.banks));
+    setPaymentModes(toPaymentModes(source.payment_modes));
+    setSelectedMonthIds(loadedMonths.map((month) => month.id));
+    setExpandedMonthId(loadedMonths[0]?.id ?? null);
+    setCollectionData(source as CollectionResponse);
+    setReceiptHtml('');
+  }, []);
 
   const loadFees = useCallback(async () => {
     if (!studentId || !session.subInstituteId) {
@@ -297,19 +348,32 @@ export default function FeesCollectionStudentPage() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/fees/collect/students/${encodeURIComponent(studentId)}`, {
-        method: 'POST',
+      if (typeof window !== 'undefined') {
+        const cachedPayload = sessionStorage.getItem(`feesCollectData:${studentId}`);
+        if (cachedPayload) {
+          sessionStorage.removeItem(`feesCollectData:${studentId}`);
+          applyCollectionData(JSON.parse(cachedPayload) as CollectionResponse);
+          return;
+        }
+      }
+
+      const apiBaseUrl = (session.hostName || API_BASE_URL || '').replace(/\/$/, '');
+      if (!apiBaseUrl || !session.academicYearId) {
+        throw new Error('Session API details are missing.');
+      }
+
+      const params = new URLSearchParams({
+        sub_institute_id: session.subInstituteId,
+        syear: session.academicYearId,
+        type: 'API',
+      });
+
+      const response = await fetch(`${apiBaseUrl}/fees/fees_collect/${encodeURIComponent(studentId)}/edit?${params.toString()}`, {
+        method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
+          Accept: 'application/json',
           ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
         },
-        body: JSON.stringify({
-          type: 'API',
-          student_id: studentId,
-          sub_institute_id: session.subInstituteId,
-          academic_year_id: session.academicYearId,
-          user_id: session.userId,
-        }),
       });
 
       const payload = (await response.json()) as CollectionResponse;
@@ -317,21 +381,13 @@ export default function FeesCollectionStudentPage() {
         throw new Error(payload.message || 'Unable to load fee collection data.');
       }
 
-      const source = payload.data ?? payload;
-      const loadedMonths = toMonths(source.unpaid_months ?? source.months);
-
-      setStudent(toStudentInfo(source.student));
-      setSummaryRows(toSummaryRows(source.fee_summary ?? source.summary));
-      setMonths(loadedMonths);
-      setBanks(toOptions(source.banks));
-      setSelectedMonthIds(loadedMonths.map((month) => month.id));
-      setExpandedMonthId(loadedMonths[0]?.id ?? null);
+      applyCollectionData(payload);
     } catch (fetchError) {
       loadDummyCollection(fetchError instanceof Error ? fetchError.message : 'Unable to load fee collection data.');
     } finally {
       setLoading(false);
     }
-  }, [loadDummyCollection, session, studentId]);
+  }, [applyCollectionData, loadDummyCollection, session, studentId]);
 
   useEffect(() => {
     // The detail page loads once after route params and browser session storage are available.
@@ -380,46 +436,104 @@ export default function FeesCollectionStudentPage() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/fees/collect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
-        },
-        body: JSON.stringify({
-          type: 'API',
-          student_id: studentId,
-          sub_institute_id: session.subInstituteId,
-          academic_year_id: session.academicYearId,
-          user_id: session.userId,
-          month_ids: selectedMonthIds,
-          particulars: selectedParticulars.map((particular) => ({
-            id: particular.id,
-            month_id: particular.monthId,
-            collection_amount: particular.collectionAmount,
-          })),
-          remarks,
-          discount,
-          fine,
-          grand_total: grandTotal,
-          payment_mode: paymentMode,
-          receipt_date: receiptDate,
-          cheque_dd_date: showChequeDate ? chequeDate : '',
-          transaction_no: paymentMode !== 'Cash' ? transactionNo : '',
-          bank_name: showBankFields ? bankName : '',
-          bank_branch: showBranch ? bankBranch : '',
-          send_sms: sendSms ? 1 : 0,
-          print_receipt: printReceipt ? 1 : 0,
-        }),
+      const apiBaseUrl = (session.hostName || API_BASE_URL || '').replace(/\/$/, '');
+      if (!apiBaseUrl || !session.academicYearId) {
+        throw new Error('Session API details are missing.');
+      }
+
+      const source = collectionData ?? {};
+      const studentRecord = asRecord(source.stu_data ?? source.student);
+      const chequeReturnCharges = toNumberArray(source.cheque_return_charges).reduce((total, item) => total + item, 0);
+      const form = new FormData();
+      const fullName = readString(studentRecord.name) || [
+        studentRecord.first_name,
+        studentRecord.middle_name,
+        studentRecord.last_name,
+      ].map(readString).filter(Boolean).join(' ');
+
+      form.append('grade_id', readString(studentRecord.grade_id));
+      form.append('standard_id', readString(studentRecord.standard_id ?? studentRecord.std_id));
+      form.append('div_id', readString(studentRecord.div_id ?? studentRecord.division_id));
+      form.append('student_id', readString(studentRecord.student_id ?? studentId));
+      form.append('std_div', readString(studentRecord.stddiv ?? student?.standardDivision));
+      form.append('full_name', fullName || readString(student?.studentName));
+      form.append('mobile', readString(studentRecord.mobile ?? student?.contactNumber));
+      form.append('uniqueid', readString(studentRecord.uniqueid ?? studentRecord.unique_id ?? student?.uniqueId));
+      form.append('enrollment', readString(studentRecord.enrollment ?? student?.grNo));
+      form.append('roll_no', readString(studentRecord.roll_no));
+      form.append('medium', readString(studentRecord.medium));
+      form.append('first_name', readString(studentRecord.first_name));
+      form.append('middle_name', readString(studentRecord.middle_name));
+      form.append('last_name', readString(studentRecord.last_name));
+      form.append('father_name', readString(studentRecord.father_name ?? student?.fatherName));
+      form.append('mother_name', readString(studentRecord.mother_name));
+      form.append('student_batch', readString(studentRecord.student_batch));
+      form.append('pan_card', readString(studentRecord.pan_card));
+
+      selectedMonthIds.forEach((monthId) => {
+        form.append(`months[${monthId}]`, monthId);
       });
 
-      const payload = await response.json().catch(() => ({})) as { message?: string; receipt_url?: string };
+      const particularTotals = new Map<string, { collectionAmount: number; amount: number }>();
+      selectedParticulars.forEach((particular) => {
+        const current = particularTotals.get(particular.id) ?? { collectionAmount: 0, amount: 0 };
+        particularTotals.set(particular.id, {
+          collectionAmount: current.collectionAmount + particular.collectionAmount,
+          amount: current.amount + particular.amount,
+        });
+      });
+
+      particularTotals.forEach((particular, particularId) => {
+        form.append(`fees_data[${particularId}]`, String(particular.collectionAmount));
+        form.append(`fine_data[${particularId}]`, '0');
+        form.append(`hid_fees_data[${particularId}]`, String(particular.amount));
+        form.append(`discount_data[${particularId}]`, '0');
+      });
+
+      const previousFees = readNumber(studentRecord.previous_fees);
+      form.append('fees_data[previous_fees]', '0');
+      form.append('fine_data[previous_fees]', '0');
+      form.append('hid_fees_data[previous_fees]', String(previousFees));
+      form.append('discount_data[previous_fees]', '0');
+      form.append('total', String(totalAmount));
+      form.append('totalFin', String(fine));
+      form.append('remarks', remarks);
+      form.append('totalDis', String(discount));
+      form.append('hidden_cheque_return_charges', String(chequeReturnCharges));
+      form.append('PAYMENT_MODE', paymentMode);
+      form.append('receiptdate', receiptDate);
+      form.append('cheque_date', chequeDate || receiptDate);
+      form.append('cheque_no', paymentMode !== 'Cash' ? transactionNo : '');
+      form.append('bank_name', showBankFields ? bankName : '');
+      form.append('bank_branch', showBranch ? bankBranch : 'N/A');
+      form.append('submit', 'Save');
+      form.append('sub_institute_id', session.subInstituteId);
+      form.append('syear', session.academicYearId);
+      form.append('type', 'API');
+
+      const response = await fetch(`${apiBaseUrl}/fees/fees_collect`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
+        body: form,
+      });
+
+      const responseText = await response.text();
+      const payload = parseJsonResponse(responseText) as ReceiptResponse;
       if (!response.ok) {
         throw new Error(payload.message || 'Unable to save fee collection.');
       }
 
-      if (printReceipt && payload.receipt_url) {
-        router.push(payload.receipt_url);
+      if (printReceipt) {
+        const html = extractReceiptHtml(payload, responseText);
+        if (!html) {
+          throw new Error('Fee collection saved, but receipt HTML was not found in the API response.');
+        }
+
+        setReceiptHtml(html);
+        window.setTimeout(() => receiptRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
         return;
       }
 
@@ -429,6 +543,22 @@ export default function FeesCollectionStudentPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const printCurrentReceipt = () => {
+    if (!receiptHtml || typeof window === 'undefined') return;
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+      setError('Receipt is ready, but the print window was blocked by the browser.');
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html><html><head><title>Fees Receipt</title></head><body>${receiptHtml}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   if (loading) {
@@ -462,6 +592,21 @@ export default function FeesCollectionStudentPage() {
         </div>
 
         {error && <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
+
+        {receiptHtml && (
+          <Card ref={receiptRef} className="border-emerald-200 bg-white shadow-sm">
+            <CardHeader className="flex flex-col gap-3 border-b border-emerald-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-base font-bold text-emerald-800">Receipt Preview</CardTitle>
+              <Button type="button" size="sm" className="h-9 rounded-lg bg-slate-900 text-white hover:bg-slate-800" onClick={printCurrentReceipt}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print Receipt
+              </Button>
+            </CardHeader>
+            <CardContent className="overflow-x-auto bg-slate-50 p-4">
+              <div className="mx-auto min-w-[720px] max-w-[900px] bg-white p-4 shadow-sm" dangerouslySetInnerHTML={{ __html: receiptHtml }} />
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-slate-200/80 bg-white shadow-sm">
           <CardHeader className="border-b border-slate-100 px-5 py-4">
@@ -783,7 +928,7 @@ function Info({ label, value, valueClassName = 'text-slate-900' }: { label: stri
 
 function getSessionContext(): SessionContext {
   if (typeof window === 'undefined') {
-    return { token: '', subInstituteId: '', userId: '', academicYearId: '' };
+    return { token: '', subInstituteId: '', userId: '', academicYearId: '', hostName: '' };
   }
 
   try {
@@ -791,13 +936,14 @@ function getSessionContext(): SessionContext {
     const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
 
     return {
-      token: readString(userData.token),
+      token: readString(userData.user_token ?? userData.token),
       subInstituteId: readString(userData.sub_institute_id ?? menuContext.sub_institute_id),
       userId: readString(userData.user_id ?? menuContext.user_id),
-      academicYearId: readString(userData.academic_year_id ?? userData.academicYearId),
+      academicYearId: readString(localStorage.getItem('selectedAcademicYear') || (userData.academic_year_id ?? userData.academicYearId)),
+      hostName: readString(userData.host_name),
     };
   } catch {
-    return { token: '', subInstituteId: '', userId: '', academicYearId: '' };
+    return { token: '', subInstituteId: '', userId: '', academicYearId: '', hostName: '' };
   }
 }
 
@@ -805,16 +951,16 @@ function toStudentInfo(value: unknown): StudentInfo {
   const record = asRecord(value);
 
   return {
-    uniqueId: readString(record.unique_id ?? record.uniqueId ?? record.id ?? record.student_id),
+    uniqueId: readString(record.uniqueid ?? record.unique_id ?? record.uniqueId ?? record.id ?? record.student_id),
     studentName: readString(record.student_name ?? record.name ?? record.full_name),
-    grNo: readString(record.gr_no ?? record.grNo ?? record.gr_number),
-    admissionYear: readString(record.admission_year ?? record.admissionYear),
-    standardDivision: readString(record.standard_division ?? record.standardDivision ?? [record.standard_name ?? record.standard, record.division_name ?? record.division].filter(Boolean).join(' / ')),
+    grNo: readString(record.gr_no ?? record.grNo ?? record.gr_number ?? record.enrollment_no ?? record.enrollment),
+    admissionYear: readString(record.admission_year ?? record.admissionYear ?? record.admission),
+    standardDivision: readString(record.stddiv ?? record.standard_division ?? record.standardDivision ?? [record.standard_name ?? record.standard, record.division_name ?? record.division].filter(Boolean).join(' / ')),
     fatherName: readString(record.father_name ?? record.fatherName),
     contactNumber: readString(record.contact_number ?? record.mobile ?? record.phone),
     parentEmail: readString(record.parent_email ?? record.email),
     studentQuota: readString(record.student_quota ?? record.quota),
-    pendingFees: readNumber(record.pending_fees ?? record.pendingFees ?? record.remaining ?? record.balance),
+    pendingFees: readNumber(record.pending_fees ?? record.pendingFees ?? record.pending ?? record.remaining ?? record.balance),
   };
 }
 
@@ -824,6 +970,11 @@ function toSummaryRows(value: unknown): SummaryRow[] {
   }
 
   const record = asRecord(value);
+  const objectRows = Object.values(record).filter((item) => item && typeof item === 'object');
+  if (objectRows.length > 0) {
+    return objectRows.map(toSummaryRow);
+  }
+
   return ['current_month', 'previous_fees', 'total']
     .map((key) => record[key])
     .filter(Boolean)
@@ -835,33 +986,49 @@ function toSummaryRow(value: unknown): SummaryRow {
 
   return {
     label: readString(record.month ?? record.label ?? record.title ?? record.name),
-    fees: readNumber(record.fees ?? record.amount ?? record.total_fees),
+    fees: readNumber(record.fees ?? record.amount ?? record.total_fees ?? record.bk),
     paid: readNumber(record.paid ?? record.paid_amount),
     discount: readNumber(record.discount ?? record.discount_amount),
-    remaining: readNumber(record.remaining ?? record.remaining_amount ?? record.balance),
+    remaining: readNumber(record.remaining ?? record.remaining_amount ?? record.remain ?? record.balance),
   };
 }
 
-function toMonths(value: unknown): FeeMonth[] {
-  if (!Array.isArray(value)) return [];
+function toMonths(value: unknown, finalFee?: unknown, finalFeeName?: unknown): FeeMonth[] {
+  const items = Array.isArray(value) ? value : Object.values(asRecord(value));
 
-  return value.map((item) => {
+  return items.map((item) => {
     const record = asRecord(item);
     const id = readString(record.id ?? record.month_id ?? record.month);
+    const remaining = readNumber(record.remaining ?? record.remain ?? record.balance ?? record.bk);
     return {
       id,
       label: readString(record.month ?? record.label ?? record.name),
-      particulars: toParticulars(record.particulars ?? record.fee_particulars ?? record.details),
+      particulars: toParticulars(record.particulars ?? record.fee_particulars ?? record.details, finalFee, finalFeeName, remaining),
     };
   }).filter((month) => month.id);
 }
 
-function toParticulars(value: unknown): FeeParticular[] {
-  if (!Array.isArray(value)) return [];
+function toParticulars(value: unknown, finalFee?: unknown, finalFeeName?: unknown, fallbackAmount = 0): FeeParticular[] {
+  if (!Array.isArray(value)) {
+    const finalFeeRecord = asRecord(finalFee);
+    const finalFeeNameRecord = asRecord(finalFeeName);
+    const finalFeeRows = Object.entries(finalFeeRecord)
+      .filter(([name]) => name.toLowerCase() !== 'total')
+      .map(([name, amount]) => ({
+        id: readString(finalFeeNameRecord[name] ?? name),
+        particular: name,
+        amount: readNumber(amount),
+        collectionAmount: readNumber(amount),
+      }))
+      .filter((particular) => particular.id);
+
+    if (finalFeeRows.length > 0) return finalFeeRows;
+    return fallbackAmount > 0 ? [{ id: 'total', particular: 'Fees', amount: fallbackAmount, collectionAmount: fallbackAmount }] : [];
+  }
 
   return value.map((item) => {
     const record = asRecord(item);
-    const amount = readNumber(record.amount ?? record.fees ?? record.due_amount);
+    const amount = readNumber(record.amount ?? record.fees ?? record.due_amount ?? record.remain);
     return {
       id: readString(record.id ?? record.particular_id ?? record.fee_head_id ?? record.particular),
       particular: readString(record.particular ?? record.name ?? record.fee_head ?? record.title),
@@ -869,6 +1036,17 @@ function toParticulars(value: unknown): FeeParticular[] {
       collectionAmount: readNumber(record.collection_amount ?? record.collectionAmount ?? record.remaining ?? amount),
     };
   }).filter((particular) => particular.id);
+}
+
+function toPaymentModes(value: unknown): SelectOption[] {
+  if (Array.isArray(value)) return toOptions(value);
+
+  const modes = Object.entries(asRecord(value)).map(([id, label]) => ({
+    id,
+    label: readString(label) || id,
+  })).filter((mode) => mode.id && mode.label);
+
+  return modes.length > 0 ? modes : defaultPaymentModes;
 }
 
 function toOptions(items: unknown): SelectOption[] {
@@ -893,4 +1071,63 @@ function readString(value: unknown): string {
 function readNumber(value: unknown): number {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function toNumberArray(value: unknown): number[] {
+  if (Array.isArray(value)) return value.map(readNumber);
+  const numericValue = readNumber(value);
+  return numericValue ? [numericValue] : [];
+}
+
+function parseJsonResponse(value: string): unknown {
+  if (!value.trim()) return {};
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+function extractReceiptHtml(payload: unknown, rawResponse: string): string {
+  const directHtml = extractHtmlString(rawResponse);
+  if (directHtml) return directHtml;
+
+  return extractHtmlFromUnknown(payload);
+}
+
+function extractHtmlFromUnknown(value: unknown): string {
+  const directHtml = extractHtmlString(value);
+  if (directHtml) return directHtml;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const html = extractHtmlFromUnknown(item);
+      if (html) return html;
+    }
+    return '';
+  }
+
+  const record = asRecord(value);
+  for (const key of ['data', 'html', 'receipt', 'receipt_html', 'receiptHtml']) {
+    const html = extractHtmlFromUnknown(record[key]);
+    if (html) return html;
+  }
+
+  return '';
+}
+
+function extractHtmlString(value: unknown): string {
+  if (typeof value !== 'string') return '';
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return '';
+
+  if (trimmedValue.startsWith('{') || trimmedValue.startsWith('[')) {
+    const parsedValue = parseJsonResponse(trimmedValue);
+    const parsedHtml = extractHtmlFromUnknown(parsedValue);
+    if (parsedHtml) return parsedHtml;
+  }
+
+  return /<\s*(style|table|div|html|body)\b/i.test(trimmedValue) ? trimmedValue : '';
 }

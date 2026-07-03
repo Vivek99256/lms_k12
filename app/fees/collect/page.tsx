@@ -35,6 +35,7 @@ type StudentFeeRow = {
   standard: string;
   section: string;
   pendingFees: number;
+  mobile?: string;
 };
 
 const currencyFormatter = new Intl.NumberFormat('en-IN', {
@@ -63,10 +64,10 @@ const dummyDivisions: SelectOption[] = [
 ];
 
 const dummyStudents: StudentFeeRow[] = [
-  { id: '1020', name: 'Rahul Patel', grNo: '1020', standard: '6', section: 'C', pendingFees: 52310 },
-  { id: '1021', name: 'Priya Sharma', grNo: '1021', standard: '7', section: 'A', pendingFees: 18450 },
-  { id: '1022', name: 'Arjun Singh', grNo: '1022', standard: '8', section: 'B', pendingFees: 32700 },
-  { id: '1023', name: 'Isha Mehta', grNo: '1023', standard: '6', section: 'A', pendingFees: 9600 },
+  { id: '1020', name: 'Rahul Patel', grNo: '1020', standard: '6', section: 'C', pendingFees: 52310, mobile: '9876543210' },
+  { id: '1021', name: 'Priya Sharma', grNo: '1021', standard: '7', section: 'A', pendingFees: 18450, mobile: '9876543211' },
+  { id: '1022', name: 'Arjun Singh', grNo: '1022', standard: '8', section: 'B', pendingFees: 32700, mobile: '9876543212' },
+  { id: '1023', name: 'Isha Mehta', grNo: '1023', standard: '6', section: 'A', pendingFees: 9600, mobile: '9876543213' },
 ];
 
 export default function FeesCollectPage() {
@@ -83,6 +84,7 @@ export default function FeesCollectPage() {
   const [levels, setLevels] = useState<SelectOption[]>([]);
   const [students, setStudents] = useState<StudentFeeRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [collectingStudentId, setCollectingStudentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
 
@@ -292,13 +294,14 @@ export default function FeesCollectPage() {
   const loadDummyStudents = useCallback((isSearch = false) => {
     const queryName = studentName.trim().toLowerCase();
     const queryGrNo = grNo.trim().toLowerCase();
+    const queryMobile = mobile.trim().toLowerCase();
 
     const filteredStudents = dummyStudents.filter((student) => {
       const matchesStandard = !standard || student.standard === standard;
       const matchesDivision = !division || student.section === division;
       const matchesName = !queryName || student.name.toLowerCase().includes(queryName);
       const matchesGrNo = !queryGrNo || student.grNo.toLowerCase().includes(queryGrNo);
-      const matchesMobile = !mobile.trim();
+      const matchesMobile = !queryMobile || (student.mobile && student.mobile.toLowerCase().includes(queryMobile));
 
       return matchesStandard && matchesDivision && matchesName && matchesGrNo && matchesMobile;
     });
@@ -346,9 +349,13 @@ export default function FeesCollectPage() {
       const form = new URLSearchParams();
       form.append('sub_institute_id', String(subInstituteId));
       form.append('syear', String(academicYearId));
-      form.append('grade', String(level));
-      form.append('standard', String(standard));
-      form.append('division', String(division));
+      if (level) form.append('grade', String(level));
+      if (standard) form.append('standard', String(standard));
+      if (division) form.append('division', String(division));
+      if (studentName.trim()) form.append('stu_name', studentName.trim());
+      if (grNo.trim()) form.append('grno', grNo.trim());
+      if (mobile.trim()) form.append('mobile', mobile.trim());
+      if (includeInactive) form.append('include_inactive', '1');
       form.append('type', 'API');
 
       const res = await fetch(`${hostName.replace(/\/$/, '')}/fees/fees_collect/show_student`, {
@@ -369,7 +376,19 @@ export default function FeesCollectPage() {
       const source = payload.data ?? payload;
       const items = Array.isArray(source) ? source : (source.stu_data ?? source.students ?? []);
 
-      setStudents(toStudentRows(items));
+      const allStudents = toStudentRows(items);
+      const queryName = studentName.trim().toLowerCase();
+      const queryGrNo = grNo.trim().toLowerCase();
+      const queryMobile = mobile.trim().toLowerCase();
+
+      const filteredStudents = allStudents.filter((student) => {
+        const matchesName = !queryName || student.name.toLowerCase().includes(queryName);
+        const matchesGrNo = !queryGrNo || student.grNo.toLowerCase().includes(queryGrNo);
+        const matchesMobile = !queryMobile || (student.mobile && student.mobile.toLowerCase().includes(queryMobile));
+        return matchesName && matchesGrNo && matchesMobile;
+      });
+
+      setStudents(filteredStudents);
       setSearched(isSearch);
     } catch (fetchError) {
       const message = fetchError instanceof Error ? fetchError.message : 'Unable to load student fees list.';
@@ -378,7 +397,53 @@ export default function FeesCollectPage() {
     } finally {
       setLoading(false);
     }
-  }, [division, level, loadDummyStudents, session, standard]);
+  }, [division, includeInactive, level, loadDummyStudents, mobile, session, standard, studentName, grNo]);
+
+  const handleCollectFees = useCallback(async (studentId: string) => {
+    const currentSession = getSessionContext();
+    const hostName = currentSession.hostName.replace(/\/$/, '');
+    const academicYearId = currentSession.academicYearId || session.academicYearId;
+
+    if (!hostName || !currentSession.subInstituteId || !academicYearId) {
+      setError('Unable to open fee collection because session data is missing.');
+      return;
+    }
+
+    setCollectingStudentId(studentId);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({
+        sub_institute_id: currentSession.subInstituteId,
+        syear: academicYearId,
+        type: 'API',
+      });
+
+      const res = await fetch(`${hostName}/fees/fees_collect/${encodeURIComponent(studentId)}/edit?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          ...(currentSession.token ? { Authorization: `Bearer ${currentSession.token}` } : {}),
+        },
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message = asRecord(payload).message;
+        throw new Error(message ? String(message) : `HTTP ${res.status}: Unable to load fee collection data.`);
+      }
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`feesCollectData:${studentId}`, JSON.stringify(payload));
+      }
+
+      router.push(`/fees/collect/${encodeURIComponent(studentId)}`);
+    } catch (collectError) {
+      setError(collectError instanceof Error ? collectError.message : 'Unable to load fee collection data.');
+    } finally {
+      setCollectingStudentId(null);
+    }
+  }, [router, session.academicYearId]);
 
   const totalPending = students.reduce((total, student) => total + student.pendingFees, 0);
 
@@ -544,8 +609,10 @@ export default function FeesCollectPage() {
                             type="button"
                             size="sm"
                             className="h-8 rounded-lg bg-[#0D6EFD] px-3 text-xs text-white hover:bg-[#0D6EFD]/90"
-                            onClick={() => router.push(`/fees/collect/${encodeURIComponent(student.id)}`)}
+                            disabled={collectingStudentId === student.id}
+                            onClick={() => handleCollectFees(student.id)}
                           >
+                            {collectingStudentId === student.id && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
                             Collect Fees
                           </Button>
                         </td>
@@ -632,13 +699,16 @@ function toStudentRows(items: unknown): StudentFeeRow[] {
     const middleName = readString(record.middle_name);
     const lastName = readString(record.last_name);
     const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
+    const stddiv = readString(record.stddiv);
+    const stddivParts = stddiv ? stddiv.split(/\s*\/\s*/) : [];
     return {
       id: readString(record.id ?? record.student_id ?? record.studentId ?? record.unique_id),
       name: readString(record.student_name ?? record.name ?? record.full_name ?? fullName),
-      grNo: readString(record.gr_no ?? record.grNo ?? record.gr_number ?? record.enrollment_no),
-      standard: readString(record.standard ?? record.standard_name ?? record.class_name),
-      section: readString(record.section ?? record.section_name ?? record.division ?? record.division_name),
-      pendingFees: readNumber(record.pending_fees ?? record.pendingFees ?? record.remaining ?? record.balance ?? record.bkoff),
+      grNo: readString(record.gr_no ?? record.grNo ?? record.gr_number ?? record.enrollment_no ?? record.enrollment),
+      standard: readString(record.standard ?? record.standard_name ?? record.class_name) || stddivParts[0],
+      section: readString(record.section ?? record.section_name ?? record.division ?? record.division_name) || stddivParts[1],
+      mobile: readString(record.mobile ?? record.phone ?? record.contact_no ?? record.mobile_number),
+      pendingFees: readNumber(record.pending_fees ?? record.pendingFees ?? record.remaining ?? record.balance ?? record.bkoff ?? record.pending),
     };
   }).filter((student) => student.id);
 }
