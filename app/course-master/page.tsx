@@ -452,10 +452,13 @@ export default function CourseMasterPage() {
                           <FileCheck size={12} />
                           Assessment
                         </button>
-                        <button className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 transition-all">
-                          <GraduationCap size={12} />
-                          Curriculum
-                        </button>
+<button
+                           onClick={() => router.push(`/course-master/lesson-plan/${course.id}/curriculum`)}
+                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-all"
+                         >
+                           <GraduationCap size={12} />
+                           Curriculum
+                         </button>
                       </div>
                     </div>
                   </div>

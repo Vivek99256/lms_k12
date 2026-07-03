@@ -466,9 +466,7 @@ export default function FeesCollectPage() {
 
               <Field label="Search Division" icon={<Users size={12} />}>
                 <Select value={division} onValueChange={(value) => setDivision(value ?? '')}>
-                  <SelectTrigger variant="soft">
-                    <SelectValue placeholder="Select division" />
-                  <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
+                  <SelectTrigger variant="soft" className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
                     <SelectValue placeholder="Select division">
                       {(selectedValue) => {
                         if (!selectedValue) return 'Select division';
