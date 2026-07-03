@@ -4,7 +4,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SubmenuItem, Level3Item as MenuLevel3Item } from '@/app/data/menuItems';
-import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 
 interface Level3ItemProps {
   label: string;
@@ -129,16 +128,17 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [] }
             onScroll={checkScrollability}
           >
             {items.map((item, idx) => {
-              const isActive = pathname === item.href.toLowerCase();
+              // Use href which is already resolved by resolveRoute in menuMappers
+              // link field preserves original API value if needed
+              const navigateRoute = item.href;
+              const isActive = pathname === navigateRoute.toLowerCase();
+              
               const handleClick = () => {
-                // Use link field if available, otherwise use href
-                if (item.link) {
-                  const route = mapApiLinkToRoute(item.link);
-                  router.push(route);
-                } else {
-                  router.push(item.href);
+                if (navigateRoute && navigateRoute !== '#') {
+                  router.push(navigateRoute);
                 }
               };
+              
               return (
                 <button
                   key={idx}
