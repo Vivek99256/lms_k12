@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Banknote, Filter, Loader2, Phone, Search, UserRound, GraduationCap, BookOpen, Users } from 'lucide-react';
-import { API_BASE_URL } from '@/app/components/utils/api_url';
-import { Banknote, Filter, Loader2, Phone, Search, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -418,11 +416,7 @@ export default function FeesCollectPage() {
                 fetchStudents(true);
               }}
             >
-              <Field label="Search Section" icon={<GraduationCap size={12} />}>
-                <Select value={level} onValueChange={(value) => setLevel(value ?? '')}>
-                  <SelectTrigger variant="soft">
-                    <SelectValue placeholder="Select section" />
-              <Field label="Search Section">
+<Field label="Search Section" icon={<GraduationCap size={12} />}>
                 <Select value={level} onValueChange={(value) => { setLevel(value ?? ''); setStandard(''); setDivision(''); }}>
                   <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
                     <SelectValue placeholder="Select section">
@@ -442,10 +436,6 @@ export default function FeesCollectPage() {
               </Field>
 
               <Field label="Search Standard" icon={<BookOpen size={12} />}>
-                <Select value={standard} onValueChange={(value) => setStandard(value ?? '')}>
-                  <SelectTrigger variant="soft">
-                    <SelectValue placeholder="Select standard" />
-              <Field label="Search Standard">
                 <Select value={standard} onValueChange={(value) => { setStandard(value ?? ''); setDivision(''); }}>
                   <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
                     <SelectValue placeholder="Select standard">
