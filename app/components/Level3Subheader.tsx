@@ -20,6 +20,7 @@ interface Level3SubheaderProps {
   fetchedMasterItems?: SubmenuItem[];
   masterLoading?: boolean;
   masterMenuGroups?: Record<string, unknown>[];
+  userProfileName?: string;
 }
 
 function getPathFromUrl(url: string): string {
@@ -30,15 +31,41 @@ function getPathFromUrl(url: string): string {
   }
 }
 
-export default function Level3Subheader({ items, parentLabel, masterItems = [], fetchedMasterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
+function hasMasterAccess(userProfileName: string): boolean {
+  const role = userProfileName.trim().toLowerCase();
+  return role === 'admin' || role === 'teacher';
+}
+
+export default function Level3Subheader({ items, parentLabel, masterItems = [], fetchedMasterItems = [], masterLoading = false, masterMenuGroups = [], userProfileName = '' }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
   const [showMasterDropdown, setShowMasterDropdown] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [selectedMasterCategory, setSelectedMasterCategory] = useState<string | number | null>(null);
+  const [selectedMasterCategory, setSelectedMasterCategory] = useState<string | number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('selectedMasterCategory');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && masterMenuGroups.some((g) => (g.id as string | number) === parsed)) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const tabsWrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (selectedMasterCategory) {
+      localStorage.setItem('selectedMasterCategory', JSON.stringify(selectedMasterCategory));
+    } else {
+      localStorage.removeItem('selectedMasterCategory');
+    }
+  }, [selectedMasterCategory]);
 
   const checkScrollability = () => {
     const el = containerRef.current;
@@ -169,7 +196,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
           )}
         </div>
 
-        {masterItems.length > 0 && (
+        {hasMasterAccess(userProfileName) && masterItems.length > 0 && (
           <div className="relative shrink-0" data-master-dropdown>
             <button
               type="button"
