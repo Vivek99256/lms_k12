@@ -39,6 +39,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [level2Panel, setLevel2Panel] = useState<Level2PanelState | null>(null);
   const panelCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sidebarLeaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const openLevel2Panel = (item: MenuItem, element: HTMLElement) => {
     if (!item.submenus?.length) return;
