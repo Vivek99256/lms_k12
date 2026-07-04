@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { ChevronRight, Menu, RefreshCw } from 'lucide-react';
-import { MenuItem, SubmenuItem } from '@/app/data/menuItems';
+import { MenuItem, SubmenuItem, Level3Item } from '@/app/data/menuItems';
+import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 
 interface SidebarProps {
   menuItems: MenuItem[];
@@ -152,8 +153,10 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
     onLevel2Select(submenu, level2Panel.item);
     setLevel2Panel(null);
 
-    if (submenu.href && submenu.href !== '#') {
-      router.push(submenu.href);
+    // Use 'link' from API, fallback to 'href', map through routeMapper
+    const navigateRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href;
+    if (navigateRoute && navigateRoute !== '#') {
+      router.push(navigateRoute);
     }
   };
 
