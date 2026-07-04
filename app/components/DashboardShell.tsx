@@ -84,35 +84,20 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, [selectedBranch]);
   const [isChatbotOpen, setIsChatbotOpen] = useState(true);
 
-  const [fetchedMasterMenuItems, setFetchedMasterMenuItems] = useState<SubmenuItem[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = localStorage.getItem('masterMenuState');
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.fetchedMasterMenuItems)) {
-        return parsed.fetchedMasterMenuItems;
-      }
-    } catch {}
-    return [];
-  });
+  const [userProfileName, setUserProfileName] = useState('');
 
-  const [masterMenuGroups, setMasterMenuGroups] = useState<Record<string, unknown>[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = localStorage.getItem('masterMenuState');
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.masterMenuGroups)) {
-        return parsed.masterMenuGroups;
-      }
-    } catch {}
-    return [];
-  });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUserProfileName((prev) => {
+      const ctx = getStoredMenuContext();
+      return ctx?.user_profile_name ? ctx.user_profile_name.toString().trim() : prev;
+    });
+  }, []);
 
+  const [fetchedMasterMenuItems, setFetchedMasterMenuItems] = useState<SubmenuItem[]>([]);
+  const [masterMenuGroups, setMasterMenuGroups] = useState<Record<string, unknown>[]>([]);
   const [masterMenuLoading, setMasterMenuLoading] = useState(false);
-
-  const userProfileName = (getStoredMenuContext()?.user_profile_name || '').toString().trim();
+  const [masterMenuFetchedFor, setMasterMenuFetchedFor] = useState<string | null>(null);
 
   const isKnownMenuPath = useCallback((checkPath: string): boolean => {
     const lower = (checkPath || '').toLowerCase();
@@ -134,8 +119,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return false;
   }, [menuItems]);
 
-   const fetchMasterMenu = async (mainMenuId: number | string | undefined, menuItem: SubmenuItem | undefined) => {
+   const fetchMasterMenu = useCallback(async (mainMenuId: number | string | undefined, menuItem: SubmenuItem | undefined) => {
     if (!mainMenuId || !menuItem) return;
+
+    const cacheKey = `${mainMenuId}-${menuItem.id}`;
+    if (masterMenuFetchedFor === cacheKey) return;
 
     const session = getStoredMenuContext();
     if (!session) return;
@@ -192,13 +180,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       const filtered = getFilteredMasterMenuItems(mapped, menuItem);
       setFetchedMasterMenuItems(filtered);
       setMasterMenuGroups(rawData.length > 0 && (rawData[0] as Record<string, unknown>).url ? [] : rawData);
+      setMasterMenuFetchedFor(cacheKey);
     } catch {
       setFetchedMasterMenuItems([]);
       setMasterMenuGroups([]);
     } finally {
       setMasterMenuLoading(false);
     }
-  };
+  }, [masterMenuFetchedFor]);
 
   useEffect(() => {
     if (!hasLoadedRef.current && selectedBranch && menuItems.length > 1) {
@@ -248,6 +237,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       level1Key: getMenuKey(parent),
       level2Key: getMenuKey(submenu),
     });
+    setMasterMenuFetchedFor(null);
 
     await fetchMasterMenu(parent.id, submenu);
 
@@ -263,6 +253,16 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (!selectedBranch?.level1Key) return null;
     return menuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key) ?? null;
   }, [menuItems, selectedBranch]);
+
+  useEffect(() => {
+    if (!selectedBranch?.level2Key || !selectedL1 || masterMenuFetchedFor) return;
+
+      const selectedLevel2 = selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key);
+      if (selectedLevel2) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        fetchMasterMenu(selectedL1.id, selectedLevel2);
+      }
+  }, [selectedBranch, selectedL1, masterMenuFetchedFor, fetchMasterMenu]);
 
   const staticMasterMenuItems = useMemo(() => {
     if (!selectedL1) return [];
