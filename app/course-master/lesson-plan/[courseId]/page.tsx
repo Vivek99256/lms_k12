@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -14,8 +14,6 @@ import {
   FileCheck,
   GraduationCap,
   Layers3,
-  Lightbulb,
-  MapPinned,
   Sparkles,
   Target,
   Users,
@@ -89,10 +87,6 @@ export default function LessonPlanPage() {
   const selectedConcept = semanticData?.concept || chapterConcepts?.concepts[0] || null;
   const [activeSemanticSection, setActiveSemanticSection] = useState('knowledge');
 
-  useEffect(() => {
-    setActiveSemanticSection('knowledge');
-  }, [selectedConcept?.title]);
-
   if (!course) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50/50">
@@ -116,259 +110,204 @@ export default function LessonPlanPage() {
     null;
 
   return isSemanticIntelligenceView ? (
-    <div className="min-h-screen bg-slate-50/30">
-      <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-6 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                <button
-                  type="button"
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.08),_transparent_28%),linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,1))]">
+      <div className="mx-auto max-w-[1720px] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="relative mb-6 overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_24px_80px_-36px_rgba(15,23,42,0.28)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_38%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.14),_transparent_32%)]" />
+          <div className="relative border-b border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(248,250,252,0.92))] px-5 py-6 sm:px-6 sm:py-7 lg:px-8">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/course-master/${course.id}/chapters`)}
+                    className="font-medium text-slate-600 transition-colors hover:text-slate-900"
+                  >
+                    Chapter List
+                  </button>
+                  <ChevronRight size={14} className="text-slate-400" />
+                  <span>{course.title}</span>
+                  <ChevronRight size={14} className="text-slate-400" />
+                  <span className="font-medium text-slate-700">{selectedChapter?.title}</span>
+                  <ChevronRight size={14} className="text-slate-400" />
+                  <span className="font-semibold text-slate-900">Semantic Intelligence</span>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <Badge className="rounded-full bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm">
+                      Semantic Intelligence
+                    </Badge>
+                    <Badge className="rounded-full border border-blue-100 bg-blue-50 px-3.5 py-1.5 text-xs font-semibold text-blue-700">
+                      {semanticData?.totalConcepts} concepts
+                    </Badge>
+                    <Badge className="rounded-full border border-sky-100 bg-sky-50 px-3.5 py-1.5 text-xs font-semibold text-sky-700">
+                      {selectedConcept?.mastery ?? '-'}
+                    </Badge>
+                  </div>
+                  <h1 className="max-w-5xl text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl xl:text-[3rem] xl:leading-[1.05]">
+                    {selectedConcept?.title}
+                  </h1>
+                  <p className="max-w-5xl text-base leading-7 text-slate-600 sm:text-[1.05rem]">
+                    {selectedConcept?.description}
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                    <p className="max-w-5xl text-sm leading-6 text-slate-500 sm:text-[0.95rem]">
+                      {semanticData?.chapterSummary}
+                    </p>
+                    <div className="w-fit rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        Active focus
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                        {activeSemanticSectionData?.title ?? 'Overview'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3 xl:justify-end">
+                <Button
+                  variant="outline"
                   onClick={() => router.push(`/course-master/${course.id}/chapters`)}
-                  className="font-medium text-slate-600 transition-colors hover:text-slate-900"
+                  className="h-11 rounded-2xl border-slate-200 bg-white/95 px-5 text-slate-700 shadow-sm hover:border-slate-300 hover:bg-white"
                 >
-                  Chapter List
-                </button>
-                <ChevronRight size={14} className="text-slate-400" />
-                <span>{course.title}</span>
-                <ChevronRight size={14} className="text-slate-400" />
-                <span className="font-medium text-slate-700">{selectedChapter?.title}</span>
-                <ChevronRight size={14} className="text-slate-400" />
-                <span className="font-semibold text-slate-900">Semantic Intelligence</span>
-              </div>
-
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                  {selectedConcept?.title}
-                </h1>
-                <p className="mt-2 max-w-4xl text-base leading-7 text-slate-600">
-                  {semanticData?.chapterSummary}
-                </p>
+                  <BookOpen size={16} className="mr-2" />
+                  Chapters
+                </Button>
+                <Button
+                  onClick={() =>
+                    router.push(
+                      `/course-master/lesson-plan/${course.id}?view=key-concepts&chapterId=${selectedChapter?.id ?? ''}${
+                        selectedConcept?.title ? `&concept=${encodeURIComponent(selectedConcept.title)}` : ''
+                      }`
+                    )
+                  }
+                  className="h-11 rounded-2xl bg-blue-600 px-5 text-white shadow-[0_16px_32px_-18px_rgba(37,99,235,0.75)] hover:bg-blue-700"
+                >
+                  <ClipboardList size={16} className="mr-2" />
+                  Key Concepts
+                </Button>
               </div>
             </div>
+          </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/course-master/${course.id}/chapters`)}
-                className="h-11 rounded-xl border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-              >
-                <BookOpen size={16} className="mr-2" />
-                Chapters
-              </Button>
-              <Button
-                onClick={() =>
-                  router.push(
-                    `/course-master/lesson-plan/${course.id}?view=key-concepts&chapterId=${selectedChapter?.id ?? ''}${
-                      selectedConcept?.title ? `&concept=${encodeURIComponent(selectedConcept.title)}` : ''
-                    }`
-                  )
-                }
-                className="h-11 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700"
-              >
-                <ClipboardList size={16} className="mr-2" />
-                Key Concepts
-              </Button>
-            </div>
+          <div className="relative grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:px-8 xl:grid-cols-4">
+            <StatPill label="Mastery" value={selectedConcept?.mastery ?? '-'} icon={Target} />
+            <StatPill label="Time" value={selectedConcept?.time ?? '-'} icon={Clock3} />
+            <StatPill label="Chapter" value={`#${selectedChapter?.number ?? '-'}`} icon={BookOpen} />
+            <StatPill label="Course" value={semanticData?.courseCode ?? '-'} icon={School} />
           </div>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6">
-          <aside className="rounded-2xl border border-slate-200/60 bg-white shadow-sm lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
-            <div className="border-b border-slate-100 px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white">
-                  <Layers3 size={18} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Concepts</p>
-                  <h2 className="text-lg font-semibold text-slate-900">{selectedChapter?.title}</h2>
-                </div>
-              </div>
-            </div>
-
-            <div className="max-h-[calc(100vh-15rem)] overflow-y-auto px-3 py-4">
-              <div className="rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50/50 px-4 py-3 mb-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Selected Concept
-                </p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{selectedConcept?.title}</p>
-                <p className="mt-1 text-xs text-slate-600">{selectedConcept?.mastery}</p>
-              </div>
-
-              <div className="space-y-2">
-                {chapterConcepts?.concepts.map((concept) => {
-                  const active = concept.title === selectedConcept?.title;
-                  return (
-                    <button
-                      key={concept.title}
-                      type="button"
-                      onClick={() => {
-                        const href = `/course-master/lesson-plan/${course.id}?view=semantic-intelligence&chapterId=${selectedChapter?.id ?? ''}&concept=${encodeURIComponent(
-                          concept.title
-                        )}`;
-                        router.replace(href, { scroll: false });
-                      }}
+        <div className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_24px_80px_-36px_rgba(15,23,42,0.22)]">
+          <div className="border-b border-slate-200/80 bg-slate-50/70 px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
+              {SECTION_META.map((section) => {
+                const Icon = section.icon;
+                const active = section.id === activeSemanticSection;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setActiveSemanticSection(section.id)}
+                    className={cn(
+                      'inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition-all',
+                      active
+                        ? 'border-blue-200 bg-white text-slate-900 shadow-[0_12px_30px_-20px_rgba(37,99,235,0.9)] ring-1 ring-blue-100'
+                        : 'border-transparent bg-white/80 text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900'
+                    )}
+                  >
+                    <span
                       className={cn(
-                        'group w-full rounded-xl border px-4 py-3 text-left transition-all',
-                        active
-                          ? 'border-blue-200 bg-blue-50 shadow-sm'
-                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className={cn(
-                            'text-sm font-semibold leading-5 line-clamp-2',
-                            active ? 'text-slate-900' : 'text-slate-700'
-                          )}>
-                            {concept.title}
-                          </p>
-                          <p className="mt-1.5 text-xs leading-5 text-slate-500 line-clamp-2">
-                            {concept.description}
-                          </p>
-                        </div>
-                        <div className={cn(
-                          'shrink-0 mt-0.5 rounded-full px-2 py-0.5 text-xs font-semibold',
-                          active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
-                        )}>
-                          {concept.mastery}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </aside>
-
-          <main className="min-w-0 rounded-2xl border border-slate-200/60 bg-white shadow-sm lg:max-h-[calc(100vh-3rem)]">
-            <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-                      Semantic Intelligence
-                    </Badge>
-                    <Badge className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                      {semanticData?.totalConcepts} concepts
-                    </Badge>
-                  </div>
-                  <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-                    {selectedConcept?.title}
-                  </h2>
-                  <p className="max-w-4xl text-sm leading-6 text-slate-600">
-                    {selectedConcept?.description}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <StatPill label="Mastery" value={selectedConcept?.mastery ?? '-'} icon={Target} />
-                  <StatPill label="Time" value={selectedConcept?.time ?? '-'} icon={Clock3} />
-                  <StatPill label="Chapter" value={`#${selectedChapter?.number ?? '-'}`} icon={BookOpen} />
-                  <StatPill label="Course" value={semanticData?.courseCode ?? '-'} icon={School} />
-                </div>
-              </div>
-            </div>
-
-            <div className="border-b border-slate-100 px-4 py-3 sm:px-6">
-              <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
-                {SECTION_META.map((section) => {
-                  const Icon = section.icon;
-                  const active = section.id === activeSemanticSection;
-                  return (
-                    <button
-                      key={section.id}
-                      type="button"
-                      onClick={() => setActiveSemanticSection(section.id)}
-                      className={cn(
-                        'inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all',
-                        active
-                          ? 'border-slate-900 bg-slate-900 text-white shadow-md'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        'flex h-8 w-8 items-center justify-center rounded-xl transition-colors',
+                        active ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'
                       )}
                     >
                       <Icon size={15} />
-                      {section.label}
-                    </button>
-                  );
-                })}
-              </div>
+                    </span>
+                    {section.label}
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            <div className="max-h-[calc(100vh-20rem)] overflow-y-auto px-4 py-5 sm:px-6">
-              {activeSemanticSectionData ? (
-                <div className="space-y-5">
-                  <div className="rounded-xl border border-slate-200/60 bg-gradient-to-r from-slate-50 via-white to-slate-50/30 p-5">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          {activeSemanticSectionData.title}
-                        </p>
-                        <h3 className="mt-1.5 text-xl font-bold text-slate-900">
-                          {activeSemanticSectionData.title}
-                        </h3>
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                          {activeSemanticSectionData.description}
-                        </p>
-                      </div>
-                      <Badge className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        {activeSemanticSectionData.cards.length} cards
-                      </Badge>
+          <div className="px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+            {activeSemanticSectionData ? (
+              <div className="space-y-6">
+                <div className="overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(239,246,255,0.55),rgba(255,255,255,0.98),rgba(248,250,252,0.98))] p-5 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.28)] sm:p-6">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="max-w-5xl">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-600/70">
+                        {activeSemanticSectionData.title}
+                      </p>
+                      <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 sm:text-[1.9rem]">
+                        {activeSemanticSectionData.title}
+                      </h2>
+                      <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600 sm:text-[0.96rem]">
+                        {activeSemanticSectionData.description}
+                      </p>
                     </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-                    {activeSemanticSectionData.cards.map((card, index) => {
-                      const sectionConfig = SECTION_META.find(s => s.id === activeSemanticSection);
-                      return (
-                        <Card key={`${activeSemanticSectionData.id}-${card.title}`} className="group transition-all hover:shadow-md hover:-translate-y-0.5">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <CardTitle className="text-base font-semibold text-slate-900 leading-tight">
-                                {card.title}
-                              </CardTitle>
-                              <Badge className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-                                {card.category}
-                              </Badge>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm leading-6 text-slate-600 line-clamp-5">
-                              {card.description}
-                            </p>
-                            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                              <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                <Sparkles size={12} />
-                                Confidence {card.confidence}
-                              </div>
-                              <span className="text-xs text-slate-400">
-                                Selected concept
-                              </span>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                    <Badge className="w-fit rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 shadow-sm">
+                      {activeSemanticSectionData.cards.length} cards
+                    </Badge>
                   </div>
                 </div>
-              ) : (
-                <div className="flex min-h-[300px] items-center justify-center">
-                  <div className="text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
+
+                <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                  {activeSemanticSectionData.cards.map((card) => {
+                    return (
+                      <Card
+                        key={`${activeSemanticSectionData.id}-${card.title}`}
+                        className="group overflow-hidden rounded-[1.6rem] border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.92))] shadow-[0_20px_45px_-36px_rgba(15,23,42,0.36)] transition-all hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_28px_60px_-36px_rgba(59,130,246,0.32)]"
+                      >
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <CardTitle className="text-base font-semibold leading-tight text-slate-950 sm:text-[1.03rem]">
+                              {card.title}
+                            </CardTitle>
+                            <Badge className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600 shadow-sm">
+                              {card.category}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <p className="text-sm leading-6 text-slate-600 line-clamp-6">
+                            {card.description}
+                          </p>
+                          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                            <div className="flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                              <Sparkles size={12} />
+                              Confidence {card.confidence}
+                            </div>
+                            <span className="text-xs font-medium text-slate-400">
+                              Selected concept
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+                <div className="flex min-h-[360px] items-center justify-center rounded-[1.75rem] border border-dashed border-slate-200 bg-slate-50/70">
+                  <div className="px-6 text-center">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm">
                       <HelpCircle size={32} className="text-slate-400" />
                     </div>
-                    <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                      No data available
-                    </h3>
-                    <p className="text-sm text-slate-500">
-                      Select a different concept to view semantic intelligence data.
-                    </p>
-                  </div>
+                  <h3 className="mb-1 text-lg font-semibold text-slate-900">
+                    No data available
+                  </h3>
+                  <p className="text-sm text-slate-500">
+                    Select a different concept to view semantic intelligence data.
+                  </p>
                 </div>
-              )}
-            </div>
-          </main>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -421,16 +360,8 @@ export default function LessonPlanPage() {
             {chapterConcepts ? (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {chapterConcepts.concepts.map((concept) => (
-                  <button
+                  <div
                     key={concept.title}
-                    type="button"
-                    onClick={() =>
-                      router.push(
-                        `/course-master/lesson-plan/${course.id}?view=semantic-intelligence&chapterId=${selectedChapter?.id ?? ''}&concept=${encodeURIComponent(
-                          concept.title
-                        )}`
-                      )
-                    }
                     className={cn(
                       'rounded-2xl border bg-white p-5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-md',
                       concept.title === keyConceptHighlight
@@ -451,13 +382,31 @@ export default function LessonPlanPage() {
                       {concept.description}
                     </p>
 
-                    <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-500">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[10px] leading-none text-slate-500">
-                        T
-                      </span>
-                      {concept.time}
+                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                      <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-500">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[10px] leading-none text-slate-500">
+                          T
+                        </span>
+                        {concept.time}
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          router.push(
+                            `/course-master/lesson-plan/${course.id}?view=semantic-intelligence&chapterId=${selectedChapter?.id ?? ''}&concept=${encodeURIComponent(
+                              concept.title
+                            )}`
+                          )
+                        }
+                        className="h-11 rounded-2xl border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 shadow-sm hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
+                      >
+                        <Brain size={16} className="mr-2" />
+                        Semantic
+                      </Button>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -819,12 +768,14 @@ function StatPill({
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/80 px-4 py-3 shadow-sm">
+    <div className="rounded-[1.4rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] px-4 py-4 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.45)]">
       <div className="flex items-center gap-2 text-slate-500">
-        <Icon size={15} className="text-slate-400" />
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+          <Icon size={15} className="text-slate-500" />
+        </span>
         <span className="text-[11px] font-semibold uppercase tracking-[0.22em]">{label}</span>
       </div>
-      <p className="mt-1 text-sm font-semibold text-slate-900">{value}</p>
+      <p className="mt-3 text-sm font-semibold text-slate-950 sm:text-[0.96rem]">{value}</p>
     </div>
   );
 }

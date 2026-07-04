@@ -60,7 +60,15 @@ function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null 
 export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [], userProfileName = '' }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
-  const [showMasterDropdown, setShowMasterDropdown] = useState(false);
+  const [showMasterDropdown, setShowMasterDropdown] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const saved = sessionStorage.getItem('masterMenuOpen');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [selectedMasterCategory, setSelectedMasterCategory] = useState<string | number | null>(() => {
@@ -78,6 +86,23 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
   });
   const containerRef = useRef<HTMLDivElement>(null);
   const tabsWrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem('masterMenuOpen', String(showMasterDropdown));
+    } catch {}
+  }, [showMasterDropdown]);
+
+  useEffect(() => {
+    if (!showMasterDropdown && masterMenuGroups.length > 0 && masterItems.length > 0) {
+      const wasOpen = typeof window !== 'undefined' && sessionStorage.getItem('masterMenuOpen') === 'true';
+      if (wasOpen) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setShowMasterDropdown(true);
+      }
+    }
+  }, [masterMenuGroups, masterItems, showMasterDropdown]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -219,7 +244,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
           )}
         </div>
 
-        {hasMasterAccess(userProfileName) && masterItems.length > 0 && (
+        {hasMasterAccess(userProfileName) && (masterMenuGroups.length > 0 || masterItems.length > 0 || masterItems.length > 0) && (
           <div className="relative shrink-0" data-master-dropdown>
             <button
               type="button"

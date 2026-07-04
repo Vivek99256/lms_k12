@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { BookOpen, Calendar, Clock, Users, Award, Target, ClipboardList } from 'lucide-react';
+import { BookOpen, Calendar, Clock, Users, Target, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { getChaptersByCourseid } from '../../../data/chapters';
+import type { Chapter } from '../../../data/chapters';
 import { courses } from '../../../data/courses';
 import type { Course } from '../../../data/courses';
 
@@ -36,22 +37,91 @@ function getStatusColor(status: Course['status']) {
   }
 }
 
-function getSectionLabel(classGrade: string): string {
-  const grade = parseInt(classGrade.replace('Class ', '').trim(), 10);
-  if (grade >= 1 && grade <= 5) return 'Primary Section';
-  if (grade >= 6 && grade <= 10) return 'Secondary Section';
-  if (grade >= 11 && grade <= 12) return 'Higher Section';
-  return 'KG';
+function buildFallbackChapters(course: Course, chapterTotal: number): Chapter[] {
+  return Array.from({ length: chapterTotal }, (_, index) => ({
+    id: `generated-${course.id}-${index + 1}`,
+    courseId: course.id,
+    number: index + 1,
+    title: `${course.subject} Chapter ${index + 1}`,
+    teachingMethodologies: [],
+    resources: {
+      teacherResource: 0,
+      lessonPlanning: 0,
+      chapterMapping: 0,
+      hspContent: 0,
+      questions: 10,
+    },
+  }));
 }
 
-function generateCurriculumUnits(course: Course) {
-  const base = course.title.split(' ').slice(0, 3).join(' ');
-  return Array.from({ length: course.chapters }, (_, i) => ({
-    id: i + 1,
-    name: i === 0 ? `${base} Fundamentals` : `${base} Part ${i + 1}`,
-    topics: 5,
-    duration: `${Math.floor(Math.random() * 3) + 1} weeks`,
-    status: i < 3 ? 'Completed' : i < course.chapters ? 'In Progress' : 'Not Started',
+function buildResolvedChapters(course: Course, chapterTotal: number, chapterData: Chapter[]) {
+  const fallbackChapters = buildFallbackChapters(course, chapterTotal);
+
+  return Array.from({ length: chapterTotal }, (_, index) => {
+    const existingChapter = chapterData[index];
+    if (!existingChapter) {
+      return fallbackChapters[index];
+    }
+
+    return {
+      ...fallbackChapters[index],
+      ...existingChapter,
+      resources: existingChapter.resources ?? fallbackChapters[index].resources,
+    };
+  });
+}
+
+function distributeMarks(weights: number[], totalMarks: number) {
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || weights.length;
+  const exactMarks = weights.map((weight) => (weight / totalWeight) * totalMarks);
+  const baseMarks = exactMarks.map((value) => Math.floor(value));
+  let remainingMarks = totalMarks - baseMarks.reduce((sum, value) => sum + value, 0);
+
+  exactMarks
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((a, b) => b.fraction - a.fraction)
+    .forEach(({ index }) => {
+      if (remainingMarks <= 0) {
+        return;
+      }
+
+      baseMarks[index] += 1;
+      remainingMarks -= 1;
+    });
+
+  return baseMarks;
+}
+
+function generateCurriculumUnits(course: Course, chapters: Chapter[]) {
+  const targetUnitCount = Math.max(1, Math.min(5, chapters.length));
+  const chaptersPerUnit = Math.max(1, Math.ceil(chapters.length / targetUnitCount));
+  const unitNameParts = ['Foundations', 'Core Concepts', 'Systems', 'Applications', 'Practice'];
+  const units = Array.from({ length: Math.ceil(chapters.length / chaptersPerUnit) }, (_, index) => {
+    const unitChapters = chapters.slice(index * chaptersPerUnit, (index + 1) * chaptersPerUnit);
+
+    return {
+      id: index + 1,
+      name: `${course.subject} ${unitNameParts[index] ?? `Unit ${index + 1}`}`,
+      chapters: unitChapters,
+      periods: '-',
+      status:
+        index < Math.min(2, targetUnitCount)
+          ? 'Completed'
+          : index === Math.min(2, targetUnitCount)
+            ? 'In Progress'
+            : 'Not Started',
+      weight: unitChapters.reduce((sum, chapter) => sum + (chapter.resources.questions || 10), 0),
+    };
+  });
+  const marksByUnit = distributeMarks(
+    units.map((unit) => unit.weight),
+    80
+  );
+
+  return units.map((unit, index) => ({
+    ...unit,
+    chapterCount: unit.chapters.length,
+    marks: marksByUnit[index] ?? 0,
   }));
 }
 
@@ -99,10 +169,7 @@ const learningOutcomes: LearningOutcome[] = [
   },
 ];
 
-interface CurriculumPageProps {
-}
-
-export default function CurriculumPage({}: CurriculumPageProps) {
+export default function CurriculumPage() {
   const router = useRouter();
   const { courseId } = useParams();
   const course = courses.find((c) => c.id === courseId);
@@ -119,10 +186,17 @@ export default function CurriculumPage({}: CurriculumPageProps) {
   }
 
   const IconComponent = ICON_MAP[course.icon] || BookOpen;
-  const units = generateCurriculumUnits(course);
+  const chapterCount = Math.max(course.chapters, getChaptersByCourseid(course.id).length);
+  const resolvedChapters = buildResolvedChapters(course, chapterCount, getChaptersByCourseid(course.id));
+  const units = generateCurriculumUnits(course, resolvedChapters);
+  const curriculumOverview = {
+    framework: 'NCF-SE 2023',
+    totalMarks: 100,
+    internalMarks: 20,
+  };
 
   const stats = [
-    { label: 'Total Units', value: course.chapters, icon: BookOpen },
+    { label: 'Total Units', value: units.length, icon: BookOpen },
     { label: 'Enrollments', value: course.enrollments, icon: Users },
     { label: 'Duration', value: `${Math.floor(course.chapters * 1.5)} weeks`, icon: Clock },
     { label: 'Completion', value: `${course.progress}%`, icon: Target },
@@ -154,11 +228,6 @@ export default function CurriculumPage({}: CurriculumPageProps) {
                 className="h-10 rounded-xl border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               >
                 Back to Courses
-              </Button>
-              <Button
-                className="h-10 rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/25"
-              >
-                Export Curriculum
               </Button>
             </div>
           </div>
@@ -216,78 +285,88 @@ export default function CurriculumPage({}: CurriculumPageProps) {
         </div>
 
         {/* Curriculum Overview Section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center">
-              <ClipboardList size={20} className="text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Curriculum Overview</h2>
-              <p className="text-sm text-slate-500">Detailed breakdown of units and chapters</p>
+        <div className="mb-8 overflow-hidden rounded-[28px] border border-slate-200/70 bg-white shadow-sm">
+          <div className="border-b border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.05),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] px-6 py-5 sm:px-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+                <ClipboardList size={18} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">LMS Curriculum Overview</h2>
+                <p className="text-sm text-slate-500">Summary aligned to the curriculum framework</p>
+              </div>
             </div>
           </div>
 
-       
+          <div className="grid grid-cols-1 divide-y divide-slate-200/80 md:grid-cols-3 md:divide-x md:divide-y-0">
+            <div className="px-6 py-5 sm:px-8">
+              <p className="text-sm font-medium text-slate-500">Framework</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{curriculumOverview.framework}</p>
+            </div>
+            <div className="px-6 py-5 sm:px-8">
+              <p className="text-sm font-medium text-slate-500">Total Marks</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{curriculumOverview.totalMarks}</p>
+            </div>
+            <div className="px-6 py-5 sm:px-8">
+              <p className="text-sm font-medium text-slate-500">Internal Marks</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{curriculumOverview.internalMarks}</p>
+            </div>
+          </div>
         </div>
 
         {/* Units Breakdown Table */}
-        <div className="rounded-2xl border border-slate-200/60 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-100 bg-slate-50/30 px-6 py-4">
-            <h3 className="text-lg font-bold text-slate-800">Units Breakdown</h3>
-            <p className="text-sm text-slate-500">Manage and track curriculum progress</p>
+        <div className="overflow-hidden rounded-[28px] border border-slate-200/70 bg-white shadow-sm">
+          <div className="border-b border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.05),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] px-6 py-5 sm:px-8">
+            <h3 className="text-xl font-bold text-slate-900">LMS Units Breakup</h3>
+            <p className="mt-1 text-sm text-slate-500">Structured view of units, included chapters, and assessment weightage</p>
           </div>
-          
+
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="font-semibold text-slate-600">Unit </TableHead>
-                  <TableHead className="font-semibold text-slate-600">Unit Name</TableHead>
-                  <TableHead className="font-semibold text-slate-600">Topics</TableHead>
-                  <TableHead className="font-semibold text-slate-600">Duration</TableHead>
-                  <TableHead className="font-semibold text-slate-600">Status</TableHead>
-                  <TableHead className="text-right font-semibold text-slate-600">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {units.map((unit) => {
-                  const statusColors = {
-                    Completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                    'In Progress': 'bg-blue-50 text-blue-700 border-blue-200',
-                    'Not Started': 'bg-slate-100 text-slate-600 border-slate-200',
-                  };
-                  
-                  return (
-                    <TableRow key={unit.id} className="hover:bg-slate-50/60">
-                      <TableCell className="font-medium text-slate-900"># {unit.id}</TableCell>
-                      <TableCell>
-                        <div className="font-medium text-slate-800">{unit.name}</div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-slate-600">{unit.topics} topics</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-slate-600">{unit.duration}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn('text-xs font-semibold', statusColors[unit.status as keyof typeof statusColors])}>
-                          {unit.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 rounded-lg border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            <div className="min-w-[980px]">
+              <div className="grid grid-cols-[80px_240px_minmax(360px,1fr)_120px_110px] border-b border-slate-200/80 bg-slate-50/70 px-4 py-4 text-sm font-semibold text-slate-700 sm:px-6">
+                <div>Unit No.</div>
+                <div>Name / Title</div>
+                <div>Chapters Included</div>
+                <div>Periods</div>
+                <div>Marks</div>
+              </div>
+
+              <div className="divide-y divide-slate-200/80">
+                {units.map((unit) => (
+                  <div
+                    key={unit.id}
+                    className="grid grid-cols-[80px_240px_minmax(360px,1fr)_120px_110px] items-start px-4 py-4 transition-colors hover:bg-slate-50/70 sm:px-6"
+                  >
+                    <div className="pt-1 text-lg font-medium text-slate-800">{unit.id}</div>
+                    <div className="space-y-3 pr-4">
+                      <div className="text-lg font-semibold leading-8 text-slate-900">{unit.name}</div>
+                      <Badge className={cn(
+                        'w-fit rounded-full border px-3 py-1 text-xs font-semibold',
+                        unit.status === 'Completed' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                        unit.status === 'In Progress' && 'border-blue-200 bg-blue-50 text-blue-700',
+                        unit.status === 'Not Started' && 'border-slate-200 bg-slate-100 text-slate-600'
+                      )}>
+                        {unit.status}
+                      </Badge>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pr-6">
+                      {unit.chapters.map((chapter) => (
+                        <span
+                          key={chapter.id}
+                          className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
                         >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                          {chapter.title}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="pt-1 text-lg font-semibold text-slate-700">{unit.periods}</div>
+                    <div className="pt-1 text-lg font-semibold text-slate-900">{unit.marks}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
