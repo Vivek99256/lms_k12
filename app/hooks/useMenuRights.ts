@@ -54,7 +54,7 @@ function getValueFromObject(obj: unknown, keys: string[]): unknown {
   return undefined;
 }
 
-function buildMenuContextFromSource(source: unknown): MenuContextPayload | null {
+export function buildMenuContextFromSource(source: unknown): MenuContextPayload | null {
   const context = {
     sub_institute_id: readNumber(getValueFromObject(source, ['sub_institute_id', 'subInstituteId', 'subInstituteID'])),
     user_id: readNumber(getValueFromObject(source, ['user_id', 'userId', 'userID', 'id'])),
@@ -75,7 +75,7 @@ function isValidMenuContext(context: MenuContextPayload | null | undefined): con
   return Boolean(context?.sub_institute_id && context.user_id);
 }
 
-function getStoredMenuContext(): MenuContextPayload | null {
+export function getStoredMenuContext(): MenuContextPayload | null {
   if (typeof window === 'undefined') return null;
 
   const storageKeys = ['menuContext', 'sessionData', 'sessiondata', 'userData', 'user_data', 'session'];

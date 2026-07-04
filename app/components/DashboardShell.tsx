@@ -7,8 +7,9 @@ import ChatbotPanel from '@/app/components/ChatbotPanel';
 import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
-import { useMenuRights } from '@/app/hooks/useMenuRights';
+import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import { usePathname, useRouter } from 'next/navigation';
+import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 interface SelectedBranch {
   level1Key: string;
@@ -19,8 +20,38 @@ function getMenuKey(item: { id?: number | string; label: string; href?: string }
   return String(item.id ?? item.href ?? item.label);
 }
 
-function isMasterMenu(item: { menuType?: string | null }) {
-  return item.menuType?.toUpperCase() === 'MASTER';
+const FEES_SETUP_MASTER_LABELS = [
+  'Fees Config Master',
+  'Fees Late Master',
+  'Fees Receipt Book Master',
+  'New Fees Title',
+  'Fees BreakOff',
+  'Update Fees BreakOff',
+  'Additional Fees Mapping',
+  'Bank Master',
+  'Other Fees Title',
+  'Fees Circular Master',
+  'Fees Month Header',
+];
+
+const FEES_SETUP_MASTER_LABEL_ORDER = new Map(
+  FEES_SETUP_MASTER_LABELS.map((label, index) => [normalizeMenuLabel(label), index])
+);
+
+function normalizeMenuLabel(label: string) {
+  return label.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function getFilteredMasterMenuItems(items: SubmenuItem[], selectedMenu: SubmenuItem) {
+  if (normalizeMenuLabel(selectedMenu.label) !== 'fees setup') return items;
+
+  return items
+    .filter((item) => FEES_SETUP_MASTER_LABEL_ORDER.has(normalizeMenuLabel(item.label)))
+    .sort((a, b) => {
+      const aIndex = FEES_SETUP_MASTER_LABEL_ORDER.get(normalizeMenuLabel(a.label)) ?? Number.MAX_SAFE_INTEGER;
+      const bIndex = FEES_SETUP_MASTER_LABEL_ORDER.get(normalizeMenuLabel(b.label)) ?? Number.MAX_SAFE_INTEGER;
+      return aIndex - bIndex;
+    });
 }
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -52,6 +83,74 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   }, [selectedBranch]);
   const [isChatbotOpen, setIsChatbotOpen] = useState(true);
+
+  const [fetchedMasterMenuItems, setFetchedMasterMenuItems] = useState<SubmenuItem[]>([]);
+  const [masterMenuGroups, setMasterMenuGroups] = useState<Record<string, unknown>[]>([]);
+  const [masterMenuLoading, setMasterMenuLoading] = useState(false);
+
+  const fetchMasterMenu = async (mainMenuId: number | string | undefined, menuItem: SubmenuItem | undefined) => {
+    if (!mainMenuId || !menuItem) return;
+
+    const session = getStoredMenuContext();
+    if (!session) return;
+
+    setMasterMenuLoading(true);
+    try {
+      const url = new URL(`${API_BASE_URL}/api/master-menu-rights`);
+      url.searchParams.set('menu_id', String(menuItem.id));
+      url.searchParams.set('main_menu_id', String(mainMenuId));
+      url.searchParams.set('type', 'API');
+      url.searchParams.set('sub_institute_id', String(session.sub_institute_id));
+      url.searchParams.set('user_id', String(session.user_id));
+
+      const res = await fetch(url.toString());
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message || 'Failed to fetch master menu rights');
+
+      const rawData = Array.isArray(data.data) ? data.data : [];
+      let mapped: SubmenuItem[] = [];
+
+      if (rawData.length > 0 && (rawData[0] as Record<string, unknown>).url) {
+        setMasterMenuGroups([]);
+        mapped = rawData.map((item: Record<string, unknown>, index: number) => ({
+          id: (item.id ?? item.tblmenu_master_id ?? index) as number | string | undefined,
+          parentId: (item.parent_menu_id ?? item.parentId) as number | string | undefined,
+          menuType: (item.menu_type ?? item.menuType) as string | undefined,
+          label: String(item.name ?? item.label ?? ''),
+          href: String(item.url ?? item.href ?? '#'),
+          icon: undefined,
+          submenus: undefined,
+        }));
+      } else {
+        setMasterMenuGroups(rawData);
+        const children: Record<string, unknown>[] = [];
+        for (const group of rawData) {
+          const groupChildren = (group as Record<string, unknown>).children;
+          if (Array.isArray(groupChildren)) {
+            children.push(...groupChildren);
+          }
+        }
+
+        mapped = children.map((item: Record<string, unknown>, index: number) => ({
+          id: (item.id ?? item.tblmenu_master_id ?? index) as number | string | undefined,
+          parentId: (item.parent_menu_id ?? item.parentId) as number | string | undefined,
+          menuType: (item.menu_type ?? item.menuType) as string | undefined,
+          label: String(item.name ?? item.label ?? ''),
+          href: String(item.url ?? item.href ?? '#'),
+          icon: undefined,
+          submenus: undefined,
+        }));
+      }
+
+      setFetchedMasterMenuItems(getFilteredMasterMenuItems(mapped, menuItem));
+    } catch {
+      setFetchedMasterMenuItems([]);
+      setMasterMenuGroups([]);
+    } finally {
+      setMasterMenuLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!hasLoadedRef.current && selectedBranch && menuItems.length > 1) {
@@ -92,13 +191,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     });
   };
 
-  const handleLevel2Select = (submenu: SubmenuItem, parent: MenuItem) => {
+  const handleLevel2Select = async (submenu: SubmenuItem, parent: MenuItem) => {
     setSelectedBranch({
       level1Key: getMenuKey(parent),
       level2Key: getMenuKey(submenu),
     });
 
-    // If Level 2 has Level 3 items, navigate to the first one by default
+    await fetchMasterMenu(parent.id, submenu);
+
     if (submenu.submenus && submenu.submenus.length > 0) {
       const firstLevel3 = submenu.submenus[0];
       if (firstLevel3.href && firstLevel3.href !== '#') {
@@ -112,12 +212,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return menuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key) ?? null;
   }, [menuItems, selectedBranch]);
 
-  const masterMenuItems = useMemo(() => {
+  const staticMasterMenuItems = useMemo(() => {
     if (!selectedL1) return [];
     return selectedL1.submenus ?? [];
   }, [selectedL1]);
-
-  const isMasterSelected = isMasterMenu(selectedL1 || {});
 
   const selectedL2 = useMemo(() => {
     if (!selectedBranch || !selectedL1 || !selectedBranch.level2Key) return null;
@@ -147,7 +245,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return found;
   })();
 
-  const showSubheader = Boolean(level3Menu?.items.length || (isMasterSelected && masterMenuItems.length > 0));
+  const showSubheader = Boolean(level3Menu?.items.length || staticMasterMenuItems.length > 0);
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
@@ -168,7 +266,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 <Level3Subheader
                   items={level3Menu?.items ?? []}
                   parentLabel={level3Menu?.parentLabel ?? ''}
-                  masterItems={isMasterSelected ? masterMenuItems : []}
+                  masterItems={staticMasterMenuItems}
+                  mainMenuId={selectedL1?.id}
+                  menuId={selectedL2?.id}
+                  masterLoading={masterMenuLoading}
+                  fetchedMasterItems={fetchedMasterMenuItems}
+                  masterMenuGroups={masterMenuGroups}
                 />
               </div>
             )}
