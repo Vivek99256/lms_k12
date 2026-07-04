@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SubmenuItem } from '@/app/data/menuItems';
@@ -39,27 +39,37 @@ function hasMasterAccess(userProfileName: string): boolean {
 
 /**
  * Get navigation route from item - prioritizes 'link' field from API
- * @param item - Level3ItemProps or SubmenuItem with link and href fields
- * @returns The route path to navigate to, or null if no valid route
  */
 function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null {
-  // First priority: use the 'link' field from API (raw link from API)
-  // e.g., "students/search_student/" from your API
   if (item.link) {
     const mappedRoute = mapApiLinkToRoute(item.link);
-    // Only return if it's a valid route (not # or empty)
     if (mappedRoute && mappedRoute !== '#' && mappedRoute !== '/dashboard') {
       return mappedRoute;
     }
   }
   
-  // Fallback to 'href' field if link is not available or invalid
   if (item.href && item.href !== '#') {
     return item.href;
   }
   
   return null;
 }
+
+/**
+ * Check if route exists and find correct path (with _ or -)
+ */
+async function checkAndGetRoute(link: string): Promise<string> {
+  try {
+    const response = await fetch(`/api/check-route?link=${encodeURIComponent(link)}`);
+    const data = await response.json();
+    return data.route || link;
+  } catch {
+    return link;
+  }
+}
+
+// Cache for route existence checks
+const routeCache: Record<string, string> = {};
 
 export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [], userProfileName = '' }: Level3SubheaderProps) {
   const router = useRouter();
@@ -183,8 +193,22 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                 const navigateRoute = getNavigationRoute(item);
                 const isActive = navigateRoute ? pathname === navigateRoute.toLowerCase() : false;
                 
-                const handleClick = () => {
-                  if (navigateRoute) {
+                const handleClick = async () => {
+                  if (!navigateRoute) return;
+                  
+                  // Check route cache first
+                  if (routeCache[navigateRoute]) {
+                    router.push(routeCache[navigateRoute]);
+                    return;
+                  }
+                  
+                  // Check if route exists with _/- variations
+                  const linkToCheck = item.link || item.href;
+                  if (linkToCheck && linkToCheck !== '#') {
+                    const checkedRoute = await checkAndGetRoute(linkToCheck);
+                    routeCache[navigateRoute] = checkedRoute;
+                    router.push(checkedRoute);
+                  } else {
                     router.push(navigateRoute);
                   }
                 };
