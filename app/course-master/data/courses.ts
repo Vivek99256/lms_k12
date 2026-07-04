@@ -45,14 +45,7 @@ export const courses: Course[] = [
 export const categories = [
   'My Course',
   'SEL',
-  'Foundational Skills',
-  'Soft Skills',
-  'Sports',
-  'Vocational Training',
-  'Hobbies and Activities',
-  'Library',
   'STEM Resources',
-  'Career Counselling',
 ];
 
 export const subjects = [...new Set(courses.map(c => c.subject))];

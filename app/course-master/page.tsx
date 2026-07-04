@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
    LayoutGrid,
@@ -21,7 +21,6 @@ import {
   MoreHorizontal,
   Plus,
   X,
-  ArrowRight,
   ClipboardList,
   FileCheck,
   GraduationCap,
@@ -53,6 +52,8 @@ const SECTION_STANDARDS: Record<string, string[]> = {
   SECONDARY: ['6', '7', '8', '9', '10'],
   HIGHER_SECONDARY: ['11', '12'],
 };
+
+const PRIMARY_CATEGORY_TABS = ['All', 'My Course', 'SEL', 'STEM Resources'] as const;
 
 function getSectionFromClassGrade(classGrade: string): string {
   const gradeNumber = classGrade.replace('Class ', '').trim();
@@ -93,13 +94,16 @@ function getStatusColor(status: Course['status']) {
 
 export default function CourseMasterPage() {
   const router = useRouter();
-  const [search, setSearch] = useState('');
+  const [search] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('My Course');
   const [sectionFilter, setSectionFilter] = useState<string>('all');
   const [standardFilter, setStandardFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const standardOptions = SECTION_STANDARDS[sectionFilter] || [];
+  const secondaryCategories = categories.filter(
+    (category) => !PRIMARY_CATEGORY_TABS.includes(category as (typeof PRIMARY_CATEGORY_TABS)[number])
+  );
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -164,33 +168,71 @@ export default function CourseMasterPage() {
               <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Course Master</h1>
               <p className="text-slate-600 mt-1">Manage and organize your course catalog</p>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 rounded-xl px-5 h-11 font-semibold">
-              <Plus size={18} className="mr-2" />
-              Create New Course
-            </Button>
+           
           </div>
         </div>
 
         {/* Filters Section */}
         <div className="mb-8 rounded-2xl border border-slate-200/60 bg-white shadow-sm overflow-hidden">
           {/* Category Tabs */}
-          <div className="border-b border-slate-100 bg-slate-50/30">
-            <div className="px-6 py-4 overflow-x-auto scrollbar-hide">
-              <div className="flex items-center gap-2">
-                {['All', ...categories].map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={cn(
-                      'shrink-0 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200',
-                      activeCategory === cat
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:bg-blue-50'
-                    )}
-                  >
-                    {cat}
-                  </button>
-                ))}
+          <div className="border-b border-slate-100 bg-[linear-gradient(180deg,rgba(248,250,252,0.92),rgba(255,255,255,0.98))]">
+            <div className="px-4 py-4 sm:px-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                      Browse Categories
+                    </p>
+                    <h2 className="mt-1 text-sm font-semibold text-slate-900">
+                      Switch between course groups without losing your current filters
+                    </h2>
+                  </div>
+                  <div className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
+                    <span className="mr-2 h-2 w-2 rounded-full bg-blue-500" />
+                    Active category:
+                    <span className="ml-1 font-semibold text-slate-700">{activeCategory}</span>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto scrollbar-hide">
+                  <div className="flex min-w-max items-center gap-2 pb-1">
+                    {PRIMARY_CATEGORY_TABS.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setActiveCategory(cat)}
+                        className={cn(
+                          'inline-flex min-h-11 shrink-0 items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold transition-all duration-200',
+                          activeCategory === cat
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                            : 'border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700'
+                        )}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {secondaryCategories.length > 0 && (
+                  <div className="overflow-x-auto scrollbar-hide">
+                    <div className="flex min-w-max items-center gap-2 pb-1">
+                      {secondaryCategories.map((cat) => (
+                        <button
+                          key={cat}
+                          onClick={() => setActiveCategory(cat)}
+                          className={cn(
+                            'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-200',
+                            activeCategory === cat
+                              ? 'border border-slate-900 bg-slate-900 text-white shadow-sm'
+                              : 'border border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white hover:text-slate-700'
+                          )}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -352,9 +394,8 @@ export default function CourseMasterPage() {
               return (
                 <div
                   key={course.id}
-                  onClick={() => router.push(routes.chapters)}
                   className={cn(
-                    'group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 hover:border-slate-300 cursor-pointer',
+                    'group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-200/60',
                     viewMode === 'list'
                       ? 'flex flex-col lg:flex-row lg:items-center'
                       : 'flex flex-col'
@@ -452,6 +493,7 @@ export default function CourseMasterPage() {
                     )}>
                       <div className="flex flex-wrap items-center justify-center gap-2">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(routes.lessonPlan);
@@ -462,16 +504,18 @@ export default function CourseMasterPage() {
                           Lesson Planning
                         </button>
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(routes.assessment);
+                            router.push(routes.chapters);
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 transition-all"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 focus-visible:ring-offset-2 active:scale-[0.98]"
                         >
                           <FileCheck size={12} />
-                          Assessment
+                          Chapters
                         </button>
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(routes.curriculum);
