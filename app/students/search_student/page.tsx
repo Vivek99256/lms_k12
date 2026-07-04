@@ -1,21 +1,10 @@
+// page.tsx
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import {
-  Search, Filter, Download, Upload, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
-  Users, UserCheck, UserX, FileText, Plus, MoreVertical, Check, X, Clock, AlertCircle,
-  TrendingUp, TrendingDown, Minus, Eye, Edit, Trash2, Mail, Phone, Home, Calendar,
-  Shield, Heart, Activity, Award, BookOpen, GraduationCap, Building2, UserCog, Settings,
-  Bell, Info, XCircle, CheckCircle, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown,
-  LayoutGrid, List, Grid3x3, Maximize2, Minimize2, RefreshCw, Copy, Printer, ExternalLink
-} from 'lucide-react';
-import { StudentProfilesTab } from './components/StudentProfilesTab';
-import { DocumentsTab } from './components/DocumentsTab';
-import { AttendanceTab } from './components/AttendanceTab';
-import { HealthTab } from './components/HealthTab';
-import { DisciplineTab } from './components/DisciplineTab';
-import { HousesTab } from './components/HousesTab';
-import { IdCardsTab } from './components/IdCardsTab';
+import { Plus, X, Calendar, Users, UserCog, Building2, Phone, Mail, Home } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { StudentProfilesDashboard } from './components/StudentProfilesDashboard';
 
 // Types
 interface Student {
@@ -82,9 +71,22 @@ const houseOptions = [
   { value: 'Yellow', label: 'Yellow House' },
 ];
 
+const attendanceTrend = [
+  { month: 'Apr', attendance: 88 }, { month: 'May', attendance: 92 },
+  { month: 'Jun', attendance: 85 }, { month: 'Jul', attendance: 90 },
+  { month: 'Aug', attendance: 94 }, { month: 'Sep', attendance: 91 },
+  { month: 'Oct', attendance: 96 }, { month: 'Nov', attendance: 89 },
+  { month: 'Dec', attendance: 93 }, { month: 'Jan', attendance: 95 },
+];
+
+const subjectPerformance = [
+  { subject: 'Maths', score: 92 }, { subject: 'Science', score: 88 },
+  { subject: 'English', score: 85 }, { subject: 'Hindi', score: 90 },
+  { subject: 'Social', score: 78 }, { subject: 'Computer', score: 95 },
+];
+
 // Main Page Component
 export default function SearchStudentPage() {
-  const [activeTab, setActiveTab] = useState('profiles');
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -95,7 +97,6 @@ export default function SearchStudentPage() {
   const [pageSize, setPageSize] = useState(10);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [selectedRecordTab, setSelectedRecordTab] = useState('overview');
 
   // Filter students
   const filteredStudents = useMemo(() => {
@@ -133,51 +134,6 @@ export default function SearchStudentPage() {
     return sorted;
   }, [filteredStudents, sortConfig]);
 
-  // Pagination
-  const totalPages = Math.ceil(sortedStudents.length / pageSize);
-  const paginatedStudents = sortedStudents.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
-  // Calculate metrics
-  const metrics = useMemo(() => ({
-    total: sampleStudents.length,
-    active: sampleStudents.filter(s => s.status === 'active').length,
-    inactive: sampleStudents.filter(s => s.status === 'inactive').length,
-    docsIssue: sampleStudents.filter(s => s.docsMissing > 0).length,
-  }), []);
-
-  const handleSort = (key: string, dir: 'asc' | 'desc') => {
-    setSortConfig({ key, dir });
-  };
-
-  const handleSelectAll = () => {
-    if (selectedStudents.length === paginatedStudents.length) {
-      setSelectedStudents([]);
-    } else {
-      setSelectedStudents(paginatedStudents.map(s => s.id));
-    }
-  };
-
-  const handleSelectStudent = (id: string) => {
-    setSelectedStudents(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const tabs = [
-    { id: 'profiles', label: 'Student profiles', icon: <Users className="w-4 h-4" /> },
-    { id: 'documents', label: 'Documents', icon: <FileText className="w-4 h-4" />, badge: metrics.docsIssue },
-    { id: 'attendance', label: 'Attendance', icon: <Calendar className="w-4 h-4" /> },
-    { id: 'health', label: 'Health & medical', icon: <Heart className="w-4 h-4" /> },
-    { id: 'discipline', label: 'Discipline', icon: <Shield className="w-4 h-4" /> },
-    { id: 'houses', label: 'Houses', icon: <Building2 className="w-4 h-4" /> },
-    { id: 'idcards', label: 'ID cards', icon: <GraduationCap className="w-4 h-4" /> },
-  ];
-
-  const activeFiltersCount = [classFilter, statusFilter, houseFilter].filter(Boolean).length;
-
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -197,66 +153,31 @@ export default function SearchStudentPage() {
         </div>
       </div>
 
-     
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200 bg-white rounded-full">
-        <div className="flex items-center gap-1 -mb-px overflow-x-auto scrollbar-hide">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-[#0D6EFD] rounded-full text-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-              {tab.badge !== undefined && tab.badge > 0 && (
-                <span className="px-1.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-700 rounded-full">
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-      {/* Metric Cards */}
-      {activeTab === 'profiles' && (
-        <StudentProfilesTab
-          students={sampleStudents}
-          selectedStudents={selectedStudents}
-          setSelectedStudents={setSelectedStudents}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-          pageSize={pageSize}
-          setPageSize={setPageSize}
-          sortConfig={sortConfig}
-          setSortConfig={setSortConfig}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          classFilter={classFilter}
-          setClassFilter={setClassFilter}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          houseFilter={houseFilter}
-          setHouseFilter={setHouseFilter}
-          setShowAddModal={setShowAddModal}
-          setSelectedStudent={setSelectedStudent}
-          classOptions={classOptions}
-          statusOptions={statusOptions}
-          houseOptions={houseOptions}
-        />
-      )}
-
-      {activeTab === 'documents' && <DocumentsTab />}
-      {activeTab === 'attendance' && <AttendanceTab />}
-      {activeTab === 'health' && <HealthTab />}
-      {activeTab === 'discipline' && <DisciplineTab />}
-      {activeTab === 'houses' && <HousesTab />}
-      {activeTab === 'idcards' && <IdCardsTab />}
+      {/* Student Profiles Dashboard */}
+      <StudentProfilesDashboard
+        students={sortedStudents}
+        selectedStudents={selectedStudents}
+        setSelectedStudents={setSelectedStudents}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+        sortConfig={sortConfig}
+        setSortConfig={setSortConfig}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        classFilter={classFilter}
+        setClassFilter={setClassFilter}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        houseFilter={houseFilter}
+        setHouseFilter={setHouseFilter}
+        setShowAddModal={setShowAddModal}
+        setSelectedStudent={setSelectedStudent}
+        classOptions={classOptions}
+        statusOptions={statusOptions}
+        houseOptions={houseOptions}
+      />
 
       {/* Add Student Modal */}
       {showAddModal && (
@@ -303,7 +224,7 @@ export default function SearchStudentPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Father's Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Father&apos;s Name</label>
                 <input
                   type="text"
                   placeholder="Enter father's name"
@@ -332,170 +253,6 @@ export default function SearchStudentPage() {
               >
                 Add Student
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Student Record Drawer */}
-      {selectedStudent && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSelectedStudent(null)}></div>
-          <div className="relative ml-auto w-full max-w-2xl bg-white shadow-2xl overflow-auto">
-            {/* Drawer Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 z-10">
-              <div className="flex items-center justify-between p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#0D6EFD] to-blue-400 flex items-center justify-center text-white text-lg font-bold">
-                    {selectedStudent.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">{selectedStudent.name}</h2>
-                    <p className="text-sm text-gray-500">{selectedStudent.admissionNo} · Class {selectedStudent.class}-{selectedStudent.section}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedStudent(null)}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              
-              {/* Record Tabs */}
-              <div className="flex items-center gap-1 px-6 border-t border-gray-100">
-                {['overview', 'documents', 'attendance', 'health', 'discipline', 'history'].map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setSelectedRecordTab(tab)}
-                    className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors capitalize ${
-                      selectedRecordTab === tab
-                        ? 'border-[#0D6EFD] text-[#0D6EFD]'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Drawer Content */}
-            <div className="p-6 space-y-6">
-              {selectedRecordTab === 'overview' && (
-                <>
-                  {/* Quick Stats */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <p className="text-2xl font-bold text-[#0D6EFD]">{selectedStudent.attendance}%</p>
-                      <p className="text-xs text-gray-500 mt-1">Attendance</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <p className="text-2xl font-bold text-emerald-600">{selectedStudent.status === 'active' ? 'Active' : selectedStudent.status}</p>
-                      <p className="text-xs text-gray-500 mt-1">Status</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <p className="text-2xl font-bold text-amber-600">{selectedStudent.house}</p>
-                      <p className="text-xs text-gray-500 mt-1">House</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-4 text-center">
-                      <p className="text-2xl font-bold text-gray-600">{selectedStudent.bloodGroup}</p>
-                      <p className="text-xs text-gray-500 mt-1">Blood Group</p>
-                    </div>
-                  </div>
-
-                  {/* Personal Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Personal Information</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-start gap-3">
-                        <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500">Date of Birth</p>
-                          <p className="text-sm font-medium text-gray-900">{new Date(selectedStudent.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Users className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500">Gender</p>
-                          <p className="text-sm font-medium text-gray-900">{selectedStudent.gender}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <UserCog className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500">Roll Number</p>
-                          <p className="text-sm font-medium text-gray-900">{selectedStudent.rollNo}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Building2 className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500">Class · Section</p>
-                          <p className="text-sm font-medium text-gray-900">Class {selectedStudent.class} · Section {selectedStudent.section}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Parent/Guardian Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Parent / Guardian Information</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-start gap-3">
-                        <UserCog className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500">Father's Name</p>
-                          <p className="text-sm font-medium text-gray-900">{selectedStudent.fatherName}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <UserCog className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500">Mother's Name</p>
-                          <p className="text-sm font-medium text-gray-900">{selectedStudent.motherName}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Phone className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500">Phone</p>
-                          <p className="text-sm font-medium text-gray-900">{selectedStudent.phone}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Mail className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500">Email</p>
-                          <p className="text-sm font-medium text-gray-900">{selectedStudent.email}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Address */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Address</h3>
-                    <div className="flex items-start gap-3 bg-gray-50 rounded-xl p-4">
-                      <Home className="w-5 h-5 text-gray-400 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{selectedStudent.address}</p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {selectedRecordTab !== 'overview' && (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-2xl flex items-center justify-center">
-                    <BookOpen className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 capitalize">{selectedRecordTab} Records</h3>
-                  <p className="text-gray-500">This section is under development</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
