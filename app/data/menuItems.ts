@@ -18,6 +18,7 @@ export interface SubmenuItem {
   menuType?: string | null;
   label: string;
   href: string;
+  link?: string | null;
   icon?: MenuIcon;
   submenus?: Level3Item[];
 }
@@ -28,6 +29,7 @@ export interface MenuItem {
   icon: MenuIcon;
   label: string;
   href?: string;
+  link?: string | null;
   submenus?: SubmenuItem[];
 }
 

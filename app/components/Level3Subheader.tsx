@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SubmenuItem } from '@/app/data/menuItems';
+import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 
 interface Level3ItemProps {
   label: string;
@@ -14,10 +15,9 @@ interface Level3ItemProps {
 interface Level3SubheaderProps {
   items: Level3ItemProps[];
   parentLabel: string;
-  masterItems?: SubmenuItem[];
   mainMenuId?: number | string;
   menuId?: number | string;
-  fetchedMasterItems?: SubmenuItem[];
+  masterItems: SubmenuItem[];
   masterLoading?: boolean;
   masterMenuGroups?: Record<string, unknown>[];
 }
@@ -30,7 +30,7 @@ function getPathFromUrl(url: string): string {
   }
 }
 
-export default function Level3Subheader({ items, parentLabel, masterItems = [], fetchedMasterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
+export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
   const [showMasterDropdown, setShowMasterDropdown] = useState(false);
@@ -60,8 +60,10 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
 
   const handleMasterClick = (item: SubmenuItem) => {
     setShowMasterDropdown(false);
-    if (item.href && item.href !== '#') {
-      router.push(item.href);
+    // Use 'link' from API, fallback to 'href', map through routeMapper
+    const navigateRoute = item.link ? mapApiLinkToRoute(item.link) : item.href;
+    if (navigateRoute && navigateRoute !== '#') {
+      router.push(navigateRoute);
     }
   };
 
@@ -126,7 +128,8 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
               onScroll={checkScrollability}
             >
               {items.map((item, idx) => {
-                const navigateRoute = item.href;
+                // Use 'link' from API, fallback to 'href', map through routeMapper
+                const navigateRoute = item.link ? mapApiLinkToRoute(item.link) : item.href;
                 const isActive = pathname === navigateRoute.toLowerCase();
                 
                 const handleClick = () => {
@@ -242,14 +245,16 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                             return (
                               <div className="grid grid-cols-2 gap-2.5">
                                 {children.map((child: Record<string, unknown>) => {
-                                  const childHref = String(child.url ?? child.href ?? '#');
+                                  // Use 'link' from API, fallback to 'href' or 'url', map through routeMapper
+                                  const childLink = String(child.link ?? child.url ?? child.href ?? '#');
+                                  const childRoute = childLink !== '#' ? mapApiLinkToRoute(childLink) : '#';
                                   const childName = String(child.name ?? '');
-                                  const isActive = pathname === getPathFromUrl(childHref);
+                                  const isActive = pathname === childRoute.toLowerCase();
                                   return (
                                     <button
                                       key={String(child.id ?? childName)}
                                       type="button"
-                                      onClick={() => router.push(childHref)}
+                                      onClick={() => childRoute !== '#' && router.push(childRoute)}
                                       className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 border ${
                                         isActive
                                           ? 'bg-blue-50/80 border-blue-200 text-[#0D6EFD] shadow-sm'
@@ -277,7 +282,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                       </>
                     ) : (
                       <div className="p-2">
-                        {!masterLoading && fetchedMasterItems.map((item) => {
+                        {!masterLoading && masterItems.map((item) => {
                           const Icon = item.icon;
                           return (
                             <button

@@ -10,6 +10,7 @@ import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/men
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import { usePathname, useRouter } from 'next/navigation';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 
 interface SelectedBranch {
   level1Key: string;
@@ -218,11 +219,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return menuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key) ?? null;
   }, [menuItems, selectedBranch]);
 
-  const staticMasterMenuItems = useMemo(() => {
-    if (!selectedL1) return [];
-    return selectedL1.submenus ?? [];
-  }, [selectedL1]);
-
   const selectedL2 = useMemo(() => {
     if (!selectedBranch || !selectedL1 || !selectedBranch.level2Key) return null;
     return selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key) ?? null;
@@ -251,7 +247,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return found;
   })();
 
-  const showSubheader = Boolean(level3Menu?.items.length || staticMasterMenuItems.length > 0);
+  const showSubheader = Boolean(level3Menu?.items.length || fetchedMasterMenuItems.length > 0 || masterMenuGroups.length > 0);
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
@@ -272,11 +268,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 <Level3Subheader
                   items={level3Menu?.items ?? []}
                   parentLabel={level3Menu?.parentLabel ?? ''}
-                  masterItems={staticMasterMenuItems}
                   mainMenuId={selectedL1?.id}
                   menuId={selectedL2?.id}
+                  masterItems={fetchedMasterMenuItems}
                   masterLoading={masterMenuLoading}
-                  fetchedMasterItems={fetchedMasterMenuItems}
                   masterMenuGroups={masterMenuGroups}
                 />
               </div>
