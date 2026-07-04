@@ -9,6 +9,7 @@ import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights } from '@/app/hooks/useMenuRights';
 import { usePathname, useRouter } from 'next/navigation';
+import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 
 interface SelectedBranch {
   level1Key: string;
@@ -63,20 +64,24 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         return;
       }
       
-      // If Level 2 has Level 3 items, navigate to the first one if current path doesn't match any Level 3
-      if (selectedLevel2?.submenus?.length) {
-        const currentPath = pathname.toLowerCase();
-        const hasMatchingLevel3 = selectedLevel2.submenus.some(
-          (l3) => l3.href && l3.href !== '#' && currentPath === l3.href.toLowerCase()
-        );
-        
-        if (!hasMatchingLevel3) {
-          const firstLevel3 = selectedLevel2.submenus[0];
-          if (firstLevel3.href && firstLevel3.href !== '#') {
-            router.push(firstLevel3.href);
-          }
-        }
-      }
+// If Level 2 has Level 3 items, navigate to the first one if current path doesn't match any Level 3
+       if (selectedLevel2?.submenus?.length) {
+         const currentPath = pathname.toLowerCase();
+         const hasMatchingLevel3 = selectedLevel2.submenus.some(
+           (l3) => {
+             const mappedRoute = l3.link ? mapApiLinkToRoute(l3.link) : l3.href;
+             return mappedRoute && mappedRoute !== '#' && currentPath === mappedRoute.toLowerCase();
+           }
+         );
+         
+         if (!hasMatchingLevel3) {
+           const firstLevel3 = selectedLevel2.submenus[0];
+           const navigateRoute = firstLevel3.link ? mapApiLinkToRoute(firstLevel3.link) : firstLevel3.href;
+           if (navigateRoute && navigateRoute !== '#') {
+             router.push(navigateRoute);
+           }
+         }
+       }
     }
     if (menuItems.length > 0) {
       hasLoadedRef.current = true;
@@ -98,11 +103,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       level2Key: getMenuKey(submenu),
     });
 
-    // If Level 2 has Level 3 items, navigate to the first one by default
     if (submenu.submenus && submenu.submenus.length > 0) {
       const firstLevel3 = submenu.submenus[0];
-      if (firstLevel3.href && firstLevel3.href !== '#') {
-        router.push(firstLevel3.href);
+      // Use link field mapped to route, fallback to href
+      const navigateRoute = firstLevel3.link ? mapApiLinkToRoute(firstLevel3.link) : firstLevel3.href;
+      if (navigateRoute && navigateRoute !== '#') {
+        router.push(navigateRoute);
       }
     }
   };
