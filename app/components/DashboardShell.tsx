@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
@@ -85,11 +85,57 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, [selectedBranch]);
   const [isChatbotOpen, setIsChatbotOpen] = useState(true);
 
-  const [fetchedMasterMenuItems, setFetchedMasterMenuItems] = useState<SubmenuItem[]>([]);
-  const [masterMenuGroups, setMasterMenuGroups] = useState<Record<string, unknown>[]>([]);
+  const [fetchedMasterMenuItems, setFetchedMasterMenuItems] = useState<SubmenuItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('masterMenuState');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.fetchedMasterMenuItems)) {
+        return parsed.fetchedMasterMenuItems;
+      }
+    } catch {}
+    return [];
+  });
+
+  const [masterMenuGroups, setMasterMenuGroups] = useState<Record<string, unknown>[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('masterMenuState');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.masterMenuGroups)) {
+        return parsed.masterMenuGroups;
+      }
+    } catch {}
+    return [];
+  });
+
   const [masterMenuLoading, setMasterMenuLoading] = useState(false);
 
-  const fetchMasterMenu = async (mainMenuId: number | string | undefined, menuItem: SubmenuItem | undefined) => {
+  const userProfileName = (getStoredMenuContext()?.user_profile_name || '').toString().trim();
+
+  const isKnownMenuPath = useCallback((checkPath: string): boolean => {
+    const lower = (checkPath || '').toLowerCase();
+    if (!lower || lower === '/dashboard' || lower === '/') return true;
+
+    for (const item of menuItems) {
+      if (item.href && item.href !== '#' && lower.startsWith(item.href.toLowerCase())) return true;
+      if (item.submenus) {
+        for (const submenu of item.submenus) {
+          if (submenu.href && submenu.href !== '#' && lower.startsWith(submenu.href.toLowerCase())) return true;
+          if (submenu.submenus) {
+            for (const l3 of submenu.submenus) {
+              if (l3.href && l3.href !== '#' && lower.startsWith(l3.href.toLowerCase())) return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }, [menuItems]);
+
+   const fetchMasterMenu = async (mainMenuId: number | string | undefined, menuItem: SubmenuItem | undefined) => {
     if (!mainMenuId || !menuItem) return;
 
     const session = getStoredMenuContext();
@@ -144,7 +190,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         }));
       }
 
-      setFetchedMasterMenuItems(getFilteredMasterMenuItems(mapped, menuItem));
+      const filtered = getFilteredMasterMenuItems(mapped, menuItem);
+      setFetchedMasterMenuItems(filtered);
+      setMasterMenuGroups(rawData.length > 0 && (rawData[0] as Record<string, unknown>).url ? [] : rawData);
     } catch {
       setFetchedMasterMenuItems([]);
       setMasterMenuGroups([]);
@@ -162,30 +210,30 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         setSelectedBranch(null);
         return;
       }
-      
-// If Level 2 has Level 3 items, navigate to the first one if current path doesn't match any Level 3
-       if (selectedLevel2?.submenus?.length) {
-         const currentPath = pathname.toLowerCase();
-         const hasMatchingLevel3 = selectedLevel2.submenus.some(
-           (l3) => {
-             const mappedRoute = l3.link ? mapApiLinkToRoute(l3.link) : l3.href;
-             return mappedRoute && mappedRoute !== '#' && currentPath === mappedRoute.toLowerCase();
-           }
-         );
-         
-         if (!hasMatchingLevel3) {
-           const firstLevel3 = selectedLevel2.submenus[0];
-           const navigateRoute = firstLevel3.link ? mapApiLinkToRoute(firstLevel3.link) : firstLevel3.href;
-           if (navigateRoute && navigateRoute !== '#') {
-             router.push(navigateRoute);
-           }
-         }
-       }
+
+      if (!isKnownMenuPath(pathname)) {
+        return;
+      }
+
+      // If Level 2 has Level 3 items, navigate to the first one if current path doesn't match any Level 3
+      if (selectedLevel2?.submenus?.length) {
+        const currentPath = pathname.toLowerCase();
+        const hasMatchingLevel3 = selectedLevel2.submenus.some(
+          (l3) => l3.href && l3.href !== '#' && currentPath === l3.href.toLowerCase()
+        );
+
+        if (!hasMatchingLevel3) {
+          const firstLevel3 = selectedLevel2.submenus[0];
+          if (firstLevel3.href && firstLevel3.href !== '#') {
+            router.push(firstLevel3.href);
+          }
+        }
+      }
     }
     if (menuItems.length > 0) {
       hasLoadedRef.current = true;
     }
-  }, [menuItems, selectedBranch, pathname, router]);
+  }, [menuItems, selectedBranch, pathname, router, isKnownMenuPath]);
 
   const toggleChatbot = () => setIsChatbotOpen((prev) => !prev);
 
@@ -273,6 +321,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   masterItems={fetchedMasterMenuItems}
                   masterLoading={masterMenuLoading}
                   masterMenuGroups={masterMenuGroups}
+                  userProfileName={userProfileName}
                 />
               </div>
             )}

@@ -21,6 +21,7 @@ interface Level3SubheaderProps {
   masterItems: SubmenuItem[];
   masterLoading?: boolean;
   masterMenuGroups?: Record<string, unknown>[];
+  userProfileName?: string;
 }
 
 function getPathFromUrl(url: string): string {
@@ -31,39 +32,41 @@ function getPathFromUrl(url: string): string {
   }
 }
 
-/**
- * Get the navigation route from an item.
- * Priority: 1. 'link' field from API (raw API link), 2. 'href' field
- * The 'link' field contains the original API value like "students/search_student/"
- * which needs to be converted to "/students/search_student" for Next.js routing.
- */
-function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null {
-  // First priority: use the 'link' field from API (this is the raw link from the API)
-  if (item.link) {
-    const mappedRoute = mapApiLinkToRoute(item.link);
-    // Only return if it's not a special route or hash
-    if (mappedRoute && mappedRoute !== '#' && mappedRoute !== '/dashboard') {
-      return mappedRoute;
-    }
-  }
-  
-  // Fallback to 'href' field
-  if (item.href && item.href !== '#') {
-    return item.href;
-  }
-  
-  return null;
+function hasMasterAccess(userProfileName: string): boolean {
+  const role = userProfileName.trim().toLowerCase();
+  return role === 'admin' || role === 'teacher';
 }
 
-export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
+export default function Level3Subheader({ items, parentLabel, masterItems = [], fetchedMasterItems = [], masterLoading = false, masterMenuGroups = [], userProfileName = '' }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
   const [showMasterDropdown, setShowMasterDropdown] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [selectedMasterCategory, setSelectedMasterCategory] = useState<string | number | null>(null);
+  const [selectedMasterCategory, setSelectedMasterCategory] = useState<string | number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('selectedMasterCategory');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && masterMenuGroups.some((g) => (g.id as string | number) === parsed)) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const tabsWrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (selectedMasterCategory) {
+      localStorage.setItem('selectedMasterCategory', JSON.stringify(selectedMasterCategory));
+    } else {
+      localStorage.removeItem('selectedMasterCategory');
+    }
+  }, [selectedMasterCategory]);
 
   const checkScrollability = () => {
     const el = containerRef.current;
@@ -196,7 +199,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
           )}
         </div>
 
-        {masterItems.length > 0 && (
+        {hasMasterAccess(userProfileName) && masterItems.length > 0 && (
           <div className="relative shrink-0" data-master-dropdown>
             <button
               type="button"
