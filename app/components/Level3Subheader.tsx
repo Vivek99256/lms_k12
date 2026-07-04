@@ -95,14 +95,14 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
   }, [showMasterDropdown]);
 
   useEffect(() => {
-    if (!showMasterDropdown && masterMenuGroups.length > 0 && fetchedMasterItems.length > 0) {
+    if (!showMasterDropdown && masterMenuGroups.length > 0 && masterItems.length > 0) {
       const wasOpen = typeof window !== 'undefined' && sessionStorage.getItem('masterMenuOpen') === 'true';
       if (wasOpen) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setShowMasterDropdown(true);
       }
     }
-  }, [masterMenuGroups, fetchedMasterItems, showMasterDropdown]);
+  }, [masterMenuGroups, masterItems, showMasterDropdown]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -244,7 +244,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
           )}
         </div>
 
-        {hasMasterAccess(userProfileName) && (masterMenuGroups.length > 0 || fetchedMasterItems.length > 0 || masterItems.length > 0) && (
+        {hasMasterAccess(userProfileName) && (masterMenuGroups.length > 0 || masterItems.length > 0 || masterItems.length > 0) && (
           <div className="relative shrink-0" data-master-dropdown>
             <button
               type="button"
