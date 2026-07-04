@@ -8,7 +8,7 @@ import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights } from '@/app/hooks/useMenuRights';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface SelectedBranch {
   level1Key: string;
@@ -25,6 +25,7 @@ function isMasterMenu(item: { menuType?: string | null }) {
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '';
+  const router = useRouter();
   const { menuItems, loading, error, refetch } = useMenuRights();
   const hasLoadedRef = useRef(false);
 
@@ -61,11 +62,26 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         setSelectedBranch(null);
         return;
       }
+      
+      // If Level 2 has Level 3 items, navigate to the first one if current path doesn't match any Level 3
+      if (selectedLevel2?.submenus?.length) {
+        const currentPath = pathname.toLowerCase();
+        const hasMatchingLevel3 = selectedLevel2.submenus.some(
+          (l3) => l3.href && l3.href !== '#' && currentPath === l3.href.toLowerCase()
+        );
+        
+        if (!hasMatchingLevel3) {
+          const firstLevel3 = selectedLevel2.submenus[0];
+          if (firstLevel3.href && firstLevel3.href !== '#') {
+            router.push(firstLevel3.href);
+          }
+        }
+      }
     }
     if (menuItems.length > 0) {
       hasLoadedRef.current = true;
     }
-  }, [menuItems, selectedBranch]);
+  }, [menuItems, selectedBranch, pathname, router]);
 
   const toggleChatbot = () => setIsChatbotOpen((prev) => !prev);
 
@@ -81,6 +97,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       level1Key: getMenuKey(parent),
       level2Key: getMenuKey(submenu),
     });
+
+    // If Level 2 has Level 3 items, navigate to the first one by default
+    if (submenu.submenus && submenu.submenus.length > 0) {
+      const firstLevel3 = submenu.submenus[0];
+      if (firstLevel3.href && firstLevel3.href !== '#') {
+        router.push(firstLevel3.href);
+      }
+    }
   };
 
   const selectedL1 = useMemo(() => {
@@ -119,7 +143,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
     }
-    return searchLevel3FromMenu(menuItems, pathname);
+    const found = searchLevel3FromMenu(menuItems, pathname);
+    return found;
   })();
 
   const showSubheader = Boolean(level3Menu?.items.length || (isMasterSelected && masterMenuItems.length > 0));

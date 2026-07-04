@@ -1,4 +1,4 @@
-import { BookOpen, Calendar, FileText, BarChart3, MessageCircle, Settings } from 'lucide-react';
+import { BookOpen, Calendar, FileText, BarChart3, MessageCircle, Settings, Search, Users } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 export type MenuIcon = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
@@ -9,6 +9,7 @@ export interface Level3Item {
   menuType?: string | null;
   label: string;
   href: string;
+  link?: string | null;
 }
 
 export interface SubmenuItem {
@@ -32,6 +33,15 @@ export interface MenuItem {
 
 export const menuItems: MenuItem[] = [
 
+  { 
+    icon: Search, 
+    label: 'Search / Edit Student', 
+    href: '/search_student',
+    submenus: [
+      { label: 'Student Profiles', href: '/search_student', icon: Users },
+      { label: 'Documents', href: '/search_student', icon: FileText },
+    ]
+  },
   { 
     icon: BookOpen, 
     label: 'Subjects', 

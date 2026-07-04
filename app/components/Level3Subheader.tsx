@@ -3,15 +3,16 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { SubmenuItem } from '@/app/data/menuItems';
+import type { SubmenuItem, Level3Item as MenuLevel3Item } from '@/app/data/menuItems';
 
-interface Level3Item {
+interface Level3ItemProps {
   label: string;
   href: string;
+  link?: string | null;
 }
 
 interface Level3SubheaderProps {
-  items: Level3Item[];
+  items: Level3ItemProps[];
   parentLabel: string;
   masterItems?: SubmenuItem[];
 }
@@ -127,14 +128,22 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [] }
             onScroll={checkScrollability}
           >
             {items.map((item, idx) => {
-              const isActive = pathname === item.href.toLowerCase();
+              // Use href which is already resolved by resolveRoute in menuMappers
+              // link field preserves original API value if needed
+              const navigateRoute = item.href;
+              const isActive = pathname === navigateRoute.toLowerCase();
+              
+              const handleClick = () => {
+                if (navigateRoute && navigateRoute !== '#') {
+                  router.push(navigateRoute);
+                }
+              };
+              
               return (
                 <button
                   key={idx}
                   type="button"
-                  onClick={() => {
-                    router.push(item.href);
-                  }}
+                  onClick={handleClick}
                   className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border shrink-0 ${
                     isActive
                       ? 'bg-[#0D6EFD] text-white border-[#0D6EFD] shadow-sm'

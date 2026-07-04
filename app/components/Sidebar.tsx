@@ -119,7 +119,9 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setLevel2Panel(null);
+      if (event.key === 'Escape') {
+        setLevel2Panel(null);
+      }
     };
 
     if (level2Panel) {
@@ -150,10 +152,6 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
 
     onLevel2Select(submenu, level2Panel.item);
     setLevel2Panel(null);
-
-    if (submenu.submenus?.length) {
-      return;
-    }
 
     if (submenu.href && submenu.href !== '#') {
       router.push(submenu.href);
