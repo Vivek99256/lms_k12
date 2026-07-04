@@ -37,7 +37,31 @@ function hasMasterAccess(userProfileName: string): boolean {
   return role === 'admin' || role === 'teacher';
 }
 
-export default function Level3Subheader({ items, parentLabel, masterItems = [], fetchedMasterItems = [], masterLoading = false, masterMenuGroups = [], userProfileName = '' }: Level3SubheaderProps) {
+/**
+ * Get navigation route from item - prioritizes 'link' field from API
+ * @param item - Level3ItemProps or SubmenuItem with link and href fields
+ * @returns The route path to navigate to, or null if no valid route
+ */
+function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null {
+  // First priority: use the 'link' field from API (raw link from API)
+  // e.g., "students/search_student/" from your API
+  if (item.link) {
+    const mappedRoute = mapApiLinkToRoute(item.link);
+    // Only return if it's a valid route (not # or empty)
+    if (mappedRoute && mappedRoute !== '#' && mappedRoute !== '/dashboard') {
+      return mappedRoute;
+    }
+  }
+  
+  // Fallback to 'href' field if link is not available or invalid
+  if (item.href && item.href !== '#') {
+    return item.href;
+  }
+  
+  return null;
+}
+
+export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [], userProfileName = '' }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
   const [showMasterDropdown, setShowMasterDropdown] = useState(false);

@@ -120,13 +120,17 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (!lower || lower === '/dashboard' || lower === '/') return true;
 
     for (const item of menuItems) {
-      if (item.href && item.href !== '#' && lower.startsWith(item.href.toLowerCase())) return true;
+      // Check link field first (from API), then fallback to href
+      const itemRoute = item.link ? mapApiLinkToRoute(item.link) : item.href;
+      if (itemRoute && itemRoute !== '#' && lower.startsWith(itemRoute.toLowerCase())) return true;
       if (item.submenus) {
         for (const submenu of item.submenus) {
-          if (submenu.href && submenu.href !== '#' && lower.startsWith(submenu.href.toLowerCase())) return true;
+          const submenuRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href;
+          if (submenuRoute && submenuRoute !== '#' && lower.startsWith(submenuRoute.toLowerCase())) return true;
           if (submenu.submenus) {
             for (const l3 of submenu.submenus) {
-              if (l3.href && l3.href !== '#' && lower.startsWith(l3.href.toLowerCase())) return true;
+              const l3Route = l3.link ? mapApiLinkToRoute(l3.link) : l3.href;
+              if (l3Route && l3Route !== '#' && lower.startsWith(l3Route.toLowerCase())) return true;
             }
           }
         }
@@ -218,14 +222,20 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       // If Level 2 has Level 3 items, navigate to the first one if current path doesn't match any Level 3
       if (selectedLevel2?.submenus?.length) {
         const currentPath = pathname.toLowerCase();
-        const hasMatchingLevel3 = selectedLevel2.submenus.some(
-          (l3) => l3.href && l3.href !== '#' && currentPath === l3.href.toLowerCase()
-        );
+        const hasMatchingLevel3 = selectedLevel2.submenus.some((l3) => {
+          // Check both link (from API) and href fields
+          const linkRoute = l3.link ? mapApiLinkToRoute(l3.link) : null;
+          const hrefRoute = l3.href && l3.href !== '#' ? l3.href : null;
+          const targetRoute = linkRoute && linkRoute !== '#' ? linkRoute : hrefRoute;
+          return targetRoute && currentPath === targetRoute.toLowerCase();
+        });
 
         if (!hasMatchingLevel3) {
           const firstLevel3 = selectedLevel2.submenus[0];
-          if (firstLevel3.href && firstLevel3.href !== '#') {
-            router.push(firstLevel3.href);
+          // Use 'link' field from API first, fallback to href
+          const navigateRoute = firstLevel3.link ? mapApiLinkToRoute(firstLevel3.link) : firstLevel3.href;
+          if (navigateRoute && navigateRoute !== '#') {
+            router.push(navigateRoute);
           }
         }
       }
@@ -277,7 +287,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     for (const item of items) {
       if (item.submenus && item.href && !item.href.startsWith('#')) {
         for (const submenu of item.submenus) {
-          const submenuHref = (submenu.href || '').toLowerCase();
+          // Check both link (from API) and href fields
+          const linkRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : null;
+          const submenuRoute = (linkRoute && linkRoute !== '#') ? linkRoute : submenu.href;
+          const submenuHref = (submenuRoute || '').toLowerCase();
           if (submenu.submenus?.length && submenuHref !== '#' && path.startsWith(submenuHref)) {
             return { parentLabel: submenu.label, items: submenu.submenus as Level3Item[] };
           }
