@@ -49,17 +49,26 @@ function readAcademicSession() {
   return null;
 }
 
+const getStoredSelection = (key: string) => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(key);
+};
+
 export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleChatbot: () => void; isChatbotOpen: boolean }) {
   const { user, logout } = useAuth();
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showTermDropdown, setShowTermDropdown] = useState(false);
 
   const [selectedYear, setSelectedYear] = useState<string>(() => {
+    const stored = getStoredSelection('selectedAcademicYear');
+    if (stored) return stored;
     const academic = readAcademicSession();
     return academic?.selectedYear || '2024-2025';
   });
 
   const [selectedTerm, setSelectedTerm] = useState<string>(() => {
+    const stored = getStoredSelection('selectedAcademicTerm');
+    if (stored) return stored;
     const academic = readAcademicSession();
     return academic?.selectedTerm || 'Term 1';
   });
@@ -67,22 +76,9 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('selectedAcademicYear', selectedYear);
+      localStorage.setItem('selectedAcademicTerm', selectedTerm);
     }
-  }, [selectedYear]);
-
-  const mountedRef = useRef(false);
-  useEffect(() => {
-    mountedRef.current = true;
-    const academic = readAcademicSession();
-    console.log('Session Data:', academic);
-    const timeout = setTimeout(() => {
-      if (academic) {
-        setSelectedYear((current) => academic.selectedYear || current);
-        setSelectedTerm((current) => academic.selectedTerm || current);
-      }
-    }, 0);
-    return () => clearTimeout(timeout);
-  }, []);
+  }, [selectedYear, selectedTerm]);
 
   const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
   const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);
@@ -111,6 +107,9 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
   const terms = academic?.terms && academic.terms.length > 0 ? academic.terms : ['Term 1', 'Term 2', 'Term 3', 'Term 4'];
   const displayTerms = terms.includes(selectedTerm) ? terms : [selectedTerm, ...terms];
 
+  const yearButtonRef = useRef<HTMLButtonElement>(null);
+  const termButtonRef = useRef<HTMLButtonElement>(null);
+
   const handleYearToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setYearPosition({ top: rect.bottom + 4, left: rect.left });
@@ -123,10 +122,24 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
     setShowTermDropdown(prev => !prev);
   };
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (yearButtonRef.current?.contains(target) || termButtonRef.current?.contains(target)) {
+        return;
+      }
+      setShowYearDropdown(false);
+      setShowTermDropdown(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const renderDropdown = (
     isOpen: boolean,
     position: { top: number; left: number } | null,
     onSelect: (val: string) => void,
+    setShowDropdown: (show: boolean) => void,
     options: string[],
     value: string
   ) => {
@@ -144,6 +157,7 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
             onClick={(e) => {
               e.preventDefault();
               onSelect(option);
+              setShowDropdown(false);
             }}
             className={`w-full text-left px-4 py-2 text-sm transition-colors ${
               value === option 
@@ -174,27 +188,28 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
 
       <div className="flex items-center gap-3">
         <button
+          ref={yearButtonRef}
           onClick={handleYearToggle}
           className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200/50 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
         >
           <GraduationCap size={16} className="text-gray-500" />
-          <span className="hidden sm:inline">Year</span>
           <span className="max-w-[80px] truncate">{selectedYear}</span>
           <ChevronDown size={14} className={`text-gray-400 transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
         </button>
 
         <button
+          ref={termButtonRef}
           onClick={handleTermToggle}
           className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200/50 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
         >
           <BookOpen size={16} className="text-gray-500" />
-          <span className="hidden sm:inline">Term</span>
+          
           <span className="max-w-[60px] truncate">{selectedTerm}</span>
           <ChevronDown size={14} className={`text-gray-400 transition-transform ${showTermDropdown ? 'rotate-180' : ''}`} />
         </button>
 
-        {renderDropdown(showYearDropdown, yearPosition, setSelectedYear, displayYears, selectedYear)}
-        {renderDropdown(showTermDropdown, termPosition, setSelectedTerm, displayTerms, selectedTerm)}
+        {renderDropdown(showYearDropdown, yearPosition, setSelectedYear, setShowYearDropdown, displayYears, selectedYear)}
+        {renderDropdown(showTermDropdown, termPosition, setSelectedTerm, setShowTermDropdown, displayTerms, selectedTerm)}
 
         <button
           onClick={onToggleChatbot}

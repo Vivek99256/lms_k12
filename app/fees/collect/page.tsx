@@ -538,12 +538,12 @@ export default function FeesCollectPage() {
                 </Select>
               </Field>
 
-              <Field label="Student Name" icon={<UserRound size={14} className="text-slate-400" />}>
+              {/* <Field label="Student Name" icon={<UserRound size={14} className="text-slate-400" />}>
                 <div className="relative">
                   <UserRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input value={studentName} onChange={(event) => setStudentName(event.target.value)} placeholder="Enter student name" className="h-10 rounded-xl border-slate-200 bg-slate-50/70 pl-9 text-sm transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                 </div>
-              </Field>
+              </Field> */}
 
               <Field label="GR No." icon={<Search size={14} className="text-slate-400" />}>
                 <Input value={grNo} onChange={(event) => setGrNo(event.target.value)} placeholder="Enter GR number" className="h-10 rounded-xl border-slate-200 bg-slate-50/70 text-sm transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
