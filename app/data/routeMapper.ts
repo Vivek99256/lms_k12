@@ -22,7 +22,7 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   
   // Check if it's a JavaScript void link
   const lowerLink = cleanLink.toLowerCase();
-  if (lowerLink === 'javascript:void(0);' || lowerLink === 'javascript:void(0)' || lowerLink === '#') {
+  if (lowerLink === 'javascript:void(0);' || lowerLink === 'javascript:void(0)' || lowerLink === '#' || lowerLink === '') {
     return '#';
   }
   

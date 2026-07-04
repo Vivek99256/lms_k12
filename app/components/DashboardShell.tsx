@@ -206,7 +206,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
     if (submenu.submenus && submenu.submenus.length > 0) {
       const firstLevel3 = submenu.submenus[0];
-      // Use link field mapped to route, fallback to href
+      // Use 'link' field from API (priority) or 'href' field
       const navigateRoute = firstLevel3.link ? mapApiLinkToRoute(firstLevel3.link) : firstLevel3.href;
       if (navigateRoute && navigateRoute !== '#') {
         router.push(navigateRoute);

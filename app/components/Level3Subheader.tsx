@@ -7,6 +7,7 @@ import type { SubmenuItem } from '@/app/data/menuItems';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 
 interface Level3ItemProps {
+  id?: number | string;
   label: string;
   href: string;
   link?: string | null;
@@ -28,6 +29,30 @@ function getPathFromUrl(url: string): string {
   } catch {
     return url.toLowerCase();
   }
+}
+
+/**
+ * Get the navigation route from an item.
+ * Priority: 1. 'link' field from API (raw API link), 2. 'href' field
+ * The 'link' field contains the original API value like "students/search_student/"
+ * which needs to be converted to "/students/search_student" for Next.js routing.
+ */
+function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null {
+  // First priority: use the 'link' field from API (this is the raw link from the API)
+  if (item.link) {
+    const mappedRoute = mapApiLinkToRoute(item.link);
+    // Only return if it's not a special route or hash
+    if (mappedRoute && mappedRoute !== '#' && mappedRoute !== '/dashboard') {
+      return mappedRoute;
+    }
+  }
+  
+  // Fallback to 'href' field
+  if (item.href && item.href !== '#') {
+    return item.href;
+  }
+  
+  return null;
 }
 
 export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
@@ -60,9 +85,8 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
 
   const handleMasterClick = (item: SubmenuItem) => {
     setShowMasterDropdown(false);
-    // Use 'link' from API, fallback to 'href', map through routeMapper
-    const navigateRoute = item.link ? mapApiLinkToRoute(item.link) : item.href;
-    if (navigateRoute && navigateRoute !== '#') {
+    const navigateRoute = getNavigationRoute(item);
+    if (navigateRoute) {
       router.push(navigateRoute);
     }
   };
@@ -128,19 +152,19 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
               onScroll={checkScrollability}
             >
               {items.map((item, idx) => {
-                // Use 'link' from API, fallback to 'href', map through routeMapper
-                const navigateRoute = item.link ? mapApiLinkToRoute(item.link) : item.href;
-                const isActive = pathname === navigateRoute.toLowerCase();
+                // Use 'link' field from API (priority) or 'href' field
+                const navigateRoute = getNavigationRoute(item);
+                const isActive = navigateRoute ? pathname === navigateRoute.toLowerCase() : false;
                 
                 const handleClick = () => {
-                  if (navigateRoute && navigateRoute !== '#') {
+                  if (navigateRoute) {
                     router.push(navigateRoute);
                   }
                 };
                 
                 return (
                   <button
-                    key={idx}
+                    key={item.id ?? idx}
                     type="button"
                     onClick={handleClick}
                     className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border shrink-0 ${
