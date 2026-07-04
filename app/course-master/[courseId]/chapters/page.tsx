@@ -12,6 +12,7 @@ import {
   Pencil,
   Trash2,
   ChevronDown,
+  Brain,
   GraduationCap,
   Sparkles,
   CheckCircle2,
@@ -756,7 +757,7 @@ export default function ChapterListPage() {
                                     {concept.time}
                                   </div>
 
-                                  <div className="mt-5 border-t border-slate-100 pt-4">
+                                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
                                     <Button
                                       type="button"
                                       variant="outline"
@@ -768,9 +769,10 @@ export default function ChapterListPage() {
                                           )}`
                                         );
                                       }}
-                                      className="h-10 rounded-xl border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                                      className="h-11 rounded-2xl border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 shadow-sm hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
                                     >
-                                      Intelligence
+                                      <Brain size={16} className="mr-2" />
+                                      Semantic
                                     </Button>
                                   </div>
                                 </div>
