@@ -36,10 +36,9 @@ function itemMatchesPath(item: MenuItem, pathname: string) {
 export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Select, onLevel2Select }: SidebarProps) {
   const pathname = usePathname() || '';
   const router = useRouter();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [level2Panel, setLevel2Panel] = useState<Level2PanelState | null>(null);
   const panelCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const sidebarLeaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const openLevel2Panel = (item: MenuItem, element: HTMLElement) => {
     if (!item.submenus?.length) return;
@@ -106,7 +105,6 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
   useEffect(() => {
     return () => {
       if (panelCloseTimeoutRef.current) clearTimeout(panelCloseTimeoutRef.current);
-      if (sidebarLeaveTimeoutRef.current) clearTimeout(sidebarLeaveTimeoutRef.current);
     };
   }, []);
 
@@ -164,17 +162,6 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
 
   return (
     <div
-      onMouseEnter={() => {
-        if (sidebarLeaveTimeoutRef.current) clearTimeout(sidebarLeaveTimeoutRef.current);
-        cancelPanelClose();
-        setIsCollapsed(false);
-      }}
-      onMouseLeave={() => {
-        sidebarLeaveTimeoutRef.current = setTimeout(() => {
-          setIsCollapsed(true);
-        }, 300);
-        schedulePanelClose();
-      }}
       className={`${isCollapsed ? 'w-[104px]' : 'w-[280px]'} h-full p-4 shrink-0 flex flex-col transition-[width] duration-700 ease-in-out relative group z-50`}
     >
       <div className="bg-white/80 backdrop-blur-xl w-full h-full rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-200/50 flex flex-col relative">
