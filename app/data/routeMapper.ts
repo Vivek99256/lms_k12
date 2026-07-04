@@ -38,9 +38,9 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return cleanLink;
   }
   
-  // Convert underscores to hyphens for consistency
-  // "admission_enquiry" -> "admission-enquiry"
-  cleanLink = cleanLink.replace(/_/g, '-');
+  // DO NOT convert underscores to hyphens - preserve the original API link format
+  // API links like "students/search_student/" should map to "/students/search_student"
+  // which corresponds to app/students/search_student/page.tsx
   
   // Prepend with / to make it a valid route
   return '/' + cleanLink;
