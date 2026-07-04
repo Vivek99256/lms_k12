@@ -4,8 +4,10 @@ import React, { useRef, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SubmenuItem } from '@/app/data/menuItems';
+import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 
 interface Level3ItemProps {
+  id?: number | string;
   label: string;
   href: string;
   link?: string | null;
@@ -14,10 +16,9 @@ interface Level3ItemProps {
 interface Level3SubheaderProps {
   items: Level3ItemProps[];
   parentLabel: string;
-  masterItems?: SubmenuItem[];
   mainMenuId?: number | string;
   menuId?: number | string;
-  fetchedMasterItems?: SubmenuItem[];
+  masterItems: SubmenuItem[];
   masterLoading?: boolean;
   masterMenuGroups?: Record<string, unknown>[];
   userProfileName?: string;
@@ -36,7 +37,27 @@ function hasMasterAccess(userProfileName: string): boolean {
   return role === 'admin' || role === 'teacher';
 }
 
-export default function Level3Subheader({ items, parentLabel, masterItems = [], fetchedMasterItems = [], masterLoading = false, masterMenuGroups = [], userProfileName = '' }: Level3SubheaderProps) {
+/**
+ * Get navigation route from item - uses 'link' field directly from API
+ */
+function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null {
+  // Use 'link' field directly from API (no modifications)
+  if (item.link) {
+    const route = mapApiLinkToRoute(item.link);
+    if (route && route !== '#') {
+      return route;
+    }
+  }
+  
+  // Fallback to 'href' field
+  if (item.href && item.href !== '#') {
+    return item.href;
+  }
+  
+  return null;
+}
+
+export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [], userProfileName = '' }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
   const [showMasterDropdown, setShowMasterDropdown] = useState(false);
@@ -87,8 +108,9 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
 
   const handleMasterClick = (item: SubmenuItem) => {
     setShowMasterDropdown(false);
-    if (item.href && item.href !== '#') {
-      router.push(item.href);
+    const navigateRoute = getNavigationRoute(item);
+    if (navigateRoute) {
+      router.push(navigateRoute);
     }
   };
 
@@ -153,18 +175,19 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
               onScroll={checkScrollability}
             >
               {items.map((item, idx) => {
-                const navigateRoute = item.href;
-                const isActive = pathname === navigateRoute.toLowerCase();
+                // Use 'link' field directly from API
+                const navigateRoute = getNavigationRoute(item);
+                const isActive = navigateRoute ? pathname === navigateRoute.toLowerCase() : false;
                 
                 const handleClick = () => {
-                  if (navigateRoute && navigateRoute !== '#') {
+                  if (navigateRoute) {
                     router.push(navigateRoute);
                   }
                 };
                 
                 return (
                   <button
-                    key={idx}
+                    key={item.id ?? idx}
                     type="button"
                     onClick={handleClick}
                     className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border shrink-0 ${
@@ -269,14 +292,16 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                             return (
                               <div className="grid grid-cols-2 gap-2.5">
                                 {children.map((child: Record<string, unknown>) => {
-                                  const childHref = String(child.url ?? child.href ?? '#');
+                                  // Use 'link' from API, fallback to 'href' or 'url', map through routeMapper
+                                  const childLink = String(child.link ?? child.url ?? child.href ?? '#');
+                                  const childRoute = childLink !== '#' ? mapApiLinkToRoute(childLink) : '#';
                                   const childName = String(child.name ?? '');
-                                  const isActive = pathname === getPathFromUrl(childHref);
+                                  const isActive = pathname === childRoute.toLowerCase();
                                   return (
                                     <button
                                       key={String(child.id ?? childName)}
                                       type="button"
-                                      onClick={() => router.push(childHref)}
+                                      onClick={() => childRoute !== '#' && router.push(childRoute)}
                                       className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 border ${
                                         isActive
                                           ? 'bg-blue-50/80 border-blue-200 text-[#0D6EFD] shadow-sm'
@@ -304,7 +329,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                       </>
                     ) : (
                       <div className="p-2">
-                        {!masterLoading && fetchedMasterItems.map((item) => {
+                        {!masterLoading && masterItems.map((item) => {
                           const Icon = item.icon;
                           return (
                             <button
