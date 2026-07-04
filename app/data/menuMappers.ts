@@ -73,26 +73,8 @@ function resolveIcon(iconStr: string | null, level: number): MenuIcon {
   return level === 1 ? LayoutDashboard : level === 2 ? BookOpen : FileText;
 }
 
-const ROUTE_MAP: Record<string, string> = {
-   'dashboard.index': '/dashboard',
-   'student.index': '/students',
-   'student.search_student': '/students/search_student',
-   'fees_collect.index': '/fees/collect',
-   'institute.index': '/institute',
- };
-
 export function resolveRoute(link: string | null): string {
-  if (!link) return '/dashboard';
-  const clean = link.trim();
-  if (clean === 'javascript:void(0);' || clean === 'javascript:void(0)') return '#';
-  const lower = clean.toLowerCase();
-  if (ROUTE_MAP[lower]) return ROUTE_MAP[lower];
-  if (lower === '/admission-enquiry') return '/admission-Enquiry';
-  if (lower === '/admission-registration') return '/admissions/registration';
-  if (lower === '/admission-confirmation') return '/admissions/confirmation';
-  if (lower.startsWith('/')) return clean;
-  
-  // Use the new route mapper for better link handling
+  // Use the route mapper for dynamic link handling
   return mapApiLinkToRoute(link);
 }
 
