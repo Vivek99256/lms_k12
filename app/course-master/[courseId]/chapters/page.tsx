@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   Download,
   ChevronRight,
+  ChevronUp,
   Plus,
   X,
   BookOpen,
@@ -20,7 +21,14 @@ import {
   Upload,
   FileText,
   Link2,
-  MessageSquare,
+  Lightbulb,
+  CircleDot,
+  Target,
+  BriefcaseBusiness,
+  TriangleAlert,
+  ClipboardList,
+  Orbit,
+  WandSparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,17 +49,6 @@ import { getChaptersByCourseid } from '../../data/chapters';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { Chapter } from '../../data/chapters';
 
-const CHAPTER_COLORS = [
-  '#0EA5E9', // Sky blue
-  '#F97316', // Orange
-  '#14B8A6', // Teal
-  '#FBBF24', // Amber
-  '#10B981', // Emerald
-  '#A78BFA', // Purple
-  '#FB7185', // Rose
-  '#64748B', // Slate
-];
-
 const EMPTY_CHAPTER_FORM = {
   chapterName: '',
   chapterDescription: '',
@@ -63,25 +60,118 @@ const EMPTY_CHAPTER_FORM = {
 const RESOURCE_MAPPING_TYPES = ['Pedagogical Process', 'Material Type', 'Learning Outcome'] as const;
 const RESOURCE_MATERIAL_TYPES = ['Mindmap', 'Teacher Training', 'Worksheet', 'Reference Notes', 'Assessment Aid'] as const;
 const RESOURCE_FILE_TYPES = ['PDF', 'PPT', 'DOCX', 'Video Link'] as const;
+const UPLOAD_CONTENT_TYPES = ['Presentation', 'Worksheet', 'Reference notes', 'Assessment video'] as const;
+const ACCEPTED_UPLOAD_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'video/mp4',
+];
+const MAX_UPLOAD_SIZE = 100 * 1024 * 1024;
 
-function getChapterSummary(chapterTitle: string) {
-  if (chapterTitle === 'Chemical Reactions and Equations') {
-    return {
-      mappedUnit: 'Chemical Substances-Nature and Behaviour (ID: 22)',
-      chapterName: chapterTitle,
-      academicYear: '2026',
-    };
-  }
+function getConceptIntelligence(conceptTitle: string, chapterTitle: string, index: number) {
+  const conceptKey = conceptTitle.toLowerCase();
+  const isForceConcept =
+    conceptKey.includes('contact') ||
+    conceptKey.includes('pressure') ||
+    conceptKey.includes('force');
+  const isSoundConcept =
+    conceptKey.includes('sound') ||
+    conceptKey.includes('vibration') ||
+    conceptKey.includes('pitch');
+  const sectionTopic = isForceConcept ? 'Force and pressure' : isSoundConcept ? 'Sound' : chapterTitle;
 
   return {
-    mappedUnit: `${chapterTitle} (Mapped Unit)`,
-    chapterName: chapterTitle,
-    academicYear: '2026',
+    domain: index % 2 === 0 ? 'Bloom · Understand' : 'Bloom · Apply',
+    dok: 'DOK 2 — Skills & concepts',
+    topic: sectionTopic,
+    knowledge: isForceConcept
+      ? [
+          'A force is a push or a pull acting on an object',
+          'Contact forces need physical touch — muscular force, friction',
+          'Non-contact forces act at a distance — magnetic, electrostatic, gravitational',
+        ]
+      : [
+          'Sound is produced by vibrating objects',
+          'Pitch changes with frequency while loudness changes with amplitude',
+          'Sound needs a medium to travel and can reflect or be absorbed',
+        ],
+    abilities: isForceConcept
+      ? [
+          'Classify everyday forces as contact or non-contact',
+          "Predict the effect of a force on an object's state of motion",
+        ]
+      : [
+          'Relate vibration patterns to the sound produced',
+          'Compare pitch and loudness in everyday listening situations',
+        ],
+    skills: isForceConcept
+      ? ['Observation', 'Reasoning', 'Communication']
+      : ['Observation', 'Analysis', 'Pattern recognition'],
+    misconceptions: isForceConcept
+      ? [
+          'A moving object always has a force acting on it',
+          'Only living things can exert forces',
+        ]
+      : [
+          'Loud sounds always have high pitch',
+          'Sound can travel equally well through a vacuum',
+        ],
+    prerequisites: isForceConcept ? ['Push and pull (Grade 7)', 'States of motion'] : ['Vibrations', 'Properties of materials'],
+    learningOutcomes: isForceConcept
+      ? [
+          'Identifies the type of force acting in a given situation',
+          'Relates force to change in speed, direction or shape',
+        ]
+      : [
+          'Explains how vibrations produce sound in different sources',
+          'Distinguishes between pitch, loudness and audibility with examples',
+        ],
+    competencies: isForceConcept ? ['Scientific inquiry', 'Evidence-based thinking'] : ['Critical thinking', 'Scientific communication'],
+    learningObjectives: isForceConcept
+      ? [
+          'Define force and give two everyday examples',
+          'Differentiate contact from non-contact forces with examples',
+        ]
+      : [
+          'Describe how vibration produces sound in simple systems',
+          'Use examples to distinguish amplitude from frequency',
+        ],
+    teachingPedagogies: isForceConcept ? ['Demonstration', 'Inquiry-based', 'Think-pair-share'] : ['Guided practice', 'Hands-on activity', 'Discussion'],
+    realWorldApplications: isForceConcept
+      ? ['Magnetic door catches', 'Vehicle braking and seat-belt safety']
+      : ['Tuning musical instruments', 'Designing quieter classrooms and cities'],
   };
 }
 
-function getChapterColor(chapterNumber: number): string {
-  return CHAPTER_COLORS[(chapterNumber - 1) % CHAPTER_COLORS.length];
+function getCourseSectionLabel(courseId: string) {
+  const numeric = Number(courseId.replace(/\D/g, '')) || 0;
+  return numeric % 2 === 0 ? 'Section A' : 'Section B';
+}
+
+function getCourseGradeLabel(classGrade: string) {
+  return `Grade ${classGrade.replace('Class', '').trim()}`;
+}
+
+function getCurriculumLabel() {
+  return 'CBSE curriculum';
+}
+
+function getChapterWindow(chapterNumber: number) {
+  const ranges = ['Apr W1-W3', 'Apr W4-May W2', 'Jun W3-Jul W3', 'Aug W1-Sep W2', 'Sep W3-Oct W4'];
+  return ranges[(chapterNumber - 1) % ranges.length];
+}
+
+function getConceptSkillBadge(index: number) {
+  return index % 2 === 0 ? 'Understand' : 'Apply';
+}
+
+function getConceptSupportMeta(index: number) {
+  return {
+    misconceptions: index % 2 === 0 ? 2 : 1,
+    prerequisites: 2,
+    dok: 'DOK 2',
+  };
 }
 
 function buildTeacherResources(chapterTitle: string) {
@@ -129,9 +219,22 @@ export default function ChapterListPage() {
   const courseId = params.courseId as string;
   const expandedChapterParam = searchParams.get('expandedChapterId');
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm] = useState('');
   const [isAddChapterOpen, setIsAddChapterOpen] = useState(false);
   const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
+  const [uploadChapter, setUploadChapter] = useState<Chapter | null>(null);
+  const [conceptDrawer, setConceptDrawer] = useState<{
+    chapter: Chapter;
+    conceptTitle: string;
+    conceptIndex: number;
+  } | null>(null);
+  const [isPresentationMenuOpen, setIsPresentationMenuOpen] = useState(false);
+  const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
+  const [isPresentationReady, setIsPresentationReady] = useState(false);
+  const [uploadContentType, setUploadContentType] = useState<string>(UPLOAD_CONTENT_TYPES[0]);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState('');
+  const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const [chapterForm, setChapterForm] = useState(EMPTY_CHAPTER_FORM);
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceMappingType, setResourceMappingType] = useState('');
@@ -178,7 +281,10 @@ export default function ChapterListPage() {
     });
   }, [resourceFileType, resourceSearch, teacherResources]);
 
-  const isAnyModalOpen = isAddChapterOpen || editingChapter !== null;
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const presentationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAnyModalOpen =
+    isAddChapterOpen || editingChapter !== null || uploadChapter !== null || conceptDrawer !== null;
   const expandedChapterId = view === 'teacher-resource' ? null : expandedChapterParam;
 
   useEffect(() => {
@@ -188,6 +294,19 @@ export default function ChapterListPage() {
       if (event.key === 'Escape') {
         setIsAddChapterOpen(false);
         setEditingChapter(null);
+        setUploadChapter(null);
+        setConceptDrawer(null);
+        setIsPresentationMenuOpen(false);
+        setIsGeneratingPresentation(false);
+        setIsPresentationReady(false);
+        setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
+        setUploadFile(null);
+        setUploadError('');
+        setIsDraggingUpload(false);
+        if (presentationTimerRef.current) {
+          clearTimeout(presentationTimerRef.current);
+          presentationTimerRef.current = null;
+        }
       }
     };
 
@@ -200,25 +319,119 @@ export default function ChapterListPage() {
     };
   }, [isAnyModalOpen]);
 
+  useEffect(() => {
+    return () => {
+      if (presentationTimerRef.current) {
+        clearTimeout(presentationTimerRef.current);
+      }
+    };
+  }, []);
+
   const closeAddChapterModal = () => {
     setIsAddChapterOpen(false);
     setChapterForm(EMPTY_CHAPTER_FORM);
   };
 
-  const openEditChapterModal = (chapter: Chapter) => {
-    setEditingChapter(chapter);
-    setChapterForm({
-      chapterName: chapter.title,
-      chapterDescription: `Curriculum-aligned chapter covering ${chapter.title.toLowerCase()} with classroom activities and assessment support.`,
-      sortOrder: String(chapter.number),
-      availability: true,
-      show: true,
-    });
+  const closeUploadContentModal = () => {
+    setUploadChapter(null);
+    setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
+    setUploadFile(null);
+    setUploadError('');
+    setIsDraggingUpload(false);
+  };
+
+  const closeConceptDrawer = () => {
+    setConceptDrawer(null);
+    setIsPresentationMenuOpen(false);
+    setIsGeneratingPresentation(false);
+    setIsPresentationReady(false);
+    if (presentationTimerRef.current) {
+      clearTimeout(presentationTimerRef.current);
+      presentationTimerRef.current = null;
+    }
   };
 
   const closeEditChapterModal = () => {
     setEditingChapter(null);
     setChapterForm(EMPTY_CHAPTER_FORM);
+  };
+
+  const openUploadContentModal = (chapter: Chapter) => {
+    setUploadChapter(chapter);
+    setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
+    setUploadFile(null);
+    setUploadError('');
+    setIsDraggingUpload(false);
+  };
+
+  const openConceptDrawer = (chapter: Chapter, conceptTitle: string, conceptIndex: number) => {
+    setConceptDrawer({
+      chapter,
+      conceptTitle,
+      conceptIndex,
+    });
+    setIsPresentationMenuOpen(false);
+    setIsGeneratingPresentation(false);
+    setIsPresentationReady(false);
+    if (presentationTimerRef.current) {
+      clearTimeout(presentationTimerRef.current);
+      presentationTimerRef.current = null;
+    }
+  };
+
+  const generateTeacherTrainingPresentation = () => {
+    setIsPresentationMenuOpen(false);
+    setIsPresentationReady(false);
+    setIsGeneratingPresentation(true);
+
+    if (presentationTimerRef.current) {
+      clearTimeout(presentationTimerRef.current);
+    }
+
+    presentationTimerRef.current = setTimeout(() => {
+      setIsGeneratingPresentation(false);
+      setIsPresentationReady(true);
+      presentationTimerRef.current = null;
+    }, 1800);
+  };
+
+  const validateUploadFile = (file: File) => {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const extensionAllowed = ['pdf', 'pptx', 'docx', 'mp4'].includes(extension ?? '');
+    const mimeAllowed = ACCEPTED_UPLOAD_TYPES.includes(file.type);
+
+    if (!mimeAllowed && !extensionAllowed) {
+      return 'Only PDF, PPTX, DOCX, and MP4 files are supported.';
+    }
+
+    if (file.size > MAX_UPLOAD_SIZE) {
+      return 'Each file must be 100 MB or smaller.';
+    }
+
+    return '';
+  };
+
+  const handleUploadFileSelection = (file: File | null) => {
+    if (!file) return;
+
+    const validationError = validateUploadFile(file);
+    if (validationError) {
+      setUploadError(validationError);
+      setUploadFile(null);
+      return;
+    }
+
+    setUploadFile(file);
+    setUploadError('');
+  };
+
+  const saveUploadContent = () => {
+    if (!uploadFile) {
+      setUploadError('Please select a file before saving.');
+      return;
+    }
+
+    closeUploadContentModal();
   };
 
   const updateExpandedChapter = (chapterId: string | null) => {
@@ -602,236 +815,205 @@ export default function ChapterListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50">
-      <div className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
-        {/* Page Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
+    <div className="min-h-screen bg-[#edf2fb]">
+      <div className="mx-auto max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => router.back()}
-              className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+              type="button"
+              onClick={() => router.push('/course-master')}
+              className="font-medium transition-colors hover:text-slate-900"
             >
-              LMS
+              Teach / learn
             </button>
-            <ChevronRight size={16} className="text-slate-400" />
-            <span className="text-sm font-semibold text-slate-600">{course.classGrade.replace('Class ', '')}</span>
-            <ChevronRight size={16} className="text-slate-400" />
-            <span className="text-sm font-semibold text-blue-600">{course.subject}</span>
+            <ChevronRight size={14} className="text-slate-400" />
+            <button
+              type="button"
+              onClick={() => router.push('/course-master')}
+              className="font-medium transition-colors hover:text-slate-900"
+            >
+              Subjects
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <span className="font-semibold text-slate-900">
+              {course.subject} - {getCourseGradeLabel(course.classGrade).replace('Grade ', 'Grade ')}{' '}
+              {getCourseSectionLabel(course.id).replace('Section ', '')}
+            </span>
           </div>
 
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Chapter List</h1>
-              <p className="text-slate-600 mt-1">{course.title}</p>
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-4 py-2 text-sm font-medium text-[#4f46e5] shadow-sm ring-1 ring-white/80">
+            <BookOpen size={14} />
+            248 questions in bank
+          </div>
+        </div>
+
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-[#4f46e5] shadow-sm ring-1 ring-slate-200/70">
+              <GraduationCap size={24} />
             </div>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSearchTerm('');
-                }}
-                className="rounded-xl h-11 px-4 font-semibold text-slate-600 border-slate-200"
-              >
-                <X size={16} className="mr-2" />
-                Clear Search
-              </Button>
-              <Button
-                onClick={() => setIsAddChapterOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 rounded-xl h-11 px-5 font-semibold"
-              >
-                <Plus size={18} className="mr-2" />
-                Add Chapter
-              </Button>
+            <div>
+              <h1 className="text-[22px] font-bold tracking-tight text-slate-950">
+                {course.subject} - {getCourseGradeLabel(course.classGrade)} - {getCourseSectionLabel(course.id)}
+              </h1>
+              <p className="mt-1 text-[15px] text-slate-600">
+                {allChapters.length} chapters -{' '}
+                {allChapters.reduce((total, chapter) => {
+                  const chapterConcepts = getChapterKeyConcepts(course.id, chapter.id);
+                  return total + (chapterConcepts?.count ?? 0);
+                }, 0)}{' '}
+                key concepts - {getCurriculumLabel()}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Chapters List */}
+        <div className="mb-6 border-b border-slate-200/80">
+          <div className="flex flex-wrap items-center gap-6 text-[15px]">
+            <button
+              type="button"
+              onClick={() => router.push(`/course-master/lesson-plan/${course.id}`)}
+              className="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 font-medium text-slate-600 transition-colors hover:text-slate-900"
+            >
+              <BookOpen size={16} />
+              Lesson plans
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/course-master/lesson-plan/${course.id}/curriculum`)}
+              className="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 font-medium text-slate-600 transition-colors hover:text-slate-900"
+            >
+              <FileText size={16} />
+              Curriculum
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 border-b-2 border-[#4f46e5] px-1 py-3 font-medium text-[#4f46e5]"
+            >
+              <BookOpen size={16} />
+              Chapters
+            </button>
+          </div>
+        </div>
+
         {filteredChapters.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200/60 bg-white py-20 text-center shadow-sm">
+          <div className="rounded-2xl border border-slate-200/80 bg-white py-20 text-center shadow-sm">
             <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
               <BookOpen size={28} className="text-slate-400" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">No chapters found</h3>
-            <p className="text-slate-500 max-w-md mx-auto">
+            <h3 className="mb-2 text-lg font-semibold text-slate-900">No chapters found</h3>
+            <p className="mx-auto max-w-md text-slate-500">
               Try adjusting your search criteria or clearing filters to see chapters.
             </p>
           </div>
         ) : (
           <div className="space-y-4">
             {filteredChapters.map((chapter) => {
-              const chapterColor = getChapterColor(chapter.number);
               const isExpanded = expandedChapterId === chapter.id;
-              const chapterSummary = getChapterSummary(chapter.title);
               const chapterConcepts = getChapterKeyConcepts(course.id, chapter.id);
+              const conceptCount = chapterConcepts?.count ?? 0;
+              const chapterContentLabel =
+                chapter.title === 'Chemical Reactions and Equations'
+                  ? 'Presentation - Core chapter walk-through'
+                  : `Presentation - ${chapter.title.split(' ').slice(0, 2).join(' ')} demos`;
+
               return (
                 <div
                   key={chapter.id}
-                  className="rounded-2xl border border-slate-200/60 bg-white shadow-sm transition-all duration-300 hover:shadow-md"
+                  className="overflow-hidden rounded-[14px] border border-slate-200/90 bg-white shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
                 >
-                  {/* Chapter Header */}
-                  <div
+                  <button
+                    type="button"
                     onClick={() => updateExpandedChapter(isExpanded ? null : chapter.id)}
-                    className="flex items-center gap-4 p-6 cursor-pointer hover:bg-slate-50/50 transition-colors"
+                    className="flex w-full items-start gap-3 px-6 py-5 text-left transition-colors hover:bg-slate-50/70"
                   >
-                    {/* Chapter Number Circle */}
-                    <div
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white font-bold text-lg shadow-md"
-                      style={{ backgroundColor: chapterColor }}
-                    >
-                      {chapter.number}
-                    </div>
-
-                    {/* Chapter Title */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                        <h3 className="min-w-0 text-lg font-bold leading-tight text-slate-900">
-                          {chapter.title}
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={(event) => event.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                        >
-                          <FileText size={12} />
-                          Content
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => event.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 shadow-sm transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
-                        >
-                          <MessageSquare size={12} />
-                          Question & Answer
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Chevron */}
                     <ChevronDown
-                      size={20}
+                      size={18}
                       className={cn(
-                        'shrink-0 text-slate-400 transition-transform duration-300',
-                        isExpanded && 'rotate-180'
+                        'mt-1 shrink-0 text-slate-500 transition-transform duration-200',
+                        !isExpanded && '-rotate-90'
                       )}
                     />
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-[19px] font-bold leading-tight text-slate-950">
+                        Chapter {chapter.number} - {chapter.title}
+                      </h3>
+                      <p className="mt-1 text-[15px] text-slate-600">
+                        {getChapterWindow(chapter.number)} - {conceptCount} concepts
+                      </p>
+                    </div>
+                  </button>
 
-                  {/* Chapter Details (Expandable) */}
                   {isExpanded && (
-                    <div className="border-t border-slate-100 bg-slate-50/30 p-6">
-                      {/* Action Buttons */}
-<div className="mb-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-                        <div className="border-b border-slate-200/70 bg-slate-50 px-5 py-4">
-                          <h4 className="text-base font-semibold text-slate-900">
-                            Key Concepts ({chapterConcepts?.count ?? 0})
-                          </h4>
+                    <div className="border-t border-slate-200/80 bg-white px-6 py-5">
+                      <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Chapter Content
+                          </span>
+                          <span className="inline-flex items-center rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff]">
+                            {chapterContentLabel}
+                          </span>
                         </div>
 
-                       <div className="p-4 sm:p-5">
-                          {chapterConcepts ? (
-                            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                              {chapterConcepts.concepts.map((concept) => (
-                                <div
-                                  key={concept.title}
-                                  className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <h3 className="text-lg font-semibold leading-tight text-slate-900">
-                                      {concept.title}
-                                    </h3>
-                                    <Badge className="shrink-0 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-                                      {concept.mastery}
-                                    </Badge>
-                                  </div>
-
-                                  <p className="mt-3 text-sm leading-6 text-slate-600">
-                                    {concept.description}
-                                  </p>
-
-                                  <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-500">
-                                    <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[10px] leading-none text-slate-500">
-                                      T
-                                    </span>
-                                    {concept.time}
-                                  </div>
-
-                                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      onClick={(event) => {
-                                        event.currentTarget.blur();
-                                        router.push(
-                                          `/course-master/lesson-plan/${course.id}?view=semantic-intelligence&chapterId=${chapter.id}&concept=${encodeURIComponent(
-                                            concept.title
-                                          )}`
-                                        );
-                                      }}
-                                      className="h-11 rounded-2xl border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 shadow-sm hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
-                                    >
-                                      <Brain size={16} className="mr-2" />
-                                      Semantic
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center">
-                              <p className="text-sm font-medium text-slate-600">
-                                No key concepts are available for this chapter.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-                      <div className="border-b border-slate-200/70 bg-slate-50 px-5 py-4">
-                          <h4 className="text-base font-semibold text-slate-900">Chapter Summary</h4>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full text-left">
-                            <thead className="bg-slate-50/90">
-                              <tr className="border-b border-slate-200/80">
-                                <th className="px-5 py-4 text-sm font-semibold text-slate-800">Mapped Unit</th>
-                                <th className="px-5 py-4 text-sm font-semibold text-slate-800">Chapter Name</th>
-                                <th className="px-5 py-4 text-sm font-semibold text-slate-800">Academic Year</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr className="border-b border-slate-100 last:border-b-0">
-                                <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                                  {chapterSummary.mappedUnit}
-                                </td>
-                                <td className="px-5 py-4 text-sm font-semibold text-slate-900">
-                                  {chapterSummary.chapterName}
-                                </td>
-                                <td className="px-5 py-4 text-sm text-slate-700">
-                                  {chapterSummary.academicYear}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-
-                      {/* Edit and Delete */}
-                      <div className="mt-4 flex gap-2 justify-end">
-                        <button
+                        <Button
                           type="button"
-                          onClick={() => openEditChapterModal(chapter)}
-                          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-all"
+                          variant="ghost"
+                          onClick={() => openUploadContentModal(chapter)}
+                          className="h-10 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
                         >
-                          <Pencil size={14} />
-                          Edit
-                        </button>
-                        <button className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition-all">
-                          <Trash2 size={14} />
-                          Delete
-                        </button>
+                          <Upload size={16} className="mr-2" />
+                          Upload content
+                        </Button>
+                      </div>
+
+                      <div className="divide-y divide-slate-200/80">
+                        {chapterConcepts?.concepts.map((concept, index) => {
+                          const supportMeta = getConceptSupportMeta(index);
+                          const skillBadge = getConceptSkillBadge(index);
+
+                          return (
+                            <div
+                              key={concept.title}
+                              className="flex flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between"
+                            >
+                              <div className="flex min-w-0 gap-3">
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">
+                                  {index + 1}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="truncate text-[15px] font-medium text-slate-950">{concept.title}</p>
+                                  <p className="mt-1 text-sm text-slate-500">
+                                    {supportMeta.misconceptions} known misconceptions - {supportMeta.prerequisites}{' '}
+                                    prerequisites
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                                <Badge className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
+                                  {skillBadge}
+                                </Badge>
+                                <Badge className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                                  {supportMeta.dok}
+                                </Badge>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => openConceptDrawer(chapter, concept.title, index)}
+                                  className="h-10 rounded-full bg-[#eef2ff] px-4 text-sm font-medium text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
+                                >
+                                  <Brain size={16} className="mr-2" />
+                                  Concept intelligence
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {!chapterConcepts?.concepts.length && (
+                          <div className="py-8 text-sm text-slate-500">No concepts available for this chapter yet.</div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -841,6 +1023,343 @@ export default function ChapterListPage() {
           </div>
         )}
       </div>
+
+      {uploadChapter && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-8 backdrop-blur-[2px]"
+          onClick={closeUploadContentModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upload-content-title"
+            className="relative w-full max-w-[690px] rounded-[18px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-8 pb-6 pt-7">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 id="upload-content-title" className="text-[24px] font-bold tracking-tight text-slate-950">
+                    Upload chapter content
+                  </h2>
+                  <p className="mt-1 text-[15px] text-slate-600">
+                    Chapter {uploadChapter.number} - {uploadChapter.title}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeUploadContentModal}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Close dialog"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Content Type
+                  </Label>
+                  <Select value={uploadContentType} onValueChange={(value) => typeof value === 'string' && setUploadContentType(value)}>
+                    <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                      <SelectValue placeholder="Select content type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UPLOAD_CONTENT_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  accept=".pdf,.pptx,.docx,.mp4,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document,video/mp4"
+                  className="hidden"
+                  onChange={(event) => handleUploadFileSelection(event.target.files?.[0] ?? null)}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => uploadInputRef.current?.click()}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setIsDraggingUpload(true);
+                  }}
+                  onDragLeave={(event) => {
+                    event.preventDefault();
+                    setIsDraggingUpload(false);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsDraggingUpload(false);
+                    handleUploadFileSelection(event.dataTransfer.files?.[0] ?? null);
+                  }}
+                  className={cn(
+                    'flex min-h-[140px] w-full flex-col items-center justify-center rounded-[12px] border border-dashed px-6 py-8 text-center transition-colors',
+                    isDraggingUpload
+                      ? 'border-[#8b85ff] bg-[#f4f3ff]'
+                      : 'border-[#d4dcf0] bg-[#f8fbff] hover:border-[#b9c6eb] hover:bg-[#f5f8ff]'
+                  )}
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200/80">
+                    <Upload size={20} />
+                  </div>
+                  <p className="mt-4 text-[14px] text-slate-600">
+                    <span className="font-medium text-[#4f46e5]">Click to upload</span> or drag and drop
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">PDF, PPTX, DOCX or MP4 - up to 100 MB each</p>
+                  {uploadFile && (
+                    <p className="mt-3 rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70">
+                      {uploadFile.name}
+                    </p>
+                  )}
+                </button>
+
+                {uploadError && <p className="text-sm font-medium text-rose-600">{uploadError}</p>}
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-4 border-t border-slate-200/80 pt-4">
+                <button
+                  type="button"
+                  onClick={closeUploadContentModal}
+                  className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900"
+                >
+                  Cancel
+                </button>
+                <Button
+                  type="button"
+                  onClick={saveUploadContent}
+                  className="h-10 rounded-xl bg-[#aea8ff] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(99,91,255,0.28)] hover:bg-[#978fff]"
+                >
+                  <Upload size={16} className="mr-2" />
+                  Save content
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {conceptDrawer && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 backdrop-blur-[1px]"
+          onClick={closeConceptDrawer}
+        >
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="concept-intelligence-title"
+            className="flex h-full w-full max-w-[500px] flex-col border-l border-slate-200/80 bg-white shadow-[-18px_0_50px_rgba(15,23,42,0.16)] transition-transform duration-300"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {(() => {
+              const details = getConceptIntelligence(
+                conceptDrawer.conceptTitle,
+                conceptDrawer.chapter.title,
+                conceptDrawer.conceptIndex
+              );
+
+              const detailSections = [
+                { title: 'Knowledge', icon: BookOpen, items: details.knowledge, kind: 'list' as const },
+                { title: 'Abilities', icon: Lightbulb, items: details.abilities, kind: 'list' as const },
+                { title: 'Skills', icon: WandSparkles, items: details.skills, kind: 'tags' as const },
+                { title: 'Misconceptions', icon: TriangleAlert, items: details.misconceptions, kind: 'list' as const },
+                { title: 'Prerequisites', icon: Orbit, items: details.prerequisites, kind: 'tags' as const },
+                { title: 'Learning outcomes', icon: Target, items: details.learningOutcomes, kind: 'list' as const },
+                { title: 'Competencies', icon: BriefcaseBusiness, items: details.competencies, kind: 'tags' as const },
+                { title: 'Learning objectives', icon: CircleDot, items: details.learningObjectives, kind: 'list' as const },
+                { title: 'Teaching pedagogies', icon: ClipboardList, items: details.teachingPedagogies, kind: 'tags' as const },
+                { title: 'Real-world applications', icon: GraduationCap, items: details.realWorldApplications, kind: 'list' as const },
+              ];
+
+              return (
+                <>
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-6 py-5">
+                    <div>
+                      <h2 id="concept-intelligence-title" className="text-[18px] font-bold tracking-tight text-slate-950">
+                        {conceptDrawer.conceptTitle}
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeConceptDrawer}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                      aria-label="Close drawer"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto px-6 py-5">
+                    <div className="pointer-events-none fixed right-5 top-5 z-20 flex w-[min(420px,calc(100vw-2.5rem))] flex-col gap-3">
+                      <div
+                        className={cn(
+                          'pointer-events-auto overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.18)] transition-all duration-300',
+                          isGeneratingPresentation
+                            ? 'translate-y-0 opacity-100'
+                            : '-translate-y-2 opacity-0'
+                        )}
+                      >
+                        <div className="flex gap-3 border-l-4 border-[#4f46e5] px-4 py-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f46e5]">
+                            <Sparkles size={16} className="animate-pulse" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[15px] font-semibold text-slate-900">
+                              Generating Teacher Training Presentation...
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              &quot;{conceptDrawer.chapter.title}&quot;
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsGeneratingPresentation(false)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                            aria-label="Dismiss generating notification"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div
+                        className={cn(
+                          'pointer-events-auto overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.18)] transition-all duration-300',
+                          isPresentationReady
+                            ? 'translate-y-0 opacity-100'
+                            : '-translate-y-2 opacity-0'
+                        )}
+                      >
+                        <div className="flex gap-3 border-l-4 border-emerald-500 px-4 py-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                            <CheckCircle2 size={16} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[15px] font-semibold text-slate-900">
+                              Teacher Training Presentation Ready
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              Added chapter content for &quot;{conceptDrawer.chapter.title}&quot; to the presentation.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsPresentationReady(false)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                            aria-label="Dismiss success notification"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
+                        {details.domain}
+                      </Badge>
+                      <Badge className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                        {details.dok}
+                      </Badge>
+                      <Badge className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                        {details.topic}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-5 rounded-[14px] border border-slate-200/80 bg-[#f8fbff] p-3">
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <Button
+                          type="button"
+                          className="h-10 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
+                        >
+                          <Sparkles size={16} className="mr-2" />
+                          Generate questions
+                        </Button>
+                        <div className="relative flex-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsPresentationMenuOpen((prev) => !prev)}
+                            className="h-10 w-full justify-between rounded-xl border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                          >
+                            <span>Generate classroom presentation</span>
+                            {isPresentationMenuOpen ? (
+                              <ChevronUp size={16} className="text-slate-500" />
+                            ) : (
+                              <ChevronDown size={16} className="text-slate-500" />
+                            )}
+                          </Button>
+
+                          <div
+                            className={cn(
+                              'absolute left-0 top-[calc(100%+8px)] z-10 w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_16px_34px_rgba(15,23,42,0.12)] transition-all duration-200',
+                              isPresentationMenuOpen
+                                ? 'pointer-events-auto translate-y-0 opacity-100'
+                                : 'pointer-events-none -translate-y-2 opacity-0'
+                            )}
+                          >
+                            <button
+                              type="button"
+                              onClick={generateTeacherTrainingPresentation}
+                              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
+                            >
+                              <BriefcaseBusiness size={16} className="text-slate-500" />
+                              Teacher training presentation
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 space-y-5">
+                      {detailSections.map((section) => {
+                        const SectionIcon = section.icon;
+
+                        return (
+                          <section key={section.title}>
+                            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                              <SectionIcon size={14} className="text-slate-500" />
+                              {section.title}
+                            </div>
+
+                            {section.kind === 'list' ? (
+                              <ul className="space-y-2 text-[15px] leading-6 text-slate-700">
+                                {section.items.map((item) => (
+                                  <li key={item} className="flex gap-2">
+                                    <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {section.items.map((item) => (
+                                  <Badge
+                                    key={item}
+                                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                                  >
+                                    {item}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </aside>
+        </div>
+      )}
 
       {isAddChapterOpen && (
         <div
