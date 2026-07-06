@@ -84,6 +84,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   }, [selectedBranch]);
   const [isChatbotOpen, setIsChatbotOpen] = useState(true);
+  const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
+  const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
 
   const [userProfileName, setUserProfileName] = useState('');
 
@@ -234,7 +236,18 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   }, [menuItems, selectedBranch, pathname, router, isKnownMenuPath]);
 
-  const toggleChatbot = () => setIsChatbotOpen((prev) => !prev);
+  const toggleChatbot = () => {
+    setIsChatbotOpen((prev) => {
+      const next = !prev;
+      setIsRightToolbarOpen(!next);
+      return next;
+    });
+  };
+
+  const toggleRightToolbar = () => {
+    if (isChatbotOpen) return;
+    setIsRightToolbarOpen((prev) => !prev);
+  };
 
   const handleLevel1Select = (item: MenuItem) => {
     setSelectedBranch((current) => {
@@ -276,11 +289,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         fetchMasterMenu(selectedL1.id, selectedLevel2);
       }
   }, [selectedBranch, selectedL1, masterMenuFetchedFor, fetchMasterMenu]);
-
-  const staticMasterMenuItems = useMemo(() => {
-    if (!selectedL1) return [];
-    return selectedL1.submenus ?? [];
-  }, [selectedL1]);
 
   const selectedL2 = useMemo(() => {
     if (!selectedBranch || !selectedL1 || !selectedBranch.level2Key) return null;
@@ -326,9 +334,19 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         onLevel2Select={handleLevel2Select}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onToggleChatbot={toggleChatbot} isChatbotOpen={isChatbotOpen} />
+        <Header
+          onToggleChatbot={toggleChatbot}
+          isChatbotOpen={isChatbotOpen}
+          onToggleRightToolbar={toggleRightToolbar}
+          isRightToolbarOpen={isRightToolbarOpen}
+          rightToolbarToggleRef={rightToolbarToggleRef}
+        />
         <div className="flex-1 flex overflow-hidden">
-          <main className={`flex-1 overflow-auto transition-all duration-300 scrollbar-hide ${isChatbotOpen ? 'w-[85%]' : 'w-full'}`}>
+          <main
+            className={`flex-1 overflow-auto scrollbar-hide transition-[width] duration-300 ease-out ${
+              isChatbotOpen ? 'w-[85%]' : 'w-full'
+            }`}
+          >
             {showSubheader && (
               <div className="px-6 pt-4">
                 <Level3Subheader
@@ -351,7 +369,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </div>
           )}
         </div>
-        <RightFloatingToolbar isChatbotOpen={isChatbotOpen} />
+        <RightFloatingToolbar
+          isChatbotOpen={isChatbotOpen}
+          isOpen={isRightToolbarOpen}
+          onOpenChange={setIsRightToolbarOpen}
+          toggleButtonRef={rightToolbarToggleRef}
+        />
       </div>
     </div>
   );
