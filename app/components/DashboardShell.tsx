@@ -157,11 +157,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           parentId: (item.parent_menu_id ?? item.parentId) as number | string | undefined,
           menuType: (item.menu_type ?? item.menuType) as string | undefined,
           label: String(item.name ?? item.label ?? ''),
-          href: String(item.url ?? item.href ?? '#'),
+          href: String(item.route_name ?? item.href ?? '#'),
           icon: undefined,
           submenus: undefined,
         }));
-      } else {
+      } else {``
         setMasterMenuGroups(rawData);
         const children: Record<string, unknown>[] = [];
         for (const group of rawData) {
@@ -176,7 +176,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           parentId: (item.parent_menu_id ?? item.parentId) as number | string | undefined,
           menuType: (item.menu_type ?? item.menuType) as string | undefined,
           label: String(item.name ?? item.label ?? ''),
-          href: String(item.url ?? item.href ?? '#'),
+          href: String(item.route_name ?? item.href ?? '#'),
           icon: undefined,
           submenus: undefined,
         }));
