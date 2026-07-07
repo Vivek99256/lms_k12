@@ -24,17 +24,15 @@ export default function ConditionChart() {
     responsive: true,
     scales: {
       x: { grid: { display: false }, ticks: { stepSize: 1, font: { size: 11 } } },
-      y: { grid: { display: false }, ticks: { font: { size: 12, weight: '500' } } },
+      y: { grid: { display: false }, ticks: { font: { size: 12, weight: 500 } } },
     },
     plugins: { legend: { display: false } },
     maintainAspectRatio: false,
   };
 
   return (
-    <div className="h-full flex flex-col justify-between">
-      <div className="h-48 mt-4">
-        <Bar data={data} options={options} />
-      </div>
+    <div className="w-full h-full min-h-0">
+      <Bar data={data} options={options} />
     </div>
   );
 }
