@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   BookOpen,
   Briefcase,
+  ClipboardList,
   Compass,
   Cpu,
   Dumbbell,
@@ -19,6 +20,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { courses, type Course } from './data/courses';
+
+const WORKSPACE_TABS = [
+  { key: 'lms', label: 'LMS' },
+  { key: 'teach', label: 'Teach / learn', icon: BookOpen },
+  { key: 'test', label: 'Test', icon: ClipboardList },
+] as const;
 
 const SECTION_BADGES = ['Section A', 'Section A', 'Section B', 'Section B'] as const;
 
@@ -64,6 +71,7 @@ function getLessonPlanCount(chapters: number, progress: number) {
 
 export default function CourseMasterPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<(typeof WORKSPACE_TABS)[number]['key']>('teach');
   const [search, setSearch] = useState('');
   const [standardFilter, setStandardFilter] = useState('all');
   const [sectionFilter, setSectionFilter] = useState('all');
@@ -84,15 +92,18 @@ export default function CourseMasterPage() {
       const matchesStandard =
         standardFilter === 'all' || course.classGrade.replace('Class', '').trim() === standardFilter;
 
-      const matchesSection = sectionFilter === 'all' || getSectionLabel(index) === sectionFilter;
+      const matchesSection =
+        sectionFilter === 'all' || getSectionLabel(index) === sectionFilter;
 
       return matchesSearch && matchesStandard && matchesSection;
     });
-  }, [search, sectionFilter, standardFilter]);
+  }, [search, standardFilter, sectionFilter]);
 
   return (
     <div className="min-h-full bg-[#E9EEF7] px-6 py-5">
       <div className="mx-auto max-w-[1800px]">
+        
+
         <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="relative w-full max-w-[300px]">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
@@ -161,7 +172,7 @@ export default function CourseMasterPage() {
                           {course.subject}
                         </h3>
                         <p className="mt-1 text-[13px] leading-5 text-[#475569] sm:text-[14px]">
-                          {getGradeLabel(course.classGrade)} - {sectionLabel}
+                          {getGradeLabel(course.classGrade)} · {sectionLabel}
                         </p>
                       </div>
                     </div>
@@ -172,16 +183,12 @@ export default function CourseMasterPage() {
                   </div>
 
                   <p className="mt-4 text-[13px] leading-5 text-[#3F5572] sm:text-[14px]">
-                    {keyConcepts} key concepts - {lessonPlanCount} lesson plans created
+                    {keyConcepts} key concepts · {lessonPlanCount} lesson plans created
                   </p>
 
                   <div className="mt-4 flex items-center justify-between gap-3">
-                    <span className="text-[14px] font-medium text-[#334155] sm:text-[15px]">
-                      Lesson planning coverage
-                    </span>
-                    <span className="text-[14px] font-semibold text-[#334155] sm:text-[15px]">
-                      {course.progress}%
-                    </span>
+                    <span className="text-[14px] font-medium text-[#334155] sm:text-[15px]">Lesson planning coverage</span>
+                    <span className="text-[14px] font-semibold text-[#334155] sm:text-[15px]">{course.progress}%</span>
                   </div>
 
                   <div className="mt-2.5 h-[7px] overflow-hidden rounded-full bg-[#EEF2F7]">

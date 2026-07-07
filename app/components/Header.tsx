@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot } from 'lucide-react';
+import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot, LayoutGrid } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 function readAcademicSession() {
@@ -54,10 +54,24 @@ const getStoredSelection = (key: string) => {
   return localStorage.getItem(key);
 };
 
-export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleChatbot: () => void; isChatbotOpen: boolean }) {
+export default function Header({
+  onToggleChatbot,
+  isChatbotOpen,
+  onToggleRightToolbar,
+  isRightToolbarOpen,
+  rightToolbarToggleRef,
+}: {
+  onToggleChatbot: () => void;
+  isChatbotOpen: boolean;
+  onToggleRightToolbar: () => void;
+  isRightToolbarOpen: boolean;
+  rightToolbarToggleRef: React.RefObject<HTMLButtonElement | null>;
+}) {
   const { user, logout } = useAuth();
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showTermDropdown, setShowTermDropdown] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [userPosition, setUserPosition] = useState<{ top: number; left: number; bottom?: number } | null>(null);
 
   const [selectedYear, setSelectedYear] = useState<string>(() => {
     const stored = getStoredSelection('selectedAcademicYear');
@@ -109,6 +123,7 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
 
   const yearButtonRef = useRef<HTMLButtonElement>(null);
   const termButtonRef = useRef<HTMLButtonElement>(null);
+  const userButtonRef = useRef<HTMLDivElement>(null);
 
   const handleYearToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -122,14 +137,25 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
     setShowTermDropdown(prev => !prev);
   };
 
+  const handleUserToggle = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setUserPosition({ 
+      top: rect.bottom + 4, 
+      left: rect.left,
+      bottom: rect.top 
+    });
+    setShowUserDropdown(prev => !prev);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (yearButtonRef.current?.contains(target) || termButtonRef.current?.contains(target)) {
+      if (yearButtonRef.current?.contains(target) || termButtonRef.current?.contains(target) || userButtonRef.current?.contains(target)) {
         return;
       }
       setShowYearDropdown(false);
       setShowTermDropdown(false);
+      setShowUserDropdown(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -228,34 +254,65 @@ export default function Header({ onToggleChatbot, isChatbotOpen }: { onToggleCha
           <div className="absolute -top-1 -right-1 bg-[#0D6EFD] text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center">3</div>
         </div>
 
-        <div className="flex items-center gap-3 cursor-pointer">
-          {logoUrl ? (
-            <img 
-              src={logoUrl} 
-              alt="Logo" 
-              className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain" 
-              onError={(e) => {
-                console.error('Header logo failed to load:', logoUrl);
-                e.currentTarget.style.display = 'none';
-              }}
-              onLoad={() => console.log('Header logo loaded:', logoUrl)}
-            />
-          ) : (
-            <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
-              {user?.name?.charAt(0).toUpperCase() || 'S'}
-            </div>
-          )}
-          <span className="font-medium text-sm flex items-center gap-1">{user?.name || 'Sarah Patel'} <ChevronDown size={14} /></span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 cursor-pointer" ref={userButtonRef} onClick={handleUserToggle}>
+            {logoUrl ? (
+              <img 
+                src={logoUrl} 
+                alt="Logo" 
+                className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain" 
+                onError={(e) => {
+                  console.error('Header logo failed to load:', logoUrl);
+                  e.currentTarget.style.display = 'none';
+                }}
+                onLoad={() => console.log('Header logo loaded:', logoUrl)}
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
+                {user?.name?.charAt(0).toUpperCase() || 'S'}
+              </div>
+            )}
+            <span className="font-medium text-sm flex items-center gap-1">
+              {user?.name || 'Sarah Patel'}
+              <ChevronDown size={14} className={`transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
+            </span>
+          </div>
+          
+          <button
+            ref={rightToolbarToggleRef}
+            type="button"
+            onClick={onToggleRightToolbar}
+            className={`p-2 rounded-full transition-colors ${
+              isRightToolbarOpen ? 'text-gray-700 bg-gray-100' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Toggle Toolbox"
+            aria-pressed={isRightToolbarOpen}
+            aria-label={isRightToolbarOpen ? 'Close toolbox' : 'Open toolbox'}
+          >
+            <LayoutGrid size={18} />
+          </button>
         </div>
-        <button
-          onClick={logout}
-          className="text-sm text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1.5 pl-4 border-l border-gray-200"
-          title="Sign out"
-        >
-          <LogOut size={16} />
-          <span className="hidden sm:inline">Sign out</span>
-        </button>
         
+        {showUserDropdown && userPosition && typeof document !== 'undefined' && createPortal(
+          <div
+            className="fixed bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-200/50 py-2 min-w-[160px] z-[9999]"
+            style={{ top: userPosition.top, left: userPosition.left }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                logout();
+                setShowUserDropdown(false);
+              }}
+              className="w-full text-left px-4 py-2 text-sm transition-colors text-gray-600 hover:text-red-600 hover:bg-red-50/80 flex items-center gap-2"
+            >
+              <LogOut size={16} />
+              Sign Out
+            </button>
+          </div>,
+          document.body
+        )}
       </div>
     </div>
   );
