@@ -152,20 +152,24 @@ function OptionCard({ option }: { option: ToolbarOption }) {
   );
 }
 
-export default function RightFloatingToolbar({ isChatbotOpen }: { isChatbotOpen: boolean }) {
+export default function RightFloatingToolbar({
+  isChatbotOpen,
+  isOpen,
+  onOpenChange,
+  toggleButtonRef,
+}: {
+  isChatbotOpen: boolean;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  toggleButtonRef: React.RefObject<HTMLButtonElement | null>;
+}) {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const activeMenu = toolbarMenus.find((menu) => menu.id === activeMenuId) ?? null;
 
   useEffect(() => {
-    if (isChatbotOpen) {
-      setActiveMenuId(null);
-    }
-  }, [isChatbotOpen]);
-
-  useEffect(() => {
-    if (!activeMenuId) {
+    if (!isOpen) {
       return;
     }
 
@@ -179,12 +183,16 @@ export default function RightFloatingToolbar({ isChatbotOpen }: { isChatbotOpen:
         return;
       }
 
-      setActiveMenuId(null);
+      if (toggleButtonRef.current?.contains(target)) {
+        return;
+      }
+
+      onOpenChange(false);
     };
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setActiveMenuId(null);
+        onOpenChange(false);
       }
     };
 
@@ -195,7 +203,7 @@ export default function RightFloatingToolbar({ isChatbotOpen }: { isChatbotOpen:
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [activeMenuId]);
+  }, [isOpen, onOpenChange, toggleButtonRef]);
 
   if (isChatbotOpen) {
     return null;
@@ -204,10 +212,16 @@ export default function RightFloatingToolbar({ isChatbotOpen }: { isChatbotOpen:
   const toolbar = (
     <div
       ref={containerRef}
-      className="pointer-events-none fixed bottom-4 right-3 z-[70] flex items-end md:bottom-auto md:right-4 md:top-1/2 md:-translate-y-1/2 md:items-center"
+      className="fixed bottom-4 right-3 z-[70] flex items-end md:bottom-auto md:right-4 md:top-1/2 md:-translate-y-1/2 md:items-center"
       aria-label="Floating editor toolbar"
     >
-      <div className="pointer-events-auto flex flex-col-reverse items-end gap-3 md:flex-row md:items-center md:gap-3">
+      <div
+        className={`flex flex-col-reverse items-end gap-3 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-3 ${
+          isOpen
+            ? 'pointer-events-auto translate-y-0 opacity-100'
+            : 'pointer-events-none -translate-y-8 opacity-0'
+        }`}
+      >
         {activeMenu && (
           <aside
             className="w-[min(88vw,20rem)] overflow-hidden rounded-[28px] border border-slate-200/70 bg-white/95 shadow-[0_22px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl md:w-[22rem] lg:w-[24rem]"
