@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { BookOpen, Calendar, Clock, Users, Award, Target, ClipboardList, ChevronRight, CircleCheckBig, CirclePlay, Lock } from 'lucide-react';
+import { BookOpen, Calendar, Clock, Users, Target, ClipboardList, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -151,7 +151,7 @@ function ChapterCard({ chapter, accentColor }: ChapterCardProps) {
   );
 }
 
-export default function ChaptersPage({}: {}) {
+export default function ChaptersPage() {
   const router = useRouter();
   const { courseId } = useParams();
   const course = courses.find((c) => c.id === courseId);
@@ -171,8 +171,8 @@ export default function ChaptersPage({}: {}) {
   const chapters = generateChapters(course);
 
   return (
-    <div className="min-h-screen bg-slate-50/50">
-      <div className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-full">
+      <div className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
         
         <div className="mb-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

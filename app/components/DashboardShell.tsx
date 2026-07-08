@@ -324,7 +324,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const showSubheader = Boolean(level3Menu?.items.length || fetchedMasterMenuItems.length > 0 || masterMenuGroups.length > 0);
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar
         menuItems={menuItems}
         loading={loading}
@@ -333,7 +333,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         onLevel1Select={handleLevel1Select}
         onLevel2Select={handleLevel2Select}
       />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden px-4 pb-4 pt-3">
         <Header
           onToggleChatbot={toggleChatbot}
           isChatbotOpen={isChatbotOpen}
@@ -341,14 +341,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           isRightToolbarOpen={isRightToolbarOpen}
           rightToolbarToggleRef={rightToolbarToggleRef}
         />
-        <div className="flex-1 flex overflow-hidden">
+        <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main
-            className={`flex-1 overflow-auto scrollbar-hide transition-[width] duration-300 ease-out ${
+            className={`min-w-0 flex-1 overflow-auto scrollbar-hide transition-[width] duration-300 ease-out ${
               isChatbotOpen ? 'w-[85%]' : 'w-full'
             }`}
           >
             {showSubheader && (
-              <div className="px-6 pt-4">
+              <div className="pb-4">
                 <Level3Subheader
                   items={level3Menu?.items ?? []}
                   parentLabel={level3Menu?.parentLabel ?? ''}
@@ -364,7 +364,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             {children}
           </main>
           {isChatbotOpen && (
-            <div className="w-[15%] min-w-[320px] overflow-hidden mt-[10px]">
+            <div className="min-h-0 w-[15%] min-w-[320px] overflow-hidden">
               <ChatbotPanel onToggleChatbot={toggleChatbot} />
             </div>
           )}
