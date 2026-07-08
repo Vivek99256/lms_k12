@@ -600,7 +600,7 @@ export default function LessonPlanPage() {
       </div>
     </div>
   ) : isKeyConceptsView ? (
-    <div className="min-h-screen bg-[#E9EEF7]">
+   <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center gap-2 text-[15px] text-[#475569]">
           <span className="inline-flex items-center gap-2">
@@ -924,8 +924,8 @@ export default function LessonPlanPage() {
       </div>
     </div>
   ) : isAssessmentView ? (
-    <div className="min-h-screen bg-slate-50/50">
-      <div className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-full">
+      <div className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <div
@@ -1097,7 +1097,7 @@ export default function LessonPlanPage() {
       </div>
     </div>
   ) : (
-    <div className="min-h-screen bg-[#E9EEF7]">
+    <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center gap-2 text-[15px] text-[#475569]">
           <span className="inline-flex items-center gap-2">

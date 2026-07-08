@@ -200,7 +200,7 @@ export default function Header({
   };
 
   return (
-    <div className="h-16 bg-white/80 backdrop-blur-xl rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-200/50 flex items-center px-4 justify-between mt-[10px] mr-[10px]">
+    <div className="flex h-16 w-full items-center justify-between rounded-[28px] border border-gray-200/50 bg-white/80 px-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
       <div className="flex items-center gap-4 flex-1">
         <button className="p-2 hover:bg-gray-100 rounded-full lg:hidden"><Menu size={20} /></button>
         

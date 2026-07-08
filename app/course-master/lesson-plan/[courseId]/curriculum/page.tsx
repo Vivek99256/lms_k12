@@ -207,7 +207,7 @@ export default function CurriculumPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-[#E9EEF7]">
+   <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center gap-2 text-[15px] text-[#475569]">
           <span className="inline-flex items-center gap-2">

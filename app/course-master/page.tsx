@@ -91,7 +91,7 @@ export default function CourseMasterPage() {
   }, [search, sectionFilter, standardFilter]);
 
   return (
-    <div className="min-h-full bg-[#E9EEF7] px-6 py-5">
+    <div className="min-h-full px-6 py-5">
       <div className="mx-auto max-w-[1800px]">
         <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="relative w-full max-w-[300px]">

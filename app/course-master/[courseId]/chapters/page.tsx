@@ -448,7 +448,7 @@ export default function ChapterListPage() {
 
   if (!course) {
     return (
-      <div className="min-h-screen bg-slate-50/50 flex items-center justify-center">
+      <div className="flex min-h-full items-center justify-center px-6 py-10">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-slate-900 mb-2">Course not found</h2>
           <button
@@ -471,8 +471,8 @@ export default function ChapterListPage() {
           : ['Chapter Reinforcement', 'Concept Mastery', 'Assessment Readiness'];
 
     return (
-      <div className="min-h-screen bg-slate-50/50">
-        <div className="mx-auto max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
+      <div className="min-h-full">
+        <div className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
           <div className="mb-8">
             <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
               <button
@@ -815,8 +815,8 @@ export default function ChapterListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#edf2fb]">
-      <div className="mx-auto max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
+      <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8 ">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
           <div className="flex flex-wrap items-center gap-2">
             <button
