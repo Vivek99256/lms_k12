@@ -26,6 +26,7 @@ import {
   type LmsCoursesResponse,
   type LmsSubject,
 } from './data/lmsCourses';
+import { type Course } from './data/courses';
 
 const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
   'My Course': BookOpen,
@@ -51,6 +52,23 @@ const CATEGORY_ACCENT_MAP: Record<string, string> = {
   'Vocational Traning': '#D97706',
   'Hobbies and Activities': '#6366F1',
   Library: '#DB2777',
+};
+
+const SECTION_BADGES = ['Section A', 'Section A', 'Section B', 'Section B'] as const;
+
+const SUBJECT_ICON_MAP: Record<Course['icon'], LucideIcon> = {
+  'book-open': BookOpen,
+  'flask-conical': FlaskConical,
+  calculator: Sigma,
+  globe: Globe,
+  'pen-tool': PenTool,
+  music: Music,
+  dumbbell: Dumbbell,
+  briefcase: Briefcase,
+  palette: Palette,
+  library: Library,
+  cpu: Cpu,
+  compass: Compass,
 };
 
 function getCourseRoutes(courseId: number | string, standardId?: number | string) {
@@ -303,7 +321,7 @@ export default function CourseMasterPage() {
                 {subject.subject_name}
               </h3>
               <p className="mt-1 text-[13px] leading-5 text-[#475569] sm:text-[14px]">
-                {getGradeLabel(subject.standard_name)} · {category}
+                {getGradeLabel(subject.standard_name)} Â· {category}
               </p>
             </div>
           </div>
