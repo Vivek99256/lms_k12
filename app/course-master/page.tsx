@@ -18,7 +18,7 @@ import {
   Sigma,
   type LucideIcon,
 } from 'lucide-react';
-import { courses, type Course } from './data/courses';
+import { categories, courses, type Course } from './data/courses';
 
 const SECTION_BADGES = ['Section A', 'Section A', 'Section B', 'Section B'] as const;
 
@@ -65,6 +65,7 @@ function getLessonPlanCount(chapters: number, progress: number) {
 export default function CourseMasterPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState<'all' | (typeof categories)[number]>('all');
   const [standardFilter, setStandardFilter] = useState('all');
   const [sectionFilter, setSectionFilter] = useState('all');
 
@@ -81,14 +82,16 @@ export default function CourseMasterPage() {
         course.title.toLowerCase().includes(search.toLowerCase()) ||
         course.code.toLowerCase().includes(search.toLowerCase());
 
+      const matchesCategory = activeCategory === 'all' || course.category === activeCategory;
+
       const matchesStandard =
         standardFilter === 'all' || course.classGrade.replace('Class', '').trim() === standardFilter;
 
       const matchesSection = sectionFilter === 'all' || getSectionLabel(index) === sectionFilter;
 
-      return matchesSearch && matchesStandard && matchesSection;
+      return matchesSearch && matchesCategory && matchesStandard && matchesSection;
     });
-  }, [search, sectionFilter, standardFilter]);
+  }, [activeCategory, search, sectionFilter, standardFilter]);
 
   return (
     <div className="min-h-full px-6 py-5">
@@ -127,6 +130,34 @@ export default function CourseMasterPage() {
             <option value="Section A">Section A</option>
             <option value="Section B">Section B</option>
           </select>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveCategory('all')}
+            className={`rounded-full border px-4 py-2 text-[14px] font-medium transition ${
+              activeCategory === 'all'
+                ? 'border-[#5648E8] bg-[#5648E8] text-white'
+                : 'border-[#D9E1EE] bg-white text-[#334155] hover:border-[#B8C5D9]'
+            }`}
+          >
+            All categories
+          </button>
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setActiveCategory(category)}
+              className={`rounded-full border px-4 py-2 text-[14px] font-medium transition ${
+                activeCategory === category
+                  ? 'border-[#5648E8] bg-[#5648E8] text-white'
+                  : 'border-[#D9E1EE] bg-white text-[#334155] hover:border-[#B8C5D9]'
+              }`}
+            >
+              {category}
+            </button>
+          ))}
         </div>
 
         <p className="mt-3 text-[15px] font-medium text-[#334155]">
