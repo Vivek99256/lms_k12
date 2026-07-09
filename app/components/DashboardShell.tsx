@@ -84,6 +84,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   }, [selectedBranch]);
   const [isChatbotOpen, setIsChatbotOpen] = useState(true);
+  const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
+  const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
 
   const [userProfileName, setUserProfileName] = useState('');
 
@@ -234,7 +236,18 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   }, [menuItems, selectedBranch, pathname, router, isKnownMenuPath]);
 
-  const toggleChatbot = () => setIsChatbotOpen((prev) => !prev);
+  const toggleChatbot = () => {
+    setIsChatbotOpen((prev) => {
+      const next = !prev;
+      setIsRightToolbarOpen(!next);
+      return next;
+    });
+  };
+
+  const toggleRightToolbar = () => {
+    if (isChatbotOpen) return;
+    setIsRightToolbarOpen((prev) => !prev);
+  };
 
   const handleLevel1Select = (item: MenuItem) => {
     setSelectedBranch((current) => {
@@ -277,11 +290,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       }
   }, [selectedBranch, selectedL1, masterMenuFetchedFor, fetchMasterMenu]);
 
-  const staticMasterMenuItems = useMemo(() => {
-    if (!selectedL1) return [];
-    return selectedL1.submenus ?? [];
-  }, [selectedL1]);
-
   const selectedL2 = useMemo(() => {
     if (!selectedBranch || !selectedL1 || !selectedBranch.level2Key) return null;
     return selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key) ?? null;
@@ -316,7 +324,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const showSubheader = Boolean(level3Menu?.items.length || fetchedMasterMenuItems.length > 0 || masterMenuGroups.length > 0);
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar
         menuItems={menuItems}
         loading={loading}
@@ -325,12 +333,22 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         onLevel1Select={handleLevel1Select}
         onLevel2Select={handleLevel2Select}
       />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onToggleChatbot={toggleChatbot} isChatbotOpen={isChatbotOpen} />
-        <div className="flex-1 flex overflow-hidden">
-          <main className={`flex-1 overflow-auto transition-all duration-300 scrollbar-hide ${isChatbotOpen ? 'w-[85%]' : 'w-full'}`}>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden px-4 pb-4 pt-3">
+        <Header
+          onToggleChatbot={toggleChatbot}
+          isChatbotOpen={isChatbotOpen}
+          onToggleRightToolbar={toggleRightToolbar}
+          isRightToolbarOpen={isRightToolbarOpen}
+          rightToolbarToggleRef={rightToolbarToggleRef}
+        />
+        <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
+          <main
+            className={`min-w-0 flex-1 overflow-auto scrollbar-hide transition-[width] duration-300 ease-out ${
+              isChatbotOpen ? 'w-[85%]' : 'w-full'
+            }`}
+          >
             {showSubheader && (
-              <div className="px-6 pt-4">
+              <div className="pb-4">
                 <Level3Subheader
                   items={level3Menu?.items ?? []}
                   parentLabel={level3Menu?.parentLabel ?? ''}
@@ -346,12 +364,17 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             {children}
           </main>
           {isChatbotOpen && (
-            <div className="w-[15%] min-w-[320px] overflow-hidden mt-[10px]">
+            <div className="min-h-0 w-[15%] min-w-[320px] overflow-hidden">
               <ChatbotPanel onToggleChatbot={toggleChatbot} />
             </div>
           )}
         </div>
-        <RightFloatingToolbar isChatbotOpen={isChatbotOpen} />
+        <RightFloatingToolbar
+          isChatbotOpen={isChatbotOpen}
+          isOpen={isRightToolbarOpen}
+          onOpenChange={setIsRightToolbarOpen}
+          toggleButtonRef={rightToolbarToggleRef}
+        />
       </div>
     </div>
   );

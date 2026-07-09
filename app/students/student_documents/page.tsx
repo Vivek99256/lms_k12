@@ -22,6 +22,7 @@ import {
   Eye,
   Edit,
   Trash2,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -52,74 +53,15 @@ interface StudentDocument {
   lastUpdated: string;
 }
 
-// Sample Data
+// Sample Data matching the image
 const sampleStudents: StudentDocument[] = [
-  { id: 'STU001', name: 'Aarav Sharma', class: '6', section: 'A', admissionNo: 'ADM/2024/001', verifiedDocs: 4, totalDocs: 6, pendingDocs: 2, missingDocs: 0, status: 'pending', lastUpdated: '2024-01-15' },
-  { id: 'STU002', name: 'Ishaan Iyer', class: '7', section: 'A', admissionNo: 'ADM/2024/002', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-14' },
-  { id: 'STU003', name: 'Ananya Gupta', class: '8', section: 'A', admissionNo: 'ADM/2024/003', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-13' },
-  { id: 'STU004', name: 'Klara Kapoor', class: '9', section: 'A', admissionNo: 'ADM/2024/004', verifiedDocs: 5, totalDocs: 6, pendingDocs: 1, missingDocs: 0, status: 'pending', lastUpdated: '2024-01-12' },
-  { id: 'STU005', name: 'Pari Menon', class: '10', section: 'A', admissionNo: 'ADM/2024/005', verifiedDocs: 3, totalDocs: 6, pendingDocs: 2, missingDocs: 1, status: 'missing', lastUpdated: '2024-01-11' },
-  { id: 'STU006', name: 'Reyansh Kumar', class: '6', section: 'B', admissionNo: 'ADM/2024/006', verifiedDocs: 5, totalDocs: 6, pendingDocs: 1, missingDocs: 0, status: 'pending', lastUpdated: '2024-01-10' },
-  { id: 'STU007', name: 'Myra Singh', class: '7', section: 'B', admissionNo: 'ADM/2024/007', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-09' },
-  { id: 'STU008', name: 'Vihaan Mehta', class: '8', section: 'B', admissionNo: 'ADM/2024/008', verifiedDocs: 4, totalDocs: 6, pendingDocs: 2, missingDocs: 0, status: 'pending', lastUpdated: '2024-01-08' },
-  { id: 'STU009', name: 'Aadhira Reddy', class: '9', section: 'B', admissionNo: 'ADM/2024/009', verifiedDocs: 2, totalDocs: 6, pendingDocs: 3, missingDocs: 1, status: 'missing', lastUpdated: '2024-01-07' },
-  { id: 'STU010', name: 'Kabir Verma', class: '10', section: 'B', admissionNo: 'ADM/2024/010', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-06' },
+  { id: 'STU001', name: 'Aarav Sharma', class: '6', section: 'A', admissionNo: 'ADM-2026-0421', verifiedDocs: 4, totalDocs: 6, pendingDocs: 2, missingDocs: 0, status: 'pending', lastUpdated: '2024-01-15' },
+  { id: 'STU002', name: 'Ishaan Iyer', class: '7', section: 'A', admissionNo: 'ADM-2026-0422', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-14' },
+  { id: 'STU003', name: 'Ananya Gupta', class: '8', section: 'A', admissionNo: 'ADM-2026-0423', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-13' },
+  { id: 'STU004', name: 'Kiara Kapoor', class: '9', section: 'A', admissionNo: 'ADM-2026-0424', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-12' },
+  { id: 'STU005', name: 'Pari Menon', class: '10', section: 'A', admissionNo: 'ADM-2026-0425', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-11' },
+  { id: 'STU006', name: 'Sai Malhotra', class: '6', section: 'A', admissionNo: 'ADM-2026-0426', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-10' },
 ];
-
-// Document Card Component
-function DocumentCard({ student }: { student: StudentDocument }) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'complete': return 'bg-emerald-100 text-emerald-700';
-      case 'pending': return 'bg-amber-100 text-amber-700';
-      case 'missing': return 'bg-red-100 text-red-700';
-      default: return 'bg-slate-100 text-slate-700';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'complete': return <CheckCircle className="w-4 h-4" />;
-      case 'pending': return <Clock className="w-4 h-4" />;
-      case 'missing': return <AlertCircle className="w-4 h-4" />;
-      default: return null;
-    }
-  };
-
-  return (
-    <div className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-lg transition-colors border-b border-slate-100 last:border-0">
-      <div className="flex items-center gap-4 flex-1">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0D6EFD] to-blue-400 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-          {student.name.split(' ').map(n => n[0]).join('')}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-900">{student.name}</p>
-          <p className="text-xs text-slate-500">Grade {student.class} - {student.section} · {student.admissionNo}</p>
-        </div>
-      </div>
-      
-      <div className="flex items-center gap-6">
-        <div className="text-center">
-          <p className="text-sm font-semibold text-slate-900">{student.verifiedDocs}/{student.totalDocs}</p>
-          <p className="text-xs text-slate-500">Verified</p>
-        </div>
-        <div className="text-center">
-          <p className="text-sm font-semibold text-amber-600">{student.pendingDocs}</p>
-          <p className="text-xs text-slate-500">Pending</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(student.status)}`}>
-            {getStatusIcon(student.status)}
-            {student.status.charAt(0).toUpperCase() + student.status.slice(1)}
-          </span>
-        </div>
-        <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-          <MoreVertical className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // Main Page Component
 export default function StudentDocumentsPage() {
@@ -259,6 +201,24 @@ export default function StudentDocumentsPage() {
     },
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'complete': return 'bg-emerald-100 text-emerald-700';
+      case 'pending': return 'bg-amber-100 text-amber-700';
+      case 'missing': return 'bg-red-100 text-red-700';
+      default: return 'bg-slate-100 text-slate-700';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'complete': return <CheckCircle className="w-3.5 h-3.5" />;
+      case 'pending': return <Clock className="w-3.5 h-3.5" />;
+      case 'missing': return <AlertCircle className="w-3.5 h-3.5" />;
+      default: return null;
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -276,55 +236,6 @@ export default function StudentDocumentsPage() {
             <Download className="w-4 h-4" />
             Export
           </button>
-        </div>
-      </div>
-
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Verified</p>
-              <p className="text-2xl font-bold text-slate-900">{metrics.verified}</p>
-            </div>
-            <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Pending Verification</p>
-              <p className="text-2xl font-bold text-amber-600">{metrics.pending}</p>
-            </div>
-            <div className="w-11 h-11 rounded-full bg-amber-100 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-amber-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Missing Documents</p>
-              <p className="text-2xl font-bold text-red-600">{metrics.missing}</p>
-            </div>
-            <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Compliance</p>
-              <p className="text-2xl font-bold text-slate-900">{complianceRate}%</p>
-            </div>
-            <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
-              <FileText className="w-5 h-5 text-blue-600" />
-            </div>
-          </div>
-          <p className="text-xs text-emerald-600 mt-1">↑ 4.6% this month</p>
         </div>
       </div>
 
@@ -356,67 +267,103 @@ export default function StudentDocumentsPage() {
           </div>
         </div>
       </div>
-
-      {/* Students Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        {/* Filters */}
-        <div className="p-4 border-b border-slate-200">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search students..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/20 focus:border-[#0D6EFD]"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedClass}
-                  onChange={(e) => setSelectedClass(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/20 focus:border-[#0D6EFD] bg-white"
-                >
-                  <option value="all">All Classes</option>
-                  <option value="6">Grade 6</option>
-                  <option value="7">Grade 7</option>
-                  <option value="8">Grade 8</option>
-                  <option value="9">Grade 9</option>
-                  <option value="10">Grade 10</option>
-                </select>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/20 focus:border-[#0D6EFD] bg-white"
-                >
-                  <option value="all">All Status</option>
-                  <option value="complete">Complete</option>
-                  <option value="pending">Pending</option>
-                  <option value="missing">Missing</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-500">{filteredStudents.length} students</span>
-            </div>
-          </div>
+{/* Stats Tabs - Like the image */}
+      <div className="flex items-center gap-6 bg-white rounded-xl border border-slate-200 p-3">
+        <div className="flex items-center gap-6">
+          <button className="flex items-center gap-2 px-3 py-1.5 bg-[#0D6EFD] text-white rounded-lg text-sm font-medium">
+            <Users className="w-4 h-4" />
+            All students
+            <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">{metrics.total}</span>
+          </button>
+          <button className="flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-50 rounded-lg text-sm font-medium transition-colors">
+            <Clock className="w-4 h-4 text-amber-500" />
+            Pending verification
+            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{metrics.pending}</span>
+          </button>
+          <button className="flex items-center gap-2 px-3 py-1.5 text-slate-600 hover:bg-slate-50 rounded-lg text-sm font-medium transition-colors">
+            <AlertCircle className="w-4 h-4 text-red-500" />
+            Missing documents
+            <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">{metrics.missing}</span>
+          </button>
         </div>
-
+        <div className="ml-auto text-sm text-slate-500">
+          {metrics.total} students
+        </div>
+      </div>
+      {/* Students Table - Matching the image design */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         {/* Table Header */}
-        <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-500 uppercase tracking-wider">
-          <div className="col-span-4">Student</div>
-          <div className="col-span-2 text-center">Verified</div>
-          <div className="col-span-2 text-center">Pending</div>
-          <div className="col-span-2 text-center">Status</div>
-          <div className="col-span-2 text-right">Actions</div>
+        <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-slate-50 border-b border-slate-200">
+          <div className="col-span-3">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Student</span>
+          </div>
+          <div className="col-span-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Class</span>
+          </div>
+          <div className="col-span-2 text-center">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Verified</span>
+          </div>
+          <div className="col-span-2 text-center">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending</span>
+          </div>
+          <div className="col-span-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
+          </div>
+          <div className="col-span-1 text-right">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Action</span>
+          </div>
         </div>
 
         {/* Students List */}
         <div className="divide-y divide-slate-100">
           {filteredStudents.map((student) => (
-            <DocumentCard key={student.id} student={student} />
+            <div key={student.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-slate-50 transition-colors">
+              {/* Student Info */}
+              <div className="col-span-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0D6EFD] to-blue-400 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                  {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{student.name}</p>
+                  <p className="text-xs text-slate-500">{student.admissionNo}</p>
+                </div>
+              </div>
+
+              {/* Class */}
+              <div className="col-span-2">
+                <span className="text-sm text-slate-700">Grade {student.class} - {student.section}</span>
+              </div>
+
+              {/* Verified */}
+              <div className="col-span-2 text-center">
+                <span className="text-sm font-semibold text-slate-900">{student.verifiedDocs} / {student.totalDocs}</span>
+              </div>
+
+              {/* Pending */}
+              <div className="col-span-2 text-center">
+                <span className={`text-sm font-semibold ${student.pendingDocs > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                  {student.pendingDocs}
+                </span>
+              </div>
+
+              {/* Status */}
+              <div className="col-span-2">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(student.status)}`}>
+                  {getStatusIcon(student.status)}
+                  {student.status === 'complete' ? 'Complete' : 
+                   student.status === 'pending' ? 'Missing documents' : 
+                   'Missing documents'}
+                </span>
+              </div>
+
+              {/* Action */}
+              <div className="col-span-1 flex items-center justify-end">
+                <button className="flex items-center gap-1 text-sm text-[#0D6EFD] hover:text-blue-700 font-medium transition-colors">
+                  Review
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           ))}
         </div>
 
