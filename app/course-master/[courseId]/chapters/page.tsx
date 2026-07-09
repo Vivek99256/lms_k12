@@ -494,6 +494,17 @@ export default function ChapterListPage() {
     router.replace(`/course-master/${courseId}/chapters${nextQuery ? `?${nextQuery}` : ''}`);
   };
 
+  if (subjectLoading && !course) {
+    return (
+      <div className="flex min-h-full items-center justify-center px-6 py-10">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#C8D3E3] border-t-[#5648E8]" />
+          <p className="text-sm font-medium text-slate-500">Loading course...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!course) {
     return (
       <div className="flex min-h-full items-center justify-center px-6 py-10">
