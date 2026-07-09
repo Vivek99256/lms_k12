@@ -302,6 +302,18 @@ export default function CourseMasterPage() {
     const SubjectIcon = CATEGORY_ICON_MAP[category] ?? BookOpen;
     const accent = CATEGORY_ACCENT_MAP[category] ?? '#5648E8';
     const chapterCount = Array.isArray(subject.chapters) ? subject.chapters.length : 0;
+    const keyConcepts = chapterCount;
+    const lessonPlanCount = Array.isArray(subject.chapters)
+      ? subject.chapters.reduce((sum, chapter) => sum + (Number(chapter.total_content) || 0), 0)
+      : 0;
+    const progress =
+      chapterCount > 0
+        ? Math.round(
+            (subject.chapters.filter((chapter) => Number(chapter.total_content) > 0).length /
+              chapterCount) *
+              100
+          )
+        : 0;
 
     return (
       <div
@@ -331,6 +343,22 @@ export default function CourseMasterPage() {
           </span>
         </div>
 
+        <p className="mt-4 text-[13px] leading-5 text-[#3F5572] sm:text-[14px]">
+          {keyConcepts} key concepts Â· {lessonPlanCount} lesson plans created
+        </p>
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="text-[14px] font-medium text-[#334155] sm:text-[15px]">Lesson planning coverage</span>
+          <span className="text-[14px] font-semibold text-[#334155] sm:text-[15px]">{progress}%</span>
+        </div>
+
+        <div className="mt-2.5 h-[7px] overflow-hidden rounded-full bg-[#EEF2F7]">
+          <div
+            className="h-full rounded-full bg-[#5648E8]"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
         <div className="mt-4 border-t border-[#E4EAF2] pt-4">
           <div className="grid grid-cols-2 gap-2.5">
             <button
@@ -338,6 +366,7 @@ export default function CourseMasterPage() {
               onClick={() => router.push(routes.lessonPlan)}
               className="col-span-2 rounded-[16px] border border-[#C8D3E3] bg-white px-4 py-2.5 text-[14px] font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF] sm:text-[15px]"
             >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="ds-icon" aria-hidden="true" style={{ display: 'inline-block', flexShrink: 0, verticalAlign: 'middle' }}><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path><path d="M8 18h.01"></path><path d="M12 18h.01"></path><path d="M16 18h.01"></path></svg>{" "}
               Lesson plans
             </button>
             <button
@@ -345,6 +374,7 @@ export default function CourseMasterPage() {
               onClick={() => router.push(routes.curriculum)}
               className="min-w-0 rounded-[16px] border border-[#C8D3E3] bg-white px-3 py-2.5 text-[14px] font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF] sm:px-4 sm:text-[15px]"
             >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="ds-icon" aria-hidden="true" style={{ display: 'inline-block', flexShrink: 0, verticalAlign: 'middle' }}><path d="M8 5h13"></path><path d="M13 12h8"></path><path d="M13 19h8"></path><path d="M3 10a2 2 0 0 0 2 2h3"></path><path d="M3 5v12a2 2 0 0 0 2 2h3"></path></svg>{" "}
               Curriculum
             </button>
             <button
@@ -352,6 +382,7 @@ export default function CourseMasterPage() {
               onClick={() => router.push(routes.chapters)}
               className="min-w-0 rounded-[16px] border border-[#C8D3E3] bg-white px-3 py-2.5 text-[14px] font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF] sm:px-4 sm:text-[15px]"
             >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="ds-icon" aria-hidden="true" style={{ display: 'inline-block', flexShrink: 0, verticalAlign: 'middle' }}><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>{" "}
               Chapters
             </button>
           </div>
@@ -363,7 +394,7 @@ export default function CourseMasterPage() {
   return (
     <div className="min-h-full px-6 py-5">
       <div className="mx-auto max-w-[1800px]">
-        <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center">
+        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="relative w-full max-w-[300px]">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
             <input
@@ -393,22 +424,39 @@ export default function CourseMasterPage() {
               </option>
             ))}
           </select>
-
-          <select
-            value={categoryFilter}
-            onChange={(event) => {
-              setCategoryFilter(event.target.value);
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setCategoryFilter('all');
               setVisibleCount(PAGE_SIZE);
             }}
-            className="h-10 min-w-[165px] rounded-[10px] border border-[#C7D2E4] bg-white px-4 text-[14px] text-[#0F172A] outline-none focus:border-[#5648E8]"
+            className={`rounded-full border px-4 py-2 text-[14px] font-medium transition ${
+              categoryFilter === 'all'
+                ? 'border-[#5648E8] bg-[#5648E8] text-white'
+                : 'border-[#D9E1EE] bg-white text-[#334155] hover:border-[#B8C5D9]'
+            }`}
           >
-            <option value="all">All categories</option>
-            {categoryOptions.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
+            All
+          </button>
+          {categoryOptions.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => {
+                setCategoryFilter(category);
+                setVisibleCount(PAGE_SIZE);
+              }}
+              className={`rounded-full border px-4 py-2 text-[14px] font-medium transition ${
+                categoryFilter === category
+                  ? 'border-[#5648E8] bg-[#5648E8] text-white'
+                  : 'border-[#D9E1EE] bg-white text-[#334155] hover:border-[#B8C5D9]'
+              }`}
+            >
+              {category}
+            </button>
+          ))}
         </div>
 
         {loading ? (
