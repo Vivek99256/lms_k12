@@ -4,34 +4,75 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   Check,
   ChevronDown,
   FileText,
   GraduationCap,
   Info,
-  LayoutGrid,
   Monitor,
   Plus,
   Search,
   Send,
   X,
 } from 'lucide-react';
+import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
 
 type ExamStatus = 'Scheduled' | 'Open' | 'Draft' | 'Closed';
-type ExamType = 'Practice' | 'Term' | 'Diagnostic';
 type AudienceMode = 'Teacher' | 'Student';
 
 type ExamRecord = {
   id: string;
   name: string;
   classLabel: string;
-  type: ExamType;
+  type: string;
   window: string;
   attempts: number;
   questions: number;
   marks: number;
   status: ExamStatus;
+};
+
+type ApiQuestionPaperRecord = {
+  id: number;
+  paper_name?: string | null;
+  paper_desc?: string | null;
+  open_date?: string | null;
+  close_date?: string | null;
+  attempt_allowed?: number | string | null;
+  total_ques?: number | string | null;
+  total_marks?: number | string | null;
+  exam_type?: string | null;
+  standard_name?: string | number | null;
+  subject_name?: string | null;
+  active_exam?: string | null;
+};
+
+type QuestionPaperApiResponse = {
+  status_code?: number;
+  message?: string;
+  data?: ApiQuestionPaperRecord[];
+};
+
+type LmsCoursesChapterRecord = {
+  id: number;
+  chapter_name?: string | null;
+  total_content?: number | string | null;
+  content_categories?: Record<string, unknown[]> | null;
+};
+
+type LmsCoursesSubjectRecord = {
+  standard_name: string | number;
+  subject_name: string;
+  subject_id: number;
+  standard_id: number;
+  chapters?: LmsCoursesChapterRecord[];
+};
+
+type LmsCoursesApiResponse = {
+  status_code?: number;
+  message?: string;
+  lms_subject?: Record<string, LmsCoursesSubjectRecord[] | undefined>;
 };
 
 type QuestionRecord = {
@@ -43,75 +84,6 @@ type QuestionRecord = {
   difficulty: string;
   marks: number;
 };
-
-const INITIAL_EXAMS: ExamRecord[] = [
-  {
-    id: 'EXM-0150',
-    name: 'Sound - concept check 2',
-    classLabel: 'Grade 8 - Science',
-    type: 'Practice',
-    window: '8 Jul 2026 - 12 Jul 2026',
-    attempts: 2,
-    questions: 12,
-    marks: 20,
-    status: 'Scheduled',
-  },
-  {
-    id: 'EXM-0146',
-    name: 'Sound - concept check 1',
-    classLabel: 'Grade 8 - Science',
-    type: 'Practice',
-    window: '29 Jun 2026 - 3 Jul 2026',
-    attempts: 3,
-    questions: 10,
-    marks: 10,
-    status: 'Open',
-  },
-  {
-    id: 'EXM-0152',
-    name: 'Term 1 mid-term - Science',
-    classLabel: 'Grade 8 - Science',
-    type: 'Term',
-    window: '27 Jul 2026',
-    attempts: 1,
-    questions: 30,
-    marks: 80,
-    status: 'Draft',
-  },
-  {
-    id: 'EXM-0128',
-    name: 'Force and pressure - unit test',
-    classLabel: 'Grade 8 - Science',
-    type: 'Term',
-    window: '24 Apr 2026',
-    attempts: 1,
-    questions: 25,
-    marks: 50,
-    status: 'Closed',
-  },
-  {
-    id: 'EXM-0141',
-    name: 'Sound - chapter diagnostic',
-    classLabel: 'Grade 8 - Science',
-    type: 'Diagnostic',
-    window: '22 Jun 2026 - 26 Jun 2026',
-    attempts: 1,
-    questions: 15,
-    marks: 15,
-    status: 'Closed',
-  },
-  {
-    id: 'EXM-0139',
-    name: 'Friction - unit test',
-    classLabel: 'Grade 8 - Science',
-    type: 'Term',
-    window: '18 May 2026',
-    attempts: 1,
-    questions: 25,
-    marks: 50,
-    status: 'Closed',
-  },
-];
 
 const statusBadgeClasses: Record<ExamStatus, string> = {
   Scheduled: 'bg-[#FFF4E8] text-[#A45C14]',
@@ -127,21 +99,13 @@ const statusDotClasses: Record<ExamStatus, string> = {
   Closed: 'bg-[#64748B]',
 };
 
-const topTabs = [
-  { label: 'LMS', icon: LayoutGrid, active: false },
-  { label: 'Teach / learn', icon: BookOpen, active: false },
-  { label: 'Test', icon: FileText, active: true },
-];
+const examTypeOptions = ['Practice', 'Term', 'Diagnostic'];
+const attemptsAllowedOptions = ['1 attempt', '2 attempts', '3 attempts'];
 
 const innerTabs = [
   { label: 'Exams', icon: FileText, active: true },
   { label: 'Results dashboard', icon: GraduationCap, active: false },
 ];
-
-const standardOptions = ['Grade 6', 'Grade 7', 'Grade 8', 'Grade 9'];
-const subjectOptions = ['Science', 'Mathematics', 'English'];
-const examTypeOptions = ['Practice', 'Term', 'Diagnostic'];
-const attemptsAllowedOptions = ['1 attempt', '2 attempts', '3 attempts'];
 
 const createExamSteps = [
   {
@@ -163,32 +127,7 @@ const createExamSteps = [
     id: 4,
     title: 'Review & publish',
     description: '',
-  },
-];
-
-const chapterOptions = [
-  {
-    id: 'force-pressure',
-    label: 'Chapter 1 - Force and pressure',
-    conceptCount: '3 concepts',
-  },
-  {
-    id: 'friction',
-    label: 'Chapter 2 - Friction',
-    conceptCount: '3 concepts',
-  },
-  {
-    id: 'sound',
-    label: 'Chapter 3 - Sound',
-    conceptCount: '4 concepts',
-  },
-];
-
-const conceptOptions = [
-  { id: 'vibration', label: 'Vibration and sound production' },
-  { id: 'amplitude', label: 'Amplitude, frequency and pitch' },
-  { id: 'audible', label: 'Audible and inaudible sounds' },
-  { id: 'noise', label: 'Noise and music' },
+ },
 ];
 
 const questionBank: QuestionRecord[] = [
@@ -239,18 +178,78 @@ const questionBank: QuestionRecord[] = [
   },
 ];
 
+const QUESTION_PAPER_DEFAULTS = {
+  subInstituteId: 1,
+  syear: 2022,
+  userProfileName: 'ADMIN',
+  userId: 6956,
+};
+
+function toNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mapQuestionPaperToExam(row: ApiQuestionPaperRecord): ExamRecord {
+  const paperName = row.paper_name?.trim() ?? '';
+  const paperDesc = row.paper_desc?.trim() ?? '';
+  const examName = [paperName, paperDesc].filter(Boolean).join(' ');
+  const standardName = row.standard_name == null ? '' : String(row.standard_name).trim();
+  const subjectName = row.subject_name?.trim() ?? '';
+  const openDate = row.open_date?.trim() ?? '';
+  const closeDate = row.close_date?.trim() ?? '';
+
+  return {
+    id: `EXM-${row.id}`,
+    name: examName || 'Untitled exam',
+    classLabel: `Grade ${standardName} - ${subjectName}`.trim(),
+    type: row.exam_type?.trim() || '-',
+    window: [openDate, closeDate].filter(Boolean).join(' - '),
+    attempts: toNumber(row.attempt_allowed),
+    questions: toNumber(row.total_ques),
+    marks: toNumber(row.total_marks),
+    status: row.active_exam === 'yes' ? 'Open' : 'Closed',
+  };
+}
+
+function toDisplayText(value: string | number | null | undefined): string {
+  return value == null ? '' : String(value).trim();
+}
+
+function getLmsSubjectRows(payload: LmsCoursesApiResponse): LmsCoursesSubjectRecord[] {
+  return Object.values(payload.lms_subject ?? {}).reduce<LmsCoursesSubjectRecord[]>(
+    (rows, group) => {
+      if (Array.isArray(group)) {
+        rows.push(...group);
+      }
+      return rows;
+    },
+    []
+  );
+}
+
+
 export default function StudentHomeworkIndexPage() {
-  const [exams, setExams] = useState<ExamRecord[]>(INITIAL_EXAMS);
+  const [apiExams, setApiExams] = useState<ExamRecord[]>([]);
+  const [publishedExams, setPublishedExams] = useState<ExamRecord[]>([]);
+  const [isLoadingExams, setIsLoadingExams] = useState(true);
+  const [examLoadError, setExamLoadError] = useState('');
+  const [lmsCourses, setLmsCourses] = useState<LmsCoursesSubjectRecord[]>([]);
+  const [isLoadingLmsCourses, setIsLoadingLmsCourses] = useState(false);
+  const [lmsCoursesError, setLmsCoursesError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [typeFilter, setTypeFilter] = useState('All types');
   const [audienceMode, setAudienceMode] = useState<AudienceMode>('Teacher');
   const [isCreateExamOpen, setIsCreateExamOpen] = useState(false);
   const [createExamStep, setCreateExamStep] = useState(1);
-  const [selectedStandard, setSelectedStandard] = useState('Grade 8');
-  const [selectedSubject, setSelectedSubject] = useState('Science');
-  const [selectedChapters, setSelectedChapters] = useState<string[]>(['sound']);
-  const [selectedConcepts, setSelectedConcepts] = useState<string[]>(['amplitude', 'audible']);
+  const [selectedStandard, setSelectedStandard] = useState('');
+  const [selectedStandardId, setSelectedStandardId] = useState<number | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedChapters, setSelectedChapters] = useState<number[]>([]);
+  const [selectedConcepts, setSelectedConcepts] = useState<string[]>([]);
+
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [examName, setExamName] = useState('');
   const [examDescription, setExamDescription] = useState('');
@@ -259,6 +258,8 @@ export default function StudentHomeworkIndexPage() {
   const [openDate, setOpenDate] = useState('2026-07-08');
   const [closeDate, setCloseDate] = useState('2026-07-12');
   const [timeLimitMinutes, setTimeLimitMinutes] = useState('40');
+  const exams = useMemo(() => [...publishedExams, ...apiExams], [apiExams, publishedExams]);
+ 
 
   const filteredExams = useMemo(() => {
     return exams.filter((exam) => {
@@ -276,7 +277,104 @@ export default function StudentHomeworkIndexPage() {
     });
   }, [exams, search, statusFilter, typeFilter]);
 
-  const toggleChapter = (chapterId: string) => {
+  const standardOptions = useMemo(() => {
+    const standardsMap = new Map<number, LmsCoursesSubjectRecord>();
+
+    lmsCourses.forEach((row) => {
+      if (!standardsMap.has(row.standard_id)) {
+        standardsMap.set(row.standard_id, row);
+      }
+    });
+
+    return Array.from(standardsMap.values()).sort((a, b) =>
+      toDisplayText(a.standard_name).localeCompare(toDisplayText(b.standard_name), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
+  }, [lmsCourses]);
+
+  const subjectOptions = useMemo(() => {
+    if (selectedStandardId == null) return [];
+
+    const subjectsMap = new Map<number, LmsCoursesSubjectRecord>();
+
+    lmsCourses
+      .filter((row) => row.standard_id === selectedStandardId)
+      .forEach((row) => {
+        if (!subjectsMap.has(row.subject_id)) {
+          subjectsMap.set(row.subject_id, row);
+        }
+      });
+
+    return Array.from(subjectsMap.values()).sort((a, b) =>
+      toDisplayText(a.subject_name).localeCompare(toDisplayText(b.subject_name), undefined, {
+        sensitivity: 'base',
+      })
+    );
+  }, [lmsCourses, selectedStandardId]);
+
+  const chapterOptions = useMemo(() => {
+    if (selectedStandardId == null || selectedSubjectId == null) return [];
+
+    const chaptersMap = new Map<number, LmsCoursesChapterRecord>();
+
+    lmsCourses
+      .filter(
+        (row) => row.standard_id === selectedStandardId && row.subject_id === selectedSubjectId
+      )
+      .forEach((row) => {
+        row.chapters?.forEach((chapter) => {
+          const existingChapter = chaptersMap.get(chapter.id);
+          if (!existingChapter) {
+            chaptersMap.set(chapter.id, {
+              ...chapter,
+              content_categories: { ...(chapter.content_categories ?? {}) },
+            });
+            return;
+          }
+
+          const mergedCategories = {
+            ...(existingChapter.content_categories ?? {}),
+            ...(chapter.content_categories ?? {}),
+          };
+
+          chaptersMap.set(chapter.id, {
+            ...existingChapter,
+            ...chapter,
+            content_categories: mergedCategories,
+          });
+        });
+      });
+
+    return Array.from(chaptersMap.values()).sort((a, b) =>
+      toDisplayText(a.chapter_name).localeCompare(toDisplayText(b.chapter_name), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
+  }, [lmsCourses, selectedStandardId, selectedSubjectId]);
+
+  const conceptOptions = useMemo(() => {
+    const selectedChapterSet = new Set(selectedChapters);
+    const concepts = new Set<string>();
+
+    chapterOptions.forEach((chapter) => {
+      if (!selectedChapterSet.has(chapter.id)) return;
+
+      Object.keys(chapter.content_categories ?? {}).forEach((contentCategory) => {
+        if (contentCategory.trim()) {
+          concepts.add(contentCategory);
+        }
+      });
+    });
+
+    return Array.from(concepts).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    );
+  }, [chapterOptions, selectedChapters]);
+
+  const toggleChapter = (chapterId: number) => {
     setSelectedChapters((current) => {
       if (current.includes(chapterId)) {
         return current.filter((item) => item !== chapterId);
@@ -308,12 +406,18 @@ export default function StudentHomeworkIndexPage() {
 
   const toggleAllQuestions = () => {
     setSelectedQuestions((current) =>
-      current.length === questionBank.length ? [] : questionBank.map((question) => question.id)
+ current.length === questionBank.length ? [] : questionBank.map((question) => question.id)
     );
   };
 
   const openCreateExamModal = () => {
     setCreateExamStep(1);
+    setSelectedStandard('');
+    setSelectedStandardId(null);
+    setSelectedSubject('');
+    setSelectedSubjectId(null);
+    setSelectedChapters([]);
+    setSelectedConcepts([]);
     setSelectedQuestions([]);
     setExamName('');
     setExamDescription('');
@@ -383,7 +487,7 @@ export default function StudentHomeworkIndexPage() {
       id: examId,
       name: examName.trim() || 'Untitled exam',
       classLabel: `${selectedStandard} - ${selectedSubject}`,
-      type: examType as ExamType,
+      type: examType,
       window:
         openDate && closeDate
           ? openDate === closeDate
@@ -396,9 +500,60 @@ export default function StudentHomeworkIndexPage() {
       status: examStatus,
     };
 
-    setExams((current) => [newExam, ...current]);
+    setPublishedExams((current) => [newExam, ...current]);
     closeCreateExamModal();
   };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const menuContext = getStoredMenuContext();
+    const subInstituteId = menuContext?.sub_institute_id || QUESTION_PAPER_DEFAULTS.subInstituteId;
+    const userProfileName = menuContext?.user_profile_name || QUESTION_PAPER_DEFAULTS.userProfileName;
+    const userId = menuContext?.user_id || QUESTION_PAPER_DEFAULTS.userId;
+
+    const fetchExams = async () => {
+      setIsLoadingExams(true);
+      setExamLoadError('');
+
+      try {
+        const url = new URL(`${API_BASE_URL}/api/question-paper`);
+        url.searchParams.set('sub_institute_id', String(subInstituteId));
+        url.searchParams.set('syear', String(QUESTION_PAPER_DEFAULTS.syear));
+        url.searchParams.set('user_profile_name', userProfileName);
+        url.searchParams.set('user_id', String(userId));
+
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as QuestionPaperApiResponse;
+
+        if (!response.ok || payload.status_code !== 1) {
+          throw new Error(payload.message || 'Failed to load exams');
+        }
+
+        const mappedExams = Array.isArray(payload.data)
+          ? payload.data.map(mapQuestionPaperToExam)
+          : [];
+
+        setApiExams(mappedExams);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setApiExams([]);
+        setExamLoadError(error instanceof Error ? error.message : 'Failed to load exams');
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingExams(false);
+        }
+      }
+    };
+
+    fetchExams();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (!isCreateExamOpen) return;
@@ -411,11 +566,60 @@ export default function StudentHomeworkIndexPage() {
     };
   }, [isCreateExamOpen]);
 
+  useEffect(() => {
+    if (!isCreateExamOpen) return;
+
+    const controller = new AbortController();
+    const menuContext = getStoredMenuContext();
+    const subInstituteId = menuContext?.sub_institute_id || QUESTION_PAPER_DEFAULTS.subInstituteId;
+    const userProfileName = menuContext?.user_profile_name || QUESTION_PAPER_DEFAULTS.userProfileName;
+    const userId = menuContext?.user_id || QUESTION_PAPER_DEFAULTS.userId;
+
+    const fetchLmsCourses = async () => {
+      setIsLoadingLmsCourses(true);
+      setLmsCoursesError('');
+
+      try {
+        const formData = new FormData();
+        formData.append('sub_institute_id', String(subInstituteId));
+        formData.append('user_profile_name', userProfileName);
+        formData.append('user_id', String(userId));
+
+        const response = await fetch(`${API_BASE_URL}/api/lms-courses`, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as LmsCoursesApiResponse;
+
+        if (!response.ok || payload.status_code !== 1) {
+          throw new Error(payload.message || 'Failed to load course data');
+        }
+
+        setLmsCourses(getLmsSubjectRows(payload));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setLmsCourses([]);
+        setLmsCoursesError(error instanceof Error ? error.message : 'Failed to load course data');
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingLmsCourses(false);
+        }
+      }
+    };
+
+    fetchLmsCourses();
+
+    return () => {
+      controller.abort();
+    };
+  }, [isCreateExamOpen]);
+
   return (
     <>
-      <div className="min-h-full bg-[#EAF0F8] px-4 py-4 sm:px-5 lg:px-6 rounded-t-3xl" >
+      
         <div className="mx-auto w-full max-w-[1540px]">
-          <section className="rounded-[24px] border border-[#D9E3F1] bg-[#EAF0F8] p-4 shadow-[0_6px_18px_rgba(15,23,42,0.04)] sm:p-5">
+          <section className="rounded-[24px] border bg-white border-[#D9E3F1] p-4 shadow-[0_6px_18px_rgba(15,23,42,0.04)] sm:p-5">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
@@ -458,33 +662,6 @@ export default function StudentHomeworkIndexPage() {
                     Student
                   </button>
                 </div>
-              </div>
-            </div>
-
-            <div className="rounded-[18px] border border-[#E0E7F1] bg-white p-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-              <div className="flex flex-col gap-1.5 md:flex-row md:items-center">
-                {topTabs.map((tab, index) => {
-                  const TabIcon = tab.icon;
-
-                  return (
-                    <div key={tab.label} className="flex items-center">
-                      <button
-                        type="button"
-                        className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-[14px] font-semibold transition ${
-                          tab.active
-                            ? 'bg-[#5846EA] text-white shadow-[0_10px_20px_rgba(88,70,234,0.28)]'
-                            : 'text-[#66758B]'
-                        }`}
-                      >
-                        <TabIcon size={16} />
-                        {tab.label}
-                      </button>
-                      {index < topTabs.length - 1 ? (
-                        <span className="mx-2 hidden h-6 w-px bg-[#E7EDF5] md:block" />
-                      ) : null}
-                    </div>
-                  );
-                })}
               </div>
             </div>
 
@@ -560,7 +737,7 @@ export default function StudentHomeworkIndexPage() {
                 <button
                   type="button"
                   onClick={openCreateExamModal}
-                  className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-[12px] bg-[#5846EA] px-4 text-[14px] font-semibold text-white shadow-[0_12px_24px_rgba(88,70,234,0.28)] transition hover:bg-[#4C3DD3]"
+                  className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-[12px] bg-[#5846EA] px-4 text-[14px] font-semibold text-white"
                 >
                   <Plus size={18} />
                   Create exam
@@ -627,7 +804,19 @@ export default function StudentHomeworkIndexPage() {
                   </table>
                 </div>
 
-                {filteredExams.length === 0 ? (
+                {isLoadingExams ? (
+                  <div className="px-6 py-12 text-center text-[14px] text-[#6B7B91]">
+                    Loading exams...
+                  </div>
+                ) : null}
+
+                {!isLoadingExams && examLoadError ? (
+                  <div className="px-6 py-12 text-center text-[14px] text-[#B45309]">
+                    {examLoadError}
+                  </div>
+                ) : null}
+
+                {!isLoadingExams && !examLoadError && filteredExams.length === 0 ? (
                   <div className="px-6 py-12 text-center text-[14px] text-[#6B7B91]">
                     No exams match the current search and filters.
                   </div>
@@ -637,7 +826,7 @@ export default function StudentHomeworkIndexPage() {
           </div>
           </section>
         </div>
-      </div>
+     
 
       {isCreateExamOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#0F172A]/52 px-3 py-3 backdrop-blur-[2px] sm:px-6 sm:py-6">
@@ -706,6 +895,7 @@ export default function StudentHomeworkIndexPage() {
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
               {createExamStep === 1 ? (
                 <>
+             
                   <div className="grid gap-5 sm:grid-cols-2">
                     <label className="block">
                       <span className="mb-2.5 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
@@ -713,13 +903,39 @@ export default function StudentHomeworkIndexPage() {
                       </span>
                       <div className="relative">
                         <select
-                          value={selectedStandard}
-                          onChange={(event) => setSelectedStandard(event.target.value)}
+                          value={selectedStandardId == null ? '' : String(selectedStandardId)}
+                          onChange={(event) => {
+                            const nextStandardId = Number(event.target.value);
+                            const nextStandard = standardOptions.find(
+                              (option) => option.standard_id === nextStandardId
+                            );
+
+                            if (!nextStandard) {
+                              setSelectedStandard('');
+                              setSelectedStandardId(null);
+                              setSelectedSubject('');
+                              setSelectedSubjectId(null);
+                              setSelectedChapters([]);
+                              setSelectedConcepts([]);
+                              return;
+                            }
+
+                            setSelectedStandard(toDisplayText(nextStandard.standard_name));
+                            setSelectedStandardId(nextStandard.standard_id);
+                            setSelectedSubject('');
+                            setSelectedSubjectId(null);
+                            setSelectedChapters([]);
+                            setSelectedConcepts([]);
+                          }}
+                          disabled={isLoadingLmsCourses}
                           className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
                         >
+                          <option value="">
+                            {isLoadingLmsCourses ? 'Loading standards...' : 'Select standard'}
+                          </option>
                           {standardOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
+                            <option key={option.standard_id} value={option.standard_id}>
+                              {toDisplayText(option.standard_name)}
                             </option>
                           ))}
                         </select>
@@ -733,13 +949,35 @@ export default function StudentHomeworkIndexPage() {
                       </span>
                       <div className="relative">
                         <select
-                          value={selectedSubject}
-                          onChange={(event) => setSelectedSubject(event.target.value)}
+                          value={selectedSubjectId == null ? '' : String(selectedSubjectId)}
+                          onChange={(event) => {
+                            const nextSubjectId = Number(event.target.value);
+                            const nextSubject = subjectOptions.find(
+                              (option) => option.subject_id === nextSubjectId
+                            );
+
+                            if (!nextSubject) {
+                              setSelectedSubject('');
+                              setSelectedSubjectId(null);
+                              setSelectedChapters([]);
+                              setSelectedConcepts([]);
+                              return;
+                            }
+
+                            setSelectedSubject(toDisplayText(nextSubject.subject_name));
+                            setSelectedSubjectId(nextSubject.subject_id);
+                            setSelectedChapters([]);
+                            setSelectedConcepts([]);
+                          }}
+                          disabled={isLoadingLmsCourses || selectedStandardId == null}
                           className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
                         >
+                          <option value="">
+                            {selectedStandardId == null ? 'Select standard first' : 'Select subject'}
+                          </option>
                           {subjectOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
+                            <option key={option.subject_id} value={option.subject_id}>
+                              {toDisplayText(option.subject_name)}
                             </option>
                           ))}
                         </select>
@@ -752,8 +990,22 @@ export default function StudentHomeworkIndexPage() {
                     <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
                       Chapters
                     </p>
+                    {lmsCoursesError ? (
+                      <p className="mt-3 text-[13px] text-[#B45309]">{lmsCoursesError}</p>
+                    ) : null}
                     <div className="mt-3 space-y-3">
-                      {chapterOptions.map((chapter) => {
+                      {isLoadingLmsCourses ? (
+                        <div className="rounded-[16px] border border-dashed border-[#D8E1EE] px-4 py-5 text-[14px] text-[#64748B]">
+                          Loading chapters...
+                        </div>
+                      ) : chapterOptions.length === 0 ? (
+                        <div className="rounded-[16px] border border-dashed border-[#D8E1EE] px-4 py-5 text-[14px] text-[#64748B]">
+                          {selectedSubjectId == null
+                            ? 'Select a standard and subject to view chapters.'
+                            : 'No chapters are available for the selected subject.'}
+                        </div>
+                      ) : (
+                        chapterOptions.map((chapter) => {
                         const isSelected = selectedChapters.includes(chapter.id);
 
                         return (
@@ -782,15 +1034,15 @@ export default function StudentHomeworkIndexPage() {
                             </span>
                             <span className="min-w-0">
                               <span className={`block text-[15px] font-medium ${isSelected ? 'text-[#4338CA]' : 'text-[#1E293B]'}`}>
-                                {chapter.label}
+                                {toDisplayText(chapter.chapter_name) || 'Untitled chapter'}
                               </span>
                               <span className="mt-1 block text-[13px] text-[#64748B]">
-                                {chapter.conceptCount}
+                                {toNumber(chapter.total_content)} contents
                               </span>
                             </span>
                           </label>
                         );
-                      })}
+                      }))}
                     </div>
                   </div>
 
@@ -799,26 +1051,32 @@ export default function StudentHomeworkIndexPage() {
                       Concepts
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {conceptOptions.map((concept) => {
-                        const isSelected = selectedConcepts.includes(concept.id);
+                      {conceptOptions.length === 0 ? (
+                        <p className="text-[14px] text-[#64748B]">
+                          Select chapter checkboxes to view related categories.
+                        </p>
+                      ) : (
+                        conceptOptions.map((concept) => {
+                        const isSelected = selectedConcepts.includes(concept);
 
                         return (
                           <button
-                            key={concept.id}
+                            key={concept}
                             type="button"
-                            onClick={() => toggleConcept(concept.id)}
+                            onClick={() => toggleConcept(concept)}
                             className={`rounded-full px-3.5 py-1.5 text-[14px] font-semibold transition ${
                               isSelected
                                 ? 'bg-[#5B4FE9] text-white shadow-[0_8px_16px_rgba(91,79,233,0.18)]'
                                 : 'bg-[#EEF2F7] text-[#51657F]'
                             }`}
                           >
-                            {concept.label}
+                            {concept}
                           </button>
                         );
-                      })}
+                      }))}
                     </div>
                   </div>
+                  
                 </>
               ) : createExamStep === 2 ? (
                 <div>
@@ -873,7 +1131,7 @@ export default function StudentHomeworkIndexPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {questionBank.map((question) => {
+                                {questionBank.map((question) => {
                                 const isSelected = selectedQuestions.includes(question.id);
 
                                 return (
@@ -918,6 +1176,7 @@ export default function StudentHomeworkIndexPage() {
                         </div>
                       </div>
                     </div>
+                   
                   </div>
                 </div>
               ) : createExamStep === 3 ? (
@@ -967,7 +1226,7 @@ export default function StudentHomeworkIndexPage() {
                               onChange={(event) => setExamType(event.target.value)}
                               className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
                             >
-                              {examTypeOptions.map((option) => (
+                                {examTypeOptions.map((option) => (
                                 <option key={option} value={option}>
                                   {option}
                                 </option>
@@ -1041,7 +1300,7 @@ export default function StudentHomeworkIndexPage() {
                         <div>
                           <p className="text-[13px] font-medium text-[#64748B]">Total questions</p>
                           <p className="mt-1 text-[20px] font-semibold text-[#1E293B]">
-                            {selectedQuestions.length}
+                           {selectedQuestions.length}
                           </p>
                         </div>
                         <div>
