@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { useAuth } from '@/contexts/AuthContext';
 import { buildMenuTree, type ApiMenuGroups, type ApiMenuItem } from '@/app/data/menuMappers';
@@ -110,6 +110,7 @@ export function useMenuRights() {
    const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
    const [loading, setLoading] = useState(false);
    const [error, setError] = useState<string | null>(null);
+   const abortRef = useRef<AbortController | null>(null);
 
    const fetchMenu = useCallback(async () => {
      const requestContext = isValidMenuContext(menuContext) ? menuContext : getStoredMenuContext();
@@ -119,6 +120,10 @@ export function useMenuRights() {
        setError('Menu session data is missing.');
        return;
      }
+
+     abortRef.current?.abort();
+     const controller = new AbortController();
+     abortRef.current = controller;
 
      setLoading(true);
      setError(null);
@@ -134,6 +139,7 @@ export function useMenuRights() {
            user_profile_id: requestContext.user_profile_id,
            client_id: requestContext.client_id,
          }),
+         signal: controller.signal,
        });
        const data = (await res.json()) as MenuRightsResponse;
        if (!res.ok) throw new Error(data.message || 'Failed to fetch menu rights');
@@ -150,10 +156,11 @@ export function useMenuRights() {
        const tree = buildMenuTree(l1, l2, l3);
        setMenuItems(tree);
      } catch (e: unknown) {
+       if (controller.signal.aborted) return;
        setError(e instanceof Error ? e.message : 'Unknown error');
        setMenuItems([]);
      } finally {
-       setLoading(false);
+       if (!controller.signal.aborted) setLoading(false);
      }
    }, [menuContext]);
 
@@ -161,6 +168,7 @@ export function useMenuRights() {
      // The menu must be loaded after browser storage/auth context is available.
      // eslint-disable-next-line react-hooks/set-state-in-effect
      fetchMenu();
+     return () => abortRef.current?.abort();
    }, [fetchMenu]);
 
    return { menuItems, loading, error, refetch: fetchMenu };
