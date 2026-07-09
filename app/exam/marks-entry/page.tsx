@@ -735,7 +735,7 @@ export default function MarksEntryPage() {
             <form onSubmit={handleSearch} className="space-y-6">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 <Field label="Select Term" icon={<Calendar />}>
-                  <Select value={term} onValueChange={setTerm}>
+                  <Select value={term} onValueChange={(value) => setTerm(value ?? '')}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select term" />
                     </SelectTrigger>
@@ -750,7 +750,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Search Section" icon={<Users />}>
-                  <Select value={section} onValueChange={setSection} disabled={!term}>
+                  <Select value={section} onValueChange={(value) => setSection(value ?? '')} disabled={!term}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select section" />
                     </SelectTrigger>
@@ -765,7 +765,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Search Standard" icon={<GraduationCap />}>
-                  <Select value={standard} onValueChange={setStandard} disabled={!section}>
+                  <Select value={standard} onValueChange={(value) => setStandard(value ?? '')} disabled={!section}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select standard" />
                     </SelectTrigger>
@@ -780,7 +780,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Search Division" icon={<Layers />}>
-                  <Select value={division} onValueChange={setDivision} disabled={!standard}>
+                  <Select value={division} onValueChange={(value) => setDivision(value ?? '')} disabled={!standard}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select division" />
                     </SelectTrigger>
@@ -795,7 +795,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Select Subject" icon={<BookOpen />}>
-                  <Select value={subject} onValueChange={setSubject} disabled={!division}>
+                  <Select value={subject} onValueChange={(value) => setSubject(value ?? '')} disabled={!division}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select subject" />
                     </SelectTrigger>
@@ -810,7 +810,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Select Exam Master" icon={<FileText />}>
-                  <Select value={examMaster} onValueChange={setExamMaster} disabled={!subject}>
+                  <Select value={examMaster} onValueChange={(value) => setExamMaster(value ?? '')} disabled={!subject}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select exam master" />
                     </SelectTrigger>
@@ -825,7 +825,7 @@ export default function MarksEntryPage() {
                 </Field>
 
                 <Field label="Select Exam" icon={<ClipboardList />}>
-                  <Select value={exam} onValueChange={setExam} disabled={!examMaster}>
+                  <Select value={exam} onValueChange={(value) => setExam(value ?? '')} disabled={!examMaster}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select exam" />
                     </SelectTrigger>
