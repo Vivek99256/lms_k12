@@ -324,7 +324,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const showSubheader = Boolean(level3Menu?.items.length || fetchedMasterMenuItems.length > 0 || masterMenuGroups.length > 0);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="app-shell-background flex h-screen overflow-hidden">
       <Sidebar
         menuItems={menuItems}
         loading={loading}

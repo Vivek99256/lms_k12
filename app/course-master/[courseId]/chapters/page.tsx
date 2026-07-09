@@ -29,6 +29,9 @@ import {
   ClipboardList,
   Orbit,
   WandSparkles,
+  Eye,
+  Play,
+  FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +54,7 @@ import {
   type SubjectWithChapters,
 } from '../../data/chapters';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
+import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import type { Chapter } from '../../data/chapters';
 
 const EMPTY_CHAPTER_FORM = {
@@ -65,13 +69,39 @@ const RESOURCE_MAPPING_TYPES = ['Pedagogical Process', 'Material Type', 'Learnin
 const RESOURCE_MATERIAL_TYPES = ['Mindmap', 'Teacher Training', 'Worksheet', 'Reference Notes', 'Assessment Aid'] as const;
 const RESOURCE_FILE_TYPES = ['PDF', 'PPT', 'DOCX', 'Video Link'] as const;
 const UPLOAD_CONTENT_TYPES = ['Presentation', 'Worksheet', 'Reference notes', 'Assessment video'] as const;
+const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
+const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
 const ACCEPTED_UPLOAD_TYPES = [
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'video/mp4',
+  'video/quicktime',
+  'video/webm',
 ];
-const MAX_UPLOAD_SIZE = 100 * 1024 * 1024;
+const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
+
+type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF';
+type ChapterContentSource = 'Gamma AI' | 'Uploaded';
+type ChapterContentPreview = 'presentation' | 'notes' | 'video' | 'pdf';
+
+interface ChapterContentItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  chapterTitle: string;
+  conceptTitle: string;
+  type: ChapterContentType;
+  source: ChapterContentSource;
+  preview: ChapterContentPreview;
+  actionLabel: 'Open' | 'Play';
+  slideCount: number;
+  statValue: string;
+  updatedDate: string;
+  updatedAt: string;
+  slides: {
+    id: string;
+    number: number;
+    title: string;
+  }[];
+}
 
 function getConceptIntelligence(conceptTitle: string, chapterTitle: string, index: number) {
   const conceptKey = conceptTitle.toLowerCase();
@@ -216,6 +246,140 @@ function buildTeacherResources(chapterTitle: string) {
   ];
 }
 
+function getCourseClassroomLabel(courseId: string, classGrade: string) {
+  const sectionLabel = getCourseSectionLabel(courseId);
+  const sectionSuffix = sectionLabel.split(' ').pop() ?? sectionLabel;
+  return `${getCourseGradeLabel(classGrade)} ${sectionSuffix}`;
+}
+
+function getChapterContentType(index: number): ChapterContentType {
+  const sequence: ChapterContentType[] = [
+    'Classroom presentation',
+    'Classroom presentation',
+    'Teacher training presentation',
+    'Video',
+    'Revision notes',
+    'PDF',
+  ];
+
+  return sequence[index % sequence.length];
+}
+
+function getChapterContentPreview(type: ChapterContentType): ChapterContentPreview {
+  if (type === 'Video') return 'video';
+  if (type === 'Revision notes') return 'notes';
+  if (type === 'PDF') return 'pdf';
+  return 'presentation';
+}
+
+function getChapterContentTitle(conceptTitle: string, type: ChapterContentType, chapterTitle: string) {
+  switch (type) {
+    case 'Teacher training presentation':
+      return `Teaching ${conceptTitle.toLowerCase()} - misconceptions & strategies`;
+    case 'Revision notes':
+      return `${chapterTitle} - chapter revision notes`;
+    case 'Video':
+      return `${conceptTitle} demonstration`;
+    case 'PDF':
+      return `NCERT ${chapterTitle} - reference chapter`;
+    default:
+      return conceptTitle;
+  }
+}
+
+function getChapterContentStat(type: ChapterContentType, index: number) {
+  const slideCount = 14 + index * 2;
+
+  if (type === 'Video') {
+    return {
+      slideCount,
+      statValue: `${8 + (index % 4)}:${index % 2 === 0 ? '20' : '45'}`,
+    };
+  }
+
+  if (type === 'Revision notes' || type === 'PDF') {
+    return {
+      slideCount,
+      statValue: `${6 + index} pages`,
+    };
+  }
+
+  return {
+    slideCount,
+    statValue: `${slideCount} slides`,
+  };
+}
+
+function buildContentSlides(conceptTitle: string, chapterTitle: string, type: ChapterContentType, count: number) {
+  const titles = [
+    `Title - ${conceptTitle}`,
+    "What you'll learn",
+    `Key idea: ${conceptTitle}`,
+    'Real-world example',
+    'Worked example',
+    'Quick activity',
+    'Check your understanding',
+    'Summary & recap',
+  ];
+
+  return Array.from({ length: Math.min(8, Math.max(4, count)) }, (_, index) => ({
+    id: `${chapterTitle}-${conceptTitle}-${index + 1}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    number: index + 1,
+    title: titles[index] ?? `${type} insight ${index + 1}`,
+  }));
+}
+
+function buildChapterContentItems(
+  course: { subject: string; classGrade: string; id: string },
+  chapter: Chapter,
+  chapterConcepts: ChapterKeyConceptGroup | null
+): ChapterContentItem[] {
+  const concepts = chapterConcepts?.concepts ?? [];
+  const itemCount = Math.max(chapter.resources.hspContent, concepts.length || 1);
+  const chapterLabel = `${course.subject} - ${chapter.title}`;
+  const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
+
+  return Array.from({ length: itemCount }, (_, index) => {
+    const concept = concepts[index % Math.max(concepts.length, 1)];
+    const fallbackConcept = `${chapter.title} overview ${index + 1}`;
+    const conceptTitle = concept?.title ?? fallbackConcept;
+    const type = getChapterContentType(index);
+    const source: ChapterContentSource = index % 3 === 0 ? 'Uploaded' : 'Gamma AI';
+    const preview = getChapterContentPreview(type);
+    const { slideCount, statValue } = getChapterContentStat(type, index);
+    const updatedDate = `${28 - (index % 9)} Jun 2026`;
+
+    return {
+      id: `${chapter.id}-content-${index + 1}`,
+      title: getChapterContentTitle(conceptTitle, type, chapter.title),
+      subtitle: `${chapterLabel} - ${gradeLabel}`,
+      chapterTitle: chapter.title,
+      conceptTitle,
+      type,
+      source,
+      preview,
+      actionLabel: type === 'Video' ? 'Play' : 'Open',
+      slideCount,
+      statValue,
+      updatedDate,
+      updatedAt: `updated ${updatedDate}`,
+      slides: buildContentSlides(conceptTitle, chapter.title, type, slideCount),
+    };
+  });
+}
+
+function getContentPreviewIcon(preview: ChapterContentPreview) {
+  if (preview === 'video') {
+    return Upload;
+  }
+
+  if (preview === 'notes' || preview === 'pdf') {
+    return FileText;
+  }
+
+  return BookOpen;
+}
+
 export default function ChapterListPage() {
   const router = useRouter();
   const params = useParams();
@@ -281,7 +445,15 @@ export default function ChapterListPage() {
   const [isPresentationMenuOpen, setIsPresentationMenuOpen] = useState(false);
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
   const [isPresentationReady, setIsPresentationReady] = useState(false);
+  const [isGeneratePresentationDrawerOpen, setIsGeneratePresentationDrawerOpen] = useState(false);
+  const [presentationMode, setPresentationMode] = useState<'Classroom' | 'Teacher training'>('Classroom');
+  const [presentationChapterId, setPresentationChapterId] = useState('');
+  const [presentationConcept, setPresentationConcept] = useState('');
+  const [presentationSlides, setPresentationSlides] = useState<string>(PRESENTATION_SLIDE_OPTIONS[2]);
+  const [presentationTheme, setPresentationTheme] = useState<string>(GAMMA_THEME_OPTIONS[0]);
+  const [presentationAudienceNotes, setPresentationAudienceNotes] = useState('');
   const [uploadContentType, setUploadContentType] = useState<string>(UPLOAD_CONTENT_TYPES[0]);
+  const [uploadChapterId, setUploadChapterId] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
@@ -291,11 +463,20 @@ export default function ChapterListPage() {
   const [resourceMappingValue, setResourceMappingValue] = useState('');
   const [resourceFileType, setResourceFileType] = useState('');
   const [resourceSearch, setResourceSearch] = useState('');
+  const [contentSearch, setContentSearch] = useState('');
+  const [contentTypeFilter, setContentTypeFilter] = useState('all');
+  const [contentChapterFilter, setContentChapterFilter] = useState('all');
+  const [contentSourceFilter, setContentSourceFilter] = useState('all');
+  const [selectedContentItem, setSelectedContentItem] = useState<ChapterContentItem | null>(null);
 
   const view = searchParams.get('view');
   const activeChapterId = searchParams.get('chapterId') ?? '';
   const resourceChapter =
     allChapters.find((chapter) => chapter.id === activeChapterId) || allChapters[0] || null;
+  const contentChapter = resourceChapter;
+  const contentChapterConcepts =
+    course && contentChapter ? getChapterKeyConcepts(course.id, contentChapter.id) : null;
+  const contentChapterConceptOptions = contentChapterConcepts?.concepts ?? [];
 
   const filteredChapters = useMemo(() => {
     return allChapters.filter((chapter) => {
@@ -329,10 +510,57 @@ export default function ChapterListPage() {
     });
   }, [resourceFileType, resourceSearch, teacherResources]);
 
+  const chapterContentItems = useMemo(() => {
+    if (!course || !contentChapter) return [];
+    return buildChapterContentItems(course, contentChapter, contentChapterConcepts);
+  }, [contentChapter, contentChapterConcepts, course]);
+
+  const contentTypeOptions = useMemo(
+    () => Array.from(new Set(chapterContentItems.map((item) => item.type))),
+    [chapterContentItems]
+  );
+
+  const contentSourceOptions = useMemo(
+    () => Array.from(new Set(chapterContentItems.map((item) => item.source))),
+    [chapterContentItems]
+  );
+
+  const presentationConceptOptions = useMemo(() => {
+    if (!presentationChapterId || !course) return [];
+    return getChapterKeyConcepts(course.id, presentationChapterId)?.concepts ?? [];
+  }, [course, presentationChapterId]);
+
+  const filteredChapterContentItems = useMemo(() => {
+    return chapterContentItems.filter((item) => {
+      const matchesSearch =
+        !contentSearch ||
+        [item.title, item.subtitle, item.type, item.chapterTitle, item.source]
+          .join(' ')
+          .toLowerCase()
+          .includes(contentSearch.toLowerCase());
+      const matchesType = contentTypeFilter === 'all' || item.type === contentTypeFilter;
+      const matchesChapter = contentChapterFilter === 'all' || item.chapterTitle === contentChapterFilter;
+      const matchesSource = contentSourceFilter === 'all' || item.source === contentSourceFilter;
+
+      return matchesSearch && matchesType && matchesChapter && matchesSource;
+    });
+  }, [
+    chapterContentItems,
+    contentChapterFilter,
+    contentSearch,
+    contentSourceFilter,
+    contentTypeFilter,
+  ]);
+
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const presentationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAnyModalOpen =
-    isAddChapterOpen || editingChapter !== null || uploadChapter !== null || conceptDrawer !== null;
+    isAddChapterOpen ||
+    editingChapter !== null ||
+    uploadChapter !== null ||
+    conceptDrawer !== null ||
+    selectedContentItem !== null ||
+    isGeneratePresentationDrawerOpen;
   const expandedChapterId = view === 'teacher-resource' ? null : expandedChapterParam;
 
   useEffect(() => {
@@ -351,6 +579,8 @@ export default function ChapterListPage() {
         setUploadFile(null);
         setUploadError('');
         setIsDraggingUpload(false);
+        setSelectedContentItem(null);
+        setIsGeneratePresentationDrawerOpen(false);
         if (presentationTimerRef.current) {
           clearTimeout(presentationTimerRef.current);
           presentationTimerRef.current = null;
@@ -383,6 +613,7 @@ export default function ChapterListPage() {
   const closeUploadContentModal = () => {
     setUploadChapter(null);
     setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
+    setUploadChapterId('');
     setUploadFile(null);
     setUploadError('');
     setIsDraggingUpload(false);
@@ -407,6 +638,7 @@ export default function ChapterListPage() {
   const openUploadContentModal = (chapter: Chapter) => {
     setUploadChapter(chapter);
     setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
+    setUploadChapterId(chapter.id);
     setUploadFile(null);
     setUploadError('');
     setIsDraggingUpload(false);
@@ -445,15 +677,15 @@ export default function ChapterListPage() {
 
   const validateUploadFile = (file: File) => {
     const extension = file.name.split('.').pop()?.toLowerCase();
-    const extensionAllowed = ['pdf', 'pptx', 'docx', 'mp4'].includes(extension ?? '');
+    const extensionAllowed = ['mp4', 'mov', 'webm'].includes(extension ?? '');
     const mimeAllowed = ACCEPTED_UPLOAD_TYPES.includes(file.type);
 
     if (!mimeAllowed && !extensionAllowed) {
-      return 'Only PDF, PPTX, DOCX, and MP4 files are supported.';
+      return 'Only MP4, MOV, and WEBM files are supported.';
     }
 
     if (file.size > MAX_UPLOAD_SIZE) {
-      return 'Each file must be 100 MB or smaller.';
+      return 'Each file must be 500 MB or smaller.';
     }
 
     return '';
@@ -493,6 +725,367 @@ export default function ChapterListPage() {
     const nextQuery = nextParams.toString();
     router.replace(`/course-master/${courseId}/chapters${nextQuery ? `?${nextQuery}` : ''}`);
   };
+
+  const openChapterContentView = (chapter: Chapter) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('view', 'content');
+    nextParams.set('chapterId', chapter.id);
+    nextParams.set('expandedChapterId', chapter.id);
+
+    router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
+  };
+
+  const closeContentDrawer = () => {
+    setSelectedContentItem(null);
+  };
+
+  const openGeneratePresentationDrawer = () => {
+    setPresentationMode('Classroom');
+    setPresentationChapterId(contentChapter?.id ?? '');
+    setPresentationConcept(contentChapterConceptOptions[0]?.title ?? '');
+    setPresentationSlides(PRESENTATION_SLIDE_OPTIONS[2]);
+    setPresentationTheme(GAMMA_THEME_OPTIONS[0]);
+    setPresentationAudienceNotes('');
+    setIsGeneratePresentationDrawerOpen(true);
+  };
+
+  const closeGeneratePresentationDrawer = () => {
+    setIsGeneratePresentationDrawerOpen(false);
+  };
+
+  useEffect(() => {
+    if (!presentationChapterId) return;
+
+    const matchingConcept = presentationConceptOptions.find(
+      (concept) => concept.title === presentationConcept
+    );
+
+    if (!matchingConcept) {
+      setPresentationConcept(presentationConceptOptions[0]?.title ?? '');
+    }
+  }, [presentationChapterId, presentationConcept, presentationConceptOptions]);
+
+  const uploadContentModal = uploadChapter ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-[2px]"
+      onClick={closeUploadContentModal}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="upload-content-title"
+        className="relative w-full max-w-[736px] rounded-[20px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="px-5 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="upload-content-title" className="text-[24px] font-bold tracking-tight text-slate-950">
+                Upload content
+              </h2>
+              <p className="mt-1 text-[15px] text-slate-600">
+                Add videos, presentations, revision notes or PDFs to the library
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={closeUploadContentModal}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Close dialog"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="mt-5 space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Content Type
+                </Label>
+                <Select value={uploadContentType} onValueChange={(value) => typeof value === 'string' && setUploadContentType(value)}>
+                  <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                    <SelectValue placeholder="Select content type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UPLOAD_CONTENT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Chapter
+                </Label>
+                <Select value={uploadChapterId} onValueChange={(value) => setUploadChapterId(value ?? '')}>
+                  <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                    <SelectValue placeholder="Select chapter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allChapters.map((chapter) => (
+                      <SelectItem key={chapter.id} value={chapter.id}>
+                        {chapter.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
+              className="hidden"
+              onChange={(event) => handleUploadFileSelection(event.target.files?.[0] ?? null)}
+            />
+
+            <button
+              type="button"
+              onClick={() => uploadInputRef.current?.click()}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setIsDraggingUpload(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                setIsDraggingUpload(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setIsDraggingUpload(false);
+                handleUploadFileSelection(event.dataTransfer.files?.[0] ?? null);
+              }}
+              className={cn(
+                'flex min-h-[152px] w-full flex-col items-center justify-center rounded-[12px] border border-dashed px-6 py-8 text-center transition-colors',
+                isDraggingUpload
+                  ? 'border-[#8b85ff] bg-[#f4f3ff]'
+                  : 'border-[#d4dcf0] bg-[#f8fbff] hover:border-[#b9c6eb] hover:bg-[#f5f8ff]'
+              )}
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200/80">
+                <Upload size={20} />
+              </div>
+              <p className="mt-4 text-[14px] text-slate-600">
+                <span className="font-medium text-[#4f46e5]">Click to upload</span> or drag and drop
+              </p>
+              <p className="mt-1 text-sm text-slate-500">MP4, MOV or WEBM - up to 500 MB</p>
+              {uploadFile && (
+                <p className="mt-3 rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70">
+                  {uploadFile.name}
+                </p>
+              )}
+            </button>
+
+            {uploadError && <p className="text-sm font-medium text-rose-600">{uploadError}</p>}
+          </div>
+
+          <div className="mt-6 flex items-center justify-end gap-4 border-t border-slate-200/80 pt-4">
+            <button
+              type="button"
+              onClick={closeUploadContentModal}
+              className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900"
+            >
+              Cancel
+            </button>
+            <Button
+              type="button"
+              onClick={saveUploadContent}
+              disabled={!uploadFile}
+              className="h-10 rounded-xl bg-[#aea8ff] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(99,91,255,0.28)] hover:bg-[#978fff] disabled:bg-[#d7d2ff] disabled:text-white/85 disabled:shadow-none"
+            >
+              <Upload size={16} className="mr-2" />
+              Save content
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const generatePresentationDrawer = (
+    <div
+      className={cn(
+        'fixed inset-0 z-50 transition-all duration-300',
+        isGeneratePresentationDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'
+      )}
+    >
+      <div
+        className={cn(
+          'absolute inset-0 bg-slate-950/45 transition-opacity duration-300',
+          isGeneratePresentationDrawerOpen ? 'opacity-100' : 'opacity-0'
+        )}
+        onClick={closeGeneratePresentationDrawer}
+      />
+
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="generate-presentation-title"
+        className={cn(
+          'absolute right-0 top-0 flex h-full w-full max-w-[700px] flex-col overflow-hidden rounded-l-[28px] border-l border-slate-200/80 bg-white shadow-[-24px_0_70px_rgba(15,23,42,0.18)] transition-transform duration-300',
+          isGeneratePresentationDrawerOpen ? 'translate-x-0' : 'translate-x-full'
+        )}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-5 py-5 sm:px-6">
+          <div>
+            <h2 id="generate-presentation-title" className="text-[18px] font-bold tracking-tight text-slate-950 sm:text-[20px]">
+              Generate presentation
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={closeGeneratePresentationDrawer}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Close drawer"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-slate-600 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#4f46e5] ring-1 ring-slate-200/80">
+                <Sparkles size={16} />
+              </div>
+              <p className="text-[15px] leading-7">
+                Slides are drafted with <span className="font-semibold text-slate-900">Gamma</span> from concept intelligence, then added to your content library.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl bg-slate-100/90 p-1">
+            <div className="grid grid-cols-2 gap-1">
+              {(['Classroom', 'Teacher training'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setPresentationMode(mode)}
+                  className={cn(
+                    'rounded-xl px-4 py-3 text-left text-[15px] font-semibold transition-colors',
+                    presentationMode === mode
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  )}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Chapter
+              </Label>
+              <Select value={presentationChapterId} onValueChange={(value) => setPresentationChapterId(value ?? '')}>
+                <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                  <SelectValue placeholder="Select chapter" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allChapters.map((chapter) => (
+                    <SelectItem key={chapter.id} value={chapter.id}>
+                      {chapter.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Concept
+              </Label>
+              <Select value={presentationConcept} onValueChange={(value) => setPresentationConcept(value ?? '')}>
+                <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                  <SelectValue placeholder="Select concept" />
+                </SelectTrigger>
+                <SelectContent>
+                  {presentationConceptOptions.map((concept) => (
+                    <SelectItem key={concept.title} value={concept.title}>
+                      {concept.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Slides
+              </Label>
+              <Select value={presentationSlides} onValueChange={(value) => setPresentationSlides(value ?? '')}>
+                <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                  <SelectValue placeholder="Select slide count" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRESENTATION_SLIDE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Gamma Theme
+              </Label>
+              <Select value={presentationTheme} onValueChange={(value) => setPresentationTheme(value ?? '')}>
+                <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                  <SelectValue placeholder="Select theme" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GAMMA_THEME_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Audience Notes (Optional)
+            </Label>
+            <Textarea
+              value={presentationAudienceNotes}
+              onChange={(event) => setPresentationAudienceNotes(event.target.value)}
+              placeholder="e.g. keep language simple, add two local examples"
+              className="min-h-[108px] rounded-2xl border-slate-300 px-4 py-3 text-[15px] text-slate-900 placeholder:text-slate-400"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-4 border-t border-slate-200/80 px-5 py-5 sm:px-6">
+          <button
+            type="button"
+            onClick={closeGeneratePresentationDrawer}
+            className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900"
+          >
+            Cancel
+          </button>
+          <Button
+            type="button"
+            onClick={closeGeneratePresentationDrawer}
+            className="h-12 rounded-2xl bg-[#4f46e5] px-6 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
+          >
+            <Sparkles size={16} className="mr-2" />
+            Generate with Gamma
+          </Button>
+        </div>
+      </aside>
+    </div>
+  );
 
   if (!course) {
     return (
@@ -862,6 +1455,348 @@ export default function ChapterListPage() {
     );
   }
 
+  if (view === 'content' && contentChapter) {
+    const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
+    const totalItems = chapterContentItems.length;
+    const gammaItems = chapterContentItems.filter((item) => item.source === 'Gamma AI').length;
+    const uploadedItems = chapterContentItems.filter((item) => item.source === 'Uploaded').length;
+    const typeLabel = contentTypeFilter === 'all' ? 'All types' : contentTypeFilter;
+    const chapterLabel = contentChapterFilter === 'all' ? 'All chapters' : contentChapterFilter;
+    const sourceLabel = contentSourceFilter === 'all' ? 'All sources' : contentSourceFilter;
+
+    return (
+      <div className="min-h-full">
+        <div className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-8">
+            <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => router.push(`/course-master/${course.id}/chapters`)}
+                className="font-medium text-slate-500 transition-colors hover:text-slate-900"
+              >
+                Teach / learn
+              </button>
+              <ChevronRight size={14} className="text-slate-400" />
+              <span className="font-medium text-slate-500">
+                {course.subject} - {gradeLabel}
+              </span>
+              <ChevronRight size={14} className="text-slate-400" />
+              <span className="font-semibold text-[#4f46e5]">Content</span>
+            </div>
+
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                  Content - {course.subject} - {gradeLabel}
+                </h1>
+                <p className="mt-2 text-slate-600">
+                  Generate presentations with Gamma, upload videos, notes and PDFs, and manage the content library for{' '}
+                  <span className="font-semibold text-slate-900">{contentChapter.title}</span>.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  onClick={openGeneratePresentationDrawer}
+                  className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
+                >
+                  <Sparkles size={16} className="mr-2" />
+                  Generate presentation
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => openUploadContentModal(contentChapter)}
+                  className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  <Upload size={16} className="mr-2" />
+                  Upload content
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Content items</p>
+                  <p className="mt-3 text-4xl font-bold tracking-tight text-slate-950">{totalItems}</p>
+                </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
+                  <FolderOpen size={18} />
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Generated with Gamma</p>
+                  <p className="mt-3 text-4xl font-bold tracking-tight text-slate-950">{gammaItems}</p>
+                </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
+                  <Sparkles size={18} />
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Uploaded</p>
+                  <p className="mt-3 text-4xl font-bold tracking-tight text-slate-950">{uploadedItems}</p>
+                </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
+                  <Upload size={18} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative w-full lg:max-w-xs">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={contentSearch}
+                onChange={(event) => setContentSearch(event.target.value)}
+                placeholder="Search content..."
+                className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 shadow-sm"
+              />
+            </div>
+
+            <Select value={contentTypeFilter} onValueChange={(value) => setContentTypeFilter(value ?? '')}>
+              <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm lg:w-[190px]">
+                <SelectValue>{typeLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                {contentTypeOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={contentChapterFilter} onValueChange={(value) => setContentChapterFilter(value ?? '')}>
+              <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm lg:w-[190px]">
+                <SelectValue>{chapterLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All chapters</SelectItem>
+                <SelectItem value={contentChapter.title}>{contentChapter.title}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={contentSourceFilter} onValueChange={(value) => setContentSourceFilter(value ?? '')}>
+              <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm lg:w-[190px]">
+                <SelectValue>{sourceLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All sources</SelectItem>
+                {contentSourceOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <p className="mb-5 text-sm text-slate-500">
+            {filteredChapterContentItems.length} of {totalItems} items
+          </p>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {filteredChapterContentItems.map((item) => {
+              const PreviewIcon = getContentPreviewIcon(item.preview);
+
+              return (
+                <article
+                  key={item.id}
+                  className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
+                >
+                  <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
+                    <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
+                      {item.type}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                      {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
+                      {item.source}
+                    </span>
+                  </div>
+
+                  <div className="-mt-[74px] flex justify-center px-4">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
+                      <PreviewIcon size={28} />
+                    </div>
+                  </div>
+
+                  <div className="px-4 pb-4 pt-3">
+                    <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
+                      {item.chapterTitle}
+                    </div>
+                    <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
+                    <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-600">{item.subtitle}</p>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
+                      <p className="text-xs text-slate-500">
+                        {item.statValue} - {item.updatedAt}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setSelectedContentItem(item)}
+                        className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
+                      >
+                        {item.actionLabel === 'Play' ? (
+                          <Play size={14} className="mr-2" />
+                        ) : (
+                          <Eye size={14} className="mr-2" />
+                        )}
+                        {item.actionLabel}
+                      </Button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div
+            className={cn(
+              'fixed inset-0 z-50 transition-all duration-300',
+              selectedContentItem ? 'pointer-events-auto' : 'pointer-events-none'
+            )}
+          >
+            <div
+              className={cn(
+                'absolute inset-0 bg-slate-950/45 transition-opacity duration-300',
+                selectedContentItem ? 'opacity-100' : 'opacity-0'
+              )}
+              onClick={closeContentDrawer}
+            />
+
+            <aside
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="content-detail-title"
+              className={cn(
+                'absolute right-0 top-0 flex h-full w-full max-w-[700px] flex-col overflow-hidden rounded-l-[28px] border-l border-slate-200/80 bg-white shadow-[-24px_0_70px_rgba(15,23,42,0.18)] transition-transform duration-300',
+                selectedContentItem ? 'translate-x-0' : 'translate-x-full'
+              )}
+            >
+              {selectedContentItem ? (
+                <>
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-5 py-5 sm:px-6">
+                    <div>
+                      <h2 id="content-detail-title" className="text-[18px] font-bold tracking-tight text-slate-950 sm:text-[20px]">
+                        {selectedContentItem.title}
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeContentDrawer}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                      aria-label="Close drawer"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                    {(() => {
+                      const isVideoContent = selectedContentItem.preview === 'video';
+
+                      return (
+                        <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
+                        {selectedContentItem.type}
+                      </Badge>
+                      <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
+                        {selectedContentItem.source === 'Gamma AI' ? (
+                          <Sparkles size={12} className="mr-1.5" />
+                        ) : (
+                          <Upload size={12} className="mr-1.5" />
+                        )}
+                        {selectedContentItem.source}
+                      </Badge>
+                    </div>
+
+                    <dl className="mt-6 grid gap-y-4 text-sm sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-5">
+                      <dt className="text-slate-500">Chapter</dt>
+                      <dd className="font-medium text-slate-900">{selectedContentItem.chapterTitle}</dd>
+                      <dt className="text-slate-500">Concept</dt>
+                      <dd className="font-medium text-slate-900">{selectedContentItem.conceptTitle}</dd>
+                      <dt className="text-slate-500">Format</dt>
+                      <dd className="font-medium text-slate-900">{selectedContentItem.type}</dd>
+                      <dt className="text-slate-500">Source</dt>
+                      <dd className="font-medium text-slate-900">{selectedContentItem.source}</dd>
+                      <dt className="text-slate-500">{isVideoContent ? 'Duration' : 'Slides'}</dt>
+                      <dd className="font-medium text-slate-900">
+                        {isVideoContent ? selectedContentItem.statValue : selectedContentItem.slideCount}
+                      </dd>
+                      <dt className="text-slate-500">Updated</dt>
+                      <dd className="font-medium text-slate-900">{selectedContentItem.updatedDate}</dd>
+                    </dl>
+
+                    {isVideoContent ? (
+                      <section className="mt-8">
+                        <div className="rounded-2xl border border-[#d9e3f1] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] px-6 py-12 shadow-[0_2px_10px_rgba(15,23,42,0.03)]">
+                          <div className="flex flex-col items-center justify-center text-center">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#c9d7f2] bg-white text-slate-500 shadow-sm">
+                              <Play size={24} className="ml-0.5 text-slate-500" />
+                            </div>
+                            <p className="mt-4 text-sm font-medium text-slate-500">
+                              Video preview placeholder - {selectedContentItem.statValue}
+                            </p>
+                          </div>
+                        </div>
+                      </section>
+                    ) : (
+                      <section className="mt-8">
+                        <div className="mb-4 border-b border-slate-200/80 pb-3">
+                          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Slides</h3>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {selectedContentItem.slides.map((slide) => (
+                            <article
+                              key={slide.id}
+                              className="rounded-xl border border-[#d9e3f1] bg-white p-3 shadow-[0_2px_10px_rgba(15,23,42,0.03)]"
+                            >
+                              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                                Slide {slide.number}
+                              </p>
+                              <h4 className="mt-2 min-h-[40px] text-[13px] font-semibold leading-5 text-slate-900">
+                                {slide.title}
+                              </h4>
+                              <div className="mt-6 space-y-2">
+                                <div className="h-1.5 w-full rounded-full bg-slate-100" />
+                                <div className="h-1.5 w-[78%] rounded-full bg-slate-100" />
+                                <div className="h-1.5 w-[56%] rounded-full bg-slate-100" />
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </>
+              ) : null}
+            </aside>
+          </div>
+          {uploadContentModal}
+          {generatePresentationDrawer}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
       <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8 ">
@@ -1021,11 +1956,11 @@ export default function ChapterListPage() {
                         <Button
                           type="button"
                           variant="ghost"
-                          onClick={() => openUploadContentModal(chapter)}
+                          onClick={() => openChapterContentView(chapter)}
                           className="h-10 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
                         >
                           <Upload size={16} className="mr-2" />
-                          Upload content
+                          View content
                         </Button>
                       </div>
 
@@ -1086,126 +2021,7 @@ export default function ChapterListPage() {
         )}
       </div>
 
-      {uploadChapter && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-8 backdrop-blur-[2px]"
-          onClick={closeUploadContentModal}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="upload-content-title"
-            className="relative w-full max-w-[690px] rounded-[18px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="px-8 pb-6 pt-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 id="upload-content-title" className="text-[24px] font-bold tracking-tight text-slate-950">
-                    Upload chapter content
-                  </h2>
-                  <p className="mt-1 text-[15px] text-slate-600">
-                    Chapter {uploadChapter.number} - {uploadChapter.title}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeUploadContentModal}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                  aria-label="Close dialog"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="mt-5 space-y-5">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Content Type
-                  </Label>
-                  <Select value={uploadContentType} onValueChange={(value) => typeof value === 'string' && setUploadContentType(value)}>
-                    <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                      <SelectValue placeholder="Select content type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {UPLOAD_CONTENT_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  accept=".pdf,.pptx,.docx,.mp4,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document,video/mp4"
-                  className="hidden"
-                  onChange={(event) => handleUploadFileSelection(event.target.files?.[0] ?? null)}
-                />
-
-                <button
-                  type="button"
-                  onClick={() => uploadInputRef.current?.click()}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setIsDraggingUpload(true);
-                  }}
-                  onDragLeave={(event) => {
-                    event.preventDefault();
-                    setIsDraggingUpload(false);
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setIsDraggingUpload(false);
-                    handleUploadFileSelection(event.dataTransfer.files?.[0] ?? null);
-                  }}
-                  className={cn(
-                    'flex min-h-[140px] w-full flex-col items-center justify-center rounded-[12px] border border-dashed px-6 py-8 text-center transition-colors',
-                    isDraggingUpload
-                      ? 'border-[#8b85ff] bg-[#f4f3ff]'
-                      : 'border-[#d4dcf0] bg-[#f8fbff] hover:border-[#b9c6eb] hover:bg-[#f5f8ff]'
-                  )}
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200/80">
-                    <Upload size={20} />
-                  </div>
-                  <p className="mt-4 text-[14px] text-slate-600">
-                    <span className="font-medium text-[#4f46e5]">Click to upload</span> or drag and drop
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">PDF, PPTX, DOCX or MP4 - up to 100 MB each</p>
-                  {uploadFile && (
-                    <p className="mt-3 rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70">
-                      {uploadFile.name}
-                    </p>
-                  )}
-                </button>
-
-                {uploadError && <p className="text-sm font-medium text-rose-600">{uploadError}</p>}
-              </div>
-
-              <div className="mt-6 flex items-center justify-end gap-4 border-t border-slate-200/80 pt-4">
-                <button
-                  type="button"
-                  onClick={closeUploadContentModal}
-                  className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900"
-                >
-                  Cancel
-                </button>
-                <Button
-                  type="button"
-                  onClick={saveUploadContent}
-                  className="h-10 rounded-xl bg-[#aea8ff] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(99,91,255,0.28)] hover:bg-[#978fff]"
-                >
-                  <Upload size={16} className="mr-2" />
-                  Save content
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {uploadContentModal}
 
       {conceptDrawer && (
         <div
