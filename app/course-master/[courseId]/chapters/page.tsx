@@ -44,8 +44,12 @@ import {
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { courses } from '../../data/courses';
-import { getChaptersByCourseid } from '../../data/chapters';
+import { courses, type Course } from '../../data/courses';
+import {
+  getChaptersByCourseid,
+  getSubjectAndChapters,
+  type SubjectWithChapters,
+} from '../../data/chapters';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { Chapter } from '../../data/chapters';
 
@@ -219,6 +223,52 @@ export default function ChapterListPage() {
   const courseId = params.courseId as string;
   const expandedChapterParam = searchParams.get('expandedChapterId');
 
+  const [subjectData, setSubjectData] = useState<SubjectWithChapters | null>(null);
+  const [subjectLoading, setSubjectLoading] = useState(true);
+
+  const courseIdParts = courseId.includes('-') ? courseId.split('-', 2) : [courseId];
+  const subjectId = courseIdParts[0];
+  const standardId = courseIdParts[1] ?? undefined;
+
+  useEffect(() => {
+    let cancelled = false;
+    setSubjectLoading(true);
+    getSubjectAndChapters(subjectId, standardId)
+      .then((data) => {
+        if (!cancelled) setSubjectData(data);
+      })
+      .finally(() => {
+        if (!cancelled) setSubjectLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId, standardId]);
+
+  const staticCourse = courses.find((c) => c.id === courseId);
+  const apiSubject = subjectData?.subject ?? null;
+  const course: Course | undefined =
+    staticCourse ??
+    (apiSubject
+      ? {
+          id: courseId,
+          title: apiSubject.subject_name,
+          code: '',
+          subject: apiSubject.subject_name,
+          category: apiSubject.content_category,
+          classGrade: `Class ${apiSubject.standard_name}`,
+          status: 'Active',
+          chapters: subjectData?.chapters.length ?? 0,
+          enrollments: 0,
+          progress: 0,
+          instructor: '',
+          createdAt: '',
+          accentColor: '#5648E8',
+          icon: 'book-open',
+        }
+      : undefined);
+  const allChapters = subjectData?.chapters ?? getChaptersByCourseid(courseId);
+
   const [searchTerm] = useState('');
   const [isAddChapterOpen, setIsAddChapterOpen] = useState(false);
   const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
@@ -242,8 +292,6 @@ export default function ChapterListPage() {
   const [resourceFileType, setResourceFileType] = useState('');
   const [resourceSearch, setResourceSearch] = useState('');
 
-  const course = courses.find((c) => c.id === courseId);
-  const allChapters = getChaptersByCourseid(courseId);
   const view = searchParams.get('view');
   const activeChapterId = searchParams.get('chapterId') ?? '';
   const resourceChapter =
@@ -896,7 +944,21 @@ export default function ChapterListPage() {
           </div>
         </div>
 
-        {filteredChapters.length === 0 ? (
+        {subjectLoading && getChaptersByCourseid(courseId).length === 0 ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((skeleton) => (
+              <div
+                key={skeleton}
+                className="overflow-hidden rounded-[14px] border border-slate-200/90 bg-white p-6 shadow-sm"
+              >
+                <div className="animate-pulse space-y-3">
+                  <div className="h-5 w-3/4 rounded-lg bg-slate-200" />
+                  <div className="h-4 w-1/2 rounded-lg bg-slate-200" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredChapters.length === 0 ? (
           <div className="rounded-2xl border border-slate-200/80 bg-white py-20 text-center shadow-sm">
             <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
               <BookOpen size={28} className="text-slate-400" />

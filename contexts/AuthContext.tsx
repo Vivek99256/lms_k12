@@ -157,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const payload = data.data || data;
         const ctx = {
           sub_institute_id: Number(getValue(payload, 'sub_institute_id') ?? getValue(payload, 'subInstituteId') ?? 0),
-          user_id: Number(getValue(payload, 'user_id') ?? getValue(payload, 'userId') ?? 0),
+          user_id: Number(getValue(payload, 'user_id') ?? getValue(payload, 'userId') ?? getValue(payload, 'id') ?? 0),
           user_profile_name: String(getValue(payload, 'user_profile_name') ?? getValue(payload, 'userProfileName') ?? getValue(payload, 'user_profile') ?? ''),
           user_profile_id: Number(getValue(payload, 'user_profile_id') ?? getValue(payload, 'userProfileId') ?? 0),
           client_id: Number(getValue(payload, 'client_id') ?? getValue(payload, 'clientId') ?? 0),
