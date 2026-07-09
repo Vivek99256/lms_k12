@@ -14,11 +14,13 @@ export interface Level3Item {
 
 export interface SubmenuItem {
   id?: number | string;
+  tblmenu_master_id?: number;
   parentId?: number | string;
   menuType?: string | null;
   label: string;
   href: string;
   link?: string | null;
+  route_name?: string;
   icon?: MenuIcon;
   submenus?: Level3Item[];
 }

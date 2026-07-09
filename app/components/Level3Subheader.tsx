@@ -24,13 +24,7 @@ interface Level3SubheaderProps {
   userProfileName?: string;
 }
 
-function getPathFromUrl(url: string): string {
-  try {
-    return new URL(url).pathname.toLowerCase();
-  } catch {
-    return url.toLowerCase();
-  }
-}
+
 
 function hasMasterAccess(userProfileName: string): boolean {
   const role = userProfileName.trim().toLowerCase();
@@ -38,10 +32,19 @@ function hasMasterAccess(userProfileName: string): boolean {
 }
 
 /**
- * Get navigation route from item - uses 'link' field directly from API
+ * Get navigation route from item - prioritizes 'route_name' if available, then 'link', then 'href'
  */
 function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null {
-  // Use 'link' field directly from API (no modifications)
+  // Priority 1: Use 'route_name' field directly from API
+  if ((item as SubmenuItem).route_name) {
+    const routeName = (item as SubmenuItem).route_name;
+    const route = mapApiLinkToRoute(routeName);
+    if (route && route !== '#') {
+      return route;
+    }
+  }
+  
+  // Priority 2: Use 'link' field directly from API
   if (item.link) {
     const route = mapApiLinkToRoute(item.link);
     if (route && route !== '#') {
@@ -200,7 +203,6 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
               onScroll={checkScrollability}
             >
               {items.map((item, idx) => {
-                // Use 'link' field directly from API
                 const navigateRoute = getNavigationRoute(item);
                 const isActive = navigateRoute ? pathname === navigateRoute.toLowerCase() : false;
                 
@@ -244,7 +246,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
           )}
         </div>
 
-        {hasMasterAccess(userProfileName) && (masterMenuGroups.length > 0 || masterItems.length > 0 || masterItems.length > 0) && (
+        {hasMasterAccess(userProfileName) && (masterMenuGroups.length > 0 || masterItems.length > 0) && (
           <div className="relative shrink-0" data-master-dropdown>
             <button
               type="button"
@@ -317,8 +319,11 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                             return (
                               <div className="grid grid-cols-2 gap-2.5">
                                 {children.map((child: Record<string, unknown>) => {
-                                  // Use 'link' from API, fallback to 'href' or 'url', map through routeMapper
-                                  const childLink = String(child.link ?? child.url ?? child.href ?? '#');
+                                  // Priority 1: Use 'route_name' from API, Priority 2: 'link', fallback to 'url' or 'href'
+                                  const childRouteName = child.route_name as string | undefined;
+                                  const childLink = childRouteName 
+                                    ? childRouteName 
+                                    : String(child.link ?? child.url ?? child.href ?? '#');
                                   const childRoute = childLink !== '#' ? mapApiLinkToRoute(childLink) : '#';
                                   const childName = String(child.name ?? '');
                                   const isActive = pathname === childRoute.toLowerCase();
