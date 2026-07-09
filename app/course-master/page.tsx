@@ -51,6 +51,23 @@ const CATEGORY_ACCENT_MAP: Record<string, string> = {
   'Vocational Traning': '#D97706',
   'Hobbies and Activities': '#6366F1',
   Library: '#DB2777',
+import { categories, courses, type Course } from './data/courses';
+
+const SECTION_BADGES = ['Section A', 'Section A', 'Section B', 'Section B'] as const;
+
+const SUBJECT_ICON_MAP: Record<Course['icon'], LucideIcon> = {
+  'book-open': BookOpen,
+  'flask-conical': FlaskConical,
+  calculator: Sigma,
+  globe: Globe,
+  'pen-tool': PenTool,
+  music: Music,
+  dumbbell: Dumbbell,
+  briefcase: Briefcase,
+  palette: Palette,
+  library: Library,
+  cpu: Cpu,
+  compass: Compass,
 };
 
 function getCourseRoutes(courseId: number | string, standardId?: number | string) {
@@ -138,6 +155,7 @@ export default function CourseMasterPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState<'all' | (typeof categories)[number]>('all');
   const [standardFilter, setStandardFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -262,6 +280,10 @@ export default function CourseMasterPage() {
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
+      const matchesCategory = activeCategory === 'all' || course.category === activeCategory;
+
+      const matchesStandard =
+        standardFilter === 'all' || course.classGrade.replace('Class', '').trim() === standardFilter;
 
     if (!hasMore) return;
 
@@ -341,6 +363,9 @@ export default function CourseMasterPage() {
       </div>
     );
   }
+      return matchesSearch && matchesCategory && matchesStandard && matchesSection;
+    });
+  }, [activeCategory, search, sectionFilter, standardFilter]);
 
   return (
     <div className="min-h-full px-6 py-5">
@@ -394,6 +419,39 @@ export default function CourseMasterPage() {
         </div>
 
         {loading ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveCategory('all')}
+            className={`rounded-full border px-4 py-2 text-[14px] font-medium transition ${
+              activeCategory === 'all'
+                ? 'border-[#5648E8] bg-[#5648E8] text-white'
+                : 'border-[#D9E1EE] bg-white text-[#334155] hover:border-[#B8C5D9]'
+            }`}
+          >
+            All categories
+          </button>
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setActiveCategory(category)}
+              className={`rounded-full border px-4 py-2 text-[14px] font-medium transition ${
+                activeCategory === category
+                  ? 'border-[#5648E8] bg-[#5648E8] text-white'
+                  : 'border-[#D9E1EE] bg-white text-[#334155] hover:border-[#B8C5D9]'
+              }`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+
+        <p className="mt-3 text-[15px] font-medium text-[#334155]">
+          {filteredCourses.length} of {courses.length} subjects
+        </p>
+
+        {filteredCourses.length === 0 ? (
           <div className="mt-8 rounded-[18px] border border-[#D9E1EE] bg-white px-6 py-16 text-center text-[#64748B] shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
             Loading courses...
           </div>
