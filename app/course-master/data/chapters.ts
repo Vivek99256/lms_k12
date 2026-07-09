@@ -6,6 +6,7 @@ export interface Chapter {
   courseId: string;
   number: number;
   title: string;
+  content_categories?: Record<string, unknown[]>;
   teachingMethodologies: string[];
   resources: {
     teacherResource: number;
@@ -68,6 +69,7 @@ export async function getSubjectAndChapters(subjectId: string, standardId?: stri
       courseId: String(id),
       number: Number(chapter.sort_order) || 0,
       title: chapter.chapter_name || '',
+      content_categories: chapter.content_categories ?? {},
       teachingMethodologies: [],
       resources: {
         teacherResource: 0,
