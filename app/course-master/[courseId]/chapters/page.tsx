@@ -71,6 +71,7 @@ const RESOURCE_FILE_TYPES = ['PDF', 'PPT', 'DOCX', 'Video Link'] as const;
 const UPLOAD_CONTENT_TYPES = ['Presentation', 'Worksheet', 'Reference notes', 'Assessment video'] as const;
 const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
 const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
+const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity'] as const;
 const ACCEPTED_UPLOAD_TYPES = [
   'video/mp4',
   'video/quicktime',
@@ -464,9 +465,12 @@ export default function ChapterListPage() {
   const [resourceFileType, setResourceFileType] = useState('');
   const [resourceSearch, setResourceSearch] = useState('');
   const [contentSearch, setContentSearch] = useState('');
-  const [contentTypeFilter, setContentTypeFilter] = useState('all');
-  const [contentChapterFilter, setContentChapterFilter] = useState('all');
   const [contentSourceFilter, setContentSourceFilter] = useState('all');
+  const [selectedLibraryChapterId, setSelectedLibraryChapterId] = useState('');
+  const [contentLibraryTab, setContentLibraryTab] =
+    useState<(typeof CONTENT_LIBRARY_TABS)[number]>('All content');
+  const [contentGroupBy, setContentGroupBy] =
+    useState<'Chapter wise' | 'Concept wise'>('Chapter wise');
   const [selectedContentItem, setSelectedContentItem] = useState<ChapterContentItem | null>(null);
 
   const view = searchParams.get('view');
@@ -476,6 +480,19 @@ export default function ChapterListPage() {
   const contentChapter = resourceChapter;
   const contentChapterConcepts =
     course && contentChapter ? getChapterKeyConcepts(course.id, contentChapter.id) : null;
+
+  const activeLibraryChapter = useMemo(
+    () => allChapters.find((chapter) => chapter.id === selectedLibraryChapterId) ?? contentChapter,
+    [allChapters, contentChapter, selectedLibraryChapterId]
+  );
+
+  const activeLibraryChapterConcepts = useMemo(
+    () =>
+      course && activeLibraryChapter
+        ? getChapterKeyConcepts(course.id, activeLibraryChapter.id)
+        : null,
+    [activeLibraryChapter, course]
+  );
   const contentChapterConceptOptions = contentChapterConcepts?.concepts ?? [];
 
   const filteredChapters = useMemo(() => {
@@ -511,14 +528,9 @@ export default function ChapterListPage() {
   }, [resourceFileType, resourceSearch, teacherResources]);
 
   const chapterContentItems = useMemo(() => {
-    if (!course || !contentChapter) return [];
-    return buildChapterContentItems(course, contentChapter, contentChapterConcepts);
-  }, [contentChapter, contentChapterConcepts, course]);
-
-  const contentTypeOptions = useMemo(
-    () => Array.from(new Set(chapterContentItems.map((item) => item.type))),
-    [chapterContentItems]
-  );
+    if (!course || !activeLibraryChapter) return [];
+    return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
+  }, [activeLibraryChapter, activeLibraryChapterConcepts, course]);
 
   const contentSourceOptions = useMemo(
     () => Array.from(new Set(chapterContentItems.map((item) => item.source))),
@@ -530,6 +542,15 @@ export default function ChapterListPage() {
     return getChapterKeyConcepts(course.id, presentationChapterId)?.concepts ?? [];
   }, [course, presentationChapterId]);
 
+  useEffect(() => {
+    if (!contentChapter) return;
+
+    const hasMatchingChapter = allChapters.some((chapter) => chapter.id === selectedLibraryChapterId);
+    if (!selectedLibraryChapterId || !hasMatchingChapter) {
+      setSelectedLibraryChapterId(contentChapter.id);
+    }
+  }, [allChapters, contentChapter, selectedLibraryChapterId]);
+
   const filteredChapterContentItems = useMemo(() => {
     return chapterContentItems.filter((item) => {
       const matchesSearch =
@@ -538,18 +559,23 @@ export default function ChapterListPage() {
           .join(' ')
           .toLowerCase()
           .includes(contentSearch.toLowerCase());
-      const matchesType = contentTypeFilter === 'all' || item.type === contentTypeFilter;
-      const matchesChapter = contentChapterFilter === 'all' || item.chapterTitle === contentChapterFilter;
       const matchesSource = contentSourceFilter === 'all' || item.source === contentSourceFilter;
+      const matchesTab =
+        contentLibraryTab === 'All content' ||
+        (contentLibraryTab === 'Presentations' &&
+          (item.type === 'Classroom presentation' || item.type === 'Teacher training presentation')) ||
+        (contentLibraryTab === 'Videos' && item.type === 'Video') ||
+        (contentLibraryTab === 'Revision notes' &&
+          (item.type === 'Revision notes' || item.type === 'PDF')) ||
+        (contentLibraryTab === 'Classroom activity' && item.type === 'Revision notes');
 
-      return matchesSearch && matchesType && matchesChapter && matchesSource;
+      return matchesSearch && matchesSource && matchesTab;
     });
   }, [
     chapterContentItems,
-    contentChapterFilter,
+    contentLibraryTab,
     contentSearch,
     contentSourceFilter,
-    contentTypeFilter,
   ]);
 
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -751,8 +777,8 @@ export default function ChapterListPage() {
 
   const openGeneratePresentationDrawer = () => {
     setPresentationMode('Classroom');
-    setPresentationChapterId(contentChapter?.id ?? '');
-    setPresentationConcept(contentChapterConceptOptions[0]?.title ?? '');
+    setPresentationChapterId(activeLibraryChapter?.id ?? contentChapter?.id ?? '');
+    setPresentationConcept(activeLibraryChapterConcepts?.concepts[0]?.title ?? '');
     setPresentationSlides(PRESENTATION_SLIDE_OPTIONS[2]);
     setPresentationTheme(GAMMA_THEME_OPTIONS[0]);
     setPresentationAudienceNotes('');
@@ -1470,9 +1496,8 @@ export default function ChapterListPage() {
     const totalItems = chapterContentItems.length;
     const gammaItems = chapterContentItems.filter((item) => item.source === 'Gamma AI').length;
     const uploadedItems = chapterContentItems.filter((item) => item.source === 'Uploaded').length;
-    const typeLabel = contentTypeFilter === 'all' ? 'All types' : contentTypeFilter;
-    const chapterLabel = contentChapterFilter === 'all' ? 'All chapters' : contentChapterFilter;
     const sourceLabel = contentSourceFilter === 'all' ? 'All sources' : contentSourceFilter;
+    const activeChapterTitle = activeLibraryChapter?.title ?? contentChapter.title;
 
     return (
       <div className="min-h-full">
@@ -1501,7 +1526,7 @@ export default function ChapterListPage() {
                 </h1>
                 <p className="mt-2 text-slate-600">
                   Generate presentations with Gamma, upload videos, notes and PDFs, and manage the content library for{' '}
-                  <span className="font-semibold text-slate-900">{contentChapter.title}</span>.
+                  <span className="font-semibold text-slate-900">{activeChapterTitle}</span>.
                 </p>
               </div>
 
@@ -1517,12 +1542,61 @@ export default function ChapterListPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => openUploadContentModal(contentChapter)}
+                  onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
                   className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                 >
                   <Upload size={16} className="mr-2" />
                   Upload content
                 </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Viewing Chapter
+                </p>
+                <div className="mt-3 w-full min-w-0 max-w-[330px]">
+                  <Select value={selectedLibraryChapterId} onValueChange={(value) => setSelectedLibraryChapterId(value ?? '')}>
+                    <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-[15px] font-medium text-slate-900 shadow-sm">
+                      <SelectValue placeholder="Select chapter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allChapters.map((chapter) => (
+                        <SelectItem key={chapter.id} value={chapter.id}>
+                          {chapter.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="mt-3 whitespace-nowrap text-sm text-slate-500">
+                  {filteredChapterContentItems.length} items in {activeChapterTitle}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 xl:items-end">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Group By
+                </p>
+                <div className="inline-flex rounded-2xl bg-slate-100/90 p-1">
+                  {(['Chapter wise', 'Concept wise'] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setContentGroupBy(option)}
+                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                        contentGroupBy === option
+                          ? 'bg-white text-[#4f46e5] shadow-sm'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -1563,6 +1637,25 @@ export default function ChapterListPage() {
             </div>
           </div>
 
+          <div className="mb-4 border-b border-slate-200/80">
+            <div className="flex flex-wrap items-center gap-6 text-[15px]">
+              {CONTENT_LIBRARY_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setContentLibraryTab(tab)}
+                  className={`inline-flex items-center border-b-2 px-1 py-3 font-medium transition-colors ${
+                    contentLibraryTab === tab
+                      ? 'border-[#4f46e5] text-[#4f46e5]'
+                      : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative w-full lg:max-w-xs">
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1573,30 +1666,6 @@ export default function ChapterListPage() {
                 className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 shadow-sm"
               />
             </div>
-
-            <Select value={contentTypeFilter} onValueChange={(value) => setContentTypeFilter(value ?? '')}>
-              <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm lg:w-[190px]">
-                <SelectValue>{typeLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                {contentTypeOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={contentChapterFilter} onValueChange={(value) => setContentChapterFilter(value ?? '')}>
-              <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm lg:w-[190px]">
-                <SelectValue>{chapterLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All chapters</SelectItem>
-                <SelectItem value={contentChapter.title}>{contentChapter.title}</SelectItem>
-              </SelectContent>
-            </Select>
 
             <Select value={contentSourceFilter} onValueChange={(value) => setContentSourceFilter(value ?? '')}>
               <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm lg:w-[190px]">
@@ -1614,7 +1683,7 @@ export default function ChapterListPage() {
           </div>
 
           <p className="mb-5 text-sm text-slate-500">
-            {filteredChapterContentItems.length} of {totalItems} items
+            {filteredChapterContentItems.length} items in {activeChapterTitle}
           </p>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
