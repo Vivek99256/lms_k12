@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils';
 import { courses, type Course } from '../../data/courses';
 import {
   getChaptersByCourseid,
+  getConceptIntelligenceData,
   getSubjectAndChapters,
   type SubjectWithChapters,
 } from '../../data/chapters';
@@ -157,78 +158,69 @@ interface ChapterContentItem {
   }[];
 }
 
-function getConceptIntelligence(conceptTitle: string, chapterTitle: string, index: number) {
-  const conceptKey = conceptTitle.toLowerCase();
-  const isForceConcept =
-    conceptKey.includes('contact') ||
-    conceptKey.includes('pressure') ||
-    conceptKey.includes('force');
-  const isSoundConcept =
-    conceptKey.includes('sound') ||
-    conceptKey.includes('vibration') ||
-    conceptKey.includes('pitch');
-  const sectionTopic = isForceConcept ? 'Force and pressure' : isSoundConcept ? 'Sound' : chapterTitle;
+interface ConceptIntelligenceDetails {
+  domain: string;
+  dok: string;
+  topic: string;
+  knowledge: string[];
+  abilities: string[];
+  skills: string[];
+  misconceptions: string[];
+  prerequisites: string[];
+  learningOutcomes: string[];
+  competencies: string[];
+  learningObjectives: string[];
+  teachingPedagogies: string[];
+  realWorldApplications: string[];
+}
+
+function asText(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function getConceptIntelligence(chapter: Chapter, conceptTitle: string): ConceptIntelligenceDetails {
+  const intel = getConceptIntelligenceData(chapter, conceptTitle);
+
+  const abilitiesForConcept = intel.abilities.filter(
+    (ability) => !ability.concept_name || ability.concept_name === conceptTitle
+  );
+  const dokEntry = intel.dok.find((entry) => entry.concept_name === conceptTitle) ?? intel.dok[0];
+
+  const primaryVerb =
+    abilitiesForConcept[0]?.verb ?? intel.blooms[0]?.level ?? 'Understand';
+  const dokLabel = dokEntry?.level
+    ? `DOK ${asText(dokEntry.level)} — Skills & concepts`
+    : 'DOK 2 — Skills & concepts';
+
+  const knowledge = (chapter.concepts ?? []).find((item) => item.title === conceptTitle)?.description
+    ? [(chapter.concepts ?? []).find((item) => item.title === conceptTitle)?.description as string]
+    : intel.knowledge;
+
+  const abilities = abilitiesForConcept.map((item) => asText(item.ability)).filter(Boolean);
+  const skills = intel.skills.map((item) => asText(item.skill)).filter(Boolean);
+  const misconceptions = (intel.misconceptions ?? []).map((item) => asText(item?.misconception)).filter(Boolean);
+  const prerequisites = (intel.prerequisites ?? []).map((item) => asText(item)).filter(Boolean);
+  const learningOutcomes = (intel.learningOutcomes ?? []).map((item) => asText(item?.outcome)).filter(Boolean);
+  const competencies = (intel.competencies ?? []).map((item) => asText(item?.competency)).filter(Boolean);
+  const learningObjectives = (intel.learningObjectives ?? []).map((item) => asText(item?.objective)).filter(Boolean);
+  const teachingPedagogies = (intel.pedagogy ?? []).map((item) => asText(item?.strategy)).filter(Boolean);
+  const realWorldApplications = (intel.realWorld ?? []).map((item) => asText(item?.application)).filter(Boolean);
 
   return {
-    domain: index % 2 === 0 ? 'Bloom · Understand' : 'Bloom · Apply',
-    dok: 'DOK 2 — Skills & concepts',
-    topic: sectionTopic,
-    knowledge: isForceConcept
-      ? [
-          'A force is a push or a pull acting on an object',
-          'Contact forces need physical touch — muscular force, friction',
-          'Non-contact forces act at a distance — magnetic, electrostatic, gravitational',
-        ]
-      : [
-          'Sound is produced by vibrating objects',
-          'Pitch changes with frequency while loudness changes with amplitude',
-          'Sound needs a medium to travel and can reflect or be absorbed',
-        ],
-    abilities: isForceConcept
-      ? [
-          'Classify everyday forces as contact or non-contact',
-          "Predict the effect of a force on an object's state of motion",
-        ]
-      : [
-          'Relate vibration patterns to the sound produced',
-          'Compare pitch and loudness in everyday listening situations',
-        ],
-    skills: isForceConcept
-      ? ['Observation', 'Reasoning', 'Communication']
-      : ['Observation', 'Analysis', 'Pattern recognition'],
-    misconceptions: isForceConcept
-      ? [
-          'A moving object always has a force acting on it',
-          'Only living things can exert forces',
-        ]
-      : [
-          'Loud sounds always have high pitch',
-          'Sound can travel equally well through a vacuum',
-        ],
-    prerequisites: isForceConcept ? ['Push and pull (Grade 7)', 'States of motion'] : ['Vibrations', 'Properties of materials'],
-    learningOutcomes: isForceConcept
-      ? [
-          'Identifies the type of force acting in a given situation',
-          'Relates force to change in speed, direction or shape',
-        ]
-      : [
-          'Explains how vibrations produce sound in different sources',
-          'Distinguishes between pitch, loudness and audibility with examples',
-        ],
-    competencies: isForceConcept ? ['Scientific inquiry', 'Evidence-based thinking'] : ['Critical thinking', 'Scientific communication'],
-    learningObjectives: isForceConcept
-      ? [
-          'Define force and give two everyday examples',
-          'Differentiate contact from non-contact forces with examples',
-        ]
-      : [
-          'Describe how vibration produces sound in simple systems',
-          'Use examples to distinguish amplitude from frequency',
-        ],
-    teachingPedagogies: isForceConcept ? ['Demonstration', 'Inquiry-based', 'Think-pair-share'] : ['Guided practice', 'Hands-on activity', 'Discussion'],
-    realWorldApplications: isForceConcept
-      ? ['Magnetic door catches', 'Vehicle braking and seat-belt safety']
-      : ['Tuning musical instruments', 'Designing quieter classrooms and cities'],
+    domain: `Bloom · ${primaryVerb}`,
+    dok: dokLabel,
+    topic: chapter.title,
+    knowledge,
+    abilities,
+    skills,
+    misconceptions,
+    prerequisites,
+    learningOutcomes,
+    competencies,
+    learningObjectives,
+    teachingPedagogies,
+    realWorldApplications,
   };
 }
 
@@ -248,18 +240,6 @@ function getCurriculumLabel() {
 function getChapterWindow(chapterNumber: number) {
   const ranges = ['Apr W1-W3', 'Apr W4-May W2', 'Jun W3-Jul W3', 'Aug W1-Sep W2', 'Sep W3-Oct W4'];
   return ranges[(chapterNumber - 1) % ranges.length];
-}
-
-function getConceptSkillBadge(index: number) {
-  return index % 2 === 0 ? 'Understand' : 'Apply';
-}
-
-function getConceptSupportMeta(index: number) {
-  return {
-    misconceptions: index % 2 === 0 ? 2 : 1,
-    prerequisites: 2,
-    dok: 'DOK 2',
-  };
 }
 
 function buildTeacherResources(chapterTitle: string) {
@@ -2435,9 +2415,8 @@ export default function ChapterListPage() {
           >
             {(() => {
               const details = getConceptIntelligence(
-                conceptDrawer.conceptTitle,
-                conceptDrawer.chapter.title,
-                conceptDrawer.conceptIndex
+                conceptDrawer.chapter,
+                conceptDrawer.conceptTitle
               );
 
               const detailSections = [

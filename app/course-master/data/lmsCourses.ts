@@ -1,14 +1,23 @@
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 export interface ApiChapter {
-  id: number;
+  id?: number;
+  chapter_id?: number;
+  subject_id?: number;
+  standard_id?: number;
   chapter_name: string;
   chapter_desc: string | null;
-  sort_order: number;
-  total_content: number | string;
-  total_triz_content: number | string;
-  total_OER_content: number | string;
-  content_categories: Record<string, unknown[]>;
+  sort_order?: number;
+  total_content?: number | string;
+  total_triz_content?: number | string;
+  total_OER_content?: number | string;
+  content_categories?: Record<string, unknown[]>;
+  concepts?: {
+    concept_id?: number | string;
+    concept_name?: string;
+    concept_description?: string;
+    semantic?: unknown;
+  }[];
 }
 
 export interface LmsSubject {
