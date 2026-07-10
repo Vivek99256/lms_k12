@@ -302,7 +302,12 @@ export default function CourseMasterPage() {
     const SubjectIcon = CATEGORY_ICON_MAP[category] ?? BookOpen;
     const accent = CATEGORY_ACCENT_MAP[category] ?? '#5648E8';
     const chapterCount = Array.isArray(subject.chapters) ? subject.chapters.length : 0;
-    const keyConcepts = chapterCount;
+    const keyConcepts = Array.isArray(subject.chapters)
+      ? subject.chapters.reduce(
+          (sum, chapter) => sum + (Array.isArray(chapter.concepts) ? chapter.concepts.length : 0),
+          0
+        )
+      : 0;
     const lessonPlanCount = Array.isArray(subject.chapters)
       ? subject.chapters.reduce((sum, chapter) => sum + (Number(chapter.total_content) || 0), 0)
       : 0;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -38,11 +38,15 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { courses } from '../../data/courses';
-import { getChaptersByCourseid } from '../../data/chapters';
+import {
+  getChaptersByCourseid,
+  getSubjectAndChapters,
+  type Chapter,
+  type SubjectWithChapters,
+} from '../../data/chapters';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import { getSemanticIntelligenceForSelection } from '../../data/semanticIntelligence';
 import type { Course } from '../../data/courses';
-import type { Chapter } from '../../data/chapters';
 
 function getStatusColor(status: Course['status']) {
   switch (status) {
@@ -66,6 +70,7 @@ const SECTION_META = [
   { id: 'misconceptions', label: 'Misconceptions', icon: AlertTriangle, color: 'from-red-500 to-rose-600' },
   { id: 'real-world', label: 'Real World', icon: Globe2, color: 'from-green-500 to-emerald-600' },
   { id: 'pedagogy', label: 'Pedagogy', icon: Presentation, color: 'from-indigo-500 to-blue-600' },
+  { id: 'assessment', label: 'Assessment', icon: FileCheck, color: 'from-rose-500 to-pink-600' },
 ] as const;
 
 const CALENDAR_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
@@ -251,26 +256,90 @@ function getLegendDotClasses(status: LessonPlanStatus) {
 export default function LessonPlanPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { courseId } = useParams();
-  const course = courses.find((c) => c.id === courseId);
+  const rawCourseId = useParams().courseId;
+  const courseId = Array.isArray(rawCourseId) ? rawCourseId[0] : rawCourseId ?? '';
   const view = searchParams.get('view');
   const isAssessmentView = view === 'assessment';
   const isKeyConceptsView = view === 'key-concepts';
   const isSemanticIntelligenceView = view === 'semantic-intelligence';
   const chapterId = searchParams.get('chapterId') ?? '';
   const conceptTitleParam = searchParams.get('concept') ?? '';
-  const courseChapters = useMemo(() => (course ? getChaptersByCourseid(course.id) : []), [course]);
+
+  const staticCourse = courses.find((c) => c.id === courseId);
+  const courseIdParts = courseId.includes('-') ? courseId.split('-', 2) : [];
+  const subjectId = courseIdParts[0];
+  const standardId = courseIdParts[1];
+
+  const isLmsRoute = Boolean(subjectId && standardId);
+  const [subjectData, setSubjectData] = useState<SubjectWithChapters | null>(null);
+  const [subjectLoading, setSubjectLoading] = useState(isLmsRoute);
+
+  useEffect(() => {
+    if (!isLmsRoute) return;
+    let cancelled = false;
+    getSubjectAndChapters(subjectId, standardId)
+      .then((data) => {
+        if (!cancelled) setSubjectData(data);
+      })
+      .finally(() => {
+        if (!cancelled) setSubjectLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLmsRoute, subjectId, standardId]);
+
+  const apiSubject = subjectData?.subject ?? null;
+  const course: Course | undefined = useMemo(
+    () =>
+      staticCourse ??
+      (apiSubject
+        ? {
+            id: courseId,
+            title: apiSubject.subject_name,
+            code: '',
+            subject: apiSubject.subject_name,
+            category: apiSubject.content_category || 'My Course',
+            classGrade: `Class ${apiSubject.standard_name}`,
+            status: 'Active',
+            chapters: subjectData?.chapters.length ?? 0,
+            enrollments: 0,
+            progress: 0,
+            instructor: '',
+            createdAt: '',
+            accentColor: '#4F46E5',
+            icon: 'book-open',
+          }
+        : undefined),
+    [staticCourse, apiSubject, subjectData, courseId]
+  );
+  const courseChapters = useMemo<Chapter[]>(() => {
+    if (subjectData?.chapters?.length) return subjectData.chapters;
+    if (staticCourse) return getChaptersByCourseid(courseId);
+    return [];
+  }, [subjectData, staticCourse, courseId]);
   const selectedChapter =
     courseChapters.find((chapter) => chapter.id === chapterId) || courseChapters[0] || null;
-  const chapterConcepts =
-    course && selectedChapter ? getChapterKeyConcepts(course.id, selectedChapter.id) : null;
+  const chapterConcepts = useMemo(() => {
+    if (!selectedChapter) return null;
+    const concepts = selectedChapter.concepts ?? [];
+    return {
+      count: concepts.length,
+      concepts: concepts.map((concept) => ({
+        title: concept.title,
+        description: concept.description,
+        mastery: '—',
+        time: '—',
+      })),
+    };
+  }, [selectedChapter]);
+  const conceptTitle = conceptTitleParam || chapterConcepts?.concepts[0]?.title || '';
   const semanticData =
-    course && selectedChapter
-      ? getSemanticIntelligenceForSelection(
-          course.id,
-          selectedChapter.id,
-          conceptTitleParam || chapterConcepts?.concepts[0]?.title || ''
-        )
+    selectedChapter && course
+      ? getSemanticIntelligenceForSelection(selectedChapter, conceptTitle, {
+          title: course.title,
+          code: course.code,
+        })
       : null;
   const selectedConcept = semanticData?.concept || chapterConcepts?.concepts[0] || null;
   const [activeSemanticSection, setActiveSemanticSection] = useState('knowledge');
@@ -294,14 +363,12 @@ export default function LessonPlanPage() {
     [course, courseChapters, visibleMonth]
   );
   const conceptOptions = useMemo(() => {
-    if (!course) return [];
-
     const concepts = courseChapters.flatMap((chapter) =>
-      (getChapterKeyConcepts(course.id, chapter.id)?.concepts ?? []).map((concept) => concept.title)
+      (chapter.concepts ?? []).map((concept) => concept.title)
     );
 
     return Array.from(new Set(concepts));
-  }, [course, courseChapters]);
+  }, [courseChapters]);
   const pedagogyOptions = useMemo(() => {
     const pedagogies = courseChapters.flatMap((chapter) => chapter.teachingMethodologies);
     return Array.from(new Set(pedagogies));
@@ -324,6 +391,14 @@ export default function LessonPlanPage() {
 
     return mapped;
   }, [lessonPlanEvents]);
+
+  if (subjectLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50/50">
+        <div className="text-center text-slate-500">Loading course intelligence…</div>
+      </div>
+    );
+  }
 
   if (!course) {
     return (
