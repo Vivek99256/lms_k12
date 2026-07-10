@@ -1,5 +1,5 @@
-import { type ApiChapter, type LmsSubject } from './lmsCourses';
-import { getRequestContext } from '../page';
+import { fetchLmsCourses, type ApiChapter, type LmsSubject } from './lmsCourses';
+import { getRequestContext, getSyear } from '../page';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 export interface Chapter {
@@ -433,15 +433,35 @@ export async function getSubjectAndChapters(subjectId: string, standardId?: stri
       subject_id: numericSubjectId,
     });
 
+    let matchedCourse: LmsSubject | undefined;
+    try {
+      const coursesResponse = await fetchLmsCourses({
+        type: 'API',
+        sub_institute_id: requestContext.sub_institute_id,
+        syear: getSyear(),
+        user_id: requestContext.user_id,
+        user_profile_name: requestContext.user_profile_name,
+        user_profile_id: requestContext.user_profile_id,
+        client_id: requestContext.client_id,
+      });
+      matchedCourse = coursesResponse.lms_subject.find(
+        (course) =>
+          Number(course.subject_id) === numericSubjectId &&
+          Number(course.standard_id) === numericStandardId
+      );
+    } catch {
+      // Chapter data remains usable if the course catalog is temporarily unavailable.
+    }
+
     const firstChapter = response.data[0];
     const subject: LmsSubject | null = firstChapter
       ? {
-          standard_name: String(firstChapter.standard_id ?? numericStandardId),
-          subject_name: String(firstChapter.subject_id ?? numericSubjectId),
+          standard_name: matchedCourse?.standard_name ?? String(firstChapter.standard_id ?? numericStandardId),
+          subject_name: matchedCourse?.subject_name ?? String(firstChapter.subject_id ?? numericSubjectId),
           subject_id: firstChapter.subject_id ?? numericSubjectId,
           standard_id: firstChapter.standard_id ?? numericStandardId,
-          display_image: '',
-          content_category: '',
+          display_image: matchedCourse?.display_image ?? '',
+          content_category: matchedCourse?.content_category ?? '',
           sub_institute_id: requestContext.sub_institute_id,
           chapters: response.data as ApiChapter[],
         }
