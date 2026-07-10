@@ -1,8 +1,12 @@
+import { fetchLmsCourses, type LmsSubject } from './lmsCourses';
+import { getRequestContext, getSyear } from '../page';
+
 export interface Chapter {
   id: string;
   courseId: string;
   number: number;
   title: string;
+  content_categories?: Record<string, unknown[]>;
   teachingMethodologies: string[];
   resources: {
     teacherResource: number;
@@ -11,6 +15,76 @@ export interface Chapter {
     hspContent: number;
     questions: number;
   };
+}
+
+interface ApiChapterSource {
+  id: number;
+  chapter_name: string;
+  chapter_desc?: string;
+  sort_order: number;
+  total_content?: number | string;
+  total_triz_content?: number | string;
+  total_OER_content?: number | string;
+  content_categories?: Record<string, unknown[]>;
+}
+
+export interface SubjectWithChapters {
+  subject: LmsSubject | null;
+  chapters: Chapter[];
+}
+
+export async function getSubjectAndChapters(subjectId: string, standardId?: string): Promise<SubjectWithChapters> {
+  const requestContext = getRequestContext();
+  if (!requestContext) return { subject: null, chapters: [] };
+
+  try {
+    const response = await fetchLmsCourses({
+      type: 'API',
+      sub_institute_id: requestContext.sub_institute_id,
+      syear: getSyear(),
+      user_id: requestContext.user_id,
+      user_profile_name: requestContext.user_profile_name,
+      user_profile_id: requestContext.user_profile_id,
+      client_id: requestContext.client_id,
+    });
+
+    const id = Number(subjectId);
+    const stdId = standardId != null && standardId !== '' ? Number(standardId) : undefined;
+    let subject: LmsSubject | null = null;
+    for (const candidate of response.lms_subject) {
+      if (candidate.subject_id === id) {
+        if (stdId !== undefined && candidate.standard_id !== stdId) {
+          continue;
+        }
+        subject = candidate;
+        break;
+      }
+    }
+
+    const rawChapters = Array.isArray(subject?.chapters)
+      ? (subject.chapters as ApiChapterSource[])
+      : [];
+
+    const chapters: Chapter[] = rawChapters.map((chapter) => ({
+      id: String(chapter.id),
+      courseId: String(id),
+      number: Number(chapter.sort_order) || 0,
+      title: chapter.chapter_name || '',
+      content_categories: chapter.content_categories ?? {},
+      teachingMethodologies: [],
+      resources: {
+        teacherResource: 0,
+        lessonPlanning: 0,
+        chapterMapping: 0,
+        hspContent: 0,
+        questions: Number(chapter.total_content) || 0,
+      },
+    }));
+
+    return { subject, chapters };
+  } catch {
+    return { subject: null, chapters: [] };
+  }
 }
 
 export const chapterData: Record<string, Chapter[]> = {
