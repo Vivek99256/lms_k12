@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -29,6 +29,8 @@ import {
   AlertTriangle,
   ArrowUp,
   ArrowUpDown,
+  Circle,
+  Clock,
   Globe2,
   Presentation,
   X,
@@ -36,6 +38,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { cn } from '@/lib/utils';
 import { courses } from '../../data/courses';
 import {
@@ -77,6 +80,38 @@ const CALENDAR_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as c
 
 type LessonPlanStatus = 'Delivered' | 'Planned' | 'Assessment';
 
+type LessonPlanApiStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'completed'
+  | 'delivered'
+  | 'planned'
+  | 'assessment';
+
+type LessonPlanConceptCoverage = {
+  conceptName: string;
+  coveragePercent: number;
+};
+
+type Teacher = {
+  id: number | string;
+  user_id?: number | string;
+  teacher_id?: number | string;
+  employee_id?: number | string;
+  userId?: number | string;
+  name?: string;
+  user_name?: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+};
+
+type TeacherSession = {
+  token: string;
+  hostName: string;
+  subInstituteId: string;
+};
+
 type LessonPlanEvent = {
   id: string;
   title: string;
@@ -84,9 +119,17 @@ type LessonPlanEvent = {
   chapterTitle: string;
   date: Date;
   status: LessonPlanStatus;
+  statusLabel: string;
   slotLabel: string;
   periods: number;
   pedagogy: string;
+  startTime: string;
+  endTime: string;
+  teacherId?: number;
+  teacherName: string;
+  plannedDurationMin?: number;
+  periodType?: string;
+  concepts: LessonPlanConceptCoverage[];
 };
 
 type LessonPlanDraft = {
@@ -96,6 +139,51 @@ type LessonPlanDraft = {
   pedagogy: string;
   objective: string;
 };
+
+type CalendarViewMode = 'day' | 'week' | 'month';
+
+type LessonPlanApiPeriod = {
+  id: number;
+  scheduled_date: string;
+  period_id?: number;
+  period_slot: string | number;
+  teacher_id?: number;
+  chapter_name?: string | null;
+  primary_concept_name?: string | null;
+  period_type?: string | null;
+  planned_duration_min?: number | null;
+  status?: LessonPlanApiStatus | null;
+  concepts?: {
+    concept_name?: string | null;
+    coverage_percent?: number | null;
+  }[];
+};
+
+type LessonPlanApiMeta = {
+  id: number;
+  plan_title?: string | null;
+  term_start_date?: string | null;
+  term_end_date?: string | null;
+  period_duration_min?: number | null;
+};
+
+type LessonPlanApiResponse = {
+  status?: boolean;
+  message?: string;
+  data?: {
+    lesson_plan?: LessonPlanApiMeta | null;
+    periods?: LessonPlanApiPeriod[];
+  }[];
+};
+
+type HoverPopupState = {
+  event: LessonPlanEvent;
+  style: React.CSSProperties;
+};
+
+function readString(value: unknown): string {
+  return value != null && value !== '' ? String(value) : '';
+}
 
 function getCourseSectionLabel(courseId: string) {
   const numeric = Number(courseId.replace(/\D/g, '')) || 0;
@@ -119,86 +207,170 @@ function getTotalKeyConceptCount(course: Course, chapters: Chapter[]) {
   return Math.max(course.chapters * 4, 12);
 }
 
-function getInstructionDates(month: Date) {
-  const year = month.getFullYear();
-  const monthIndex = month.getMonth();
-  const dates: Date[] = [];
-  const totalDays = new Date(year, monthIndex + 1, 0).getDate();
+const LESSON_PLAN_API_URL =
+  'https://dev.triz.co.in/api/intelligence/lesson-plans?sub_institute_id=195&standard_id=2235&subject_id=4018&term_id=149&division_id=936&syear=2025';
 
-  for (let day = 1; day <= totalDays; day += 1) {
-    const date = new Date(year, monthIndex, day);
-    const weekday = date.getDay();
-    if (weekday !== 0 && weekday !== 6) {
-      dates.push(date);
+const PERIOD_SLOT_TIME_MAP: Record<string, { startHour: number; startMinute: number; fallbackLabel: string }> = {
+  AM: { startHour: 8, startMinute: 0, fallbackLabel: 'AM' },
+  '0': { startHour: 8, startMinute: 0, fallbackLabel: 'AM' },
+  '1': { startHour: 9, startMinute: 0, fallbackLabel: 'P1' },
+  P1: { startHour: 9, startMinute: 0, fallbackLabel: 'P1' },
+  '2': { startHour: 10, startMinute: 0, fallbackLabel: 'P2' },
+  P2: { startHour: 10, startMinute: 0, fallbackLabel: 'P2' },
+  '3': { startHour: 11, startMinute: 0, fallbackLabel: 'P3' },
+  P3: { startHour: 11, startMinute: 0, fallbackLabel: 'P3' },
+  '4': { startHour: 12, startMinute: 0, fallbackLabel: 'P4' },
+  P4: { startHour: 12, startMinute: 0, fallbackLabel: 'P4' },
+  '5': { startHour: 13, startMinute: 0, fallbackLabel: 'P5' },
+  P5: { startHour: 13, startMinute: 0, fallbackLabel: 'P5' },
+  '6': { startHour: 14, startMinute: 0, fallbackLabel: 'P6' },
+  P6: { startHour: 14, startMinute: 0, fallbackLabel: 'P6' },
+};
+
+function formatTimeFromParts(hour: number, minute: number) {
+  const date = new Date();
+  date.setHours(hour, minute, 0, 0);
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function addMinutesToTime(hour: number, minute: number, duration: number) {
+  const date = new Date();
+  date.setHours(hour, minute, 0, 0);
+  date.setMinutes(date.getMinutes() + duration);
+  return {
+    hour: date.getHours(),
+    minute: date.getMinutes(),
+    label: date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    }),
+  };
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeStatusLabel(status: LessonPlanApiStatus | string | null | undefined) {
+  switch (status) {
+    case 'not_started':
+      return 'Not Started';
+    case 'in_progress':
+      return 'In Progress';
+    case 'completed':
+      return 'Completed';
+    case 'delivered':
+      return 'Delivered';
+    case 'planned':
+      return 'Planned';
+    case 'assessment':
+      return 'Assessment';
+    default:
+      return 'Planned';
+  }
+}
+
+function mapStatusToCalendarStatus(status: LessonPlanApiStatus | string | null | undefined): LessonPlanStatus {
+  switch (status) {
+    case 'delivered':
+    case 'completed':
+      return 'Delivered';
+    case 'assessment':
+      return 'Assessment';
+    default:
+      return 'Planned';
+  }
+}
+
+function getStoredTeacherName(teacherId: number | undefined) {
+  if (!teacherId || typeof window === 'undefined') return null;
+
+  const candidates = ['userData', 'menuContext'];
+
+  const visit = (value: unknown, depth = 0): string | null => {
+    if (depth > 5 || value == null) return null;
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const result = visit(item, depth + 1);
+        if (result) return result;
+      }
+      return null;
+    }
+
+    if (typeof value !== 'object') return null;
+
+    const record = value as Record<string, unknown>;
+    const recordId = Number(record.teacher_id ?? record.user_id ?? record.id ?? record.employee_id);
+    if (recordId === teacherId) {
+      const directName =
+        record.teacher_name ??
+        record.user_name ??
+        record.name ??
+        record.full_name ??
+        record.employee_name;
+      if (typeof directName === 'string' && directName.trim()) {
+        return directName.trim();
+      }
+
+      const firstName = typeof record.first_name === 'string' ? record.first_name.trim() : '';
+      const lastName = typeof record.last_name === 'string' ? record.last_name.trim() : '';
+      const composed = `${firstName} ${lastName}`.trim();
+      if (composed) return composed;
+    }
+
+    for (const nestedValue of Object.values(record)) {
+      const result = visit(nestedValue, depth + 1);
+      if (result) return result;
+    }
+
+    return null;
+  };
+
+  for (const key of candidates) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as unknown;
+      const result = visit(parsed);
+      if (result) return result;
+    } catch {
+      continue;
     }
   }
 
-  return dates;
+  return null;
 }
 
-function createLessonPlanEvents(course: Course, chapters: Chapter[], month: Date) {
-  const concepts = chapters.flatMap((chapter) => {
-    const conceptGroup = getChapterKeyConcepts(course.id, chapter.id);
-    return (conceptGroup?.concepts ?? []).map((concept) => ({
-      chapter,
-      concept,
-    }));
-  });
+function getTeacherSession(): TeacherSession | null {
+  if (typeof window === 'undefined') return null;
 
-  const sourceConcepts =
-    concepts.length > 0
-      ? concepts
-      : Array.from({ length: Math.min(Math.max(course.chapters, 5), 8) }, (_, index) => ({
-          chapter: {
-            id: `fallback-${index + 1}`,
-            courseId: course.id,
-            number: index + 1,
-            title: `Chapter ${index + 1}`,
-            teachingMethodologies: [],
-            resources: {
-              teacherResource: 0,
-              lessonPlanning: 0,
-              chapterMapping: 0,
-              hspContent: 0,
-              questions: 0,
-            },
-          },
-          concept: {
-            title: `${course.subject} concept ${index + 1}`,
-            description: '',
-            mastery: '80% Mastery',
-            time: '15 min est.',
-          },
-        }));
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
 
-  const teachingDates = getInstructionDates(month);
-  const statusCycle: LessonPlanStatus[] = ['Delivered', 'Planned', 'Planned', 'Assessment'];
-  const slotCycle = ['P1', 'P2', 'P3', 'P4', 'P5'];
+    const token = readString(userData.user_token ?? userData.token);
+    const hostName = readString(userData.host_name) || API_BASE_URL;
+    const subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
 
-  return sourceConcepts.slice(0, Math.min(sourceConcepts.length, teachingDates.length, 12)).map((item, index) => {
-    const prefix =
-      index % 4 === 3
-        ? item.chapter.title
-        : item.concept.title;
-
-    const suffixOptions = ['intro', 'recap', 'practice', 'activity', 'review', 'discussion'];
-    const suffix = suffixOptions[index % suffixOptions.length];
-    const status = statusCycle[index % statusCycle.length];
+    if (!token || !hostName || !subInstituteId) {
+      return null;
+    }
 
     return {
-      id: `${item.chapter.id}-${index}`,
-      title: `${prefix} - ${suffix}`,
-      conceptTitle: item.concept.title,
-      chapterTitle: item.chapter.title,
-      date: teachingDates[index],
-      status,
-      slotLabel: status === 'Assessment' ? 'AM' : slotCycle[index % slotCycle.length],
-      periods: (index % 3) + 1,
-      pedagogy:
-        item.chapter.teachingMethodologies[index % Math.max(item.chapter.teachingMethodologies.length, 1)] ||
-        'Guided practice',
+      token,
+      hostName,
+      subInstituteId,
     };
-  });
+  } catch {
+    return null;
+  }
 }
 
 function getCalendarGrid(month: Date) {
@@ -221,6 +393,67 @@ function getCalendarGrid(month: Date) {
 
 function formatMonthTitle(month: Date) {
   return month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function getStartOfWeekSunday(date: Date) {
+  const next = new Date(date);
+  next.setDate(next.getDate() - next.getDay());
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function getWeekDatesSunday(date: Date) {
+  const start = getStartOfWeekSunday(date);
+  return Array.from({ length: 7 }, (_, index) => {
+    const next = new Date(start);
+    next.setDate(start.getDate() + index);
+    return next;
+  });
+}
+
+function formatCalendarHeaderTitle(date: Date, viewMode: CalendarViewMode) {
+  if (viewMode === 'month') {
+    return formatMonthTitle(date);
+  }
+
+  if (viewMode === 'day') {
+    return date.toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  const weekDates = getWeekDatesSunday(date);
+  const start = weekDates[0];
+  const end = weekDates[6];
+
+  const startLabel = start.toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+  });
+  const endLabel = end.toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: start.getMonth() === end.getMonth() ? undefined : 'short',
+    year: start.getFullYear() === end.getFullYear() ? undefined : 'numeric',
+  });
+
+  return `${startLabel} - ${endLabel}`;
+}
+
+const DAY_TIMELINE_START_HOUR = 7;
+const DAY_TIMELINE_END_HOUR = 15;
+const DAY_TIMELINE_HOUR_HEIGHT = 72;
+
+function formatHourLabel(hour: number) {
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const normalizedHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${normalizedHour} ${suffix}`;
+}
+
+function getSlotHourRange(slotLabel: string) {
+  const range = PERIOD_SLOT_TIME_MAP[slotLabel] ?? PERIOD_SLOT_TIME_MAP[String(slotLabel)] ?? PERIOD_SLOT_TIME_MAP.P1;
+  return { startHour: range.startHour, endHour: range.startHour + 1 };
 }
 
 function formatLessonPlanDate(date: Date) {
@@ -253,6 +486,49 @@ function getLegendDotClasses(status: LessonPlanStatus) {
   }
 }
 
+function getEventCardClasses(status: LessonPlanStatus) {
+  return `cursor-pointer rounded-[8px] border border-[#E2E8F0] border-l-[3px] px-2 py-1.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none focus:ring-2 focus:ring-[#C7D2FE] ${getEventStatusClasses(
+    status
+  )}`;
+}
+
+function CalendarEventCard({
+  event,
+  className,
+  style,
+  onOpenHover,
+  onCloseHover,
+}: {
+  event: LessonPlanEvent;
+  className?: string;
+  style?: React.CSSProperties;
+  onOpenHover: (event: LessonPlanEvent, element: HTMLElement) => void;
+  onCloseHover: () => void;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onMouseEnter={(hoverEvent) => onOpenHover(event, hoverEvent.currentTarget)}
+      onMouseLeave={onCloseHover}
+      onFocus={(focusEvent) => onOpenHover(event, focusEvent.currentTarget)}
+      onBlur={onCloseHover}
+      className={cn(getEventCardClasses(event.status), className)}
+      style={style}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="line-clamp-2 font-medium">{event.conceptTitle}</p>
+          <p className="mt-1 text-[12px] text-[#64748B]">
+            {event.startTime} - {event.endTime}
+          </p>
+        </div>
+        <span className="shrink-0 text-[12px] text-[#64748B]">{event.slotLabel}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function LessonPlanPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -273,21 +549,6 @@ export default function LessonPlanPage() {
   const isLmsRoute = Boolean(subjectId && standardId);
   const [subjectData, setSubjectData] = useState<SubjectWithChapters | null>(null);
   const [subjectLoading, setSubjectLoading] = useState(isLmsRoute);
-
-  useEffect(() => {
-    if (!isLmsRoute) return;
-    let cancelled = false;
-    getSubjectAndChapters(subjectId, standardId)
-      .then((data) => {
-        if (!cancelled) setSubjectData(data);
-      })
-      .finally(() => {
-        if (!cancelled) setSubjectLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isLmsRoute, subjectId, standardId]);
 
   const apiSubject = subjectData?.subject ?? null;
   const course: Course | undefined = useMemo(
@@ -343,9 +604,14 @@ export default function LessonPlanPage() {
       : null;
   const selectedConcept = semanticData?.concept || chapterConcepts?.concepts[0] || null;
   const [activeSemanticSection, setActiveSemanticSection] = useState('knowledge');
-  const [visibleMonth, setVisibleMonth] = useState(() => new Date(2026, 6, 1));
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date('2025-04-01T00:00:00'));
+  const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>('month');
   const [isCreateLessonPlanOpen, setIsCreateLessonPlanOpen] = useState(false);
+  const [apiPeriods, setApiPeriods] = useState<LessonPlanApiPeriod[]>([]);
+  const [lessonPlanLoading, setLessonPlanLoading] = useState(true);
+  const [lessonPlanError, setLessonPlanError] = useState<string | null>(null);
   const [createdLessonPlans, setCreatedLessonPlans] = useState<LessonPlanEvent[]>([]);
+  const [hoverPopup, setHoverPopup] = useState<HoverPopupState | null>(null);
   const [lessonPlanDraft, setLessonPlanDraft] = useState<LessonPlanDraft>({
     conceptTitle: '',
     plannedDate: '',
@@ -353,15 +619,64 @@ export default function LessonPlanPage() {
     pedagogy: '',
     objective: '',
   });
+  const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!isLmsRoute) return;
+    let cancelled = false;
+    getSubjectAndChapters(subjectId, standardId)
+      .then((data) => {
+        if (!cancelled) setSubjectData(data);
+      })
+      .finally(() => {
+        if (!cancelled) setSubjectLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLmsRoute, subjectId, standardId]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(LESSON_PLAN_API_URL, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = (await response.json()) as LessonPlanApiResponse;
+        if (!response.ok) {
+          throw new Error('Failed to fetch lesson plan calendar.');
+        }
+        const firstItem = Array.isArray(payload.data) ? payload.data[0] : null;
+        setApiPeriods(Array.isArray(firstItem?.periods) ? firstItem.periods : []);
+        if (firstItem?.lesson_plan?.term_start_date) {
+          setVisibleMonth(new Date(`${firstItem.lesson_plan.term_start_date}T00:00:00`));
+        }
+      })
+      .catch((error: unknown) => {
+        if ((error as Error)?.name === 'AbortError') return;
+        setApiPeriods([]);
+        setLessonPlanError(error instanceof Error ? error.message : 'Unable to fetch lesson plan calendar.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLessonPlanLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hoverCloseTimerRef.current) {
+        clearTimeout(hoverCloseTimerRef.current);
+      }
+    };
+  }, []);
+
   const chapterCount = Math.max(course?.chapters ?? 0, courseChapters.length);
   const gradeLabel = course ? getCourseGradeLabel(course.classGrade) : '';
   const sectionLabel = course ? getCourseSectionLabel(course.id) : '';
   const curriculumLabel = course ? getCurriculumLabel(course) : '';
   const totalKeyConcepts = course ? getTotalKeyConceptCount(course, courseChapters) : 0;
-  const generatedLessonPlanEvents = useMemo(
-    () => (course ? createLessonPlanEvents(course, courseChapters, visibleMonth) : []),
-    [course, courseChapters, visibleMonth]
-  );
   const conceptOptions = useMemo(() => {
     const concepts = courseChapters.flatMap((chapter) =>
       (chapter.concepts ?? []).map((concept) => concept.title)
@@ -373,17 +688,55 @@ export default function LessonPlanPage() {
     const pedagogies = courseChapters.flatMap((chapter) => chapter.teachingMethodologies);
     return Array.from(new Set(pedagogies));
   }, [courseChapters]);
+  const apiLessonPlanEvents = useMemo(() => {
+    return apiPeriods.map((period) => {
+      const slotKey = String(period.period_slot).toUpperCase();
+      const slotConfig =
+        PERIOD_SLOT_TIME_MAP[slotKey] ??
+        PERIOD_SLOT_TIME_MAP[String(period.period_slot)] ??
+        PERIOD_SLOT_TIME_MAP.P1;
+      const duration = Number(period.planned_duration_min) || 35;
+      const endTime = addMinutesToTime(slotConfig.startHour, slotConfig.startMinute, duration);
+      const teacherId = Number(period.teacher_id) || undefined;
+
+      return {
+        id: String(period.id),
+        title: period.primary_concept_name?.trim() || period.chapter_name?.trim() || `Lesson Period ${period.period_slot}`,
+        conceptTitle: period.primary_concept_name?.trim() || period.chapter_name?.trim() || 'Untitled concept',
+        chapterTitle: period.chapter_name?.trim() || 'Untitled chapter',
+        date: new Date(`${period.scheduled_date}T00:00:00`),
+        status: mapStatusToCalendarStatus(period.status),
+        statusLabel: normalizeStatusLabel(period.status),
+        slotLabel: slotConfig.fallbackLabel,
+        periods: 1,
+        pedagogy: period.period_type?.trim() || 'Teaching',
+        startTime: formatTimeFromParts(slotConfig.startHour, slotConfig.startMinute),
+        endTime: endTime.label,
+        teacherId,
+        teacherName: getStoredTeacherName(teacherId) || `Teacher #${teacherId ?? '—'}`,
+        plannedDurationMin: duration,
+        periodType: period.period_type?.trim() || 'Teaching',
+        concepts: Array.isArray(period.concepts)
+          ? period.concepts.map((concept) => ({
+              conceptName: concept.concept_name?.trim() || 'Untitled concept',
+              coveragePercent: Number(concept.coverage_percent) || 0,
+            }))
+          : [],
+      } satisfies LessonPlanEvent;
+    });
+  }, [apiPeriods]);
   const lessonPlanEvents = useMemo(() => {
-    return [...generatedLessonPlanEvents, ...createdLessonPlans].sort(
+    return [...apiLessonPlanEvents, ...createdLessonPlans].sort(
       (left, right) => left.date.getTime() - right.date.getTime()
     );
-  }, [createdLessonPlans, generatedLessonPlanEvents]);
+  }, [apiLessonPlanEvents, createdLessonPlans]);
   const calendarCells = useMemo(() => getCalendarGrid(visibleMonth), [visibleMonth]);
+  const weekDates = useMemo(() => getWeekDatesSunday(visibleMonth), [visibleMonth]);
   const eventMap = useMemo(() => {
     const mapped = new Map<string, LessonPlanEvent[]>();
 
     lessonPlanEvents.forEach((event) => {
-      const key = event.date.toISOString().slice(0, 10);
+      const key = formatDateKey(event.date);
       const current = mapped.get(key) ?? [];
       current.push(event);
       mapped.set(key, current);
@@ -391,6 +744,74 @@ export default function LessonPlanPage() {
 
     return mapped;
   }, [lessonPlanEvents]);
+  const calendarHeaderTitle = useMemo(
+    () => formatCalendarHeaderTitle(visibleMonth, calendarViewMode),
+    [visibleMonth, calendarViewMode]
+  );
+
+  const cancelHoverClose = () => {
+    if (hoverCloseTimerRef.current) {
+      clearTimeout(hoverCloseTimerRef.current);
+      hoverCloseTimerRef.current = null;
+    }
+  };
+
+  const scheduleHoverClose = () => {
+    cancelHoverClose();
+    hoverCloseTimerRef.current = setTimeout(() => {
+      setHoverPopup(null);
+    }, 180);
+  };
+
+  const openHoverPopup = (event: LessonPlanEvent, element: HTMLElement) => {
+    cancelHoverClose();
+    const rect = element.getBoundingClientRect();
+    const popupWidth = 340;
+    const popupHeight = 320;
+    const gap = 6;
+
+    let left = rect.right + gap;
+    let top = rect.top;
+
+    if (left + popupWidth > window.innerWidth - 16) {
+      left = rect.left - popupWidth - gap;
+    }
+    if (left < 16) {
+      left = Math.max(16, window.innerWidth - popupWidth - 16);
+    }
+    if (top + popupHeight > window.innerHeight - 16) {
+      top = rect.bottom - popupHeight;
+    }
+    if (top < 16) {
+      top = 16;
+    }
+
+    setHoverPopup({
+      event,
+      style: {
+        position: 'fixed',
+        top,
+        left,
+        width: popupWidth,
+        maxWidth: 'calc(100vw - 32px)',
+        zIndex: 9999,
+      },
+    });
+  };
+
+  const openHoverPopupFromMouse = (
+    hoverEvent: React.MouseEvent<HTMLElement>,
+    event: LessonPlanEvent
+  ) => {
+    openHoverPopup(event, hoverEvent.currentTarget);
+  };
+
+  const openHoverPopupFromFocus = (
+    focusEvent: React.FocusEvent<HTMLElement>,
+    event: LessonPlanEvent
+  ) => {
+    openHoverPopup(event, focusEvent.currentTarget);
+  };
 
   if (subjectLoading) {
     return (
@@ -461,9 +882,21 @@ export default function LessonPlanPage() {
       chapterTitle: selectedChapter?.title ?? 'Custom lesson',
       date: eventDate,
       status: 'Planned',
+      statusLabel: 'Planned',
       slotLabel: `P${lessonPlanDraft.periods || '2'}`,
       periods: Number(lessonPlanDraft.periods || 2),
       pedagogy: lessonPlanDraft.pedagogy,
+      startTime: '9:00 AM',
+      endTime: '9:35 AM',
+      teacherName: 'Teacher #—',
+      plannedDurationMin: 35,
+      periodType: 'Teaching',
+      concepts: [
+        {
+          conceptName: lessonPlanDraft.conceptTitle,
+          coveragePercent: 100,
+        },
+      ],
     };
 
     setCreatedLessonPlans((current) => [...current, nextEvent]);
@@ -1263,18 +1696,37 @@ export default function LessonPlanPage() {
             </button>
           </div>
 
-          <Button
-            onClick={openCreateLessonPlanModal}
-            className="h-11 rounded-[14px] bg-[#4F46E5] px-5 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] hover:bg-[#4338CA]"
-          >
-            <Plus size={16} className="mr-2" />
-            Create lesson plan
-          </Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="inline-flex rounded-[14px] border border-[#D8E1F0] bg-[#EEF3FB] p-1 shadow-[0_1px_4px_rgba(15,23,42,0.04)]">
+              {(['day', 'week', 'month'] as CalendarViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setCalendarViewMode(mode)}
+                  className={`rounded-[10px] px-4 py-2 text-[14px] font-medium capitalize transition sm:px-5 ${
+                    calendarViewMode === mode
+                      ? 'bg-white text-[#4F46E5] shadow-[0_1px_4px_rgba(15,23,42,0.06)]'
+                      : 'text-[#475569] hover:text-[#0F172A]'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              onClick={openCreateLessonPlanModal}
+              className="h-11 rounded-[14px] bg-[#4F46E5] px-5 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] hover:bg-[#4338CA]"
+            >
+              <Plus size={16} className="mr-2" />
+              Create lesson plan
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-[18px] border border-[#D8E1F0] bg-white shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
           <div className="flex flex-col gap-4 border-b border-[#E3EAF4] px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-[18px] font-semibold text-[#0F172A]">{formatMonthTitle(visibleMonth)}</h2>
+            <h2 className="text-[18px] font-semibold text-[#0F172A]">{calendarHeaderTitle}</h2>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="flex flex-wrap items-center gap-5 text-[14px] text-[#475569]">
@@ -1290,9 +1742,15 @@ export default function LessonPlanPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    setVisibleMonth(
-                      (current) => new Date(current.getFullYear(), current.getMonth() - 1, 1)
-                    )
+                    setVisibleMonth((current) => {
+                      if (calendarViewMode === 'day') {
+                        return new Date(current.getFullYear(), current.getMonth(), current.getDate() - 1);
+                      }
+                      if (calendarViewMode === 'week') {
+                        return new Date(current.getFullYear(), current.getMonth(), current.getDate() - 7);
+                      }
+                      return new Date(current.getFullYear(), current.getMonth() - 1, 1);
+                    })
                   }
                   className="flex h-9 w-9 items-center justify-center rounded-full text-[#64748B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A]"
                 >
@@ -1301,9 +1759,15 @@ export default function LessonPlanPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    setVisibleMonth(
-                      (current) => new Date(current.getFullYear(), current.getMonth() + 1, 1)
-                    )
+                    setVisibleMonth((current) => {
+                      if (calendarViewMode === 'day') {
+                        return new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1);
+                      }
+                      if (calendarViewMode === 'week') {
+                        return new Date(current.getFullYear(), current.getMonth(), current.getDate() + 7);
+                      }
+                      return new Date(current.getFullYear(), current.getMonth() + 1, 1);
+                    })
                   }
                   className="flex h-9 w-9 items-center justify-center rounded-full text-[#64748B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A]"
                 >
@@ -1313,59 +1777,339 @@ export default function LessonPlanPage() {
             </div>
           </div>
 
+          {lessonPlanLoading ? (
+            <div className="border-b border-[#E3EAF4] px-4 py-4 text-[14px] text-[#64748B] sm:px-6">
+              Loading lesson plan calendar...
+            </div>
+          ) : null}
+
+          {!lessonPlanLoading && lessonPlanError ? (
+            <div className="border-b border-[#FDE2E2] bg-[#FFF8F8] px-4 py-4 text-[14px] text-[#B91C1C] sm:px-6">
+              {lessonPlanError}
+            </div>
+          ) : null}
+
+          {!lessonPlanLoading && !lessonPlanError && lessonPlanEvents.length === 0 ? (
+            <div className="border-b border-[#E3EAF4] px-4 py-4 text-[14px] text-[#64748B] sm:px-6">
+              No lesson plan periods were returned for this calendar.
+            </div>
+          ) : null}
+
           <div className="overflow-x-auto p-4 sm:p-5">
-            <div className="min-w-[980px] overflow-hidden rounded-[14px] border border-[#D8E1F0]">
-              <div className="grid grid-cols-7 bg-[#F6F9FD]">
-                {CALENDAR_WEEKDAYS.map((day) => (
-                  <div
-                    key={day}
-                    className="border-b border-r border-[#D8E1F0] px-3 py-3 text-center text-[14px] font-medium text-[#334155] last:border-r-0"
-                  >
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7">
-                {calendarCells.map((date, index) => {
-                  const key = date ? date.toISOString().slice(0, 10) : `empty-${index}`;
-                  const events = date ? eventMap.get(key) ?? [] : [];
-                  const isCurrentMonth = Boolean(date);
-
-                  return (
+            {calendarViewMode === 'month' ? (
+              <div className="min-w-[980px] overflow-hidden rounded-[14px] border border-[#D8E1F0]">
+                <div className="grid grid-cols-7 bg-[#F6F9FD]">
+                  {CALENDAR_WEEKDAYS.map((day) => (
                     <div
-                      key={key}
-                      className={`min-h-[96px] border-b border-r border-[#D8E1F0] p-2.5 last:border-r-0 ${
-                        isCurrentMonth ? 'bg-white' : 'bg-[#F3F6FA]'
+                      key={day}
+                      className="border-b border-r border-[#D8E1F0] px-3 py-3 text-center text-[14px] font-medium text-[#334155] last:border-r-0"
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7">
+                  {calendarCells.map((date, index) => {
+                    const key = date ? formatDateKey(date) : `empty-${index}`;
+                    const events = date ? eventMap.get(key) ?? [] : [];
+                    const isCurrentMonth = Boolean(date);
+
+                    return (
+                      <div
+                        key={key}
+                        className={`min-h-[96px] border-b border-r border-[#D8E1F0] p-2.5 last:border-r-0 ${
+                          isCurrentMonth ? 'bg-white' : 'bg-[#F3F6FA]'
+                        }`}
+                      >
+                        {date ? (
+                          <>
+                            <div className="mb-2 text-[14px] font-medium text-[#334155]">{date.getDate()}</div>
+                            <div className="space-y-2">
+                              {events.map((event) => (
+                                <div
+                                  key={event.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onMouseEnter={(hoverEvent) => openHoverPopupFromMouse(hoverEvent, event)}
+                                  onMouseLeave={scheduleHoverClose}
+                                  onFocus={(focusEvent) => openHoverPopupFromFocus(focusEvent, event)}
+                                  onBlur={scheduleHoverClose}
+                                  className={cn(getEventCardClasses(event.status), 'min-w-0')}
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="line-clamp-2 font-medium">{event.conceptTitle}</p>
+                                      <p className="mt-1 text-[12px] text-[#64748B]">
+                                        {event.startTime} - {event.endTime}
+                                      </p>
+                                    </div>
+                                    <span className="shrink-0 text-[12px] text-[#64748B]">{event.slotLabel}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : calendarViewMode === 'day' ? (
+              <div className="min-w-[980px] overflow-hidden rounded-[14px] border border-[#D8E1F0]">
+                <div className="grid grid-cols-[92px_minmax(0,1fr)] bg-[#F6F9FD]">
+                  <div className="border-b border-r border-[#D8E1F0] px-3 py-3" />
+                  <div className="border-b border-[#D8E1F0] px-3 py-3 text-center text-[14px] font-medium text-[#334155]">
+                    <div>{visibleMonth.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                    <div className="mt-1 text-[13px] text-[#64748B]">
+                      {visibleMonth.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="max-h-[680px] overflow-y-auto">
+                  <div className="grid grid-cols-[92px_minmax(0,1fr)]">
+                    <div className="border-r border-[#D8E1F0] bg-[#F8FAFC]">
+                      {Array.from(
+                        { length: DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1 },
+                        (_, index) => DAY_TIMELINE_START_HOUR + index
+                      ).map((hour) => (
+                        <div
+                          key={hour}
+                          className="flex h-[72px] items-start justify-center border-b border-[#EAF0F7] px-2 pt-2 text-[13px] font-medium text-[#475569]"
+                        >
+                          {formatHourLabel(hour)}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="relative bg-white" style={{ height: `${(DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1) * DAY_TIMELINE_HOUR_HEIGHT}px` }}>
+                      {Array.from(
+                        { length: DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1 },
+                        (_, index) => DAY_TIMELINE_START_HOUR + index
+                      ).map((hour, index, hours) => (
+                        <div
+                          key={`separator-${hour}`}
+                          className={`absolute left-0 right-0 border-b border-[#EAF0F7] ${
+                            index !== hours.length - 1 ? '' : 'border-b-0'
+                          }`}
+                          style={{ top: `${index * DAY_TIMELINE_HOUR_HEIGHT}px` }}
+                        />
+                      ))}
+
+                      {(eventMap.get(formatDateKey(visibleMonth)) ?? []).map((event) => {
+                        const { startHour, endHour } = getSlotHourRange(event.slotLabel);
+                        const top = (startHour - DAY_TIMELINE_START_HOUR) * DAY_TIMELINE_HOUR_HEIGHT + 4;
+                        const height = Math.max((endHour - startHour) * DAY_TIMELINE_HOUR_HEIGHT - 8, 44);
+
+                        return (
+                          <CalendarEventCard
+                            key={event.id}
+                            event={event}
+                            className="absolute left-2 right-2"
+                            style={{ top: `${top}px`, height: `${height}px` }}
+                            onOpenHover={openHoverPopup}
+                            onCloseHover={scheduleHoverClose}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="min-w-[980px] overflow-hidden rounded-[14px] border border-[#D8E1F0]">
+                <div className="grid grid-cols-[92px_repeat(7,minmax(120px,1fr))] bg-[#F6F9FD]">
+                  <div className="border-b border-r border-[#D8E1F0] px-3 py-3" />
+                  {weekDates.map((date, index, dates) => (
+                    <div
+                      key={`${formatDateKey(date)}-${index}`}
+                      className={`border-b px-3 py-3 text-center text-[14px] font-medium text-[#334155] ${
+                        index !== dates.length - 1 ? 'border-r border-[#D8E1F0]' : ''
                       }`}
                     >
-                      {date ? (
-                        <>
-                          <div className="mb-2 text-[14px] font-medium text-[#334155]">{date.getDate()}</div>
-                          <div className="space-y-2">
-                            {events.map((event) => (
-                              <div
-                                key={event.id}
-                                className={`rounded-[8px] border border-[#E2E8F0] border-l-[3px] px-2 py-1.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] ${getEventStatusClasses(
-                                  event.status
-                                )}`}
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="line-clamp-1 font-medium">{event.title}</p>
-                                  <span className="shrink-0 text-[12px] text-[#64748B]">{event.slotLabel}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      ) : null}
+                      <div>{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                      <div className="mt-1 text-[13px] text-[#64748B]">
+                        {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+
+                <div className="max-h-[680px] overflow-y-auto">
+                  <div className="grid grid-cols-[92px_repeat(7,minmax(120px,1fr))]">
+                    <div className="border-r border-[#D8E1F0] bg-[#F8FAFC]">
+                      {Array.from(
+                        { length: DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1 },
+                        (_, index) => DAY_TIMELINE_START_HOUR + index
+                      ).map((hour) => (
+                        <div
+                          key={hour}
+                          className="flex h-[72px] items-start justify-center border-b border-[#EAF0F7] px-2 pt-2 text-[13px] font-medium text-[#475569]"
+                        >
+                          {formatHourLabel(hour)}
+                        </div>
+                      ))}
+                    </div>
+
+                    {weekDates.map((date, dayIndex) => {
+                      const key = formatDateKey(date);
+                      const dayEvents = [...(eventMap.get(key) ?? [])].sort((left, right) => {
+                        const leftRange = getSlotHourRange(left.slotLabel);
+                        const rightRange = getSlotHourRange(right.slotLabel);
+                        return leftRange.startHour - rightRange.startHour;
+                      });
+                      const overlapCountBySlot = new Map<string, number>();
+
+                      return (
+                        <div
+                          key={key}
+                          className={`relative bg-white ${
+                            dayIndex !== weekDates.length - 1 ? 'border-r border-[#D8E1F0]' : ''
+                          }`}
+                          style={{ height: `${(DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1) * DAY_TIMELINE_HOUR_HEIGHT}px` }}
+                        >
+                          {Array.from(
+                            { length: DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1 },
+                            (_, index) => DAY_TIMELINE_START_HOUR + index
+                          ).map((hour, index, hours) => (
+                            <div
+                              key={`${key}-separator-${hour}`}
+                              className={`absolute left-0 right-0 border-b border-[#EAF0F7] ${
+                                index !== hours.length - 1 ? '' : 'border-b-0'
+                              }`}
+                              style={{ top: `${index * DAY_TIMELINE_HOUR_HEIGHT}px` }}
+                            />
+                          ))}
+
+                          {dayEvents.map((event) => {
+                            const { startHour, endHour } = getSlotHourRange(event.slotLabel);
+                            const slotKey = `${startHour}-${endHour}`;
+                            const overlapIndex = overlapCountBySlot.get(slotKey) ?? 0;
+                            overlapCountBySlot.set(slotKey, overlapIndex + 1);
+                            const totalOverlaps = dayEvents.filter((item) => {
+                              const range = getSlotHourRange(item.slotLabel);
+                              return range.startHour === startHour && range.endHour === endHour;
+                            }).length;
+
+                            const top = (startHour - DAY_TIMELINE_START_HOUR) * DAY_TIMELINE_HOUR_HEIGHT + 4;
+                            const height = Math.max((endHour - startHour) * DAY_TIMELINE_HOUR_HEIGHT - 8, 44);
+                            const widthCalc = `calc(${100 / totalOverlaps}% - 8px)`;
+                            const leftCalc = totalOverlaps > 1 ? `calc(${(100 / totalOverlaps) * overlapIndex}% + 4px)` : '4px';
+
+                            return (
+                              <CalendarEventCard
+                                key={event.id}
+                                event={event}
+                                className="absolute"
+                                style={{
+                                  top: `${top}px`,
+                                  height: `${height}px`,
+                                  width: widthCalc,
+                                  left: leftCalc,
+                                }}
+                                onOpenHover={openHoverPopup}
+                                onCloseHover={scheduleHoverClose}
+                              />
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {hoverPopup ? (
+          <div
+            className="fixed z-[9999] max-w-[340px]"
+            style={hoverPopup.style}
+            onMouseEnter={cancelHoverClose}
+            onMouseLeave={scheduleHoverClose}
+          >
+            <div className="rounded-[16px] border border-[#D8E1F0] bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.16)]">
+              <div className="border-b border-[#E2E8F0] pb-3">
+                <div className="min-w-0">
+                  <p className="text-[17px] font-semibold text-[#0F172A]">
+                    {hoverPopup.event.chapterTitle}
+                  </p>
+                  <p className="mt-1 text-[13px] text-[#64748B]">
+                    {formatLessonPlanDate(hoverPopup.event.date)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2 py-3 text-[13px] text-[#475569]">
+                <div className="flex items-center justify-between gap-3">
+                  <span>Period</span>
+                  <span className="font-medium text-[#0F172A]">{hoverPopup.event.slotLabel}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Duration</span>
+                  <span className="font-medium text-[#0F172A]">
+                    {hoverPopup.event.plannedDurationMin ?? 0} minutes
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Teacher</span>
+                  <span className="font-medium text-[#0F172A]">{hoverPopup.event.teacherName}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Status</span>
+                  <span className="font-medium text-[#0F172A]">{hoverPopup.event.statusLabel}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Type</span>
+                  <span className="font-medium capitalize text-[#0F172A]">
+                    {hoverPopup.event.periodType?.replace(/_/g, ' ') ?? 'Teaching'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 pt-1 text-[#64748B]">
+                  <Clock className="h-4 w-4 text-[#64748B]" />
+                  <span>{hoverPopup.event.startTime} - {hoverPopup.event.endTime}</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#64748B]">
+                  <Circle className="h-3 w-3 fill-current text-[#64748B]" />
+                  <span>{hoverPopup.event.teacherName}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-[#E2E8F0] pt-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#64748B]">
+                  Primary Concept
+                </p>
+                <p className="mt-2 text-[15px] font-medium text-[#0F172A]">
+                  {hoverPopup.event.conceptTitle}
+                </p>
+              </div>
+
+              <div className="mt-4 border-t border-[#E2E8F0] pt-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#64748B]">
+                  Concept Coverage
+                </p>
+                <div className="mt-2 space-y-2">
+                  {hoverPopup.event.concepts.length > 0 ? (
+                    hoverPopup.event.concepts.map((concept, index) => (
+                      <div
+                        key={`${concept.conceptName}-${index}`}
+                        className="flex items-start justify-between gap-3 text-[13px] text-[#0F172A]"
+                      >
+                        <span className="min-w-0 flex-1 break-words">{concept.conceptName}</span>
+                        <span className="shrink-0 text-[#64748B]">{concept.coveragePercent}%</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[13px] text-[#64748B]">No concept coverage available.</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         {isCreateLessonPlanOpen && (
           <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(15,23,42,0.18)] px-4 py-8 backdrop-blur-[2px]">
