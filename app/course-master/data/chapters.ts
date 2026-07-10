@@ -389,6 +389,49 @@ export interface NewChapterMasterRequest {
   subject_id: number;
 }
 
+export interface ChapterContentAsset {
+  id: number;
+  title: string;
+  description: string | null;
+  filename: string | null;
+  url: string | null;
+  file_type: string | null;
+  content_category: string | null;
+  created_at: string | null;
+}
+
+export interface ChapterContentResponse {
+  id: number;
+  chapter_name: string;
+  content_categories: Record<string, ChapterContentAsset[]>;
+}
+
+export async function fetchChapterContent(
+  chapterId: number,
+  subInstituteId: number
+): Promise<ChapterContentResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-chapter-content`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chapter_id: chapterId,
+      sub_institute_id: subInstituteId,
+    }),
+  });
+
+  const raw = (await res.json()) as Record<string, unknown>;
+  if (!res.ok || Number(raw.status_code) !== 1) {
+    throw new Error((raw.message as string) || 'Failed to fetch chapter content');
+  }
+
+  const data = (raw.data ?? {}) as Record<string, unknown>;
+  return {
+    id: Number(data.id ?? chapterId),
+    chapter_name: String(data.chapter_name ?? ''),
+    content_categories: (data.content_categories ?? {}) as Record<string, ChapterContentAsset[]>,
+  };
+}
+
 export async function fetchNewChapterMaster(
   request: NewChapterMasterRequest
 ): Promise<NewChapterMasterResponse> {
