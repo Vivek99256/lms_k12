@@ -2242,7 +2242,7 @@ export default function ChapterListPage() {
             </div>
             <div>
               <h1 className="text-[22px] font-bold tracking-tight text-slate-950">
-                {course.subject} - {getCourseGradeLabel(course.classGrade)} - {getCourseSectionLabel(course.id)}
+                {course.subject} - {getCourseGradeLabel(course.classGrade)} 
               </h1>
               <p className="mt-1 text-[15px] text-slate-600">
                 {allChapters.length} chapters -{' '}
