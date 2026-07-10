@@ -68,16 +68,69 @@ const EMPTY_CHAPTER_FORM = {
 const RESOURCE_MAPPING_TYPES = ['Pedagogical Process', 'Material Type', 'Learning Outcome'] as const;
 const RESOURCE_MATERIAL_TYPES = ['Mindmap', 'Teacher Training', 'Worksheet', 'Reference Notes', 'Assessment Aid'] as const;
 const RESOURCE_FILE_TYPES = ['PDF', 'PPT', 'DOCX', 'Video Link'] as const;
-const UPLOAD_CONTENT_TYPES = ['Presentation', 'Worksheet', 'Reference notes', 'Assessment video'] as const;
+const UPLOAD_CONTENT_TYPES = ['Presentation', 'Video', 'Revision notes', 'Classroom activity'] as const;
+const UPLOAD_PRESENTATION_TYPES = ['Classroom presentation', 'Teacher training presentation'] as const;
+const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
+const QUESTION_TYPE_OPTIONS = ['Multiple choice', 'True or false', 'Short answer', 'Assertion and reason'] as const;
 const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
 const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
 const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity'] as const;
-const ACCEPTED_UPLOAD_TYPES = [
-  'video/mp4',
-  'video/quicktime',
-  'video/webm',
-];
-const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
+const UPLOAD_TYPE_CONFIG: Record<
+  (typeof UPLOAD_CONTENT_TYPES)[number],
+  {
+    accept: string;
+    helperText: string;
+    maxSize: number;
+    extensions: string[];
+    mimeTypes: string[];
+  }
+> = {
+  Presentation: {
+    accept:
+      '.ppt,.pptx,.pdf,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    helperText: 'PPT, PPTX or PDF · up to 100 MB',
+    maxSize: 100 * 1024 * 1024,
+    extensions: ['ppt', 'pptx', 'pdf'],
+    mimeTypes: [
+      'application/pdf',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ],
+  },
+  Video: {
+    accept: '.mp4,.mov,.webm,video/mp4,video/quicktime,video/webm',
+    helperText: 'MP4, MOV or WEBM · up to 500 MB',
+    maxSize: 500 * 1024 * 1024,
+    extensions: ['mp4', 'mov', 'webm'],
+    mimeTypes: ['video/mp4', 'video/quicktime', 'video/webm'],
+  },
+  'Revision notes': {
+    accept:
+      '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    helperText: 'PDF, DOC or DOCX · up to 50 MB',
+    maxSize: 50 * 1024 * 1024,
+    extensions: ['pdf', 'doc', 'docx'],
+    mimeTypes: [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ],
+  },
+  'Classroom activity': {
+    accept:
+      '.pdf,.ppt,.pptx,.docx,application/pdf,application/msword,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    helperText: 'PDF, PPT, PPTX or DOCX · up to 100 MB',
+    maxSize: 100 * 1024 * 1024,
+    extensions: ['pdf', 'ppt', 'pptx', 'docx'],
+    mimeTypes: [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ],
+  },
+};
 
 type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF';
 type ChapterContentSource = 'Gamma AI' | 'Uploaded';
@@ -453,8 +506,18 @@ export default function ChapterListPage() {
   const [presentationSlides, setPresentationSlides] = useState<string>(PRESENTATION_SLIDE_OPTIONS[2]);
   const [presentationTheme, setPresentationTheme] = useState<string>(GAMMA_THEME_OPTIONS[0]);
   const [presentationAudienceNotes, setPresentationAudienceNotes] = useState('');
-  const [uploadContentType, setUploadContentType] = useState<string>(UPLOAD_CONTENT_TYPES[0]);
+  const [uploadContentType, setUploadContentType] = useState<(typeof UPLOAD_CONTENT_TYPES)[number]>(
+    UPLOAD_CONTENT_TYPES[0]
+  );
+  const [uploadPresentationType, setUploadPresentationType] = useState<
+    (typeof UPLOAD_PRESENTATION_TYPES)[number]
+  >(UPLOAD_PRESENTATION_TYPES[0]);
   const [uploadChapterId, setUploadChapterId] = useState('');
+  const [uploadConcept, setUploadConcept] = useState('all');
+  const [uploadMethod, setUploadMethod] = useState<(typeof UPLOAD_METHOD_TABS)[number]>(
+    UPLOAD_METHOD_TABS[0]
+  );
+  const [uploadLink, setUploadLink] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
@@ -472,6 +535,13 @@ export default function ChapterListPage() {
   const [contentGroupBy, setContentGroupBy] =
     useState<'Chapter wise' | 'Concept wise'>('Chapter wise');
   const [selectedContentItem, setSelectedContentItem] = useState<ChapterContentItem | null>(null);
+  const [questionModalConcept, setQuestionModalConcept] = useState<{
+    chapter: Chapter;
+    conceptTitle: string;
+    conceptIndex: number;
+  } | null>(null);
+  const [questionType, setQuestionType] = useState('');
+  const [totalQuestions, setTotalQuestions] = useState('');
 
   const view = searchParams.get('view');
   const activeChapterId = searchParams.get('chapterId') ?? '';
@@ -541,6 +611,28 @@ export default function ChapterListPage() {
     if (!presentationChapterId || !course) return [];
     return getChapterKeyConcepts(course.id, presentationChapterId)?.concepts ?? [];
   }, [course, presentationChapterId]);
+  const uploadChapterOptions = useMemo(
+    () => allChapters.map((chapter) => ({ id: chapter.id, title: chapter.title })),
+    [allChapters]
+  );
+  const uploadSelectedChapter = useMemo(
+    () => allChapters.find((chapter) => chapter.id === uploadChapterId) ?? uploadChapter,
+    [allChapters, uploadChapter, uploadChapterId]
+  );
+  const uploadConceptOptions = useMemo(() => {
+    if (!course || !uploadChapterId) return [];
+    return getChapterKeyConcepts(course.id, uploadChapterId)?.concepts ?? [];
+  }, [course, uploadChapterId]);
+  const uploadTypeConfig = UPLOAD_TYPE_CONFIG[uploadContentType];
+  const canSaveUploadContent =
+    uploadMethod === 'Upload file' ? Boolean(uploadFile) : uploadLink.trim().length > 0;
+  const totalQuestionsNumber = Number(totalQuestions);
+  const isTotalQuestionsValid =
+    totalQuestions.trim() !== '' &&
+    Number.isInteger(totalQuestionsNumber) &&
+    totalQuestionsNumber >= 1 &&
+    totalQuestionsNumber <= 50;
+  const canGenerateQuestions = questionType !== '' && isTotalQuestionsValid;
 
   useEffect(() => {
     if (!contentChapter) return;
@@ -586,7 +678,8 @@ export default function ChapterListPage() {
     uploadChapter !== null ||
     conceptDrawer !== null ||
     selectedContentItem !== null ||
-    isGeneratePresentationDrawerOpen;
+    isGeneratePresentationDrawerOpen ||
+    questionModalConcept !== null;
   const expandedChapterId = view === 'teacher-resource' ? null : expandedChapterParam;
 
   useEffect(() => {
@@ -602,11 +695,19 @@ export default function ChapterListPage() {
         setIsGeneratingPresentation(false);
         setIsPresentationReady(false);
         setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
+        setUploadPresentationType(UPLOAD_PRESENTATION_TYPES[0]);
+        setUploadChapterId('');
+        setUploadConcept('all');
+        setUploadMethod(UPLOAD_METHOD_TABS[0]);
+        setUploadLink('');
         setUploadFile(null);
         setUploadError('');
         setIsDraggingUpload(false);
         setSelectedContentItem(null);
         setIsGeneratePresentationDrawerOpen(false);
+        setQuestionModalConcept(null);
+        setQuestionType('');
+        setTotalQuestions('');
         if (presentationTimerRef.current) {
           clearTimeout(presentationTimerRef.current);
           presentationTimerRef.current = null;
@@ -639,10 +740,17 @@ export default function ChapterListPage() {
   const closeUploadContentModal = () => {
     setUploadChapter(null);
     setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
+    setUploadPresentationType(UPLOAD_PRESENTATION_TYPES[0]);
     setUploadChapterId('');
+    setUploadConcept('all');
+    setUploadMethod(UPLOAD_METHOD_TABS[0]);
+    setUploadLink('');
     setUploadFile(null);
     setUploadError('');
     setIsDraggingUpload(false);
+    if (uploadInputRef.current) {
+      uploadInputRef.current.value = '';
+    }
   };
 
   const closeConceptDrawer = () => {
@@ -664,10 +772,17 @@ export default function ChapterListPage() {
   const openUploadContentModal = (chapter: Chapter) => {
     setUploadChapter(chapter);
     setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
+    setUploadPresentationType(UPLOAD_PRESENTATION_TYPES[0]);
     setUploadChapterId(chapter.id);
+    setUploadConcept('all');
+    setUploadMethod(UPLOAD_METHOD_TABS[0]);
+    setUploadLink('');
     setUploadFile(null);
     setUploadError('');
     setIsDraggingUpload(false);
+    if (uploadInputRef.current) {
+      uploadInputRef.current.value = '';
+    }
   };
 
   const openConceptDrawer = (chapter: Chapter, conceptTitle: string, conceptIndex: number) => {
@@ -702,16 +817,17 @@ export default function ChapterListPage() {
   };
 
   const validateUploadFile = (file: File) => {
+    const config = UPLOAD_TYPE_CONFIG[uploadContentType];
     const extension = file.name.split('.').pop()?.toLowerCase();
-    const extensionAllowed = ['mp4', 'mov', 'webm'].includes(extension ?? '');
-    const mimeAllowed = ACCEPTED_UPLOAD_TYPES.includes(file.type);
+    const extensionAllowed = config.extensions.includes(extension ?? '');
+    const mimeAllowed = file.type ? config.mimeTypes.includes(file.type) : false;
 
     if (!mimeAllowed && !extensionAllowed) {
-      return 'Only MP4, MOV, and WEBM files are supported.';
+      return `Only ${config.helperText.split(' · ')[0]} files are supported.`;
     }
 
-    if (file.size > MAX_UPLOAD_SIZE) {
-      return 'Each file must be 500 MB or smaller.';
+    if (file.size > config.maxSize) {
+      return `Each file must be ${Math.round(config.maxSize / (1024 * 1024))} MB or smaller.`;
     }
 
     return '';
@@ -732,13 +848,36 @@ export default function ChapterListPage() {
   };
 
   const saveUploadContent = () => {
-    if (!uploadFile) {
-      setUploadError('Please select a file before saving.');
+    if (uploadMethod === 'Upload file') {
+      if (!uploadFile) {
+        setUploadError('Please select a file before saving.');
+        return;
+      }
+    } else if (!uploadLink.trim()) {
+      setUploadError('Please add a link before saving.');
       return;
     }
 
     closeUploadContentModal();
   };
+
+  useEffect(() => {
+    if (!uploadChapterId) return;
+
+    const matchingConcept = uploadConceptOptions.find((concept) => concept.title === uploadConcept);
+    if (!matchingConcept && uploadConcept !== 'all') {
+      setUploadConcept('all');
+    }
+  }, [uploadChapterId, uploadConcept, uploadConceptOptions]);
+
+  useEffect(() => {
+    setUploadError('');
+    setUploadFile(null);
+    setIsDraggingUpload(false);
+    if (uploadInputRef.current) {
+      uploadInputRef.current.value = '';
+    }
+  }, [uploadContentType, uploadMethod]);
 
   const updateExpandedChapter = (chapterId: string | null) => {
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -763,6 +902,22 @@ export default function ChapterListPage() {
 
   const closeContentDrawer = () => {
     setSelectedContentItem(null);
+  };
+
+  const openGenerateQuestionsModal = (chapter: Chapter, conceptTitle: string, conceptIndex: number) => {
+    setQuestionModalConcept({
+      chapter,
+      conceptTitle,
+      conceptIndex,
+    });
+    setQuestionType('');
+    setTotalQuestions('');
+  };
+
+  const closeGenerateQuestionsModal = () => {
+    setQuestionModalConcept(null);
+    setQuestionType('');
+    setTotalQuestions('');
   };
 
   const openGeneratePresentationDrawer = () => {
@@ -810,7 +965,7 @@ export default function ChapterListPage() {
                 Upload content
               </h2>
               <p className="mt-1 text-[15px] text-slate-600">
-                Add videos, presentations, revision notes or PDFs to the library
+                Add presentations, videos, revision notes or classroom activities to the library
               </p>
             </div>
             <button
@@ -827,9 +982,14 @@ export default function ChapterListPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Content Type
+                  Content Type <span className="text-rose-500">*</span>
                 </Label>
-                <Select value={uploadContentType} onValueChange={(value) => typeof value === 'string' && setUploadContentType(value)}>
+                <Select
+                  value={uploadContentType}
+                  onValueChange={(value) =>
+                    setUploadContentType(value as (typeof UPLOAD_CONTENT_TYPES)[number])
+                  }
+                >
                   <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
                     <SelectValue placeholder="Select content type" />
                   </SelectTrigger>
@@ -845,14 +1005,37 @@ export default function ChapterListPage() {
 
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Chapter
+                  Presentation Type
+                </Label>
+                <Select
+                  value={uploadPresentationType}
+                  onValueChange={(value) =>
+                    setUploadPresentationType(value as (typeof UPLOAD_PRESENTATION_TYPES)[number])
+                  }
+                >
+                  <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                    <SelectValue placeholder="Select presentation type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UPLOAD_PRESENTATION_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Chapter <span className="text-rose-500">*</span>
                 </Label>
                 <Select value={uploadChapterId} onValueChange={(value) => setUploadChapterId(value ?? '')}>
                   <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
                     <SelectValue placeholder="Select chapter" />
                   </SelectTrigger>
                   <SelectContent>
-                    {allChapters.map((chapter) => (
+                    {uploadChapterOptions.map((chapter) => (
                       <SelectItem key={chapter.id} value={chapter.id}>
                         {chapter.title}
                       </SelectItem>
@@ -860,52 +1043,118 @@ export default function ChapterListPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Concept
+                </Label>
+                <Select value={uploadConcept} onValueChange={(value) => setUploadConcept(value ?? 'all')}>
+                  <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                    <SelectValue placeholder="Select concept" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All concepts</SelectItem>
+                    {uploadConceptOptions.map((concept) => (
+                      <SelectItem key={concept.title} value={concept.title}>
+                        {concept.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="rounded-[12px] bg-[#eef3fb] p-1">
+              <div className="inline-flex gap-1">
+                {UPLOAD_METHOD_TABS.map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => {
+                      setUploadMethod(tab);
+                      setUploadError('');
+                    }}
+                    className={cn(
+                      'rounded-[10px] px-4 py-2 text-[15px] font-semibold transition-colors',
+                      uploadMethod === tab
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900'
+                    )}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <input
               ref={uploadInputRef}
               type="file"
-              accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
+              accept={uploadTypeConfig.accept}
               className="hidden"
               onChange={(event) => handleUploadFileSelection(event.target.files?.[0] ?? null)}
             />
 
-            <button
-              type="button"
-              onClick={() => uploadInputRef.current?.click()}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setIsDraggingUpload(true);
-              }}
-              onDragLeave={(event) => {
-                event.preventDefault();
-                setIsDraggingUpload(false);
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                setIsDraggingUpload(false);
-                handleUploadFileSelection(event.dataTransfer.files?.[0] ?? null);
-              }}
-              className={cn(
-                'flex min-h-[152px] w-full flex-col items-center justify-center rounded-[12px] border border-dashed px-6 py-8 text-center transition-colors',
-                isDraggingUpload
-                  ? 'border-[#8b85ff] bg-[#f4f3ff]'
-                  : 'border-[#d4dcf0] bg-[#f8fbff] hover:border-[#b9c6eb] hover:bg-[#f5f8ff]'
-              )}
-            >
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200/80">
-                <Upload size={20} />
-              </div>
-              <p className="mt-4 text-[14px] text-slate-600">
-                <span className="font-medium text-[#4f46e5]">Click to upload</span> or drag and drop
-              </p>
-              <p className="mt-1 text-sm text-slate-500">MP4, MOV or WEBM - up to 500 MB</p>
-              {uploadFile && (
-                <p className="mt-3 rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70">
-                  {uploadFile.name}
+            {uploadMethod === 'Upload file' ? (
+              <button
+                type="button"
+                onClick={() => uploadInputRef.current?.click()}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setIsDraggingUpload(true);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  setIsDraggingUpload(false);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setIsDraggingUpload(false);
+                  handleUploadFileSelection(event.dataTransfer.files?.[0] ?? null);
+                }}
+                className={cn(
+                  'flex min-h-[172px] w-full flex-col items-center justify-center rounded-[14px] border border-dashed px-6 py-8 text-center transition-colors',
+                  isDraggingUpload
+                    ? 'border-[#8b85ff] bg-[#f4f3ff]'
+                    : 'border-[#d4dcf0] bg-[#f8fbff] hover:border-[#b9c6eb] hover:bg-[#f5f8ff]'
+                )}
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200/80">
+                  <Upload size={22} />
+                </div>
+                <p className="mt-5 text-[14px] text-slate-600">
+                  <span className="font-semibold text-[#4f46e5]">Click to upload</span> or drag and drop
                 </p>
-              )}
-            </button>
+                <p className="mt-2 text-sm text-slate-500">{uploadTypeConfig.helperText}</p>
+                {uploadFile && (
+                  <p className="mt-4 rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/70">
+                    {uploadFile.name}
+                  </p>
+                )}
+              </button>
+            ) : (
+              <div className="rounded-[14px] border border-slate-200 bg-[#f8fbff] p-5">
+                <Label htmlFor="upload-content-link" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Content Link
+                </Label>
+                <div className="mt-3 flex items-center gap-3 rounded-[12px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <Link2 size={18} className="text-slate-400" />
+                  <Input
+                    id="upload-content-link"
+                    value={uploadLink}
+                    onChange={(event) => {
+                      setUploadLink(event.target.value);
+                      setUploadError('');
+                    }}
+                    placeholder="Paste a content link"
+                    className="h-auto border-0 p-0 text-[15px] text-slate-900 shadow-none focus-visible:ring-0"
+                  />
+                </div>
+                <p className="mt-3 text-sm text-slate-500">
+                  Add a shareable link for {uploadSelectedChapter?.title ?? 'this chapter'} content.
+                </p>
+              </div>
+            )}
 
             {uploadError && <p className="text-sm font-medium text-rose-600">{uploadError}</p>}
           </div>
@@ -921,11 +1170,103 @@ export default function ChapterListPage() {
             <Button
               type="button"
               onClick={saveUploadContent}
-              disabled={!uploadFile}
+              disabled={!canSaveUploadContent}
               className="h-10 rounded-xl bg-[#aea8ff] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(99,91,255,0.28)] hover:bg-[#978fff] disabled:bg-[#d7d2ff] disabled:text-white/85 disabled:shadow-none"
             >
               <Upload size={16} className="mr-2" />
               Save content
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const generateQuestionsModal = questionModalConcept ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-[2px]"
+      onClick={closeGenerateQuestionsModal}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="generate-ai-questions-title"
+        className="relative w-full max-w-[800px] rounded-[20px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="px-6 pb-6 pt-6 sm:px-8">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2
+                id="generate-ai-questions-title"
+                className="text-[24px] font-bold tracking-tight text-slate-950"
+              >
+                Generate AI questions
+              </h2>
+              <p className="mt-1 text-[15px] text-slate-600">
+                Concept: {questionModalConcept.conceptTitle}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={closeGenerateQuestionsModal}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Close dialog"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="mt-6 space-y-5">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Question Type <span className="text-rose-500">*</span>
+              </Label>
+              <Select value={questionType} onValueChange={(value) => setQuestionType(value ?? '')}>
+                <SelectTrigger className="h-12 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                  <SelectValue placeholder="Select question type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {QUESTION_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="total-questions" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Total Questions <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                id="total-questions"
+                inputMode="numeric"
+                value={totalQuestions}
+                onChange={(event) => setTotalQuestions(event.target.value.replace(/[^\d]/g, ''))}
+                placeholder="Enter a number"
+                className="h-12 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none"
+              />
+              <p className="text-sm text-slate-500">Between 1 and 50</p>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-end gap-4 border-t border-slate-200/80 pt-4">
+            <button
+              type="button"
+              onClick={closeGenerateQuestionsModal}
+              className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900"
+            >
+              Cancel
+            </button>
+            <Button
+              type="button"
+              disabled={!canGenerateQuestions}
+              className="h-10 rounded-xl bg-[#aea8ff] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(99,91,255,0.28)] hover:bg-[#978fff] disabled:bg-[#d7d2ff] disabled:text-white/85 disabled:shadow-none"
+            >
+              <Sparkles size={16} className="mr-2" />
+              Generate questions
             </Button>
           </div>
         </div>
@@ -1553,16 +1894,19 @@ export default function ChapterListPage() {
             </div>
           </div>
 
-          <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm sm:px-5">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex min-w-0 flex-1 items-center gap-3 xl:flex-nowrap">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50 text-slate-500">
+                  <BookOpen size={17} />
+                </div>
+                <p className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Viewing Chapter
                 </p>
-                <div className="mt-3 w-full min-w-0 max-w-[330px]">
+                <div className="min-w-0 w-full max-w-[320px] shrink">
                   <Select value={selectedLibraryChapterId} onValueChange={(value) => setSelectedLibraryChapterId(value ?? '')}>
-                    <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-[15px] font-medium text-slate-900 shadow-sm">
-                      <SelectValue placeholder="Select chapter" />
+                    <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 shadow-sm">
+                      <span className="truncate">{activeChapterTitle}</span>
                     </SelectTrigger>
                     <SelectContent>
                       {allChapters.map((chapter) => (
@@ -1573,13 +1917,13 @@ export default function ChapterListPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <p className="mt-3 whitespace-nowrap text-sm text-slate-500">
+                <p className="shrink-0 whitespace-nowrap text-sm text-slate-500">
                   {filteredChapterContentItems.length} items in {activeChapterTitle}
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2 xl:items-end">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <div className="flex items-center justify-between gap-3 xl:justify-end">
+                <p className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Group By
                 </p>
                 <div className="inline-flex rounded-2xl bg-slate-100/90 p-1">
@@ -1871,6 +2215,7 @@ export default function ChapterListPage() {
             </aside>
           </div>
           {uploadContentModal}
+          {generateQuestionsModal}
           {generatePresentationDrawer}
         </div>
       </div>
@@ -1987,110 +2332,82 @@ export default function ChapterListPage() {
           <div className="space-y-4">
             {filteredChapters.map((chapter) => {
               const isExpanded = expandedChapterId === chapter.id;
-              const chapterConcepts = getChapterKeyConcepts(course.id, chapter.id);
-              const conceptCount = chapterConcepts?.count ?? 0;
-              const chapterContentLabel =
-                chapter.title === 'Chemical Reactions and Equations'
-                  ? 'Presentation - Core chapter walk-through'
-                  : `Presentation - ${chapter.title.split(' ').slice(0, 2).join(' ')} demos`;
+              const chapterConceptRows = Object.keys(chapter.content_categories ?? {}).filter((concept) =>
+                concept.trim()
+              );
 
               return (
                 <div
                   key={chapter.id}
                   className="overflow-hidden rounded-[14px] border border-slate-200/90 bg-white shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
                 >
-                  <button
-                    type="button"
-                    onClick={() => updateExpandedChapter(isExpanded ? null : chapter.id)}
-                    className="flex w-full items-start gap-3 px-6 py-5 text-left transition-colors hover:bg-slate-50/70"
-                  >
-                    <ChevronDown
-                      size={18}
-                      className={cn(
-                        'mt-1 shrink-0 text-slate-500 transition-transform duration-200',
-                        !isExpanded && '-rotate-90'
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-[19px] font-bold leading-tight text-slate-950">
-                        Chapter {chapter.number} - {chapter.title}
-                      </h3>
-                      <p className="mt-1 text-[15px] text-slate-600">
-                        {getChapterWindow(chapter.number)} - {conceptCount} concepts
-                      </p>
-                    </div>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="border-t border-slate-200/80 bg-white px-6 py-5">
-                      <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Chapter Content
-                          </span>
-                          <span className="inline-flex items-center rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff]">
-                            {chapterContentLabel}
-                          </span>
-                        </div>
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => openChapterContentView(chapter)}
-                          className="h-10 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
-                        >
-                          <Upload size={16} className="mr-2" />
-                          View content
-                        </Button>
-                      </div>
-
-                      <div className="divide-y divide-slate-200/80">
-                        {chapterConcepts?.concepts.map((concept, index) => {
-                          const supportMeta = getConceptSupportMeta(index);
-                          const skillBadge = getConceptSkillBadge(index);
-
-                          return (
-                            <div
-                              key={concept.title}
-                              className="flex flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between"
-                            >
-                              <div className="flex min-w-0 gap-3">
-                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">
-                                  {index + 1}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="truncate text-[15px] font-medium text-slate-950">{concept.title}</p>
-                                  <p className="mt-1 text-sm text-slate-500">
-                                    {supportMeta.misconceptions} known misconceptions - {supportMeta.prerequisites}{' '}
-                                    prerequisites
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                                <Badge className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
-                                  {skillBadge}
-                                </Badge>
-                                <Badge className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
-                                  {supportMeta.dok}
-                                </Badge>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  onClick={() => openConceptDrawer(chapter, concept.title, index)}
-                                  className="h-10 rounded-full bg-[#eef2ff] px-4 text-sm font-medium text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
-                                >
-                                  <Brain size={16} className="mr-2" />
-                                  Concept intelligence
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {!chapterConcepts?.concepts.length && (
-                          <div className="py-8 text-sm text-slate-500">No concepts available for this chapter yet.</div>
+                  <div className="flex items-start justify-between gap-4 px-6 py-5">
+                    <button
+                      type="button"
+                      onClick={() => updateExpandedChapter(isExpanded ? null : chapter.id)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <ChevronDown
+                        size={18}
+                        className={cn(
+                          'shrink-0 text-slate-500 transition-transform duration-200',
+                          !isExpanded && '-rotate-90'
                         )}
+                      />
+                      <div className="min-w-0">
+                        <h3 className="text-[19px] font-bold leading-tight text-slate-950">
+                          {`Chapter ${chapter.number} \u00B7 ${chapter.title}`}
+                        </h3>
+                      </div>
+                    </button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => openChapterContentView(chapter)}
+                      className="h-10 shrink-0 rounded-2xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                    >
+                      <FolderOpen size={16} className="mr-2" />
+                      Content
+                    </Button>
+                  </div>
+
+                  {isExpanded && chapterConceptRows.length > 0 && (
+                    <div className="border-t border-slate-200/80 bg-white px-6">
+                      <div className="divide-y divide-slate-200/80">
+                        {chapterConceptRows.map((concept, index) => (
+                          <div
+                            key={concept}
+                            className="flex flex-col gap-3 py-3.5 lg:flex-row lg:items-center lg:justify-between"
+                          >
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
+                                {index + 1}
+                              </div>
+                              <p className="truncate text-[15px] font-medium text-slate-950">{concept}</p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => openConceptDrawer(chapter, concept, index)}
+                                className="h-9 rounded-xl border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                              >
+                                <Brain size={16} className="mr-2 text-[#4f46e5]" />
+                                Concept Intelligence
+                              </Button>
+                              <Button
+                                type="button"
+                                onClick={() => openGenerateQuestionsModal(chapter, concept, index)}
+                                className="h-9 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] hover:bg-[#4338ca]"
+                              >
+                                <Sparkles size={16} className="mr-2" />
+                                Generate Questions
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -2102,17 +2419,18 @@ export default function ChapterListPage() {
       </div>
 
       {uploadContentModal}
+      {generateQuestionsModal}
 
       {conceptDrawer && (
         <div
-          className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 backdrop-blur-[1px]"
+          className="fixed inset-0 z-50 flex justify-end bg-slate-950/45 backdrop-blur-[2px]"
           onClick={closeConceptDrawer}
         >
           <aside
             role="dialog"
             aria-modal="true"
             aria-labelledby="concept-intelligence-title"
-            className="flex h-full w-full max-w-[500px] flex-col border-l border-slate-200/80 bg-white shadow-[-18px_0_50px_rgba(15,23,42,0.16)] transition-transform duration-300"
+            className="flex h-full w-full max-w-[520px] flex-col overflow-hidden rounded-l-[28px] border-l border-slate-200/80 bg-white shadow-[-24px_0_70px_rgba(15,23,42,0.18)] transition-transform duration-300"
             onClick={(event) => event.stopPropagation()}
           >
             {(() => {
@@ -2137,9 +2455,9 @@ export default function ChapterListPage() {
 
               return (
                 <>
-                  <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-6 py-5">
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-5 py-5 sm:px-6">
                     <div>
-                      <h2 id="concept-intelligence-title" className="text-[18px] font-bold tracking-tight text-slate-950">
+                      <h2 id="concept-intelligence-title" className="text-[18px] font-bold tracking-tight text-slate-950 sm:text-[20px]">
                         {conceptDrawer.conceptTitle}
                       </h2>
                     </div>
@@ -2153,129 +2471,23 @@ export default function ChapterListPage() {
                     </button>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto px-6 py-5">
-                    <div className="pointer-events-none fixed right-5 top-5 z-20 flex w-[min(420px,calc(100vw-2.5rem))] flex-col gap-3">
-                      <div
-                        className={cn(
-                          'pointer-events-auto overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.18)] transition-all duration-300',
-                          isGeneratingPresentation
-                            ? 'translate-y-0 opacity-100'
-                            : '-translate-y-2 opacity-0'
-                        )}
-                      >
-                        <div className="flex gap-3 border-l-4 border-[#4f46e5] px-4 py-3">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f46e5]">
-                            <Sparkles size={16} className="animate-pulse" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[15px] font-semibold text-slate-900">
-                              Generating Teacher Training Presentation...
-                            </p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              &quot;{conceptDrawer.chapter.title}&quot;
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setIsGeneratingPresentation(false)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                            aria-label="Dismiss generating notification"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div
-                        className={cn(
-                          'pointer-events-auto overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.18)] transition-all duration-300',
-                          isPresentationReady
-                            ? 'translate-y-0 opacity-100'
-                            : '-translate-y-2 opacity-0'
-                        )}
-                      >
-                        <div className="flex gap-3 border-l-4 border-emerald-500 px-4 py-3">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                            <CheckCircle2 size={16} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[15px] font-semibold text-slate-900">
-                              Teacher Training Presentation Ready
-                            </p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              Added chapter content for &quot;{conceptDrawer.chapter.title}&quot; to the presentation.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setIsPresentationReady(false)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                            aria-label="Dismiss success notification"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
+                  <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
+                        <Sparkles size={12} className="mr-1.5" />
                         {details.domain}
                       </Badge>
                       <Badge className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                        <Orbit size={12} className="mr-1.5" />
                         {details.dok}
                       </Badge>
                       <Badge className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
-                        {details.topic}
+                        <BookOpen size={12} className="mr-1.5" />
+                        {conceptDrawer.chapter.title}
                       </Badge>
                     </div>
 
-                    <div className="mt-5 rounded-[14px] border border-slate-200/80 bg-[#f8fbff] p-3">
-                      <div className="flex flex-col gap-3 sm:flex-row">
-                        <Button
-                          type="button"
-                          className="h-10 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
-                        >
-                          <Sparkles size={16} className="mr-2" />
-                          Generate questions
-                        </Button>
-                        <div className="relative flex-1">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsPresentationMenuOpen((prev) => !prev)}
-                            className="h-10 w-full justify-between rounded-xl border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50"
-                          >
-                            <span>Generate classroom presentation</span>
-                            {isPresentationMenuOpen ? (
-                              <ChevronUp size={16} className="text-slate-500" />
-                            ) : (
-                              <ChevronDown size={16} className="text-slate-500" />
-                            )}
-                          </Button>
-
-                          <div
-                            className={cn(
-                              'absolute left-0 top-[calc(100%+8px)] z-10 w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_16px_34px_rgba(15,23,42,0.12)] transition-all duration-200',
-                              isPresentationMenuOpen
-                                ? 'pointer-events-auto translate-y-0 opacity-100'
-                                : 'pointer-events-none -translate-y-2 opacity-0'
-                            )}
-                          >
-                            <button
-                              type="button"
-                              onClick={generateTeacherTrainingPresentation}
-                              className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
-                            >
-                              <BriefcaseBusiness size={16} className="text-slate-500" />
-                              Teacher training presentation
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 space-y-5">
+                    <div className="mt-6 space-y-5">
                       {detailSections.map((section) => {
                         const SectionIcon = section.icon;
 
@@ -2617,3 +2829,4 @@ export default function ChapterListPage() {
     </div>
   );
 }
+
