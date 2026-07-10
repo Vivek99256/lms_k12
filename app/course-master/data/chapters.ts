@@ -25,6 +25,7 @@ interface ApiChapterSource {
   total_content?: number | string;
   total_triz_content?: number | string;
   total_OER_content?: number | string;
+  content_categories?: Record<string, unknown[]>;
 }
 
 export interface SubjectWithChapters {
