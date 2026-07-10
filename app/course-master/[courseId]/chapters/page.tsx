@@ -49,11 +49,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { courses, type Course } from '../../data/courses';
 import {
+  fetchChapterContent,
   getChaptersByCourseid,
   getConceptIntelligenceData,
   getSubjectAndChapters,
+  type ChapterContentAsset,
   type SubjectWithChapters,
 } from '../../data/chapters';
+import { getRequestContext } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import type { Chapter } from '../../data/chapters';
@@ -151,11 +154,53 @@ interface ChapterContentItem {
   statValue: string;
   updatedDate: string;
   updatedAt: string;
+  contentUrl?: string;
   slides: {
     id: string;
     number: number;
     title: string;
   }[];
+}
+
+function getApiContentType(category: string, asset: ChapterContentAsset): ChapterContentType {
+  const contentLabel = `${category} ${asset.file_type ?? ''} ${asset.title}`.toLowerCase();
+  if (contentLabel.includes('video') || /\.(mp4|mov|webm)(?:$|\?)/.test(asset.filename ?? '')) return 'Video';
+  if (contentLabel.includes('presentation') || /\.(ppt|pptx)(?:$|\?)/.test(asset.filename ?? '')) {
+    return 'Classroom presentation';
+  }
+  if (contentLabel.includes('pdf')) return 'PDF';
+  return 'Revision notes';
+}
+
+function buildApiChapterContentItems(
+  chapter: Chapter,
+  categories: Record<string, ChapterContentAsset[]>
+): ChapterContentItem[] {
+  return Object.entries(categories).flatMap(([category, assets]) =>
+    (assets ?? []).map((asset) => {
+      const type = getApiContentType(category, asset);
+      const contentUrl = asset.url || asset.filename || undefined;
+      const updatedDate = asset.created_at?.split(' ')[0] ?? '—';
+
+      return {
+        id: String(asset.id),
+        title: asset.title || 'Untitled content',
+        subtitle: asset.description || category,
+        chapterTitle: chapter.title,
+        conceptTitle: category,
+        type,
+        source: 'Uploaded',
+        preview: getChapterContentPreview(type),
+        actionLabel: type === 'Video' ? 'Play' : 'Open',
+        slideCount: 0,
+        statValue: asset.file_type || category,
+        updatedDate,
+        updatedAt: updatedDate === '—' ? 'Date unavailable' : `updated ${updatedDate}`,
+        contentUrl,
+        slides: [],
+      };
+    })
+  );
 }
 
 interface ConceptIntelligenceDetails {
@@ -515,6 +560,11 @@ export default function ChapterListPage() {
   const [contentGroupBy, setContentGroupBy] =
     useState<'Chapter wise' | 'Concept wise'>('Chapter wise');
   const [selectedContentItem, setSelectedContentItem] = useState<ChapterContentItem | null>(null);
+  const [chapterContentCategories, setChapterContentCategories] = useState<
+    Record<string, Record<string, ChapterContentAsset[]>>
+  >({});
+  const [contentLoading, setContentLoading] = useState(false);
+  const [contentError, setContentError] = useState('');
   const [questionModalConcept, setQuestionModalConcept] = useState<{
     chapter: Chapter;
     conceptTitle: string;
@@ -579,8 +629,11 @@ export default function ChapterListPage() {
 
   const chapterContentItems = useMemo(() => {
     if (!course || !activeLibraryChapter) return [];
+    const apiCategories = chapterContentCategories[activeLibraryChapter.id];
+    if (apiCategories) return buildApiChapterContentItems(activeLibraryChapter, apiCategories);
+    if (/^\d+$/.test(activeLibraryChapter.id)) return [];
     return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
-  }, [activeLibraryChapter, activeLibraryChapterConcepts, course]);
+  }, [activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, course]);
 
   const contentSourceOptions = useMemo(
     () => Array.from(new Set(chapterContentItems.map((item) => item.source))),
@@ -622,6 +675,47 @@ export default function ChapterListPage() {
       setSelectedLibraryChapterId(contentChapter.id);
     }
   }, [allChapters, contentChapter, selectedLibraryChapterId]);
+
+  useEffect(() => {
+    if (view !== 'content' || !activeLibraryChapter || !/^\d+$/.test(activeLibraryChapter.id)) return;
+    if (chapterContentCategories[activeLibraryChapter.id]) return;
+
+    const requestContext = getRequestContext();
+    if (!requestContext) {
+      queueMicrotask(() => setContentError('Course master session data is missing.'));
+      return;
+    }
+
+    let cancelled = false;
+    Promise.resolve()
+      .then(() => {
+        if (!cancelled) {
+          setContentLoading(true);
+          setContentError('');
+        }
+        return fetchChapterContent(Number(activeLibraryChapter.id), requestContext.sub_institute_id);
+      })
+      .then((response) => {
+        if (!cancelled) {
+          setChapterContentCategories((current) => ({
+            ...current,
+            [activeLibraryChapter.id]: response.content_categories,
+          }));
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setContentError(error instanceof Error ? error.message : 'Failed to load chapter content.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setContentLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLibraryChapter, chapterContentCategories, view]);
 
   const filteredChapterContentItems = useMemo(() => {
     return chapterContentItems.filter((item) => {
@@ -2008,9 +2102,24 @@ export default function ChapterListPage() {
           </div>
 
           <p className="mb-5 text-sm text-slate-500">
-            {filteredChapterContentItems.length} items in {activeChapterTitle}
+            {contentLoading ? 'Loading content…' : `${filteredChapterContentItems.length} items in ${activeChapterTitle}`}
           </p>
 
+          {contentError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {contentError}
+            </div>
+          ) : contentLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {[1, 2, 3, 4].map((item) => (
+                <div key={item} className="h-72 animate-pulse rounded-2xl bg-slate-100" />
+              ))}
+            </div>
+          ) : filteredChapterContentItems.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500">
+              No content is available for this chapter.
+            </div>
+          ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {filteredChapterContentItems.map((item) => {
               const PreviewIcon = getContentPreviewIcon(item.preview);
@@ -2066,6 +2175,7 @@ export default function ChapterListPage() {
               );
             })}
           </div>
+          )}
 
           <div
             className={cn(
@@ -2144,6 +2254,17 @@ export default function ChapterListPage() {
                       <dt className="text-slate-500">Updated</dt>
                       <dd className="font-medium text-slate-900">{selectedContentItem.updatedDate}</dd>
                     </dl>
+
+                    {selectedContentItem.contentUrl ? (
+                      <a
+                        href={selectedContentItem.contentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-6 inline-flex h-10 items-center rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#4338ca]"
+                      >
+                        {isVideoContent ? 'Play content' : 'Open content'}
+                      </a>
+                    ) : null}
 
                     {isVideoContent ? (
                       <section className="mt-8">
