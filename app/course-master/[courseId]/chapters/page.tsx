@@ -60,6 +60,7 @@ import { getRequestContext } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import type { Chapter } from '../../data/chapters';
+import { GeneratePresentationDrawer } from './sideDrawer';
 
 const EMPTY_CHAPTER_FORM = {
   chapterName: '',
@@ -76,9 +77,8 @@ const UPLOAD_CONTENT_TYPES = ['Presentation', 'Video', 'Revision notes', 'Classr
 const UPLOAD_PRESENTATION_TYPES = ['Classroom presentation', 'Teacher training presentation'] as const;
 const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
 const QUESTION_TYPE_OPTIONS = ['Multiple choice', 'True or false', 'Short answer', 'Assertion and reason'] as const;
-const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
-const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
 const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity'] as const;
+
 const UPLOAD_TYPE_CONFIG: Record<
   (typeof UPLOAD_CONTENT_TYPES)[number],
   {
@@ -185,7 +185,7 @@ function buildApiChapterContentItems(
       return {
         id: String(asset.id),
         title: asset.title || 'Untitled content',
-        subtitle: asset.description || category,
+        subtitle: category,
         chapterTitle: chapter.title,
         conceptTitle: category,
         type,
@@ -280,11 +280,6 @@ function getCourseGradeLabel(classGrade: string) {
 
 function getCurriculumLabel() {
   return 'CBSE curriculum';
-}
-
-function getChapterWindow(chapterNumber: number) {
-  const ranges = ['Apr W1-W3', 'Apr W4-May W2', 'Jun W3-Jul W3', 'Aug W1-Sep W2', 'Sep W3-Oct W4'];
-  return ranges[(chapterNumber - 1) % ranges.length];
 }
 
 function buildTeacherResources(chapterTitle: string) {
@@ -459,6 +454,12 @@ function getContentPreviewIcon(preview: ChapterContentPreview) {
   return BookOpen;
 }
 
+function truncateToWords(value: string, maxWords = 150): string {
+  const words = value.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return value;
+  return words.slice(0, maxWords).join(' ') + '…';
+}
+
 export default function ChapterListPage() {
   const router = useRouter();
   const params = useParams();
@@ -525,12 +526,7 @@ export default function ChapterListPage() {
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
   const [isPresentationReady, setIsPresentationReady] = useState(false);
   const [isGeneratePresentationDrawerOpen, setIsGeneratePresentationDrawerOpen] = useState(false);
-  const [presentationMode, setPresentationMode] = useState<'Classroom' | 'Teacher training'>('Classroom');
-  const [presentationChapterId, setPresentationChapterId] = useState('');
-  const [presentationConcept, setPresentationConcept] = useState('');
-  const [presentationSlides, setPresentationSlides] = useState<string>(PRESENTATION_SLIDE_OPTIONS[2]);
-  const [presentationTheme, setPresentationTheme] = useState<string>(GAMMA_THEME_OPTIONS[0]);
-  const [presentationAudienceNotes, setPresentationAudienceNotes] = useState('');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploadContentType, setUploadContentType] = useState<(typeof UPLOAD_CONTENT_TYPES)[number]>(
     UPLOAD_CONTENT_TYPES[0]
   );
@@ -593,7 +589,6 @@ export default function ChapterListPage() {
         : null,
     [activeLibraryChapter, course]
   );
-  const contentChapterConceptOptions = contentChapterConcepts?.concepts ?? [];
 
   const filteredChapters = useMemo(() => {
     return allChapters.filter((chapter) => {
@@ -640,10 +635,6 @@ export default function ChapterListPage() {
     [chapterContentItems]
   );
 
-  const presentationConceptOptions = useMemo(() => {
-    if (!presentationChapterId || !course) return [];
-    return getChapterKeyConcepts(course.id, presentationChapterId)?.concepts ?? [];
-  }, [course, presentationChapterId]);
   const uploadChapterOptions = useMemo(
     () => allChapters.map((chapter) => ({ id: chapter.id, title: chapter.title })),
     [allChapters]
@@ -995,12 +986,6 @@ export default function ChapterListPage() {
   };
 
   const openGeneratePresentationDrawer = () => {
-    setPresentationMode('Classroom');
-    setPresentationChapterId(activeLibraryChapter?.id ?? contentChapter?.id ?? '');
-    setPresentationConcept(activeLibraryChapterConcepts?.concepts[0]?.title ?? '');
-    setPresentationSlides(PRESENTATION_SLIDE_OPTIONS[2]);
-    setPresentationTheme(GAMMA_THEME_OPTIONS[0]);
-    setPresentationAudienceNotes('');
     setIsGeneratePresentationDrawerOpen(true);
   };
 
@@ -1008,17 +993,12 @@ export default function ChapterListPage() {
     setIsGeneratePresentationDrawerOpen(false);
   };
 
-  useEffect(() => {
-    if (!presentationChapterId) return;
-
-    const matchingConcept = presentationConceptOptions.find(
-      (concept) => concept.title === presentationConcept
-    );
-
-    if (!matchingConcept) {
-      setPresentationConcept(presentationConceptOptions[0]?.title ?? '');
-    }
-  }, [presentationChapterId, presentationConcept, presentationConceptOptions]);
+  const handleGenerateSuccess = (raw: Record<string, unknown>) => {
+    setSuccessMessage((raw.message as string) || 'Gamma content generated successfully');
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  };
 
   const uploadContentModal = uploadChapter ? (
     <div
@@ -1106,7 +1086,9 @@ export default function ChapterListPage() {
                 </Label>
                 <Select value={uploadChapterId} onValueChange={(value) => setUploadChapterId(value ?? '')}>
                   <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                    <SelectValue placeholder="Select chapter" />
+                    <SelectValue placeholder="Select chapter">
+                      {allChapters.find(ch => ch.id === uploadChapterId)?.title || 'Select chapter'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {uploadChapterOptions.map((chapter) => (
@@ -1347,186 +1329,6 @@ export default function ChapterListPage() {
       </div>
     </div>
   ) : null;
-
-  const generatePresentationDrawer = (
-    <div
-      className={cn(
-        'fixed inset-0 z-50 transition-all duration-300',
-        isGeneratePresentationDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'
-      )}
-    >
-      <div
-        className={cn(
-          'absolute inset-0 bg-slate-950/45 transition-opacity duration-300',
-          isGeneratePresentationDrawerOpen ? 'opacity-100' : 'opacity-0'
-        )}
-        onClick={closeGeneratePresentationDrawer}
-      />
-
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="generate-presentation-title"
-        className={cn(
-          'absolute right-0 top-0 flex h-full w-full max-w-[700px] flex-col overflow-hidden rounded-l-[28px] border-l border-slate-200/80 bg-white shadow-[-24px_0_70px_rgba(15,23,42,0.18)] transition-transform duration-300',
-          isGeneratePresentationDrawerOpen ? 'translate-x-0' : 'translate-x-full'
-        )}
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-5 py-5 sm:px-6">
-          <div>
-            <h2 id="generate-presentation-title" className="text-[18px] font-bold tracking-tight text-slate-950 sm:text-[20px]">
-              Generate presentation
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={closeGeneratePresentationDrawer}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-            aria-label="Close drawer"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-slate-600 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#4f46e5] ring-1 ring-slate-200/80">
-                <Sparkles size={16} />
-              </div>
-              <p className="text-[15px] leading-7">
-                Slides are drafted with <span className="font-semibold text-slate-900">Gamma</span> from concept intelligence, then added to your content library.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 rounded-2xl bg-slate-100/90 p-1">
-            <div className="grid grid-cols-2 gap-1">
-              {(['Classroom', 'Teacher training'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setPresentationMode(mode)}
-                  className={cn(
-                    'rounded-xl px-4 py-3 text-left text-[15px] font-semibold transition-colors',
-                    presentationMode === mode
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  )}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Chapter
-              </Label>
-              <Select value={presentationChapterId} onValueChange={(value) => setPresentationChapterId(value ?? '')}>
-                <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                  <SelectValue placeholder="Select chapter" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allChapters.map((chapter) => (
-                    <SelectItem key={chapter.id} value={chapter.id}>
-                      {chapter.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Concept
-              </Label>
-              <Select value={presentationConcept} onValueChange={(value) => setPresentationConcept(value ?? '')}>
-                <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                  <SelectValue placeholder="Select concept" />
-                </SelectTrigger>
-                <SelectContent>
-                  {presentationConceptOptions.map((concept) => (
-                    <SelectItem key={concept.title} value={concept.title}>
-                      {concept.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Slides
-              </Label>
-              <Select value={presentationSlides} onValueChange={(value) => setPresentationSlides(value ?? '')}>
-                <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                  <SelectValue placeholder="Select slide count" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRESENTATION_SLIDE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Gamma Theme
-              </Label>
-              <Select value={presentationTheme} onValueChange={(value) => setPresentationTheme(value ?? '')}>
-                <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                  <SelectValue placeholder="Select theme" />
-                </SelectTrigger>
-                <SelectContent>
-                  {GAMMA_THEME_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="mt-6 space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Audience Notes (Optional)
-            </Label>
-            <Textarea
-              value={presentationAudienceNotes}
-              onChange={(event) => setPresentationAudienceNotes(event.target.value)}
-              placeholder="e.g. keep language simple, add two local examples"
-              className="min-h-[108px] rounded-2xl border-slate-300 px-4 py-3 text-[15px] text-slate-900 placeholder:text-slate-400"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-4 border-t border-slate-200/80 px-5 py-5 sm:px-6">
-          <button
-            type="button"
-            onClick={closeGeneratePresentationDrawer}
-            className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900"
-          >
-            Cancel
-          </button>
-          <Button
-            type="button"
-            onClick={closeGeneratePresentationDrawer}
-            className="h-12 rounded-2xl bg-[#4f46e5] px-6 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
-          >
-            <Sparkles size={16} className="mr-2" />
-            Generate with Gamma
-          </Button>
-        </div>
-      </aside>
-    </div>
-  );
 
   if (subjectLoading && !course) {
     return (
@@ -2149,8 +1951,8 @@ export default function ChapterListPage() {
                     <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
                       {item.chapterTitle}
                     </div>
-                    <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-                    <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-600">{item.subtitle}</p>
+                     <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
+                     <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-600">{truncateToWords(item.subtitle, 150)}</p>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
                       <p className="text-xs text-slate-500">
@@ -2238,6 +2040,10 @@ export default function ChapterListPage() {
                       </Badge>
                     </div>
 
+                    {selectedContentItem.subtitle ? (
+                      <p className="mt-4 text-sm leading-7 text-slate-600">{selectedContentItem.subtitle}</p>
+                    ) : null}
+
                     <dl className="mt-6 grid gap-y-4 text-sm sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-5">
                       <dt className="text-slate-500">Chapter</dt>
                       <dd className="font-medium text-slate-900">{selectedContentItem.chapterTitle}</dd>
@@ -2317,7 +2123,16 @@ export default function ChapterListPage() {
           </div>
           {uploadContentModal}
           {generateQuestionsModal}
-          {generatePresentationDrawer}
+          <GeneratePresentationDrawer
+            isOpen={isGeneratePresentationDrawerOpen}
+            onClose={closeGeneratePresentationDrawer}
+            allChapters={allChapters}
+            courseId={course.id}
+            course={course}
+            initialChapterId={activeLibraryChapter?.id ?? contentChapter?.id ?? ''}
+            initialConcept={activeLibraryChapterConcepts?.concepts[0]?.title ?? ''}
+            onSuccess={handleGenerateSuccess}
+          />
         </div>
       </div>
     );
@@ -2326,6 +2141,12 @@ export default function ChapterListPage() {
   return (
     <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
       <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8 ">
+        {successMessage && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
+            <CheckCircle2 size={16} className="shrink-0" />
+            {successMessage}
+          </div>
+        )}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -2929,4 +2750,3 @@ export default function ChapterListPage() {
     </div>
   );
 }
-
