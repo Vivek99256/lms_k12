@@ -1254,16 +1254,17 @@ export default function StudentHomeworkIndexPage() {
       current.map((chapter) => {
         if (chapter.chapterId !== activeStudentChapter.chapterId) return chapter;
 
-        const updatedConcepts = chapter.concepts.map((concept, index, concepts) => {
+        const updatedConcepts: StudentConceptProgress[] = chapter.concepts.map((concept, index, concepts) => {
           if (concept.id === activePracticeConcept.id) {
             const attemptsCount = concept.attemptsCount + 1;
+            const nextStatus: StudentConceptStatus = didMasterConcept ? 'Mastered' : 'In progress';
 
             return {
               ...concept,
               mastery: nextMastery,
               attemptsCount,
               attemptsLabel: `${nextMastery}%`,
-              status: didMasterConcept ? 'Mastered' : 'In progress',
+              status: nextStatus,
               subtitle: didMasterConcept
                 ? `Mastered · ${attemptsCount} ${attemptsCount === 1 ? 'attempt' : 'attempts'}`
                 : formatPracticeAttemptSubtitle(attemptsCount, activePracticeAssessment.masteryTarget),
@@ -1279,7 +1280,7 @@ export default function StudentHomeworkIndexPage() {
           ) {
             return {
               ...concept,
-              status: 'In progress',
+              status: 'In progress' as StudentConceptStatus,
               canLearn: true,
               canPractice: true,
               subtitle: formatPracticeAttemptSubtitle(concept.attemptsCount, activePracticeAssessment.masteryTarget),
