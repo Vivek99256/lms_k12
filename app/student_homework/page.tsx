@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Award,
   ArrowLeft,
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { ChatbotLayoutContext } from '@/app/components/DashboardShell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -857,6 +858,7 @@ function formatDurationLabel(totalSeconds: number): string {
 
 
 export default function StudentHomeworkIndexPage() {
+  const { isChatbotOpen } = useContext(ChatbotLayoutContext);
   const [audienceMode, setAudienceMode] = useState<AudienceMode>(() => {
     if (typeof window === 'undefined') return 'Teacher';
     const stored = localStorage.getItem('learningManagementAudienceMode');
@@ -2274,7 +2276,11 @@ export default function StudentHomeworkIndexPage() {
                             return (
                               <div
                                 key={concept.id}
-                                className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.6fr)_170px_120px_auto] lg:items-center"
+                                className={
+                                  isChatbotOpen
+                                    ? 'grid gap-4 px-5 py-5'
+                                    : 'grid gap-4 px-5 py-5 2xl:grid-cols-[minmax(0,1.35fr)_170px_120px_auto] 2xl:items-center'
+                                }
                               >
                                 <div className="flex min-w-0 items-start gap-3">
                                   <span
@@ -2309,7 +2315,7 @@ export default function StudentHomeworkIndexPage() {
                                   </div>
                                 </div>
 
-                                <div>
+                                <div className={isChatbotOpen ? 'min-w-0 max-w-full' : 'min-w-0 max-w-[320px]'}>
                                   <div className="flex items-center justify-between gap-3 text-[13px] text-[#4E6280]">
                                     <span>{concept.attemptsLabel}</span>
                                     <span>{concept.mastery}%</span>
@@ -2322,7 +2328,7 @@ export default function StudentHomeworkIndexPage() {
                                   </div>
                                 </div>
 
-                                <div>
+                                <div className={isChatbotOpen ? '' : '2xl:col-span-1'}>
                                   <span
                                     className={`inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-semibold ${studentStatusBadgeClasses[concept.status]}`}
                                   >
@@ -2330,15 +2336,21 @@ export default function StudentHomeworkIndexPage() {
                                   </span>
                                 </div>
 
-                                <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
+                                <div
+                                  className={
+                                    isChatbotOpen
+                                      ? 'flex flex-col gap-2'
+                                      : 'flex flex-col gap-2 sm:flex-row sm:flex-wrap 2xl:col-span-1 2xl:flex-nowrap 2xl:justify-end'
+                                  }
+                                >
                                   <button
                                     type="button"
                                     disabled={!concept.canLearn}
-                                    className={`inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition ${
+                                    className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition ${
                                       concept.canLearn
                                         ? 'border-[#D6DEEA] bg-white text-[#334155] hover:border-[#B7C5D8]'
                                         : 'cursor-not-allowed border-[#E2E8F0] bg-[#F8FAFC] text-[#A0AEC0]'
-                                    }`}
+                                    } ${isChatbotOpen ? 'w-full' : ''}`}
                                   >
                                     <BookOpen size={14} />
                                     Learn content
@@ -2347,11 +2359,11 @@ export default function StudentHomeworkIndexPage() {
                                     type="button"
                                     disabled={!concept.canPractice}
                                     onClick={() => openPracticeAssessmentModal(concept.id)}
-                                    className={`inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition ${
+                                    className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition ${
                                       concept.canPractice
                                         ? 'border-[#CBD5E1] bg-white text-[#172554] hover:border-[#94A3B8]'
                                         : 'cursor-not-allowed border-[#E2E8F0] bg-[#F8FAFC] text-[#A0AEC0]'
-                                    }`}
+                                    } ${isChatbotOpen ? 'w-full' : ''}`}
                                   >
                                     <FileText size={14} />
                                     Practice assessment
