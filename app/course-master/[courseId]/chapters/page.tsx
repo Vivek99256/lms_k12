@@ -50,10 +50,12 @@ import { cn } from '@/lib/utils';
 import { courses, type Course } from '../../data/courses';
 import {
   fetchChapterContent,
+  generateIntelligenceQuestions,
   getChaptersByCourseid,
   getConceptIntelligenceData,
   getSubjectAndChapters,
   type ChapterContentAsset,
+  type GeneratedQuestionPreview,
   type SubjectWithChapters,
 } from '../../data/chapters';
 import { getRequestContext } from '../../page';
@@ -75,7 +77,14 @@ const RESOURCE_FILE_TYPES = ['PDF', 'PPT', 'DOCX', 'Video Link'] as const;
 const UPLOAD_CONTENT_TYPES = ['Presentation', 'Video', 'Revision notes', 'Classroom activity'] as const;
 const UPLOAD_PRESENTATION_TYPES = ['Classroom presentation', 'Teacher training presentation'] as const;
 const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
-const QUESTION_TYPE_OPTIONS = ['Multiple choice', 'True or false', 'Short answer', 'Assertion and reason'] as const;
+const QUESTION_TYPE_OPTIONS = ['MCQ', 'Narrative'] as const;
+const QUESTION_TYPE_API_CONFIG: Record<
+  (typeof QUESTION_TYPE_OPTIONS)[number],
+  { question_type: 'mcq' | 'narrative'; question_type_id: number }
+> = {
+  MCQ: { question_type: 'mcq', question_type_id: 1 },
+  Narrative: { question_type: 'narrative', question_type_id: 2 },
+};
 const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
 const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
 const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity'] as const;
@@ -572,6 +581,10 @@ export default function ChapterListPage() {
   } | null>(null);
   const [questionType, setQuestionType] = useState('');
   const [totalQuestions, setTotalQuestions] = useState('');
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [questionGenerationError, setQuestionGenerationError] = useState('');
+  const [questionGenerationSuccess, setQuestionGenerationSuccess] = useState('');
+  const [generatedQuestionPreviews, setGeneratedQuestionPreviews] = useState<GeneratedQuestionPreview[]>([]);
 
   const view = searchParams.get('view');
   const activeChapterId = searchParams.get('chapterId') ?? '';
@@ -665,7 +678,7 @@ export default function ChapterListPage() {
     Number.isInteger(totalQuestionsNumber) &&
     totalQuestionsNumber >= 1 &&
     totalQuestionsNumber <= 50;
-  const canGenerateQuestions = questionType !== '' && isTotalQuestionsValid;
+  const canGenerateQuestions = questionType !== '' && isTotalQuestionsValid && !isGeneratingQuestions;
 
   useEffect(() => {
     if (!contentChapter) return;
@@ -782,6 +795,8 @@ export default function ChapterListPage() {
         setQuestionModalConcept(null);
         setQuestionType('');
         setTotalQuestions('');
+        setQuestionGenerationError('');
+        setQuestionGenerationSuccess('');
         if (presentationTimerRef.current) {
           clearTimeout(presentationTimerRef.current);
           presentationTimerRef.current = null;
@@ -986,12 +1001,80 @@ export default function ChapterListPage() {
     });
     setQuestionType('');
     setTotalQuestions('');
+    setQuestionGenerationError('');
+    setQuestionGenerationSuccess('');
+    setGeneratedQuestionPreviews([]);
   };
 
   const closeGenerateQuestionsModal = () => {
     setQuestionModalConcept(null);
     setQuestionType('');
     setTotalQuestions('');
+    setQuestionGenerationError('');
+    setQuestionGenerationSuccess('');
+    setGeneratedQuestionPreviews([]);
+  };
+
+  const submitGenerateQuestions = async () => {
+    if (!questionModalConcept || !isTotalQuestionsValid || !questionType) return;
+
+    const requestContext = getRequestContext();
+    if (!requestContext) {
+      setQuestionGenerationError('Course master session data is missing.');
+      return;
+    }
+
+    const selectedConcept = questionModalConcept.chapter.concepts?.find(
+      (concept) => concept.title === questionModalConcept.conceptTitle
+    );
+    const chapterId = Number(questionModalConcept.chapter.id);
+    const conceptId = Number(selectedConcept?.id);
+    const numericSubjectId = Number(subjectData?.subject?.subject_id ?? subjectId);
+    const numericStandardId = Number(subjectData?.subject?.standard_id ?? standardId);
+
+    if (![chapterId, conceptId, numericSubjectId, numericStandardId].every(Number.isFinite)) {
+      setQuestionGenerationError('Question generation needs saved chapter, subject, standard, and concept IDs.');
+      return;
+    }
+
+    const config = QUESTION_TYPE_API_CONFIG[questionType as (typeof QUESTION_TYPE_OPTIONS)[number]];
+    if (!config) {
+      setQuestionGenerationError('Please select a valid question type.');
+      return;
+    }
+
+    setIsGeneratingQuestions(true);
+    setQuestionGenerationError('');
+    setQuestionGenerationSuccess('');
+    setGeneratedQuestionPreviews([]);
+
+    try {
+      const response = await generateIntelligenceQuestions({
+        chapter_id: chapterId,
+        subject_id: numericSubjectId,
+        standard_id: numericStandardId,
+        concept_id: conceptId,
+        sub_institute_id: requestContext.sub_institute_id,
+        question_type: config.question_type,
+        question_type_id: config.question_type_id,
+        total_questions: totalQuestionsNumber,
+        created_by: requestContext.user_id,
+      });
+
+      const inserted = response.data?.inserted;
+      setQuestionGenerationSuccess(
+        inserted != null
+          ? `${response.message} ${inserted} question${inserted === 1 ? '' : 's'} saved.`
+          : response.message
+      );
+      setGeneratedQuestionPreviews(response.data?.questions ?? []);
+    } catch (error: unknown) {
+      setQuestionGenerationError(
+        error instanceof Error ? error.message : 'Failed to generate questions.'
+      );
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
   };
 
   const openGeneratePresentationDrawer = () => {
@@ -1256,6 +1339,94 @@ export default function ChapterListPage() {
     </div>
   ) : null;
 
+  const renderGeneratedQuestionPreview = (question: GeneratedQuestionPreview, index: number) => {
+    const answer = question.answer ?? {};
+    const options = answer.options ?? [];
+    const markingPoints = answer.marking_points ?? [];
+
+    return (
+      <article
+        key={`${question.id}-${index}`}
+        className="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm"
+      >
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+          <span>Question {index + 1}</span>
+          <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">
+            ID {question.id}
+          </span>
+          {answer.bloom_level ? (
+            <span className="rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-700">
+              {answer.bloom_level}
+            </span>
+          ) : null}
+          {question.points ? (
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">
+              {question.points} mark{question.points === 1 ? '' : 's'}
+            </span>
+          ) : null}
+        </div>
+
+        <h3 className="mt-3 text-[15px] font-semibold leading-6 text-slate-950">
+          {question.question_title}
+        </h3>
+
+        {options.length > 0 ? (
+          <div className="mt-3 grid gap-2">
+            {options.map((option, optionIndex) => (
+              <div
+                key={`${option.label ?? optionIndex}-${option.text ?? optionIndex}`}
+                className={cn(
+                  'flex gap-3 rounded-[8px] border px-3 py-2 text-sm',
+                  option.is_correct
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                    : 'border-slate-200 bg-slate-50 text-slate-700'
+                )}
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-700">
+                  {option.label ?? String.fromCharCode(65 + optionIndex)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p>{option.text}</p>
+                  {option.is_correct ? (
+                    <p className="mt-1 text-xs font-semibold text-emerald-700">Correct answer</p>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {answer.model_answer ? (
+          <div className="mt-3 rounded-[8px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">
+              Model answer
+            </p>
+            <p className="mt-1 leading-6">{answer.model_answer}</p>
+          </div>
+        ) : null}
+
+        {markingPoints.length > 0 ? (
+          <div className="mt-3 rounded-[8px] border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Marking points
+            </p>
+            <ul className="mt-2 space-y-1 text-sm text-slate-700">
+              {markingPoints.map((point, pointIndex) => (
+                <li key={`${point.criterion ?? pointIndex}`} className="leading-6">
+                  {point.criterion}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {answer.explanation ? (
+          <p className="mt-3 text-sm leading-6 text-slate-600">{answer.explanation}</p>
+        ) : null}
+      </article>
+    );
+  };
+
   const generateQuestionsModal = questionModalConcept ? (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-[2px]"
@@ -1265,10 +1436,10 @@ export default function ChapterListPage() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="generate-ai-questions-title"
-        className="relative w-full max-w-[800px] rounded-[20px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
+        className="relative max-h-[90vh] w-full max-w-[800px] overflow-hidden rounded-[20px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="px-6 pb-6 pt-6 sm:px-8">
+        <div className="max-h-[90vh] overflow-y-auto px-6 pb-6 pt-6 sm:px-8">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2
@@ -1324,6 +1495,31 @@ export default function ChapterListPage() {
               />
               <p className="text-sm text-slate-500">Between 1 and 50</p>
             </div>
+            {questionGenerationError ? (
+              <p className="rounded-[10px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                {questionGenerationError}
+              </p>
+            ) : null}
+            {questionGenerationSuccess ? (
+              <p className="rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                {questionGenerationSuccess}
+              </p>
+            ) : null}
+            {generatedQuestionPreviews.length > 0 ? (
+              <div className="rounded-[12px] border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Generated questions
+                  </p>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                    {generatedQuestionPreviews.length} saved
+                  </span>
+                </div>
+                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                  {generatedQuestionPreviews.map(renderGeneratedQuestionPreview)}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-6 flex items-center justify-end gap-4 border-t border-slate-200/80 pt-4">
@@ -1336,11 +1532,13 @@ export default function ChapterListPage() {
             </button>
             <Button
               type="button"
+              onClick={submitGenerateQuestions}
               disabled={!canGenerateQuestions}
+              aria-busy={isGeneratingQuestions}
               className="h-10 rounded-xl bg-[#aea8ff] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(99,91,255,0.28)] hover:bg-[#978fff] disabled:bg-[#d7d2ff] disabled:text-white/85 disabled:shadow-none"
             >
               <Sparkles size={16} className="mr-2" />
-              Generate questions
+              {isGeneratingQuestions ? 'Generating...' : 'Generate questions'}
             </Button>
           </div>
         </div>
