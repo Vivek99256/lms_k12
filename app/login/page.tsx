@@ -32,6 +32,7 @@ export default function LoginPage() {
         setError('Invalid credentials. Please try again.');
         return;
       }
+      localStorage.removeItem('selectedMenuBranch');
       router.replace('/dashboard');
     } catch {
       setError('Something went wrong. Please try again.');
