@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Award,
   ArrowLeft,
@@ -25,7 +25,6 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
-import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -176,6 +175,12 @@ type QuestionPaperApiResponse = {
   data?: ApiQuestionPaperRecord[];
 };
 
+type CreateQuestionPaperApiResponse = {
+  status_code?: number;
+  message?: string;
+  id?: number;
+};
+
 type LmsCoursesChapterRecord = {
   id: number;
   chapter_name?: string | null;
@@ -195,6 +200,58 @@ type LmsCoursesApiResponse = {
   status_code?: number;
   message?: string;
   lms_subject?: Record<string, LmsCoursesSubjectRecord[] | undefined>;
+};
+
+type ChapterConceptRecord = {
+  id: number | string;
+  name?: string | null;
+  chapter_id?: number | string | null;
+};
+
+type ChapterConceptOption = {
+  value: string;
+  label: string;
+  chapterId: number;
+};
+
+type ChapterConceptsApiResponse = {
+  status?: boolean;
+  status_code?: number;
+  message?: string;
+  data?: ChapterConceptRecord[];
+};
+
+type ApiQuestionRecord = {
+  id: number | string;
+  question_title?: string | null;
+  description?: string | null;
+  concept_id?: number | string | null;
+  concept_name?: string | null;
+  concept?: {
+    name?: string | null;
+  } | null;
+  question_type_id?: number | string | null;
+  question_type_name?: string | null;
+  question_type?: {
+    name?: string | null;
+  } | null;
+  bloom_name?: string | null;
+  bloom_level?: string | null;
+  bloom?: {
+    name?: string | null;
+  } | null;
+  difficulty_name?: string | null;
+  difficulty_level?: string | null;
+  difficulty?: string | null;
+  points?: number | string | null;
+  marks?: number | string | null;
+};
+
+type QuestionsApiResponse = {
+  status?: boolean;
+  status_code?: number;
+  message?: string;
+  data?: ApiQuestionRecord[];
 };
 
 type QuestionRecord = {
@@ -708,64 +765,45 @@ const createExamSteps = [
  },
 ];
 
-const questionBank: QuestionRecord[] = [
-  {
-    id: 'q-1',
-    question: 'Select all sounds that are ultrasonic.',
-    concept: 'Audible and inaudible sounds',
-    type: 'Multiple answer',
-    bloom: 'Apply',
-    difficulty: 'Medium',
-    marks: 4,
-  },
-  {
-    id: 'q-2',
-    question: 'Describe two practical uses of ultrasound in medicine or industry.',
-    concept: 'Audible and inaudible sounds',
-    type: 'Narrative',
-    bloom: 'Understand',
-    difficulty: 'Medium',
-    marks: 5,
-  },
-  {
-    id: 'q-3',
-    question: 'Select all factors that increase the loudness of a drum beat.',
-    concept: 'Amplitude, frequency and pitch',
-    type: 'Multiple answer',
-    bloom: 'Apply',
-    difficulty: 'Easy',
-    marks: 4,
-  },
-  {
-    id: 'q-4',
-    question: 'Explain how vibration frequency changes the pitch of a guitar string.',
-    concept: 'Amplitude, frequency and pitch',
-    type: 'Short answer',
-    bloom: 'Analyze',
-    difficulty: 'Hard',
-    marks: 6,
-  },
-  {
-    id: 'q-5',
-    question: 'Match each sound source to the kind of vibration it produces.',
-    concept: 'Vibration and sound production',
-    type: 'Match',
-    bloom: 'Understand',
-    difficulty: 'Easy',
-    marks: 3,
-  },
-];
-
-const QUESTION_PAPER_DEFAULTS = {
-  subInstituteId: 1,
-  syear: 2022,
-  userProfileName: 'ADMIN',
-  userId: 6956,
-};
-
 function toNumber(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
+function getCreateExamSession() {
+  if (typeof window === 'undefined') {
+    return { token: '', subInstituteId: '', userProfileName: '', userId: '', syear: '' };
+  }
+
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+    const academicYears = userData.academicYears;
+    let syear = readString(localStorage.getItem('selectedAcademicYear'));
+
+    if (!syear && Array.isArray(academicYears) && academicYears.length > 0) {
+      const firstYear = academicYears[0] as Record<string, unknown>;
+      syear = readString(firstYear.syear);
+    }
+
+    if (!syear) {
+      syear = readString(userData.academic_year_id ?? userData.academicYearId ?? menuContext.academic_year_id);
+    }
+
+    return {
+      token: readString(userData.user_token ?? userData.token ?? menuContext.user_token ?? menuContext.token),
+      subInstituteId: readString(userData.sub_institute_id ?? menuContext.sub_institute_id),
+      userProfileName: readString(menuContext.user_profile_name ?? userData.user_profile_name),
+      userId: readString(menuContext.user_id ?? userData.user_id),
+      syear,
+    };
+  } catch {
+    return { token: '', subInstituteId: '', userProfileName: '', userId: '', syear: '' };
+  }
 }
 
 function mapQuestionPaperToExam(row: ApiQuestionPaperRecord): ExamRecord {
@@ -825,9 +863,9 @@ export default function StudentHomeworkIndexPage() {
     return stored === 'Student' ? 'Student' : 'Teacher';
   });
   const [apiExams, setApiExams] = useState<ExamRecord[]>([]);
-  const [publishedExams, setPublishedExams] = useState<ExamRecord[]>([]);
   const [isLoadingExams, setIsLoadingExams] = useState(true);
   const [examLoadError, setExamLoadError] = useState('');
+  const [publishSuccessMessage, setPublishSuccessMessage] = useState('');
   const [lmsCourses, setLmsCourses] = useState<LmsCoursesSubjectRecord[]>([]);
   const [isLoadingLmsCourses, setIsLoadingLmsCourses] = useState(false);
   const [lmsCoursesError, setLmsCoursesError] = useState('');
@@ -850,7 +888,13 @@ export default function StudentHomeworkIndexPage() {
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
   const [selectedChapters, setSelectedChapters] = useState<number[]>([]);
+  const [conceptOptions, setConceptOptions] = useState<ChapterConceptOption[]>([]);
   const [selectedConcepts, setSelectedConcepts] = useState<string[]>([]);
+  const [isConceptLoading, setIsConceptLoading] = useState(false);
+  const [conceptError, setConceptError] = useState('');
+  const [questions, setQuestions] = useState<ApiQuestionRecord[]>([]);
+  const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
+  const [questionsError, setQuestionsError] = useState('');
   const [studentChapterProgressList, setStudentChapterProgressList] =
     useState<StudentChapterProgress[]>(studentChapterProgressData);
   const [studentSelectedChapterId, setStudentSelectedChapterId] = useState<number>(
@@ -863,12 +907,15 @@ export default function StudentHomeworkIndexPage() {
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [examName, setExamName] = useState('');
   const [examDescription, setExamDescription] = useState('');
-  const [examType, setExamType] = useState('Practice');
-  const [attemptsAllowed, setAttemptsAllowed] = useState('2 attempts');
-  const [openDate, setOpenDate] = useState('2026-07-08');
-  const [closeDate, setCloseDate] = useState('2026-07-12');
-  const [timeLimitMinutes, setTimeLimitMinutes] = useState('40');
-  const exams = useMemo(() => [...publishedExams, ...apiExams], [apiExams, publishedExams]);
+  const [examType, setExamType] = useState('');
+  const [attemptsAllowed, setAttemptsAllowed] = useState('');
+  const [openDate, setOpenDate] = useState('');
+  const [closeDate, setCloseDate] = useState('');
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState('');
+  const scopeScrollRef = useRef<HTMLDivElement | null>(null);
+  const exams = apiExams;
   const activeStudentChapter = useMemo(
     () =>
       studentChapterProgressList.find((chapter) => chapter.chapterId === studentSelectedChapterId) ??
@@ -1056,26 +1103,27 @@ export default function StudentHomeworkIndexPage() {
     );
   }, [lmsCourses, selectedStandardId, selectedSubjectId]);
 
-  const conceptOptions = useMemo(() => {
-    const selectedChapterSet = new Set(selectedChapters);
-    const concepts = new Set<string>();
-
-    chapterOptions.forEach((chapter) => {
-      if (!selectedChapterSet.has(chapter.id)) return;
-
-      Object.keys(chapter.content_categories ?? {}).forEach((contentCategory) => {
-        if (contentCategory.trim()) {
-          concepts.add(contentCategory);
-        }
-      });
-    });
-
-    return Array.from(concepts).sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  const selectedChapterOptions = useMemo(() => {
+    const chapterMap = new Map(
+      chapterOptions.map((chapter) => [chapter.id, toDisplayText(chapter.chapter_name) || 'Untitled chapter'])
     );
+
+    return selectedChapters.map((chapterId) => ({
+      value: String(chapterId),
+      label: chapterMap.get(chapterId) || 'Untitled chapter',
+    }));
   }, [chapterOptions, selectedChapters]);
 
+  const selectedStandardRow = useMemo(
+    () => standardOptions.find((option) => option.standard_id === selectedStandardId) ?? null,
+    [selectedStandardId, standardOptions]
+  );
+
   const toggleChapter = (chapterId: number) => {
+    setQuestions([]);
+    setSelectedQuestions([]);
+    setQuestionsError('');
+    setIsQuestionsLoading(false);
     setSelectedChapters((current) => {
       if (current.includes(chapterId)) {
         return current.filter((item) => item !== chapterId);
@@ -1086,6 +1134,10 @@ export default function StudentHomeworkIndexPage() {
   };
 
   const toggleConcept = (conceptId: string) => {
+    setQuestions([]);
+    setSelectedQuestions([]);
+    setQuestionsError('');
+    setIsQuestionsLoading(false);
     setSelectedConcepts((current) => {
       if (current.includes(conceptId)) {
         return current.filter((item) => item !== conceptId);
@@ -1107,32 +1159,95 @@ export default function StudentHomeworkIndexPage() {
 
   const toggleAllQuestions = () => {
     setSelectedQuestions((current) =>
- current.length === questionBank.length ? [] : questionBank.map((question) => question.id)
+ current.length === questionRows.length ? [] : questionRows.map((question) => question.id)
     );
   };
 
+  const conceptNameMap = useMemo(() => {
+    return Object.fromEntries(
+      conceptOptions.map((concept) => [Number(concept.value), concept.label])
+    );
+  }, [conceptOptions]);
+
+  const getQuestionTypeLabel = (questionTypeId: number) => {
+    const typeMap: Record<number, string> = {
+      1: 'MCQ',
+      2: 'True / False',
+      3: 'Short Answer',
+      4: 'Long Answer',
+      5: 'Fill in the Blank',
+    };
+
+    return typeMap[Number(questionTypeId)] ?? '—';
+  };
+
+  const questionRows = useMemo<QuestionRecord[]>(() => {
+    return questions.map((question) => ({
+      id: String(question.id),
+      question: question.question_title || question.description || 'Untitled question',
+      concept:
+        question.concept_name ||
+        question.concept?.name ||
+        conceptNameMap[Number(question.concept_id)] ||
+        '—',
+      type:
+        question.question_type_name ||
+        question.question_type?.name ||
+        getQuestionTypeLabel(toNumber(question.question_type_id)),
+      bloom:
+        question.bloom_name ||
+        question.bloom_level ||
+        question.bloom?.name ||
+        '—',
+      difficulty:
+        question.difficulty_name ||
+        question.difficulty_level ||
+        question.difficulty ||
+        '—',
+      marks: Number(question.points ?? question.marks ?? 0),
+    }));
+  }, [conceptNameMap, questions]);
+
+  const selectedQuestionRows = useMemo(
+    () => questionRows.filter((question) => selectedQuestions.includes(question.id)),
+    [questionRows, selectedQuestions]
+  );
+
   const openCreateExamModal = () => {
+    setPublishSuccessMessage('');
+    resetCreateExamForm();
+    setIsCreateExamOpen(true);
+  };
+
+  const resetCreateExamForm = () => {
     setCreateExamStep(1);
     setSelectedStandard('');
     setSelectedStandardId(null);
     setSelectedSubject('');
     setSelectedSubjectId(null);
     setSelectedChapters([]);
+    setConceptOptions([]);
     setSelectedConcepts([]);
+    setIsConceptLoading(false);
+    setConceptError('');
+    setQuestions([]);
+    setQuestionsError('');
+    setIsQuestionsLoading(false);
     setSelectedQuestions([]);
     setExamName('');
     setExamDescription('');
-    setExamType('Practice');
-    setAttemptsAllowed('2 attempts');
-    setOpenDate('2026-07-08');
-    setCloseDate('2026-07-12');
-    setTimeLimitMinutes('40');
-    setIsCreateExamOpen(true);
+    setExamType('');
+    setAttemptsAllowed('');
+    setOpenDate('');
+    setCloseDate('');
+    setTimeLimitMinutes('');
+    setIsPublishing(false);
+    setPublishError('');
   };
 
   const closeCreateExamModal = () => {
     setIsCreateExamOpen(false);
-    setCreateExamStep(1);
+    resetCreateExamForm();
   };
 
   const closePracticeAssessmentModal = () => {
@@ -1166,13 +1281,13 @@ export default function StudentHomeworkIndexPage() {
   };
 
   const selectedQuestionMarks = useMemo(() => {
-    return questionBank
+    return questionRows
       .filter((question) => selectedQuestions.includes(question.id))
       .reduce((total, question) => total + question.marks, 0);
-  }, [selectedQuestions]);
+  }, [questionRows, selectedQuestions]);
 
   const allQuestionsSelected =
-    questionBank.length > 0 && selectedQuestions.length === questionBank.length;
+    questionRows.length > 0 && selectedQuestions.length === questionRows.length;
 
   const formatDisplayDate = (value: string) => {
     if (!value) return '-';
@@ -1186,6 +1301,75 @@ export default function StudentHomeworkIndexPage() {
       year: 'numeric',
     });
   };
+
+  const formatDateTime = (value: string) => {
+    if (!value) return '';
+
+    const hasTime = value.includes('T') || value.includes(' ');
+    const normalizedValue = hasTime ? value.replace(' ', 'T') : `${value}T00:00:00`;
+    const date = new Date(normalizedValue);
+
+    if (Number.isNaN(date.getTime())) {
+      return hasTime ? value.replace('T', ' ') : `${value} 00:00:00`;
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  };
+
+  const refreshExamList = useCallback(async (options?: { signal?: AbortSignal; showLoading?: boolean }) => {
+    const { signal, showLoading = true } = options ?? {};
+    const session = getCreateExamSession();
+
+    if (showLoading) {
+      setIsLoadingExams(true);
+    }
+    setExamLoadError('');
+
+    if (!session.subInstituteId || !session.userProfileName || !session.userId || !session.syear) {
+      setApiExams([]);
+      setExamLoadError('Exam session data is missing.');
+      if (showLoading) {
+        setIsLoadingExams(false);
+      }
+      return;
+    }
+
+    try {
+      const url = new URL(`${API_BASE_URL}/api/question-paper`);
+      url.searchParams.set('sub_institute_id', session.subInstituteId);
+      url.searchParams.set('syear', session.syear);
+      url.searchParams.set('user_profile_name', session.userProfileName);
+      url.searchParams.set('user_id', session.userId);
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        signal,
+      });
+      const payload = (await response.json()) as QuestionPaperApiResponse;
+
+      if (!response.ok || payload.status_code !== 1) {
+        throw new Error(payload.message || 'Failed to load exams');
+      }
+
+      const mappedExams = Array.isArray(payload.data) ? payload.data.map(mapQuestionPaperToExam) : [];
+      setApiExams(mappedExams);
+    } catch (error) {
+      if (signal?.aborted) return;
+      setApiExams([]);
+      setExamLoadError(error instanceof Error ? error.message : 'Failed to load exams');
+    } finally {
+      if (!signal?.aborted && showLoading) {
+        setIsLoadingExams(false);
+      }
+    }
+  }, []);
 
   const goToNextExamStep = () => {
     if (createExamStep === 1) {
@@ -1204,35 +1388,92 @@ export default function StudentHomeworkIndexPage() {
     }
   };
 
-  const publishExam = () => {
-    const now = new Date();
-    const selectedOpenDate = openDate ? new Date(`${openDate}T00:00:00`) : null;
-    const isOpen =
-      selectedOpenDate !== null && !Number.isNaN(selectedOpenDate.getTime()) && selectedOpenDate <= now;
-    const examStatus: ExamStatus = isOpen ? 'Open' : 'Scheduled';
-    const attemptsMatch = attemptsAllowed.match(/\d+/);
-    const attempts = attemptsMatch ? Number(attemptsMatch[0]) : 1;
-    const examId = `EXM-${String(1600 + exams.length + 1).padStart(4, '0')}`;
+  const publishExam = async () => {
+    if (isPublishing) return;
 
-    const newExam: ExamRecord = {
-      id: examId,
-      name: examName.trim() || 'Untitled exam',
-      classLabel: `${selectedStandard} - ${selectedSubject}`,
-      type: examType,
-      window:
-        openDate && closeDate
-          ? openDate === closeDate
-            ? formatDisplayDate(openDate)
-            : `${formatDisplayDate(openDate)} - ${formatDisplayDate(closeDate)}`
-          : formatDisplayDate(openDate) || formatDisplayDate(closeDate),
-      attempts,
-      questions: selectedQuestions.length,
-      marks: selectedQuestionMarks,
-      status: examStatus,
-    };
+    const session = getCreateExamSession();
+    const selectedExamType = examType.trim().toLowerCase();
+    const selectedQuestionIds = selectedQuestions.map(Number).filter((id) => Number.isFinite(id));
+    const attemptAllowed = Number(attemptsAllowed.match(/\d+/)?.[0] ?? 1);
+    const timeAllowed = Number(timeLimitMinutes);
+    const grade = toNumber(selectedStandardRow?.standard_name);
 
-    setPublishedExams((current) => [newExam, ...current]);
-    closeCreateExamModal();
+    if (!session.subInstituteId || !session.userId || !session.token || !session.syear) {
+      setPublishError('User session is missing. Please sign in again and try publishing.');
+      return;
+    }
+
+    if (
+      selectedStandardId == null ||
+      selectedSubjectId == null ||
+      !grade ||
+      !examName.trim() ||
+      !examType.trim() ||
+      !attemptsAllowed.trim() ||
+      !openDate ||
+      !closeDate ||
+      !Number.isFinite(timeAllowed) ||
+      timeAllowed <= 0 ||
+      selectedQuestionIds.length === 0
+    ) {
+      setPublishError('Complete the exam details and select at least one question before publishing.');
+      return;
+    }
+
+    try {
+      setIsPublishing(true);
+      setPublishError('');
+      setPublishSuccessMessage('');
+
+      const payload = {
+        sub_institute_id: Number(session.subInstituteId),
+        syear: Number(session.syear),
+        user_id: Number(session.userId),
+        grade,
+        standard: Number(selectedStandardId),
+        subject: Number(selectedSubjectId),
+        paper_name: examName.trim(),
+        paper_desc: examDescription.trim(),
+        open_date: formatDateTime(openDate),
+        close_date: formatDateTime(closeDate),
+        time_allowed: timeAllowed,
+        total_ques: selectedQuestionIds.length,
+        total_marks: selectedQuestionRows.reduce((total, question) => total + Number(question.marks ?? 0), 0),
+        attempt_allowed: attemptAllowed,
+        exam_type: selectedExamType,
+        question_ids: selectedQuestionIds,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/question-paper`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = (await response.json()) as CreateQuestionPaperApiResponse;
+
+      if (!response.ok || result.status_code !== 1) {
+        throw new Error(result.message || 'Unable to publish the exam.');
+      }
+
+      const successMessage = result.message || 'Question-Paper Added Successfully';
+
+      setPublishSuccessMessage(successMessage);
+      setIsCreateExamOpen(false);
+      resetCreateExamForm();
+      await refreshExamList({ showLoading: false });
+    } catch (error) {
+      console.error('Publish exam error:', error);
+
+      const message = error instanceof Error ? error.message : 'Unable to publish the exam.';
+      setPublishError(message);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const submitPracticeAssessment = () => {
@@ -1336,54 +1577,19 @@ export default function StudentHomeworkIndexPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const menuContext = getStoredMenuContext();
-    const subInstituteId = menuContext?.sub_institute_id || QUESTION_PAPER_DEFAULTS.subInstituteId;
-    const userProfileName = menuContext?.user_profile_name || QUESTION_PAPER_DEFAULTS.userProfileName;
-    const userId = menuContext?.user_id || QUESTION_PAPER_DEFAULTS.userId;
-
-    const fetchExams = async () => {
-      setIsLoadingExams(true);
-      setExamLoadError('');
-
-      try {
-        const url = new URL(`${API_BASE_URL}/api/question-paper`);
-        url.searchParams.set('sub_institute_id', String(subInstituteId));
-        url.searchParams.set('syear', String(QUESTION_PAPER_DEFAULTS.syear));
-        url.searchParams.set('user_profile_name', userProfileName);
-        url.searchParams.set('user_id', String(userId));
-
-        const response = await fetch(url.toString(), {
-          method: 'GET',
-          signal: controller.signal,
-        });
-        const payload = (await response.json()) as QuestionPaperApiResponse;
-
-        if (!response.ok || payload.status_code !== 1) {
-          throw new Error(payload.message || 'Failed to load exams');
-        }
-
-        const mappedExams = Array.isArray(payload.data)
-          ? payload.data.map(mapQuestionPaperToExam)
-          : [];
-
-        setApiExams(mappedExams);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setApiExams([]);
-        setExamLoadError(error instanceof Error ? error.message : 'Failed to load exams');
-      } finally {
+    const timeoutId = window.setTimeout(() => {
+      refreshExamList({ signal: controller.signal }).catch((error) => {
         if (!controller.signal.aborted) {
-          setIsLoadingExams(false);
+          console.error('Exam list refresh error:', error);
         }
-      }
-    };
-
-    fetchExams();
+      });
+    }, 0);
 
     return () => {
+      window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, []);
+  }, [refreshExamList]);
 
   useEffect(() => {
     if (!isCreateExamOpen && !activePracticeConceptId) return;
@@ -1400,20 +1606,24 @@ export default function StudentHomeworkIndexPage() {
     if (!isCreateExamOpen) return;
 
     const controller = new AbortController();
-    const menuContext = getStoredMenuContext();
-    const subInstituteId = menuContext?.sub_institute_id || QUESTION_PAPER_DEFAULTS.subInstituteId;
-    const userProfileName = menuContext?.user_profile_name || QUESTION_PAPER_DEFAULTS.userProfileName;
-    const userId = menuContext?.user_id || QUESTION_PAPER_DEFAULTS.userId;
+    const session = getCreateExamSession();
 
     const fetchLmsCourses = async () => {
       setIsLoadingLmsCourses(true);
       setLmsCoursesError('');
 
+      if (!session.subInstituteId || !session.userProfileName || !session.userId) {
+        setLmsCourses([]);
+        setLmsCoursesError('Course session data is missing.');
+        setIsLoadingLmsCourses(false);
+        return;
+      }
+
       try {
         const formData = new FormData();
-        formData.append('sub_institute_id', String(subInstituteId));
-        formData.append('user_profile_name', userProfileName);
-        formData.append('user_id', String(userId));
+        formData.append('sub_institute_id', session.subInstituteId);
+        formData.append('user_profile_name', session.userProfileName);
+        formData.append('user_id', session.userId);
 
         const response = await fetch(`${API_BASE_URL}/api/lms-courses`, {
           method: 'POST',
@@ -1444,6 +1654,171 @@ export default function StudentHomeworkIndexPage() {
       controller.abort();
     };
   }, [isCreateExamOpen]);
+
+  useEffect(() => {
+    if (!isCreateExamOpen) return;
+    if (selectedChapters.length === 0) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const fetchChapterConcepts = async () => {
+      const session = getCreateExamSession();
+      const scrollTop = scopeScrollRef.current?.scrollTop ?? 0;
+
+      if (!session.subInstituteId) {
+        setConceptOptions([]);
+        setConceptError('Concept session data is missing.');
+        return;
+      }
+
+      try {
+        setIsConceptLoading(true);
+        setConceptError('');
+
+        const payload = {
+          chapter_id: selectedChapters,
+          sub_institute_id: toNumber(session.subInstituteId),
+        };
+
+        const response = await fetch(`${API_BASE_URL}/api/lms-chapter-concepts`, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          },
+        });
+
+        const result = (await response.json()) as ChapterConceptsApiResponse;
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to load chapter concepts');
+        }
+
+        const uniqueOptions = new Map<string, ChapterConceptOption>();
+        (result.data ?? []).forEach((concept) => {
+          const value = readString(concept.id);
+          const label = readString(concept.name).trim();
+
+          if (!value || !label) return;
+          if (uniqueOptions.has(value)) return;
+
+          uniqueOptions.set(value, {
+            value,
+            label,
+            chapterId: toNumber(concept.chapter_id),
+          });
+        });
+
+        const nextOptions = Array.from(uniqueOptions.values()).sort((left, right) =>
+          left.label.localeCompare(right.label, undefined, {
+            numeric: true,
+            sensitivity: 'base',
+          })
+        );
+
+        if (controller.signal.aborted) return;
+
+        setConceptOptions(nextOptions);
+        setSelectedConcepts((current) =>
+          current.filter((conceptId) => nextOptions.some((option) => option.value === conceptId))
+        );
+        requestAnimationFrame(() => {
+          if (scopeScrollRef.current) {
+            scopeScrollRef.current.scrollTop = scrollTop;
+          }
+        });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('Concept API error:', error);
+        setConceptOptions([]);
+        setConceptError('Concepts could not be loaded. Please try again.');
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsConceptLoading(false);
+        }
+      }
+    };
+
+    fetchChapterConcepts();
+
+    return () => {
+      controller.abort();
+    };
+  }, [isCreateExamOpen, selectedChapters]);
+
+  useEffect(() => {
+    if (!isCreateExamOpen || createExamStep !== 2) return;
+
+    const session = getCreateExamSession();
+    if (!selectedSubjectId || selectedChapters.length === 0 || selectedConcepts.length === 0) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const fetchQuestions = async () => {
+      try {
+        setIsQuestionsLoading(true);
+        setQuestionsError('');
+
+        const formData = new FormData();
+        formData.append('subject_id', String(selectedSubjectId));
+
+        selectedChapters.forEach((chapterId) => {
+          formData.append('chapter_id[]', String(chapterId));
+        });
+
+        selectedConcepts.forEach((conceptId) => {
+          formData.append('concept_id[]', String(conceptId));
+        });
+
+        const response = await fetch(`${API_BASE_URL}/api/lms-questions`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          },
+          body: formData,
+          signal: controller.signal,
+        });
+
+        const result = (await response.json()) as QuestionsApiResponse;
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to load questions');
+        }
+
+        const nextQuestions = result.data ?? [];
+        if (controller.signal.aborted) return;
+
+        setQuestions(nextQuestions);
+        setSelectedQuestions((current) =>
+          current.filter((id) => nextQuestions.some((question) => String(question.id) === id))
+        );
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('Question API error:', error);
+        setQuestions([]);
+        setSelectedQuestions([]);
+        setQuestionsError('Unable to load questions.');
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsQuestionsLoading(false);
+        }
+      }
+    };
+
+    fetchQuestions();
+
+    return () => {
+      controller.abort();
+    };
+  }, [createExamStep, isCreateExamOpen, selectedChapters, selectedConcepts, selectedSubjectId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1629,6 +2004,12 @@ export default function StudentHomeworkIndexPage() {
                 <p className="text-[14px] font-medium text-[#5F7087]">
                   {filteredExams.length} of {exams.length} exams
                 </p>
+
+                {publishSuccessMessage ? (
+                  <div className="rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-[14px] font-medium text-[#166534]">
+                    {publishSuccessMessage}
+                  </div>
+                ) : null}
 
                 <div className="overflow-hidden rounded-[18px] border border-[#D9E3F0] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
                   <div className="overflow-x-auto">
@@ -2484,7 +2865,7 @@ export default function StudentHomeworkIndexPage() {
               </div>
             </div>
 
-            <div className="shrink-0 border-t border-[#E4EAF2] bg-white px-5 py-4 sm:px-7">
+            <div className="shrink-0 border-t border-[#E4EAF2] bg-white px-7 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[14px] font-medium text-[#5F7087]">
                   {practiceAnsweredCount} of {activePracticeAssessment.questions.length} answered
@@ -2515,11 +2896,17 @@ export default function StudentHomeworkIndexPage() {
       ) : null}
 
       {isCreateExamOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#0F172A]/52 px-3 py-3 backdrop-blur-[2px] sm:px-6 sm:py-6">
-          <div className="flex h-[90vh] max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-[#DCE4F0] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
-            <div className="shrink-0 border-b border-[#E4EAF2] bg-white px-5 py-5 sm:px-7 sm:py-6">
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="Close create exam drawer"
+            className="absolute inset-0 z-40 bg-slate-900/50"
+            onClick={closeCreateExamModal}
+          />
+          <aside className="absolute right-0 top-0 z-50 flex h-full w-full max-w-[720px] flex-col bg-white shadow-2xl">
+            <div className="shrink-0 border-b border-[#E4EAF2] bg-white px-7 py-5">
               <div className="flex items-center justify-between">
-              <h2 className="text-[24px] font-semibold tracking-[-0.03em] text-[#1E293B]">
+              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-900">
                 Create exam
               </h2>
                 <button
@@ -2533,8 +2920,8 @@ export default function StudentHomeworkIndexPage() {
               </div>
             </div>
 
-            <div className="shrink-0 border-b border-[#E4EAF2] bg-white px-5 py-5 sm:px-7 sm:py-6">
-              <div className="grid gap-5 sm:grid-cols-4 sm:gap-3">
+            <div className="shrink-0 overflow-x-auto border-b border-[#E4EAF2] bg-white px-7 py-6">
+              <div className="grid min-w-[620px] grid-cols-4 gap-3">
                 {createExamSteps.map((step, index) => {
                   const isCompleted = createExamStep > step.id;
                   const isActive = createExamStep === step.id;
@@ -2544,7 +2931,7 @@ export default function StudentHomeworkIndexPage() {
                     <div key={step.id} className="relative">
                       <div className="flex items-start gap-3">
                         <span
-                          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[15px] font-semibold ${
+                          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[14px] font-semibold ${
                             isActive
                               ? 'border-[#5B4FE9] text-[#5B4FE9]'
                               : isCompleted
@@ -2556,33 +2943,34 @@ export default function StudentHomeworkIndexPage() {
                         </span>
                         <div>
                           <p
-                            className={`text-[15px] font-semibold ${
+                            className={`text-[14px] font-semibold ${
                               isActive || isCompleted ? 'text-[#5B4FE9]' : 'text-[#51657F]'
                             }`}
                           >
                             {step.title}
                           </p>
                           {step.description ? (
-                            <p className="mt-1 max-w-[130px] text-[13px] leading-6 text-[#51657F]">
+                            <p className="mt-1 max-w-[110px] text-[12px] leading-5 text-[#51657F]">
                               {step.description}
                             </p>
                           ) : null}
                         </div>
                       </div>
-                      {!isLast ? (
-                        <span className="absolute left-[132px] top-4 hidden h-px w-[calc(100%-140px)] bg-[#CBD5E1] sm:block" />
-                      ) : null}
+                      {!isLast ? <span className="absolute left-[116px] top-4 h-px w-[calc(100%-124px)] bg-[#CBD5E1]" /> : null}
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+            <div
+              ref={scopeScrollRef}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-7 py-6"
+            >
               {createExamStep === 1 ? (
                 <>
              
-                  <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <label className="block">
                       <span className="mb-2.5 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
                         Standard
@@ -2602,7 +2990,12 @@ export default function StudentHomeworkIndexPage() {
                               setSelectedSubject('');
                               setSelectedSubjectId(null);
                               setSelectedChapters([]);
+                              setConceptOptions([]);
                               setSelectedConcepts([]);
+                              setConceptError('');
+                              setQuestions([]);
+                              setQuestionsError('');
+                              setSelectedQuestions([]);
                               return;
                             }
 
@@ -2611,7 +3004,12 @@ export default function StudentHomeworkIndexPage() {
                             setSelectedSubject('');
                             setSelectedSubjectId(null);
                             setSelectedChapters([]);
+                            setConceptOptions([]);
                             setSelectedConcepts([]);
+                            setConceptError('');
+                            setQuestions([]);
+                            setQuestionsError('');
+                            setSelectedQuestions([]);
                           }}
                           disabled={isLoadingLmsCourses}
                           className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
@@ -2646,14 +3044,24 @@ export default function StudentHomeworkIndexPage() {
                               setSelectedSubject('');
                               setSelectedSubjectId(null);
                               setSelectedChapters([]);
+                              setConceptOptions([]);
                               setSelectedConcepts([]);
+                              setConceptError('');
+                              setQuestions([]);
+                              setQuestionsError('');
+                              setSelectedQuestions([]);
                               return;
                             }
 
                             setSelectedSubject(toDisplayText(nextSubject.subject_name));
                             setSelectedSubjectId(nextSubject.subject_id);
                             setSelectedChapters([]);
+                            setConceptOptions([]);
                             setSelectedConcepts([]);
+                            setConceptError('');
+                            setQuestions([]);
+                            setQuestionsError('');
+                            setSelectedQuestions([]);
                           }}
                           disabled={isLoadingLmsCourses || selectedStandardId == null}
                           className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
@@ -2672,14 +3080,35 @@ export default function StudentHomeworkIndexPage() {
                     </label>
                   </div>
 
-                  <div className="mt-6">
-                    <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
+                  <div className="mt-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Chapters
                     </p>
+                    <div className="mt-3 min-h-[44px] max-h-[88px] overflow-y-auto rounded-[16px] border border-[#D8E1EE] bg-[#F8FAFC] px-3 py-2">
+                      {selectedChapterOptions.length === 0 ? (
+                        <p className="text-[14px] text-[#64748B]">No chapters selected yet.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedChapterOptions.slice(0, 2).map((chapter) => (
+                            <span
+                              key={chapter.value}
+                              className="inline-flex max-w-[220px] items-center gap-1 rounded-md bg-violet-50 px-2 py-1 text-sm text-violet-700"
+                            >
+                              <span className="truncate">{chapter.label}</span>
+                            </span>
+                          ))}
+                          {selectedChapterOptions.length > 2 ? (
+                            <span className="rounded-md bg-slate-100 px-2 py-1 text-sm text-slate-700">
+                              +{selectedChapterOptions.length - 2} more
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
                     {lmsCoursesError ? (
                       <p className="mt-3 text-[13px] text-[#B45309]">{lmsCoursesError}</p>
                     ) : null}
-                    <div className="mt-3 space-y-3">
+                    <div className="mt-3 max-h-56 space-y-2 overflow-y-auto overscroll-contain pr-1">
                       {isLoadingLmsCourses ? (
                         <div className="rounded-[16px] border border-dashed border-[#D8E1EE] px-4 py-5 text-[14px] text-[#64748B]">
                           Loading chapters...
@@ -2697,10 +3126,10 @@ export default function StudentHomeworkIndexPage() {
                         return (
                           <label
                             key={chapter.id}
-                            className={`flex cursor-pointer items-start gap-3 rounded-[16px] border px-3 py-3 transition ${
+                            className={`flex cursor-pointer items-start gap-3 rounded-lg px-1 py-2 transition ${
                               isSelected
-                                ? 'border-[#D8D1FF] bg-[#F7F5FF]'
-                                : 'border-transparent bg-transparent hover:bg-[#F8FAFC]'
+                                ? 'bg-[#F7F5FF]'
+                                : 'bg-transparent hover:bg-[#F8FAFC]'
                             }`}
                           >
                             <input
@@ -2719,11 +3148,11 @@ export default function StudentHomeworkIndexPage() {
                               <Check size={15} strokeWidth={3} />
                             </span>
                             <span className="min-w-0">
-                              <span className={`block text-[15px] font-medium ${isSelected ? 'text-[#4338CA]' : 'text-[#1E293B]'}`}>
+                              <span className={`block font-medium ${isSelected ? 'text-[#4338CA]' : 'text-slate-800'}`}>
                                 {toDisplayText(chapter.chapter_name) || 'Untitled chapter'}
                               </span>
-                              <span className="mt-1 block text-[13px] text-[#64748B]">
-                                {toNumber(chapter.total_content)} contents
+                              <span className="mt-1 block text-sm text-slate-500">
+                                {toNumber(chapter.total_content)} concepts
                               </span>
                             </span>
                           </label>
@@ -2732,35 +3161,55 @@ export default function StudentHomeworkIndexPage() {
                     </div>
                   </div>
 
-                  <div className="mt-6">
-                    <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
+                  <div className="mt-6 min-h-[180px]">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Concepts
                     </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {conceptOptions.length === 0 ? (
-                        <p className="text-[14px] text-[#64748B]">
-                          Select chapter checkboxes to view related categories.
-                        </p>
-                      ) : (
-                        conceptOptions.map((concept) => {
-                        const isSelected = selectedConcepts.includes(concept);
+                    {!selectedChapters.length ? (
+                      <p className="mt-3 text-[14px] text-[#64748B]">
+                        Select chapter checkboxes to view related concepts.
+                      </p>
+                    ) : null}
+                    {selectedChapters.length > 0 && isConceptLoading ? (
+                      <div className="mt-3 rounded-[16px] border border-[#D8E1EE] px-4 py-4 text-[14px] text-[#64748B]">
+                        Loading concepts...
+                      </div>
+                    ) : null}
+                    {selectedChapters.length > 0 && conceptError ? (
+                      <div className="mt-3 rounded-[16px] border border-[#F3C7C7] px-4 py-4 text-[14px] text-[#DC2626]">
+                        {conceptError}
+                      </div>
+                    ) : null}
+                    {selectedChapters.length > 0 &&
+                    !isConceptLoading &&
+                    conceptOptions.length === 0 &&
+                    !conceptError ? (
+                      <div className="mt-3 rounded-[16px] border border-[#D8E1EE] px-4 py-4 text-[14px] text-[#64748B]">
+                        No concepts are available for the selected chapters.
+                      </div>
+                    ) : null}
+                    {!isConceptLoading && conceptOptions.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {conceptOptions.map((concept) => {
+                          const isSelected = selectedConcepts.includes(concept.value);
 
-                        return (
-                          <button
-                            key={concept}
-                            type="button"
-                            onClick={() => toggleConcept(concept)}
-                            className={`rounded-full px-3.5 py-1.5 text-[14px] font-semibold transition ${
-                              isSelected
-                                ? 'bg-[#5B4FE9] text-white shadow-[0_8px_16px_rgba(91,79,233,0.18)]'
-                                : 'bg-[#EEF2F7] text-[#51657F]'
-                            }`}
-                          >
-                            {concept}
-                          </button>
-                        );
-                      }))}
-                    </div>
+                          return (
+                            <button
+                              key={concept.value}
+                              type="button"
+                              onClick={() => toggleConcept(concept.value)}
+                              className={`rounded-full px-3 py-1.5 text-sm transition ${
+                                isSelected
+                                  ? 'bg-violet-600 text-white'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {concept.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
                   
                 </>
@@ -2786,82 +3235,96 @@ export default function StudentHomeworkIndexPage() {
                       </div>
                     </div>
 
-                    <div className="mt-5 overflow-hidden rounded-[20px] border border-[#DCE4F0] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-                      <div className="overflow-x-auto">
-                        <div className="max-h-[min(44vh,420px)] overflow-y-auto">
-                          <table className="w-full min-w-[920px] border-separate border-spacing-0">
-                            <thead className="sticky top-0 z-10 bg-[#F8FAFC]">
-                              <tr>
-                                <th className="border-b border-[#E4EAF2] px-4 py-4 text-left">
-                                  <button
-                                    type="button"
-                                    onClick={toggleAllQuestions}
-                                    className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border transition ${
-                                      allQuestionsSelected
-                                        ? 'border-[#5B4FE9] bg-[#5B4FE9] text-white'
-                                        : 'border-[#CBD5E1] bg-white text-transparent'
-                                    }`}
-                                    aria-label="Select all questions"
-                                  >
-                                    <Check size={13} strokeWidth={3} />
-                                  </button>
-                                </th>
-                                {['Question', 'Concept', 'Type', 'Bloom', 'Difficulty', 'Marks'].map((heading) => (
-                                  <th
-                                    key={heading}
-                                    className="border-b border-[#E4EAF2] px-4 py-4 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-[#64748B]"
-                                  >
-                                    {heading}
+                    {isQuestionsLoading ? (
+                      <div className="mt-5 rounded-[20px] border border-[#DCE4F0] p-6 text-center text-[14px] text-[#64748B]">
+                        Loading questions...
+                      </div>
+                    ) : questionsError ? (
+                      <div className="mt-5 rounded-[20px] border border-red-200 p-4 text-[14px] text-red-600">
+                        {questionsError}
+                      </div>
+                    ) : questionRows.length === 0 ? (
+                      <div className="mt-5 rounded-[20px] border border-[#DCE4F0] p-6 text-center text-[14px] text-slate-500">
+                        No questions found for the selected concepts.
+                      </div>
+                    ) : (
+                      <div className="mt-5 overflow-hidden rounded-[20px] border border-[#DCE4F0] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+                        <div className="overflow-x-auto">
+                          <div className="max-h-[min(44vh,420px)] overflow-y-auto">
+                            <table className="w-full min-w-[920px] border-separate border-spacing-0">
+                              <thead className="sticky top-0 z-10 bg-[#F8FAFC]">
+                                <tr>
+                                  <th className="border-b border-[#E4EAF2] px-4 py-4 text-left">
+                                    <button
+                                      type="button"
+                                      onClick={toggleAllQuestions}
+                                      className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border transition ${
+                                        allQuestionsSelected
+                                          ? 'border-[#5B4FE9] bg-[#5B4FE9] text-white'
+                                          : 'border-[#CBD5E1] bg-white text-transparent'
+                                      }`}
+                                      aria-label="Select all questions"
+                                    >
+                                      <Check size={13} strokeWidth={3} />
+                                    </button>
                                   </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                                {questionBank.map((question) => {
-                                const isSelected = selectedQuestions.includes(question.id);
+                                  {['Question', 'Concept', 'Type', 'Bloom', 'Difficulty', 'Marks'].map((heading) => (
+                                    <th
+                                      key={heading}
+                                      className="border-b border-[#E4EAF2] px-4 py-4 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-[#64748B]"
+                                    >
+                                      {heading}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {questionRows.map((question) => {
+                                  const isSelected = selectedQuestions.includes(question.id);
 
-                                return (
-                                  <tr key={question.id} className={isSelected ? 'bg-[#FBFAFF]' : 'bg-white'}>
-                                    <td className="border-b border-[#E4EAF2] px-4 py-4 align-top">
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleQuestion(question.id)}
-                                        className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border transition ${
-                                          isSelected
-                                            ? 'border-[#5B4FE9] bg-[#5B4FE9] text-white'
-                                            : 'border-[#CBD5E1] bg-white text-transparent'
-                                        }`}
-                                        aria-label={`Select question ${question.id}`}
-                                      >
-                                        <Check size={13} strokeWidth={3} />
-                                      </button>
-                                    </td>
-                                    <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] leading-6 text-[#0F172A]">
-                                      {question.question}
-                                    </td>
-                                    <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] leading-6 text-[#51657F]">
-                                      {question.concept}
-                                    </td>
-                                    <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] text-[#0F172A]">
-                                      {question.type}
-                                    </td>
-                                    <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] text-[#0F172A]">
-                                      {question.bloom}
-                                    </td>
-                                    <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] text-[#0F172A]">
-                                      {question.difficulty}
-                                    </td>
-                                    <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] font-semibold text-[#0F172A]">
-                                      {question.marks}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
+                                  return (
+                                    <tr key={question.id} className={isSelected ? 'bg-[#FBFAFF]' : 'bg-white'}>
+                                      <td className="border-b border-[#E4EAF2] px-4 py-4 align-top">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleQuestion(question.id)}
+                                          className={`inline-flex h-5 w-5 items-center justify-center rounded-[5px] border transition ${
+                                            isSelected
+                                              ? 'border-[#5B4FE9] bg-[#5B4FE9] text-white'
+                                              : 'border-[#CBD5E1] bg-white text-transparent'
+                                          }`}
+                                          aria-label={`Select question ${question.id}`}
+                                        >
+                                          <Check size={13} strokeWidth={3} />
+                                        </button>
+                                      </td>
+                                      <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] leading-6 text-[#0F172A]">
+                                        {question.question}
+                                      </td>
+                                      <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] leading-6 text-[#51657F]">
+                                        {question.concept}
+                                      </td>
+                                      <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] text-[#0F172A]">
+                                        {question.type}
+                                      </td>
+                                      <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] text-[#0F172A]">
+                                        {question.bloom}
+                                      </td>
+                                      <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] text-[#0F172A]">
+                                        {question.difficulty}
+                                      </td>
+                                      <td className="border-b border-[#E4EAF2] px-4 py-4 text-[14px] font-semibold text-[#0F172A]">
+                                        {question.marks}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                    
                   </div>
                 </div>
@@ -2912,7 +3375,8 @@ export default function StudentHomeworkIndexPage() {
                               onChange={(event) => setExamType(event.target.value)}
                               className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
                             >
-                                {examTypeOptions.map((option) => (
+                              <option value="">Select exam type</option>
+                              {examTypeOptions.map((option) => (
                                 <option key={option} value={option}>
                                   {option}
                                 </option>
@@ -2932,6 +3396,7 @@ export default function StudentHomeworkIndexPage() {
                               onChange={(event) => setAttemptsAllowed(event.target.value)}
                               className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
                             >
+                              <option value="">Select attempts</option>
                               {attemptsAllowedOptions.map((option) => (
                                 <option key={option} value={option}>
                                   {option}
@@ -3017,7 +3482,7 @@ export default function StudentHomeworkIndexPage() {
                     </div>
                     <div>
                       <p className="text-[14px] text-[#64748B]">Type</p>
-                      <p className="mt-1 text-[16px] font-semibold text-[#1E293B]">{examType}</p>
+                      <p className="mt-1 text-[16px] font-semibold text-[#1E293B]">{examType || '-'}</p>
                     </div>
                     <div>
                       <p className="text-[14px] text-[#64748B]">Standard</p>
@@ -3041,7 +3506,7 @@ export default function StudentHomeworkIndexPage() {
                     </div>
                     <div>
                       <p className="text-[14px] text-[#64748B]">Attempts allowed</p>
-                      <p className="mt-1 text-[16px] font-semibold text-[#1E293B]">{attemptsAllowed}</p>
+                      <p className="mt-1 text-[16px] font-semibold text-[#1E293B]">{attemptsAllowed || '-'}</p>
                     </div>
                     <div>
                       <p className="text-[14px] text-[#64748B]">Open date</p>
@@ -3054,7 +3519,7 @@ export default function StudentHomeworkIndexPage() {
                     <div>
                       <p className="text-[14px] text-[#64748B]">Time limit</p>
                       <p className="mt-1 text-[16px] font-semibold text-[#1E293B]">
-                        {timeLimitMinutes} minutes
+                        {timeLimitMinutes ? `${timeLimitMinutes} minutes` : '-'}
                       </p>
                     </div>
                   </div>
@@ -3067,6 +3532,12 @@ export default function StudentHomeworkIndexPage() {
                       </p>
                     </div>
                   </div>
+
+                  {publishError ? (
+                    <div className="mt-4 rounded-[16px] border border-[#F3C7C7] bg-[#FEF2F2] px-4 py-3 text-[14px] text-[#B91C1C]">
+                      {publishError}
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -3075,10 +3546,10 @@ export default function StudentHomeworkIndexPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
-                disabled={createExamStep === 1}
+                disabled={createExamStep === 1 || isPublishing}
                 onClick={() => setCreateExamStep((current) => Math.max(1, current - 1))}
                 className={`inline-flex h-11 items-center gap-2 rounded-[12px] px-4 text-[15px] font-semibold ${
-                  createExamStep === 1
+                  createExamStep === 1 || isPublishing
                     ? 'text-[#B4BFD0]'
                     : 'text-[#475569] transition hover:bg-[#F5F7FB]'
                 }`}
@@ -3091,6 +3562,7 @@ export default function StudentHomeworkIndexPage() {
                 <button
                   type="button"
                   onClick={closeCreateExamModal}
+                  disabled={isPublishing}
                   className="inline-flex h-11 items-center justify-center rounded-[12px] px-4 text-[15px] font-semibold text-[#334155] transition hover:bg-[#F5F7FB]"
                 >
                   Cancel
@@ -3098,9 +3570,9 @@ export default function StudentHomeworkIndexPage() {
                 <button
                   type="button"
                   onClick={createExamStep === 4 ? publishExam : goToNextExamStep}
-                  disabled={createExamStep === 2 && selectedQuestions.length === 0}
+                  disabled={isPublishing || (createExamStep === 2 && selectedQuestions.length === 0)}
                   className={`inline-flex h-[50px] items-center justify-center gap-2 rounded-[16px] px-6 text-[15px] font-semibold transition ${
-                    createExamStep === 2 && selectedQuestions.length === 0
+                    isPublishing || (createExamStep === 2 && selectedQuestions.length === 0)
                       ? 'bg-[#C7C2FA] text-white shadow-none'
                       : 'bg-[#5846EA] text-white shadow-[0_14px_28px_rgba(88,70,234,0.28)] hover:bg-[#4C3DD3]'
                   }`}
@@ -3108,7 +3580,7 @@ export default function StudentHomeworkIndexPage() {
                   {createExamStep === 4 ? (
                     <>
                       <Send size={18} />
-                      Publish exam
+                      {isPublishing ? 'Publishing...' : 'Publish exam'}
                     </>
                   ) : (
                     <>
@@ -3120,7 +3592,7 @@ export default function StudentHomeworkIndexPage() {
               </div>
               </div>
             </div>
-          </div>
+          </aside>
         </div>
       ) : null}
 
