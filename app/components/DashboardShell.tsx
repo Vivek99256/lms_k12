@@ -65,28 +65,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const { menuItems, loading, error, refetch } = useMenuRights();
   const hasLoadedRef = useRef(false);
 
-  const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const saved = localStorage.getItem('selectedMenuBranch');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed?.level1Key && parsed?.level2Key) {
-          return parsed;
-        }
-      }
-    } catch {}
-    return null;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (selectedBranch) {
-      localStorage.setItem('selectedMenuBranch', JSON.stringify(selectedBranch));
-    } else {
-      localStorage.removeItem('selectedMenuBranch');
-    }
-  }, [selectedBranch]);
+  const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(null);
   const [isChatbotOpen, setIsChatbotOpen] = useState(true);
   const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
   const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
