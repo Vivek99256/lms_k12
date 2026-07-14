@@ -1275,6 +1275,12 @@ export default function ChapterListPage() {
     setGeneratedQuestionPreviews([]);
   };
 
+  const handleOpenContent = (item: ChapterContentItem) => {
+    if (!item.contentUrl) return;
+
+    window.open(item.contentUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const closeGenerateQuestionsModal = () => {
     setQuestionModalConcept(null);
     setQuestionType('');
@@ -2358,7 +2364,7 @@ export default function ChapterListPage() {
                 <Sparkles size={16} />
               </div>
               <p className="text-[15px] leading-7">
-                Slides are drafted with <span className="font-semibold text-slate-900">Gamma</span> from concept intelligence, then added to your content library.
+                Slides are drafted with <span className="font-semibold text-slate-900">AI</span> from concept intelligence, then added to your content library.
               </p>
             </div>
           </div>
@@ -2484,7 +2490,7 @@ export default function ChapterListPage() {
             className="h-12 rounded-2xl bg-[#4f46e5] px-6 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
           >
             <Sparkles size={16} className="mr-2" />
-            Generate with Gamma
+            Generate with AI
           </Button>
         </div>
       </aside>
@@ -3059,7 +3065,7 @@ export default function ChapterListPage() {
                   Content - {course.subject} - {gradeLabel}
                 </h1>
                 <p className="mt-2 text-slate-600">
-                  Generate presentations with Gamma, upload videos, notes and PDFs, and manage the content library for{' '}
+                  Generate presentations with AI, upload videos, notes and PDFs, and manage the content library for{' '}
                   <span className="font-semibold text-slate-900">{activeChapterTitle}</span>.
                 </p>
               </div>
@@ -3153,7 +3159,7 @@ export default function ChapterListPage() {
             <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-slate-600">Generated with Gamma</p>
+                  <p className="text-sm font-medium text-slate-600">Generated with AI</p>
                   <p className="mt-3 text-4xl font-bold tracking-tight text-slate-950">{gammaItems}</p>
                 </div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
@@ -3277,7 +3283,10 @@ export default function ChapterListPage() {
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => setSelectedContentItem(item)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenContent(item);
+                        }}
                         className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
                       >
                         {item.actionLabel === 'Play' ? (
