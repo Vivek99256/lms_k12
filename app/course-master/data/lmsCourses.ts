@@ -25,6 +25,10 @@ export interface LmsSubject {
   subject_name: string;
   subject_id: number;
   standard_id: number;
+  section_id?: number | string;
+  section_name?: string;
+  division_id?: number | string;
+  division_name?: string;
   display_image: string;
   content_category: string;
   sub_institute_id: number;
@@ -40,6 +44,12 @@ export interface LmsSubject {
   lesson_plan_count?: number | string;
   total_lesson_plans?: number | string;
   lessonPlans?: unknown[];
+  chapter_count?: number | string;
+  chapters_count?: number | string;
+  coverage_percentage?: number | string;
+  lesson_planning_coverage?: number | string;
+  section?: string;
+  division?: string;
 }
 
 export interface LmsCoursesResponse {
