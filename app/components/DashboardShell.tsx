@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
@@ -16,6 +16,10 @@ interface SelectedBranch {
   level1Key: string;
   level2Key: string;
 }
+
+export const ChatbotLayoutContext = createContext<{ isChatbotOpen: boolean }>({
+  isChatbotOpen: false,
+});
 
 function getMenuKey(item: { id?: number | string; label: string; href?: string }) {
   return String(item.id ?? item.href ?? item.label);
@@ -347,21 +351,23 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               isChatbotOpen ? 'w-[85%]' : 'w-full'
             }`}
           >
-            {showSubheader && (
-              <div className="pb-4">
-                <Level3Subheader
-                  items={level3Menu?.items ?? []}
-                  parentLabel={level3Menu?.parentLabel ?? ''}
-                  mainMenuId={selectedL1?.id}
-                  menuId={selectedL2?.id}
-                  masterItems={fetchedMasterMenuItems}
-                  masterLoading={masterMenuLoading}
-                  masterMenuGroups={masterMenuGroups}
-                  userProfileName={userProfileName}
-                />
-              </div>
-            )}
-            {children}
+            <ChatbotLayoutContext.Provider value={{ isChatbotOpen }}>
+              {showSubheader && (
+                <div className="pb-4">
+                  <Level3Subheader
+                    items={level3Menu?.items ?? []}
+                    parentLabel={level3Menu?.parentLabel ?? ''}
+                    mainMenuId={selectedL1?.id}
+                    menuId={selectedL2?.id}
+                    masterItems={fetchedMasterMenuItems}
+                    masterLoading={masterMenuLoading}
+                    masterMenuGroups={masterMenuGroups}
+                    userProfileName={userProfileName}
+                  />
+                </div>
+              )}
+              {children}
+            </ChatbotLayoutContext.Provider>
           </main>
           {isChatbotOpen && (
             <div className="min-h-0 w-[15%] min-w-[320px] overflow-hidden">
