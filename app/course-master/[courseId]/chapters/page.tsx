@@ -32,6 +32,7 @@ import {
   Eye,
   Play,
   FolderOpen,
+  Database,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -78,6 +79,7 @@ const UPLOAD_CONTENT_TYPES = ['Presentation', 'Video', 'Revision notes', 'Classr
 const UPLOAD_PRESENTATION_TYPES = ['Classroom presentation', 'Teacher training presentation'] as const;
 const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
 const QUESTION_TYPE_OPTIONS = ['MCQ', 'Narrative'] as const;
+const QUESTION_OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
 const QUESTION_TYPE_API_CONFIG: Record<
   (typeof QUESTION_TYPE_OPTIONS)[number],
   { question_type: 'mcq' | 'narrative'; question_type_id: number }
@@ -169,6 +171,38 @@ interface ChapterContentItem {
     number: number;
     title: string;
   }[];
+}
+
+type QuestionBankQuestionType = (typeof QUESTION_TYPE_OPTIONS)[number];
+type QuestionOptionLabel = (typeof QUESTION_OPTION_LABELS)[number];
+
+interface QuestionBankOption {
+  label: string;
+  text: string;
+  isCorrect?: boolean;
+}
+
+interface QuestionBankItem {
+  id: string;
+  displayId: string;
+  chapterId: string;
+  chapterTitle: string;
+  conceptTitle: string;
+  category: string;
+  type: QuestionBankQuestionType;
+  marks: number;
+  question: string;
+  options?: QuestionBankOption[];
+  modelAnswer?: string;
+}
+
+interface QuestionBankGroup {
+  id: string;
+  chapterId: string;
+  chapterTitle: string;
+  conceptTitle: string;
+  category: string;
+  questions: QuestionBankItem[];
 }
 
 function getApiContentType(category: string, asset: ChapterContentAsset): ChapterContentType {
@@ -468,6 +502,99 @@ function getContentPreviewIcon(preview: ChapterContentPreview) {
   return BookOpen;
 }
 
+function getQuestionBankConceptTitles(course: Course, chapter: Chapter) {
+  const savedConcepts = (chapter.concepts ?? [])
+    .map((concept) => concept.title)
+    .filter((title) => title.trim());
+  const keyConcepts = getChapterKeyConcepts(course.id, chapter.id)?.concepts.map((concept) => concept.title) ?? [];
+  const categoryConcepts = Object.keys(chapter.content_categories ?? {}).filter(
+    (title) => title.trim() && !/^(my course|videos|recorded videos)$/i.test(title.trim())
+  );
+  const concepts = savedConcepts.length
+    ? savedConcepts
+    : keyConcepts.length
+      ? keyConcepts
+      : categoryConcepts;
+
+  return Array.from(new Set(concepts.map((title) => title.trim()))).slice(0, 4);
+}
+
+function getQuestionBankCategory(course: Course, chapter: Chapter, conceptTitle: string) {
+  const haystack = `${chapter.title} ${conceptTitle}`.toLowerCase();
+
+  if (/sound|amplitude|frequency|pitch|ultrasound|wave/.test(haystack)) return 'Sound';
+  if (/force|motion|work|energy|electric|magnet|light/.test(haystack)) return 'Physics';
+  if (/reaction|acid|base|salt|metal|carbon/.test(haystack)) return 'Chemistry';
+  if (/life|cell|organ|plant|animal|nutrition|respiration/.test(haystack)) return 'Biology';
+
+  return course.subject || 'Concept';
+}
+
+function buildQuestionBankItems(course: Course, chapters: Chapter[]): QuestionBankItem[] {
+  let questionNumber = 101;
+
+  return chapters.flatMap((chapter) => {
+    const concepts = getQuestionBankConceptTitles(course, chapter);
+    const conceptTitles = concepts.length ? concepts : [chapter.title];
+
+    return conceptTitles.flatMap((conceptTitle, conceptIndex) => {
+      const conceptLower = conceptTitle.toLowerCase();
+      const chapterLower = chapter.title.toLowerCase();
+      const category = getQuestionBankCategory(course, chapter, conceptTitle);
+      const baseId = `${chapter.id}-${conceptTitle}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+      return [
+        {
+          id: `${baseId}-mcq-key-idea`,
+          displayId: `QB-${questionNumber++}`,
+          chapterId: chapter.id,
+          chapterTitle: chapter.title,
+          conceptTitle,
+          category,
+          type: 'MCQ' as const,
+          marks: 1,
+          question: `Which option best represents ${conceptLower} in ${chapterLower}?`,
+          options: [
+            { label: 'A', text: conceptTitle, isCorrect: true },
+            { label: 'B', text: 'A separate topic from another chapter' },
+            { label: 'C', text: 'Only a memorized definition' },
+            { label: 'D', text: 'None of these' },
+          ],
+        },
+        {
+          id: `${baseId}-mcq-application`,
+          displayId: `QB-${questionNumber++}`,
+          chapterId: chapter.id,
+          chapterTitle: chapter.title,
+          conceptTitle,
+          category,
+          type: 'MCQ' as const,
+          marks: 1,
+          question: `What should a learner check first while applying ${conceptLower}?`,
+          options: [
+            { label: 'A', text: 'Ignore the given condition' },
+            { label: 'B', text: `Identify where ${conceptLower} appears in the situation`, isCorrect: true },
+            { label: 'C', text: 'Copy the previous answer exactly' },
+            { label: 'D', text: 'Skip the supporting reason' },
+          ],
+        },
+        {
+          id: `${baseId}-narrative-${conceptIndex + 1}`,
+          displayId: `QB-${questionNumber++}`,
+          chapterId: chapter.id,
+          chapterTitle: chapter.title,
+          conceptTitle,
+          category,
+          type: 'Narrative' as const,
+          marks: 3,
+          question: `Describe how ${conceptLower} can be used or observed in ${chapterLower}.`,
+          modelAnswer: `A complete answer names ${conceptLower}, connects it to ${chapter.title}, and gives a clear example with a short reason. Any valid example with the correct concept link earns full marks.`,
+        },
+      ];
+    });
+  });
+}
+
 export default function ChapterListPage() {
   const router = useRouter();
   const params = useParams();
@@ -484,7 +611,9 @@ export default function ChapterListPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setSubjectLoading(true);
+    queueMicrotask(() => {
+      if (!cancelled) setSubjectLoading(true);
+    });
     getSubjectAndChapters(subjectId, standardId)
       .then((data) => {
         if (!cancelled) setSubjectData(data);
@@ -497,28 +626,32 @@ export default function ChapterListPage() {
     };
   }, [subjectId, standardId]);
 
-  const staticCourse = courses.find((c) => c.id === courseId);
-  const apiSubject = subjectData?.subject ?? null;
-  const course: Course | undefined =
-    staticCourse ??
-    (apiSubject
-      ? {
-          id: courseId,
-          title: apiSubject.subject_name,
-          code: '',
-          subject: apiSubject.subject_name,
-          category: apiSubject.content_category,
-          classGrade: `Class ${apiSubject.standard_name}`,
-          status: 'Active',
-          chapters: subjectData?.chapters.length ?? 0,
-          enrollments: 0,
-          progress: 0,
-          instructor: '',
-          createdAt: '',
-          accentColor: '#5648E8',
-          icon: 'book-open',
-        }
-      : undefined);
+  const course: Course | undefined = useMemo(() => {
+    const staticCourse = courses.find((c) => c.id === courseId);
+    const apiSubject = subjectData?.subject ?? null;
+
+    return (
+      staticCourse ??
+      (apiSubject
+        ? {
+            id: courseId,
+            title: apiSubject.subject_name,
+            code: '',
+            subject: apiSubject.subject_name,
+            category: apiSubject.content_category,
+            classGrade: `Class ${apiSubject.standard_name}`,
+            status: 'Active',
+            chapters: subjectData?.chapters.length ?? 0,
+            enrollments: 0,
+            progress: 0,
+            instructor: '',
+            createdAt: '',
+            accentColor: '#5648E8',
+            icon: 'book-open',
+          }
+        : undefined)
+    );
+  }, [courseId, subjectData?.chapters, subjectData?.subject]);
   const allChapters = subjectData?.chapters ?? getChaptersByCourseid(courseId);
 
   const [searchTerm] = useState('');
@@ -563,6 +696,27 @@ export default function ChapterListPage() {
   const [resourceSearch, setResourceSearch] = useState('');
   const [contentSearch, setContentSearch] = useState('');
   const [contentSourceFilter, setContentSourceFilter] = useState('all');
+  const [questionBankChapterFilter, setQuestionBankChapterFilter] = useState('all');
+  const [questionBankConceptFilter, setQuestionBankConceptFilter] = useState('all');
+  const [questionBankTypeFilter, setQuestionBankTypeFilter] = useState('all');
+  const [manualQuestionBankItems, setManualQuestionBankItems] = useState<QuestionBankItem[]>([]);
+  const [questionBankItemEdits, setQuestionBankItemEdits] = useState<Record<string, QuestionBankItem>>({});
+  const [editingQuestionBankItem, setEditingQuestionBankItem] = useState<QuestionBankItem | null>(null);
+  const [isAddQuestionBankModalOpen, setIsAddQuestionBankModalOpen] = useState(false);
+  const [manualQuestionChapterId, setManualQuestionChapterId] = useState('');
+  const [manualQuestionConcept, setManualQuestionConcept] = useState('');
+  const [manualQuestionType, setManualQuestionType] = useState<QuestionBankQuestionType>('MCQ');
+  const [manualQuestionMarks, setManualQuestionMarks] = useState('1');
+  const [manualQuestionText, setManualQuestionText] = useState('');
+  const [manualQuestionOptions, setManualQuestionOptions] = useState<Record<QuestionOptionLabel, string>>({
+    A: '',
+    B: '',
+    C: '',
+    D: '',
+  });
+  const [manualCorrectOption, setManualCorrectOption] = useState<QuestionOptionLabel>('A');
+  const [manualModelAnswer, setManualModelAnswer] = useState('');
+  const [manualQuestionError, setManualQuestionError] = useState('');
   const [selectedLibraryChapterId, setSelectedLibraryChapterId] = useState('');
   const [contentLibraryTab, setContentLibraryTab] =
     useState<(typeof CONTENT_LIBRARY_TABS)[number]>('All content');
@@ -653,6 +807,92 @@ export default function ChapterListPage() {
     [chapterContentItems]
   );
 
+  const generatedQuestionBankItems = useMemo(
+    () => (course ? buildQuestionBankItems(course, allChapters) : []),
+    [allChapters, course]
+  );
+  const questionBankItems = useMemo(
+    () =>
+      [...generatedQuestionBankItems, ...manualQuestionBankItems].map(
+        (question) => questionBankItemEdits[question.id] ?? question
+      ),
+    [generatedQuestionBankItems, manualQuestionBankItems, questionBankItemEdits]
+  );
+  const questionBankChapterOptions = useMemo(
+    () => allChapters.map((chapter) => ({ id: chapter.id, title: chapter.title })),
+    [allChapters]
+  );
+  const manualQuestionChapter = useMemo(
+    () => allChapters.find((chapter) => chapter.id === manualQuestionChapterId) ?? null,
+    [allChapters, manualQuestionChapterId]
+  );
+  const manualQuestionConceptOptions = useMemo(
+    () => (course && manualQuestionChapter ? getQuestionBankConceptTitles(course, manualQuestionChapter) : []),
+    [course, manualQuestionChapter]
+  );
+  const questionBankConceptOptions = useMemo(() => {
+    const conceptSource =
+      questionBankChapterFilter === 'all'
+        ? questionBankItems
+        : questionBankItems.filter((question) => question.chapterId === questionBankChapterFilter);
+
+    return Array.from(new Set(conceptSource.map((question) => question.conceptTitle)));
+  }, [questionBankChapterFilter, questionBankItems]);
+  const effectiveQuestionBankConceptFilter =
+    questionBankConceptFilter === 'all' || questionBankConceptOptions.includes(questionBankConceptFilter)
+      ? questionBankConceptFilter
+      : 'all';
+  const filteredQuestionBankItems = useMemo(() => {
+    return questionBankItems.filter((question) => {
+      const matchesChapter =
+        questionBankChapterFilter === 'all' || question.chapterId === questionBankChapterFilter;
+      const matchesConcept =
+        effectiveQuestionBankConceptFilter === 'all' ||
+        question.conceptTitle === effectiveQuestionBankConceptFilter;
+      const matchesType =
+        questionBankTypeFilter === 'all' || question.type === questionBankTypeFilter;
+
+      return matchesChapter && matchesConcept && matchesType;
+    });
+  }, [
+    effectiveQuestionBankConceptFilter,
+    questionBankChapterFilter,
+    questionBankItems,
+    questionBankTypeFilter,
+  ]);
+  const questionBankVisibleNumberById = useMemo(
+    () => new Map(filteredQuestionBankItems.map((question, index) => [question.id, index + 1])),
+    [filteredQuestionBankItems]
+  );
+  const groupedQuestionBankItems = useMemo(() => {
+    const groups: QuestionBankGroup[] = [];
+    const groupLookup = new Map<string, QuestionBankGroup>();
+
+    filteredQuestionBankItems.forEach((question) => {
+      const key = `${question.chapterId}-${question.conceptTitle}`;
+      const existingGroup = groupLookup.get(key);
+
+      if (existingGroup) {
+        existingGroup.questions.push(question);
+        return;
+      }
+
+      const group: QuestionBankGroup = {
+        id: key,
+        chapterId: question.chapterId,
+        chapterTitle: question.chapterTitle,
+        conceptTitle: question.conceptTitle,
+        category: question.category,
+        questions: [question],
+      };
+
+      groupLookup.set(key, group);
+      groups.push(group);
+    });
+
+    return groups;
+  }, [filteredQuestionBankItems]);
+
   const presentationConceptOptions = useMemo(() => {
     if (!presentationChapterId || !course) return [];
     return getChapterKeyConcepts(course.id, presentationChapterId)?.concepts ?? [];
@@ -685,9 +925,20 @@ export default function ChapterListPage() {
 
     const hasMatchingChapter = allChapters.some((chapter) => chapter.id === selectedLibraryChapterId);
     if (!selectedLibraryChapterId || !hasMatchingChapter) {
-      setSelectedLibraryChapterId(contentChapter.id);
+      queueMicrotask(() => setSelectedLibraryChapterId(contentChapter.id));
     }
   }, [allChapters, contentChapter, selectedLibraryChapterId]);
+
+  useEffect(() => {
+    if (view !== 'question-bank' || !activeChapterId) return;
+    const hasMatchingChapter = allChapters.some((chapter) => chapter.id === activeChapterId);
+    if (!hasMatchingChapter || questionBankChapterFilter === activeChapterId) return;
+
+    queueMicrotask(() => {
+      setQuestionBankChapterFilter(activeChapterId);
+      setQuestionBankConceptFilter('all');
+    });
+  }, [activeChapterId, allChapters, questionBankChapterFilter, view]);
 
   useEffect(() => {
     if (view !== 'content' || !activeLibraryChapter || !/^\d+$/.test(activeLibraryChapter.id)) return;
@@ -766,6 +1017,7 @@ export default function ChapterListPage() {
     conceptDrawer !== null ||
     selectedContentItem !== null ||
     isGeneratePresentationDrawerOpen ||
+    isAddQuestionBankModalOpen ||
     questionModalConcept !== null;
   const expandedChapterId = view === 'teacher-resource' ? null : expandedChapterParam;
 
@@ -792,6 +1044,9 @@ export default function ChapterListPage() {
         setIsDraggingUpload(false);
         setSelectedContentItem(null);
         setIsGeneratePresentationDrawerOpen(false);
+        setIsAddQuestionBankModalOpen(false);
+        setEditingQuestionBankItem(null);
+        setManualQuestionError('');
         setQuestionModalConcept(null);
         setQuestionType('');
         setTotalQuestions('');
@@ -955,14 +1210,16 @@ export default function ChapterListPage() {
 
     const matchingConcept = uploadConceptOptions.find((concept) => concept.title === uploadConcept);
     if (!matchingConcept && uploadConcept !== 'all') {
-      setUploadConcept('all');
+      queueMicrotask(() => setUploadConcept('all'));
     }
   }, [uploadChapterId, uploadConcept, uploadConceptOptions]);
 
   useEffect(() => {
-    setUploadError('');
-    setUploadFile(null);
-    setIsDraggingUpload(false);
+    queueMicrotask(() => {
+      setUploadError('');
+      setUploadFile(null);
+      setIsDraggingUpload(false);
+    });
     if (uploadInputRef.current) {
       uploadInputRef.current.value = '';
     }
@@ -986,6 +1243,18 @@ export default function ChapterListPage() {
     nextParams.set('chapterId', chapter.id);
     nextParams.set('expandedChapterId', chapter.id);
 
+    router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
+  };
+
+  const openQuestionBankView = (chapter: Chapter) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('view', 'question-bank');
+    nextParams.set('chapterId', chapter.id);
+    nextParams.set('expandedChapterId', chapter.id);
+
+    setQuestionBankChapterFilter(chapter.id);
+    setQuestionBankConceptFilter('all');
+    setQuestionBankTypeFilter('all');
     router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
   };
 
@@ -1013,6 +1282,180 @@ export default function ChapterListPage() {
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+  };
+
+  const resetManualQuestionForm = () => {
+    setManualQuestionChapterId('');
+    setManualQuestionConcept('');
+    setManualQuestionType('MCQ');
+    setManualQuestionMarks('1');
+    setManualQuestionText('');
+    setManualQuestionOptions({
+      A: '',
+      B: '',
+      C: '',
+      D: '',
+    });
+    setManualCorrectOption('A');
+    setManualModelAnswer('');
+    setManualQuestionError('');
+    setEditingQuestionBankItem(null);
+  };
+
+  const closeAddQuestionBankModal = () => {
+    setIsAddQuestionBankModalOpen(false);
+    resetManualQuestionForm();
+  };
+
+  const openQuestionBankAddQuestion = () => {
+    const targetQuestion = filteredQuestionBankItems[0] ?? questionBankItems[0];
+    const filterChapter =
+      questionBankChapterFilter === 'all'
+        ? null
+        : allChapters.find((chapter) => chapter.id === questionBankChapterFilter) ?? null;
+    const targetChapter =
+      filterChapter ??
+      (targetQuestion ? allChapters.find((chapter) => chapter.id === targetQuestion.chapterId) ?? null : null) ??
+      resourceChapter ??
+      allChapters[0] ??
+      null;
+
+    if (!targetChapter || !course) return;
+
+    const conceptOptions = getQuestionBankConceptTitles(course, targetChapter);
+    const targetConcept =
+      effectiveQuestionBankConceptFilter !== 'all' &&
+      conceptOptions.includes(effectiveQuestionBankConceptFilter)
+        ? effectiveQuestionBankConceptFilter
+        : targetQuestion?.chapterId === targetChapter.id && conceptOptions.includes(targetQuestion.conceptTitle)
+          ? targetQuestion.conceptTitle
+          : conceptOptions[0] ?? '';
+    const targetType: QuestionBankQuestionType =
+      questionBankTypeFilter === 'Narrative' ? 'Narrative' : 'MCQ';
+
+    setManualQuestionChapterId(targetChapter.id);
+    setManualQuestionConcept(targetConcept);
+    setManualQuestionType(targetType);
+    setManualQuestionMarks(targetType === 'Narrative' ? '3' : '1');
+    setManualQuestionText('');
+    setManualQuestionOptions({
+      A: '',
+      B: '',
+      C: '',
+      D: '',
+    });
+    setManualCorrectOption('A');
+    setManualModelAnswer('');
+    setManualQuestionError('');
+    setIsAddQuestionBankModalOpen(true);
+  };
+
+  const openQuestionBankEditQuestion = (question: QuestionBankItem) => {
+    const chapter = allChapters.find((item) => item.id === question.chapterId) ?? allChapters[0] ?? null;
+    const correctOption =
+      (question.options?.find((option) => option.isCorrect)?.label as QuestionOptionLabel | undefined) ?? 'A';
+
+    setEditingQuestionBankItem(question);
+    setManualQuestionChapterId(chapter?.id ?? question.chapterId);
+    setManualQuestionConcept(question.conceptTitle);
+    setManualQuestionType(question.type);
+    setManualQuestionMarks(String(question.marks));
+    setManualQuestionText(question.question);
+    setManualQuestionOptions({
+      A: question.options?.find((option) => option.label === 'A')?.text ?? '',
+      B: question.options?.find((option) => option.label === 'B')?.text ?? '',
+      C: question.options?.find((option) => option.label === 'C')?.text ?? '',
+      D: question.options?.find((option) => option.label === 'D')?.text ?? '',
+    });
+    setManualCorrectOption(correctOption);
+    setManualModelAnswer(question.modelAnswer ?? '');
+    setManualQuestionError('');
+    setIsAddQuestionBankModalOpen(true);
+  };
+
+  const updateManualQuestionChapter = (chapterId: string) => {
+    const nextChapter = allChapters.find((chapter) => chapter.id === chapterId) ?? null;
+    const nextConcepts = course && nextChapter ? getQuestionBankConceptTitles(course, nextChapter) : [];
+
+    setManualQuestionChapterId(chapterId);
+    setManualQuestionConcept(nextConcepts[0] ?? '');
+    setManualQuestionError('');
+  };
+
+  const updateManualQuestionType = (value: string | null) => {
+    const nextType: QuestionBankQuestionType = value === 'Narrative' ? 'Narrative' : 'MCQ';
+
+    setManualQuestionType(nextType);
+    setManualQuestionMarks(nextType === 'Narrative' ? '3' : '1');
+    setManualQuestionError('');
+  };
+
+  const submitManualQuestion = () => {
+    const chapter = allChapters.find((item) => item.id === manualQuestionChapterId);
+    const marks = Number(manualQuestionMarks);
+
+    if (!chapter || !course) {
+      setManualQuestionError('Please select a chapter.');
+      return;
+    }
+
+    if (!manualQuestionConcept) {
+      setManualQuestionError('Please select a concept.');
+      return;
+    }
+
+    if (!manualQuestionText.trim()) {
+      setManualQuestionError('Please enter the question text.');
+      return;
+    }
+
+    if (!Number.isFinite(marks) || marks <= 0) {
+      setManualQuestionError('Please enter valid marks.');
+      return;
+    }
+
+    if (
+      manualQuestionType === 'MCQ' &&
+      !QUESTION_OPTION_LABELS.every((label) => manualQuestionOptions[label].trim() !== '')
+    ) {
+      setManualQuestionError('Please enter all four answer options.');
+      return;
+    }
+
+    const nextQuestion: QuestionBankItem = {
+      id: editingQuestionBankItem?.id ?? `manual-${Date.now()}`,
+      displayId: editingQuestionBankItem?.displayId ?? `QB-${101 + questionBankItems.length}`,
+      chapterId: chapter.id,
+      chapterTitle: chapter.title,
+      conceptTitle: manualQuestionConcept,
+      category: getQuestionBankCategory(course, chapter, manualQuestionConcept),
+      type: manualQuestionType,
+      marks,
+      question: manualQuestionText.trim(),
+      options:
+        manualQuestionType === 'MCQ'
+          ? QUESTION_OPTION_LABELS.map((label) => ({
+              label,
+              text: manualQuestionOptions[label].trim(),
+              isCorrect: label === manualCorrectOption,
+            }))
+          : undefined,
+      modelAnswer:
+        manualQuestionType === 'Narrative'
+          ? manualModelAnswer.trim() || 'Model answer not added yet.'
+          : undefined,
+    };
+
+    if (editingQuestionBankItem) {
+      setQuestionBankItemEdits((current) => ({
+        ...current,
+        [editingQuestionBankItem.id]: nextQuestion,
+      }));
+    } else {
+      setManualQuestionBankItems((current) => [...current, nextQuestion]);
+    }
+
+    closeAddQuestionBankModal();
   };
 
   const submitGenerateQuestions = async () => {
@@ -1099,7 +1542,7 @@ export default function ChapterListPage() {
     );
 
     if (!matchingConcept) {
-      setPresentationConcept(presentationConceptOptions[0]?.title ?? '');
+      queueMicrotask(() => setPresentationConcept(presentationConceptOptions[0]?.title ?? ''));
     }
   }, [presentationChapterId, presentationConcept, presentationConceptOptions]);
 
@@ -1426,6 +1869,328 @@ export default function ChapterListPage() {
       </article>
     );
   };
+
+  const renderQuestionBankQuestion = (question: QuestionBankItem) => {
+    const visibleNumber = questionBankVisibleNumberById.get(question.id) ?? 1;
+
+    return (
+      <article
+        key={question.id}
+        className="rounded-[8px] border border-slate-200/90 bg-white px-5 py-5 shadow-[0_2px_8px_rgba(15,23,42,0.08)] sm:px-6"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 gap-4">
+            <span className="shrink-0 pt-0.5 font-mono text-[14px] text-slate-600">
+              {question.displayId}
+            </span>
+            <h3 className="min-w-0 text-[18px] font-bold leading-7 text-slate-950">
+              {visibleNumber}. {question.question}
+            </h3>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2 self-start">
+            <span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-xs font-bold text-[#3157ff]">
+              {question.type}
+            </span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+              {question.marks} mark{question.marks === 1 ? '' : 's'}
+            </span>
+          </div>
+        </div>
+
+        {question.options ? (
+          <div className="mt-4 space-y-2">
+            {question.options.map((option) => (
+              <div
+                key={`${question.id}-${option.label}`}
+                className={cn(
+                  'flex min-h-11 items-center gap-3 rounded-[6px] border px-3 text-[16px] transition-colors',
+                  option.isCorrect
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                    : 'border-slate-200 bg-white text-slate-900'
+                )}
+              >
+                <span className="shrink-0 font-mono text-sm font-semibold text-slate-600">
+                  {option.label}.
+                </span>
+                <span className="min-w-0 flex-1">{option.text}</span>
+                {option.isCorrect ? (
+                  <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {question.modelAnswer ? (
+          <div className="mt-4 rounded-[6px] border border-slate-200 border-l-4 border-l-[#4f46e5] bg-[#f3f7fc] px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+              Model answer
+            </p>
+            <p className="mt-2 text-[16px] leading-7 text-slate-700">{question.modelAnswer}</p>
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex justify-end gap-3 border-t border-slate-200/80 pt-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => openQuestionBankEditQuestion(question)}
+            className="h-10 rounded-2xl bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e2e7ff] hover:text-[#4338ca]"
+          >
+            <Pencil size={17} className="mr-2" />
+            Edit
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 rounded-2xl px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+          >
+            <Trash2 size={17} className="mr-2" />
+            Delete
+          </Button>
+        </div>
+      </article>
+    );
+  };
+
+  const isEditingQuestionBankItem = editingQuestionBankItem !== null;
+  const addQuestionBankModal = isAddQuestionBankModalOpen ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-[1px]"
+      onClick={closeAddQuestionBankModal}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-question-bank-title"
+        className="flex max-h-[92vh] w-full max-w-[1128px] flex-col overflow-hidden rounded-[16px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.32)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 px-7 pb-4 pt-7 sm:px-8">
+          <div>
+            <h2 id="add-question-bank-title" className="text-[30px] font-bold leading-tight text-slate-950">
+              {isEditingQuestionBankItem ? 'Edit question' : 'Add question to bank'}
+            </h2>
+            <p className="mt-1 text-[18px] leading-7 text-slate-600">
+              {isEditingQuestionBankItem
+                ? 'Update this question and its answer.'
+                : 'Manually add a question to the question bank, chapter-wise.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={closeAddQuestionBankModal}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+            aria-label="Close dialog"
+          >
+            <X size={22} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-7 pb-5 sm:px-8">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                Chapter <span className="text-rose-500">*</span>
+              </Label>
+              <Select value={manualQuestionChapterId} onValueChange={(value) => updateManualQuestionChapter(value ?? '')}>
+                <SelectTrigger className="h-[50px] rounded-[7px] border-slate-300 bg-white px-4 text-[17px] text-slate-900 shadow-none">
+                  <SelectValue>{manualQuestionChapter?.title ?? 'Select a chapter'}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {questionBankChapterOptions.map((chapter) => (
+                    <SelectItem key={chapter.id} value={chapter.id}>
+                      {chapter.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                Concept <span className="text-rose-500">*</span>
+              </Label>
+              <Select value={manualQuestionConcept} onValueChange={(value) => setManualQuestionConcept(value ?? '')}>
+                <SelectTrigger className="h-[50px] rounded-[7px] border-slate-300 bg-white px-4 text-[17px] text-slate-900 shadow-none">
+                  <SelectValue>{manualQuestionConcept || 'Select a concept'}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {manualQuestionConceptOptions.map((concept) => (
+                    <SelectItem key={concept} value={concept}>
+                      {concept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(180px,1fr)]">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                Question Type <span className="text-rose-500">*</span>
+              </Label>
+              <Select value={manualQuestionType} onValueChange={updateManualQuestionType}>
+                <SelectTrigger className="h-[50px] rounded-[7px] border-slate-300 bg-white px-4 text-[17px] text-slate-900 shadow-none">
+                  <SelectValue>{manualQuestionType}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {QUESTION_TYPE_OPTIONS.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="manual-question-marks" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                Marks
+              </Label>
+              <Input
+                id="manual-question-marks"
+                inputMode="numeric"
+                value={manualQuestionMarks}
+                onChange={(event) => {
+                  setManualQuestionMarks(event.target.value.replace(/[^\d]/g, ''));
+                  setManualQuestionError('');
+                }}
+                className="h-[50px] rounded-[7px] border-slate-300 px-4 text-[17px] text-slate-900 shadow-none"
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-1.5">
+            <Label htmlFor="manual-question-text" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+              Question Text <span className="text-rose-500">*</span>
+            </Label>
+            <Textarea
+              id="manual-question-text"
+              value={manualQuestionText}
+              onChange={(event) => {
+                setManualQuestionText(event.target.value);
+                setManualQuestionError('');
+              }}
+              placeholder="Enter the question"
+              className="min-h-[106px] rounded-[7px] border-slate-300 px-4 py-3 text-[17px] text-slate-900 placeholder:text-slate-400 shadow-none"
+            />
+          </div>
+
+          {manualQuestionType === 'MCQ' ? (
+            <div className="mt-6">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Options - Mark the correct answer
+              </p>
+              <div className="mt-3 space-y-3">
+                {QUESTION_OPTION_LABELS.map((label) => (
+                  <div key={label} className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-4">
+                    <span className="text-sm font-bold text-slate-600">{label}</span>
+                    <Input
+                      value={manualQuestionOptions[label]}
+                      onChange={(event) => {
+                        setManualQuestionOptions((current) => ({
+                          ...current,
+                          [label]: event.target.value,
+                        }));
+                        setManualQuestionError('');
+                      }}
+                      placeholder={`Option ${label}`}
+                      className="h-[50px] rounded-[7px] border-slate-300 px-4 text-[17px] text-slate-900 placeholder:text-slate-400 shadow-none"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 max-w-[350px] space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                  Correct Option
+                </Label>
+                <Select
+                  value={manualCorrectOption}
+                  onValueChange={(value) => setManualCorrectOption((value || 'A') as QuestionOptionLabel)}
+                >
+                  <SelectTrigger className="h-[50px] rounded-[7px] border-slate-300 bg-white px-4 text-[17px] text-slate-900 shadow-none">
+                    <SelectValue>
+                      {manualQuestionOptions[manualCorrectOption].trim()
+                        ? `${manualCorrectOption} · ${manualQuestionOptions[manualCorrectOption].trim()}`
+                        : manualCorrectOption}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {QUESTION_OPTION_LABELS.map((label) => (
+                      <SelectItem key={label} value={label}>
+                        {manualQuestionOptions[label].trim()
+                          ? `${label} · ${manualQuestionOptions[label].trim()}`
+                          : label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-6 space-y-1.5">
+              <Label htmlFor="manual-model-answer" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                Model Answer
+              </Label>
+              <Textarea
+                id="manual-model-answer"
+                value={manualModelAnswer}
+                onChange={(event) => setManualModelAnswer(event.target.value)}
+                placeholder="Enter the model answer"
+                className="min-h-[118px] rounded-[7px] border-slate-300 px-4 py-3 text-[17px] text-slate-900 placeholder:text-slate-400 shadow-none"
+              />
+            </div>
+          )}
+
+          {manualQuestionError ? (
+            <p className="mt-5 rounded-[8px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+              {manualQuestionError}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex items-center justify-end gap-4 border-t border-slate-200/90 px-7 py-4 sm:px-8">
+          <button
+            type="button"
+            onClick={closeAddQuestionBankModal}
+            className="h-11 px-3 text-[16px] font-semibold text-slate-600 transition-colors hover:text-slate-950"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="ds-btn ds-btn--primary ds-btn--md inline-flex h-11 items-center gap-2 rounded-xl bg-[#4f46e5] px-6 text-[16px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] transition-colors hover:bg-[#4338ca]"
+            onClick={submitManualQuestion}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="ds-icon"
+              aria-hidden="true"
+              style={{ display: 'inline-block', flexShrink: 0, verticalAlign: 'middle' }}
+            >
+              <path d="M20 6 9 17l-5-5"></path>
+            </svg>
+            <span className="ds-btn__label">
+              <span className="sc-interp">
+                {isEditingQuestionBankItem ? 'Save changes' : 'Add to bank'}
+              </span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   const generateQuestionsModal = questionModalConcept ? (
     <div
@@ -2105,6 +2870,161 @@ export default function ChapterListPage() {
     );
   }
 
+  if (view === 'question-bank') {
+    const questionCountLabel = `${filteredQuestionBankItems.length} of ${questionBankItems.length} questions`;
+
+    return (
+      <div className="min-h-screen rounded-t-3xl bg-[#E9EEF7]">
+        <div className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:px-9">
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            <button
+              type="button"
+              onClick={() => router.push('/course-master')}
+              className="inline-flex items-center gap-2 font-medium text-[#34489a] transition-colors hover:text-[#1f2f76]"
+            >
+              <BookOpen size={16} />
+              Teach / learn
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <button
+              type="button"
+              onClick={() => router.push(`/course-master/${course.id}/chapters`)}
+              className="font-medium transition-colors hover:text-slate-900"
+            >
+              Chapters
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <span className="font-bold text-slate-950">Question bank</span>
+          </div>
+
+          <div className="mb-6">
+            <h1 className="text-[24px] font-bold tracking-tight text-slate-950">Question bank</h1>
+            <p className="mt-2 text-[16px] leading-7 text-slate-700">
+              View and manage questions & answers. Correct options are highlighted; narrative questions show a model answer. Use Add question to build the bank chapter-wise.
+            </p>
+          </div>
+
+          <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <p className="text-[16px] font-medium text-slate-700">{questionCountLabel}</p>
+
+            <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[225px_275px_215px_auto]">
+              <Select
+                value={questionBankChapterFilter}
+                onValueChange={(value) => {
+                  setQuestionBankChapterFilter(value ?? 'all');
+                  setQuestionBankConceptFilter('all');
+                }}
+              >
+                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                  <SelectValue>
+                    {questionBankChapterFilter === 'all'
+                      ? 'All Chapters'
+                      : questionBankChapterOptions.find((chapter) => chapter.id === questionBankChapterFilter)
+                          ?.title ?? 'All Chapters'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Chapters</SelectItem>
+                  {questionBankChapterOptions.map((chapter) => (
+                    <SelectItem key={chapter.id} value={chapter.id}>
+                      {chapter.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={effectiveQuestionBankConceptFilter}
+                onValueChange={(value) => setQuestionBankConceptFilter(value ?? 'all')}
+              >
+                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                  <SelectValue>
+                    {effectiveQuestionBankConceptFilter === 'all'
+                      ? 'All Concepts'
+                      : questionBankConceptOptions.find((concept) => concept === effectiveQuestionBankConceptFilter)
+                          ?? 'All Concepts'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Concepts</SelectItem>
+                  {questionBankConceptOptions.map((concept) => (
+                    <SelectItem key={concept} value={concept}>
+                      {concept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={questionBankTypeFilter} onValueChange={(value) => setQuestionBankTypeFilter(value ?? 'all')}>
+                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                  <SelectValue>
+                    {questionBankTypeFilter === 'all' ? 'All Types' : questionBankTypeFilter}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {QUESTION_TYPE_OPTIONS.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                onClick={openQuestionBankAddQuestion}
+                disabled={questionBankItems.length === 0}
+                className="h-10 rounded-xl bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
+              >
+                <Plus size={18} className="mr-2" />
+                Add question
+              </Button>
+            </div>
+          </div>
+
+          {groupedQuestionBankItems.length === 0 ? (
+            <div className="rounded-[8px] border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
+              <h2 className="text-lg font-bold text-slate-950">No questions found</h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Change the filters or add a question for the selected chapter.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {groupedQuestionBankItems.map((group) => (
+                <section key={group.id}>
+                  <div className="mb-4 flex flex-col gap-3 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 flex-wrap items-center gap-3">
+                      <Lightbulb size={20} className="shrink-0 text-[#4f46e5]" />
+                      <h2 className="min-w-0 text-[20px] font-bold leading-7 text-slate-950">
+                        {group.conceptTitle}
+                      </h2>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200">
+                        {group.category}
+                      </span>
+                    </div>
+
+                    <p className="text-sm font-medium text-slate-600">
+                      {group.questions.length} question{group.questions.length === 1 ? '' : 's'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-5">
+                    {group.questions.map(renderQuestionBankQuestion)}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {addQuestionBankModal}
+        {generateQuestionsModal}
+      </div>
+    );
+  }
+
   if (view === 'content' && contentChapter) {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const totalItems = chapterContentItems.length;
@@ -2664,10 +3584,19 @@ export default function ChapterListPage() {
                       type="button"
                       variant="outline"
                       onClick={() => openChapterContentView(chapter)}
-                      className="h-10 shrink-0 rounded-2xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                     >
                       <FolderOpen size={16} className="mr-2" />
                       Content
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => openQuestionBankView(chapter)}
+                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                    >
+                      <Database size={16} className="mr-2" />
+                      Question Bank
                     </Button>
                   </div>
 
