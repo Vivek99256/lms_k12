@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { format } from 'date-fns';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -37,9 +38,15 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Calendar as DatePickerCalendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { getRequestContext } from '../../page';
 import { courses } from '../../data/courses';
 import {
   getChaptersByCourseid,
@@ -60,6 +67,220 @@ function getStatusColor(status: Course['status']) {
     case 'Archived':
       return 'bg-slate-100 text-slate-600 border-slate-200';
   }
+}
+
+function CreateLessonPlanDialog({
+  open,
+  onOpenChange,
+  contextLabel,
+  conceptOptions,
+  pedagogyOptions,
+  lessonPlanDraft,
+  lessonPlanDraftErrors,
+  isSavingLessonPlan,
+  setLessonPlanDraft,
+  setLessonPlanDraftErrors,
+  onSave,
+}: CreateLessonPlanDialogProps) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(15,23,42,0.18)] px-4 py-8 backdrop-blur-[2px]">
+      <div className="absolute inset-0" aria-hidden="true" />
+      <div className="relative z-[1] w-full max-w-[640px] rounded-[18px] bg-white px-6 py-5 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:px-7 sm:py-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-[24px] font-semibold tracking-tight text-[#0F172A]">
+              Create concept-wise lesson plan
+            </h2>
+            <p className="mt-1 text-[15px] text-[#64748B]">{contextLabel}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            disabled={isSavingLessonPlan}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#64748B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="mt-6 space-y-5">
+          <div>
+            <Label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
+              Concept <span className="text-[#DC2626]">*</span>
+            </Label>
+            <Select
+              value={lessonPlanDraft.conceptTitle || ''}
+              onValueChange={(value) => {
+                setLessonPlanDraft((current) => ({ ...current, conceptTitle: value || current.conceptTitle }));
+                setLessonPlanDraftErrors((current) => ({ ...current, conceptTitle: undefined }));
+              }}
+            >
+              <SelectTrigger
+                className={cn(
+                  'h-12 rounded-[10px] border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A]',
+                  lessonPlanDraftErrors.conceptTitle && 'border-[#DC2626] focus-visible:ring-[#DC2626]/20'
+                )}
+              >
+                <SelectValue placeholder="Select a concept" />
+              </SelectTrigger>
+              <SelectContent align="start">
+                {conceptOptions.map((concept) => (
+                  <SelectItem key={concept} value={concept}>
+                    {concept}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {lessonPlanDraftErrors.conceptTitle ? (
+              <p className="mt-1.5 text-[13px] text-[#DC2626]">{lessonPlanDraftErrors.conceptTitle}</p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
+                Planned Date <span className="text-[#DC2626]">*</span>
+              </Label>
+              <Popover>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isSavingLessonPlan}
+                      className={cn(
+                        'h-12 w-full justify-start rounded-[10px] border-[#CBD5E1] bg-white px-4 text-left text-[16px] font-normal text-[#0F172A] hover:bg-white',
+                        !lessonPlanDraft.plannedDate && 'text-[#94A3B8]',
+                        lessonPlanDraftErrors.plannedDate && 'border-[#DC2626]'
+                      )}
+                    >
+                      <Calendar size={16} className="mr-2 text-[#64748B]" />
+                      {lessonPlanDraft.plannedDate
+                        ? format(new Date(`${lessonPlanDraft.plannedDate}T00:00:00`), 'dd MMM yyyy')
+                        : 'Pick a date'}
+                    </Button>
+                  }
+                />
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DatePickerCalendar
+                    mode="single"
+                    selected={
+                      lessonPlanDraft.plannedDate
+                        ? new Date(`${lessonPlanDraft.plannedDate}T00:00:00`)
+                        : undefined
+                    }
+                    onSelect={(date) => {
+                      setLessonPlanDraft((current) => ({
+                        ...current,
+                        plannedDate: date ? format(date, 'yyyy-MM-dd') : '',
+                      }));
+                      setLessonPlanDraftErrors((current) => ({ ...current, plannedDate: undefined }));
+                    }}
+                    disabled={(date) => date < new Date('1900-01-01')}
+                    captionLayout="dropdown"
+                  />
+                </PopoverContent>
+              </Popover>
+              {lessonPlanDraftErrors.plannedDate ? (
+                <p className="mt-1.5 text-[13px] text-[#DC2626]">{lessonPlanDraftErrors.plannedDate}</p>
+              ) : null}
+            </div>
+
+            <div>
+              <Label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
+                Periods
+              </Label>
+              <Input
+                type="number"
+                min="1"
+                value={lessonPlanDraft.periods}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  if (nextValue === '' || /^\d+$/.test(nextValue)) {
+                    setLessonPlanDraft((current) => ({ ...current, periods: nextValue }));
+                    setLessonPlanDraftErrors((current) => ({ ...current, periods: undefined }));
+                  }
+                }}
+                inputMode="numeric"
+                disabled={isSavingLessonPlan}
+                className={cn(
+                  'h-12 rounded-[10px] border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A]',
+                  lessonPlanDraftErrors.periods && 'border-[#DC2626] focus-visible:ring-[#DC2626]/20'
+                )}
+              />
+              <p className="mt-1.5 text-[14px] text-[#64748B]">Class periods needed</p>
+              {lessonPlanDraftErrors.periods ? (
+                <p className="mt-1.5 text-[13px] text-[#DC2626]">{lessonPlanDraftErrors.periods}</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div>
+            <Label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
+              Teaching pedagogy
+            </Label>
+            <Select
+              value={lessonPlanDraft.pedagogy ?? ''}
+              onValueChange={(value) =>
+                setLessonPlanDraft((current) => ({ ...current, pedagogy: value }))
+              }
+            >
+              <SelectTrigger className="h-12 rounded-[10px] border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A]">
+                <SelectValue placeholder="Select pedagogy" />
+              </SelectTrigger>
+              <SelectContent align="start">
+                {pedagogyOptions.map((pedagogy) => (
+                  <SelectItem key={pedagogy} value={pedagogy}>
+                    {pedagogy}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
+              Learning objectives
+            </Label>
+            <Textarea
+              rows={4}
+              value={lessonPlanDraft.objective}
+              onChange={(event) =>
+                setLessonPlanDraft((current) => ({ ...current, objective: event.target.value }))
+              }
+              placeholder="What should students be able to do after this lesson?"
+              disabled={isSavingLessonPlan}
+              className="min-h-[104px] rounded-[10px] border-[#CBD5E1] bg-white px-4 py-3 text-[16px] text-[#0F172A] placeholder:text-[#94A3B8]"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 border-t border-[#E2E8F0] pt-4">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              disabled={isSavingLessonPlan}
+              className="h-11 rounded-[12px] px-4 text-[16px] font-medium text-[#475569] hover:text-[#0F172A]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onSave}
+              disabled={isSavingLessonPlan}
+              className="h-11 rounded-[14px] bg-[#4F46E5] px-5 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:bg-[#A5B4FC]"
+            >
+              <Check size={16} className="mr-2" />
+              {isSavingLessonPlan ? 'Saving...' : 'Save lesson plan'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const SECTION_META = [
@@ -93,25 +314,6 @@ type LessonPlanConceptCoverage = {
   coveragePercent: number;
 };
 
-type Teacher = {
-  id: number | string;
-  user_id?: number | string;
-  teacher_id?: number | string;
-  employee_id?: number | string;
-  userId?: number | string;
-  name?: string;
-  user_name?: string;
-  first_name?: string;
-  middle_name?: string;
-  last_name?: string;
-};
-
-type TeacherSession = {
-  token: string;
-  hostName: string;
-  subInstituteId: string;
-};
-
 type LessonPlanEvent = {
   id: string;
   title: string;
@@ -125,7 +327,6 @@ type LessonPlanEvent = {
   pedagogy: string;
   startTime: string;
   endTime: string;
-  teacherId?: number;
   teacherName: string;
   plannedDurationMin?: number;
   periodType?: string;
@@ -136,8 +337,14 @@ type LessonPlanDraft = {
   conceptTitle: string;
   plannedDate: string;
   periods: string;
-  pedagogy: string;
+  pedagogy: string | null;
   objective: string;
+};
+
+type LessonPlanDraftErrors = {
+  conceptTitle?: string;
+  plannedDate?: string;
+  periods?: string;
 };
 
 type CalendarViewMode = 'day' | 'week' | 'month';
@@ -145,10 +352,15 @@ type CalendarViewMode = 'day' | 'week' | 'month';
 type LessonPlanApiPeriod = {
   id: number;
   scheduled_date: string;
+  week_day?: string;
+  week_number?: number;
   period_id?: number;
+  teacher_name?: string | null;
   period_slot: string | number;
   teacher_id?: number;
+  chapter_id?: number;
   chapter_name?: string | null;
+  primary_concept_id?: number;
   primary_concept_name?: string | null;
   period_type?: string | null;
   planned_duration_min?: number | null;
@@ -176,13 +388,95 @@ type LessonPlanApiResponse = {
   }[];
 };
 
-type HoverPopupState = {
-  event: LessonPlanEvent;
-  style: React.CSSProperties;
+type HoverPopupPosition = {
+  top: number;
+  left: number;
+};
+
+interface Division {
+  id?: number;
+  division_id?: number;
+  division_name?: string;
+  name?: string;
+  title?: string;
+}
+
+type SessionContext = {
+  subInstituteId: string;
+  token: string;
+  termId: string;
+  standardId: string;
+};
+
+type CreateLessonPlanDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  contextLabel: string;
+  conceptOptions: string[];
+  pedagogyOptions: string[];
+  lessonPlanDraft: LessonPlanDraft;
+  lessonPlanDraftErrors: LessonPlanDraftErrors;
+  isSavingLessonPlan: boolean;
+  setLessonPlanDraft: React.Dispatch<React.SetStateAction<LessonPlanDraft>>;
+  setLessonPlanDraftErrors: React.Dispatch<React.SetStateAction<LessonPlanDraftErrors>>;
+  onSave: () => void | Promise<void>;
 };
 
 function readString(value: unknown): string {
   return value != null && value !== '' ? String(value) : '';
+}
+
+function getSessionData() {
+  try {
+    return JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+  } catch (error) {
+    console.error('Invalid session data:', error);
+    return {};
+  }
+}
+
+function resolveSessionTermId(
+  userData: Record<string, unknown>,
+  menuContext: Record<string, unknown>
+) {
+  const directTermId = readString(
+    userData.term_id ?? menuContext.term_id ?? userData.academic_term_id ?? menuContext.academic_term_id
+  );
+
+  if (directTermId) {
+    return directTermId;
+  }
+
+  const selectedAcademicTerm = readString(localStorage.getItem('selectedAcademicTerm'));
+  const academicTermsSources = [
+    userData.academicTerms,
+    menuContext.academicTerms,
+    userData.academic_terms,
+    menuContext.academic_terms,
+  ];
+
+  for (const source of academicTermsSources) {
+    if (!Array.isArray(source)) continue;
+
+    const matchedTerm = source.find((item) => {
+      if (!item || typeof item !== 'object') return false;
+      const record = item as Record<string, unknown>;
+      const label = readString(record.title ?? record.term_name ?? record.name ?? record.label);
+      return selectedAcademicTerm ? label === selectedAcademicTerm : true;
+    });
+
+    if (matchedTerm && typeof matchedTerm === 'object') {
+      const record = matchedTerm as Record<string, unknown>;
+      const resolvedId = readString(
+        record.term_id ?? record.id ?? record.academic_term_id ?? record.value
+      );
+      if (resolvedId) {
+        return resolvedId;
+      }
+    }
+  }
+
+  return '';
 }
 
 function getCourseSectionLabel(courseId: string) {
@@ -206,9 +500,6 @@ function getTotalKeyConceptCount(course: Course, chapters: Chapter[]) {
   if (conceptCount > 0) return conceptCount;
   return Math.max(course.chapters * 4, 12);
 }
-
-const LESSON_PLAN_API_URL =
-  'https://dev.triz.co.in/api/intelligence/lesson-plans?sub_institute_id=195&standard_id=2235&subject_id=4018&term_id=149&division_id=936&syear=2025';
 
 const PERIOD_SLOT_TIME_MAP: Record<string, { startHour: number; startMinute: number; fallbackLabel: string }> = {
   AM: { startHour: 8, startMinute: 0, fallbackLabel: 'AM' },
@@ -285,91 +576,6 @@ function mapStatusToCalendarStatus(status: LessonPlanApiStatus | string | null |
       return 'Assessment';
     default:
       return 'Planned';
-  }
-}
-
-function getStoredTeacherName(teacherId: number | undefined) {
-  if (!teacherId || typeof window === 'undefined') return null;
-
-  const candidates = ['userData', 'menuContext'];
-
-  const visit = (value: unknown, depth = 0): string | null => {
-    if (depth > 5 || value == null) return null;
-
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const result = visit(item, depth + 1);
-        if (result) return result;
-      }
-      return null;
-    }
-
-    if (typeof value !== 'object') return null;
-
-    const record = value as Record<string, unknown>;
-    const recordId = Number(record.teacher_id ?? record.user_id ?? record.id ?? record.employee_id);
-    if (recordId === teacherId) {
-      const directName =
-        record.teacher_name ??
-        record.user_name ??
-        record.name ??
-        record.full_name ??
-        record.employee_name;
-      if (typeof directName === 'string' && directName.trim()) {
-        return directName.trim();
-      }
-
-      const firstName = typeof record.first_name === 'string' ? record.first_name.trim() : '';
-      const lastName = typeof record.last_name === 'string' ? record.last_name.trim() : '';
-      const composed = `${firstName} ${lastName}`.trim();
-      if (composed) return composed;
-    }
-
-    for (const nestedValue of Object.values(record)) {
-      const result = visit(nestedValue, depth + 1);
-      if (result) return result;
-    }
-
-    return null;
-  };
-
-  for (const key of candidates) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw) as unknown;
-      const result = visit(parsed);
-      if (result) return result;
-    } catch {
-      continue;
-    }
-  }
-
-  return null;
-}
-
-function getTeacherSession(): TeacherSession | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
-    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
-
-    const token = readString(userData.user_token ?? userData.token);
-    const hostName = readString(userData.host_name) || API_BASE_URL;
-    const subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
-
-    if (!token || !hostName || !subInstituteId) {
-      return null;
-    }
-
-    return {
-      token,
-      hostName,
-      subInstituteId,
-    };
-  } catch {
-    return null;
   }
 }
 
@@ -494,26 +700,37 @@ function getEventCardClasses(status: LessonPlanStatus) {
 
 function CalendarEventCard({
   event,
+  hoveredPeriodId,
   className,
   style,
   onOpenHover,
   onCloseHover,
 }: {
   event: LessonPlanEvent;
+  hoveredPeriodId: string | null;
   className?: string;
   style?: React.CSSProperties;
-  onOpenHover: (event: LessonPlanEvent, element: HTMLElement) => void;
+  onOpenHover: (element: HTMLElement, event: LessonPlanEvent) => void;
   onCloseHover: () => void;
 }) {
+  const isActive = hoveredPeriodId === event.id;
+  const isInactive = hoveredPeriodId !== null && hoveredPeriodId !== event.id;
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onMouseEnter={(hoverEvent) => onOpenHover(event, hoverEvent.currentTarget)}
+      onMouseEnter={(hoverEvent) => onOpenHover(hoverEvent.currentTarget, event)}
       onMouseLeave={onCloseHover}
-      onFocus={(focusEvent) => onOpenHover(event, focusEvent.currentTarget)}
+      onFocus={(focusEvent) => onOpenHover(focusEvent.currentTarget, event)}
       onBlur={onCloseHover}
-      className={cn(getEventCardClasses(event.status), className)}
+      className={cn(
+        getEventCardClasses(event.status),
+        'transition-all duration-150',
+        isActive && 'relative z-[99995] scale-[1.02] opacity-100 blur-none shadow-xl ring-2 ring-violet-200',
+        isInactive ? 'opacity-25 blur-[2px]' : 'opacity-100 blur-0',
+        className
+      )}
       style={style}
     >
       <div className="flex items-start justify-between gap-2">
@@ -581,6 +798,16 @@ export default function LessonPlanPage() {
   }, [subjectData, staticCourse, courseId]);
   const selectedChapter =
     courseChapters.find((chapter) => chapter.id === chapterId) || courseChapters[0] || null;
+  const handleSubjectClick = (nextSubjectId: number | null, nextChapterId: number | null) => {
+    console.log('Subject Clicked:', {
+      subject_id: nextSubjectId,
+    });
+    console.log('Chapter Clicked:', {
+      chapter_id: nextChapterId,
+    });
+    setSelectedSubjectId(nextSubjectId);
+    setSelectedChapterId(nextChapterId);
+  };
   const chapterConcepts = useMemo(() => {
     if (!selectedChapter) return null;
     const concepts = selectedChapter.concepts ?? [];
@@ -589,8 +816,8 @@ export default function LessonPlanPage() {
       concepts: concepts.map((concept) => ({
         title: concept.title,
         description: concept.description,
-        mastery: '—',
-        time: '—',
+        mastery: 'Ã¢â‚¬â€',
+        time: 'Ã¢â‚¬â€',
       })),
     };
   }, [selectedChapter]);
@@ -603,15 +830,33 @@ export default function LessonPlanPage() {
         })
       : null;
   const selectedConcept = semanticData?.concept || chapterConcepts?.concepts[0] || null;
+  const routeStandardId = /^\d+$/.test(standardId) ? Number(standardId) : null;
   const [activeSemanticSection, setActiveSemanticSection] = useState('knowledge');
   const [visibleMonth, setVisibleMonth] = useState(() => new Date('2025-04-01T00:00:00'));
   const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>('month');
   const [isCreateLessonPlanOpen, setIsCreateLessonPlanOpen] = useState(false);
   const [apiPeriods, setApiPeriods] = useState<LessonPlanApiPeriod[]>([]);
-  const [lessonPlanLoading, setLessonPlanLoading] = useState(true);
+  const [lessonPlanLoading, setLessonPlanLoading] = useState(false);
   const [lessonPlanError, setLessonPlanError] = useState<string | null>(null);
+  const [lessonPlanRefreshKey, setLessonPlanRefreshKey] = useState(0);
   const [createdLessonPlans, setCreatedLessonPlans] = useState<LessonPlanEvent[]>([]);
-  const [hoverPopup, setHoverPopup] = useState<HoverPopupState | null>(null);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+  const [selectedDivisionId, setSelectedDivisionId] = useState<number | null>(null);
+  const [divisionLoading, setDivisionLoading] = useState(false);
+  const [divisionError, setDivisionError] = useState('');
+  const [sessionContext, setSessionContext] = useState<SessionContext>({
+    subInstituteId: '',
+    token: '',
+    termId: '',
+    standardId: '',
+  });
+  const currentStandardId = Number(sessionContext.standardId || routeStandardId || 0) || null;
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(
+    /^\d+$/.test(subjectId) ? Number(subjectId) : null
+  );
+  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null);
+  const [hoveredPeriod, setHoveredPeriod] = useState<LessonPlanEvent | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<HoverPopupPosition>({ top: 0, left: 0 });
   const [lessonPlanDraft, setLessonPlanDraft] = useState<LessonPlanDraft>({
     conceptTitle: '',
     plannedDate: '',
@@ -619,7 +864,9 @@ export default function LessonPlanPage() {
     pedagogy: '',
     objective: '',
   });
-  const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lessonPlanDraftErrors, setLessonPlanDraftErrors] = useState<LessonPlanDraftErrors>({});
+  const [isSavingLessonPlan, setIsSavingLessonPlan] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isLmsRoute) return;
@@ -637,37 +884,247 @@ export default function LessonPlanPage() {
   }, [isLmsRoute, subjectId, standardId]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch(LESSON_PLAN_API_URL, { signal: controller.signal })
-      .then(async (response) => {
-        const payload = (await response.json()) as LessonPlanApiResponse;
-        if (!response.ok) {
-          throw new Error('Failed to fetch lesson plan calendar.');
+    const nextSubjectId = /^\d+$/.test(subjectId) ? Number(subjectId) : null;
+    const nextChapterId =
+      selectedChapter && /^\d+$/.test(String(selectedChapter.id))
+        ? Number(selectedChapter.id)
+        : null;
+
+    handleSubjectClick(nextSubjectId, nextChapterId);
+  }, [selectedChapter, subjectId]);
+
+  useEffect(() => {
+    const syncSessionContext = () => {
+      const userData = getSessionData();
+      let menuContext: Record<string, unknown> = {};
+
+      try {
+        menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+      } catch (error) {
+        console.error('Invalid menu context:', error);
+      }
+
+      const requestContext = getRequestContext();
+      const nextSessionContext = {
+        subInstituteId: readString(
+          requestContext?.sub_institute_id ?? userData.sub_institute_id ?? menuContext.sub_institute_id
+        ),
+        token: readString(
+          userData.token ?? userData.user_token ?? menuContext.token ?? menuContext.user_token
+        ),
+        termId: resolveSessionTermId(userData, menuContext),
+        standardId: readString(
+          userData.standard_id ?? menuContext.standard_id ?? routeStandardId
+        ),
+      };
+
+      console.log('Current Session:', {
+        ...userData,
+        token: userData.token ? 'present' : undefined,
+        user_token: userData.user_token ? 'present' : undefined,
+      });
+      console.log('Current Standard ID:', currentStandardId);
+      setSessionContext(nextSessionContext);
+    };
+
+    syncSessionContext();
+    window.addEventListener('focus', syncSessionContext);
+    window.addEventListener('storage', syncSessionContext);
+
+    return () => {
+      window.removeEventListener('focus', syncSessionContext);
+      window.removeEventListener('storage', syncSessionContext);
+    };
+  }, [currentStandardId, routeStandardId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchDivisions = async () => {
+      if (!cancelled) {
+        setDivisions([]);
+        setSelectedDivisionId(null);
+        setDivisionError('');
+      }
+
+      if (!currentStandardId) {
+        if (!cancelled) {
+          setDivisionLoading(false);
+          setDivisionError('Please select a standard first.');
         }
-        const firstItem = Array.isArray(payload.data) ? payload.data[0] : null;
+        return;
+      }
+
+      console.log('Division request values:', {
+        subInstituteId: sessionContext.subInstituteId,
+        standardId: currentStandardId,
+        hasToken: Boolean(sessionContext.token),
+      });
+
+      if (!sessionContext.token || !sessionContext.subInstituteId) {
+        if (!cancelled) {
+          setDivisionLoading(false);
+          setDivisionError('Current session is missing token or institute.');
+        }
+        return;
+      }
+
+      try {
+        if (!cancelled) {
+          setDivisionLoading(true);
+        }
+
+        const url = new URL('https://erp.triz.co.in/get_adminDivision');
+        url.searchParams.set('standard_id', String(currentStandardId));
+        url.searchParams.set('token', sessionContext.token);
+        url.searchParams.set('sub_institute_id', sessionContext.subInstituteId);
+
+        const response = await fetch(url.toString(), {
+          method: 'POST',
+          headers: {  
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            standard_id: currentStandardId,
+            token: sessionContext.token,
+            sub_institute_id: sessionContext.subInstituteId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to load divisions`);
+        }
+
+        const payload = (await response.json()) as Record<string, unknown>;
+        console.log('Division API response:', payload);
+        const divisionData =
+          payload.data ??
+          payload.divisions ??
+          payload.division ??
+          payload;
+        const nextDivisions = Array.isArray(divisionData) ? (divisionData as Division[]) : [];
+
+        if (!cancelled) {
+          setDivisions(nextDivisions);
+          if (nextDivisions.length === 0) {
+            setDivisionError('No divisions are available for the selected standard.');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch divisions:', error);
+        if (!cancelled) {
+          setDivisions([]);
+          setDivisionError('Failed to load divisions.');
+        }
+      } finally {
+        if (!cancelled) {
+          setDivisionLoading(false);
+        }
+      }
+    };
+
+    void fetchDivisions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStandardId, sessionContext.subInstituteId, sessionContext.token]);
+
+  useEffect(() => {
+    if (!selectedDivisionId) {
+      return;
+    }
+
+    if (!selectedSubjectId || !selectedChapterId) return;
+
+    const controller = new AbortController();
+    const runFetchLessonPlans = async () => {
+      const lessonPlanApiUrl =
+        'https://dev.triz.co.in/api/intelligence/lesson-plans?sub_institute_id=195&standard_id=2235&subject_id=4018&term_id=149&division_id=936&syear=2025';
+      setLessonPlanLoading(true);
+
+      try {
+        const resolvedToken = sessionContext.token;
+
+        console.log({
+          token: resolvedToken ? 'present' : 'missing',
+          lessonPlanApiUrl,
+        });
+
+        const response = await fetch(lessonPlanApiUrl, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/json',
+            ...(resolvedToken
+              ? {
+                  Authorization: `Bearer ${resolvedToken}`,
+                }
+              : {}),
+          },
+        });
+        const responseText = await response.text();
+        let payload: LessonPlanApiResponse | Record<string, unknown> = {};
+        if (responseText) {
+          try {
+            payload = JSON.parse(responseText) as LessonPlanApiResponse | Record<string, unknown>;
+          } catch {
+            payload = { message: responseText };
+          }
+        }
+
+        if (!response.ok) {
+          const apiMessage =
+            (typeof payload === 'object' &&
+              payload &&
+              'message' in payload &&
+              typeof payload.message === 'string' &&
+              payload.message) ||
+            `Lesson plan API failed with status ${response.status}`;
+          throw new Error(apiMessage);
+        }
+
+        console.log(payload);
+        const typedPayload = payload as LessonPlanApiResponse;
+        const firstItem = Array.isArray(typedPayload.data) ? typedPayload.data[0] : null;
         setApiPeriods(Array.isArray(firstItem?.periods) ? firstItem.periods : []);
         if (firstItem?.lesson_plan?.term_start_date) {
           setVisibleMonth(new Date(`${firstItem.lesson_plan.term_start_date}T00:00:00`));
         }
-      })
-      .catch((error: unknown) => {
+        setLessonPlanError(null);
+      } catch (error) {
         if ((error as Error)?.name === 'AbortError') return;
+        setLessonPlanError(
+          error instanceof Error ? error.message : 'Unable to fetch lesson plan calendar.'
+        );
         setApiPeriods([]);
-        setLessonPlanError(error instanceof Error ? error.message : 'Unable to fetch lesson plan calendar.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLessonPlanLoading(false);
-        }
-      });
+        setLessonPlanLoading(false);
+        return;
+      }
+
+      if (!controller.signal.aborted) {
+        setLessonPlanLoading(false);
+      }
+    };
+
+    void runFetchLessonPlans();
 
     return () => controller.abort();
-  }, []);
+  }, [
+    selectedDivisionId,
+    selectedSubjectId,
+    selectedChapterId,
+    currentStandardId,
+    standardId,
+    subjectId,
+    sessionContext,
+    lessonPlanRefreshKey,
+  ]);
 
   useEffect(() => {
     return () => {
-      if (hoverCloseTimerRef.current) {
-        clearTimeout(hoverCloseTimerRef.current);
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
       }
     };
   }, []);
@@ -677,17 +1134,33 @@ export default function LessonPlanPage() {
   const sectionLabel = course ? getCourseSectionLabel(course.id) : '';
   const curriculumLabel = course ? getCurriculumLabel(course) : '';
   const totalKeyConcepts = course ? getTotalKeyConceptCount(course, courseChapters) : 0;
+  const selectedDivision = useMemo(
+    () =>
+      divisions.find(
+        (division) => Number(division.division_id ?? division.id ?? 0) === selectedDivisionId
+      ) ?? null,
+    [divisions, selectedDivisionId]
+  );
+  const selectedDivisionLabel =
+    selectedDivision?.division_name ??
+    selectedDivision?.name ??
+    selectedDivision?.title ??
+    (selectedDivisionId ? `Section ${selectedDivisionId}` : sectionLabel);
+  const selectedSubjectLabel = subjectData?.subject?.subject_name ?? course?.subject ?? '';
+  const selectedStandardLabel = gradeLabel;
+  const lessonPlanContextLabel = `${selectedSubjectLabel} · ${selectedStandardLabel} · ${selectedDivisionLabel}`;
   const conceptOptions = useMemo(() => {
-    const concepts = courseChapters.flatMap((chapter) =>
-      (chapter.concepts ?? []).map((concept) => concept.title)
-    );
+    const concepts = (selectedChapter?.concepts ?? []).map((concept) => concept.title);
 
     return Array.from(new Set(concepts));
-  }, [courseChapters]);
+  }, [selectedChapter]);
   const pedagogyOptions = useMemo(() => {
-    const pedagogies = courseChapters.flatMap((chapter) => chapter.teachingMethodologies);
+    const pedagogies =
+      selectedChapter?.teachingMethodologies?.length
+        ? selectedChapter.teachingMethodologies
+        : courseChapters.flatMap((chapter) => chapter.teachingMethodologies);
     return Array.from(new Set(pedagogies));
-  }, [courseChapters]);
+  }, [courseChapters, selectedChapter]);
   const apiLessonPlanEvents = useMemo(() => {
     return apiPeriods.map((period) => {
       const slotKey = String(period.period_slot).toUpperCase();
@@ -697,7 +1170,6 @@ export default function LessonPlanPage() {
         PERIOD_SLOT_TIME_MAP.P1;
       const duration = Number(period.planned_duration_min) || 35;
       const endTime = addMinutesToTime(slotConfig.startHour, slotConfig.startMinute, duration);
-      const teacherId = Number(period.teacher_id) || undefined;
 
       return {
         id: String(period.id),
@@ -712,8 +1184,7 @@ export default function LessonPlanPage() {
         pedagogy: period.period_type?.trim() || 'Teaching',
         startTime: formatTimeFromParts(slotConfig.startHour, slotConfig.startMinute),
         endTime: endTime.label,
-        teacherId,
-        teacherName: getStoredTeacherName(teacherId) || `Teacher #${teacherId ?? '—'}`,
+        teacherName: period.teacher_name?.trim() || 'Teacher name unavailable',
         plannedDurationMin: duration,
         periodType: period.period_type?.trim() || 'Teaching',
         concepts: Array.isArray(period.concepts)
@@ -748,75 +1219,89 @@ export default function LessonPlanPage() {
     () => formatCalendarHeaderTitle(visibleMonth, calendarViewMode),
     [visibleMonth, calendarViewMode]
   );
+  const hoveredPeriodId = hoveredPeriod?.id ?? null;
 
-  const cancelHoverClose = () => {
-    if (hoverCloseTimerRef.current) {
-      clearTimeout(hoverCloseTimerRef.current);
-      hoverCloseTimerRef.current = null;
+  const cancelCloseHover = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
     }
   };
 
-  const scheduleHoverClose = () => {
-    cancelHoverClose();
-    hoverCloseTimerRef.current = setTimeout(() => {
-      setHoverPopup(null);
+  const scheduleCloseHover = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+
+    closeTimerRef.current = setTimeout(() => {
+      setHoveredPeriod(null);
+      closeTimerRef.current = null;
     }, 180);
   };
 
-  const openHoverPopup = (event: LessonPlanEvent, element: HTMLElement) => {
-    cancelHoverClose();
+  const openPeriodHover = (element: HTMLElement, period: LessonPlanEvent) => {
+    cancelCloseHover();
     const rect = element.getBoundingClientRect();
-    const popupWidth = 340;
-    const popupHeight = 320;
-    const gap = 6;
+    const popupWidth = 380;
+    const popupHeight = 430;
+    const gap = 14;
 
     let left = rect.right + gap;
     let top = rect.top;
 
-    if (left + popupWidth > window.innerWidth - 16) {
+    if (left + popupWidth > window.innerWidth - gap) {
       left = rect.left - popupWidth - gap;
     }
-    if (left < 16) {
-      left = Math.max(16, window.innerWidth - popupWidth - 16);
+    if (left < gap) {
+      left = gap;
     }
-    if (top + popupHeight > window.innerHeight - 16) {
-      top = rect.bottom - popupHeight;
+    if (top + popupHeight > window.innerHeight - gap) {
+      top = window.innerHeight - popupHeight - gap;
     }
-    if (top < 16) {
-      top = 16;
+    if (top < gap) {
+      top = gap;
     }
 
-    setHoverPopup({
-      event,
-      style: {
-        position: 'fixed',
-        top,
-        left,
-        width: popupWidth,
-        maxWidth: 'calc(100vw - 32px)',
-        zIndex: 9999,
-      },
+    setHoverPosition({ top, left });
+    setHoveredPeriod(period);
+  };
+
+  useEffect(() => {
+    if (!isCreateLessonPlanOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeCreateLessonPlanModal();
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isCreateLessonPlanOpen]);
+
+  useEffect(() => {
+    if (!isCreateLessonPlanOpen) return;
+
+    setLessonPlanDraft({
+      conceptTitle: '',
+      plannedDate: '',
+      periods: '2',
+      pedagogy: null,
+      objective: '',
     });
-  };
-
-  const openHoverPopupFromMouse = (
-    hoverEvent: React.MouseEvent<HTMLElement>,
-    event: LessonPlanEvent
-  ) => {
-    openHoverPopup(event, hoverEvent.currentTarget);
-  };
-
-  const openHoverPopupFromFocus = (
-    focusEvent: React.FocusEvent<HTMLElement>,
-    event: LessonPlanEvent
-  ) => {
-    openHoverPopup(event, focusEvent.currentTarget);
-  };
+    setLessonPlanDraftErrors({});
+  }, [isCreateLessonPlanOpen]);
 
   if (subjectLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50/50">
-        <div className="text-center text-slate-500">Loading course intelligence…</div>
+        <div className="text-center text-slate-500">Loading course intelligenceÃ¢â‚¬Â¦</div>
       </div>
     );
   }
@@ -845,34 +1330,47 @@ export default function LessonPlanPage() {
 
   const resetLessonPlanDraft = () => {
     setLessonPlanDraft({
-      conceptTitle: conceptOptions[0] ?? '',
+      conceptTitle: '',
       plannedDate: '',
       periods: '2',
-      pedagogy: pedagogyOptions[0] ?? '',
+      pedagogy: null,
       objective: '',
     });
-  };
-
-  const openCreateLessonPlanModal = () => {
-    setLessonPlanDraft({
-      conceptTitle: conceptOptions[0] ?? '',
-      plannedDate: '',
-      periods: '2',
-      pedagogy: pedagogyOptions[0] ?? '',
-      objective: '',
-    });
-    setIsCreateLessonPlanOpen(true);
+    setLessonPlanDraftErrors({});
   };
 
   const closeCreateLessonPlanModal = () => {
+    if (isSavingLessonPlan) return;
     setIsCreateLessonPlanOpen(false);
     resetLessonPlanDraft();
   };
 
-  const handleSaveLessonPlan = () => {
-    if (!lessonPlanDraft.conceptTitle || !lessonPlanDraft.plannedDate || !lessonPlanDraft.pedagogy) {
+  const validateLessonPlanDraft = () => {
+    const nextErrors: LessonPlanDraftErrors = {};
+    const periodCount = Number(lessonPlanDraft.periods);
+
+    if (!lessonPlanDraft.conceptTitle) {
+      nextErrors.conceptTitle = 'Please select a concept.';
+    }
+
+    if (!lessonPlanDraft.plannedDate) {
+      nextErrors.plannedDate = 'Please pick a planned date.';
+    }
+
+    if (!lessonPlanDraft.periods || !Number.isFinite(periodCount) || periodCount <= 0) {
+      nextErrors.periods = 'Enter a valid positive number of periods.';
+    }
+
+    setLessonPlanDraftErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSaveLessonPlan = async () => {
+    if (isSavingLessonPlan || !validateLessonPlanDraft()) {
       return;
     }
+
+    setIsSavingLessonPlan(true);
 
     const eventDate = new Date(`${lessonPlanDraft.plannedDate}T00:00:00`);
     const nextEvent: LessonPlanEvent = {
@@ -885,10 +1383,10 @@ export default function LessonPlanPage() {
       statusLabel: 'Planned',
       slotLabel: `P${lessonPlanDraft.periods || '2'}`,
       periods: Number(lessonPlanDraft.periods || 2),
-      pedagogy: lessonPlanDraft.pedagogy,
+      pedagogy: lessonPlanDraft.pedagogy || 'Teaching',
       startTime: '9:00 AM',
       endTime: '9:35 AM',
-      teacherName: 'Teacher #—',
+      teacherName: 'Teacher name unavailable',
       plannedDurationMin: 35,
       periodType: 'Teaching',
       concepts: [
@@ -899,10 +1397,20 @@ export default function LessonPlanPage() {
       ],
     };
 
-    setCreatedLessonPlans((current) => [...current, nextEvent]);
-    setVisibleMonth(new Date(eventDate.getFullYear(), eventDate.getMonth(), 1));
-    setIsCreateLessonPlanOpen(false);
-    resetLessonPlanDraft();
+    try {
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 700);
+      });
+
+      setCreatedLessonPlans((current) => [...current, nextEvent]);
+      setVisibleMonth(new Date(eventDate.getFullYear(), eventDate.getMonth(), 1));
+      setLessonPlanRefreshKey((current) => current + 1);
+      setIsCreateLessonPlanOpen(false);
+      resetLessonPlanDraft();
+      alert('Lesson plan saved successfully!');
+    } finally {
+      setIsSavingLessonPlan(false);
+    }
   };
 
   return isSemanticIntelligenceView ? (
@@ -1134,7 +1642,7 @@ export default function LessonPlanPage() {
                   {course.subject} - {gradeLabel} - {sectionLabel}
                 </h1>
                 <p className="mt-1 text-[16px] text-[#475569]">
-                  {chapterCount} chapters · {totalKeyConcepts} key concepts · {curriculumLabel}
+                  {chapterCount} chapters Ã‚Â· {totalKeyConcepts} key concepts Ã‚Â· {curriculumLabel}
                 </p>
               </div>
             </div>
@@ -1196,7 +1704,8 @@ export default function LessonPlanPage() {
           </div>
 
           <Button
-            onClick={openCreateLessonPlanModal}
+            type="button"
+            onClick={() => setIsCreateLessonPlanOpen(true)}
             className="h-11 rounded-[14px] bg-[#4F46E5] px-5 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] hover:bg-[#4338CA]"
           >
             <Plus size={16} className="mr-2" />
@@ -1291,144 +1800,25 @@ export default function LessonPlanPage() {
           </div>
         </div>
 
-        {isCreateLessonPlanOpen && (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(15,23,42,0.18)] px-4 py-8 backdrop-blur-[2px]">
-            <div
-              className="absolute inset-0"
-              onClick={closeCreateLessonPlanModal}
-              aria-hidden="true"
-            />
-            <div className="relative z-[1] w-full max-w-[640px] rounded-[18px] bg-white px-6 py-5 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:px-7 sm:py-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-[24px] font-semibold tracking-tight text-[#0F172A]">
-                    Create concept-wise lesson plan
-                  </h2>
-                  <p className="mt-1 text-[15px] text-[#64748B]">
-                    {course.subject} · {gradeLabel} · {sectionLabel}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeCreateLessonPlanModal}
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-[#64748B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A]"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="mt-6 space-y-5">
-                <div>
-                  <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                    Concept *
-                  </label>
-                  <select
-                    value={lessonPlanDraft.conceptTitle}
-                    onChange={(event) =>
-                      setLessonPlanDraft((current) => ({ ...current, conceptTitle: event.target.value }))
-                    }
-                    className="h-11 w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A] outline-none focus:border-[#4F46E5]"
-                  >
-                    <option value="">Select a concept</option>
-                    {conceptOptions.map((concept) => (
-                      <option key={concept} value={concept}>
-                        {concept}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                      Planned date *
-                    </label>
-                    <input
-                      type="date"
-                      value={lessonPlanDraft.plannedDate}
-                      onChange={(event) =>
-                        setLessonPlanDraft((current) => ({ ...current, plannedDate: event.target.value }))
-                      }
-                      className="h-11 w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A] outline-none focus:border-[#4F46E5]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                      Periods
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="8"
-                      value={lessonPlanDraft.periods}
-                      onChange={(event) =>
-                        setLessonPlanDraft((current) => ({ ...current, periods: event.target.value }))
-                      }
-                      className="h-11 w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A] outline-none focus:border-[#4F46E5]"
-                    />
-                    <p className="mt-1.5 text-[14px] text-[#64748B]">Class periods needed</p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                    Teaching pedagogy
-                  </label>
-                  <select
-                    value={lessonPlanDraft.pedagogy}
-                    onChange={(event) =>
-                      setLessonPlanDraft((current) => ({ ...current, pedagogy: event.target.value }))
-                    }
-                    className="h-11 w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A] outline-none focus:border-[#4F46E5]"
-                  >
-                    <option value="">Select pedagogy</option>
-                    {pedagogyOptions.map((pedagogy) => (
-                      <option key={pedagogy} value={pedagogy}>
-                        {pedagogy}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                    Learning objectives
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={lessonPlanDraft.objective}
-                    onChange={(event) =>
-                      setLessonPlanDraft((current) => ({ ...current, objective: event.target.value }))
-                    }
-                    placeholder="What should students be able to do after this lesson?"
-                    className="w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 py-3 text-[16px] text-[#0F172A] outline-none placeholder:text-[#94A3B8] focus:border-[#4F46E5]"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-5 border-t border-[#E2E8F0] pt-4">
-                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={closeCreateLessonPlanModal}
-                    className="rounded-[12px] px-4 py-2.5 text-[16px] font-medium text-[#475569] transition hover:text-[#0F172A]"
-                  >
-                    Cancel
-                  </button>
-                  <Button
-                    onClick={handleSaveLessonPlan}
-                    disabled={!lessonPlanDraft.conceptTitle || !lessonPlanDraft.plannedDate || !lessonPlanDraft.pedagogy}
-                    className="h-11 rounded-[14px] bg-[#4F46E5] px-5 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:bg-[#A5B4FC]"
-                  >
-                    <Check size={16} className="mr-2" />
-                    Save lesson plan
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <CreateLessonPlanDialog
+          open={isCreateLessonPlanOpen}
+          onOpenChange={(open) => {
+            if (open) {
+              setIsCreateLessonPlanOpen(true);
+              return;
+            }
+            closeCreateLessonPlanModal();
+          }}
+          contextLabel={lessonPlanContextLabel}
+          conceptOptions={conceptOptions}
+          pedagogyOptions={pedagogyOptions}
+          lessonPlanDraft={lessonPlanDraft}
+          lessonPlanDraftErrors={lessonPlanDraftErrors}
+          isSavingLessonPlan={isSavingLessonPlan}
+          setLessonPlanDraft={setLessonPlanDraft}
+          setLessonPlanDraftErrors={setLessonPlanDraftErrors}
+          onSave={handleSaveLessonPlan}
+        />
       </div>
     </div>
   ) : isAssessmentView ? (
@@ -1607,6 +1997,47 @@ export default function LessonPlanPage() {
   ) : (
     <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-5 rounded-xl border border-slate-200 bg-white p-5">
+          <label className="mb-2 block text-sm font-medium text-slate-700">
+            Select Division
+          </label>
+          <select
+            value={selectedDivisionId ?? ''}
+            onChange={(event) => {
+              const divisionId = event.target.value ? Number(event.target.value) : null;
+              setSelectedDivisionId(divisionId);
+            }}
+            disabled={!currentStandardId || divisionLoading || divisions.length === 0}
+            className="w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+          >
+            <option value="">
+              {divisionLoading
+                ? 'Loading divisions...'
+                : divisions.length === 0
+                  ? 'No divisions available'
+                  : 'Select Division'}
+            </option>
+            {divisions.map((division) => (
+              <option
+                key={division.division_id ?? division.id}
+                value={division.division_id ?? division.id}
+              >
+                {division.division_name ??
+                  division.name ??
+                  division.title ??
+                  `Division ${division.division_id ?? division.id}`}
+              </option>
+            ))}
+          </select>
+          {divisionError ? (
+            <p className="mt-2 text-xs text-red-600">
+              {divisionError}
+            </p>
+          ) : null}
+        </div>
+
+        {selectedDivisionId ? (
+          <>
         <div className="mb-5 flex flex-wrap items-center gap-2 text-[15px] text-[#475569]">
           <span className="inline-flex items-center gap-2">
             <BookOpen size={14} className="text-[#475569]" />
@@ -1631,7 +2062,7 @@ export default function LessonPlanPage() {
                   {course.subject} - {gradeLabel} - {sectionLabel}
                 </h1>
                 <p className="mt-1 text-[16px] text-[#475569]">
-                  {chapterCount} chapters · {totalKeyConcepts} key concepts · {curriculumLabel}
+                  {chapterCount} chapters Ã‚Â· {totalKeyConcepts} key concepts Ã‚Â· {curriculumLabel}
                 </p>
               </div>
             </div>
@@ -1715,7 +2146,8 @@ export default function LessonPlanPage() {
             </div>
 
             <Button
-              onClick={openCreateLessonPlanModal}
+              type="button"
+              onClick={() => setIsCreateLessonPlanOpen(true)}
               className="h-11 rounded-[14px] bg-[#4F46E5] px-5 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] hover:bg-[#4338CA]"
             >
               <Plus size={16} className="mr-2" />
@@ -1802,7 +2234,10 @@ export default function LessonPlanPage() {
                   {CALENDAR_WEEKDAYS.map((day) => (
                     <div
                       key={day}
-                      className="border-b border-r border-[#D8E1F0] px-3 py-3 text-center text-[14px] font-medium text-[#334155] last:border-r-0"
+                      className={cn(
+                        'border-b border-r border-[#D8E1F0] px-3 py-3 text-center text-[14px] font-medium text-[#334155] last:border-r-0 transition-all duration-150',
+                        hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                      )}
                     >
                       {day}
                     </div>
@@ -1814,28 +2249,47 @@ export default function LessonPlanPage() {
                     const key = date ? formatDateKey(date) : `empty-${index}`;
                     const events = date ? eventMap.get(key) ?? [] : [];
                     const isCurrentMonth = Boolean(date);
+                    const containsHoveredPeriod = events.some((event) => event.id === hoveredPeriodId);
 
                     return (
                       <div
                         key={key}
-                        className={`min-h-[96px] border-b border-r border-[#D8E1F0] p-2.5 last:border-r-0 ${
-                          isCurrentMonth ? 'bg-white' : 'bg-[#F3F6FA]'
-                        }`}
+                        className={cn(
+                          'min-h-[96px] border-b border-r border-[#D8E1F0] p-2.5 last:border-r-0 transition-all duration-150',
+                          isCurrentMonth ? 'bg-white' : 'bg-[#F3F6FA]',
+                          hoveredPeriod && !containsHoveredPeriod && 'opacity-45 blur-[1px]'
+                        )}
                       >
                         {date ? (
                           <>
-                            <div className="mb-2 text-[14px] font-medium text-[#334155]">{date.getDate()}</div>
+                            <div
+                              className={cn(
+                                'mb-2 text-[14px] font-medium text-[#334155] transition-all duration-150',
+                                hoveredPeriod && !containsHoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                              )}
+                            >
+                              {date.getDate()}
+                            </div>
                             <div className="space-y-2">
                               {events.map((event) => (
                                 <div
                                   key={event.id}
                                   role="button"
                                   tabIndex={0}
-                                  onMouseEnter={(hoverEvent) => openHoverPopupFromMouse(hoverEvent, event)}
-                                  onMouseLeave={scheduleHoverClose}
-                                  onFocus={(focusEvent) => openHoverPopupFromFocus(focusEvent, event)}
-                                  onBlur={scheduleHoverClose}
-                                  className={cn(getEventCardClasses(event.status), 'min-w-0')}
+                                  onMouseEnter={(hoverEvent) => openPeriodHover(hoverEvent.currentTarget, event)}
+                                  onMouseLeave={scheduleCloseHover}
+                                  onFocus={(focusEvent) => openPeriodHover(focusEvent.currentTarget, event)}
+                                  onBlur={scheduleCloseHover}
+                                  className={cn(
+                                    getEventCardClasses(event.status),
+                                    'min-w-0 transition-all duration-150',
+                                    hoveredPeriodId === event.id &&
+                                      'relative z-[99995] scale-[1.02] opacity-100 blur-none shadow-xl ring-2 ring-violet-200',
+                                    hoveredPeriodId !== null &&
+                                      hoveredPeriodId !== event.id &&
+                                      'opacity-25 blur-[2px]',
+                                    hoveredPeriodId === null && 'opacity-100 blur-0'
+                                  )}
                                 >
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
@@ -1859,8 +2313,18 @@ export default function LessonPlanPage() {
             ) : calendarViewMode === 'day' ? (
               <div className="min-w-[980px] overflow-hidden rounded-[14px] border border-[#D8E1F0]">
                 <div className="grid grid-cols-[92px_minmax(0,1fr)] bg-[#F6F9FD]">
-                  <div className="border-b border-r border-[#D8E1F0] px-3 py-3" />
-                  <div className="border-b border-[#D8E1F0] px-3 py-3 text-center text-[14px] font-medium text-[#334155]">
+                  <div
+                    className={cn(
+                      'border-b border-r border-[#D8E1F0] px-3 py-3 transition-all duration-150',
+                      hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                    )}
+                  />
+                  <div
+                    className={cn(
+                      'border-b border-[#D8E1F0] px-3 py-3 text-center text-[14px] font-medium text-[#334155] transition-all duration-150',
+                      hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                    )}
+                  >
                     <div>{visibleMonth.toLocaleDateString('en-US', { weekday: 'short' })}</div>
                     <div className="mt-1 text-[13px] text-[#64748B]">
                       {visibleMonth.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -1877,23 +2341,31 @@ export default function LessonPlanPage() {
                       ).map((hour) => (
                         <div
                           key={hour}
-                          className="flex h-[72px] items-start justify-center border-b border-[#EAF0F7] px-2 pt-2 text-[13px] font-medium text-[#475569]"
+                          className={cn(
+                            'flex h-[72px] items-start justify-center border-b border-[#EAF0F7] px-2 pt-2 text-[13px] font-medium text-[#475569] transition-all duration-150',
+                            hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                          )}
                         >
                           {formatHourLabel(hour)}
                         </div>
                       ))}
                     </div>
 
-                    <div className="relative bg-white" style={{ height: `${(DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1) * DAY_TIMELINE_HOUR_HEIGHT}px` }}>
+                    <div
+                      className="relative bg-white"
+                      style={{ height: `${(DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1) * DAY_TIMELINE_HOUR_HEIGHT}px` }}
+                    >
                       {Array.from(
                         { length: DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1 },
                         (_, index) => DAY_TIMELINE_START_HOUR + index
                       ).map((hour, index, hours) => (
                         <div
                           key={`separator-${hour}`}
-                          className={`absolute left-0 right-0 border-b border-[#EAF0F7] ${
-                            index !== hours.length - 1 ? '' : 'border-b-0'
-                          }`}
+                          className={cn(
+                            'absolute left-0 right-0 border-b border-[#EAF0F7] transition-all duration-150',
+                            index !== hours.length - 1 ? '' : 'border-b-0',
+                            hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                          )}
                           style={{ top: `${index * DAY_TIMELINE_HOUR_HEIGHT}px` }}
                         />
                       ))}
@@ -1907,10 +2379,11 @@ export default function LessonPlanPage() {
                           <CalendarEventCard
                             key={event.id}
                             event={event}
+                            hoveredPeriodId={hoveredPeriodId}
                             className="absolute left-2 right-2"
                             style={{ top: `${top}px`, height: `${height}px` }}
-                            onOpenHover={openHoverPopup}
-                            onCloseHover={scheduleHoverClose}
+                            onOpenHover={openPeriodHover}
+                            onCloseHover={scheduleCloseHover}
                           />
                         );
                       })}
@@ -1921,13 +2394,20 @@ export default function LessonPlanPage() {
             ) : (
               <div className="min-w-[980px] overflow-hidden rounded-[14px] border border-[#D8E1F0]">
                 <div className="grid grid-cols-[92px_repeat(7,minmax(120px,1fr))] bg-[#F6F9FD]">
-                  <div className="border-b border-r border-[#D8E1F0] px-3 py-3" />
+                  <div
+                    className={cn(
+                      'border-b border-r border-[#D8E1F0] px-3 py-3 transition-all duration-150',
+                      hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                    )}
+                  />
                   {weekDates.map((date, index, dates) => (
                     <div
                       key={`${formatDateKey(date)}-${index}`}
-                      className={`border-b px-3 py-3 text-center text-[14px] font-medium text-[#334155] ${
-                        index !== dates.length - 1 ? 'border-r border-[#D8E1F0]' : ''
-                      }`}
+                      className={cn(
+                        'border-b px-3 py-3 text-center text-[14px] font-medium text-[#334155] transition-all duration-150',
+                        index !== dates.length - 1 ? 'border-r border-[#D8E1F0]' : '',
+                        hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                      )}
                     >
                       <div>{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
                       <div className="mt-1 text-[13px] text-[#64748B]">
@@ -1946,7 +2426,10 @@ export default function LessonPlanPage() {
                       ).map((hour) => (
                         <div
                           key={hour}
-                          className="flex h-[72px] items-start justify-center border-b border-[#EAF0F7] px-2 pt-2 text-[13px] font-medium text-[#475569]"
+                          className={cn(
+                            'flex h-[72px] items-start justify-center border-b border-[#EAF0F7] px-2 pt-2 text-[13px] font-medium text-[#475569] transition-all duration-150',
+                            hoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                          )}
                         >
                           {formatHourLabel(hour)}
                         </div>
@@ -1961,13 +2444,16 @@ export default function LessonPlanPage() {
                         return leftRange.startHour - rightRange.startHour;
                       });
                       const overlapCountBySlot = new Map<string, number>();
+                      const containsHoveredPeriod = dayEvents.some((event) => event.id === hoveredPeriodId);
 
                       return (
                         <div
                           key={key}
-                          className={`relative bg-white ${
-                            dayIndex !== weekDates.length - 1 ? 'border-r border-[#D8E1F0]' : ''
-                          }`}
+                          className={cn(
+                            'relative bg-white transition-all duration-150',
+                            dayIndex !== weekDates.length - 1 ? 'border-r border-[#D8E1F0]' : '',
+                            hoveredPeriod && !containsHoveredPeriod && 'opacity-45 blur-[1px]'
+                          )}
                           style={{ height: `${(DAY_TIMELINE_END_HOUR - DAY_TIMELINE_START_HOUR + 1) * DAY_TIMELINE_HOUR_HEIGHT}px` }}
                         >
                           {Array.from(
@@ -1976,9 +2462,11 @@ export default function LessonPlanPage() {
                           ).map((hour, index, hours) => (
                             <div
                               key={`${key}-separator-${hour}`}
-                              className={`absolute left-0 right-0 border-b border-[#EAF0F7] ${
-                                index !== hours.length - 1 ? '' : 'border-b-0'
-                              }`}
+                              className={cn(
+                                'absolute left-0 right-0 border-b border-[#EAF0F7] transition-all duration-150',
+                                index !== hours.length - 1 ? '' : 'border-b-0',
+                                hoveredPeriod && !containsHoveredPeriod ? 'opacity-35 blur-[1px]' : 'opacity-100 blur-0'
+                              )}
                               style={{ top: `${index * DAY_TIMELINE_HOUR_HEIGHT}px` }}
                             />
                           ))}
@@ -2002,6 +2490,7 @@ export default function LessonPlanPage() {
                               <CalendarEventCard
                                 key={event.id}
                                 event={event}
+                                hoveredPeriodId={hoveredPeriodId}
                                 className="absolute"
                                 style={{
                                   top: `${top}px`,
@@ -2009,8 +2498,8 @@ export default function LessonPlanPage() {
                                   width: widthCalc,
                                   left: leftCalc,
                                 }}
-                                onOpenHover={openHoverPopup}
-                                onCloseHover={scheduleHoverClose}
+                                onOpenHover={openPeriodHover}
+                                onCloseHover={scheduleCloseHover}
                               />
                             );
                           })}
@@ -2024,231 +2513,115 @@ export default function LessonPlanPage() {
           </div>
         </div>
 
-        {hoverPopup ? (
+        <CreateLessonPlanDialog
+          open={isCreateLessonPlanOpen}
+          onOpenChange={(open) => {
+            if (open) {
+              setIsCreateLessonPlanOpen(true);
+              return;
+            }
+            closeCreateLessonPlanModal();
+          }}
+          contextLabel={lessonPlanContextLabel}
+          conceptOptions={conceptOptions}
+          pedagogyOptions={pedagogyOptions}
+          lessonPlanDraft={lessonPlanDraft}
+          lessonPlanDraftErrors={lessonPlanDraftErrors}
+          isSavingLessonPlan={isSavingLessonPlan}
+          setLessonPlanDraft={setLessonPlanDraft}
+          setLessonPlanDraftErrors={setLessonPlanDraftErrors}
+          onSave={handleSaveLessonPlan}
+        />
+
+        {hoveredPeriod ? (
           <div
-            className="fixed z-[9999] max-w-[340px]"
-            style={hoverPopup.style}
-            onMouseEnter={cancelHoverClose}
-            onMouseLeave={scheduleHoverClose}
+            className="fixed z-[999999] w-[380px] max-h-[82vh] overflow-y-auto rounded-[16px] border border-[#D8E1F0] bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
+            style={{
+              top: `${hoverPosition.top}px`,
+              left: `${hoverPosition.left}px`,
+            }}
+            onMouseEnter={cancelCloseHover}
+            onMouseLeave={scheduleCloseHover}
           >
-            <div className="rounded-[16px] border border-[#D8E1F0] bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.16)]">
-              <div className="border-b border-[#E2E8F0] pb-3">
-                <div className="min-w-0">
-                  <p className="text-[17px] font-semibold text-[#0F172A]">
-                    {hoverPopup.event.chapterTitle}
-                  </p>
-                  <p className="mt-1 text-[13px] text-[#64748B]">
-                    {formatLessonPlanDate(hoverPopup.event.date)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2 py-3 text-[13px] text-[#475569]">
-                <div className="flex items-center justify-between gap-3">
-                  <span>Period</span>
-                  <span className="font-medium text-[#0F172A]">{hoverPopup.event.slotLabel}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Duration</span>
-                  <span className="font-medium text-[#0F172A]">
-                    {hoverPopup.event.plannedDurationMin ?? 0} minutes
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Teacher</span>
-                  <span className="font-medium text-[#0F172A]">{hoverPopup.event.teacherName}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Status</span>
-                  <span className="font-medium text-[#0F172A]">{hoverPopup.event.statusLabel}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span>Type</span>
-                  <span className="font-medium capitalize text-[#0F172A]">
-                    {hoverPopup.event.periodType?.replace(/_/g, ' ') ?? 'Teaching'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 pt-1 text-[#64748B]">
-                  <Clock className="h-4 w-4 text-[#64748B]" />
-                  <span>{hoverPopup.event.startTime} - {hoverPopup.event.endTime}</span>
-                </div>
-                <div className="flex items-center gap-2 text-[#64748B]">
-                  <Circle className="h-3 w-3 fill-current text-[#64748B]" />
-                  <span>{hoverPopup.event.teacherName}</span>
-                </div>
-              </div>
-
-              <div className="border-t border-[#E2E8F0] pt-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#64748B]">
-                  Primary Concept
+            <div className="border-b border-[#E2E8F0] pb-3">
+              <div className="min-w-0">
+                <p className="text-[17px] font-semibold text-[#0F172A]">
+                  {hoveredPeriod.chapterTitle}
                 </p>
-                <p className="mt-2 text-[15px] font-medium text-[#0F172A]">
-                  {hoverPopup.event.conceptTitle}
+                <p className="mt-1 text-[13px] text-[#64748B]">
+                  {formatLessonPlanDate(hoveredPeriod.date)}
                 </p>
               </div>
+            </div>
 
-              <div className="mt-4 border-t border-[#E2E8F0] pt-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#64748B]">
-                  Concept Coverage
-                </p>
-                <div className="mt-2 space-y-2">
-                  {hoverPopup.event.concepts.length > 0 ? (
-                    hoverPopup.event.concepts.map((concept, index) => (
-                      <div
-                        key={`${concept.conceptName}-${index}`}
-                        className="flex items-start justify-between gap-3 text-[13px] text-[#0F172A]"
-                      >
-                        <span className="min-w-0 flex-1 break-words">{concept.conceptName}</span>
-                        <span className="shrink-0 text-[#64748B]">{concept.coveragePercent}%</span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-[13px] text-[#64748B]">No concept coverage available.</p>
-                  )}
-                </div>
+            <div className="space-y-2 py-3 text-[13px] text-[#475569]">
+              <div className="flex items-center justify-between gap-3">
+                <span>Period</span>
+                <span className="font-medium text-[#0F172A]">{hoveredPeriod.slotLabel}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Duration</span>
+                <span className="font-medium text-[#0F172A]">
+                  {hoveredPeriod.plannedDurationMin ?? 0} minutes
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Teacher</span>
+                <span className="font-medium text-[#0F172A]">{hoveredPeriod.teacherName}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Status</span>
+                <span className="font-medium text-[#0F172A]">{hoveredPeriod.statusLabel}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Type</span>
+                <span className="font-medium capitalize text-[#0F172A]">
+                  {hoveredPeriod.periodType?.replace(/_/g, ' ') ?? 'Teaching'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 pt-1 text-[#64748B]">
+                <Clock className="h-4 w-4 text-[#64748B]" />
+                <span>{hoveredPeriod.startTime} - {hoveredPeriod.endTime}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[#64748B]">
+                <Circle className="h-3 w-3 fill-current text-[#64748B]" />
+                <span>{hoveredPeriod.teacherName}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-[#E2E8F0] pt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#64748B]">
+                Primary Concept
+              </p>
+              <p className="mt-2 text-[15px] font-medium text-[#0F172A]">
+                {hoveredPeriod.conceptTitle}
+              </p>
+            </div>
+
+            <div className="mt-4 border-t border-[#E2E8F0] pt-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#64748B]">
+                Concept Coverage
+              </p>
+              <div className="mt-2 space-y-2">
+                {hoveredPeriod.concepts.length > 0 ? (
+                  hoveredPeriod.concepts.map((concept, index) => (
+                    <div
+                      key={`${concept.conceptName}-${index}`}
+                      className="flex items-start justify-between gap-3 text-[13px] text-[#0F172A]"
+                    >
+                      <span className="min-w-0 flex-1 break-words">{concept.conceptName}</span>
+                      <span className="shrink-0 text-[#64748B]">{concept.coveragePercent}%</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-[13px] text-[#64748B]">No concept coverage available.</p>
+                )}
               </div>
             </div>
           </div>
         ) : null}
-
-        {isCreateLessonPlanOpen && (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(15,23,42,0.18)] px-4 py-8 backdrop-blur-[2px]">
-            <div
-              className="absolute inset-0"
-              onClick={closeCreateLessonPlanModal}
-              aria-hidden="true"
-            />
-            <div className="relative z-[1] w-full max-w-[640px] rounded-[18px] bg-white px-6 py-5 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:px-7 sm:py-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-[24px] font-semibold tracking-tight text-[#0F172A]">
-                    Create concept-wise lesson plan
-                  </h2>
-                  <p className="mt-1 text-[15px] text-[#64748B]">
-                    {course.subject} · {gradeLabel} · {sectionLabel}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeCreateLessonPlanModal}
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-[#64748B] transition hover:bg-[#F8FAFC] hover:text-[#0F172A]"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="mt-6 space-y-5">
-                <div>
-                  <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                    Concept *
-                  </label>
-                  <select
-                    value={lessonPlanDraft.conceptTitle}
-                    onChange={(event) =>
-                      setLessonPlanDraft((current) => ({ ...current, conceptTitle: event.target.value }))
-                    }
-                    className="h-11 w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A] outline-none focus:border-[#4F46E5]"
-                  >
-                    <option value="">Select a concept</option>
-                    {conceptOptions.map((concept) => (
-                      <option key={concept} value={concept}>
-                        {concept}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                      Planned date *
-                    </label>
-                    <input
-                      type="date"
-                      value={lessonPlanDraft.plannedDate}
-                      onChange={(event) =>
-                        setLessonPlanDraft((current) => ({ ...current, plannedDate: event.target.value }))
-                      }
-                      className="h-11 w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A] outline-none focus:border-[#4F46E5]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                      Periods
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="8"
-                      value={lessonPlanDraft.periods}
-                      onChange={(event) =>
-                        setLessonPlanDraft((current) => ({ ...current, periods: event.target.value }))
-                      }
-                      className="h-11 w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A] outline-none focus:border-[#4F46E5]"
-                    />
-                    <p className="mt-1.5 text-[14px] text-[#64748B]">Class periods needed</p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                    Teaching pedagogy
-                  </label>
-                  <select
-                    value={lessonPlanDraft.pedagogy}
-                    onChange={(event) =>
-                      setLessonPlanDraft((current) => ({ ...current, pedagogy: event.target.value }))
-                    }
-                    className="h-11 w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A] outline-none focus:border-[#4F46E5]"
-                  >
-                    <option value="">Select pedagogy</option>
-                    {pedagogyOptions.map((pedagogy) => (
-                      <option key={pedagogy} value={pedagogy}>
-                        {pedagogy}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-                    Learning objectives
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={lessonPlanDraft.objective}
-                    onChange={(event) =>
-                      setLessonPlanDraft((current) => ({ ...current, objective: event.target.value }))
-                    }
-                    placeholder="What should students be able to do after this lesson?"
-                    className="w-full rounded-[10px] border border-[#CBD5E1] bg-white px-4 py-3 text-[16px] text-[#0F172A] outline-none placeholder:text-[#94A3B8] focus:border-[#4F46E5]"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-5 border-t border-[#E2E8F0] pt-4">
-                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={closeCreateLessonPlanModal}
-                    className="rounded-[12px] px-4 py-2.5 text-[16px] font-medium text-[#475569] transition hover:text-[#0F172A]"
-                  >
-                    Cancel
-                  </button>
-                  <Button
-                    onClick={handleSaveLessonPlan}
-                    disabled={!lessonPlanDraft.conceptTitle || !lessonPlanDraft.plannedDate || !lessonPlanDraft.pedagogy}
-                    className="h-11 rounded-[14px] bg-[#4F46E5] px-5 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:bg-[#A5B4FC]"
-                  >
-                    <Check size={16} className="mr-2" />
-                    Save lesson plan
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+          </>
+        ) : null}
       </div>
     </div>
   );
