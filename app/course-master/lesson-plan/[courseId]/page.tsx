@@ -1301,7 +1301,7 @@ export default function LessonPlanPage() {
   if (subjectLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50/50">
-        <div className="text-center text-slate-500">Loading course intelligenceÃ¢â‚¬Â¦</div>
+        <div className="text-center text-slate-500">Loading course intelligence...</div>
       </div>
     );
   }
