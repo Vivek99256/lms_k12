@@ -10,7 +10,9 @@ import {
   Dumbbell,
   FlaskConical,
   Globe,
+  GraduationCap,
   Library,
+  Monitor,
   Music,
   Palette,
   PenTool,
@@ -18,6 +20,14 @@ import {
   Sigma,
   type LucideIcon,
 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import {
@@ -152,6 +162,11 @@ export default function CourseMasterPage() {
   const router = useRouter();
   const { menuContext } = useAuth();
 
+  const [audienceMode, setAudienceMode] = useState<'Teacher' | 'Student'>(() => {
+    if (typeof window === 'undefined') return 'Teacher';
+    const stored = localStorage.getItem('learningManagementAudienceMode');
+    return stored === 'Student' ? 'Student' : 'Teacher';
+  });
   const [data, setData] = useState<LmsCoursesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -278,6 +293,10 @@ export default function CourseMasterPage() {
   const hasMore = visibleCount < totalSubjects;
 
   useEffect(() => {
+    localStorage.setItem('learningManagementAudienceMode', audienceMode);
+  }, [audienceMode]);
+
+  useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
@@ -298,19 +317,33 @@ export default function CourseMasterPage() {
 
   function renderSubjectCard(subject: LmsSubject) {
     const routes = getCourseRoutes(subject.subject_id, subject.standard_id);
-    const category = subject.content_category;
+    const category = subject.category_name || subject.content_category;
     const SubjectIcon = CATEGORY_ICON_MAP[category] ?? BookOpen;
     const accent = CATEGORY_ACCENT_MAP[category] ?? '#5648E8';
     const chapterCount = Array.isArray(subject.chapters) ? subject.chapters.length : 0;
-    const keyConcepts = Array.isArray(subject.chapters)
-      ? subject.chapters.reduce(
-          (sum, chapter) => sum + (Array.isArray(chapter.concepts) ? chapter.concepts.length : 0),
-          0
-        )
-      : 0;
-    const lessonPlanCount = Array.isArray(subject.chapters)
-      ? subject.chapters.reduce((sum, chapter) => sum + (Number(chapter.total_content) || 0), 0)
-      : 0;
+    const keyConceptCount = Number(
+      subject.key_concepts_count ??
+        subject.key_concept_count ??
+        subject.concepts_count ??
+        subject.total_concepts ??
+        subject.keyConcepts?.length ??
+        subject.concepts?.length ??
+        (Array.isArray(subject.chapters)
+          ? subject.chapters.reduce(
+              (sum, chapter) => sum + (Array.isArray(chapter.concepts) ? chapter.concepts.length : 0),
+              0
+            )
+          : 0)
+    );
+    const lessonPlanCount = Number(
+      subject.lesson_plans_count ??
+        subject.lesson_plan_count ??
+        subject.total_lesson_plans ??
+        subject.lessonPlans?.length ??
+        (Array.isArray(subject.chapters)
+          ? subject.chapters.reduce((sum, chapter) => sum + (Number(chapter.total_content) || 0), 0)
+          : 0)
+    );
     const progress =
       chapterCount > 0
         ? Math.round(
@@ -338,7 +371,9 @@ export default function CourseMasterPage() {
                 {subject.subject_name}
               </h3>
               <p className="mt-1 text-[13px] leading-5 text-[#475569] sm:text-[14px]">
-                {getGradeLabel(subject.standard_name)} Â· {category}
+                {getGradeLabel(subject.standard_name)}
+                <span className="mx-1">{'\u00B7'}</span>
+                {category}
               </p>
             </div>
           </div>
@@ -349,7 +384,9 @@ export default function CourseMasterPage() {
         </div>
 
         <p className="mt-4 text-[13px] leading-5 text-[#3F5572] sm:text-[14px]">
-          {keyConcepts} key concepts Â· {lessonPlanCount} lesson plans created
+          {keyConceptCount} key concepts
+          <span className="mx-1">{'\u00B7'}</span>
+          {lessonPlanCount} lesson plans created
         </p>
 
         <div className="mt-4 flex items-center justify-between gap-3">
@@ -399,70 +436,104 @@ export default function CourseMasterPage() {
   return (
     <div className="min-h-full px-6 py-5">
       <div className="mx-auto max-w-[1800px]">
-        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-center">
-          <div className="relative w-full max-w-[300px]">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setVisibleCount(PAGE_SIZE);
-              }}
-              placeholder="Search subjects..."
-              className="h-10 w-full rounded-[10px] border border-[#C7D2E4] bg-white pl-11 pr-4 text-[14px] text-[#0F172A] outline-none placeholder:text-[#94A3B8] focus:border-[#5648E8]"
-            />
-          </div>
+        
+          <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end xl:flex-nowrap">
+            <div className="w-full xl:max-w-[360px]">
+              <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">
+                Search Subjects
+              </Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setVisibleCount(PAGE_SIZE);
+                  }}
+                  placeholder="Search subjects..."
+                  className="h-12 w-full rounded-[14px] border border-[#C7D2E4] bg-white pl-11 pr-4 text-[14px] text-[#0F172A] outline-none shadow-[0_2px_8px_rgba(15,23,42,0.04)] placeholder:text-[#94A3B8] focus:border-[#5648E8]"
+                />
+              </div>
+            </div>
 
-          <select
-            value={standardFilter}
-            onChange={(event) => {
-              setStandardFilter(event.target.value);
-              setVisibleCount(PAGE_SIZE);
-            }}
-            className="h-10 min-w-[165px] rounded-[10px] border border-[#C7D2E4] bg-white px-4 text-[14px] text-[#0F172A] outline-none focus:border-[#5648E8]"
-          >
-            <option value="all">All standards</option>
-            {standardOptions.map((standard) => (
-              <option key={standard} value={standard}>
-                Grade {standard}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setCategoryFilter('all');
-              setVisibleCount(PAGE_SIZE);
-            }}
-            className={`rounded-full border px-4 py-2 text-[14px] font-medium transition ${
-              categoryFilter === 'all'
-                ? 'border-[#5648E8] bg-[#5648E8] text-white'
-                : 'border-[#D9E1EE] bg-white text-[#334155] hover:border-[#B8C5D9]'
-            }`}
-          >
-            All
-          </button>
-          {categoryOptions.map((category) => (
-            <button
-              key={category}
-              type="button"
-              onClick={() => {
-                setCategoryFilter(category);
-                setVisibleCount(PAGE_SIZE);
-              }}
-              className={`rounded-full border px-4 py-2 text-[14px] font-medium transition ${
-                categoryFilter === category
-                  ? 'border-[#5648E8] bg-[#5648E8] text-white'
-                  : 'border-[#D9E1EE] bg-white text-[#334155] hover:border-[#B8C5D9]'
-              }`}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
+            <div className="w-full sm:w-56">
+              <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">Grade</Label>
+              <Select
+                value={standardFilter}
+                onValueChange={(value) => {
+                  setStandardFilter(value ?? 'all');
+                  setVisibleCount(PAGE_SIZE);
+                }}
+              >
+                <SelectTrigger className="h-12 rounded-[14px] border-[#C7D2E4] bg-white text-[14px] text-[#0F172A] shadow-[0_2px_8px_rgba(15,23,42,0.04)] focus:ring-0 focus:ring-offset-0">
+                  <SelectValue placeholder="Select grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All standards</SelectItem>
+                  {standardOptions.map((standard) => (
+                    <SelectItem key={standard} value={standard}>
+                      Grade {standard}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full sm:w-64">
+              <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">Category</Label>
+              <Select
+                value={categoryFilter}
+                onValueChange={(value) => {
+                  setCategoryFilter(value ?? 'all');
+                  setVisibleCount(PAGE_SIZE);
+                }}
+              >
+                <SelectTrigger className="h-12 rounded-[14px] border-[#C7D2E4] bg-white text-[14px] text-[#0F172A] shadow-[0_2px_8px_rgba(15,23,42,0.04)] focus:ring-0 focus:ring-offset-0">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  {categoryOptions.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full md:ml-auto md:w-auto">
+              <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">View As</Label>
+              <div className="inline-flex h-12 w-full rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_2px_8px_rgba(15,23,42,0.04)] md:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setAudienceMode('Teacher')}
+                  className={`inline-flex flex-1 items-center justify-center gap-2 rounded-[10px] px-4 text-[14px] font-semibold transition md:flex-none ${
+                    audienceMode === 'Teacher'
+                      ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
+                      : 'text-[#6B7B91]'
+                  }`}
+                >
+                  <Monitor size={16} />
+                  Teacher
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAudienceMode('Student')}
+                  className={`inline-flex flex-1 items-center justify-center gap-2 rounded-[10px] px-4 text-[14px] font-semibold transition md:flex-none ${
+                    audienceMode === 'Student'
+                      ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
+                      : 'text-[#6B7B91]'
+                  }`}
+                >
+                  <GraduationCap size={16} />
+                  Student
+                </button>
+              </div>
+            </div>
+          </div>
+        
 
         {loading ? (
           <div className="mt-8 rounded-[18px] border border-[#D9E1EE] bg-white px-6 py-16 text-center text-[#64748B] shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
@@ -474,7 +545,7 @@ export default function CourseMasterPage() {
           </div>
         ) : (
           <>
-            <p className="mt-3 text-[15px] font-medium text-[#334155]">
+            <p className="mt-4 text-[15px] font-medium text-[#334155]">
               {totalSubjects} subjects
             </p>
 
@@ -484,7 +555,7 @@ export default function CourseMasterPage() {
               </div>
             ) : (
               <>
-                <div className="mt-6 flex flex-col gap-10">
+                <div className="mt-5 flex flex-col gap-10">
                   {visibleGroups.map((group) => (
                     <section key={group.standardName}>
                       <h2 className="mb-4 text-[20px] font-semibold text-[#0F172A]">
