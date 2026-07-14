@@ -406,6 +406,121 @@ export interface ChapterContentResponse {
   content_categories: Record<string, ChapterContentAsset[]>;
 }
 
+export type IntelligenceQuestionType = 'mcq' | 'narrative';
+
+export interface GenerateIntelligenceQuestionsRequest {
+  concept_id: number;
+  sub_institute_id: number;
+  subject_id: number;
+  standard_id: number;
+  chapter_id: number;
+  question_type_id: number;
+  question_type: IntelligenceQuestionType;
+  total_questions: number;
+  created_by: number;
+  grade_id?: number;
+}
+
+export interface GeneratedQuestionPreview {
+  id: number;
+  question_type: IntelligenceQuestionType;
+  question_title: string;
+  description?: string;
+  subconcept?: string;
+  points?: number;
+  hint_text?: string | null;
+  learning_outcome?: string[];
+  answer?: {
+    sub_type?: string;
+    bloom_level?: string;
+    dok_level?: number;
+    difficulty?: string;
+    options?: Array<{
+      label?: string;
+      text?: string;
+      is_correct?: boolean;
+      distractor_type?: string;
+      rationale?: string;
+    }>;
+    correct_option?: string;
+    explanation?: string;
+    remediation?: string;
+    model_answer?: string;
+    marking_points?: Array<{
+      criterion?: string;
+      knowledge_ref?: string;
+      mark?: number;
+    }>;
+  };
+}
+
+export interface GenerateIntelligenceQuestionsResponse {
+  status: boolean;
+  message: string;
+  data?: {
+    requested?: number;
+    generated?: number;
+    inserted?: number;
+    skipped_duplicate?: number;
+    skipped_invalid?: number;
+    question_ids?: number[];
+    questions?: GeneratedQuestionPreview[];
+    missing_slice?: boolean;
+    [key: string]: unknown;
+  };
+}
+
+function responseContext(res: Response) {
+  const status = [res.status, res.statusText].filter(Boolean).join(' ');
+  const source = res.url ? ` from ${res.url}` : '';
+  return status || source ? ` (${status}${source})` : '';
+}
+
+function extractHtmlMessage(text: string) {
+  const title = text.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+  if (title?.trim()) {
+    return title.replace(/\s+/g, ' ').trim();
+  }
+
+  return text
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 180);
+}
+
+async function readApiJson(res: Response, fallback: string): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  const trimmed = text.trim();
+
+  if (!trimmed) {
+    return {};
+  }
+
+  const contentType = res.headers.get('content-type') ?? '';
+  const looksLikeJson =
+    contentType.toLowerCase().includes('json') ||
+    trimmed.startsWith('{') ||
+    trimmed.startsWith('[');
+
+  if (looksLikeJson) {
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+      return { data: parsed };
+    } catch {
+      // Fall through so HTML error pages that start with "<" become readable messages.
+    }
+  }
+
+  const message = extractHtmlMessage(trimmed) || 'The server returned a non-JSON response.';
+  throw new Error(`${fallback}: ${message}${responseContext(res)}`);
+}
+
 export async function fetchChapterContent(
   chapterId: number,
   subInstituteId: number
@@ -419,7 +534,7 @@ export async function fetchChapterContent(
     }),
   });
 
-  const raw = (await res.json()) as Record<string, unknown>;
+  const raw = await readApiJson(res, 'Failed to fetch chapter content');
   if (!res.ok || Number(raw.status_code) !== 1) {
     throw new Error((raw.message as string) || 'Failed to fetch chapter content');
   }
@@ -429,6 +544,43 @@ export async function fetchChapterContent(
     id: Number(data.id ?? chapterId),
     chapter_name: String(data.chapter_name ?? ''),
     content_categories: (data.content_categories ?? {}) as Record<string, ChapterContentAsset[]>,
+  };
+}
+
+function getApiErrorMessage(raw: Record<string, unknown>, fallback: string) {
+  const errors = raw.errors;
+  if (errors && typeof errors === 'object') {
+    for (const value of Object.values(errors as Record<string, unknown>)) {
+      if (Array.isArray(value) && value.length > 0) {
+        return String(value[0]);
+      }
+      if (typeof value === 'string' && value.trim()) {
+        return value;
+      }
+    }
+  }
+
+  return (raw.message as string) || fallback;
+}
+
+export async function generateIntelligenceQuestions(
+  request: GenerateIntelligenceQuestionsRequest
+): Promise<GenerateIntelligenceQuestionsResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/intelligence/questions/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+
+  const raw = await readApiJson(res, 'Failed to generate questions');
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to generate questions'));
+  }
+
+  return {
+    status: Boolean(raw.status),
+    message: (raw.message as string) || 'Questions generated successfully.',
+    data: raw.data as GenerateIntelligenceQuestionsResponse['data'],
   };
 }
 
@@ -442,7 +594,7 @@ export async function fetchNewChapterMaster(
 
   const res = await fetch(url.toString());
 
-  const raw = (await res.json()) as Record<string, unknown>;
+  const raw = await readApiJson(res, 'Failed to fetch chapters');
   if (!res.ok) {
     throw new Error((raw.message as string) || 'Failed to fetch chapters');
   }
