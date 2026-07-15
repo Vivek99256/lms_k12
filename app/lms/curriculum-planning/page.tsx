@@ -1,7 +1,8 @@
 'use client';
 
 import { Fragment, useState } from 'react';
-import { ArrowRight, Filter, Pencil, Plus, X } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, ChevronDown, ChevronLeft, Download, Filter, Pencil, Plus, Search, X } from 'lucide-react';
 
 type Stat = {
   label: string;
@@ -28,6 +29,36 @@ type Lesson = {
   dotColor: string;
   status: string;
   badgeClassName: string;
+};
+
+type UpcomingLessonStatus = 'In progress' | 'Upcoming' | 'Ready';
+type SubjectProgressStatus = 'Done' | 'In progress' | 'Upcoming';
+
+type UpcomingLessonRow = {
+  date: string;
+  time: string;
+  subject: string;
+  dotColor: string;
+  fill: string;
+  text: string;
+  topic: string;
+  room: string;
+  period: string;
+  status: UpcomingLessonStatus;
+  highlight?: boolean;
+};
+
+type SubjectProgressTopic = {
+  title: string;
+  range: string;
+  status: SubjectProgressStatus;
+};
+
+type SubjectProgressDetail = {
+  subject: string;
+  color: string;
+  progress: number;
+  topics: SubjectProgressTopic[];
 };
 
 const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
@@ -138,6 +169,213 @@ const upcomingLessons: Lesson[] = [
   },
 ];
 
+const allUpcomingLessons: UpcomingLessonRow[] = [
+  {
+    date: '21 May',
+    time: '9:30 AM',
+    subject: 'Maths',
+    dotColor: '#2f7dd9',
+    fill: '#dcecff',
+    text: '#0f4c8a',
+    topic: 'Calculus - Intro to derivatives',
+    room: 'Room 14',
+    period: 'P2',
+    status: 'In progress',
+    highlight: true,
+  },
+  {
+    date: '21 May',
+    time: '11:30 AM',
+    subject: 'English',
+    dotColor: '#7468d9',
+    fill: '#e8e4fb',
+    text: '#473aa5',
+    topic: 'Media literacy - Analysing news',
+    room: 'Room 7',
+    period: 'P4',
+    status: 'Upcoming',
+  },
+  {
+    date: '21 May',
+    time: '1:30 PM',
+    subject: 'Geography',
+    dotColor: '#d45628',
+    fill: '#fae0d4',
+    text: '#8a331a',
+    topic: 'Development - Human development index',
+    room: 'Room 3',
+    period: 'P6',
+    status: 'Ready',
+  },
+  {
+    date: '22 May',
+    time: '9:30 AM',
+    subject: 'Science',
+    dotColor: '#18a379',
+    fill: '#d8f0e8',
+    text: '#0d6c55',
+    topic: 'Revision - Ecosystems and biomes',
+    room: 'Lab B',
+    period: 'P2',
+    status: 'Upcoming',
+  },
+  {
+    date: '22 May',
+    time: '11:30 AM',
+    subject: 'History',
+    dotColor: '#b87916',
+    fill: '#fae8c7',
+    text: '#6f470c',
+    topic: 'Cold War - Detente and arms race',
+    room: 'Room 9',
+    period: 'P4',
+    status: 'Ready',
+  },
+  {
+    date: '23 May',
+    time: '9:30 AM',
+    subject: 'Art',
+    dotColor: '#c64a74',
+    fill: '#f7dce8',
+    text: '#8b2549',
+    topic: 'Exhibition prep - Final portfolio review',
+    room: 'Studio',
+    period: 'P1',
+    status: 'Upcoming',
+  },
+  {
+    date: '26 May',
+    time: '9:30 AM',
+    subject: 'Maths',
+    dotColor: '#2f7dd9',
+    fill: '#dcecff',
+    text: '#0f4c8a',
+    topic: 'Calculus - Differentiation rules',
+    room: 'Room 14',
+    period: 'P2',
+    status: 'Upcoming',
+  },
+  {
+    date: '26 May',
+    time: '1:30 PM',
+    subject: 'Science',
+    dotColor: '#18a379',
+    fill: '#d8f0e8',
+    text: '#0d6c55',
+    topic: 'Physics - Forces and motion',
+    room: 'Lab A',
+    period: 'P6',
+    status: 'Upcoming',
+  },
+  {
+    date: '27 May',
+    time: '11:30 AM',
+    subject: 'English',
+    dotColor: '#7468d9',
+    fill: '#e8e4fb',
+    text: '#473aa5',
+    topic: 'Writing - Argumentative essays',
+    room: 'Room 7',
+    period: 'P4',
+    status: 'Upcoming',
+  },
+  {
+    date: '28 May',
+    time: '9:30 AM',
+    subject: 'History',
+    dotColor: '#b87916',
+    fill: '#fae8c7',
+    text: '#6f470c',
+    topic: 'Modern history - Globalisation',
+    room: 'Room 9',
+    period: 'P2',
+    status: 'Upcoming',
+  },
+];
+
+const subjectProgressDetails: SubjectProgressDetail[] = [
+  {
+    subject: 'Mathematics',
+    color: '#2f7dd9',
+    progress: 62,
+    topics: [
+      { title: 'Algebra', range: 'Jul-Aug - 2 months', status: 'Done' },
+      { title: 'Geometry', range: 'Sep-Oct - 2 months', status: 'Done' },
+      { title: 'Statistics', range: 'Nov - 1 month', status: 'Done' },
+      { title: 'Fractions', range: 'Jan-Feb - 2 months', status: 'Done' },
+      { title: 'Calculus', range: 'Mar-Apr - 2 months', status: 'In progress' },
+      { title: 'Revision', range: 'May - 1 month', status: 'Upcoming' },
+      { title: 'Exams', range: 'Jun - 1 month', status: 'Upcoming' },
+    ],
+  },
+  {
+    subject: 'Science',
+    color: '#18a379',
+    progress: 55,
+    topics: [
+      { title: 'Biology', range: 'Jul-Aug', status: 'Done' },
+      { title: 'Chemistry', range: 'Sep-Oct', status: 'Done' },
+      { title: 'Physics (term 1)', range: 'Nov', status: 'Done' },
+      { title: 'Ecology', range: 'Jan-Feb', status: 'In progress' },
+      { title: 'Physics (term 2)', range: 'Mar', status: 'Upcoming' },
+      { title: 'Lab work', range: 'Apr', status: 'Upcoming' },
+      { title: 'Revision & Exams', range: 'May-Jun', status: 'Upcoming' },
+    ],
+  },
+  {
+    subject: 'English',
+    color: '#7468d9',
+    progress: 48,
+    topics: [
+      { title: 'Prose reading', range: 'Jul-Aug', status: 'Done' },
+      { title: 'Poetry', range: 'Sep', status: 'Done' },
+      { title: 'Drama', range: 'Oct-Nov', status: 'Done' },
+      { title: 'Writing skills', range: 'Jan-Feb', status: 'In progress' },
+      { title: 'Media literacy', range: 'Mar-Apr', status: 'In progress' },
+      { title: 'Revision & Exams', range: 'May-Jun', status: 'Upcoming' },
+    ],
+  },
+  {
+    subject: 'History',
+    color: '#b87916',
+    progress: 40,
+    topics: [
+      { title: 'World War I', range: 'Jul-Aug', status: 'Done' },
+      { title: 'World War II', range: 'Sep-Oct', status: 'Done' },
+      { title: 'Cold War', range: 'Nov - Feb', status: 'In progress' },
+      { title: 'Civil Rights', range: 'Jan', status: 'Upcoming' },
+      { title: 'Modern history', range: 'Mar-Apr', status: 'Upcoming' },
+      { title: 'Revision & Exams', range: 'May-Jun', status: 'Upcoming' },
+    ],
+  },
+  {
+    subject: 'Geography',
+    color: '#d45628',
+    progress: 35,
+    topics: [
+      { title: 'Climate systems', range: 'Jul-Aug', status: 'Done' },
+      { title: 'Landforms', range: 'Sep-Oct', status: 'Done' },
+      { title: 'Ecosystems', range: 'Nov', status: 'In progress' },
+      { title: 'Urban geography', range: 'Jan-Feb', status: 'Upcoming' },
+      { title: 'Development', range: 'Mar-Apr', status: 'Upcoming' },
+      { title: 'Revision & Exams', range: 'May-Jun', status: 'Upcoming' },
+    ],
+  },
+  {
+    subject: 'Art',
+    color: '#c64a74',
+    progress: 50,
+    topics: [
+      { title: 'Drawing fundamentals', range: 'Jul-Aug', status: 'Done' },
+      { title: 'Colour theory', range: 'Sep-Oct', status: 'Done' },
+      { title: '3D forms & sculpture', range: 'Nov', status: 'Done' },
+      { title: 'Digital art', range: 'Jan-Feb', status: 'In progress' },
+      { title: 'Portfolio development', range: 'Mar-Apr', status: 'In progress' },
+      { title: 'Exhibition prep', range: 'May-Jun', status: 'Upcoming' },
+    ],
+  },
+];
+
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const editMonths = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
 const editColourLabels = ['#2f7dd9', '#18a379', '#7468d9', '#b87916', '#d45628', '#c64a74'];
@@ -170,6 +408,24 @@ const quickTags = [
 
 const primaryActionClassName =
   'bg-[var(--primary-blue)] text-white hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)]';
+
+const upcomingLessonStatusClassName: Record<UpcomingLessonStatus, string> = {
+  'In progress': 'bg-[#dcecff] text-[#1761a7]',
+  Upcoming: 'bg-[#e3e1de] text-[#706b64]',
+  Ready: 'bg-[#def4d2] text-[#3f7b2b]',
+};
+
+const subjectProgressStatusClassName: Record<SubjectProgressStatus, string> = {
+  Done: 'bg-[#def4d2] text-[#3f7b2b]',
+  'In progress': 'bg-[#dcecff] text-[#1761a7]',
+  Upcoming: 'bg-[#e3e1de] text-[#706b64]',
+};
+
+const subjectProgressStatusDot: Record<SubjectProgressStatus, string> = {
+  Done: '#1aa179',
+  'In progress': '#2f7dd9',
+  Upcoming: '#d8d4ce',
+};
 
 function getTopicStyle(plan: SubjectPlan, topic: string) {
   if (topic === 'Exams') {
@@ -694,10 +950,343 @@ function EditTopicDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+function AllUpcomingLessonsView({
+  onBack,
+  onFilter,
+  onAddLesson,
+}: {
+  onBack: () => void;
+  onFilter: () => void;
+  onAddLesson: () => void;
+}) {
+  return (
+    <div className="min-h-full px-4 py-4 text-[#26231f] sm:px-6 lg:px-7">
+      <div className="mb-5">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#d7d3cd] bg-white px-3 text-sm font-medium text-[#706b64] shadow-sm transition-colors hover:bg-[#f1f0ed] hover:text-[#2d2924]"
+          >
+            <ChevronLeft size={16} />
+            Back to yearly view
+          </button>
+          <span className="text-sm text-[#9a958e]">Yearly view</span>
+          <span className="text-sm text-[#9a958e]">&gt;</span>
+          <span className="text-sm font-semibold text-[#2d2924]">All upcoming lessons</span>
+        </div>
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">All upcoming lessons</h1>
+            <p className="mt-1 text-sm text-[#706b64]">
+              Grade 8 - From 21 May 2026 onwards - 134 lessons remaining
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onFilter}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#d7d3cd] bg-white px-4 text-sm font-medium text-[#332f2a] shadow-sm transition-colors hover:bg-[#f1f0ed]"
+            >
+              <Filter size={15} />
+              Filter
+            </button>
+            <button
+              type="button"
+              onClick={onAddLesson}
+              className={`inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-semibold shadow-sm transition-colors ${primaryActionClassName}`}
+            >
+              <Plus size={16} />
+              Add lesson
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-4 grid gap-2 lg:grid-cols-[minmax(0,1fr)_140px_120px]">
+        <label className="relative block">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9a958e]"
+          />
+          <input
+            type="search"
+            placeholder="Search lessons by topic, subject, room..."
+            className="h-10 w-full rounded-lg border border-[#d7d3cd] bg-white pl-9 pr-3 text-sm text-[#2b2723] outline-none transition-colors placeholder:text-[#8d8780] focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15"
+          />
+        </label>
+        <label className="relative block">
+          <select
+            defaultValue="All subjects"
+            className="h-10 w-full appearance-none rounded-lg border border-[#d7d3cd] bg-white px-3 pr-9 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15"
+          >
+            <option>All subjects</option>
+            {filterSubjects.map((subject) => (
+              <option key={subject.name}>{subject.name}</option>
+            ))}
+          </select>
+          <ChevronDown
+            size={15}
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#9a958e]"
+          />
+        </label>
+        <label className="relative block">
+          <select
+            defaultValue="All statuses"
+            className="h-10 w-full appearance-none rounded-lg border border-[#d7d3cd] bg-white px-3 pr-9 text-sm text-[#2b2723] outline-none transition-colors focus:border-[#2f7dd9] focus:ring-2 focus:ring-[#2f7dd9]/15"
+          >
+            <option>All statuses</option>
+            <option>In progress</option>
+            <option>Upcoming</option>
+            <option>Ready</option>
+          </select>
+          <ChevronDown
+            size={15}
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#9a958e]"
+          />
+        </label>
+      </div>
+
+      <section className="overflow-hidden rounded-[18px] border border-[#d7d3cd] bg-white shadow-[0_12px_28px_rgba(23,22,15,0.12)]">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+            <thead className="bg-[#ebe9e6] text-[11px] font-bold text-[#77716b]">
+              <tr>
+                <th className="px-4 py-4">Date &amp; time</th>
+                <th className="px-4 py-4">Subject</th>
+                <th className="px-4 py-4">Topic</th>
+                <th className="px-4 py-4">Room</th>
+                <th className="px-4 py-4">Period</th>
+                <th className="px-4 py-4">Status</th>
+                <th className="px-4 py-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allUpcomingLessons.map((lesson) => (
+                <tr key={`${lesson.date}-${lesson.time}-${lesson.topic}`} className="border-t border-[#e7e3dd]">
+                  <td
+                    className={`whitespace-nowrap px-4 py-4 text-xs font-medium ${
+                      lesson.highlight ? 'font-bold text-[#1f5f9f]' : 'text-[#2d2924]'
+                    }`}
+                  >
+                    {lesson.date} - {lesson.time}
+                  </td>
+                  <td className="px-4 py-4">
+                    <span
+                      className="inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-semibold"
+                      style={{ backgroundColor: lesson.fill, color: lesson.text }}
+                    >
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: lesson.dotColor }} />
+                      {lesson.subject}
+                    </span>
+                  </td>
+                  <td className="min-w-[300px] px-4 py-4 text-sm text-[#2d2924]">{lesson.topic}</td>
+                  <td className="whitespace-nowrap px-4 py-4 text-xs font-medium text-[#706b64]">{lesson.room}</td>
+                  <td className="whitespace-nowrap px-4 py-4 text-xs font-medium text-[#706b64]">{lesson.period}</td>
+                  <td className="whitespace-nowrap px-4 py-4">
+                    <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${upcomingLessonStatusClassName[lesson.status]}`}>
+                      {lesson.status}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-4">
+                    <button type="button" className="text-sm font-medium text-[#706b64] transition-colors hover:text-[#2f7dd9]">
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div className="mt-5 flex flex-col gap-3 text-xs text-[#706b64] sm:flex-row sm:items-center sm:justify-between">
+        <div>Showing 10 of 134 upcoming lessons</div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#d7d3cd] bg-white px-3 font-medium text-[#2d2924] transition-colors hover:bg-[#f1f0ed]"
+          >
+            <ChevronLeft size={14} />
+            Prev
+          </button>
+          {[1, 2, 3].map((page) => (
+            <button
+              key={page}
+              type="button"
+              className={`h-8 w-8 rounded-lg border text-sm font-medium transition-colors ${
+                page === 1
+                  ? 'border-[#2f7dd9] bg-[#dcecff] text-[#0f4c8a]'
+                  : 'border-[#d7d3cd] bg-white text-[#2d2924] hover:bg-[#f1f0ed]'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#d7d3cd] bg-white px-3 font-medium text-[#2d2924] transition-colors hover:bg-[#f1f0ed]"
+          >
+            Next
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubjectProgressDetailsView({
+  onBack,
+  onFilter,
+}: {
+  onBack: () => void;
+  onFilter: () => void;
+}) {
+  return (
+    <div className="min-h-full px-4 py-4 text-[#26231f] sm:px-6 lg:px-7">
+      <div className="mb-5">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#d7d3cd] bg-white px-3 text-xs font-medium text-[#706b64] shadow-sm transition-colors hover:bg-[#f1f0ed] hover:text-[#2d2924]"
+          >
+            <ChevronLeft size={14} />
+            Back to yearly view
+          </button>
+          <span className="text-xs text-[#9a958e]">Yearly view</span>
+          <span className="text-xs text-[#9a958e]">&gt;</span>
+          <span className="text-xs font-semibold text-[#2d2924]">Subject progress details</span>
+        </div>
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">
+              Subject progress - detailed breakdown
+            </h1>
+            <p className="mt-1 text-sm text-[#706b64]">Grade 8 - All subjects - Academic Year 2025-26</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onFilter}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#d7d3cd] bg-white px-4 text-sm font-medium text-[#332f2a] shadow-sm transition-colors hover:bg-[#f1f0ed]"
+            >
+              <Filter size={15} />
+              Filter
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#d7d3cd] bg-white px-4 text-sm font-medium text-[#332f2a] shadow-sm transition-colors hover:bg-[#f1f0ed]"
+            >
+              <Download size={15} />
+              Export
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <section className="mb-4 grid gap-3 md:grid-cols-3">
+        <div className="rounded-lg bg-white px-4 py-4 text-center">
+          <div className="text-3xl font-bold leading-none tracking-[0] text-[#17160f]">48</div>
+          <div className="mt-2 text-xs font-medium text-[#77716b]">Total topics</div>
+        </div>
+        <div className="rounded-lg bg-white px-4 py-4 text-center">
+          <div className="text-3xl font-bold leading-none tracking-[0] text-[#0d6c55]">19</div>
+          <div className="mt-2 text-xs font-medium text-[#77716b]">Completed</div>
+        </div>
+        <div className="rounded-lg bg-white px-4 py-4 text-center">
+          <div className="text-3xl font-bold leading-none tracking-[0] text-[#0f4c8a]">7</div>
+          <div className="mt-2 text-xs font-medium text-[#77716b]">In progress</div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        {subjectProgressDetails.map((subject) => (
+          <article
+            key={subject.subject}
+            className="rounded-lg border border-[#d7d3cd] bg-white p-4 shadow-[0_10px_24px_rgba(23,22,15,0.10)]"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: subject.color }} />
+                <h2 className="truncate text-sm font-semibold tracking-[0] text-[#24211d]">{subject.subject}</h2>
+              </div>
+              <span className="shrink-0 text-xs font-medium text-[#706b64]">{subject.progress}% complete</span>
+            </div>
+
+            <ProgressLine value={subject.progress} color={subject.color} />
+
+            <div className="mt-3 space-y-2">
+              {subject.topics.map((topic) => (
+                <div
+                  key={`${subject.subject}-${topic.title}`}
+                  className="flex min-h-12 items-center justify-between gap-3 rounded-md bg-[#efeeec] px-3 py-2"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: subjectProgressStatusDot[topic.status] }}
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[#2d2924]">{topic.title}</div>
+                      <div className="mt-0.5 truncate text-xs text-[#7d766f]">{topic.range}</div>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${subjectProgressStatusClassName[topic.status]}`}>
+                    {topic.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+      </section>
+    </div>
+  );
+}
+
 export default function CurriculumPlanningPage() {
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = useState(false);
+  const [isUpcomingLessonsViewOpen, setIsUpcomingLessonsViewOpen] = useState(false);
+  const [isSubjectProgressViewOpen, setIsSubjectProgressViewOpen] = useState(false);
+
+  const dialogs = (
+    <>
+      {isFilterDialogOpen && <FilterSyllabusDialog onClose={() => setIsFilterDialogOpen(false)} />}
+      {isEditDialogOpen && <EditTopicDialog onClose={() => setIsEditDialogOpen(false)} />}
+      {isAddTopicDialogOpen && <AddTopicDialog onClose={() => setIsAddTopicDialogOpen(false)} />}
+    </>
+  );
+
+  if (isUpcomingLessonsViewOpen) {
+    return (
+      <>
+        {dialogs}
+        <AllUpcomingLessonsView
+          onBack={() => setIsUpcomingLessonsViewOpen(false)}
+          onFilter={() => setIsFilterDialogOpen(true)}
+          onAddLesson={() => setIsAddTopicDialogOpen(true)}
+        />
+      </>
+    );
+  }
+
+  if (isSubjectProgressViewOpen) {
+    return (
+      <>
+        {dialogs}
+        <SubjectProgressDetailsView
+          onBack={() => setIsSubjectProgressViewOpen(false)}
+          onFilter={() => setIsFilterDialogOpen(true)}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-full  px-4 py-4 text-[#26231f] sm:px-6 lg:px-7">
@@ -735,9 +1324,7 @@ export default function CurriculumPlanningPage() {
         </div>
       </div>
 
-      {isFilterDialogOpen && <FilterSyllabusDialog onClose={() => setIsFilterDialogOpen(false)} />}
-      {isEditDialogOpen && <EditTopicDialog onClose={() => setIsEditDialogOpen(false)} />}
-      {isAddTopicDialogOpen && <AddTopicDialog onClose={() => setIsAddTopicDialogOpen(false)} />}
+      {dialogs}
 
       <section className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
@@ -802,10 +1389,10 @@ export default function CurriculumPlanningPage() {
         <div className="rounded-lg border border-[#ddd9d2] bg-white p-4 shadow-[0_8px_18px_rgba(23,22,15,0.08)]">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold tracking-[0]">May 2026 - monthly detail</h2>
-            <button type="button" className="inline-flex items-center gap-1 text-sm font-medium text-[#2f7dd9]">
+            <Link href="/lms/monthly-plan" className="inline-flex items-center gap-1 text-sm font-medium text-[#2f7dd9]">
               View full
               <ArrowRight size={14} />
-            </button>
+            </Link>
           </div>
 
           <div className="grid grid-cols-5 gap-1.5">
@@ -833,7 +1420,11 @@ export default function CurriculumPlanningPage() {
         <div className="rounded-lg border border-[#ddd9d2] bg-white p-4 shadow-[0_8px_18px_rgba(23,22,15,0.08)]">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold tracking-[0]">Upcoming lessons</h2>
-            <button type="button" className="inline-flex items-center gap-1 text-sm font-medium text-[#2f7dd9]">
+            <button
+              type="button"
+              onClick={() => setIsUpcomingLessonsViewOpen(true)}
+              className="inline-flex items-center gap-1 text-sm font-medium text-[#2f7dd9]"
+            >
               See all
               <ArrowRight size={14} />
             </button>
@@ -858,7 +1449,11 @@ export default function CurriculumPlanningPage() {
         <div className="rounded-lg border border-[#ddd9d2] bg-white p-4 shadow-[0_8px_18px_rgba(23,22,15,0.08)]">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold tracking-[0]">Subject progress</h2>
-            <button type="button" className="inline-flex items-center gap-1 text-sm font-medium text-[#2f7dd9]">
+            <button
+              type="button"
+              onClick={() => setIsSubjectProgressViewOpen(true)}
+              className="inline-flex items-center gap-1 text-sm font-medium text-[#2f7dd9]"
+            >
               Details
               <ArrowRight size={14} />
             </button>
