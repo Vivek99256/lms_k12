@@ -74,6 +74,9 @@ const quickTags = [
   { label: 'Practical / Lab', active: false },
 ];
 
+const primaryActionClassName =
+  'bg-[var(--primary-blue)] text-white hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)]';
+
 const lessonsForMay21: Lesson[] = [
   {
     subject: 'Mathematics',
@@ -593,7 +596,7 @@ function FilterSyllabusDialog({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="submit"
-            className="h-9 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2a271f]"
+            className={`h-9 rounded-lg px-4 text-sm font-semibold transition-colors ${primaryActionClassName}`}
           >
             Apply filters
           </button>
@@ -706,7 +709,7 @@ function AddLessonDialog({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="submit"
-            className="h-9 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2a271f]"
+            className={`h-9 rounded-lg px-4 text-sm font-semibold transition-colors ${primaryActionClassName}`}
           >
             Add topic
           </button>
@@ -762,7 +765,7 @@ export default function MonthlyPlanPage() {
           <button
             type="button"
             onClick={() => setIsAddLessonDialogOpen(true)}
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[#17160f] bg-[#17160f] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#2b281f]"
+            className={`inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[var(--primary-blue)] px-4 text-sm font-semibold shadow-sm transition-colors ${primaryActionClassName}`}
             aria-label="Add lesson"
           >
             <Plus size={17} />
