@@ -119,6 +119,13 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
     }, 300);
   };
 
+  const closeSidebarAfterSelection = () => {
+    cancelPanelClose();
+    cancelSidebarClose();
+    setLevel2Panel(null);
+    setIsCollapsed(true);
+  };
+
   useEffect(() => {
     return () => {
       if (panelCloseTimeoutRef.current) clearTimeout(panelCloseTimeoutRef.current);
@@ -160,6 +167,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
 
     if (item.href && item.href !== '#') {
       router.push(item.href);
+      closeSidebarAfterSelection();
     }
   };
 
@@ -174,6 +182,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
     if (navigateRoute && navigateRoute !== '#') {
       router.push(navigateRoute);
     }
+    closeSidebarAfterSelection();
   };
 
   const showInitialLoading = loading && menuItems.length === 0;
