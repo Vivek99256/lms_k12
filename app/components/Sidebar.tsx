@@ -104,9 +104,32 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
     }
   };
 
+  const cancelSidebarClose = () => {
+    if (sidebarLeaveTimeoutRef.current) {
+      clearTimeout(sidebarLeaveTimeoutRef.current);
+      sidebarLeaveTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleSidebarClose = () => {
+    cancelSidebarClose();
+    sidebarLeaveTimeoutRef.current = setTimeout(() => {
+      setIsCollapsed(true);
+      setLevel2Panel(null);
+    }, 300);
+  };
+
+  const closeSidebarAfterSelection = () => {
+    cancelPanelClose();
+    cancelSidebarClose();
+    setLevel2Panel(null);
+    setIsCollapsed(true);
+  };
+
   useEffect(() => {
     return () => {
       if (panelCloseTimeoutRef.current) clearTimeout(panelCloseTimeoutRef.current);
+      if (sidebarLeaveTimeoutRef.current) clearTimeout(sidebarLeaveTimeoutRef.current);
     };
   }, []);
 
@@ -144,6 +167,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
 
     if (item.href && item.href !== '#') {
       router.push(item.href);
+      closeSidebarAfterSelection();
     }
   };
 
@@ -158,6 +182,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
     if (navigateRoute && navigateRoute !== '#') {
       router.push(navigateRoute);
     }
+    closeSidebarAfterSelection();
   };
 
   const showInitialLoading = loading && menuItems.length === 0;
@@ -165,6 +190,11 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
   return (
     <div
       className={`${isCollapsed ? 'w-[104px]' : 'w-[280px]'} h-full p-4 shrink-0 flex flex-col transition-[width] duration-700 ease-in-out relative group z-50`}
+      onMouseEnter={() => {
+        cancelSidebarClose();
+        setIsCollapsed(false);
+      }}
+      onMouseLeave={scheduleSidebarClose}
     >
       <div className="bg-white/80 backdrop-blur-xl w-full h-full rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-200/50 flex flex-col relative">
         <div className={`pt-8 pb-6 flex items-center transition-all duration-500 ${isCollapsed ? 'justify-center' : 'px-5 justify-between'}`}>
@@ -320,13 +350,12 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
           }}
           onMouseEnter={() => {
             cancelPanelClose();
-            if (sidebarLeaveTimeoutRef.current) clearTimeout(sidebarLeaveTimeoutRef.current);
+            cancelSidebarClose();
+            setIsCollapsed(false);
           }}
           onMouseLeave={() => {
             schedulePanelClose();
-            sidebarLeaveTimeoutRef.current = setTimeout(() => {
-              setIsCollapsed(true);
-            }, 300);
+            scheduleSidebarClose();
           }}
         >
           <div className="px-4 py-2 mb-1">
