@@ -168,6 +168,9 @@ const quickTags = [
   { label: 'Practical / Lab', active: false },
 ];
 
+const primaryActionClassName =
+  'bg-[var(--primary-blue)] text-white hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)]';
+
 function getTopicStyle(plan: SubjectPlan, topic: string) {
   if (topic === 'Exams') {
     return {
@@ -382,7 +385,7 @@ function AddTopicDialog({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="submit"
-            className="h-9 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2a271f]"
+            className={`h-9 rounded-lg px-4 text-sm font-semibold transition-colors ${primaryActionClassName}`}
           >
             Add topic
           </button>
@@ -521,7 +524,7 @@ function FilterSyllabusDialog({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="submit"
-            className="h-9 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2a271f]"
+            className={`h-9 rounded-lg px-4 text-sm font-semibold transition-colors ${primaryActionClassName}`}
           >
             Apply filters
           </button>
@@ -681,7 +684,7 @@ function EditTopicDialog({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="submit"
-            className="h-9 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2a271f]"
+            className={`h-9 rounded-lg px-4 text-sm font-semibold transition-colors ${primaryActionClassName}`}
           >
             Save changes
           </button>
@@ -724,7 +727,7 @@ export default function CurriculumPlanningPage() {
           <button
             type="button"
             onClick={() => setIsAddTopicDialogOpen(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#2a271f]"
+            className={`inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold shadow-sm transition-colors ${primaryActionClassName}`}
           >
             <Plus size={16} />
             Add topic

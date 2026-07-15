@@ -297,6 +297,9 @@ const quickTags = [
   { label: 'Practical / Lab', active: false },
 ];
 
+const primaryActionClassName =
+  'bg-[var(--primary-blue)] text-white hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)]';
+
 const resourceStyles: Record<ResourceKind, { icon: typeof FileText; className: string }> = {
   pdf: { icon: FileText, className: 'bg-[#f8dfd2] text-[#9a4423]' },
   link: { icon: Link2, className: 'bg-[#dcecff] text-[#1761a7]' },
@@ -625,7 +628,7 @@ function FilterLessonDialog({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="submit"
-            className="h-9 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2a271f]"
+            className={`h-9 rounded-lg px-4 text-sm font-semibold transition-colors ${primaryActionClassName}`}
           >
             Apply filters
           </button>
@@ -711,7 +714,7 @@ function AddLessonDialog({ onClose }: { onClose: () => void }) {
         </button>
         <button
           type="submit"
-          className="h-9 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2a271f]"
+          className={`h-9 rounded-lg px-4 text-sm font-semibold transition-colors ${primaryActionClassName}`}
         >
           Add topic
         </button>
@@ -814,7 +817,7 @@ function EditLessonDialog({ lesson, onClose }: { lesson: Lesson; onClose: () => 
         </button>
         <button
           type="submit"
-          className="h-9 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2a271f]"
+          className={`h-9 rounded-lg px-4 text-sm font-semibold transition-colors ${primaryActionClassName}`}
         >
           Save changes
         </button>
@@ -956,7 +959,7 @@ export default function LessonPlanPage() {
           <button
             type="button"
             onClick={() => setIsAddLessonDialogOpen(true)}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#17160f] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#2a271f]"
+            className={`inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold shadow-sm transition-colors ${primaryActionClassName}`}
           >
             <Plus size={17} />
             Add lesson
