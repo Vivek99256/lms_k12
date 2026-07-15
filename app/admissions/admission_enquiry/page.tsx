@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { 
   ArrowUpRight, 
   ArrowDownRight, 
@@ -12,8 +12,10 @@ import {
   Search,
   SlidersHorizontal,
   ChevronDown,
+  Plus,
   MoreVertical
 } from 'lucide-react';
+import { API_BASE_URL } from '@/app/components/utils/api_url';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -45,6 +47,163 @@ ChartJS.register(
   Filler
 );
 
+type AdmissionEnquiryApiRow = {
+  id: number | string;
+  enquiry_no?: number | string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  mobile?: string | null;
+  email?: string | null;
+  admission_standard?: number | string | null;
+  source_of_enquiry?: string | null;
+  followup_date?: string | null;
+  status?: string | null;
+  father_name?: string | null;
+  mother_name?: string | null;
+  guardian_name?: string | null;
+  counciler_name?: string | null;
+};
+
+type AdmissionEnquiryApiResponse = {
+  status_code?: number | string;
+  message?: string;
+  data?: AdmissionEnquiryApiRow[];
+};
+
+type EnquiryRosterRow = {
+  apiId: string;
+  enquiryNo: string;
+  student: string;
+  initials: string;
+  guardian: string;
+  grade: string;
+  source: string;
+  status: string;
+  assigned: string;
+  initialsAssigned: string;
+  followUp: string;
+  searchText: string;
+};
+
+type AdmissionEnquirySession = {
+  baseUrl: string;
+  token: string;
+  subInstituteId: string;
+  syear: string;
+};
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
+function getAdmissionEnquirySession(): AdmissionEnquirySession {
+  if (typeof window === 'undefined') {
+    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '' };
+  }
+
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+    const academicYears = userData.academicYears;
+
+    let syear = readString(localStorage.getItem('selectedAcademicYear'));
+    if (!syear && Array.isArray(academicYears) && academicYears.length > 0) {
+      const firstYear = academicYears[0] as Record<string, unknown>;
+      syear = readString(firstYear.syear);
+    }
+    if (!syear) {
+      syear = readString(userData.academic_year_id ?? userData.academicYearId ?? menuContext.academic_year_id);
+    }
+
+    return {
+      baseUrl: readString(userData.host_name) || API_BASE_URL,
+      token: readString(userData.user_token ?? userData.token ?? menuContext.user_token ?? menuContext.token),
+      subInstituteId: readString(userData.sub_institute_id ?? menuContext.sub_institute_id),
+      syear,
+    };
+  } catch {
+    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '' };
+  }
+}
+
+function getFullName(...parts: Array<string | null | undefined>): string {
+  return parts.map((part) => part?.trim()).filter(Boolean).join(' ');
+}
+
+function getInitials(name: string): string {
+  const parts = name.split(' ').filter(Boolean);
+  const initials = parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : name.slice(0, 2);
+  return initials.toUpperCase() || '--';
+}
+
+function formatShortDate(value?: string | null): string {
+  if (!value) return '-';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+  }).format(date);
+}
+
+function formatStatus(value?: string | null): string {
+  const status = value?.replace(/[_-]/g, ' ').trim();
+  if (!status) return 'New';
+  if (status.toLowerCase() === 'approve') return 'Approved';
+  return status.replace(/\w\S*/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
+}
+
+function getStatusBadgeClass(status: string): string {
+  switch (status.toLowerCase()) {
+    case 'approved':
+    case 'converted':
+      return 'bg-emerald-50 text-emerald-700';
+    case 'new':
+      return 'bg-blue-50 text-blue-700';
+    case 'visit scheduled':
+      return 'bg-amber-50 text-amber-700';
+    case 'contacted':
+      return 'bg-purple-50 text-purple-700';
+    case 'application sent':
+      return 'bg-indigo-50 text-indigo-700';
+    case 'closed':
+      return 'bg-slate-100 text-slate-600';
+    default:
+      return 'bg-slate-100 text-slate-700';
+  }
+}
+
+function mapAdmissionEnquiryToRosterRow(row: AdmissionEnquiryApiRow): EnquiryRosterRow {
+  const student = getFullName(row.first_name, row.middle_name, row.last_name) || `Enquiry ${readString(row.enquiry_no || row.id)}`;
+  const guardian = row.guardian_name?.trim() || row.father_name?.trim() || row.mother_name?.trim() || 'Not available';
+  const gradeValue = readString(row.admission_standard);
+  const source = row.source_of_enquiry?.trim() || 'Not specified';
+  const status = formatStatus(row.status);
+  const assigned = row.counciler_name?.trim() || 'Unassigned';
+
+  const rosterRow = {
+    apiId: readString(row.id),
+    enquiryNo: readString(row.enquiry_no) || readString(row.id),
+    student,
+    initials: getInitials(student),
+    guardian,
+    grade: gradeValue ? `Grade ${gradeValue}` : '-',
+    source,
+    status,
+    assigned,
+    initialsAssigned: assigned === 'Unassigned' ? '--' : getInitials(assigned),
+    followUp: formatShortDate(row.followup_date),
+  };
+
+  return {
+    ...rosterRow,
+    searchText: Object.values(rosterRow).join(' ').toLowerCase(),
+  };
+}
+
 export default function AdmissionManagementContent() {
   // --- Chart Data Configurations ---
   
@@ -54,7 +213,7 @@ export default function AdmissionManagementContent() {
       {
         label: 'Students',
         data: [320, 240, 180, 120, 96],
-        backgroundColor: '#4F46E5', // Indigo 600
+        backgroundColor: '#0D6EFD',
         borderRadius: 4,
       },
     ],
@@ -104,20 +263,79 @@ export default function AdmissionManagementContent() {
     ],
   };
 
-  // --- Roster Data ---
-  const rosterData = [
-    { id: 'ENQ-2026-0420', student: 'Diya Menon', initials: 'DM', guardian: 'Anil Menon', grade: 'Grade 6', source: 'Referral', status: 'Contacted', assigned: 'Rahul K.', initialsAssigned: 'RK', followUp: '04 Jul' },
-    { id: 'ENQ-2026-0419', student: 'Kabir Rao', initials: 'KR', guardian: 'Sunita Rao', grade: 'LKG', source: 'Walk-in', status: 'Visit scheduled', assigned: 'Priya N.', initialsAssigned: 'PN', followUp: '06 Jul' },
-    { id: 'ENQ-2026-0418', student: 'Ishaan Gupta', initials: 'IG', guardian: 'Neha Gupta', grade: 'Grade 9', source: 'Social', status: 'Application sent', assigned: 'Rahul K.', initialsAssigned: 'RK', followUp: '07 Jul' },
-    { id: 'ENQ-2026-0417', student: 'Ananya Iyer', initials: 'AI', guardian: 'Raghav Iyer', grade: 'Grade 3', source: 'Event', status: 'Contacted', assigned: 'Priya N.', initialsAssigned: 'PN', followUp: '05 Jul' },
-    { id: 'ENQ-2026-0416', student: 'Vivaan Nair', initials: 'VN', guardian: 'Lakshmi Nair', grade: 'Grade 6', source: 'Website', status: 'Converted', assigned: 'Rahul K.', initialsAssigned: 'RK', followUp: '—' },
-    { id: 'ENQ-2026-0415', student: 'Saanvi Deshpande', initials: 'SD', guardian: 'Prakash Deshpande', grade: 'Grade 1', source: 'Referral', status: 'Visit scheduled', assigned: 'Priya N.', initialsAssigned: 'PN', followUp: '08 Jul' },
-    { id: 'ENQ-2026-0414', student: 'Reyansh Joshi', initials: 'RJ', guardian: 'Kavya Joshi', grade: 'Grade 9', source: 'Website', status: 'New', assigned: 'Unassigned', initialsAssigned: '??', followUp: '05 Jul' },
-    { id: 'ENQ-2026-0413', student: 'Myra Kapoor', initials: 'MK', guardian: 'Rohit Kapoor', grade: 'UKG', source: 'Walk-in', status: 'Closed', assigned: 'Rahul K.', initialsAssigned: 'RK', followUp: '—' },
-  ];
+  const [searchQuery, setSearchQuery] = useState('');
+  const [rosterData, setRosterData] = useState<EnquiryRosterRow[]>([]);
+  const [isRosterLoading, setIsRosterLoading] = useState(true);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchAdmissionEnquiries = async () => {
+      const session = getAdmissionEnquirySession();
+
+      if (!session.subInstituteId || !session.syear) {
+        setRosterData([]);
+        setRosterError('Session is missing sub institute or academic year.');
+        setIsRosterLoading(false);
+        return;
+      }
+
+      setIsRosterLoading(true);
+      setRosterError(null);
+
+      try {
+        const baseUrl = session.baseUrl.replace(/\/$/, '');
+        const url = new URL(`${baseUrl}/api/admission_enquiry`);
+        url.searchParams.set('sub_institute_id', session.subInstituteId);
+        url.searchParams.set('syear', session.syear);
+        url.searchParams.set('type', 'API');
+
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load enquiries (${response.status})`);
+        }
+
+        const payload = (await response.json()) as AdmissionEnquiryApiResponse;
+        if (String(payload.status_code) !== '1') {
+          throw new Error(payload.message || 'Failed to load enquiries.');
+        }
+
+        setRosterData(Array.isArray(payload.data) ? payload.data.map(mapAdmissionEnquiryToRosterRow) : []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setRosterData([]);
+        setRosterError(error instanceof Error ? error.message : 'Failed to load enquiries.');
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsRosterLoading(false);
+        }
+      }
+    };
+
+    fetchAdmissionEnquiries();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  const filteredRosterData = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return rosterData;
+    return rosterData.filter((row) => row.searchText.includes(query));
+  }, [rosterData, searchQuery]);
 
   return (
-    <div className="space-y-6 bg-slate-50 p-6 min-h-screen text-slate-800">
+    <div className="space-y-6  p-6 min-h-screen text-slate-800">
       
       {/* --- KPI Metric Cards --- */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -179,7 +397,7 @@ export default function AdmissionManagementContent() {
               <h3 className="font-semibold text-slate-900 text-sm">Admissions funnel</h3>
               <p className="text-xs text-slate-400">Enquiry to confirmed · cycle 2026–27</p>
             </div>
-            <button className="text-xs font-medium text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded flex items-center gap-1">
+            <button className="text-xs font-medium text-[var(--primary-blue)] hover:bg-blue-50 px-2 py-1 rounded flex items-center gap-1">
               Details <Maximize2 className="w-3 h-3" />
             </button>
           </div>
@@ -203,7 +421,7 @@ export default function AdmissionManagementContent() {
               <h3 className="font-semibold text-slate-900 text-sm">Enquiry sources</h3>
               <p className="text-xs text-slate-400">This cycle</p>
             </div>
-            <button className="text-xs font-medium text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded flex items-center gap-1">
+            <button className="text-xs font-medium text-[var(--primary-blue)] hover:bg-blue-50 px-2 py-1 rounded flex items-center gap-1">
               Details <Maximize2 className="w-3 h-3" />
             </button>
           </div>
@@ -234,7 +452,7 @@ export default function AdmissionManagementContent() {
               <h3 className="font-semibold text-slate-900 text-sm">Source quality</h3>
               <p className="text-xs text-slate-400">Multi-attribute comparison (0–100)</p>
             </div>
-            <button className="text-xs font-medium text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded flex items-center gap-1">
+            <button className="text-xs font-medium text-[var(--primary-blue)] hover:bg-blue-50 px-2 py-1 rounded flex items-center gap-1">
               Details <Maximize2 className="w-3 h-3" />
             </button>
           </div>
@@ -257,12 +475,18 @@ export default function AdmissionManagementContent() {
         
         {/* Header Filters Area */}
         <div className="p-4 border-b border-slate-100 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
-          <h3 className="font-semibold text-slate-900 text-base">Enquiry roster <span className="text-xs text-slate-400 font-normal ml-1">12 enquiries</span></h3>
+          <h3 className="font-semibold text-slate-900 text-base">Enquiry roster <span className="text-xs text-slate-400 font-normal ml-1">{rosterData.length} enquiries</span></h3>
           
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <input type="text" placeholder="Search roster…" className="pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 w-48" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search roster..."
+                className="pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--primary-blue)] w-48"
+              />
             </div>
             
             <button className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 font-medium">
@@ -273,6 +497,9 @@ export default function AdmissionManagementContent() {
             </button>
             <button className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-100 font-medium">
               Grade <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--primary-blue)] text-white rounded-lg text-sm hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)] font-medium shadow-sm transition-colors">
+              <Plus className="w-3.5 h-3.5" /> Enquiry
             </button>
           </div>
         </div>
@@ -294,61 +521,77 @@ export default function AdmissionManagementContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rosterData.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="p-4"><input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" /></td>
-                  <td className="p-4 font-medium text-slate-900">{row.id}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 font-semibold text-xs flex items-center justify-center">
-                        {row.initials}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-slate-900">{row.student}</div>
-                        <div className="text-xs text-slate-400">Guardian: {row.guardian}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4 text-slate-600">{row.grade}</td>
-                  <td className="p-4 text-slate-600">{row.source}</td>
-                  <td className="p-4">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                      ${row.status === 'Converted' ? 'bg-emerald-50 text-emerald-700' : ''}
-                      ${row.status === 'New' ? 'bg-blue-50 text-blue-700' : ''}
-                      ${row.status === 'Visit scheduled' ? 'bg-amber-50 text-amber-700' : ''}
-                      ${row.status === 'Contacted' ? 'bg-purple-50 text-purple-700' : ''}
-                      ${row.status === 'Application sent' ? 'bg-indigo-50 text-indigo-700' : ''}
-                      ${row.status === 'Closed' ? 'bg-slate-100 text-slate-600' : ''}
-                    `}>
-                      {row.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center">
-                        {row.initialsAssigned}
-                      </div>
-                      <span>{row.assigned}</span>
-                    </div>
-                  </td>
-                  <td className="p-4 text-slate-500 font-medium">{row.followUp}</td>
-                  <td className="p-4">
-                    <button className="text-slate-400 hover:text-slate-600">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+              {isRosterLoading ? (
+                <tr>
+                  <td colSpan={9} className="p-6 text-center text-sm text-slate-500">
+                    Loading enquiries...
                   </td>
                 </tr>
-              ))}
+              ) : rosterError ? (
+                <tr>
+                  <td colSpan={9} className="p-6 text-center text-sm text-rose-600">
+                    {rosterError}
+                  </td>
+                </tr>
+              ) : filteredRosterData.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="p-6 text-center text-sm text-slate-500">
+                    No enquiries found.
+                  </td>
+                </tr>
+              ) : (
+                filteredRosterData.map((row) => (
+                  <tr key={`${row.apiId}-${row.enquiryNo}`} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="p-4"><input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" /></td>
+                    <td className="p-4 font-medium text-slate-900">{row.enquiryNo}</td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 font-semibold text-xs flex items-center justify-center">
+                          {row.initials}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-900">{row.student}</div>
+                          <div className="text-xs text-slate-400">Guardian: {row.guardian}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4 text-slate-600">{row.grade}</td>
+                    <td className="p-4 text-slate-600">{row.source}</td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(row.status)}`}>
+                        {row.status}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center">
+                          {row.initialsAssigned}
+                        </div>
+                        <span>{row.assigned}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-slate-500 font-medium">{row.followUp}</td>
+                    <td className="p-4">
+                      <button className="text-slate-400 hover:text-slate-600">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
         
         {/* Pagination Footer */}
         <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-          <div>1 – 8 of 12 Rows</div>
+          <div>
+            {isRosterLoading
+              ? 'Loading rows'
+              : `${filteredRosterData.length === 0 ? 0 : 1} - ${filteredRosterData.length} of ${rosterData.length} Rows`}
+          </div>
           <div className="flex items-center gap-2">
             <button className="px-2 py-1 bg-slate-100 text-slate-800 font-semibold rounded shadow-sm">1</button>
-            <button className="px-2 py-1 hover:bg-slate-50 rounded">2</button>
           </div>
         </div>
 
