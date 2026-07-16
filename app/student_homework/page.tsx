@@ -26,6 +26,10 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { ChatbotLayoutContext } from '@/app/components/DashboardShell';
+import {
+  SearchDropdown,
+  type SearchDropdownValues,
+} from '@/components/search-dropdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -35,6 +39,14 @@ type AudienceMode = 'Teacher' | 'Student';
 type StudentLearningTab = 'PAL' | 'Online Exam' | 'Offline Exam';
 
 type StudentConceptStatus = 'Mastered' | 'In progress' | 'Locked';
+
+type LearningContent = {
+  id: number;
+  title: string;
+  type: string;
+  publishedBy: string;
+  previewUrl?: string;
+};
 
 type StudentConceptProgress = {
   id: string;
@@ -46,6 +58,7 @@ type StudentConceptProgress = {
   status: StudentConceptStatus;
   canLearn: boolean;
   canPractice: boolean;
+  learningContent: LearningContent[];
 };
 
 type StudentChapterProgress = {
@@ -98,31 +111,6 @@ type StudentOnlineQuestionPaper = {
   questions: StudentOnlineQuestion[];
 };
 
-type StudentOfflineExamRecord = {
-  id: string;
-  name: string;
-  standard: string;
-  subject: string;
-  classLabel: string;
-  chapter: string;
-  examDate: string;
-  examTime: string;
-  questions: number;
-  durationMinutes: number;
-  instructions?: string[];
-  venue?: string;
-  marks: number;
-  status: StudentExamStatus;
-  actionLabel: string;
-  actionDisabled?: boolean;
-};
-
-type StudentOfflineQuestionPaper = {
-  examId: string;
-  instructions: string[];
-  questions: StudentOnlineQuestion[];
-};
-
 type StudentPracticeQuestionOption = {
   id: string;
   label: string;
@@ -157,15 +145,34 @@ type ExamRecord = {
 
 type ApiQuestionPaperRecord = {
   id: number;
+  grade_id?: number | string | null;
+  standard_id?: number | string | null;
+  subject_id?: number | string | null;
+  grade?: number | string | null;
+  standard?: number | string | null;
+  subject?: number | string | null;
   paper_name?: string | null;
   paper_desc?: string | null;
   open_date?: string | null;
   close_date?: string | null;
+  timelimit_enable?: number | string | null;
+  time_allowed?: number | string | null;
   attempt_allowed?: number | string | null;
   total_ques?: number | string | null;
   total_marks?: number | string | null;
+  question_ids?: string | null;
+  shuffle_question?: number | string | null;
+  show_feedback?: number | string | null;
+  show_hide?: number | string | null;
+  result_show_ans?: number | string | null;
+  created_on?: string | null;
+  created_by?: number | string | null;
+  sub_institute_id?: number | string | null;
+  syear?: number | string | null;
   exam_type?: string | null;
+  ai_generated?: string | null;
   standard_name?: string | number | null;
+  grade_name?: string | null;
   subject_name?: string | null;
   active_exam?: string | null;
 };
@@ -174,6 +181,93 @@ type QuestionPaperApiResponse = {
   status_code?: number;
   message?: string;
   data?: ApiQuestionPaperRecord[];
+};
+
+type QuestionDetail = {
+  id: number;
+  question_type_id: number;
+  grade_id: number;
+  standard_id: number;
+  subject_id: number;
+  grade?: number;
+  standard?: number;
+  subject?: number;
+  chapter_id: number | null;
+  concept_id: number | null;
+  topic_id: number | null;
+  question_title: string;
+  description: string;
+  points: number;
+  multiple_answer: number;
+  concept: string | null;
+  subconcept: string | null;
+  pre_grade_topic: string | null;
+  post_grade_topic: string | null;
+  cross_curriculum_grade_topic: string | null;
+  sub_institute_id: number;
+  status: number;
+  created_by: number;
+  created_on: string;
+  answer: unknown;
+  hint_text: string;
+  learning_outcome: string;
+  options?: Array<{
+    id?: number;
+    option?: string;
+    option_text?: string;
+    answer?: string;
+    value?: string;
+  }>;
+  question_options?: Array<{
+    id?: number;
+    option?: string;
+    option_text?: string;
+    answer?: string;
+    value?: string;
+  }>;
+};
+
+type QuestionPaperDetail = {
+  id: number;
+  grade_id: number;
+  standard_id: number;
+  subject_id: number;
+  grade?: number;
+  standard?: number;
+  subject?: number;
+  paper_name: string;
+  paper_desc: string | null;
+  open_date: string;
+  close_date: string;
+  timelimit_enable: number;
+  time_allowed: number;
+  total_marks: number;
+  total_ques: number;
+  question_ids: string;
+  shuffle_question: number;
+  attempt_allowed: number;
+  show_feedback: number;
+  show_hide: number;
+  result_show_ans: number;
+  created_on: string;
+  created_by: number;
+  sub_institute_id: number;
+  syear: number;
+  exam_type: string;
+  ai_generated: string;
+  standard_name?: string | number | null;
+  grade_name?: string | null;
+  subject_name?: string | null;
+  difficulty_distribution: unknown;
+  taxonomy_distribution: unknown;
+  sections_config: unknown;
+  question_arr: QuestionDetail[];
+};
+
+type QuestionPaperDetailResponse = {
+  status_code: number;
+  message: string;
+  data: QuestionPaperDetail;
 };
 
 type CreateQuestionPaperApiResponse = {
@@ -279,7 +373,10 @@ const statusDotClasses: Record<ExamStatus, string> = {
   Closed: 'bg-[#64748B]',
 };
 
-const examTypeOptions = ['Practice', 'Term', 'Diagnostic'];
+const examTypeOptions = [
+  { label: 'Online', value: 'online' },
+  { label: 'Offline', value: 'offline' },
+];
 const attemptsAllowedOptions = ['1 attempt', '2 attempts', '3 attempts'];
 
 const innerTabs = [
@@ -314,6 +411,14 @@ const studentChapterProgressData: StudentChapterProgress[] = [
         status: 'Mastered',
         canLearn: true,
         canPractice: false,
+        learningContent: [
+          {
+            id: 101,
+            title: 'Vibration and sound production - classroom presentation',
+            type: 'Classroom presentation',
+            publishedBy: 'Teacher published',
+          },
+        ],
       },
       {
         id: 'c2',
@@ -325,6 +430,14 @@ const studentChapterProgressData: StudentChapterProgress[] = [
         status: 'Mastered',
         canLearn: true,
         canPractice: false,
+        learningContent: [
+          {
+            id: 102,
+            title: 'Amplitude, frequency and pitch - lesson deck',
+            type: 'Classroom presentation',
+            publishedBy: 'Teacher published',
+          },
+        ],
       },
       {
         id: 'c3',
@@ -336,6 +449,14 @@ const studentChapterProgressData: StudentChapterProgress[] = [
         status: 'In progress',
         canLearn: true,
         canPractice: true,
+        learningContent: [
+          {
+            id: 103,
+            title: 'Audible and inaudible sounds - guided explainer',
+            type: 'Classroom presentation',
+            publishedBy: 'Teacher published',
+          },
+        ],
       },
       {
         id: 'c4',
@@ -347,6 +468,7 @@ const studentChapterProgressData: StudentChapterProgress[] = [
         status: 'Locked',
         canLearn: false,
         canPractice: false,
+        learningContent: [],
       },
     ],
   },
@@ -525,224 +647,6 @@ const studentOnlineQuestionPapers: StudentOnlineQuestionPaper[] = [
   },
 ];
 
-const studentOfflineExams: StudentOfflineExamRecord[] = [
-  {
-    id: 'OFF-114',
-    name: 'Sound - term paper',
-    standard: 'Grade 8',
-    subject: 'Science',
-    classLabel: 'Science - Grade 8 A',
-    chapter: 'Sound',
-    examDate: '22 Jul 2026',
-    examTime: '10:30 AM - 11:15 AM',
-    questions: 5,
-    durationMinutes: 40,
-    instructions: [
-      'All questions are compulsory.',
-      'Marks for each question are shown in brackets.',
-      'Circle the correct option for multiple-choice questions.',
-    ],
-    venue: 'Room 204',
-    marks: 10,
-    status: 'Upcoming',
-    actionLabel: 'Print question paper',
-  },
-  {
-    id: 'OFF-108',
-    name: 'Lab Observation Assessment',
-    standard: 'Grade 8',
-    subject: 'Science',
-    classLabel: 'Science - Grade 8 A',
-    chapter: 'Light and Reflection',
-    examDate: '12 Jul 2026',
-    examTime: '09:00 AM - 09:30 AM',
-    questions: 4,
-    durationMinutes: 30,
-    instructions: [
-      'Answer neatly in the space provided on paper.',
-      'Read each question carefully before attempting it.',
-      'Use diagrams where necessary.',
-    ],
-    venue: 'Physics Lab',
-    marks: 10,
-    status: 'Completed',
-    actionLabel: 'Print question paper',
-  },
-  {
-    id: 'OFF-095',
-    name: 'Periodic Written Test - Motion',
-    standard: 'Grade 7',
-    subject: 'Science',
-    classLabel: 'Science - Grade 8 A',
-    chapter: 'Motion',
-    examDate: '02 Jul 2026',
-    examTime: '11:45 AM - 12:30 PM',
-    questions: 6,
-    durationMinutes: 35,
-    instructions: [
-      'All questions are compulsory.',
-      'Write answers in the order of the question paper.',
-      'Show rough work only in the margin area.',
-    ],
-    venue: 'Room 112',
-    marks: 20,
-    status: 'Closed',
-    actionLabel: 'Print question paper',
-  },
-];
-
-const studentOfflineQuestionPapers: StudentOfflineQuestionPaper[] = [
-  {
-    examId: 'OFF-114',
-    instructions: [
-      'All questions are compulsory.',
-      'Marks for each question are shown in brackets.',
-      'Circle the correct option for multiple-choice questions.',
-    ],
-    questions: studentOnlineQuestionPapers[0]?.questions ?? [],
-  },
-  {
-    examId: 'OFF-108',
-    instructions: [
-      'Answer neatly in the space provided on paper.',
-      'Read each question carefully before attempting it.',
-      'Use diagrams where necessary.',
-    ],
-    questions: [
-      {
-        id: 'off-108-q1',
-        question: 'Which surface reflects the maximum amount of light regularly?',
-        marks: 2,
-        correctOptionId: 'mirror',
-        options: [
-          { id: 'mirror', label: 'A polished mirror' },
-          { id: 'wall', label: 'A rough painted wall' },
-          { id: 'paper', label: 'A crumpled paper sheet' },
-          { id: 'cloth', label: 'A thick cloth surface' },
-        ],
-      },
-      {
-        id: 'off-108-q2',
-        question: 'The bouncing back of light from a surface is called...',
-        marks: 2,
-        correctOptionId: 'reflection',
-        options: [
-          { id: 'reflection', label: 'Reflection' },
-          { id: 'refraction', label: 'Refraction' },
-          { id: 'dispersion', label: 'Dispersion' },
-          { id: 'absorption', label: 'Absorption' },
-        ],
-      },
-      {
-        id: 'off-108-q3',
-        question: 'Images formed by a plane mirror are always...',
-        marks: 3,
-        correctOptionId: 'virtual',
-        options: [
-          { id: 'virtual', label: 'Virtual and erect' },
-          { id: 'real', label: 'Real and inverted' },
-          { id: 'smaller', label: 'Always smaller than the object' },
-          { id: 'colored', label: 'Colored differently from the object' },
-        ],
-      },
-      {
-        id: 'off-108-q4',
-        question: 'Which device uses multiple reflections to let us see around corners?',
-        marks: 3,
-        correctOptionId: 'periscope',
-        options: [
-          { id: 'periscope', label: 'Periscope' },
-          { id: 'telescope', label: 'Telescope' },
-          { id: 'microscope', label: 'Microscope' },
-          { id: 'stethoscope', label: 'Stethoscope' },
-        ],
-      },
-    ],
-  },
-  {
-    examId: 'OFF-095',
-    instructions: [
-      'All questions are compulsory.',
-      'Write answers in the order of the question paper.',
-      'Show rough work only in the margin area.',
-    ],
-    questions: [
-      {
-        id: 'off-095-q1',
-        question: 'The SI unit of speed is...',
-        marks: 3,
-        correctOptionId: 'ms',
-        options: [
-          { id: 'ms', label: 'm/s' },
-          { id: 'km', label: 'km' },
-          { id: 'm', label: 'm' },
-          { id: 's', label: 's' },
-        ],
-      },
-      {
-        id: 'off-095-q2',
-        question: 'If an object covers equal distances in equal intervals of time, it is said to be in...',
-        marks: 3,
-        correctOptionId: 'uniform',
-        options: [
-          { id: 'uniform', label: 'Uniform motion' },
-          { id: 'random', label: 'Random motion' },
-          { id: 'periodic', label: 'Periodic motion' },
-          { id: 'vibratory', label: 'Vibratory motion' },
-        ],
-      },
-      {
-        id: 'off-095-q3',
-        question: 'A change in position of an object with time is called...',
-        marks: 4,
-        correctOptionId: 'motion',
-        options: [
-          { id: 'motion', label: 'Motion' },
-          { id: 'rest', label: 'Rest' },
-          { id: 'force', label: 'Force' },
-          { id: 'gravity', label: 'Gravity' },
-        ],
-      },
-      {
-        id: 'off-095-q4',
-        question: 'Which graph represents uniform motion?',
-        marks: 3,
-        correctOptionId: 'straight',
-        options: [
-          { id: 'straight', label: 'A straight line on a distance-time graph' },
-          { id: 'curve', label: 'A curved line on a distance-time graph' },
-          { id: 'horizontal', label: 'A horizontal line on a speed-time graph at zero' },
-          { id: 'zigzag', label: 'A zig-zag line on a graph' },
-        ],
-      },
-      {
-        id: 'off-095-q5',
-        question: 'The odometer in a vehicle measures...',
-        marks: 3,
-        correctOptionId: 'distance',
-        options: [
-          { id: 'distance', label: 'Distance travelled' },
-          { id: 'speed', label: 'Instantaneous speed' },
-          { id: 'fuel', label: 'Fuel level' },
-          { id: 'temperature', label: 'Engine temperature' },
-        ],
-      },
-      {
-        id: 'off-095-q6',
-        question: 'When speed changes with time, the motion is called...',
-        marks: 4,
-        correctOptionId: 'nonuniform',
-        options: [
-          { id: 'nonuniform', label: 'Non-uniform motion' },
-          { id: 'uniform', label: 'Uniform motion' },
-          { id: 'oscillatory', label: 'Oscillatory motion' },
-          { id: 'stationary', label: 'Stationary motion' },
-        ],
-      },
-    ],
-  },
-];
-
 const createExamSteps = [
   {
     id: 1,
@@ -833,6 +737,16 @@ function toDisplayText(value: string | number | null | undefined): string {
   return value == null ? '' : String(value).trim();
 }
 
+function getSingleDropdownValue(
+  value: string | string[] | undefined
+): string {
+  if (Array.isArray(value)) {
+    return value[0] || '';
+  }
+
+  return value || '';
+}
+
 function getLmsSubjectRows(payload: LmsCoursesApiResponse): LmsCoursesSubjectRecord[] {
   return Object.values(payload.lms_subject ?? {}).reduce<LmsCoursesSubjectRecord[]>(
     (rows, group) => {
@@ -856,6 +770,307 @@ function formatDurationLabel(totalSeconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+function getStudentExamErrorMessage(error: unknown): string {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : 'Unable to load question papers.';
+
+  if (!message) {
+    return 'Unable to load question papers.';
+  }
+
+  if (
+    message.includes('SQLSTATE') ||
+    message.includes('Unknown column') ||
+    message.includes('on clause')
+  ) {
+    return 'We could not load exams right now because the exam service returned an invalid response. Please try again shortly or contact your school administrator.';
+  }
+
+  if (
+    message.includes('Failed to fetch') ||
+    message.includes('NetworkError') ||
+    message.includes('ERR_CONNECTION')
+  ) {
+    return 'We could not connect to the exam service. Please check your connection and try again.';
+  }
+
+  return message;
+}
+
+interface QuestionPaperViewProps {
+  paper: QuestionPaperDetail;
+  onBack: () => void;
+}
+
+interface PrintableQuestionPaperProps {
+  paper: QuestionPaperDetail;
+  onPrint: () => void;
+}
+
+function getPrintableQuestionOptions(question: QuestionDetail): string[] {
+  const rawOptions = question.options || question.question_options || [];
+
+  return rawOptions
+    .map(
+      (option) =>
+        option.option_text ||
+        option.option ||
+        option.answer ||
+        option.value ||
+        ''
+    )
+    .filter(Boolean);
+}
+
+function PrintableQuestionPaper({
+  paper,
+  onPrint,
+}: PrintableQuestionPaperProps) {
+  return (
+    <section className="offline-question-paper rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none">
+      <div className="no-print mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm text-slate-600">
+            {paper.grade_name || 'Section'} - {paper.subject_name || 'Subject'} - Grade{' '}
+            {paper.standard_name || paper.standard_id}
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          onClick={onPrint}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
+        >
+          <Printer size={18} />
+          Print question paper
+        </Button>
+      </div>
+
+      <div className="mx-auto max-w-4xl rounded-2xl border-2 border-slate-200 bg-white px-8 py-8 print:max-w-none print:rounded-none print:border-0 print:px-0 print:py-0">
+        <header className="border-b border-slate-200 pb-6 text-center">
+          <h1 className="text-2xl font-bold text-slate-900">
+            {paper.paper_name}
+          </h1>
+
+          <p className="mt-2 text-sm text-slate-600">
+            {paper.grade_name || 'Section'} - {paper.subject_name || 'Subject'} - Grade{' '}
+            {paper.standard_name || paper.standard_id}
+          </p>
+
+          {paper.paper_desc ? (
+            <p className="mt-1 text-sm text-slate-500">
+              {paper.paper_desc}
+            </p>
+          ) : null}
+
+          <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-slate-700">
+            <span>Total questions: {paper.total_ques}</span>
+            <span>Total marks: {paper.total_marks}</span>
+            {paper.timelimit_enable === 1 ? (
+              <span>Duration: {paper.time_allowed} min</span>
+            ) : null}
+          </div>
+        </header>
+
+        <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4 print:bg-white">
+          <h2 className="text-sm font-bold text-slate-900">
+            Instructions
+          </h2>
+
+          <ol className="mt-2 list-inside list-decimal space-y-1 text-sm leading-6 text-slate-700">
+            <li>All questions are compulsory.</li>
+            <li>Marks for each question are shown in brackets.</li>
+            <li>Select or write the correct answer as required.</li>
+          </ol>
+        </div>
+
+        <div className="mt-7 space-y-8">
+          {paper.question_arr?.map((question, index) => {
+            const options = getPrintableQuestionOptions(question);
+
+            return (
+              <article
+                key={question.id}
+                className="break-inside-avoid"
+              >
+                <div className="flex items-start justify-between gap-5">
+                  <h3 className="text-sm font-semibold leading-7 text-slate-900">
+                    {index + 1}. {question.question_title}
+                  </h3>
+
+                  <span className="shrink-0 text-sm font-medium text-violet-600">
+                    ({question.points} {question.points === 1 ? 'mark' : 'marks'})
+                  </span>
+                </div>
+
+                {question.description ? (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {question.description}
+                  </p>
+                ) : null}
+
+                {options.length > 0 ? (
+                  <div className="mt-3 space-y-2 pl-3">
+                    {options.map((option, optionIndex) => (
+                      <div
+                        key={`${question.id}-${optionIndex}`}
+                        className="text-sm text-slate-800"
+                      >
+                        {String.fromCharCode(65 + optionIndex)}. {option}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    <div className="h-6 border-b border-slate-300" />
+                    <div className="h-6 border-b border-slate-300" />
+                    <div className="h-6 border-b border-slate-300" />
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-violet-600 hover:text-violet-700"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              Back to exams
+            </button>
+
+            <h1 className="text-2xl font-bold text-slate-900">
+              {paper.paper_name}
+            </h1>
+
+            {paper.paper_desc ? (
+              <p className="mt-2 text-sm text-slate-600">
+                {paper.paper_desc}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-700">
+              {paper.total_ques} questions
+            </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-700">
+              {paper.total_marks} marks
+            </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-700">
+              {paper.time_allowed} min
+            </span>
+            <span className="rounded-full bg-violet-50 px-3 py-1.5 text-sm capitalize text-violet-700">
+              {paper.exam_type}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {paper.question_arr?.length > 0 ? (
+          paper.question_arr.map((question, index) => (
+            <article
+              key={question.id}
+              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 font-semibold text-violet-700">
+                    {index + 1}
+                  </div>
+
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold leading-7 text-slate-900">
+                      {question.question_title}
+                    </h2>
+
+                    {question.description ? (
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        {question.description}
+                      </p>
+                    ) : null}
+
+                    {question.learning_outcome ? (
+                      <p className="mt-3 text-sm text-slate-500">
+                        Learning outcome: {question.learning_outcome}
+                      </p>
+                    ) : null}
+
+                    {question.hint_text ? (
+                      <div className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                        Hint: {question.hint_text}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700">
+                  {question.points} {question.points === 1 ? 'mark' : 'marks'}
+                </span>
+              </div>
+
+              <div className="mt-5">
+                <textarea
+                  name={`answer_${question.id}`}
+                  rows={4}
+                  placeholder="Write your answer here..."
+                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                />
+              </div>
+            </article>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+            <p className="font-medium text-slate-700">
+              No questions found
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              This question paper currently has no questions.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {paper.question_arr?.length > 0 ? (
+        <div className="sticky bottom-4 flex justify-end rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+          <button
+            type="button"
+            className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
+          >
+            Submit Exam
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 
 export default function StudentHomeworkIndexPage() {
   const { isChatbotOpen } = useContext(ChatbotLayoutContext);
@@ -875,16 +1090,39 @@ export default function StudentHomeworkIndexPage() {
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [typeFilter, setTypeFilter] = useState('All types');
   const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>('PAL');
-  const [selectedOnlineStandard, setSelectedOnlineStandard] = useState('Grade 8');
-  const [selectedOnlineSubject, setSelectedOnlineSubject] = useState('Science');
-  const [selectedOfflineStandard, setSelectedOfflineStandard] = useState('Grade 8');
-  const [selectedOfflineSubject, setSelectedOfflineSubject] = useState('Science');
+  const [examFilters, setExamFilters] = useState({
+    grade_id: '',
+    standard_id: '',
+    subject_id: '',
+  });
+  const [studentQuestionPapers, setStudentQuestionPapers] = useState<ApiQuestionPaperRecord[]>([]);
+  const [isSearchingStudentExams, setIsSearchingStudentExams] = useState(false);
+  const [studentExamSearchError, setStudentExamSearchError] = useState('');
+  const [hasSearchedStudentExams, setHasSearchedStudentExams] = useState(false);
+  const [offlineExamPapers, setOfflineExamPapers] = useState<ApiQuestionPaperRecord[]>([]);
+  const [isLoadingOfflineExams, setIsLoadingOfflineExams] = useState(false);
+  const [offlineExamError, setOfflineExamError] = useState('');
+  const [hasSearchedOfflineExams, setHasSearchedOfflineExams] = useState(false);
+  const [selectedPaper, setSelectedPaper] = useState<QuestionPaperDetail | null>(null);
+  const [selectedPaperContext, setSelectedPaperContext] = useState<'online' | 'offline' | null>(null);
+  const [paperLoading, setPaperLoading] = useState(false);
+  const [paperError, setPaperError] = useState('');
+  const [offlineExamFilters, setOfflineExamFilters] = useState<Partial<SearchDropdownValues>>({
+    section: '',
+    standard: '',
+    subject: '',
+  });
   const [activeOnlineExamId, setActiveOnlineExamId] = useState<string | null>(null);
   const [onlinePaperAnswers, setOnlinePaperAnswers] = useState<Record<string, string>>({});
   const [isSubmittingOnlinePaper, setIsSubmittingOnlinePaper] = useState(false);
   const [completedOnlineExamIds, setCompletedOnlineExamIds] = useState<string[]>([]);
   const [isCreateExamOpen, setIsCreateExamOpen] = useState(false);
   const [createExamStep, setCreateExamStep] = useState(1);
+  const [createExamFilters, setCreateExamFilters] = useState<Partial<SearchDropdownValues>>({
+    section: '',
+    standard: '',
+    subject: '',
+  });
   const [selectedStandard, setSelectedStandard] = useState('');
   const [selectedStandardId, setSelectedStandardId] = useState<number | null>(null);
   const [selectedSubject, setSelectedSubject] = useState('');
@@ -902,6 +1140,8 @@ export default function StudentHomeworkIndexPage() {
   const [studentSelectedChapterId, setStudentSelectedChapterId] = useState<number>(
     studentChapterProgressData[0]?.chapterId ?? 0
   );
+  const [selectedConcept, setSelectedConcept] = useState<StudentConceptProgress | null>(null);
+  const [isLearnDrawerOpen, setIsLearnDrawerOpen] = useState(false);
   const [activePracticeConceptId, setActivePracticeConceptId] = useState<string | null>(null);
   const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
   const [practiceTimeLeft, setPracticeTimeLeft] = useState(0);
@@ -918,6 +1158,8 @@ export default function StudentHomeworkIndexPage() {
   const [publishError, setPublishError] = useState('');
   const scopeScrollRef = useRef<HTMLDivElement | null>(null);
   const exams = apiExams;
+  const onlineExamSession = getCreateExamSession();
+  const isStudentProfile = onlineExamSession.userProfileName.trim().toUpperCase() === 'STUDENT';
   const activeStudentChapter = useMemo(
     () =>
       studentChapterProgressList.find((chapter) => chapter.chapterId === studentSelectedChapterId) ??
@@ -941,29 +1183,6 @@ export default function StudentHomeworkIndexPage() {
   const hasAnsweredAllPracticeQuestions = activePracticeAssessment
     ? practiceAnsweredCount === activePracticeAssessment.questions.length
     : false;
-  const onlineStandardOptions = useMemo(
-    () => Array.from(new Set(studentOnlineExams.map((exam) => exam.standard))),
-    []
-  );
-  const onlineSubjectOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          studentOnlineExams
-            .filter((exam) => exam.standard === selectedOnlineStandard)
-            .map((exam) => exam.subject)
-        )
-      ),
-    [selectedOnlineStandard]
-  );
-  const filteredStudentOnlineExams = useMemo(
-    () =>
-      studentOnlineExams.filter(
-        (exam) =>
-          exam.standard === selectedOnlineStandard && exam.subject === selectedOnlineSubject
-      ),
-    [selectedOnlineStandard, selectedOnlineSubject]
-  );
   const activeOnlineExam = useMemo(
     () => studentOnlineExams.find((exam) => exam.id === activeOnlineExamId) ?? null,
     [activeOnlineExamId]
@@ -980,35 +1199,378 @@ export default function StudentHomeworkIndexPage() {
   const hasAnsweredAllOnlineQuestions = activeOnlineQuestionPaper
     ? onlineAnsweredCount === activeOnlineQuestionPaper.questions.length
     : false;
-  const offlineStandardOptions = useMemo(
-    () => Array.from(new Set(studentOfflineExams.map((exam) => exam.standard))),
-    []
-  );
-  const offlineSubjectOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          studentOfflineExams
-            .filter((exam) => exam.standard === selectedOfflineStandard)
-            .map((exam) => exam.subject)
-        )
-      ),
-    [selectedOfflineStandard]
-  );
-  const filteredStudentOfflineExams = useMemo(
-    () =>
-      studentOfflineExams.filter(
-        (exam) =>
-          exam.standard === selectedOfflineStandard && exam.subject === selectedOfflineSubject
-      ),
-    [selectedOfflineStandard, selectedOfflineSubject]
-  );
-  const activeOfflineExam = filteredStudentOfflineExams[0] ?? null;
-  const activeOfflineQuestionPaper = useMemo(
-    () =>
-      studentOfflineQuestionPapers.find((paper) => paper.examId === activeOfflineExam?.id) ?? null,
-    [activeOfflineExam]
-  );
+  const handleOnlineExamDropdownChange = (values: SearchDropdownValues) => {
+    const gradeId = Array.isArray(values.section)
+      ? values.section[0] || ''
+      : values.section || '';
+    const standardId = Array.isArray(values.standard)
+      ? values.standard[0] || ''
+      : values.standard || '';
+    const subjectId = Array.isArray(values.subject)
+      ? values.subject[0] || ''
+      : values.subject || '';
+
+    setExamFilters({
+      grade_id: String(gradeId),
+      standard_id: String(standardId),
+      subject_id: String(subjectId),
+    });
+
+    setSelectedPaper(null);
+    setPaperError('');
+    setStudentQuestionPapers([]);
+    setHasSearchedStudentExams(false);
+    setStudentExamSearchError('');
+  };
+
+  const clearCreateExamSelections = () => {
+    setSelectedChapters([]);
+    setConceptOptions([]);
+    setSelectedConcepts([]);
+    setConceptError('');
+    setQuestions([]);
+    setQuestionsError('');
+    setSelectedQuestions([]);
+  };
+
+  const handleExamDropdownChange = (values: SearchDropdownValues) => {
+    setCreateExamFilters({
+      section: values.section,
+      standard: values.standard,
+      subject: values.subject,
+    });
+  };
+
+  const handleOfflineExamDropdownChange = (values: SearchDropdownValues) => {
+    setOfflineExamFilters({
+      section: values.section,
+      standard: values.standard,
+      subject: values.subject,
+    });
+    setSelectedPaper(null);
+    setSelectedPaperContext(null);
+    setPaperError('');
+  };
+
+  const fetchOfflineQuestionPaperDetail = useCallback(async (
+    paper: ApiQuestionPaperRecord
+  ) => {
+    const session = getCreateExamSession();
+
+    if (!session.subInstituteId) {
+      setPaperError('Sub-institute ID is missing.');
+      return;
+    }
+
+    try {
+      setPaperLoading(true);
+      setPaperError('');
+      setSelectedPaper(null);
+      setSelectedPaperContext('offline');
+
+      const queryParams = new URLSearchParams({
+        sub_institute_id: session.subInstituteId,
+      });
+
+      const response = await fetch(
+        `https://dev.triz.co.in/api/question-paper/${paper.id}?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      const result = (await response.json()) as QuestionPaperDetailResponse;
+
+      if (!response.ok) {
+        throw new Error(
+          getStudentExamErrorMessage(
+            result?.message || `Request failed with status ${response.status}`
+          )
+        );
+      }
+
+      if (Number(result?.status_code) !== 1 || !result?.data) {
+        throw new Error(
+          getStudentExamErrorMessage(
+            result?.message || 'Unable to load question paper.'
+          )
+        );
+      }
+
+      setSelectedPaper({
+        ...result.data,
+        standard_name: result.data.standard_name || toDisplayText(paper.standard_name),
+        grade_name: result.data.grade_name || paper.grade_name || '',
+        subject_name: result.data.subject_name || paper.subject_name || '',
+      });
+    } catch (error) {
+      const friendlyMessage = getStudentExamErrorMessage(error);
+      setSelectedPaper(null);
+      setSelectedPaperContext(null);
+      setPaperError(friendlyMessage);
+    } finally {
+      setPaperLoading(false);
+    }
+  }, []);
+
+  const handleOpenStudentQuestionPaper = async (
+    paperId: number,
+    context: 'online' | 'offline'
+  ) => {
+    const session = getCreateExamSession();
+
+    if (!session.subInstituteId) {
+      setPaperError('Sub-institute ID is missing.');
+      return;
+    }
+
+    try {
+      setPaperLoading(true);
+      setPaperError('');
+      setSelectedPaper(null);
+      setSelectedPaperContext(context);
+
+      const queryParams = new URLSearchParams({
+        sub_institute_id: session.subInstituteId,
+      });
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/question-paper/${paperId}?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      const result = (await response.json()) as QuestionPaperDetailResponse;
+
+      if (!response.ok) {
+        throw new Error(
+          getStudentExamErrorMessage(
+            result?.message || `Request failed with status ${response.status}`
+          )
+        );
+      }
+
+      if (Number(result?.status_code) !== 1 || !result?.data) {
+        throw new Error(
+          getStudentExamErrorMessage(
+            result?.message || 'Unable to load the question paper.'
+          )
+        );
+      }
+
+      setSelectedPaper(result.data);
+    } catch (error) {
+      const friendlyMessage = getStudentExamErrorMessage(error);
+      setSelectedPaperContext(null);
+      setPaperError(friendlyMessage);
+    } finally {
+      setPaperLoading(false);
+    }
+  };
+
+  const fetchOnlineExams = useCallback(async (includeFilters: boolean) => {
+    const session = getCreateExamSession();
+
+    if (
+      !session.subInstituteId ||
+      !session.syear ||
+      !session.userProfileName ||
+      !session.userId
+    ) {
+      setStudentExamSearchError('Required login session information is missing.');
+      return;
+    }
+
+    const queryParams = new URLSearchParams({
+      sub_institute_id: session.subInstituteId,
+      syear: session.syear,
+      user_profile_name: session.userProfileName,
+      user_id: session.userId,
+    });
+
+    if (includeFilters) {
+      const { grade_id, standard_id, subject_id } = examFilters;
+
+      if (!grade_id) {
+        setStudentExamSearchError('Please select a section.');
+        return;
+      }
+
+      if (!standard_id) {
+        setStudentExamSearchError('Please select a standard.');
+        return;
+      }
+
+      if (!subject_id) {
+        setStudentExamSearchError('Please select a subject.');
+        return;
+      }
+
+      queryParams.set('grade_id', grade_id);
+      queryParams.set('standard_id', standard_id);
+      queryParams.set('subject_id', subject_id);
+    }
+
+    try {
+      setIsSearchingStudentExams(true);
+      setHasSearchedStudentExams(true);
+      setStudentExamSearchError('');
+      setSelectedPaper(null);
+      setPaperError('');
+      setStudentQuestionPapers([]);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/question-paper?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      const result = (await response.json()) as QuestionPaperApiResponse;
+
+      if (!response.ok) {
+        throw new Error(
+          getStudentExamErrorMessage(
+            result?.message || `Request failed with status ${response.status}`
+          )
+        );
+      }
+
+      if (Number(result?.status_code) !== 1 || !Array.isArray(result?.data)) {
+        throw new Error(
+          getStudentExamErrorMessage(
+            result?.message || 'No question papers found.'
+          )
+        );
+      }
+
+      setStudentQuestionPapers(result.data);
+    } catch (error) {
+      const friendlyMessage = getStudentExamErrorMessage(error);
+      setStudentQuestionPapers([]);
+      setStudentExamSearchError(friendlyMessage);
+    } finally {
+      setIsSearchingStudentExams(false);
+    }
+  }, [examFilters]);
+
+  const handleOnlineExamSearch = useCallback(() => {
+    void fetchOnlineExams(true);
+  }, [fetchOnlineExams]);
+
+  const fetchOfflineExams = useCallback(async () => {
+    const gradeId = getSingleDropdownValue(offlineExamFilters.section);
+    const standardId = getSingleDropdownValue(offlineExamFilters.standard);
+    const subjectId = getSingleDropdownValue(offlineExamFilters.subject);
+
+    if (!gradeId || !standardId || !subjectId) {
+      setOfflineExamPapers([]);
+      setHasSearchedOfflineExams(false);
+      setOfflineExamError('');
+      return;
+    }
+
+    const session = getCreateExamSession();
+
+    if (
+      !session.subInstituteId ||
+      !session.syear ||
+      !session.userProfileName ||
+      !session.userId
+    ) {
+      setOfflineExamPapers([]);
+      setHasSearchedOfflineExams(false);
+      setOfflineExamError('Required login session information is missing.');
+      return;
+    }
+
+    try {
+      setIsLoadingOfflineExams(true);
+      setHasSearchedOfflineExams(true);
+      setOfflineExamError('');
+      setOfflineExamPapers([]);
+      setSelectedPaper(null);
+      setSelectedPaperContext(null);
+      setPaperError('');
+
+      const queryParams = new URLSearchParams({
+        sub_institute_id: session.subInstituteId,
+        syear: session.syear,
+        user_profile_name: session.userProfileName.toUpperCase(),
+        user_id: session.userId,
+        grade_id: gradeId,
+        standard_id: standardId,
+        subject_id: subjectId,
+        exam_type: 'offline',
+      });
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/question-paper?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      const result = (await response.json()) as QuestionPaperApiResponse;
+
+      if (!response.ok) {
+        throw new Error(
+          getStudentExamErrorMessage(
+            result?.message || `Request failed with status ${response.status}`
+          )
+        );
+      }
+
+      if (Number(result?.status_code) !== 1 || !Array.isArray(result?.data)) {
+        throw new Error(
+          getStudentExamErrorMessage(
+            result?.message || 'No offline exams found.'
+          )
+        );
+      }
+
+      setOfflineExamPapers(result.data);
+
+      if (result.data.length > 0) {
+        await fetchOfflineQuestionPaperDetail(result.data[0]);
+      }
+    } catch (error) {
+      const friendlyMessage = getStudentExamErrorMessage(error);
+      setOfflineExamPapers([]);
+      setOfflineExamError(friendlyMessage);
+    } finally {
+      setIsLoadingOfflineExams(false);
+    }
+  }, [fetchOfflineQuestionPaperDetail, offlineExamFilters]);
+
+  useEffect(() => {
+    if (!isStudentProfile) {
+      return;
+    }
+
+    void fetchOnlineExams(false);
+  }, [fetchOnlineExams, isStudentProfile]);
+
+  useEffect(() => {
+    void fetchOfflineExams();
+  }, [fetchOfflineExams]);
  
 
   const filteredExams = useMemo(() => {
@@ -1026,43 +1588,6 @@ export default function StudentHomeworkIndexPage() {
       return matchesSearch && matchesStatus && matchesType;
     });
   }, [exams, search, statusFilter, typeFilter]);
-
-  const standardOptions = useMemo(() => {
-    const standardsMap = new Map<number, LmsCoursesSubjectRecord>();
-
-    lmsCourses.forEach((row) => {
-      if (!standardsMap.has(row.standard_id)) {
-        standardsMap.set(row.standard_id, row);
-      }
-    });
-
-    return Array.from(standardsMap.values()).sort((a, b) =>
-      toDisplayText(a.standard_name).localeCompare(toDisplayText(b.standard_name), undefined, {
-        numeric: true,
-        sensitivity: 'base',
-      })
-    );
-  }, [lmsCourses]);
-
-  const subjectOptions = useMemo(() => {
-    if (selectedStandardId == null) return [];
-
-    const subjectsMap = new Map<number, LmsCoursesSubjectRecord>();
-
-    lmsCourses
-      .filter((row) => row.standard_id === selectedStandardId)
-      .forEach((row) => {
-        if (!subjectsMap.has(row.subject_id)) {
-          subjectsMap.set(row.subject_id, row);
-        }
-      });
-
-    return Array.from(subjectsMap.values()).sort((a, b) =>
-      toDisplayText(a.subject_name).localeCompare(toDisplayText(b.subject_name), undefined, {
-        sensitivity: 'base',
-      })
-    );
-  }, [lmsCourses, selectedStandardId]);
 
   const chapterOptions = useMemo(() => {
     if (selectedStandardId == null || selectedSubjectId == null) return [];
@@ -1115,11 +1640,6 @@ export default function StudentHomeworkIndexPage() {
       label: chapterMap.get(chapterId) || 'Untitled chapter',
     }));
   }, [chapterOptions, selectedChapters]);
-
-  const selectedStandardRow = useMemo(
-    () => standardOptions.find((option) => option.standard_id === selectedStandardId) ?? null,
-    [selectedStandardId, standardOptions]
-  );
 
   const toggleChapter = (chapterId: number) => {
     setQuestions([]);
@@ -1223,19 +1743,19 @@ export default function StudentHomeworkIndexPage() {
 
   const resetCreateExamForm = () => {
     setCreateExamStep(1);
+    setCreateExamFilters({
+      section: '',
+      standard: '',
+      subject: '',
+    });
     setSelectedStandard('');
     setSelectedStandardId(null);
     setSelectedSubject('');
     setSelectedSubjectId(null);
-    setSelectedChapters([]);
-    setConceptOptions([]);
-    setSelectedConcepts([]);
+    clearCreateExamSelections();
     setIsConceptLoading(false);
-    setConceptError('');
-    setQuestions([]);
-    setQuestionsError('');
     setIsQuestionsLoading(false);
-    setSelectedQuestions([]);
+    setQuestionsError('');
     setExamName('');
     setExamDescription('');
     setExamType('');
@@ -1256,6 +1776,19 @@ export default function StudentHomeworkIndexPage() {
     setActivePracticeConceptId(null);
     setPracticeAnswers({});
     setPracticeTimeLeft(0);
+  };
+
+  const handleOpenLearnContent = (concept: StudentConceptProgress) => {
+    setSelectedConcept(concept);
+    setIsLearnDrawerOpen(true);
+  };
+
+  const handleCloseLearnContent = () => {
+    setIsLearnDrawerOpen(false);
+
+    window.setTimeout(() => {
+      setSelectedConcept(null);
+    }, 200);
   };
 
   const openOnlineQuestionPaper = (examId: string) => {
@@ -1375,6 +1908,33 @@ export default function StudentHomeworkIndexPage() {
 
   const goToNextExamStep = () => {
     if (createExamStep === 1) {
+      const gradeId = Array.isArray(createExamFilters.section)
+        ? createExamFilters.section[0]
+        : createExamFilters.section;
+
+      const standardId = Array.isArray(createExamFilters.standard)
+        ? createExamFilters.standard[0]
+        : createExamFilters.standard;
+
+      const subjectId = Array.isArray(createExamFilters.subject)
+        ? createExamFilters.subject[0]
+        : createExamFilters.subject;
+
+      if (!gradeId) {
+        window.alert('Please select a section.');
+        return;
+      }
+
+      if (!standardId) {
+        window.alert('Please select a standard.');
+        return;
+      }
+
+      if (!subjectId) {
+        window.alert('Please select a subject.');
+        return;
+      }
+
       setCreateExamStep(2);
       return;
     }
@@ -1398,7 +1958,15 @@ export default function StudentHomeworkIndexPage() {
     const selectedQuestionIds = selectedQuestions.map(Number).filter((id) => Number.isFinite(id));
     const attemptAllowed = Number(attemptsAllowed.match(/\d+/)?.[0] ?? 1);
     const timeAllowed = Number(timeLimitMinutes);
-    const grade = toNumber(selectedStandardRow?.standard_name);
+    const gradeId = Array.isArray(createExamFilters.section)
+      ? createExamFilters.section[0]
+      : createExamFilters.section;
+    const standardId = Array.isArray(createExamFilters.standard)
+      ? createExamFilters.standard[0]
+      : createExamFilters.standard;
+    const subjectId = Array.isArray(createExamFilters.subject)
+      ? createExamFilters.subject[0]
+      : createExamFilters.subject;
 
     if (!session.subInstituteId || !session.userId || !session.token || !session.syear) {
       setPublishError('User session is missing. Please sign in again and try publishing.');
@@ -1406,9 +1974,9 @@ export default function StudentHomeworkIndexPage() {
     }
 
     if (
-      selectedStandardId == null ||
-      selectedSubjectId == null ||
-      !grade ||
+      !gradeId ||
+      !standardId ||
+      !subjectId ||
       !examName.trim() ||
       !examType.trim() ||
       !attemptsAllowed.trim() ||
@@ -1431,9 +1999,9 @@ export default function StudentHomeworkIndexPage() {
         sub_institute_id: Number(session.subInstituteId),
         syear: Number(session.syear),
         user_id: Number(session.userId),
-        grade,
-        standard: Number(selectedStandardId),
-        subject: Number(selectedSubjectId),
+        grade: Number(gradeId),
+        standard: Number(standardId),
+        subject: Number(subjectId),
         paper_name: examName.trim(),
         paper_desc: examDescription.trim(),
         open_date: formatDateTime(openDate),
@@ -1983,9 +2551,8 @@ export default function StudentHomeworkIndexPage() {
                             className="h-10 min-w-[130px] appearance-none rounded-[10px] border border-[#CFD9E6] bg-white px-3.5 pr-9 text-[14px] text-[#24324A] outline-none focus:border-[#7C6CF4]"
                           >
                             <option>All types</option>
-                            <option>Practice</option>
-                            <option>Term</option>
-                            <option>Diagnostic</option>
+                            <option value="online">Online</option>
+                            <option value="offline">Offline</option>
                           </select>
                           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8798]" />
                         </div>
@@ -2345,15 +2912,29 @@ export default function StudentHomeworkIndexPage() {
                                 >
                                   <button
                                     type="button"
+                                    onClick={() => handleOpenLearnContent(concept)}
                                     disabled={!concept.canLearn}
+                                    aria-label={`Open learning content for ${concept.title}`}
                                     className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition ${
                                       concept.canLearn
-                                        ? 'border-[#D6DEEA] bg-white text-[#334155] hover:border-[#B7C5D8]'
+                                        ? 'border-[#D6DEEA] bg-white text-[#334155] hover:border-[#B7C5D8] hover:text-indigo-600'
                                         : 'cursor-not-allowed border-[#E2E8F0] bg-[#F8FAFC] text-[#A0AEC0]'
                                     } ${isChatbotOpen ? 'w-full' : ''}`}
                                   >
-                                    <BookOpen size={14} />
-                                    Learn content
+                                    <svg
+                                      width="19"
+                                      height="19"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="1.8"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+                                    </svg>
+                                    <span>Learn content</span>
                                   </button>
                                   <button
                                     type="button"
@@ -2377,6 +2958,16 @@ export default function StudentHomeworkIndexPage() {
                     </div>
                   </>
                 ) : studentLearningTab === 'Online Exam' ? (
+                  selectedPaper && selectedPaperContext === 'online' ? (
+                    <QuestionPaperView
+                      paper={selectedPaper}
+                      onBack={() => {
+                        setSelectedPaper(null);
+                        setSelectedPaperContext(null);
+                        setPaperError('');
+                      }}
+                    />
+                  ) : (
                   activeOnlineExam && activeOnlineQuestionPaper ? (
                     <div className="flex flex-col gap-5">
                       <div className="flex flex-col gap-4 border-b border-[#D9E3F0] pb-4 lg:flex-row lg:items-start lg:justify-between">
@@ -2496,69 +3087,104 @@ export default function StudentHomeworkIndexPage() {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-5">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <label className="block w-full max-w-[180px]">
-                          <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
-                            Standard
-                          </span>
-                          <div className="relative">
-                            <select
-                              value={selectedOnlineStandard}
-                              onChange={(event) => {
-                                const nextStandard = event.target.value;
-                                const nextSubjects = Array.from(
-                                  new Set(
-                                    studentOnlineExams
-                                      .filter((exam) => exam.standard === nextStandard)
-                                      .map((exam) => exam.subject)
-                                  )
-                                );
+                      {!isStudentProfile ? (
+                        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                          <SearchDropdown
+                            fields={['section', 'standard', 'subject']}
+                            values={{
+                              section: examFilters.grade_id,
+                              standard: examFilters.standard_id,
+                              subject: examFilters.subject_id,
+                            }}
+                            required={{
+                              section: true,
+                              standard: true,
+                              subject: true,
+                            }}
+                            labels={{
+                              section: 'Section',
+                              standard: 'Standard',
+                              subject: 'Subject',
+                            }}
+                            placeholders={{
+                              section: 'Select Section',
+                              standard: 'Select Standard',
+                              subject: 'Select Subject',
+                            }}
+                            onChange={handleOnlineExamDropdownChange}
+                          />
 
-                                setSelectedOnlineStandard(nextStandard);
-                                setSelectedOnlineSubject(nextSubjects[0] ?? '');
-                              }}
-                              className="h-11 w-full appearance-none rounded-[10px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
+                          <div className="mt-5 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={handleOnlineExamSearch}
+                              disabled={isSearchingStudentExams}
+                              className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              {onlineStandardOptions.map((standard) => (
-                                <option key={standard} value={standard}>
-                                  {standard}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                              {isSearchingStudentExams ? 'Searching...' : 'Search Exam'}
+                            </button>
                           </div>
-                        </label>
 
-                        <label className="block w-full max-w-[180px]">
-                          <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
-                            Subject
-                          </span>
-                          <div className="relative">
-                            <select
-                              value={selectedOnlineSubject}
-                              onChange={(event) => setSelectedOnlineSubject(event.target.value)}
-                              className="h-11 w-full appearance-none rounded-[10px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
-                            >
-                              {onlineSubjectOptions.map((subject) => (
-                                <option key={subject} value={subject}>
-                                  {subject}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                          </div>
-                        </label>
-                      </div>
+                          {studentExamSearchError ? (
+                            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                              <p className="text-sm font-semibold text-red-700">
+                                Unable to load exams
+                              </p>
+                              <p className="mt-1 text-sm text-red-600">
+                                {studentExamSearchError}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
 
                       <div className="space-y-4">
-                        {filteredStudentOnlineExams.map((exam) => {
-                          const isCompleted = completedOnlineExamIds.includes(exam.id);
-                          const displayStatus: StudentExamStatus = isCompleted ? 'Completed' : exam.status;
-                          const displayAttemptStatus = isCompleted ? 'Completed' : exam.attempts;
+                        {paperLoading ? (
+                          <div className="rounded-[18px] border border-[#D9E3F0] bg-white px-5 py-8 text-center text-[14px] text-[#5F7087]">
+                            Opening question paper...
+                          </div>
+                        ) : null}
 
-                          return (
+                        {paperError ? (
+                          <div className="rounded-[18px] border border-red-200 bg-red-50 px-5 py-4">
+                            <p className="text-sm font-semibold text-red-700">
+                              Unable to open question paper
+                            </p>
+                            <p className="mt-1 text-sm text-red-600">
+                              {paperError}
+                            </p>
+                          </div>
+                        ) : null}
+
+                        {isStudentProfile && studentExamSearchError ? (
+                          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                            <p className="text-sm font-semibold text-red-700">
+                              Unable to load exams
+                            </p>
+                            <p className="mt-1 text-sm text-red-600">
+                              {studentExamSearchError}
+                            </p>
+                          </div>
+                        ) : null}
+
+                        {isSearchingStudentExams ? (
+                          <div className="rounded-[18px] border border-[#D9E3F0] bg-white px-5 py-8 text-center text-[14px] text-[#5F7087]">
+                            Loading question papers...
+                          </div>
+                        ) : !hasSearchedStudentExams && !isStudentProfile ? (
+                          <div className="rounded-[18px] border border-dashed border-[#D9E3F0] bg-white px-5 py-8 text-center text-[14px] text-[#5F7087]">
+                            Select Section, Standard, and Subject, then click Search Exam.
+                          </div>
+                        ) : studentQuestionPapers.length === 0 && !studentExamSearchError ? (
+                          <div className="rounded-[18px] border border-dashed border-[#D9E3F0] bg-white px-5 py-8 text-center text-[14px] text-[#5F7087]">
+                            {isStudentProfile
+                              ? 'No question paper is available for your account right now.'
+                              : 'No question paper is available for the selected Section, Standard and Subject.'}
+                          </div>
+                        ) : !studentExamSearchError ? (
+                          studentQuestionPapers.map((paper) => (
                             <Card
-                              key={exam.id}
+                              key={paper.id}
                               className="rounded-[18px] border border-[#D9E3F0] bg-white py-0 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
                             >
                               <CardContent className="flex flex-col gap-4 px-4 py-5 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
@@ -2568,24 +3194,44 @@ export default function StudentHomeworkIndexPage() {
                                   </span>
 
                                   <div className="min-w-0">
-                                    <h3 className="text-[18px] font-semibold text-[#172554]">{exam.name}</h3>
+                                    <h3 className="text-[18px] font-semibold text-[#172554]">
+                                      {paper.paper_name || 'Untitled exam'}
+                                    </h3>
                                     <p className="mt-1 text-[14px] text-[#5F7087]">
-                                      {exam.subject} - {exam.classLabel} - Chapter: {exam.chapter}
+                                      {paper.subject_name || 'Subject'} - Grade{' '}
+                                      {toDisplayText(paper.standard_name) || '-'}
                                     </p>
+                                    {paper.paper_desc ? (
+                                      <p className="mt-1 text-[14px] text-[#7B8798]">
+                                        {paper.paper_desc}
+                                      </p>
+                                    ) : null}
                                     <div className="mt-3 flex flex-wrap gap-2">
                                       <span className="rounded-full bg-[#F4F7FB] px-2.5 py-1 text-[13px] text-[#475569]">
-                                        {exam.questions} questions
+                                        {toNumber(paper.total_ques)}{' '}
+                                        {toNumber(paper.total_ques) === 1 ? 'question' : 'questions'}
                                       </span>
                                       <span className="rounded-full bg-[#F4F7FB] px-2.5 py-1 text-[13px] text-[#475569]">
-                                        {exam.marks} marks
+                                        {toNumber(paper.total_marks)}{' '}
+                                        {toNumber(paper.total_marks) === 1 ? 'mark' : 'marks'}
                                       </span>
-                                      <span className="rounded-full bg-[#F4F7FB] px-2.5 py-1 text-[13px] text-[#475569]">
-                                        {exam.durationMinutes} min
+                                      {toNumber(paper.timelimit_enable) === 1 ? (
+                                        <span className="rounded-full bg-[#F4F7FB] px-2.5 py-1 text-[13px] text-[#475569]">
+                                          {toNumber(paper.time_allowed)} min
+                                        </span>
+                                      ) : null}
+                                      <span className="rounded-full bg-[#FFF4E8] px-2.5 py-1 text-[13px] text-[#A45C14]">
+                                        {toNumber(paper.attempt_allowed)}{' '}
+                                        {toNumber(paper.attempt_allowed) === 1 ? 'attempt' : 'attempts'}
                                       </span>
                                       <span
-                                        className={`rounded-full px-2.5 py-1 text-[13px] ${studentExamStatusBadgeClasses[displayStatus]}`}
+                                        className={`rounded-full px-2.5 py-1 text-[13px] ${
+                                          paper.active_exam === 'yes'
+                                            ? 'bg-[#EAF9F1] text-[#14804A]'
+                                            : 'bg-[#EEF2F7] text-[#64748B]'
+                                        }`}
                                       >
-                                        {displayAttemptStatus}
+                                        {paper.active_exam === 'yes' ? 'Active' : 'Inactive'}
                                       </span>
                                     </div>
                                   </div>
@@ -2593,162 +3239,111 @@ export default function StudentHomeworkIndexPage() {
 
                                 <Button
                                   type="button"
-                                  className="h-11 rounded-[14px] bg-[#5846EA] px-5 text-[14px] font-semibold text-white hover:bg-[#4C3DD3]"
-                                  onClick={() => openOnlineQuestionPaper(exam.id)}
+                                  className="h-11 rounded-[14px] bg-[#5846EA] px-5 text-[14px] font-semibold text-white hover:bg-[#4C3DD3] disabled:bg-slate-300"
+                                  onClick={() => handleOpenStudentQuestionPaper(paper.id, 'online')}
                                 >
                                   <FileText size={16} />
                                   Open question paper
                                 </Button>
                               </CardContent>
                             </Card>
-                          );
-                        })}
+                          ))
+                        ) : null}
                       </div>
                     </div>
+                  )
                   )
                 ) : (
                   <div className="flex flex-col gap-5">
                     <div className="no-print flex items-start gap-2 rounded-[14px] border border-[#D8E5FF] bg-[#F5F8FF] px-4 py-3 text-[13px] text-[#4C63A8]">
                       <Info size={16} className="mt-0.5 shrink-0" />
                       <p>
-                        This is a printable question paper for the offline exam. Review all questions, then print or save it as PDF to write your answers on paper.
+                        Select Section, Standard, and Subject to load the offline question paper automatically.
                       </p>
                     </div>
 
-                    <div className="no-print flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <label className="block w-full max-w-[180px]">
-                          <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
-                            Standard
-                          </span>
-                          <div className="relative">
-                            <select
-                              value={selectedOfflineStandard}
-                              onChange={(event) => {
-                                const nextStandard = event.target.value;
-                                const nextSubjects = Array.from(
-                                  new Set(
-                                    studentOfflineExams
-                                      .filter((exam) => exam.standard === nextStandard)
-                                      .map((exam) => exam.subject)
-                                  )
-                                );
+                    <div className="no-print rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <SearchDropdown
+                        fields={['section', 'standard', 'subject']}
+                        values={offlineExamFilters}
+                        required={{
+                          section: true,
+                          standard: true,
+                          subject: true,
+                        }}
+                        labels={{
+                          section: 'Section',
+                          standard: 'Standard',
+                          subject: 'Subject',
+                        }}
+                        placeholders={{
+                          section: 'Select Section',
+                          standard: 'Select Standard',
+                          subject: 'Select Subject',
+                        }}
+                        onChange={handleOfflineExamDropdownChange}
+                      />
 
-                                setSelectedOfflineStandard(nextStandard);
-                                setSelectedOfflineSubject(nextSubjects[0] ?? '');
-                              }}
-                              className="h-11 w-full appearance-none rounded-[10px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
+                      {offlineExamPapers.length > 1 ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {offlineExamPapers.map((paper) => (
+                            <button
+                              key={paper.id}
+                              type="button"
+                              onClick={() => void fetchOfflineQuestionPaperDetail(paper)}
+                              className={`rounded-full px-3 py-1.5 text-sm transition ${
+                                selectedPaper?.id === paper.id && selectedPaperContext === 'offline'
+                                  ? 'bg-violet-600 text-white'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
                             >
-                              {offlineStandardOptions.map((standard) => (
-                                <option key={standard} value={standard}>
-                                  {standard}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                          </div>
-                        </label>
-
-                        <label className="block w-full max-w-[180px]">
-                          <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
-                            Subject
-                          </span>
-                          <div className="relative">
-                            <select
-                              value={selectedOfflineSubject}
-                              onChange={(event) => setSelectedOfflineSubject(event.target.value)}
-                              className="h-11 w-full appearance-none rounded-[10px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
-                            >
-                              {offlineSubjectOptions.map((subject) => (
-                                <option key={subject} value={subject}>
-                                  {subject}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                          </div>
-                        </label>
-                      </div>
-
-                      {activeOfflineExam ? (
-                        <Button
-                          type="button"
-                          className="h-11 rounded-[14px] bg-[#5846EA] px-5 text-[14px] font-semibold text-white hover:bg-[#4C3DD3]"
-                          onClick={printOfflineQuestionPaper}
-                        >
-                          <Printer size={16} />
-                          Print question paper
-                        </Button>
+                              {paper.paper_name || `Paper ${paper.id}`}
+                            </button>
+                          ))}
+                        </div>
                       ) : null}
                     </div>
 
-                    {activeOfflineExam ? (
-                      <>
-                        <p className="no-print text-[14px] text-[#5F7087]">
-                          {activeOfflineExam.subject} - {activeOfflineExam.classLabel} - Chapter: {activeOfflineExam.chapter}
+                    {offlineExamError ? (
+                      <div className="no-print rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                        <p className="text-sm font-semibold text-red-700">
+                          Unable to load offline exams
                         </p>
+                        <p className="mt-1 text-sm text-red-600">
+                          {offlineExamError}
+                        </p>
+                      </div>
+                    ) : null}
 
-                        <Card className="offline-question-paper mx-auto w-full max-w-[860px] rounded-[18px] border border-[#D9E3F0] bg-white py-0 shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
-                          <CardContent className="px-5 py-6 sm:px-8 sm:py-7">
-                            <div className="text-center">
-                              <h2 className="text-[28px] font-semibold tracking-[-0.03em] text-[#172554]">
-                                {activeOfflineExam.name}
-                              </h2>
-                              <p className="mt-2 text-[14px] text-[#5F7087]">
-                                {activeOfflineExam.subject} - {activeOfflineExam.classLabel} - Chapter: {activeOfflineExam.chapter}
-                              </p>
-                              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[13px] text-[#475569]">
-                                <span>Total questions: {activeOfflineExam.questions}</span>
-                                <span>Total marks: {activeOfflineExam.marks}</span>
-                                <span>Duration: {activeOfflineExam.durationMinutes} min</span>
-                              </div>
-                            </div>
+                    {paperError ? (
+                      <div className="no-print rounded-[18px] border border-red-200 bg-red-50 px-5 py-4">
+                        <p className="text-sm font-semibold text-red-700">
+                          Unable to open question paper
+                        </p>
+                        <p className="mt-1 text-sm text-red-600">
+                          {paperError}
+                        </p>
+                      </div>
+                    ) : null}
 
-                            <div className="my-6 h-px bg-[#D9E3F0]" />
-
-                            <div className="rounded-[12px] border border-[#D9E3F0] bg-[#FAFBFD] px-4 py-3 text-[13px] text-[#475569]">
-                              <p className="font-semibold text-[#172554]">Instructions</p>
-                              <ol className="mt-2 space-y-1">
-                                {(activeOfflineQuestionPaper?.instructions || activeOfflineExam.instructions || []).map(
-                                  (instruction, index) => (
-                                    <li key={instruction}>{index + 1}. {instruction}</li>
-                                  )
-                                )}
-                              </ol>
-                            </div>
-
-                            <div className="mt-6 space-y-6">
-                              {activeOfflineQuestionPaper?.questions.map((question, index) => (
-                                <div key={question.id} className="offline-question">
-                                  <div className="flex items-start justify-between gap-4">
-                                    <p className="text-[15px] font-semibold leading-7 text-[#172554]">
-                                      {index + 1}. {question.question}
-                                    </p>
-                                    <span className="shrink-0 text-[13px] text-[#7C6CF4]">
-                                      ({question.marks} marks)
-                                    </span>
-                                  </div>
-
-                                  <div className="mt-3 space-y-2 pl-3 text-[14px] text-[#24324A]">
-                                    {question.options.map((option, optionIndex) => (
-                                      <p key={option.id}>
-                                        {String.fromCharCode(65 + optionIndex)}. {option.label}
-                                      </p>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </>
-                    ) : (
-                      <Card className="rounded-[18px] border border-dashed border-[#D9E3F0] bg-white py-0 shadow-none">
-                        <CardContent className="px-5 py-8 text-center text-[14px] text-[#64748B]">
-                          No offline question paper is available for the selected standard and subject.
-                        </CardContent>
-                      </Card>
-                    )}
+                    {isLoadingOfflineExams || paperLoading ? (
+                      <div className="rounded-[18px] border border-[#D9E3F0] bg-white px-5 py-8 text-center text-[14px] text-[#5F7087]">
+                        Loading question paper...
+                      </div>
+                    ) : !hasSearchedOfflineExams ? (
+                      <div className="no-print rounded-[18px] border border-dashed border-[#D9E3F0] bg-white px-5 py-8 text-center text-[14px] text-[#5F7087]">
+                        Select Section, Standard, and Subject. The offline question paper will appear here.
+                      </div>
+                    ) : selectedPaper && selectedPaperContext === 'offline' ? (
+                      <PrintableQuestionPaper
+                        paper={selectedPaper}
+                        onPrint={printOfflineQuestionPaper}
+                      />
+                    ) : !offlineExamError ? (
+                      <div className="no-print rounded-[18px] border border-dashed border-[#D9E3F0] bg-white px-5 py-8 text-center text-[14px] text-[#5F7087]">
+                        No offline question paper is available for the selected Section, Standard, and Subject.
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -2907,6 +3502,151 @@ export default function StudentHomeworkIndexPage() {
         </div>
       ) : null}
 
+      {selectedConcept ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close learning content drawer"
+            onClick={handleCloseLearnContent}
+            className={`fixed inset-0 z-40 bg-slate-900/55 transition-opacity duration-300 ${
+              isLearnDrawerOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+          />
+
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="learn-content-title"
+            className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-[600px] flex-col bg-white shadow-2xl transition-transform duration-300 ${
+              isLearnDrawerOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}
+          >
+            <div className="flex items-start justify-between border-b border-slate-200 px-7 py-6">
+              <h2
+                id="learn-content-title"
+                className="max-w-[470px] text-2xl font-bold leading-tight text-slate-900"
+              >
+                Personalized learning - {selectedConcept.title}
+              </h2>
+
+              <button
+                type="button"
+                onClick={handleCloseLearnContent}
+                aria-label="Close"
+                className="ml-4 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-7 py-7">
+              {selectedConcept.status === 'Mastered' ? (
+                <div className="mb-5 flex items-start gap-2 text-sm font-medium text-blue-600">
+                  <svg
+                    className="mt-0.5 shrink-0"
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 11v5" />
+                    <path d="M12 8h.01" />
+                  </svg>
+
+                  <p>
+                    Concept mastered - this content stays available for revision.
+                  </p>
+                </div>
+              ) : null}
+
+              {selectedConcept.learningContent.length > 0 ? (
+                <div className="space-y-4">
+                  {selectedConcept.learningContent.map((content) => (
+                    <article
+                      key={content.id}
+                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M4 3h16v12H4z" />
+                            <path d="M8 21h8" />
+                            <path d="M12 15v6" />
+                          </svg>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <h3 className="font-semibold leading-6 text-slate-900">
+                              {content.title}
+                            </h3>
+
+                            <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
+                              {content.type}
+                            </span>
+                          </div>
+
+                          <p className="mt-1 text-sm text-slate-500">
+                            {content.publishedBy}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex min-h-[122px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+                        {content.previewUrl ? (
+                          <iframe
+                            src={content.previewUrl}
+                            title={content.title}
+                            className="h-[280px] w-full rounded-lg"
+                          />
+                        ) : (
+                          <p className="text-sm text-slate-500">
+                            Content preview placeholder
+                          </p>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
+                  <p className="font-medium text-slate-700">
+                    No learning content available
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Learning content has not been published for this concept yet.
+                  </p>
+                </div>
+              )}
+            </div>
+          </aside>
+        </>
+      ) : null}
+
       {isCreateExamOpen ? (
         <div className="fixed inset-0 z-50">
           <button
@@ -2982,114 +3722,62 @@ export default function StudentHomeworkIndexPage() {
               {createExamStep === 1 ? (
                 <>
              
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="mb-2.5 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
-                        Standard
-                      </span>
-                      <div className="relative">
-                        <select
-                          value={selectedStandardId == null ? '' : String(selectedStandardId)}
-                          onChange={(event) => {
-                            const nextStandardId = Number(event.target.value);
-                            const nextStandard = standardOptions.find(
-                              (option) => option.standard_id === nextStandardId
-                            );
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <SearchDropdown
+                      fields={['section', 'standard', 'subject']}
+                      values={createExamFilters}
+                      required={{
+                        section: true,
+                        standard: true,
+                        subject: true,
+                      }}
+                      labels={{
+                        section: 'Section',
+                        standard: 'Standard',
+                        subject: 'Subject',
+                      }}
+                      placeholders={{
+                        section: 'Select Section',
+                        standard: 'Select Standard',
+                        subject: 'Select Subject',
+                      }}
+                      onChange={handleExamDropdownChange}
+                      onSectionChange={() => {
+                        setSelectedStandard('');
+                        setSelectedStandardId(null);
+                        setSelectedSubject('');
+                        setSelectedSubjectId(null);
+                        clearCreateExamSelections();
+                      }}
+                      onStandardChange={(value, selectedData) => {
+                        const standardId = Array.isArray(value)
+                          ? Number(value[0] || 0)
+                          : Number(value || 0);
 
-                            if (!nextStandard) {
-                              setSelectedStandard('');
-                              setSelectedStandardId(null);
-                              setSelectedSubject('');
-                              setSelectedSubjectId(null);
-                              setSelectedChapters([]);
-                              setConceptOptions([]);
-                              setSelectedConcepts([]);
-                              setConceptError('');
-                              setQuestions([]);
-                              setQuestionsError('');
-                              setSelectedQuestions([]);
-                              return;
-                            }
+                        setSelectedStandard(
+                          selectedData[0]?.name
+                            ? toDisplayText(selectedData[0].name)
+                            : ''
+                        );
+                        setSelectedStandardId(Number.isFinite(standardId) && standardId > 0 ? standardId : null);
+                        setSelectedSubject('');
+                        setSelectedSubjectId(null);
+                        clearCreateExamSelections();
+                      }}
+                      onSubjectChange={(value, selectedData) => {
+                        const subjectId = Array.isArray(value)
+                          ? Number(value[0] || 0)
+                          : Number(value || 0);
 
-                            setSelectedStandard(toDisplayText(nextStandard.standard_name));
-                            setSelectedStandardId(nextStandard.standard_id);
-                            setSelectedSubject('');
-                            setSelectedSubjectId(null);
-                            setSelectedChapters([]);
-                            setConceptOptions([]);
-                            setSelectedConcepts([]);
-                            setConceptError('');
-                            setQuestions([]);
-                            setQuestionsError('');
-                            setSelectedQuestions([]);
-                          }}
-                          disabled={isLoadingLmsCourses}
-                          className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
-                        >
-                          <option value="">
-                            {isLoadingLmsCourses ? 'Loading standards...' : 'Select standard'}
-                          </option>
-                          {standardOptions.map((option) => (
-                            <option key={option.standard_id} value={option.standard_id}>
-                              {toDisplayText(option.standard_name)}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                      </div>
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-2.5 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
-                        Subject
-                      </span>
-                      <div className="relative">
-                        <select
-                          value={selectedSubjectId == null ? '' : String(selectedSubjectId)}
-                          onChange={(event) => {
-                            const nextSubjectId = Number(event.target.value);
-                            const nextSubject = subjectOptions.find(
-                              (option) => option.subject_id === nextSubjectId
-                            );
-
-                            if (!nextSubject) {
-                              setSelectedSubject('');
-                              setSelectedSubjectId(null);
-                              setSelectedChapters([]);
-                              setConceptOptions([]);
-                              setSelectedConcepts([]);
-                              setConceptError('');
-                              setQuestions([]);
-                              setQuestionsError('');
-                              setSelectedQuestions([]);
-                              return;
-                            }
-
-                            setSelectedSubject(toDisplayText(nextSubject.subject_name));
-                            setSelectedSubjectId(nextSubject.subject_id);
-                            setSelectedChapters([]);
-                            setConceptOptions([]);
-                            setSelectedConcepts([]);
-                            setConceptError('');
-                            setQuestions([]);
-                            setQuestionsError('');
-                            setSelectedQuestions([]);
-                          }}
-                          disabled={isLoadingLmsCourses || selectedStandardId == null}
-                          className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
-                        >
-                          <option value="">
-                            {selectedStandardId == null ? 'Select standard first' : 'Select subject'}
-                          </option>
-                          {subjectOptions.map((option) => (
-                            <option key={option.subject_id} value={option.subject_id}>
-                              {toDisplayText(option.subject_name)}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                      </div>
-                    </label>
+                        setSelectedSubject(
+                          selectedData[0]?.subject_name
+                            ? toDisplayText(selectedData[0].subject_name)
+                            : ''
+                        );
+                        setSelectedSubjectId(Number.isFinite(subjectId) && subjectId > 0 ? subjectId : null);
+                        clearCreateExamSelections();
+                      }}
+                    />
                   </div>
 
                   <div className="mt-5">
@@ -3389,8 +4077,8 @@ export default function StudentHomeworkIndexPage() {
                             >
                               <option value="">Select exam type</option>
                               {examTypeOptions.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
                                 </option>
                               ))}
                             </select>
@@ -3610,12 +4298,26 @@ export default function StudentHomeworkIndexPage() {
 
       <style jsx global>{`
         @media print {
+          @page {
+            size: A4;
+            margin: 16mm;
+          }
+
           body {
             background: #fff !important;
           }
 
           body * {
             visibility: hidden;
+          }
+
+          header,
+          aside,
+          nav,
+          .sidebar,
+          .app-header,
+          .floating-toolbar {
+            display: none !important;
           }
 
           .offline-question-paper,
@@ -3636,7 +4338,7 @@ export default function StudentHomeworkIndexPage() {
             border: none !important;
           }
 
-          .offline-question {
+          .break-inside-avoid {
             break-inside: avoid;
             page-break-inside: avoid;
           }
