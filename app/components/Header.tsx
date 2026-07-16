@@ -96,6 +96,7 @@ export default function Header({
 
   const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
   const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);
+  const [hasLogoError, setHasLogoError] = useState(false);
 
   const academic = readAcademicSession();
   const logoUrl = (() => {
@@ -104,7 +105,6 @@ export default function Header({
       const stored = localStorage.getItem('userData');
       if (stored) {
         const parsed = JSON.parse(stored);
-        console.log('Header logoUrl from localStorage:', parsed.logo);
         if (parsed.logo) {
           if (parsed.logo.startsWith('http')) return parsed.logo;
           const base = parsed.host_name || '';
@@ -115,6 +115,10 @@ export default function Header({
     } catch {}
     return null;
   })();
+
+  useEffect(() => {
+    setHasLogoError(false);
+  }, [logoUrl]);
   const years = academic?.years && academic.years.length > 0 ? academic.years : ['2024-2025', '2023-2024', '2022-2023'];
   const displayYears = years.includes(selectedYear) ? years : [selectedYear, ...years];
 
@@ -256,16 +260,14 @@ export default function Header({
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-3 cursor-pointer" ref={userButtonRef} onClick={handleUserToggle}>
-            {logoUrl ? (
+            {logoUrl && !hasLogoError ? (
               <img 
                 src={logoUrl} 
                 alt="Logo" 
                 className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain" 
-                onError={(e) => {
-                  console.error('Header logo failed to load:', logoUrl);
-                  e.currentTarget.style.display = 'none';
+                onError={() => {
+                  setHasLogoError(true);
                 }}
-                onLoad={() => console.log('Header logo loaded:', logoUrl)}
               />
             ) : (
               <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">

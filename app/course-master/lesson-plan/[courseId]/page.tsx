@@ -974,7 +974,7 @@ export default function LessonPlanPage() {
           setDivisionLoading(true);
         }
 
-        const url = new URL('https://erp.triz.co.in/get_adminDivision');
+        const url = new URL('${API_BASE_URL}/get_adminDivision');
         url.searchParams.set('standard_id', String(currentStandardId));
         url.searchParams.set('token', sessionContext.token);
         url.searchParams.set('sub_institute_id', sessionContext.subInstituteId);
