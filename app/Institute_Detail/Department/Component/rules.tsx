@@ -515,7 +515,7 @@ function RuleDetail({
   );
 }
 
-export default function RulesModule() {
+export default function RulesModule({ departmentName }: { departmentName?: string }) {
   const [rules, setRules] = useState<Rule[]>(initialRules);
   const [view, setView] = useState<RuleView>("list");
   const [selected, setSelected] = useState<Rule | null>(null);
@@ -741,6 +741,7 @@ export default function RulesModule() {
         kind="Rule"
         onClose={() => setAiDrawerOpen(false)}
         onSave={handleAiSave}
+        departmentName={departmentName}
       />
     </div>
   );

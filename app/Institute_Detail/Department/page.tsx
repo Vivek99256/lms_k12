@@ -26,7 +26,6 @@ import {
 import PoliciesModule from "./Component/polices";
 import RulesModule from "./Component/rules";
 import SopsModule from "./Component/sops";
-import { Button } from "@/components/ui/button";
 
 type DepartmentStatus = "Active" | "Inactive" | "Pending";
 
@@ -65,6 +64,7 @@ type HierarchyResponse = {
 
 type DepartmentView = {
   id: string;
+  apiId: number;
   name: string;
   shortName: string;
   code: string;
@@ -90,6 +90,7 @@ type HierarchyNode = {
 
 type ListRow = {
   id: string;
+  apiId: number;
   name: string;
   code: string;
   parent: string;
@@ -506,6 +507,7 @@ function buildListRows(departments: DepartmentView[]): ListRow[] {
       const headInfo = getHeadInfo(employees);
       rows.push({
         id,
+        apiId: sub.id,
         name: sub.name,
         code: `SD-${sub.id}`,
         parent: parentName,
@@ -526,6 +528,7 @@ function buildListRows(departments: DepartmentView[]): ListRow[] {
   for (const department of departments) {
     rows.push({
       id: department.id,
+      apiId: department.apiId,
       name: department.name,
       code: department.code,
       parent: department.parent,
@@ -630,6 +633,7 @@ export default function DepartmentPage() {
           const headInfo = getHeadInfo(employees);
           return {
             id: String(department.id),
+            apiId: department.id,
             name: department.name,
             shortName:
               department.name.length > 16
@@ -1019,11 +1023,11 @@ export default function DepartmentPage() {
             </div>
             <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-3.5 py-5">
               {activeTab === "SOPs" ? (
-                <SopsModule />
+                <SopsModule departmentName={selectedDepartment?.name} departmentId={selectedDepartment?.apiId} />
               ) : activeTab === "Policies" ? (
-                <PoliciesModule />
+                <PoliciesModule departmentName={selectedDepartment?.name} />
               ) : activeTab === "Rules" ? (
-                <RulesModule />
+                <RulesModule departmentName={selectedDepartment?.name} />
               ) : activeTab === "Overview" ? (
                 <>
                   <div className="border-t border-[#dfe7f0] pt-3">

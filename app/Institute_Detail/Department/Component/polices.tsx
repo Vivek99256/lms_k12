@@ -445,7 +445,7 @@ function PolicyDetail({
   );
 }
 
-export default function PoliciesModule() {
+export default function PoliciesModule({ departmentName }: { departmentName?: string }) {
   const [policies, setPolicies] = useState<Policy[]>(initialPolicies);
   const [view, setView] = useState<PolicyView>("list");
   const [selected, setSelected] = useState<Policy | null>(null);
@@ -672,6 +672,7 @@ export default function PoliciesModule() {
         kind="Policy"
         onClose={() => setAiDrawerOpen(false)}
         onSave={handleAiSave}
+        departmentName={departmentName}
       />
     </div>
   );

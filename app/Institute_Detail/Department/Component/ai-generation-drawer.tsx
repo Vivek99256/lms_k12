@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 
+import { API_BASE_URL } from "@/app/components/utils/api_url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -36,11 +37,19 @@ export type AiGeneratedDocumentSave = {
   status: "Draft" | "Active";
 };
 
+export type AiGeneratedDocumentSavedResult = {
+  id?: string | number;
+  pdfUrl?: string;
+};
+
 type AiGenerationDrawerProps = {
   open: boolean;
   kind: AiDocumentKind;
   onClose: () => void;
-  onSave: (document: AiGeneratedDocumentSave) => void;
+  onSave: (
+    document: AiGeneratedDocumentSave
+  ) => void | AiGeneratedDocumentSavedResult | Promise<void | AiGeneratedDocumentSavedResult>;
+  departmentName?: string;
 };
 
 const includeSections = [
@@ -77,6 +86,64 @@ const defaultPurpose: Record<AiDocumentKind, string> = {
   Policy: "To define clear expectations, ownership, and compliance requirements for department operations.",
   Rule: "To automate consistent decisions while keeping approvals transparent and auditable.",
 };
+
+type AiGenerationMode = "generate" | "improve" | "regenerate";
+
+type AiGenerationSession = {
+  baseUrl: string;
+  token: string;
+};
+
+type AiSopGenerationResponse = {
+  status_code?: number | string;
+  message?: string;
+  data?: {
+    content?: string;
+  };
+  errors?: Record<string, string[]>;
+};
+
+function readString(value: unknown): string {
+  return typeof value === "string"
+    ? value
+    : value == null
+      ? ""
+      : String(value);
+}
+
+function getAiGenerationSession(): AiGenerationSession {
+  if (typeof window === "undefined") {
+    return { baseUrl: API_BASE_URL, token: "" };
+  }
+
+  try {
+    const userData = JSON.parse(
+      localStorage.getItem("userData") || "{}"
+    ) as Record<string, unknown>;
+    const menuContext = JSON.parse(
+      localStorage.getItem("menuContext") || "{}"
+    ) as Record<string, unknown>;
+
+    return {
+      baseUrl: readString(userData.host_name) || API_BASE_URL,
+      token: readString(
+        userData.user_token ??
+          userData.token ??
+          menuContext.user_token ??
+          menuContext.token
+      ),
+    };
+  } catch {
+    return { baseUrl: API_BASE_URL, token: "" };
+  }
+}
+
+function getFirstValidationError(errors?: Record<string, string[]>): string {
+  if (!errors) return "";
+
+  const firstKey = Object.keys(errors)[0];
+  return firstKey ? errors[firstKey]?.[0] ?? "" : "";
+}
 
 function buildGeneratedContent(
   kind: AiDocumentKind,
@@ -153,13 +220,21 @@ export default function AiGenerationDrawer({
   kind,
   onClose,
   onSave,
+  departmentName,
 }: AiGenerationDrawerProps) {
-  const [department, setDepartment] = useState("Fees");
-  const [category, setCategory] = useState(categoryOptions[kind][0]);
-  const [title, setTitle] = useState(defaultTitles[kind]);
-  const [purpose, setPurpose] = useState(defaultPurpose[kind]);
-  const [roles, setRoles] = useState("Accounts Department, Front Office");
-  const [keywords, setKeywords] = useState("Fee Collection, Receipt, Online Payment");
+  const selectedDepartmentName = departmentName?.trim() || "";
+  const [department, setDepartment] = useState(selectedDepartmentName);
+
+  useEffect(() => {
+    if (!selectedDepartmentName) return;
+
+    queueMicrotask(() => setDepartment(selectedDepartmentName));
+  }, [selectedDepartmentName]);
+  const [category] = useState(categoryOptions[kind][0]);
+  const [title, setTitle] = useState(selectedDepartmentName || defaultTitles[kind]);
+  const [purpose, setPurpose] = useState("");
+  const [roles, setRoles] = useState("");
+  const [keywords, setKeywords] = useState("");
   const [language, setLanguage] = useState("English");
   const [documentType, setDocumentType] = useState(typeOptions[kind][0]);
   const [detailLevel, setDetailLevel] = useState("Detailed");
@@ -167,9 +242,15 @@ export default function AiGenerationDrawer({
   const [content, setContent] = useState(() =>
     buildGeneratedContent(kind, defaultTitles[kind], defaultPurpose[kind], includeSections)
   );
+  const [generationMode, setGenerationMode] = useState<AiGenerationMode | null>(null);
+  const [generationError, setGenerationError] = useState("");
+  const [saveMode, setSaveMode] = useState<"Draft" | "Active" | null>(null);
+  const [saveError, setSaveError] = useState("");
 
   const titleLabel = kind === "SOP" ? "SOP Type" : `${kind} Type`;
   const editorTitle = `AI-Generated ${kind} Editor`;
+  const isGenerating = generationMode !== null;
+  const isSaving = saveMode !== null;
 
   useEffect(() => {
     if (!open) return;
@@ -194,24 +275,113 @@ export default function AiGenerationDrawer({
     [keywords]
   );
 
+  const requestAiContent = async (mode: AiGenerationMode) => {
+    if (kind !== "SOP") {
+      if (mode === "improve") {
+        setContent((current) =>
+          `${current.trim()}\n\nAI Improvement Notes\n- Use measurable ownership for each step.\n- Add exception handling and audit record expectations.\n- Keep language clear for all applicable users.`
+        );
+      } else {
+        setContent(buildGeneratedContent(kind, title, purpose, selectedSections));
+      }
+      return;
+    }
+
+    const trimmedDepartment = department.trim();
+    const trimmedTitle = title.trim();
+    const trimmedPurpose = purpose.trim();
+
+    if (!trimmedDepartment || !trimmedTitle || !trimmedPurpose) {
+      setGenerationError("Department, Title, and Purpose / Short Description are required.");
+      return;
+    }
+
+    if (selectedSections.length === 0) {
+      setGenerationError("Select at least one section to include in the SOP.");
+      return;
+    }
+
+    const session = getAiGenerationSession();
+    const baseUrl = session.baseUrl.replace(/\/$/, "");
+    const headers: HeadersInit = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+
+    if (session.token) {
+      headers.Authorization = `Bearer ${session.token}`;
+    }
+
+    setGenerationMode(mode);
+    setGenerationError("");
+
+    try {
+      const response = await fetch(`${baseUrl}/api/ai-sop/generate`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          department: trimmedDepartment,
+          title: trimmedTitle,
+          purpose: trimmedPurpose,
+          roles,
+          keywords,
+          language,
+          sop_type: documentType,
+          detail_level: detailLevel,
+          include_sections: selectedSections,
+          existing_content: mode === "generate" ? "" : content,
+          mode,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as AiSopGenerationResponse | null;
+
+      if (!response.ok || !payload || String(payload.status_code ?? "0") !== "1") {
+        throw new Error(
+          getFirstValidationError(payload?.errors) ||
+            payload?.message ||
+            "Unable to generate SOP. Please try again."
+        );
+      }
+
+      const generatedContent = payload.data?.content?.trim();
+      if (!generatedContent) {
+        throw new Error("Gemini returned an empty SOP. Please try again.");
+      }
+
+      setContent(generatedContent);
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : "Unable to generate SOP. Please try again.");
+    } finally {
+      setGenerationMode(null);
+    }
+  };
+
   const regenerate = () => {
-    setContent(buildGeneratedContent(kind, title, purpose, selectedSections));
+    void requestAiContent("regenerate");
   };
 
   const improve = () => {
-    setContent((current) =>
-      `${current.trim()}\n\nAI Improvement Notes\n- Use measurable ownership for each step.\n- Add exception handling and audit record expectations.\n- Keep language clear for all applicable users.`
-    );
+    void requestAiContent("improve");
   };
 
-  const save = (status: "Draft" | "Active") => {
-    onSave({
-      title: title.trim() || defaultTitles[kind],
-      category,
-      description: content.trim() || buildGeneratedContent(kind, title, purpose, selectedSections),
-      status,
-    });
-    onClose();
+  const save = async (status: "Draft" | "Active") => {
+    setSaveMode(status);
+    setSaveError("");
+
+    try {
+      await onSave({
+        title: title.trim() || defaultTitles[kind],
+        category,
+        description: content.trim() || buildGeneratedContent(kind, title, purpose, selectedSections),
+        status,
+      });
+      onClose();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Unable to save SOP. Please try again.");
+    } finally {
+      setSaveMode(null);
+    }
   };
 
   return (
@@ -259,25 +429,12 @@ export default function AiGenerationDrawer({
             <section className="space-y-4 rounded-xl border border-[#dce5ef] bg-white p-4">
               <h4 className="text-[13px] font-semibold text-[#004cff]">1. Basic Information</h4>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
-                  Department
-                  <Select
-                    value={department}
-                    onValueChange={(value) => {
-                      if (value) setDepartment(value);
-                    }}
-                  >
-                    <SelectTrigger className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Fees">Fees</SelectItem>
-                      <SelectItem value="Academics">Academics</SelectItem>
-                      <SelectItem value="Administration">Administration</SelectItem>
-                      <SelectItem value="Human Resources">Human Resources</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </label>
+                <div className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
+                  <span>Department</span>
+                  <div className="flex h-9 items-center rounded-lg border border-[#d7e0eb] bg-[#f3f7fb] px-3 text-[12px] font-medium text-[#061632]">
+                    {department || "—"}
+                  </div>
+                </div>
               </div>
               <label className="space-y-1 text-[12px] font-semibold text-[#061632]">
                 Title
@@ -293,16 +450,18 @@ export default function AiGenerationDrawer({
                   value={purpose}
                   onChange={(event) => setPurpose(event.target.value)}
                   rows={4}
-                  className="min-h-[92px] rounded-lg border-[#d7e0eb] bg-white text-[12px] leading-5"
+                  placeholder="Enter the purpose or a short description of this SOP."
+                  className="min-h-[92px] rounded-lg border-[#d7e0eb] bg-white text-[12px] leading-5 placeholder:text-[#7c8da8]"
                 />
               </label>
 
-              <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
+                <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
                 Applicable Roles/Users
                 <Input
                   value={roles}
                   onChange={(event) => setRoles(event.target.value)}
-                  className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px]"
+                  placeholder="e.g. Accounts Department, Front Office"
+                  className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px] placeholder:text-[#7c8da8]"
                 />
               </label>
 
@@ -311,7 +470,8 @@ export default function AiGenerationDrawer({
                 <Input
                   value={keywords}
                   onChange={(event) => setKeywords(event.target.value)}
-                  className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px]"
+                  placeholder="e.g. Fee Collection, Receipt, Online Payment"
+                  className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px] placeholder:text-[#7c8da8]"
                 />
               </label>
               <div className="flex flex-wrap gap-1.5">
@@ -369,11 +529,21 @@ export default function AiGenerationDrawer({
               <Button
                 type="button"
                 className="h-10 w-full bg-[#004cff] text-[12px] font-semibold hover:bg-[#003dcc]"
-                onClick={regenerate}
+                onClick={() => void requestAiContent("generate")}
+                disabled={isGenerating}
               >
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
-                Generate with AI
+                {generationMode === "generate" ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                )}
+                {generationMode === "generate" ? "Generating..." : "Generate with AI"}
               </Button>
+              {generationError ? (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-medium text-red-700">
+                  {generationError}
+                </p>
+              ) : null}
             </section>
 
             <div className="space-y-4">
@@ -436,9 +606,14 @@ export default function AiGenerationDrawer({
                       size="sm"
                       className="h-8 text-[12px]"
                       onClick={improve}
+                      disabled={isGenerating}
                     >
-                      <WandSparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                      AI Improve
+                      {generationMode === "improve" ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <WandSparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      {generationMode === "improve" ? "Improving..." : "AI Improve"}
                     </Button>
                     <Button
                       type="button"
@@ -446,9 +621,13 @@ export default function AiGenerationDrawer({
                       size="sm"
                       className="h-8 text-[12px]"
                       onClick={regenerate}
+                      disabled={isGenerating}
                     >
-                      <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                      Regenerate
+                      <RefreshCw
+                        className={`h-3.5 w-3.5 ${generationMode === "regenerate" ? "animate-spin" : ""}`}
+                        aria-hidden="true"
+                      />
+                      {generationMode === "regenerate" ? "Regenerating..." : "Regenerate"}
                     </Button>
                   </div>
                 </div>
@@ -498,9 +677,10 @@ export default function AiGenerationDrawer({
                       variant="outline"
                       size="sm"
                       className="h-8 text-[12px]"
-                      onClick={() => save("Draft")}
+                      onClick={() => void save("Draft")}
+                      disabled={isGenerating || isSaving}
                     >
-                      Save as Draft
+                      {saveMode === "Draft" ? "Saving..." : "Save as Draft"}
                     </Button>
                     <Button
                       type="button"
@@ -515,13 +695,23 @@ export default function AiGenerationDrawer({
                       type="button"
                       size="sm"
                       className="h-8 bg-emerald-600 text-[12px] hover:bg-emerald-700"
-                      onClick={() => save("Active")}
+                      onClick={() => void save("Active")}
+                      disabled={isGenerating || isSaving}
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      Save & Publish
+                      {saveMode === "Active" ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      {saveMode === "Active" ? "Publishing..." : "Save & Publish"}
                     </Button>
                   </div>
                 </div>
+                {saveError ? (
+                  <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-medium text-red-700">
+                    {saveError}
+                  </p>
+                ) : null}
               </section>
             </div>
           </div>

@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 
+import { API_BASE_URL } from "@/app/components/utils/api_url";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,10 @@ import {
 } from "@/components/ui/table";
 
 import AiGenerationDrawer from "./ai-generation-drawer";
-import type { AiGeneratedDocumentSave } from "./ai-generation-drawer";
+import type {
+  AiGeneratedDocumentSave,
+  AiGeneratedDocumentSavedResult,
+} from "./ai-generation-drawer";
 
 export type SopStatus = "Active" | "Draft" | "Archived";
 export type SopView = "list" | "add" | "edit" | "view";
@@ -53,6 +57,7 @@ export interface Sop {
   status: SopStatus;
   uploadedBy: string;
   uploadedOn: string;
+  pdfUrl?: string;
 }
 
 type ActivityEvent = {
@@ -64,6 +69,79 @@ type ActivityEvent = {
 };
 
 const CURRENT_USER = "You";
+
+type SopSession = {
+  baseUrl: string;
+  token: string;
+  subInstituteId: string;
+  userId: string;
+};
+
+type StoreSopResponse = {
+  status_code?: number | string;
+  message?: string;
+  data?: {
+    id?: number | string;
+    pdf_url?: string;
+  };
+  errors?: Record<string, string[]>;
+};
+
+function readString(value: unknown): string {
+  return typeof value === "string"
+    ? value
+    : value == null
+      ? ""
+      : String(value);
+}
+
+function getSopSession(): SopSession {
+  if (typeof window === "undefined") {
+    return { baseUrl: API_BASE_URL, token: "", subInstituteId: "", userId: "" };
+  }
+
+  try {
+    const userData = JSON.parse(
+      localStorage.getItem("userData") || "{}"
+    ) as Record<string, unknown>;
+    const menuContext = JSON.parse(
+      localStorage.getItem("menuContext") || "{}"
+    ) as Record<string, unknown>;
+
+    return {
+      baseUrl: readString(userData.host_name) || API_BASE_URL,
+      token: readString(
+        userData.user_token ??
+          userData.token ??
+          menuContext.user_token ??
+          menuContext.token
+      ),
+      subInstituteId: readString(
+        userData.sub_institute_id ?? menuContext.sub_institute_id
+      ),
+      userId: readString(
+        userData.user_id ??
+          userData.id ??
+          userData.user_profile_id ??
+          menuContext.user_id ??
+          menuContext.user_profile_id
+      ),
+    };
+  } catch {
+    return { baseUrl: API_BASE_URL, token: "", subInstituteId: "", userId: "" };
+  }
+}
+
+function getApiErrorMessage(payload: StoreSopResponse | null, fallback: string): string {
+  const errors = payload?.errors;
+  if (errors) {
+    const firstKey = Object.keys(errors)[0];
+    const firstMessage = firstKey ? errors[firstKey]?.[0] : "";
+    if (firstMessage) return firstMessage;
+  }
+
+  return payload?.message || fallback;
+}
 
 const initialSops: Sop[] = [
   {
@@ -586,7 +664,13 @@ function ViewAllDialog({
   );
 }
 
-export default function SopsModule() {
+export default function SopsModule({
+  departmentName,
+  departmentId,
+}: {
+  departmentName?: string;
+  departmentId?: string | number;
+}) {
   const [sops, setSops] = useState<Sop[]>(initialSops);
   const [view, setView] = useState<SopView>("list");
   const [selected, setSelected] = useState<Sop | null>(null);
@@ -594,6 +678,7 @@ export default function SopsModule() {
   const [pendingDelete, setPendingDelete] = useState<Sop | null>(null);
   const [viewAllOpen, setViewAllOpen] = useState(false);
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -621,19 +706,86 @@ export default function SopsModule() {
     goToList();
   };
 
-  const handleAiSave = (document: AiGeneratedDocumentSave) => {
+  const storePublishedSop = async (
+    document: AiGeneratedDocumentSave
+  ): Promise<AiGeneratedDocumentSavedResult> => {
+    const session = getSopSession();
+    const selectedDepartmentId = readString(departmentId).trim();
+
+    if (!selectedDepartmentId) {
+      throw new Error("Department ID is missing. Please select a department and try again.");
+    }
+
+    if (!session.subInstituteId) {
+      throw new Error("SubInstitute ID is missing. Please sign in again and try again.");
+    }
+
+    const baseUrl = session.baseUrl.replace(/\/$/, "");
+    const headers: HeadersInit = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+
+    if (session.token) {
+      headers.Authorization = `Bearer ${session.token}`;
+    }
+
+    const response = await fetch(`${baseUrl}/api/ai-sop/store`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        sop_name: document.title,
+        department_id: selectedDepartmentId,
+        sop_content: document.description,
+        sub_institute_id: session.subInstituteId,
+        created_by: session.userId || undefined,
+        updated_by: session.userId || undefined,
+        status: document.status,
+      }),
+    });
+
+    const payload = (await response.json().catch(() => null)) as StoreSopResponse | null;
+
+    if (!response.ok || !payload || String(payload.status_code ?? "0") !== "1") {
+      throw new Error(getApiErrorMessage(payload, "Unable to publish SOP. Please try again."));
+    }
+
+    return {
+      id: payload.data?.id,
+      pdfUrl: payload.data?.pdf_url,
+    };
+  };
+
+  const handleAiSave = async (
+    document: AiGeneratedDocumentSave
+  ): Promise<AiGeneratedDocumentSavedResult | void> => {
+    let savedResult: AiGeneratedDocumentSavedResult | undefined;
+
+    if (document.status === "Active") {
+      savedResult = await storePublishedSop(document);
+    }
+
     const sop: Sop = {
-      id: createId(),
+      id: savedResult?.id ? String(savedResult.id) : createId(),
       title: document.title,
       version: "v1.0",
-      type: "AI",
+      type: document.status === "Active" ? "PDF" : "AI",
       status: document.status,
       uploadedBy: CURRENT_USER,
       uploadedOn: formatToday(),
+      pdfUrl: savedResult?.pdfUrl,
     };
 
     setSops((current) => [sop, ...current]);
+    setFeedback({
+      kind: "success",
+      message:
+        document.status === "Active"
+          ? "SOP published successfully. PDF generated and saved."
+          : "SOP saved as draft.",
+    });
     goToList();
+    return savedResult;
   };
 
   const handleUpdate = (updated: Sop) => {
@@ -642,6 +794,17 @@ export default function SopsModule() {
   };
 
   const handleDownload = (sop: Sop) => {
+    if (sop.pdfUrl) {
+      const link = document.createElement("a");
+      link.href = sop.pdfUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
     const content = [
       `SOP Title: ${sop.title}`,
       `Version: ${sop.version}`,
@@ -751,6 +914,18 @@ export default function SopsModule() {
         </div>
       </div>
 
+      {feedback ? (
+        <div
+          className={`mb-4 rounded-lg border px-3 py-2 text-[12px] font-medium ${
+            feedback.kind === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
+
       {pendingDelete ? (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
           <p className="text-[13px] leading-5 text-[#061632]">
@@ -850,6 +1025,7 @@ export default function SopsModule() {
         kind="SOP"
         onClose={() => setAiDrawerOpen(false)}
         onSave={handleAiSave}
+        departmentName={departmentName}
       />
     </div>
   );
