@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   ShieldCheck,
+  Sparkles,
   Trash2,
   User,
 } from "lucide-react";
@@ -25,6 +26,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+
+import AiGenerationDrawer from "./ai-generation-drawer";
+import type { AiGeneratedDocumentSave } from "./ai-generation-drawer";
 
 export type RuleStatus = "Active" | "Draft";
 export type RuleCategory = "Leave" | "Attendance" | "Approval" | "Finance" | "Security";
@@ -108,6 +112,22 @@ function formatToday() {
 
 function createId() {
   return `rul-${Date.now()}`;
+}
+
+function createRuleCode(category: string) {
+  const prefix = category
+    .replace(/[^a-z]/gi, "")
+    .slice(0, 3)
+    .toUpperCase()
+    .padEnd(3, "RUL");
+
+  return `${prefix}-AI-${Date.now().toString().slice(-3)}`;
+}
+
+function resolveRuleCategory(category: string): RuleCategory {
+  return ruleCategories.includes(category as RuleCategory)
+    ? (category as RuleCategory)
+    : "Approval";
 }
 
 function StatusBadge({ status }: { status: RuleStatus }) {
@@ -501,6 +521,7 @@ export default function RulesModule() {
   const [selected, setSelected] = useState<Rule | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Rule | null>(null);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -524,6 +545,22 @@ export default function RulesModule() {
   };
 
   const handleAdd = (rule: Rule) => {
+    setRules((current) => [rule, ...current]);
+    goToList();
+  };
+
+  const handleAiSave = (document: AiGeneratedDocumentSave) => {
+    const rule: Rule = {
+      id: createId(),
+      name: document.title,
+      code: createRuleCode(document.category),
+      category: resolveRuleCategory(document.category),
+      status: document.status,
+      lastUpdated: formatToday(),
+      updatedBy: CURRENT_USER,
+      description: document.description,
+    };
+
     setRules((current) => [rule, ...current]);
     goToList();
   };
@@ -619,15 +656,27 @@ export default function RulesModule() {
         <h3 className="text-base font-semibold text-[#061632]">
           Rules ({rules.length})
         </h3>
-        <Button
-          type="button"
-          size="lg"
-          className="h-10 shrink-0 px-3 text-[12px]"
-          onClick={() => setView("add")}
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Add Rule
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            size="lg"
+            className="h-10 px-3 text-[12px]"
+            onClick={() => setView("add")}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add Rule
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-10 border-[#d7e0eb] bg-white px-3 text-[12px] font-semibold text-[#6d28d9] hover:bg-[#f5efff]"
+            onClick={() => setAiDrawerOpen(true)}
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            AI Generate
+          </Button>
+        </div>
       </div>
 
       {pendingDelete ? (
@@ -686,6 +735,13 @@ export default function RulesModule() {
           />
         ))}
       </div>
+
+      <AiGenerationDrawer
+        open={aiDrawerOpen}
+        kind="Rule"
+        onClose={() => setAiDrawerOpen(false)}
+        onSave={handleAiSave}
+      />
     </div>
   );
 }

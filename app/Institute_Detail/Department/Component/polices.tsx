@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   ScrollText,
+  Sparkles,
   Trash2,
   User,
 } from "lucide-react";
@@ -25,6 +26,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+
+import AiGenerationDrawer from "./ai-generation-drawer";
+import type { AiGeneratedDocumentSave } from "./ai-generation-drawer";
 
 export type PolicyStatus = "Active" | "Draft";
 
@@ -91,6 +95,16 @@ function formatToday() {
 
 function createId() {
   return `pol-${Date.now()}`;
+}
+
+function createPolicyCode(category: string) {
+  const prefix = category
+    .replace(/[^a-z]/gi, "")
+    .slice(0, 3)
+    .toUpperCase()
+    .padEnd(3, "POL");
+
+  return `${prefix}-AI-${Date.now().toString().slice(-3)}`;
 }
 
 function StatusBadge({ status }: { status: PolicyStatus }) {
@@ -437,6 +451,7 @@ export default function PoliciesModule() {
   const [selected, setSelected] = useState<Policy | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Policy | null>(null);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -460,6 +475,21 @@ export default function PoliciesModule() {
   };
 
   const handleAdd = (policy: Policy) => {
+    setPolicies((current) => [policy, ...current]);
+    goToList();
+  };
+
+  const handleAiSave = (document: AiGeneratedDocumentSave) => {
+    const policy: Policy = {
+      id: createId(),
+      name: document.title,
+      code: createPolicyCode(document.category),
+      status: document.status,
+      lastUpdated: formatToday(),
+      updatedBy: CURRENT_USER,
+      description: document.description,
+    };
+
     setPolicies((current) => [policy, ...current]);
     goToList();
   };
@@ -555,15 +585,27 @@ export default function PoliciesModule() {
         <h3 className="text-base font-semibold text-[#061632]">
           Policies ({policies.length})
         </h3>
-        <Button
-          type="button"
-          size="lg"
-          className="h-10 shrink-0 px-3 text-[12px]"
-          onClick={() => setView("add")}
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Add Policy
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            size="lg"
+            className="h-10 px-3 text-[12px]"
+            onClick={() => setView("add")}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add Policy
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-10 border-[#d7e0eb] bg-white px-3 text-[12px] font-semibold text-[#6d28d9] hover:bg-[#f5efff]"
+            onClick={() => setAiDrawerOpen(true)}
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            AI Generate
+          </Button>
+        </div>
       </div>
 
       {pendingDelete ? (
@@ -624,6 +666,13 @@ export default function PoliciesModule() {
           />
         ))}
       </div>
+
+      <AiGenerationDrawer
+        open={aiDrawerOpen}
+        kind="Policy"
+        onClose={() => setAiDrawerOpen(false)}
+        onSave={handleAiSave}
+      />
     </div>
   );
 }

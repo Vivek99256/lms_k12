@@ -4,9 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   Activity,
-  AlertTriangle,
   ArrowLeft,
-  CheckCircle2,
   Clock,
   Download,
   Eye,
@@ -15,11 +13,10 @@ import {
   Pencil,
   Plus,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Upload,
   User,
-  UserPlus,
-  Users,
   X,
 } from "lucide-react";
 
@@ -41,6 +38,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+import AiGenerationDrawer from "./ai-generation-drawer";
+import type { AiGeneratedDocumentSave } from "./ai-generation-drawer";
 
 export type SopStatus = "Active" | "Draft" | "Archived";
 export type SopView = "list" | "add" | "edit" | "view";
@@ -593,6 +593,7 @@ export default function SopsModule() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Sop | null>(null);
   const [viewAllOpen, setViewAllOpen] = useState(false);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -616,6 +617,21 @@ export default function SopsModule() {
   };
 
   const handleAdd = (sop: Sop) => {
+    setSops((current) => [sop, ...current]);
+    goToList();
+  };
+
+  const handleAiSave = (document: AiGeneratedDocumentSave) => {
+    const sop: Sop = {
+      id: createId(),
+      title: document.title,
+      version: "v1.0",
+      type: "AI",
+      status: document.status,
+      uploadedBy: CURRENT_USER,
+      uploadedOn: formatToday(),
+    };
+
     setSops((current) => [sop, ...current]);
     goToList();
   };
@@ -712,15 +728,27 @@ export default function SopsModule() {
     <div className="min-h-0 overflow-y-auto">
       <div className="mb-4 flex items-start justify-between gap-3">
         <h3 className="text-base font-semibold text-[#061632]">SOPs ({sops.length})</h3>
-        <Button
-          type="button"
-          size="lg"
-          className="h-10 shrink-0 px-3 text-[12px]"
-          onClick={() => setView("add")}
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Add SOP
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            size="lg"
+            className="h-10 px-3 text-[12px]"
+            onClick={() => setView("add")}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add SOP
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-10 border-[#d7e0eb] bg-white px-3 text-[12px] font-semibold text-[#6d28d9] hover:bg-[#f5efff]"
+            onClick={() => setAiDrawerOpen(true)}
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            AI Generate
+          </Button>
+        </div>
       </div>
 
       {pendingDelete ? (
@@ -816,6 +844,13 @@ export default function SopsModule() {
           }}
         />
       ) : null}
+
+      <AiGenerationDrawer
+        open={aiDrawerOpen}
+        kind="SOP"
+        onClose={() => setAiDrawerOpen(false)}
+        onSave={handleAiSave}
+      />
     </div>
   );
 }

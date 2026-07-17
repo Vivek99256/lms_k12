@@ -1,0 +1,532 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  CheckCircle2,
+  Languages,
+  List,
+  RefreshCw,
+  Sparkles,
+  WandSparkles,
+  X,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+
+export type AiDocumentKind = "SOP" | "Policy" | "Rule";
+
+export type AiGeneratedDocumentSave = {
+  title: string;
+  category: string;
+  description: string;
+  status: "Draft" | "Active";
+};
+
+type AiGenerationDrawerProps = {
+  open: boolean;
+  kind: AiDocumentKind;
+  onClose: () => void;
+  onSave: (document: AiGeneratedDocumentSave) => void;
+};
+
+const includeSections = [
+  "Purpose",
+  "Scope",
+  "Responsibilities",
+  "Procedure",
+  "Compliance",
+  "Records",
+  "Approval",
+  "Required Documents",
+];
+
+const categoryOptions: Record<AiDocumentKind, string[]> = {
+  SOP: ["SOP", "Finance", "HR", "Academic", "Administration"],
+  Policy: ["Policy", "HR", "Compliance", "Security", "Academic"],
+  Rule: ["Rule", "Attendance", "Approval", "Finance", "Security"],
+};
+
+const typeOptions: Record<AiDocumentKind, string[]> = {
+  SOP: ["New SOP", "Improve Existing SOP", "Convert from Policy"],
+  Policy: ["New Policy", "Improve Existing Policy", "Convert from SOP"],
+  Rule: ["New Rule", "Improve Existing Rule", "Convert from Policy"],
+};
+
+const defaultTitles: Record<AiDocumentKind, string> = {
+  SOP: "Fee Collection SOP",
+  Policy: "Department Access Policy",
+  Rule: "Approval Escalation Rule",
+};
+
+const defaultPurpose: Record<AiDocumentKind, string> = {
+  SOP: "To standardize the process of collecting student fees accurately and securely.",
+  Policy: "To define clear expectations, ownership, and compliance requirements for department operations.",
+  Rule: "To automate consistent decisions while keeping approvals transparent and auditable.",
+};
+
+function buildGeneratedContent(
+  kind: AiDocumentKind,
+  title: string,
+  purpose: string,
+  sections: string[]
+) {
+  const name = title.trim() || defaultTitles[kind];
+  const intro = purpose.trim() || defaultPurpose[kind];
+  const lines = sections.map((section, index) => {
+    if (section === "Procedure") {
+      return `${index + 1}. Procedure\n- Verify the request details and required records.\n- Assign ownership to the responsible role.\n- Complete the action, document evidence, and notify stakeholders.`;
+    }
+
+    if (section === "Responsibilities") {
+      return `${index + 1}. Responsibilities\n- Department owner: Review and approve the ${kind.toLowerCase()}.\n- Assigned users: Follow the defined steps and maintain records.\n- Compliance team: Monitor exceptions and audit readiness.`;
+    }
+
+    if (section === "Approval") {
+      return `${index + 1}. Approval\nThis ${kind.toLowerCase()} should be reviewed by the department head and published after final compliance sign-off.`;
+    }
+
+    return `${index + 1}. ${section}\n${intro}`;
+  });
+
+  return `${name}\n\n${lines.join("\n\n")}`;
+}
+
+function SectionCheckbox({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-2 w-full cursor-pointer">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 shrink-0 accent-[#004cff]"
+      />
+
+      <span className="text-[12px] leading-5 text-[#405275] break-words">
+        {label}
+      </span>
+    </label>
+  );
+}
+function ToolbarButton({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className="flex h-7 w-7 items-center justify-center rounded-md text-[#405275] hover:bg-[#eef3ff] hover:text-[#004cff]"
+    >
+      {children}
+    </button>
+  );
+}
+
+export default function AiGenerationDrawer({
+  open,
+  kind,
+  onClose,
+  onSave,
+}: AiGenerationDrawerProps) {
+  const [department, setDepartment] = useState("Fees");
+  const [category, setCategory] = useState(categoryOptions[kind][0]);
+  const [title, setTitle] = useState(defaultTitles[kind]);
+  const [purpose, setPurpose] = useState(defaultPurpose[kind]);
+  const [roles, setRoles] = useState("Accounts Department, Front Office");
+  const [keywords, setKeywords] = useState("Fee Collection, Receipt, Online Payment");
+  const [language, setLanguage] = useState("English");
+  const [documentType, setDocumentType] = useState(typeOptions[kind][0]);
+  const [detailLevel, setDetailLevel] = useState("Detailed");
+  const [selectedSections, setSelectedSections] = useState<string[]>(includeSections);
+  const [content, setContent] = useState(() =>
+    buildGeneratedContent(kind, defaultTitles[kind], defaultPurpose[kind], includeSections)
+  );
+
+  const titleLabel = kind === "SOP" ? "SOP Type" : `${kind} Type`;
+  const editorTitle = `AI-Generated ${kind} Editor`;
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
+
+  const keywordChips = useMemo(
+    () =>
+      keywords
+        .split(",")
+        .map((keyword) => keyword.trim())
+        .filter(Boolean)
+        .slice(0, 4),
+    [keywords]
+  );
+
+  const regenerate = () => {
+    setContent(buildGeneratedContent(kind, title, purpose, selectedSections));
+  };
+
+  const improve = () => {
+    setContent((current) =>
+      `${current.trim()}\n\nAI Improvement Notes\n- Use measurable ownership for each step.\n- Add exception handling and audit record expectations.\n- Keep language clear for all applicable users.`
+    );
+  };
+
+  const save = (status: "Draft" | "Active") => {
+    onSave({
+      title: title.trim() || defaultTitles[kind],
+      category,
+      description: content.trim() || buildGeneratedContent(kind, title, purpose, selectedSections),
+      status,
+    });
+    onClose();
+  };
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 transition ${open ? "pointer-events-auto" : "pointer-events-none"
+        }`}
+      aria-hidden={!open}
+    >
+      <button
+        type="button"
+        aria-label="Close AI generation drawer"
+        className={`absolute inset-0 bg-[#061632]/35 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"
+          }`}
+        onClick={onClose}
+      />
+      <aside
+        className={`absolute right-0 top-0 flex h-full w-full max-w-[960px] transform flex-col bg-[#f7faff] shadow-2xl transition-transform duration-300 ease-out sm:w-[92vw] lg:w-[78vw] ${open ? "translate-x-0" : "translate-x-full"
+          }`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`AI ${kind} generation form`}
+      >
+        <div className="flex items-center justify-between border-b border-[#dce5ef] bg-white px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="flex items-center gap-2 text-base font-semibold text-[#061632]">
+              <Sparkles className="h-4 w-4 text-[#6d28d9]" />
+              AI {kind} Generation
+            </h3>
+            <p className="mt-1 text-[12px] text-[#52657d]">
+              Generate, edit, and save a department {kind.toLowerCase()} without leaving details.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-[#061632] hover:bg-[#f3f7fc]"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
+          <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+            <section className="space-y-4 rounded-xl border border-[#dce5ef] bg-white p-4">
+              <h4 className="text-[13px] font-semibold text-[#004cff]">1. Basic Information</h4>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
+                  Department
+                  <Select
+                    value={department}
+                    onValueChange={(value) => {
+                      if (value) setDepartment(value);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Fees">Fees</SelectItem>
+                      <SelectItem value="Academics">Academics</SelectItem>
+                      <SelectItem value="Administration">Administration</SelectItem>
+                      <SelectItem value="Human Resources">Human Resources</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
+              </div>
+              <label className="space-y-1 text-[12px] font-semibold text-[#061632]">
+                Title
+                <Input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px]"
+                />
+              </label>
+              <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
+                Purpose / Short Description
+                <Textarea
+                  value={purpose}
+                  onChange={(event) => setPurpose(event.target.value)}
+                  rows={4}
+                  className="min-h-[92px] rounded-lg border-[#d7e0eb] bg-white text-[12px] leading-5"
+                />
+              </label>
+
+              <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
+                Applicable Roles/Users
+                <Input
+                  value={roles}
+                  onChange={(event) => setRoles(event.target.value)}
+                  className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px]"
+                />
+              </label>
+
+              <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
+                Keywords
+                <Input
+                  value={keywords}
+                  onChange={(event) => setKeywords(event.target.value)}
+                  className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px]"
+                />
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {keywordChips.map((keyword) => (
+                  <span
+                    key={keyword}
+                    className="rounded-md bg-[#eaf1ff] px-2 py-1 text-[11px] font-medium text-[#004cff]"
+                  >
+                    {keyword}
+                  </span>
+                ))}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
+                  Language
+                  <Select
+                    value={language}
+                    onValueChange={(value) => {
+                      if (value) setLanguage(value);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="English">English</SelectItem>
+                      <SelectItem value="Hindi">Hindi</SelectItem>
+                      <SelectItem value="Gujarati">Gujarati</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
+                <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
+                  {titleLabel}
+                  <Select
+                    value={documentType}
+                    onValueChange={(value) => {
+                      if (value) setDocumentType(value);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {typeOptions[kind].map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+              </div>
+
+              <Button
+                type="button"
+                className="h-10 w-full bg-[#004cff] text-[12px] font-semibold hover:bg-[#003dcc]"
+                onClick={regenerate}
+              >
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                Generate with AI
+              </Button>
+            </section>
+
+            <div className="space-y-4">
+              <section className=" gap-4 rounded-xl border border-[#dce5ef] bg-white p-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                <div>
+                  <h4 className="text-[13px] font-semibold text-[#6d28d9]">
+                    2. AI Generation Options
+                  </h4>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+                    <div className="space-y-2">
+                      <p className="text-[12px] font-semibold text-[#061632]">
+                        Detail Level
+                      </p>
+
+                      <select
+                        value={detailLevel}
+                        onChange={(e) => setDetailLevel(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-[#d7e0eb] bg-white px-3 text-[12px] text-[#061632] shadow-sm focus:border-[#004cff] focus:outline-none"
+                      >
+                        <option value="Brief">Brief</option>
+                        <option value="Standard">Standard</option>
+                        <option value="Detailed">Detailed</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2 min-w-0">
+                      <p className="text-[12px] font-semibold text-[#061632]">
+                        Include Sections
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                        {includeSections.map((section) => (
+                          <SectionCheckbox
+                            key={section}
+                            label={section}
+                            checked={selectedSections.includes(section)}
+                            onChange={(checked) =>
+                              setSelectedSections((current) =>
+                                checked
+                                  ? [...current, section]
+                                  : current.filter((item) => item !== section)
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-[#dce5ef] bg-white p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <h4 className="text-[13px] font-semibold text-[#009f74]">3. {editorTitle}</h4>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[12px]"
+                      onClick={improve}
+                    >
+                      <WandSparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                      AI Improve
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[12px]"
+                      onClick={regenerate}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                      Regenerate
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-lg border border-[#d7e0eb] bg-white">
+                  <div className="flex flex-wrap items-center gap-1 border-b border-[#d7e0eb] bg-[#fbfdff] px-2 py-1.5">
+                    <select
+                      aria-label="Text style"
+                      className="h-7 rounded-md border border-[#d7e0eb] bg-white px-2 text-[11px] text-[#405275]"
+                      defaultValue="Normal"
+                    >
+                      <option>Normal</option>
+                      <option>Heading</option>
+                      <option>Subheading</option>
+                    </select>
+                    <ToolbarButton label="Bold">
+                      <Bold className="h-3.5 w-3.5" />
+                    </ToolbarButton>
+                    <ToolbarButton label="Bulleted list">
+                      <List className="h-3.5 w-3.5" />
+                    </ToolbarButton>
+                    <ToolbarButton label="Align left">
+                      <AlignLeft className="h-3.5 w-3.5" />
+                    </ToolbarButton>
+                    <ToolbarButton label="Align center">
+                      <AlignCenter className="h-3.5 w-3.5" />
+                    </ToolbarButton>
+                    <ToolbarButton label="Align right">
+                      <AlignRight className="h-3.5 w-3.5" />
+                    </ToolbarButton>
+                  </div>
+                  <Textarea
+                    value={content}
+                    onChange={(event) => setContent(event.target.value)}
+                    rows={16}
+                    className="min-h-[330px] resize-y rounded-none border-0 bg-white p-4 font-mono text-[12px] leading-6 text-[#061632] focus-visible:ring-0"
+                  />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[11px] text-[#7c8da8]">
+                    AI content may be inaccurate. Review before publishing.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[12px]"
+                      onClick={() => save("Draft")}
+                    >
+                      Save as Draft
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-[12px]"
+                    >
+                      <Languages className="h-3.5 w-3.5" aria-hidden="true" />
+                      Translate
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 bg-emerald-600 text-[12px] hover:bg-emerald-700"
+                      onClick={() => save("Active")}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      Save & Publish
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
