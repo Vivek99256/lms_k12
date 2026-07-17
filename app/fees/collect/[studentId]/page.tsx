@@ -573,7 +573,7 @@ export default function FeesCollectionStudentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/70">
+    <div className="min-h-screen ">
       <div className="mx-auto max-w-[1500px] space-y-6 p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">

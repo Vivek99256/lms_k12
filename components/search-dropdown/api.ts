@@ -5,7 +5,7 @@ import {
   type Subject,
 } from "./types";
 
-const API_BASE_URL = "https://erp.triz.co.in";
+import { API_BASE_URL } from "@/app/components/utils/api_url";
 
 interface ApiResponse<T> {
   status: number | string;
