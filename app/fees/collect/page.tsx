@@ -123,21 +123,6 @@ const currencySymbol = currencyFormatter
 
 const paymentMixColors = ['#4f46e5', '#0f9b6e', '#2563eb', '#e17a00', '#0891b2', '#be185d'];
 
-const dummyStudents: StudentFeeRow[] = [
-  { id: '2733', name: 'Vihaan Shah', grNo: '2733', admissionNo: 'ADM-2022-0733', standard: '12', section: 'B', feeHead: 'Exam · Term 2', dueDate: '08 Jul 2026', pendingFees: 12000, mobile: '9876543210', status: 'overdue' },
-  { id: '0555', name: 'Ananya Iyer', grNo: '0555', admissionNo: 'ADM-2022-0555', standard: '10', section: 'A', feeHead: 'Lab · Term 2', dueDate: '10 Jul 2026', pendingFees: 9500, mobile: '9876543211', status: 'overdue' },
-  { id: '0129', name: 'Ishaan Gupta', grNo: '0129', admissionNo: 'ADM-2023-0129', standard: '9', section: 'A', feeHead: 'Tuition · Term 2', dueDate: '12 Jul 2026', pendingFees: 52000, mobile: '9876543212', status: 'overdue' },
-  { id: '0192', name: 'Aarav Mehta', grNo: '0192', admissionNo: 'ADM-2024-0192', standard: '5', section: 'A', feeHead: 'Tuition · Term 2', dueDate: '15 Jul 2026', pendingFees: 42500, mobile: '9876543213', status: 'overdue' },
-  { id: '0871', name: 'Diya Sharma', grNo: '0871', admissionNo: 'ADM-2023-0871', standard: '8', section: 'B', feeHead: 'Tuition · Term 2', dueDate: '15 Jul 2026', pendingFees: 24000, mobile: '9876543214', status: 'partial' },
-  { id: '0217', name: 'Saanvi Reddy', grNo: '0217', admissionNo: 'ADM-2024-0217', standard: '7', section: 'B', feeHead: 'Tuition · Term 2', dueDate: '15 Jul 2026', pendingFees: 45000, mobile: '9876543215', status: 'paid' },
-  { id: '0402', name: 'Reyansh Jain', grNo: '0402', admissionNo: 'ADM-2022-0402', standard: '11', section: 'A', feeHead: 'Hostel · Term 2', dueDate: '18 Jul 2026', pendingFees: 34000, mobile: '9876543216', status: 'partial' },
-  { id: '0043', name: 'Vivaan Rao', grNo: '0043', admissionNo: 'ADM-2025-0043', standard: '3', section: 'A', feeHead: 'Transport · Term 2', dueDate: '20 Jul 2026', pendingFees: 18000, mobile: '9876543217', status: 'due' },
-  { id: '0666', name: 'Arjun Menon', grNo: '0666', admissionNo: 'ADM-2023-0666', standard: '8', section: 'A', feeHead: 'Transport · Term 2', dueDate: '20 Jul 2026', pendingFees: 18000, mobile: '9876543218', status: 'overdue' },
-  { id: '0121', name: 'Aadhya Bose', grNo: '0121', admissionNo: 'ADM-2025-0121', standard: '4', section: 'C', feeHead: 'Tuition · Term 2', dueDate: '22 Jul 2026', pendingFees: 39000, mobile: '9876543219', status: 'due' },
-  { id: '0314', name: 'Kabir Khan', grNo: '0314', admissionNo: 'ADM-2024-0314', standard: '6', section: 'B', feeHead: 'Lab · Term 2', dueDate: '24 Jul 2026', pendingFees: 10000, mobile: '9876543220', status: 'due' },
-  { id: '0912', name: 'Meera Nair', grNo: '0912', admissionNo: 'ADM-2023-0912', standard: '2', section: 'A', feeHead: 'Activity · Term 2', dueDate: '26 Jul 2026', pendingFees: 15000, mobile: '9876543221', status: 'partial' },
-];
-
 export default function FeesCollectPage() {
   const router = useRouter();
   const fetchRequestIdRef = useRef(0);
@@ -166,15 +151,15 @@ export default function FeesCollectPage() {
   const [dashboardSnapshot, setDashboardSnapshot] = useState<DashboardSnapshot>({});
   const [session] = useState(getSessionContext);
 
-  const loadDummyStudents = useCallback((message?: string) => {
+  const clearStudentData = useCallback((message: string) => {
     cachedStudentsRef.current = [];
-    setStudents(dummyStudents);
+    setStudents([]);
     setDashboardSnapshot({});
     setSelectedStudentIds([]);
     setCurrentPage(1);
     setHasMoreStudents(false);
-    setTotalStudentCount(dummyStudents.length);
-    setError(message ? `${message} Showing demo dues.` : 'Showing demo dues.');
+    setTotalStudentCount(0);
+    setError(message);
   }, []);
 
   const fetchStudents = useCallback(async (filters: StudentFetchFilters = {}, options: StudentFetchOptions = {}) => {
@@ -194,7 +179,7 @@ export default function FeesCollectPage() {
     fetchRequestIdRef.current = requestId;
 
     if (!session.subInstituteId) {
-      loadDummyStudents('Session data is missing.');
+      clearStudentData('Session data is missing.');
       return;
     }
 
@@ -233,7 +218,7 @@ export default function FeesCollectPage() {
       const academicYearId = readString(localStorage.getItem('selectedAcademicYear') || session.academicYearId);
 
       if (!hostName || !token || !subInstituteId) {
-        loadDummyStudents('Session data is missing.');
+        clearStudentData('Session data is missing.');
         return;
       }
 
@@ -311,7 +296,12 @@ export default function FeesCollectPage() {
     } catch (fetchError) {
       if (fetchRequestIdRef.current !== requestId) return;
       const message = fetchError instanceof Error ? fetchError.message : 'Unable to load student fees list.';
-      loadDummyStudents(message);
+      if (append) {
+        setHasMoreStudents(false);
+        setError(message);
+      } else {
+        clearStudentData(message);
+      }
     } finally {
       if (fetchRequestIdRef.current === requestId) {
         if (append) {
@@ -321,7 +311,7 @@ export default function FeesCollectPage() {
         }
       }
     }
-  }, [includeInactive, loadDummyStudents, session]);
+  }, [clearStudentData, includeInactive, session]);
 
   useEffect(() => {
     // The collect dashboard loads the current dues once the browser session is available.

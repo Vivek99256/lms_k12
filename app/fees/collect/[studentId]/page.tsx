@@ -118,161 +118,6 @@ const currencyFormatter = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0,
 });
 
-const dummyBanks: SelectOption[] = [
-  { id: 'hdfc', label: 'HDFC Bank' },
-  { id: 'sbi', label: 'State Bank of India' },
-  { id: 'icici', label: 'ICICI Bank' },
-];
-
-const dummyCollections: Record<string, {
-  student: StudentInfo;
-  summaryRows: SummaryRow[];
-  months: FeeMonth[];
-}> = {
-  '1020': {
-    student: {
-      uniqueId: 'STU-1020',
-      studentName: 'Rahul Patel',
-      grNo: '1020',
-      admissionYear: '2022-23',
-      standardDivision: '6 / C',
-      fatherName: 'Mahesh Patel',
-      contactNumber: '+91 9876543210',
-      parentEmail: 'mahesh.patel@example.com',
-      studentQuota: 'General',
-      pendingFees: 52310,
-    },
-    summaryRows: [
-      { label: 'Current Month', fees: 12500, paid: 0, discount: 0, remaining: 12500 },
-      { label: 'Previous Fees', fees: 39810, paid: 0, discount: 0, remaining: 39810 },
-      { label: 'Total', fees: 52310, paid: 0, discount: 0, remaining: 52310 },
-    ],
-    months: [
-      {
-        id: 'apr-2022',
-        label: 'Apr 2022',
-        particulars: [
-          { id: 'tuition-apr', particular: 'Tuition Fees', amount: 8500, collectionAmount: 8500 },
-          { id: 'transport-apr', particular: 'Transport Fees', amount: 2500, collectionAmount: 2500 },
-          { id: 'other-apr', particular: 'Other Fees', amount: 1500, collectionAmount: 1500 },
-        ],
-      },
-      {
-        id: 'may-2022',
-        label: 'May 2022',
-        particulars: [
-          { id: 'tuition-may', particular: 'Tuition Fees', amount: 8500, collectionAmount: 8500 },
-          { id: 'hostel-may', particular: 'Hostel Fees', amount: 4200, collectionAmount: 4200 },
-          { id: 'previous-may', particular: 'Previous Fees', amount: 18610, collectionAmount: 18610 },
-        ],
-      },
-    ],
-  },
-  '1021': {
-    student: {
-      uniqueId: 'STU-1021',
-      studentName: 'Priya Sharma',
-      grNo: '1021',
-      admissionYear: '2023-24',
-      standardDivision: '7 / A',
-      fatherName: 'Rajesh Sharma',
-      contactNumber: '+91 9876543211',
-      parentEmail: 'rajesh.sharma@example.com',
-      studentQuota: 'OBC',
-      pendingFees: 18450,
-    },
-    summaryRows: [
-      { label: 'Current Month', fees: 9450, paid: 0, discount: 0, remaining: 9450 },
-      { label: 'Previous Fees', fees: 9000, paid: 0, discount: 0, remaining: 9000 },
-      { label: 'Total', fees: 18450, paid: 0, discount: 0, remaining: 18450 },
-    ],
-    months: [
-      {
-        id: 'jun-2022',
-        label: 'Jun 2022',
-        particulars: [
-          { id: 'tuition-jun', particular: 'Tuition Fees', amount: 7000, collectionAmount: 7000 },
-          { id: 'transport-jun', particular: 'Transport Fees', amount: 2450, collectionAmount: 2450 },
-        ],
-      },
-      {
-        id: 'jul-2022',
-        label: 'Jul 2022',
-        particulars: [
-          { id: 'tuition-jul', particular: 'Tuition Fees', amount: 7000, collectionAmount: 7000 },
-          { id: 'other-jul', particular: 'Other Fees', amount: 2000, collectionAmount: 2000 },
-        ],
-      },
-    ],
-  },
-  '1022': {
-    student: {
-      uniqueId: 'STU-1022',
-      studentName: 'Arjun Singh',
-      grNo: '1022',
-      admissionYear: '2021-22',
-      standardDivision: '8 / B',
-      fatherName: 'Vikram Singh',
-      contactNumber: '+91 9876543212',
-      parentEmail: 'vikram.singh@example.com',
-      studentQuota: 'General',
-      pendingFees: 32700,
-    },
-    summaryRows: [
-      { label: 'Current Month', fees: 11700, paid: 0, discount: 0, remaining: 11700 },
-      { label: 'Previous Fees', fees: 21000, paid: 0, discount: 0, remaining: 21000 },
-      { label: 'Total', fees: 32700, paid: 0, discount: 0, remaining: 32700 },
-    ],
-    months: [
-      {
-        id: 'aug-2022',
-        label: 'Aug 2022',
-        particulars: [
-          { id: 'tuition-aug', particular: 'Tuition Fees', amount: 9000, collectionAmount: 9000 },
-          { id: 'transport-aug', particular: 'Transport Fees', amount: 2700, collectionAmount: 2700 },
-        ],
-      },
-      {
-        id: 'sep-2022',
-        label: 'Sep 2022',
-        particulars: [
-          { id: 'tuition-sep', particular: 'Tuition Fees', amount: 9000, collectionAmount: 9000 },
-          { id: 'hostel-sep', particular: 'Hostel Fees', amount: 12000, collectionAmount: 12000 },
-        ],
-      },
-    ],
-  },
-  '1023': {
-    student: {
-      uniqueId: 'STU-1023',
-      studentName: 'Isha Mehta',
-      grNo: '1023',
-      admissionYear: '2024-25',
-      standardDivision: '6 / A',
-      fatherName: 'Amit Mehta',
-      contactNumber: '+91 9876543213',
-      parentEmail: 'amit.mehta@example.com',
-      studentQuota: 'General',
-      pendingFees: 9600,
-    },
-    summaryRows: [
-      { label: 'Current Month', fees: 9600, paid: 0, discount: 0, remaining: 9600 },
-      { label: 'Previous Fees', fees: 0, paid: 0, discount: 0, remaining: 0 },
-      { label: 'Total', fees: 9600, paid: 0, discount: 0, remaining: 9600 },
-    ],
-    months: [
-      {
-        id: 'oct-2022',
-        label: 'Oct 2022',
-        particulars: [
-          { id: 'tuition-oct', particular: 'Tuition Fees', amount: 7600, collectionAmount: 7600 },
-          { id: 'other-oct', particular: 'Other Fees', amount: 2000, collectionAmount: 2000 },
-        ],
-      },
-    ],
-  },
-};
-
 export default function FeesCollectionStudentPage() {
   const router = useRouter();
   const params = useParams<{ studentId: string }>();
@@ -303,21 +148,19 @@ export default function FeesCollectionStudentPage() {
   const [collectionData, setCollectionData] = useState<CollectionResponse | null>(null);
   const [receiptHtml, setReceiptHtml] = useState('');
 
-  const loadDummyCollection = useCallback((message?: string) => {
-    const fallback = dummyCollections[studentId] ?? dummyCollections['1020'];
-
-    setStudent(fallback.student);
-    setSummaryRows(fallback.summaryRows);
-    setMonths(fallback.months);
-    setBanks(dummyBanks);
+  const clearCollectionData = useCallback((message: string) => {
+    setStudent(null);
+    setSummaryRows([]);
+    setMonths([]);
+    setBanks([]);
     setPaymentModes(defaultPaymentModes);
     setCollectionData(null);
     setReceiptHtml('');
-    setSelectedMonthIds(fallback.months.map((month) => month.id));
-    setExpandedMonthId(fallback.months[0]?.id ?? null);
-    setError(message ? `${message} Showing dummy data.` : 'Showing dummy data.');
+    setSelectedMonthIds([]);
+    setExpandedMonthId(null);
+    setError(message);
     setLoading(false);
-  }, [studentId]);
+  }, []);
 
   const applyCollectionData = useCallback((payload: CollectionResponse) => {
     const source = payload.data ?? payload;
@@ -340,7 +183,7 @@ export default function FeesCollectionStudentPage() {
 
   const loadFees = useCallback(async () => {
     if (!studentId || !session.subInstituteId) {
-      loadDummyCollection('Student or session data is missing.');
+      clearCollectionData('Student or session data is missing.');
       return;
     }
 
@@ -383,11 +226,11 @@ export default function FeesCollectionStudentPage() {
 
       applyCollectionData(payload);
     } catch (fetchError) {
-      loadDummyCollection(fetchError instanceof Error ? fetchError.message : 'Unable to load fee collection data.');
+      clearCollectionData(fetchError instanceof Error ? fetchError.message : 'Unable to load fee collection data.');
     } finally {
       setLoading(false);
     }
-  }, [applyCollectionData, loadDummyCollection, session, studentId]);
+  }, [applyCollectionData, clearCollectionData, session, studentId]);
 
   useEffect(() => {
     // The detail page loads once after route params and browser session storage are available.
@@ -567,6 +410,23 @@ export default function FeesCollectionStudentPage() {
         <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm">
           <Loader2 className="h-4 w-4 animate-spin text-[#0D6EFD]" />
           Loading fee collection data...
+        </div>
+      </div>
+    );
+  }
+
+  if (!student) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50/70 p-6">
+        <div className="w-full max-w-xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <Button type="button" variant="outline" size="sm" className="mb-4 rounded-lg bg-white" onClick={() => router.push('/fees/collect')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to collect
+          </Button>
+          <h1 className="text-lg font-bold text-slate-950">Unable to load fee collection</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {error || 'Laravel did not return fee collection data for this student.'}
+          </p>
         </div>
       </div>
     );
