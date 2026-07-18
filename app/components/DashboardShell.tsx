@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
@@ -16,6 +16,10 @@ interface SelectedBranch {
   level1Key: string;
   level2Key: string;
 }
+
+export const ChatbotLayoutContext = createContext<{ isChatbotOpen: boolean }>({
+  isChatbotOpen: false,
+});
 
 function getMenuKey(item: { id?: number | string; label: string; href?: string }) {
   return String(item.id ?? item.href ?? item.label);
@@ -61,28 +65,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const { menuItems, loading, error, refetch } = useMenuRights();
   const hasLoadedRef = useRef(false);
 
-  const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const saved = localStorage.getItem('selectedMenuBranch');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed?.level1Key && parsed?.level2Key) {
-          return parsed;
-        }
-      }
-    } catch {}
-    return null;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (selectedBranch) {
-      localStorage.setItem('selectedMenuBranch', JSON.stringify(selectedBranch));
-    } else {
-      localStorage.removeItem('selectedMenuBranch');
-    }
-  }, [selectedBranch]);
+  const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(null);
   const [isChatbotOpen, setIsChatbotOpen] = useState(true);
   const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
   const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
@@ -163,7 +146,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           icon: undefined,
           submenus: undefined,
         }));
-      } else {``
+      } else {
         setMasterMenuGroups(rawData);
         const children: Record<string, unknown>[] = [];
         for (const group of rawData) {
@@ -239,7 +222,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const toggleChatbot = () => {
     setIsChatbotOpen((prev) => {
       const next = !prev;
-      setIsRightToolbarOpen(!next);
+      setIsRightToolbarOpen(false);
       return next;
     });
   };
@@ -347,21 +330,23 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               isChatbotOpen ? 'w-[85%]' : 'w-full'
             }`}
           >
-            {showSubheader && (
-              <div className="pb-4">
-                <Level3Subheader
-                  items={level3Menu?.items ?? []}
-                  parentLabel={level3Menu?.parentLabel ?? ''}
-                  mainMenuId={selectedL1?.id}
-                  menuId={selectedL2?.id}
-                  masterItems={fetchedMasterMenuItems}
-                  masterLoading={masterMenuLoading}
-                  masterMenuGroups={masterMenuGroups}
-                  userProfileName={userProfileName}
-                />
-              </div>
-            )}
-            {children}
+            <ChatbotLayoutContext.Provider value={{ isChatbotOpen }}>
+              {showSubheader && (
+                <div className="pb-4">
+                  <Level3Subheader
+                    items={level3Menu?.items ?? []}
+                    parentLabel={level3Menu?.parentLabel ?? ''}
+                    mainMenuId={selectedL1?.id}
+                    menuId={selectedL2?.id}
+                    masterItems={fetchedMasterMenuItems}
+                    masterLoading={masterMenuLoading}
+                    masterMenuGroups={masterMenuGroups}
+                    userProfileName={userProfileName}
+                  />
+                </div>
+              )}
+              {children}
+            </ChatbotLayoutContext.Provider>
           </main>
           {isChatbotOpen && (
             <div className="min-h-0 w-[15%] min-w-[320px] overflow-hidden">

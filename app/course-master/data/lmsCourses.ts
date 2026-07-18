@@ -25,10 +25,31 @@ export interface LmsSubject {
   subject_name: string;
   subject_id: number;
   standard_id: number;
+  section_id?: number | string;
+  section_name?: string;
+  division_id?: number | string;
+  division_name?: string;
   display_image: string;
   content_category: string;
   sub_institute_id: number;
   chapters: ApiChapter[];
+  category_name?: string;
+  key_concepts_count?: number | string;
+  key_concept_count?: number | string;
+  concepts_count?: number | string;
+  total_concepts?: number | string;
+  keyConcepts?: unknown[];
+  concepts?: unknown[];
+  lesson_plans_count?: number | string;
+  lesson_plan_count?: number | string;
+  total_lesson_plans?: number | string;
+  lessonPlans?: unknown[];
+  chapter_count?: number | string;
+  chapters_count?: number | string;
+  coverage_percentage?: number | string;
+  lesson_planning_coverage?: number | string;
+  section?: string;
+  division?: string;
 }
 
 export interface LmsCoursesResponse {

@@ -209,6 +209,10 @@ export default function RightFloatingToolbar({
     return null;
   }
 
+  if (!isOpen) {
+    return null;
+  }
+
   const toolbar = (
     <div
       ref={containerRef}
@@ -216,11 +220,7 @@ export default function RightFloatingToolbar({
       aria-label="Floating editor toolbar"
     >
       <div
-        className={`flex flex-col-reverse items-end gap-3 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-3 ${
-          isOpen
-            ? 'pointer-events-auto translate-y-0 opacity-100'
-            : 'pointer-events-none -translate-y-8 opacity-0'
-        }`}
+        className="flex flex-col-reverse items-end gap-3 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-3"
       >
         {activeMenu && (
           <aside

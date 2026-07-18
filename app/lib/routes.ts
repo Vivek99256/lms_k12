@@ -21,6 +21,13 @@ export const ROUTES = {
   // Fees routes
   fees: {
     collect: '/fees/collect',
+    nachS1ExcelExport: '/fees/NACH_s1excel_export',
+    nachS2ExcelImport: '/fees/NACH_s2excel_import',
+    nachS3ExcelExport: '/fees/NACH_s3excel_export',
+    nachS4ExcelImport: '/fees/NACH_s4excel_import',
+    otherFeesCollect: '/fees/other_fees_collect',
+    otherFeesCancel: '/fees/other_fees_cancel',
+    onlineFeesCollect: '/fees/online_fees_collect',
   },
 } as const;
 
