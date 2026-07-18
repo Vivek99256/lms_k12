@@ -146,7 +146,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           icon: undefined,
           submenus: undefined,
         }));
-      } else {``
+      } else {
         setMasterMenuGroups(rawData);
         const children: Record<string, unknown>[] = [];
         for (const group of rawData) {
@@ -222,7 +222,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const toggleChatbot = () => {
     setIsChatbotOpen((prev) => {
       const next = !prev;
-      setIsRightToolbarOpen(!next);
+      setIsRightToolbarOpen(false);
       return next;
     });
   };
