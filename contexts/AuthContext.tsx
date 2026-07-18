@@ -143,9 +143,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/api-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, type: 'API' }),
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          type: "API",
+        }),
       });
       const data = await res.json();
       if (res.ok && data) {
