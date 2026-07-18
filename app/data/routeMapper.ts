@@ -24,6 +24,30 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   
   // Remove trailing slashes only
   cleanLink = cleanLink.replace(/\/+$/, '');
+
+  if (cleanLink.toLowerCase() === 'fees_config_master.index') {
+    return '/fees/master/fees-config-master';
+  }
+
+  if (cleanLink.toLowerCase() === 'fees_title.index') {
+    return '/fees/master/new-fees-title-master';
+  }
+
+  if (cleanLink.toLowerCase() === 'fees_receipt_book_master.index') {
+    return '/fees/master/fees-receipt-book-master';
+  }
+
+  if (cleanLink.toLowerCase() === 'fees_breackoff.index') {
+    return '/fees/master/fees-breakoff';
+  }
+
+  if (cleanLink.toLowerCase() === 'other_fee_map.index') {
+    return '/fees/master/additional-fees-mapping';
+  }
+
+  if (cleanLink.toLowerCase() === 'other_fees_title.index') {
+    return '/fees/master/other-fees-title';
+  }
   
   if (!cleanLink) return '#';
   

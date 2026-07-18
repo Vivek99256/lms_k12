@@ -89,6 +89,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
   });
   const containerRef = useRef<HTMLDivElement>(null);
   const tabsWrapperRef = useRef<HTMLDivElement>(null);
+  const masterPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -116,6 +117,23 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
     }
   }, [selectedMasterCategory]);
 
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        masterPanelRef.current &&
+        !masterPanelRef.current.contains(event.target as Node)
+      ) {
+        setShowMasterDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, []);
+
   const checkScrollability = () => {
     const el = containerRef.current;
     if (!el) return;
@@ -134,11 +152,15 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
     });
   };
 
-  const handleMasterClick = (item: SubmenuItem) => {
+  const handleMasterNavigation = (route: string) => {
     setShowMasterDropdown(false);
+    router.push(route);
+  };
+
+  const handleMasterClick = (item: SubmenuItem) => {
     const navigateRoute = getNavigationRoute(item);
     if (navigateRoute) {
-      router.push(navigateRoute);
+      handleMasterNavigation(navigateRoute);
     }
   };
 
@@ -247,7 +269,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
         </div>
 
         {hasMasterAccess(userProfileName) && (masterMenuGroups.length > 0 || masterItems.length > 0) && (
-          <div className="relative shrink-0" data-master-dropdown>
+          <div className="relative shrink-0" data-master-dropdown ref={masterPanelRef}>
             <button
               type="button"
               onClick={handleMasterButtonClick}
@@ -331,7 +353,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                                     <button
                                       key={String(child.id ?? childName)}
                                       type="button"
-                                      onClick={() => childRoute !== '#' && router.push(childRoute)}
+                                      onClick={() => childRoute !== '#' && handleMasterNavigation(childRoute)}
                                       className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 border ${
                                         isActive
                                           ? 'bg-blue-50/80 border-blue-200 text-[#0D6EFD] shadow-sm'
