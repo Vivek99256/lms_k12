@@ -79,7 +79,6 @@ const RESOURCE_FILE_TYPES = ['PDF', 'PPT', 'DOCX', 'Video Link'] as const;
 const UPLOAD_CONTENT_TYPES = ['Presentation', 'Video', 'Revision notes', 'Classroom activity'] as const;
 const UPLOAD_PRESENTATION_TYPES = ['Classroom presentation', 'Teacher training presentation'] as const;
 const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
-const QUESTION_TYPE_OPTIONS = ['Multiple choice', 'True or false', 'Short answer', 'Assertion and reason'] as const;
 const QUESTION_TYPE_OPTIONS = ['MCQ', 'Narrative'] as const;
 const QUESTION_OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
 const QUESTION_TYPE_API_CONFIG: Record<
@@ -504,6 +503,8 @@ function truncateToWords(value: string, maxWords = 150): string {
   const words = value.split(/\s+/).filter(Boolean);
   if (words.length <= maxWords) return value;
   return words.slice(0, maxWords).join(' ') + '…';
+}
+
 function getQuestionBankConceptTitles(course: Course, chapter: Chapter) {
   const savedConcepts = (chapter.concepts ?? [])
     .map((concept) => concept.title)
@@ -669,6 +670,12 @@ export default function ChapterListPage() {
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
   const [isPresentationReady, setIsPresentationReady] = useState(false);
   const [isGeneratePresentationDrawerOpen, setIsGeneratePresentationDrawerOpen] = useState(false);
+  const [presentationMode, setPresentationMode] = useState<'Classroom' | 'Teacher training'>('Classroom');
+  const [presentationChapterId, setPresentationChapterId] = useState('');
+  const [presentationConcept, setPresentationConcept] = useState('');
+  const [presentationSlides, setPresentationSlides] = useState<string>(PRESENTATION_SLIDE_OPTIONS[1]);
+  const [presentationTheme, setPresentationTheme] = useState<string>(GAMMA_THEME_OPTIONS[0]);
+  const [presentationAudienceNotes, setPresentationAudienceNotes] = useState('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploadContentType, setUploadContentType] = useState<(typeof UPLOAD_CONTENT_TYPES)[number]>(
     UPLOAD_CONTENT_TYPES[0]
@@ -1317,7 +1324,7 @@ export default function ChapterListPage() {
         : allChapters.find((chapter) => chapter.id === questionBankChapterFilter) ?? null;
     const targetChapter =
       filterChapter ??
-      (targetQuestion ? allChapters.find((chapter) => chapter.id === targetQuestion.chapterId) ?? null : null) ??
+      (targetQuestion ? allChapters.find((chapter) => chapter.id === targetQuestion.chapterId) : null) ??
       resourceChapter ??
       allChapters[0] ??
       null;
