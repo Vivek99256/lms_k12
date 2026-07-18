@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlignCenter,
@@ -222,6 +222,11 @@ export default function AiGenerationDrawer({
   onSave,
   departmentName,
 }: AiGenerationDrawerProps) {
+  const [hasGenerated, setHasGenerated] = useState(false);
+  const handleClose = useCallback(() => {
+    setHasGenerated(false);
+    onClose();
+  }, [onClose]);
   const selectedDepartmentName = departmentName?.trim() || "";
   const [department, setDepartment] = useState(selectedDepartmentName);
 
@@ -253,17 +258,24 @@ export default function AiGenerationDrawer({
   const isSaving = saveMode !== null;
 
   useEffect(() => {
+    if (hasGenerated) {
+      const element = document.getElementById("ai-generated-editor");
+      element?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [hasGenerated]);
+
+  useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        handleClose();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, open]);
+  }, [handleClose, open]);
 
   const keywordChips = useMemo(
     () =>
@@ -284,6 +296,7 @@ export default function AiGenerationDrawer({
       } else {
         setContent(buildGeneratedContent(kind, title, purpose, selectedSections));
       }
+      setHasGenerated(true);
       return;
     }
 
@@ -350,6 +363,7 @@ export default function AiGenerationDrawer({
       }
 
       setContent(generatedContent);
+      setHasGenerated(true);
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : "Unable to generate SOP. Please try again.");
     } finally {
@@ -395,7 +409,7 @@ export default function AiGenerationDrawer({
         aria-label="Close AI generation drawer"
         className={`absolute inset-0 bg-[#061632]/35 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"
           }`}
-        onClick={onClose}
+        onClick={handleClose}
       />
       <aside
         className={`absolute right-0 top-0 flex h-full w-full max-w-[960px] transform flex-col bg-[#f7faff] shadow-2xl transition-transform duration-300 ease-out sm:w-[92vw] lg:w-[78vw] ${open ? "translate-x-0" : "translate-x-full"
@@ -418,7 +432,7 @@ export default function AiGenerationDrawer({
             type="button"
             aria-label="Close"
             className="flex h-8 w-8 items-center justify-center rounded-md text-[#061632] hover:bg-[#f3f7fc]"
-            onClick={onClose}
+            onClick={handleClose}
           >
             <X className="h-4 w-4" />
           </button>
@@ -596,8 +610,9 @@ export default function AiGenerationDrawer({
                 </div>
               </section>
 
-              <section className="rounded-xl border border-[#dce5ef] bg-white p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              {hasGenerated ? (
+                <section id="ai-generated-editor" className="rounded-xl border border-[#dce5ef] bg-white p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <h4 className="text-[13px] font-semibold text-[#009f74]">3. {editorTitle}</h4>
                   <div className="flex items-center gap-2">
                     <Button
@@ -680,7 +695,7 @@ export default function AiGenerationDrawer({
                       onClick={() => void save("Draft")}
                       disabled={isGenerating || isSaving}
                     >
-                      {saveMode === "Draft" ? "Saving..." : "Save as Draft"}
+                      {saveMode === "Draft" ? "Saving..." : "Save Policy"}
                     </Button>
                     <Button
                       type="button"
@@ -713,6 +728,7 @@ export default function AiGenerationDrawer({
                   </p>
                 ) : null}
               </section>
+            ) : null}
             </div>
           </div>
         </div>

@@ -87,6 +87,29 @@ type StoreSopResponse = {
   errors?: Record<string, string[]>;
 };
 
+type ApiSopRecord = {
+  id?: number | string;
+  sop_name?: string;
+  title?: string;
+  pdf_url?: string;
+  pdf_file_path?: string;
+  status?: string;
+  created_by?: number | string | null;
+  created_by_name?: string | null;
+  uploaded_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  type?: string | null;
+};
+
+type ListSopsResponse = {
+  status_code?: number | string;
+  message?: string;
+  data?: ApiSopRecord[] | { data?: ApiSopRecord[]; sops?: ApiSopRecord[] };
+  sops?: ApiSopRecord[];
+  errors?: Record<string, string[]>;
+};
+
 function readString(value: unknown): string {
   return typeof value === "string"
     ? value
@@ -132,7 +155,10 @@ function getSopSession(): SopSession {
   }
 }
 
-function getApiErrorMessage(payload: StoreSopResponse | null, fallback: string): string {
+function getApiErrorMessage(
+  payload: { message?: string; errors?: Record<string, string[]> } | null,
+  fallback: string
+): string {
   const errors = payload?.errors;
   if (errors) {
     const firstKey = Object.keys(errors)[0];
@@ -142,46 +168,6 @@ function getApiErrorMessage(payload: StoreSopResponse | null, fallback: string):
 
   return payload?.message || fallback;
 }
-
-const initialSops: Sop[] = [
-  {
-    id: "sop-1",
-    title: "Employee Onboarding Workflow",
-    version: "v2.3",
-    type: "PDF",
-    status: "Active",
-    uploadedBy: "Priya Nair",
-    uploadedOn: "12 Jun 2025",
-  },
-  {
-    id: "sop-2",
-    title: "Incident Reporting & Escalation",
-    version: "v1.1",
-    type: "DOCX",
-    status: "Active",
-    uploadedBy: "Sanjay Kapoor",
-    uploadedOn: "28 May 2025",
-  },
-  {
-    id: "sop-3",
-    title: "Quarterly Performance Review",
-    version: "v3.0",
-    type: "PDF",
-    status: "Draft",
-    uploadedBy: "Meera Iyer",
-    uploadedOn: "15 May 2025",
-  },
-  {
-    id: "sop-4",
-    title: "Data Privacy & Retention",
-    version: "v2.0",
-    type: "DOCX",
-    status: "Archived",
-    uploadedBy: "Kabir Khan",
-    uploadedOn: "19 Mar 2025",
-  },
-];
-
 
 const recentActivity: ActivityEvent[] = [
   {
@@ -215,6 +201,19 @@ function formatToday() {
   });
 }
 
+function formatApiDate(value?: string | null): string {
+  if (!value) return "-";
+
+  const date = new Date(value.replace(" ", "T"));
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function createId() {
   return `sop-${Date.now()}`;
 }
@@ -222,6 +221,50 @@ function createId() {
 function getFileType(fileName: string) {
   const extension = fileName.split(".").pop()?.trim();
   return extension ? extension.toUpperCase() : "PDF";
+}
+
+function normalizeSopStatus(value?: string): SopStatus {
+  if (value === "Draft" || value === "Archived") return value;
+  return "Active";
+}
+
+function resolveListRecords(payload: ListSopsResponse | null): ApiSopRecord[] {
+  if (!payload) return [];
+
+  if (Array.isArray(payload.data)) {
+    return payload.data;
+  }
+
+  if (payload.data && typeof payload.data === "object") {
+    if (Array.isArray(payload.data.data)) return payload.data.data;
+    if (Array.isArray(payload.data.sops)) return payload.data.sops;
+  }
+
+  if (Array.isArray(payload.sops)) {
+    return payload.sops;
+  }
+
+  return [];
+}
+
+function mapApiSop(record: ApiSopRecord): Sop {
+  const title = readString(record.sop_name ?? record.title).trim() || "Untitled SOP";
+  const pdfUrl = readString(record.pdf_url).trim();
+  const filePath = readString(record.pdf_file_path).trim();
+  const uploadedBy =
+    readString(record.uploaded_by ?? record.created_by_name).trim() ||
+    (record.created_by ? `User ${record.created_by}` : CURRENT_USER);
+
+  return {
+    id: readString(record.id) || createId(),
+    title,
+    version: "v1.0",
+    type: readString(record.type).trim() || (pdfUrl || filePath ? "PDF" : "AI"),
+    status: normalizeSopStatus(readString(record.status)),
+    uploadedBy,
+    uploadedOn: formatApiDate(record.created_at ?? record.updated_at),
+    pdfUrl,
+  };
 }
 
 function statusClass(status: SopStatus) {
@@ -671,7 +714,8 @@ export default function SopsModule({
   departmentName?: string;
   departmentId?: string | number;
 }) {
-  const [sops, setSops] = useState<Sop[]>(initialSops);
+  const [sops, setSops] = useState<Sop[]>([]);
+  const [loadingSops, setLoadingSops] = useState(false);
   const [view, setView] = useState<SopView>("list");
   const [selected, setSelected] = useState<Sop | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -680,6 +724,66 @@ export default function SopsModule({
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    const selectedDepartmentId = readString(departmentId).trim();
+
+    if (!selectedDepartmentId) {
+      queueMicrotask(() => setSops([]));
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadSops() {
+      const session = getSopSession();
+      const baseUrl = session.baseUrl.replace(/\/$/, "");
+      const url = new URL(`${baseUrl}/api/ai-sop`);
+      url.searchParams.set("department_id", selectedDepartmentId);
+      if (session.subInstituteId) {
+        url.searchParams.set("sub_institute_id", session.subInstituteId);
+      }
+
+      setLoadingSops(true);
+      setFeedback(null);
+
+      try {
+        const response = await fetch(url.toString(), {
+          method: "GET",
+          signal: controller.signal,
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          },
+        });
+
+        const payload = (await response.json().catch(() => null)) as ListSopsResponse | null;
+
+        if (!response.ok || !payload || String(payload.status_code ?? "1") === "0") {
+          throw new Error(getApiErrorMessage(payload, "Unable to load SOPs. Please try again."));
+        }
+
+        setSops(resolveListRecords(payload).map(mapApiSop));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+
+        setSops([]);
+        setFeedback({
+          kind: "error",
+          message: error instanceof Error ? error.message : "Unable to load SOPs. Please try again.",
+        });
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingSops(false);
+        }
+      }
+    }
+
+    void loadSops();
+
+    return () => controller.abort();
+  }, [departmentId]);
 
   useEffect(() => {
     if (!openMenu) return;
@@ -781,7 +885,7 @@ export default function SopsModule({
       kind: "success",
       message:
         document.status === "Active"
-          ? "SOP published successfully. PDF generated and saved."
+          ? "SOP published successfully. PDF uploaded and saved."
           : "SOP saved as draft.",
     });
     goToList();
@@ -889,30 +993,35 @@ export default function SopsModule({
 
   return (
     <div className="min-h-0 overflow-y-auto">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <h3 className="text-base font-semibold text-[#061632]">SOPs ({sops.length})</h3>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            size="lg"
-            className="h-10 px-3 text-[12px]"
-            onClick={() => setView("add")}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add SOP
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="h-10 border-[#d7e0eb] bg-white px-3 text-[12px] font-semibold text-[#6d28d9] hover:bg-[#f5efff]"
-            onClick={() => setAiDrawerOpen(true)}
-          >
-            <Sparkles className="h-4 w-4" aria-hidden="true" />
-            AI Generate
-          </Button>
-        </div>
-      </div>
+     <div className="mb-4">
+  <div className="flex items-center justify-between">
+    <h3 className="text-base font-semibold text-[#061632]">
+      SOPs ({sops.length})
+    </h3>
+  </div>
+
+  <div className="mt-3 flex gap-2">
+    <Button
+      type="button"
+      onClick={() => setView("add")}
+      className="h-10 flex-1 rounded-lg bg-[#2563eb] text-white font-medium hover:bg-[#1d4ed8]"
+    >
+      <Plus className="mr-2 h-4 w-4" />
+      Add SOP
+    </Button>
+
+   <Button
+  type="button"
+  variant="outline"
+  size="lg"
+  className="h-10 min-w-0 flex-1 overflow-hidden whitespace-nowrap rounded-lg border-[#d7e0eb] bg-white px-3 text-[12px] font-semibold text-[#6d28d9] hover:bg-[#f5efff] hover:text-[#5b21b6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ab3f5]  "
+  onClick={() => setAiDrawerOpen(true)}
+>
+  <Sparkles className="mr-2 h-4 w-4 shrink-0" />
+  <span className="truncate">Generate with AI</span>
+</Button>
+  </div>
+</div>
 
       {feedback ? (
         <div
@@ -951,7 +1060,11 @@ export default function SopsModule({
 
       <div className="space-y-5 pb-1">
 
-        {sops.length > 0 ? (
+        {loadingSops ? (
+          <div className="rounded-xl border border-[#dce5ef] bg-white p-4 text-[12px] font-medium text-[#52657d] shadow-[0_1px_4px_rgba(15,23,42,0.12)]">
+            Loading SOPs...
+          </div>
+        ) : sops.length > 0 ? (
           <div className="space-y-4">
             {sops.map((sop) => (
               <SopCard

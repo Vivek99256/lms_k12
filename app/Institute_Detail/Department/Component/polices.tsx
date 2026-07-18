@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-import AiGenerationDrawer from "./ai-generation-drawer";
+import PolicyGenerationDialog from "./policy-generation-dialog";
 import type { AiGeneratedDocumentSave } from "./ai-generation-drawer";
 
 export type PolicyStatus = "Active" | "Draft";
@@ -581,15 +581,17 @@ export default function PoliciesModule({ departmentName }: { departmentName?: st
 
   return (
     <div className="min-h-0 overflow-y-auto">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <h3 className="text-base font-semibold text-[#061632]">
-          Policies ({policies.length})
-        </h3>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+     <div className="mb-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-[#061632]">
+            Policies ({policies.length})
+          </h3>
+        </div>
+        <div className="mt-3 flex gap-2">
           <Button
             type="button"
             size="lg"
-            className="h-10 px-3 text-[12px]"
+             className="h-10 flex-1 rounded-lg bg-[#2563eb] text-white font-medium hover:bg-[#1d4ed8] hover:text"
             onClick={() => setView("add")}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -599,7 +601,7 @@ export default function PoliciesModule({ departmentName }: { departmentName?: st
             type="button"
             variant="outline"
             size="lg"
-            className="h-10 border-[#d7e0eb] bg-white px-3 text-[12px] font-semibold text-[#6d28d9] hover:bg-[#f5efff]"
+           className="h-10 min-w-0 flex-1 overflow-hidden whitespace-nowrap rounded-lg border-[#d7e0eb] bg-white px-3 text-[12px] font-semibold text-[#6d28d9] hover:bg-[#f5efff] hover:text-[#5b21b6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ab3f5]"
             onClick={() => setAiDrawerOpen(true)}
           >
             <Sparkles className="h-4 w-4" aria-hidden="true" />
@@ -667,9 +669,8 @@ export default function PoliciesModule({ departmentName }: { departmentName?: st
         ))}
       </div>
 
-      <AiGenerationDrawer
+      <PolicyGenerationDialog
         open={aiDrawerOpen}
-        kind="Policy"
         onClose={() => setAiDrawerOpen(false)}
         onSave={handleAiSave}
         departmentName={departmentName}
