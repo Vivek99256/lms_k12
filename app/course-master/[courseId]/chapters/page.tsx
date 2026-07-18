@@ -63,6 +63,7 @@ import { getRequestContext } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import type { Chapter } from '../../data/chapters';
+import { GeneratePresentationDrawer } from './sideDrawer';
 
 const EMPTY_CHAPTER_FORM = {
   chapterName: '',
@@ -90,6 +91,7 @@ const QUESTION_TYPE_API_CONFIG: Record<
 const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
 const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
 const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity'] as const;
+
 const UPLOAD_TYPE_CONFIG: Record<
   (typeof UPLOAD_CONTENT_TYPES)[number],
   {
@@ -228,7 +230,7 @@ function buildApiChapterContentItems(
       return {
         id: String(asset.id),
         title: asset.title || 'Untitled content',
-        subtitle: asset.description || category,
+        subtitle: category,
         chapterTitle: chapter.title,
         conceptTitle: category,
         type,
@@ -323,11 +325,6 @@ function getCourseGradeLabel(classGrade: string) {
 
 function getCurriculumLabel() {
   return 'CBSE curriculum';
-}
-
-function getChapterWindow(chapterNumber: number) {
-  const ranges = ['Apr W1-W3', 'Apr W4-May W2', 'Jun W3-Jul W3', 'Aug W1-Sep W2', 'Sep W3-Oct W4'];
-  return ranges[(chapterNumber - 1) % ranges.length];
 }
 
 function buildTeacherResources(chapterTitle: string) {
@@ -502,6 +499,12 @@ function getContentPreviewIcon(preview: ChapterContentPreview) {
   return BookOpen;
 }
 
+function truncateToWords(value: string, maxWords = 150): string {
+  const words = value.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return value;
+  return words.slice(0, maxWords).join(' ') + '…';
+}
+
 function getQuestionBankConceptTitles(course: Course, chapter: Chapter) {
   const savedConcepts = (chapter.concepts ?? [])
     .map((concept) => concept.title)
@@ -670,9 +673,10 @@ export default function ChapterListPage() {
   const [presentationMode, setPresentationMode] = useState<'Classroom' | 'Teacher training'>('Classroom');
   const [presentationChapterId, setPresentationChapterId] = useState('');
   const [presentationConcept, setPresentationConcept] = useState('');
-  const [presentationSlides, setPresentationSlides] = useState<string>(PRESENTATION_SLIDE_OPTIONS[2]);
+  const [presentationSlides, setPresentationSlides] = useState<string>(PRESENTATION_SLIDE_OPTIONS[1]);
   const [presentationTheme, setPresentationTheme] = useState<string>(GAMMA_THEME_OPTIONS[0]);
   const [presentationAudienceNotes, setPresentationAudienceNotes] = useState('');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploadContentType, setUploadContentType] = useState<(typeof UPLOAD_CONTENT_TYPES)[number]>(
     UPLOAD_CONTENT_TYPES[0]
   );
@@ -760,7 +764,6 @@ export default function ChapterListPage() {
         : null,
     [activeLibraryChapter, course]
   );
-  const contentChapterConceptOptions = contentChapterConcepts?.concepts ?? [];
 
   const filteredChapters = useMemo(() => {
     return allChapters.filter((chapter) => {
@@ -1321,7 +1324,7 @@ export default function ChapterListPage() {
         : allChapters.find((chapter) => chapter.id === questionBankChapterFilter) ?? null;
     const targetChapter =
       filterChapter ??
-      (targetQuestion ? allChapters.find((chapter) => chapter.id === targetQuestion.chapterId) ?? null : null) ??
+      (targetQuestion ? allChapters.find((chapter) => chapter.id === targetQuestion.chapterId) : null) ??
       resourceChapter ??
       allChapters[0] ??
       null;
@@ -1527,12 +1530,6 @@ export default function ChapterListPage() {
   };
 
   const openGeneratePresentationDrawer = () => {
-    setPresentationMode('Classroom');
-    setPresentationChapterId(activeLibraryChapter?.id ?? contentChapter?.id ?? '');
-    setPresentationConcept(activeLibraryChapterConcepts?.concepts[0]?.title ?? '');
-    setPresentationSlides(PRESENTATION_SLIDE_OPTIONS[2]);
-    setPresentationTheme(GAMMA_THEME_OPTIONS[0]);
-    setPresentationAudienceNotes('');
     setIsGeneratePresentationDrawerOpen(true);
   };
 
@@ -1540,6 +1537,12 @@ export default function ChapterListPage() {
     setIsGeneratePresentationDrawerOpen(false);
   };
 
+  const handleGenerateSuccess = (raw: Record<string, unknown>) => {
+    setSuccessMessage((raw.message as string) || 'Gamma content generated successfully');
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  };
   useEffect(() => {
     if (!presentationChapterId) return;
 
@@ -1638,7 +1641,9 @@ export default function ChapterListPage() {
                 </Label>
                 <Select value={uploadChapterId} onValueChange={(value) => setUploadChapterId(value ?? '')}>
                   <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                    <SelectValue placeholder="Select chapter" />
+                    <SelectValue placeholder="Select chapter">
+                      {allChapters.find(ch => ch.id === uploadChapterId)?.title || 'Select chapter'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {uploadChapterOptions.map((chapter) => (
@@ -3273,8 +3278,8 @@ export default function ChapterListPage() {
                     <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
                       {item.chapterTitle}
                     </div>
-                    <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-                    <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-600">{item.subtitle}</p>
+                     <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
+                     <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-600">{truncateToWords(item.subtitle, 150)}</p>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
                       <p className="text-xs text-slate-500">
@@ -3365,6 +3370,10 @@ export default function ChapterListPage() {
                       </Badge>
                     </div>
 
+                    {selectedContentItem.subtitle ? (
+                      <p className="mt-4 text-sm leading-7 text-slate-600">{selectedContentItem.subtitle}</p>
+                    ) : null}
+
                     <dl className="mt-6 grid gap-y-4 text-sm sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-5">
                       <dt className="text-slate-500">Chapter</dt>
                       <dd className="font-medium text-slate-900">{selectedContentItem.chapterTitle}</dd>
@@ -3444,7 +3453,16 @@ export default function ChapterListPage() {
           </div>
           {uploadContentModal}
           {generateQuestionsModal}
-          {generatePresentationDrawer}
+          <GeneratePresentationDrawer
+            isOpen={isGeneratePresentationDrawerOpen}
+            onClose={closeGeneratePresentationDrawer}
+            allChapters={allChapters}
+            courseId={course.id}
+            course={course}
+            initialChapterId={activeLibraryChapter?.id ?? contentChapter?.id ?? ''}
+            initialConcept={activeLibraryChapterConcepts?.concepts[0]?.title ?? ''}
+            onSuccess={handleGenerateSuccess}
+          />
         </div>
       </div>
     );
@@ -3453,6 +3471,12 @@ export default function ChapterListPage() {
   return (
     <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
       <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8 ">
+        {successMessage && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
+            <CheckCircle2 size={16} className="shrink-0" />
+            {successMessage}
+          </div>
+        )}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -4065,4 +4089,3 @@ export default function ChapterListPage() {
     </div>
   );
 }
-
