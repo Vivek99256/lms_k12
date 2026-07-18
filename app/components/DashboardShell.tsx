@@ -9,7 +9,6 @@ import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import { usePathname, useRouter } from 'next/navigation';
-import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 
 interface SelectedBranch {
@@ -120,7 +119,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
     setMasterMenuLoading(true);
     try {
-      const url = new URL(`${API_BASE_URL}/api/master-menu-rights`);
+      const url = new URL(`/api/proxy?path=api/master-menu-rights`);
       url.searchParams.set('menu_id', String(menuItem.id));
       url.searchParams.set('main_menu_id', String(mainMenuId));
       url.searchParams.set('type', 'API');
