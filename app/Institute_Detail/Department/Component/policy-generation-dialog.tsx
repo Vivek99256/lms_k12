@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AiGeneratedDocumentSave } from "./ai-generation-drawer";
+import { Tooltip } from "./ai-generation-drawer";
 
 type Props = {
   open: boolean;
@@ -178,9 +179,9 @@ export default function PolicyGenerationDialog({ open, onClose, onSave, departme
               </div>
             </section>
 
-            {hasGenerated ? <section id="policy-generated-editor" className="overflow-hidden rounded-xl border border-[#d8e1ef]">
+            {hasGenerated ? <section id="policy-generated-editor" className="overflow-visible rounded-xl border border-[#d8e1ef]">
               <div className="flex items-center justify-between px-5 py-3"><h3 className="text-[14px] font-semibold text-[#00a351]">3. AI-Generated Policy Editor</h3><div className="flex gap-2"><Button variant="outline" className="h-9 border-[#ded7ff] text-[11px]" onClick={() => setContent(`${content}\n\nImprovement Notes\nReview ownership, exceptions, and measurable compliance requirements.`)}><WandSparkles className="h-4 w-4 text-[#5c39ed]" />AI Improve</Button><Button variant="outline" className="h-9 border-[#ded7ff] text-[11px]" onClick={() => setContent(generated)}><RefreshCw className="h-4 w-4" />Regenerate</Button></div></div>
-              <div className="mx-5 flex h-10 items-center gap-1 rounded-t-lg border border-[#d8e1ef] px-2 text-[#111827]"><select className="mr-2 h-7 rounded border border-[#e2e7ef] px-2 text-[11px]"><option>Normal</option><option>Heading</option></select>{[[Bold, "Bold"], [Italic, "Italic"], [Underline, "Underline"], [List, "List"], [AlignLeft, "Align left"], [AlignCenter, "Align center"], [AlignRight, "Align right"]].map(([Icon, label]) => { const ToolIcon = Icon as typeof Bold; return <button key={label as string} type="button" title={label as string} className="rounded p-1.5 hover:bg-slate-100"><ToolIcon className="h-4 w-4" /></button>; })}</div>
+              <div className="mx-5 flex h-10 items-center gap-1 rounded-t-lg border border-[#d8e1ef] px-2 text-[#111827]"><select className="mr-2 h-7 rounded border border-[#e2e7ef] px-2 text-[11px]"><option>Normal</option><option>Heading</option></select>{[[Bold, "Bold"], [Italic, "Italic"], [Underline, "Underline"], [List, "List"], [AlignLeft, "Align left"], [AlignCenter, "Align center"], [AlignRight, "Align right"]].map(([Icon, label]) => { const ToolIcon = Icon as typeof Bold; return <Tooltip key={label as string} label={label as string}><button type="button" title={label as string} className="rounded p-1.5 hover:bg-slate-100"><ToolIcon className="h-4 w-4" /></button></Tooltip>; })}</div>
               <Textarea aria-label="Generated policy content" value={content} onChange={(e) => setContent(e.target.value)} className="mx-5 mb-5 min-h-[300px] w-[calc(100%-40px)] resize-none rounded-t-none border-[#d8e1ef] px-4 py-4 font-sans text-[12px] font-normal leading-6" />
             </section> : null}
           </div>

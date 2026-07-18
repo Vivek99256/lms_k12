@@ -172,6 +172,13 @@ function buildGeneratedContent(
   return `${name}\n\n${lines.join("\n\n")}`;
 }
 
+function stripMarkdown(value: string): string {
+  return value
+    .replace(/[#*_`]+/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .trim();
+}
+
 function SectionCheckbox({
   label,
   checked,
@@ -204,14 +211,58 @@ function ToolbarButton({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className="flex h-7 w-7 items-center justify-center rounded-md text-[#405275] hover:bg-[#eef3ff] hover:text-[#004cff]"
+    <Tooltip label={label}>
+      <button
+        type="button"
+        aria-label={label}
+        title={label}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-[#405275] hover:bg-[#eef3ff] hover:text-[#004cff]"
+      >
+        {children}
+      </button>
+    </Tooltip>
+  );
+}
+
+export function Tooltip({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className="tooltip-host relative inline-flex"
+      onMouseEnter={(event) => {
+        const bubble = event.currentTarget.querySelector(".tooltip-bubble");
+        bubble?.classList.remove("opacity-0");
+        bubble?.classList.add("opacity-100");
+      }}
+      onMouseLeave={(event) => {
+        const bubble = event.currentTarget.querySelector(".tooltip-bubble");
+        bubble?.classList.remove("opacity-100");
+        bubble?.classList.add("opacity-0");
+      }}
+      onFocus={(event) => {
+        const bubble = event.currentTarget.querySelector(".tooltip-bubble");
+        bubble?.classList.remove("opacity-0");
+        bubble?.classList.add("opacity-100");
+      }}
+      onBlur={(event) => {
+        const bubble = event.currentTarget.querySelector(".tooltip-bubble");
+        bubble?.classList.remove("opacity-100");
+        bubble?.classList.add("opacity-0");
+      }}
     >
       {children}
-    </button>
+      <span
+        role="tooltip"
+        className="tooltip-bubble pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#061632] px-2 py-1 text-[10px] font-medium text-white opacity-0 transition-opacity duration-150"
+      >
+        {label}
+      </span>
+    </span>
   );
 }
 
@@ -362,7 +413,7 @@ export default function AiGenerationDrawer({
         throw new Error("Gemini returned an empty SOP. Please try again.");
       }
 
-      setContent(generatedContent);
+      setContent(stripMarkdown(generatedContent));
       setHasGenerated(true);
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : "Unable to generate SOP. Please try again.");
@@ -647,7 +698,7 @@ export default function AiGenerationDrawer({
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-lg border border-[#d7e0eb] bg-white">
+                <div className="overflow-visible rounded-lg border border-[#d7e0eb] bg-white">
                   <div className="flex flex-wrap items-center gap-1 border-b border-[#d7e0eb] bg-[#fbfdff] px-2 py-1.5">
                     <select
                       aria-label="Text style"
