@@ -1,12 +1,11 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import {API_BASE_URL} from '../app/components/utils/api_url';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: { name: string; email: string; avatar?: string } | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   menuContext: {
     sub_institute_id: number;
@@ -142,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/api-login`, {
+      const res = await fetch(`/api/proxy?path=api/api-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, type: 'API' }),
@@ -185,11 +184,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAcademicTerms(Array.isArray(data.academicTerms) ? data.academicTerms : []);
         setAcademicYears(Array.isArray(data.academicYears) ? data.academicYears : []);
         resetInactivityTimer();
-        return true;
+        return { success: true };
       }
-      return false;
-    } catch {
-      return false;
+      return { success: false, error: data?.message || 'Invalid credentials. Please try again.' };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Network error. Please try again.';
+      return { success: false, error: message };
     }
   }, [resetInactivityTimer]);
 
@@ -219,7 +219,7 @@ export function useAuth() {
     return {
       isAuthenticated: false,
       user: null,
-      login: async () => false,
+      login: async (): Promise<{ success: boolean; error?: string }> => ({ success: false }),
       logout: () => {},
       menuContext: null,
       academicTerms: [],
