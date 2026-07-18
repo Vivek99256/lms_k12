@@ -27,9 +27,9 @@ export default function LoginPage() {
     setError('');
     setIsLoading(true);
     try {
-      const success = await login(email, password);
-      if (!success) {
-        setError('Invalid credentials. Please try again.');
+      const result = await login(email, password);
+      if (!result.success) {
+        setError(result.error || 'Invalid credentials. Please try again.');
         return;
       }
       localStorage.removeItem('selectedMenuBranch');
