@@ -2,27 +2,22 @@
 
 import { FormEvent, ReactNode, useState } from "react"
 import {
+  Building2,
+  ChevronLeft,
   ChevronRight,
-  Eye,
-  Filter,
+  Landmark,
   Pencil,
   Plus,
-  Save,
   Search,
   Send,
+  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -74,6 +69,7 @@ type OrganizationProfile = {
   dateFormat: string
   language: string
   numberFormat: string
+  totalEmployees: string
   workingDays: string[]
   sisterCompanies: SisterCompany[]
 }
@@ -88,6 +84,13 @@ type SisterCompany = {
   name: string
   relationship: string
   status: "Active" | "Inactive"
+  profile: OrganizationProfile
+}
+
+type SisterCompanyFormState = {
+  mode: "add" | "edit"
+  id?: string
+  draft: OrganizationProfile
 }
 
 const allDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -95,7 +98,7 @@ const allDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const options = {
   organizationType: ["Company", "Partnership", "LLP", "Trust", "Society"],
   businessType: ["Private Limited", "Public Limited", "Partnership", "Non Profit"],
-  industryType: ["Education", "Information Technology", "Healthcare", "Manufacturing"],
+  industryType: ["Information Technology", "Education", "Healthcare", "Manufacturing"],
   status: ["Active", "Pending Review", "Inactive"],
   country: ["India", "United States", "United Kingdom"],
   timeZone: ["(IST) Asia/Kolkata", "(GMT) Europe/London", "(PST) America/Los_Angeles"],
@@ -108,68 +111,216 @@ const options = {
 
 const initialProfile: OrganizationProfile = {
   status: "Active",
-  organizationName: "Greenfield K12 Academy",
-  organizationCode: "GKA-2026",
+  organizationName: "ABC Technologies Pvt. Ltd.",
+  organizationCode: "ABC123",
   organizationType: "Company",
   businessType: "Private Limited",
-  industryType: "Education",
-  establishedDate: "2008-06-12",
-  registrationNo: "REG-K12-45128",
-  gstNo: "27AAACG1234H1Z5",
-  panNo: "AAACG1234H",
-  website: "https://greenfieldacademy.edu",
+  industryType: "Information Technology",
+  establishedDate: "2014-08-18",
+  registrationNo: "REG-GJ-AHD-2014-4821",
+  gstNo: "24AABCA9812F1Z7",
+  panNo: "AABCA9812F",
+  website: "www.abctech.com",
   companyDescription:
-    "A K12 education organization focused on academics, arts, sports, and learner-centered digital experiences.",
-  email: "office@greenfieldacademy.edu",
-  phone: "+91 22 4567 8901",
-  alternatePhone: "+91 22 4567 8902",
-  addressLine1: "18 Knowledge Park Road, Sector 5",
-  addressLine2: "Powai",
+    "ABC Technologies Pvt. Ltd. provides cloud, analytics, and education technology services for schools and enterprise learning teams.",
+  email: "info@abctech.com",
+  phone: "079-12345678",
+  alternatePhone: "079-12345679",
+  addressLine1: "407, Riverfront Business Park, Ashram Road",
+  addressLine2: "Near Ellis Bridge",
   country: "India",
-  state: "Maharashtra",
-  city: "Mumbai",
-  postalCode: "400076",
-  brandName: "Greenfield Academy",
-  tagline: "Learn. Lead. Grow.",
+  state: "Gujarat",
+  city: "Ahmedabad",
+  postalCode: "380009",
+  brandName: "ATP",
+  tagline: "Technology for measurable growth",
   brandDescription:
-    "A student-first brand identity used across campuses, admissions, portals, and communications.",
+    "ATP is the operating brand used for digital transformation, institutional management, and analytics solutions.",
   timeZone: "(IST) Asia/Kolkata",
   currency: "INR - Indian Rupee",
   financialYear: "April - March",
   dateFormat: "DD/MM/YYYY",
   language: "English",
   numberFormat: "1,234.56",
-  workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  totalEmployees: "248",
+  workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
   sisterCompanies: [
     {
       id: "company-1",
-      name: "Greenfield Junior Campus",
+      name: "GapstoGrowth Analytics",
       relationship: "Sister Company",
       status: "Active",
+      profile: {
+        status: "Active",
+        organizationName: "GapstoGrowth Analytics",
+        organizationCode: "GGA-2026",
+        organizationType: "Company",
+        businessType: "Private Limited",
+        industryType: "Information Technology",
+        establishedDate: "2017-03-14",
+        registrationNo: "REG-GJ-AHD-2017-2194",
+        gstNo: "24AAHCG5421B1Z3",
+        panNo: "AAHCG5421B",
+        website: "www.gapstogrowthanalytics.com",
+        companyDescription:
+          "GapstoGrowth Analytics delivers data warehousing, business intelligence dashboards, and predictive analytics services for education and mid-market clients.",
+        email: "contact@gapstogrowthanalytics.com",
+        phone: "079-40124567",
+        alternatePhone: "079-40124568",
+        addressLine1: "B-1202, Titanium Heights, Corporate Road",
+        addressLine2: "Prahlad Nagar",
+        country: "India",
+        state: "Gujarat",
+        city: "Ahmedabad",
+        postalCode: "380015",
+        brandName: "GGA",
+        tagline: "Analytics that guide growth",
+        brandDescription:
+          "GGA is the analytics services brand for reporting, forecasting, and operational intelligence solutions.",
+        timeZone: "(IST) Asia/Kolkata",
+        currency: "INR - Indian Rupee",
+        financialYear: "April - March",
+        dateFormat: "DD/MM/YYYY",
+        language: "English",
+        numberFormat: "1,234.56",
+        totalEmployees: "86",
+        workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        sisterCompanies: [],
+      },
     },
     {
       id: "company-2",
-      name: "Greenfield Learning Centre",
+      name: "GapstoGrowth EMEA",
       relationship: "Sister Company",
       status: "Active",
+      profile: {
+        status: "Active",
+        organizationName: "GapstoGrowth EMEA",
+        organizationCode: "GGE-2026",
+        organizationType: "Company",
+        businessType: "Private Limited",
+        industryType: "Information Technology",
+        establishedDate: "2019-09-02",
+        registrationNo: "REG-UK-LON-2019-7742",
+        gstNo: "29AAFCG1934K1Z2",
+        panNo: "AAFCG1934K",
+        website: "www.gapstogrowthemea.com",
+        companyDescription:
+          "GapstoGrowth EMEA manages regional implementation, customer success, and platform support for clients across Europe, the Middle East, and Africa.",
+        email: "hello@gapstogrowthemea.com",
+        phone: "+44 20 7946 0831",
+        alternatePhone: "+44 20 7946 0832",
+        addressLine1: "12th Floor, Meridian House, 34 Great Eastern Street",
+        addressLine2: "Shoreditch",
+        country: "United Kingdom",
+        state: "England",
+        city: "London",
+        postalCode: "EC2A 3ER",
+        brandName: "GGE",
+        tagline: "Regional delivery, global standards",
+        brandDescription:
+          "GGE represents the EMEA delivery arm for implementations, managed services, and enterprise support.",
+        timeZone: "(GMT) Europe/London",
+        currency: "GBP - British Pound",
+        financialYear: "January - December",
+        dateFormat: "DD/MM/YYYY",
+        language: "English",
+        numberFormat: "1,234.56",
+        totalEmployees: "64",
+        workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        sisterCompanies: [],
+      },
     },
     {
       id: "company-3",
-      name: "Greenfield Global Services LLP",
+      name: "GapstoGrowth Cloud Labs",
       relationship: "Sister Company",
       status: "Inactive",
+      profile: {
+        status: "Inactive",
+        organizationName: "GapstoGrowth Cloud Labs",
+        organizationCode: "GCL-2026",
+        organizationType: "Company",
+        businessType: "Private Limited",
+        industryType: "Information Technology",
+        establishedDate: "2020-01-20",
+        registrationNo: "REG-KA-BLR-2020-1186",
+        gstNo: "29AAHCG8263M1Z6",
+        panNo: "AAHCG8263M",
+        website: "www.gapstogrowthcloudlabs.com",
+        companyDescription:
+          "GapstoGrowth Cloud Labs focuses on cloud architecture prototypes, DevOps automation, and managed infrastructure experiments.",
+        email: "support@gapstogrowthcloudlabs.com",
+        phone: "080-46781234",
+        alternatePhone: "080-46781235",
+        addressLine1: "5th Floor, Invento Tech Park, Outer Ring Road",
+        addressLine2: "Marathahalli",
+        country: "India",
+        state: "Karnataka",
+        city: "Bengaluru",
+        postalCode: "560037",
+        brandName: "GCL",
+        tagline: "Cloud prototypes to production",
+        brandDescription:
+          "GCL is the cloud innovation and infrastructure engineering brand within the company group.",
+        timeZone: "(IST) Asia/Kolkata",
+        currency: "INR - Indian Rupee",
+        financialYear: "April - March",
+        dateFormat: "DD/MM/YYYY",
+        language: "English",
+        numberFormat: "1,234.56",
+        totalEmployees: "42",
+        workingDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        sisterCompanies: [],
+      },
     },
   ],
 }
 
 const PAGE_SIZE = 5
+const cardSurfaceClass =
+  "gap-0 rounded-xl bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.16)]"
 
-function createSisterCompany(): SisterCompany {
+function createSisterCompanyProfile(company?: SisterCompany): OrganizationProfile {
+  if (company?.profile) {
+    return {
+      ...company.profile,
+      sisterCompanies: [],
+    }
+  }
+
   return {
-    id: `company-${Date.now()}`,
-    name: "",
-    relationship: "Sister Company",
-    status: "Active",
+    ...initialProfile,
+    status: company?.status ?? "Active",
+    organizationName: company?.name ?? "",
+    organizationCode: "NEW-SC",
+    registrationNo: "REG-GJ-AHD-2026-0001",
+    gstNo: "24AAHCS0001N1Z1",
+    panNo: "AAHCS0001N",
+    website: "www.newsistercompany.com",
+    companyDescription:
+      "New Sister Company is a sample group entity profile used for validating company registration, contact, address, and settings workflows.",
+    email: "info@newsistercompany.com",
+    phone: "079-40000001",
+    alternatePhone: "079-40000002",
+    addressLine1: "501, Commerce Square, C.G. Road",
+    addressLine2: "Navrangpura",
+    city: "Ahmedabad",
+    state: "Gujarat",
+    postalCode: "380006",
+    brandName:
+      company?.name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase() || "SC",
+    tagline: "Built for connected growth",
+    brandDescription:
+      "SC is a placeholder brand identity for sister company onboarding and UI validation.",
+    totalEmployees: "25",
+    sisterCompanies: [],
   }
 }
 
@@ -177,12 +328,12 @@ export default function OrganizationProfilePage() {
   const [profile, setProfile] = useState<OrganizationProfile>(initialProfile)
   const [draft, setDraft] = useState<OrganizationProfile>(initialProfile)
   const [isEditing, setIsEditing] = useState(false)
-  const [message, setMessage] = useState("")
+  const [, setMessage] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [page, setPage] = useState(1)
+  const [sisterForm, setSisterForm] = useState<SisterCompanyFormState | null>(null)
 
   const currentProfile = isEditing ? draft : profile
-
   const visibleCompanies = currentProfile.sisterCompanies.filter((company) =>
     company.name.toLowerCase().includes(searchTerm.trim().toLowerCase())
   )
@@ -192,6 +343,8 @@ export default function OrganizationProfilePage() {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   )
+  const rangeStart = visibleCompanies.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, visibleCompanies.length)
 
   function handleEdit() {
     setDraft(profile)
@@ -212,8 +365,13 @@ export default function OrganizationProfilePage() {
   function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
+    if (sisterForm) {
+      handleSaveSisterCompany()
+      return
+    }
+
     if (!draft.organizationName.trim() || !draft.organizationCode.trim()) {
-      setMessage("Organization name and code are required.")
+      setMessage("Company name and code are required.")
       return
     }
 
@@ -227,7 +385,7 @@ export default function OrganizationProfilePage() {
       sisterCompanies: draft.sisterCompanies.filter((company) => company.name.trim()),
     })
     setIsEditing(false)
-    setMessage("Organization profile updated.")
+    setMessage("Institute profile updated.")
   }
 
   function updateField(field: OrganizationField, value: string) {
@@ -264,364 +422,747 @@ export default function OrganizationProfilePage() {
     }))
   }
 
-  const rangeStart = visibleCompanies.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(currentPage * PAGE_SIZE, visibleCompanies.length)
+  function openNewSisterCompany() {
+    setSisterForm({
+      mode: "add",
+      draft: createSisterCompanyProfile(),
+    })
+    setIsEditing(false)
+    setSearchTerm("")
+    setPage(1)
+  }
+
+  function openEditSisterCompany(company: SisterCompany) {
+    setSisterForm({
+      mode: "edit",
+      id: company.id,
+      draft: createSisterCompanyProfile(company),
+    })
+    setIsEditing(false)
+  }
+
+  function updateSisterFormField(field: OrganizationField, value: string) {
+    setSisterForm((current) =>
+      current
+        ? {
+            ...current,
+            draft: {
+              ...current.draft,
+              [field]: value,
+            },
+          }
+        : current
+    )
+  }
+
+  function toggleSisterWorkingDay(day: string) {
+    setSisterForm((current) =>
+      current
+        ? {
+            ...current,
+            draft: {
+              ...current.draft,
+              workingDays: current.draft.workingDays.includes(day)
+                ? current.draft.workingDays.filter((item) => item !== day)
+                : [...current.draft.workingDays, day],
+            },
+          }
+        : current
+    )
+  }
+
+  function handleSaveSisterCompany() {
+    if (!sisterForm) return
+
+    const companyName = sisterForm.draft.organizationName.trim()
+    if (!companyName) {
+      setMessage("Sister company name is required.")
+      return
+    }
+
+    const nextCompany: SisterCompany = {
+      id: sisterForm.id ?? `company-${Date.now()}`,
+      name: companyName,
+      relationship: "Sister Company",
+      status:
+        sisterForm.draft.status === "Inactive"
+          ? "Inactive"
+          : "Active",
+      profile: {
+        ...sisterForm.draft,
+        organizationName: companyName,
+        sisterCompanies: [],
+      },
+    }
+
+    setProfile((current) => ({
+      ...current,
+      sisterCompanies:
+        sisterForm.mode === "edit"
+          ? current.sisterCompanies.map((company) =>
+              company.id === nextCompany.id ? nextCompany : company
+            )
+          : [...current.sisterCompanies, nextCompany],
+    }))
+    setDraft((current) => ({
+      ...current,
+      sisterCompanies:
+        sisterForm.mode === "edit"
+          ? current.sisterCompanies.map((company) =>
+              company.id === nextCompany.id ? nextCompany : company
+            )
+          : [...current.sisterCompanies, nextCompany],
+    }))
+    setSisterForm(null)
+    setMessage("Sister company saved.")
+  }
+
+  function closeSisterForm() {
+    setSisterForm(null)
+    setMessage("")
+  }
+
+  if (sisterForm) {
+    const sisterDraft = sisterForm.draft
+    const breadcrumbEnd =
+      sisterForm.mode === "add"
+        ? "New Sister Company"
+        : sisterDraft.organizationName || "Edit Sister Company"
+
+    return (
+      <form
+        onSubmit={handleSave}
+        className="min-h-screen bg-[#f6f8fb] px-4 py-0 text-[12px] text-slate-950 sm:px-5 lg:px-6"
+      >
+        <div className="mx-auto flex w-full max-w-[1160px] min-w-0 flex-col gap-6 py-4">
+          <Card
+            size="sm"
+            className="flex min-h-[58px] flex-row items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 shadow-sm"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-blue-100 bg-blue-50 text-blue-600">
+                <Building2 className="size-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="flex min-w-0 items-center gap-1 text-sm font-semibold">
+                  <button
+                    type="button"
+                    className="truncate text-slate-950 transition-colors hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    onClick={closeSisterForm}
+                  >
+                    {profile.organizationName}
+                  </button>
+                  <span className="shrink-0 text-slate-400">/</span>
+                  <span className="truncate text-slate-950" aria-current="page">
+                    {breadcrumbEnd}
+                  </span>
+                </h1>
+                <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">
+                  Manage sister company core information
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-md px-3 text-xs"
+              onClick={closeSisterForm}
+            >
+              <X className="size-4" aria-hidden="true" />
+              Back
+            </Button>
+          </Card>
+
+          <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(240px,304px)_minmax(0,1fr)]">
+            <Card className={cn(cardSurfaceClass, "min-h-[432px] border-x border-b border-t-0")}>
+              <h2 className="text-base font-semibold">Company Logo</h2>
+              <div className="mt-6 flex flex-col items-center">
+                <div className="flex size-[102px] items-center justify-center rounded-xl bg-[#2f66e8] text-2xl font-bold text-white shadow-lg shadow-blue-500/20">
+                  {sisterDraft.brandName || "SC"}
+                </div>
+                <Input
+                  value={sisterDraft.brandName}
+                  onChange={(event) => updateSisterFormField("brandName", event.target.value)}
+                  className="mt-5 h-8 max-w-[150px] rounded-[10px] bg-white text-center"
+                  aria-label="Company logo text"
+                />
+              </div>
+              <div className="mt-6 space-y-4">
+                <ReadField label="Founded" value={sisterDraft.establishedDate || "Pending"} />
+                <ReadField label="Total Employees" value={sisterDraft.totalEmployees} />
+              </div>
+            </Card>
+
+            <Card className={cn(cardSurfaceClass, "border-x border-b border-t-0")}>
+              <SectionTitle
+                title="Company Details"
+                description="Core registration and identity information."
+              />
+              <div className="mt-5 grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
+                <EditableField
+                  id="sisterOrganizationName"
+                  label="Company Name"
+                  value={sisterDraft.organizationName}
+                  required
+                  onChange={(value) => updateSisterFormField("organizationName", value)}
+                />
+                <EditableField
+                  id="sisterOrganizationCode"
+                  label="Company Code"
+                  value={sisterDraft.organizationCode}
+                  required
+                  onChange={(value) => updateSisterFormField("organizationCode", value)}
+                />
+                <EditableField
+                  id="sisterRegistrationNo"
+                  label="Registration Number"
+                  value={sisterDraft.registrationNo}
+                  required
+                  autoFocus
+                  onChange={(value) => updateSisterFormField("registrationNo", value)}
+                />
+                <EditableSelect
+                  label="Industry"
+                  value={sisterDraft.industryType}
+                  options={options.industryType}
+                  required
+                  onChange={(value) => updateSisterFormField("industryType", value)}
+                />
+                <EditableSelect
+                  label="Organization Type"
+                  value={sisterDraft.organizationType}
+                  options={options.organizationType}
+                  required
+                  onChange={(value) => updateSisterFormField("organizationType", value)}
+                />
+                <EditableSelect
+                  label="Business Type"
+                  value={sisterDraft.businessType}
+                  options={options.businessType}
+                  required
+                  onChange={(value) => updateSisterFormField("businessType", value)}
+                />
+                <EditableField
+                  id="sisterEstablishedDate"
+                  label="Established Date"
+                  type="date"
+                  value={sisterDraft.establishedDate}
+                  required
+                  onChange={(value) => updateSisterFormField("establishedDate", value)}
+                />
+                <EditableField
+                  id="sisterTotalEmployees"
+                  label="Total Employees"
+                  value={sisterDraft.totalEmployees}
+                  required
+                  onChange={(value) => updateSisterFormField("totalEmployees", value)}
+                />
+                <EditableField
+                  id="sisterGstNo"
+                  label="GST No."
+                  value={sisterDraft.gstNo}
+                  required
+                  onChange={(value) => updateSisterFormField("gstNo", value)}
+                />
+                <EditableField
+                  id="sisterPanNo"
+                  label="PAN No."
+                  value={sisterDraft.panNo}
+                  required
+                  onChange={(value) => updateSisterFormField("panNo", value)}
+                />
+                <EditableField
+                  id="sisterWebsite"
+                  label="Website"
+                  value={sisterDraft.website}
+                  onChange={(value) => updateSisterFormField("website", value)}
+                />
+                <EditableTextarea
+                  id="sisterCompanyDescription"
+                  label="Company Description"
+                  value={sisterDraft.companyDescription}
+                  className="md:col-span-2"
+                  required
+                  onChange={(value) => updateSisterFormField("companyDescription", value)}
+                />
+              </div>
+            </Card>
+          </div>
+
+          <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
+            <Card className={cn(cardSurfaceClass, "min-h-[344px]")}>
+              <SectionTitle title="Contact Information" />
+              <div className="mt-6 grid grid-cols-1 gap-4">
+                <EditableField
+                  id="sisterEmail"
+                  label="Email Address"
+                  type="email"
+                  value={sisterDraft.email}
+                  required
+                  onChange={(value) => updateSisterFormField("email", value)}
+                />
+                <EditableField
+                  id="sisterPhone"
+                  label="Phone Number"
+                  value={sisterDraft.phone}
+                  required
+                  onChange={(value) => updateSisterFormField("phone", value)}
+                />
+              </div>
+            </Card>
+
+            <Card className={cn(cardSurfaceClass, "min-h-[344px]")}>
+              <SectionTitle title="Registered Address" />
+              <div className="mt-6 grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
+                <EditableField
+                  id="sisterAddressLine1"
+                  label="Address Line 1"
+                  value={sisterDraft.addressLine1}
+                  required
+                  className="md:col-span-2"
+                  onChange={(value) => updateSisterFormField("addressLine1", value)}
+                />
+                <EditableField
+                  id="sisterAddressLine2"
+                  label="Address Line 2"
+                  value={sisterDraft.addressLine2}
+                  className="md:col-span-2"
+                  onChange={(value) => updateSisterFormField("addressLine2", value)}
+                />
+                <EditableField
+                  id="sisterCity"
+                  label="City"
+                  value={sisterDraft.city}
+                  required
+                  onChange={(value) => updateSisterFormField("city", value)}
+                />
+                <EditableField
+                  id="sisterState"
+                  label="State"
+                  value={sisterDraft.state}
+                  required
+                  onChange={(value) => updateSisterFormField("state", value)}
+                />
+                <EditableField
+                  id="sisterPostalCode"
+                  label="Postal Code"
+                  value={sisterDraft.postalCode}
+                  required
+                  onChange={(value) => updateSisterFormField("postalCode", value)}
+                />
+                <EditableSelect
+                  label="Country"
+                  value={sisterDraft.country}
+                  options={options.country}
+                  required
+                  onChange={(value) => updateSisterFormField("country", value)}
+                />
+              </div>
+            </Card>
+          </div>
+
+          <Card className={cardSurfaceClass}>
+            <SectionTitle title="Settings" />
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <EditableSelect
+                label="Status"
+                value={sisterDraft.status}
+                options={options.status}
+                onChange={(value) => updateSisterFormField("status", value)}
+              />
+              <EditableSelect
+                label="Time Zone"
+                value={sisterDraft.timeZone}
+                options={options.timeZone}
+                onChange={(value) => updateSisterFormField("timeZone", value)}
+              />
+              <EditableSelect
+                label="Currency"
+                value={sisterDraft.currency}
+                options={options.currency}
+                onChange={(value) => updateSisterFormField("currency", value)}
+              />
+              <EditableSelect
+                label="Financial Year"
+                value={sisterDraft.financialYear}
+                options={options.financialYear}
+                onChange={(value) => updateSisterFormField("financialYear", value)}
+              />
+              <EditableSelect
+                label="Date Format"
+                value={sisterDraft.dateFormat}
+                options={options.dateFormat}
+                onChange={(value) => updateSisterFormField("dateFormat", value)}
+              />
+              <EditableSelect
+                label="Language"
+                value={sisterDraft.language}
+                options={options.language}
+                onChange={(value) => updateSisterFormField("language", value)}
+              />
+              <WorkingDays
+                days={sisterDraft.workingDays}
+                isEditing
+                onToggle={toggleSisterWorkingDay}
+              />
+            </div>
+          </Card>
+
+          <Card className="flex flex-row flex-wrap items-center justify-end gap-2 rounded-xl bg-white px-5 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+            <Button type="button" variant="outline" onClick={closeSisterForm}>
+              <X className="size-4" aria-hidden="true" />
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
+              <Send className="size-4" aria-hidden="true" />
+              Save Sister Company
+            </Button>
+          </Card>
+        </div>
+      </form>
+    )
+  }
 
   return (
     <form
       onSubmit={handleSave}
-      className="min-h-screen bg-slate-50 px-4 py-5 text-slate-900 sm:px-6 lg:px-8"
+      className="min-h-screen bg-[#f6f8fb] px-4 py-0 text-[12px] text-slate-950 sm:px-5 lg:px-6"
     >
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={currentProfile.status} />
-              {!isEditing && <Badge variant="outline">View Mode</Badge>}
+      <div className="mx-auto flex w-full max-w-[1160px] min-w-0 flex-col gap-6 py-4">
+        <Card
+          size="sm"
+          className="flex min-h-[58px] flex-row items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 shadow-sm"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-blue-100 bg-blue-50 text-blue-600">
+              <Landmark className="size-5" aria-hidden="true" />
             </div>
-            <h1 className="mt-3 text-xl font-semibold text-slate-950">
-              Organization Profile
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Registration, contact, branding, linked company, and settings details.
-            </p>
-            {message && (
-              <p
-                className={cn(
-                  "mt-2 text-sm font-medium",
-                  isEditing ? "text-rose-600" : "text-emerald-600"
-                )}
-              >
-                {message}
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold text-slate-950">
+                Institute Profile
+              </h1>
+              <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">
+                Manage your institute&apos;s core information
               </p>
+            </div>
+          </div>
+          <HeaderActions isEditing={isEditing} onCancel={handleCancel} onEdit={handleEdit} />
+        </Card>
+
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(240px,304px)_minmax(0,1fr)]">
+          <Card
+            className={cn(
+              cardSurfaceClass,
+              "border-x border-b border-t-0",
+              isEditing && "min-h-[432px]"
             )}
+          >
+            <h2 className="text-base font-semibold">Company Logo</h2>
+            <div className={cn("flex flex-col items-center", isEditing ? "mt-6" : "mt-5")}>
+              <div className="flex size-[102px] items-center justify-center rounded-xl bg-[#2f66e8] text-2xl font-bold text-white shadow-lg shadow-blue-500/20">
+                {currentProfile.brandName || "ATP"}
+              </div>
+              {isEditing && (
+                <Input
+                  value={draft.brandName}
+                  onChange={(event) => updateField("brandName", event.target.value)}
+                  className="mt-5 h-8 max-w-[150px] rounded-[10px] bg-white text-center"
+                  aria-label="Company logo text"
+                />
+              )}
+            </div>
+            <div className={cn("space-y-4", isEditing ? "mt-6" : "mt-5")}>
+              <ReadField label="Founded" value={currentProfile.establishedDate || "Pending"} />
+              <ReadField label="Total Employees" value={currentProfile.totalEmployees} />
+            </div>
+          </Card>
+
+          <Card className={cn(cardSurfaceClass, "border-x border-b border-t-0")}>
+            <SectionTitle
+              title="Company Details"
+              description="Core registration and identity information."
+            />
+            <div className="mt-5 grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
+              <EditableField
+                id="organizationName"
+                label="Company Name"
+                value={currentProfile.organizationName}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("organizationName", value)}
+              />
+              <EditableField
+                id="organizationCode"
+                label="Company Code"
+                value={currentProfile.organizationCode}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("organizationCode", value)}
+              />
+              <EditableField
+                id="registrationNo"
+                label="Registration Number"
+                value={currentProfile.registrationNo}
+                required
+                autoFocus={isEditing}
+                disabled={!isEditing}
+                onChange={(value) => updateField("registrationNo", value)}
+              />
+              <EditableSelect
+                label="Industry"
+                value={currentProfile.industryType}
+                options={options.industryType}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("industryType", value)}
+              />
+              <EditableSelect
+                label="Organization Type"
+                value={currentProfile.organizationType}
+                options={options.organizationType}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("organizationType", value)}
+              />
+              <EditableSelect
+                label="Business Type"
+                value={currentProfile.businessType}
+                options={options.businessType}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("businessType", value)}
+              />
+              <EditableField
+                id="establishedDate"
+                label="Established Date"
+                type="date"
+                value={currentProfile.establishedDate}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("establishedDate", value)}
+              />
+              <EditableField
+                id="totalEmployees"
+                label="Total Employees"
+                value={currentProfile.totalEmployees}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("totalEmployees", value)}
+              />
+              <EditableField
+                id="gstNo"
+                label="GST No."
+                value={currentProfile.gstNo}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("gstNo", value)}
+              />
+              <EditableField
+                id="panNo"
+                label="PAN No."
+                value={currentProfile.panNo}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("panNo", value)}
+              />
+              <EditableField
+                id="website"
+                label="Website"
+                value={currentProfile.website}
+                disabled={!isEditing}
+                onChange={(value) => updateField("website", value)}
+              />
+              <EditableTextarea
+                id="companyDescription"
+                label="Company Description"
+                value={currentProfile.companyDescription}
+                className="md:col-span-2"
+                disabled={!isEditing}
+                required
+                onChange={(value) => updateField("companyDescription", value)}
+              />
+            </div>
+          </Card>
+        </div>
+
+        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
+          <Card className={cn(cardSurfaceClass, isEditing && "min-h-[344px]")}>
+            <SectionTitle title="Contact Information" />
+            <div className="mt-6 grid grid-cols-1 gap-4">
+              <EditableField
+                id="email"
+                label="Email Address"
+                type="email"
+                value={currentProfile.email}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("email", value)}
+              />
+              <EditableField
+                id="phone"
+                label="Phone Number"
+                value={currentProfile.phone}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("phone", value)}
+              />
+            </div>
+          </Card>
+
+          <Card className={cn(cardSurfaceClass, isEditing && "min-h-[344px]")}>
+            <SectionTitle title="Registered Address" />
+            <div className="mt-6 grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
+              <EditableField
+                id="addressLine1"
+                label="Address Line 1"
+                value={currentProfile.addressLine1}
+                required
+                disabled={!isEditing}
+                className="md:col-span-2"
+                onChange={(value) => updateField("addressLine1", value)}
+              />
+              <EditableField
+                id="addressLine2"
+                label="Address Line 2"
+                value={currentProfile.addressLine2}
+                disabled={!isEditing}
+                className="md:col-span-2"
+                onChange={(value) => updateField("addressLine2", value)}
+              />
+              <EditableField
+                id="city"
+                label="City"
+                value={currentProfile.city}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("city", value)}
+              />
+              <EditableField
+                id="state"
+                label="State"
+                value={currentProfile.state}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("state", value)}
+              />
+              <EditableField
+                id="postalCode"
+                label="Postal Code"
+                value={currentProfile.postalCode}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("postalCode", value)}
+              />
+              <EditableSelect
+                label="Country"
+                value={currentProfile.country}
+                options={options.country}
+                required
+                disabled={!isEditing}
+                onChange={(value) => updateField("country", value)}
+              />
+            </div>
+          </Card>
+        </div>
+
+        <Card className={cardSurfaceClass}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionTitle
+              title="Sister Companies"
+              icon={<Building2 className="size-4 text-blue-600" aria-hidden="true" />}
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 rounded-lg border border-blue-200 bg-white px-3 text-blue-600 shadow-sm hover:bg-blue-50"
+              onClick={openNewSisterCompany}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              Add Sister Company
+            </Button>
           </div>
 
-          <HeaderActions
-            isEditing={isEditing}
-            onCancel={handleCancel}
-            onEdit={handleEdit}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <SectionCard title="Branding">
-            {isEditing ? (
-              <div className="grid grid-cols-1 gap-5">
-                <LogoBlock brandName={draft.brandName} showAction />
-                <EditableField
-                  id="brandName"
-                  label="Brand Name"
-                  value={draft.brandName}
-                  required
-                  onChange={(value) => updateField("brandName", value)}
-                />
-                <EditableField
-                  id="tagline"
-                  label="Tagline"
-                  value={draft.tagline}
-                  onChange={(value) => updateField("tagline", value)}
-                />
-                <EditableTextarea
-                  id="brandDescription"
-                  label="Brand Description"
-                  value={draft.brandDescription}
-                  onChange={(value) => updateField("brandDescription", value)}
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6">
-                <LogoBlock brandName={profile.brandName} />
-                <div className="flex flex-col gap-5">
-                  <ReadField label="Brand Name" value={profile.brandName} />
-                  <ReadField label="Tagline" value={profile.tagline} />
-                </div>
-                <ReadField label="Brand Description" value={profile.brandDescription} />
-              </div>
-            )}
-          </SectionCard>
-
-          <SectionCard title="Contact Details">
-            {isEditing ? (
-              <div className="grid grid-cols-1 gap-5">
-                <EditableField
-                  id="email"
-                  label="Email"
-                  type="email"
-                  value={draft.email}
-                  required
-                  onChange={(value) => updateField("email", value)}
-                />
-                <EditableField
-                  id="phone"
-                  label="Phone"
-                  value={draft.phone}
-                  required
-                  onChange={(value) => updateField("phone", value)}
-                />
-                <EditableField
-                  id="alternatePhone"
-                  label="Alternate Phone"
-                  value={draft.alternatePhone}
-                  onChange={(value) => updateField("alternatePhone", value)}
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6">
-                <ReadField label="Email" value={profile.email} />
-                <ReadField label="Phone" value={profile.phone} />
-                <ReadField label="Alternate Phone" value={profile.alternatePhone} />
-              </div>
-            )}
-          </SectionCard>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <SectionCard title="Contact Information">
-            {isEditing ? (
-              <div className="grid grid-cols-1 gap-5">
-                <EditableField
-                  id="organizationName"
-                  label="Organization Name"
-                  value={draft.organizationName}
-                  required
-                  onChange={(value) => updateField("organizationName", value)}
-                />
-                <EditableField
-                  id="organizationCode"
-                  label="Organization Code"
-                  value={draft.organizationCode}
-                  required
-                  onChange={(value) => updateField("organizationCode", value)}
-                />
-                <EditableSelect
-                  label="Organization Type"
-                  value={draft.organizationType}
-                  options={options.organizationType}
-                  onChange={(value) => updateField("organizationType", value)}
-                />
-                <EditableSelect
-                  label="Business Type"
-                  value={draft.businessType}
-                  options={options.businessType}
-                  onChange={(value) => updateField("businessType", value)}
-                />
-                <EditableSelect
-                  label="Industry Type"
-                  value={draft.industryType}
-                  options={options.industryType}
-                  onChange={(value) => updateField("industryType", value)}
-                />
-                <EditableSelect
-                  label="Status"
-                  value={draft.status}
-                  options={options.status}
-                  onChange={(value) => updateField("status", value)}
-                />
-                <EditableField
-                  id="establishedDate"
-                  label="Established Date"
-                  type="date"
-                  value={draft.establishedDate}
-                  onChange={(value) => updateField("establishedDate", value)}
-                />
-                <EditableField
-                  id="registrationNo"
-                  label="Registration No."
-                  value={draft.registrationNo}
-                  onChange={(value) => updateField("registrationNo", value)}
-                />
-                <EditableField
-                  id="gstNo"
-                  label="GST No."
-                  value={draft.gstNo}
-                  onChange={(value) => updateField("gstNo", value)}
-                />
-                <EditableField
-                  id="panNo"
-                  label="PAN No."
-                  value={draft.panNo}
-                  onChange={(value) => updateField("panNo", value)}
-                />
-                <EditableField
-                  id="website"
-                  label="Website"
-                  value={draft.website}
-                  onChange={(value) => updateField("website", value)}
-                />
-                <EditableTextarea
-                  id="companyDescription"
-                  label="Company Description"
-                  value={draft.companyDescription}
-                  onChange={(value) => updateField("companyDescription", value)}
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6">
-                <ReadField label="Organization Name" value={profile.organizationName} />
-                <ReadField label="Organization Code" value={profile.organizationCode} />
-                <ReadField label="Organization Type" value={profile.organizationType} />
-                <ReadField label="Business Type" value={profile.businessType} />
-                <ReadField label="Industry Type" value={profile.industryType} />
-                <ReadField label="Status" value={profile.status} />
-                <ReadField label="Established Date" value={profile.establishedDate} />
-                <ReadField label="Registration No." value={profile.registrationNo} />
-                <ReadField label="GST No." value={profile.gstNo} />
-                <ReadField label="PAN No." value={profile.panNo} />
-                <ReadField label="Website" value={profile.website} />
-                <ReadField label="Company Description" value={profile.companyDescription} />
-              </div>
-            )}
-          </SectionCard>
-
-          <SectionCard title="Address">
-            {isEditing ? (
-              <div className="grid grid-cols-1 gap-5">
-                <EditableField
-                  id="addressLine1"
-                  label="Address Line 1"
-                  value={draft.addressLine1}
-                  required
-                  onChange={(value) => updateField("addressLine1", value)}
-                />
-                <EditableField
-                  id="addressLine2"
-                  label="Address Line 2"
-                  value={draft.addressLine2}
-                  onChange={(value) => updateField("addressLine2", value)}
-                />
-                <EditableSelect
-                  label="Country"
-                  value={draft.country}
-                  options={options.country}
-                  onChange={(value) => updateField("country", value)}
-                />
-                <EditableField
-                  id="state"
-                  label="State"
-                  value={draft.state}
-                  required
-                  onChange={(value) => updateField("state", value)}
-                />
-                <EditableField
-                  id="city"
-                  label="City"
-                  value={draft.city}
-                  required
-                  onChange={(value) => updateField("city", value)}
-                />
-                <EditableField
-                  id="postalCode"
-                  label="Postal Code"
-                  value={draft.postalCode}
-                  required
-                  onChange={(value) => updateField("postalCode", value)}
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6">
-                <ReadField label="Address Line 1" value={profile.addressLine1} />
-                <ReadField label="Address Line 2" value={profile.addressLine2} />
-                <ReadField label="Country" value={profile.country} />
-                <ReadField label="State" value={profile.state} />
-                <ReadField label="City" value={profile.city} />
-                <ReadField label="Postal Code" value={profile.postalCode} />
-              </div>
-            )}
-          </SectionCard>
-        </div>
-
-        <SectionCard
-          title="Sister Companies"
-          actions={
-            isEditing ? (
-              <Button
-                type="button"
-                size="sm"
-                className="bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90"
-                onClick={() =>
-                  setDraft((current) => ({
-                    ...current,
-                    sisterCompanies: [...current.sisterCompanies, createSisterCompany()],
-                  }))
-                }
-              >
-                <Plus className="size-4" aria-hidden="true" />
-                Add Sister Company
-              </Button>
-            ) : undefined
-          }
-        >
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative w-full max-w-xs flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                <Input
-                  value={searchTerm}
-                  onChange={(event) => {
-                    setSearchTerm(event.target.value)
-                    setPage(1)
-                  }}
-                  placeholder="Search sister companies..."
-                  className="h-9 bg-white pl-9"
-                  aria-label="Search sister companies"
-                />
-              </div>
-              <Button type="button" variant="outline" size="sm" className="h-9">
-                <Filter className="size-4" aria-hidden="true" />
-                Filter
-              </Button>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="relative w-full max-w-[403px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <Input
+                value={searchTerm}
+                onChange={(event) => {
+                  setSearchTerm(event.target.value)
+                  setPage(1)
+                }}
+                placeholder="Search companies..."
+                className="h-[26px] rounded-lg bg-white pl-9 text-[11px]"
+                aria-label="Search companies"
+              />
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg bg-white px-3 shadow-sm"
+            >
+              <SlidersHorizontal className="size-4" aria-hidden="true" />
+              Filter
+            </Button>
+          </div>
 
-            <Table>
+          <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+            <Table className="min-w-[720px]">
               <TableHeader>
-                <TableRow>
-                  <TableHead>Company Name</TableHead>
-                  <TableHead>Relationship Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  {isEditing && <TableHead>Actions</TableHead>}
+                <TableRow className="bg-slate-50 hover:bg-slate-50">
+                  <TableHead className="h-9 px-4 text-[11px] font-semibold text-slate-950">
+                    Company Name
+                  </TableHead>
+                  <TableHead className="h-9 px-4 text-[11px] font-semibold text-slate-950">
+                    Relationship Type
+                  </TableHead>
+                  <TableHead className="h-9 px-4 text-[11px] font-semibold text-slate-950">
+                    Status
+                  </TableHead>
+                  <TableHead className="h-9 px-4 text-[11px] font-semibold text-slate-950">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pagedCompanies.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={isEditing ? 4 : 3}
-                      className="py-10 text-center text-sm text-slate-500"
-                    >
+                    <TableCell colSpan={4} className="py-10 text-center text-slate-500">
                       No sister companies found.
                     </TableCell>
                   </TableRow>
                 ) : (
                   pagedCompanies.map((company) => (
-                    <TableRow key={company.id}>
-                      <TableCell>
+                    <TableRow key={company.id} className="h-12 odd:bg-white even:bg-slate-50">
+                      <TableCell className="px-4 font-semibold">
                         {isEditing ? (
                           <Input
                             value={company.name}
                             onChange={(event) =>
                               updateSisterCompany(company.id, "name", event.target.value)
                             }
-                            className="bg-white"
+                            className="h-8 rounded-lg bg-white"
                           />
                         ) : (
                           company.name
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-4 text-slate-700">
                         {isEditing ? (
                           <Input
                             value={company.relationship}
                             onChange={(event) =>
                               updateSisterCompany(company.id, "relationship", event.target.value)
                             }
-                            className="bg-white"
+                            className="h-8 rounded-lg bg-white"
                           />
                         ) : (
                           company.relationship
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-4">
                         {isEditing ? (
                           <Select
                             value={company.status}
@@ -629,7 +1170,7 @@ export default function OrganizationProfilePage() {
                               updateSisterCompany(company.id, "status", value ?? "Active")
                             }
                           >
-                            <SelectTrigger variant="soft" className="bg-white">
+                            <SelectTrigger variant="soft" className="h-8 w-[118px] bg-white">
                               <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -641,162 +1182,135 @@ export default function OrganizationProfilePage() {
                           <StatusBadge status={company.status} />
                         )}
                       </TableCell>
-                      {isEditing && (
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              className="bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90"
-                              aria-label={`View ${company.name || "sister company"}`}
-                            >
-                              <Eye className="size-4" aria-hidden="true" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              className="bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90"
-                              aria-label={`Edit ${company.name || "sister company"}`}
-                            >
-                              <Pencil className="size-4" aria-hidden="true" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              variant="destructive"
-                              aria-label={`Remove ${company.name || "sister company"}`}
-                              onClick={() => removeSisterCompany(company.id)}
-                            >
-                              <Trash2 className="size-4" aria-hidden="true" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
+                      <TableCell className="px-4">
+                        <div className="flex items-center gap-3">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            className="text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                            aria-label={`Edit ${company.name || "sister company"}`}
+                            onClick={() => openEditSisterCompany(company)}
+                          >
+                            <Pencil className="size-4" aria-hidden="true" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            className="text-red-500 hover:bg-red-50 hover:text-red-600"
+                            aria-label={`Remove ${company.name || "sister company"}`}
+                            disabled={!isEditing}
+                            onClick={() => removeSisterCompany(company.id)}
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
-
-            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
-              <p className="text-xs text-slate-500">
-                Showing {rangeStart} to {rangeEnd} of {visibleCompanies.length} entries
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((value) => Math.max(1, value - 1))}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs font-medium text-slate-600">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
           </div>
-        </SectionCard>
 
-        <SectionCard
-          title="Settings (Overview)"
-          actions={
-            !isEditing ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-[11px] text-slate-600">
+              Showing {rangeStart} to {rangeEnd} of {visibleCompanies.length} entries
+            </p>
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
-                size="sm"
-                className="bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90"
-                onClick={handleEdit}
+                variant="outline"
+                size="icon-sm"
+                className="rounded-full bg-white"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
               >
-                View &amp; Edit Settings
+                <ChevronLeft className="size-4" aria-hidden="true" />
+              </Button>
+              <span className="flex size-7 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+                {currentPage}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="rounded-full bg-white"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+              >
                 <ChevronRight className="size-4" aria-hidden="true" />
               </Button>
-            ) : undefined
-          }
-        >
-          {isEditing ? (
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-              <EditableSelect
-                label="Time Zone"
-                value={draft.timeZone}
-                options={options.timeZone}
-                onChange={(value) => updateField("timeZone", value)}
-              />
-              <EditableSelect
-                label="Currency"
-                value={draft.currency}
-                options={options.currency}
-                onChange={(value) => updateField("currency", value)}
-              />
-              <EditableSelect
-                label="Financial Year"
-                value={draft.financialYear}
-                options={options.financialYear}
-                onChange={(value) => updateField("financialYear", value)}
-              />
-              <EditableSelect
-                label="Date Format"
-                value={draft.dateFormat}
-                options={options.dateFormat}
-                onChange={(value) => updateField("dateFormat", value)}
-              />
-              <EditableSelect
-                label="Language"
-                value={draft.language}
-                options={options.language}
-                onChange={(value) => updateField("language", value)}
-              />
-              <EditableSelect
-                label="Number Format"
-                value={draft.numberFormat}
-                options={options.numberFormat}
-                onChange={(value) => updateField("numberFormat", value)}
-              />
-              <WorkingDays
-                days={draft.workingDays}
-                isEditing
-                onToggle={toggleWorkingDay}
-              />
             </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <ReadField label="Time Zone" value={profile.timeZone} />
-              <ReadField label="Currency" value={profile.currency} />
-              <ReadField label="Financial Year" value={profile.financialYear} />
-              <ReadField label="Date Format" value={profile.dateFormat} />
-              <ReadField label="Language" value={profile.language} />
-              <ReadField label="Number Format" value={profile.numberFormat} />
-              <WorkingDays days={profile.workingDays} />
-            </div>
-          )}
-        </SectionCard>
+          </div>
+
+        </Card>
+
+        <Card className={cardSurfaceClass}>
+          <SectionTitle title="Settings" />
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <EditableSelect
+              label="Time Zone"
+              value={currentProfile.timeZone}
+              options={options.timeZone}
+              disabled={!isEditing}
+              onChange={(value) => updateField("timeZone", value)}
+            />
+            <EditableSelect
+              label="Currency"
+              value={currentProfile.currency}
+              options={options.currency}
+              disabled={!isEditing}
+              onChange={(value) => updateField("currency", value)}
+            />
+            <EditableSelect
+              label="Financial Year"
+              value={currentProfile.financialYear}
+              options={options.financialYear}
+              disabled={!isEditing}
+              onChange={(value) => updateField("financialYear", value)}
+            />
+            <EditableSelect
+              label="Date Format"
+              value={currentProfile.dateFormat}
+              options={options.dateFormat}
+              disabled={!isEditing}
+              onChange={(value) => updateField("dateFormat", value)}
+            />
+            <EditableSelect
+              label="Language"
+              value={currentProfile.language}
+              options={options.language}
+              disabled={!isEditing}
+              onChange={(value) => updateField("language", value)}
+            />
+            <EditableSelect
+              label="Number Format"
+              value={currentProfile.numberFormat}
+              options={options.numberFormat}
+              disabled={!isEditing}
+              onChange={(value) => updateField("numberFormat", value)}
+            />
+            <WorkingDays
+              days={currentProfile.workingDays}
+              isEditing={isEditing}
+              onToggle={toggleWorkingDay}
+            />
+          </div>
+        </Card>
 
         {isEditing && (
-          <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
+          <Card className="flex flex-row flex-wrap items-center justify-end gap-2 rounded-xl bg-white px-5 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
             <Button type="button" variant="outline" onClick={handleCancel}>
               <X className="size-4" aria-hidden="true" />
               Cancel
             </Button>
-            <Button type="button" variant="outline" onClick={() => setMessage("Draft saved.")}>
-              <Save className="size-4" aria-hidden="true" />
-              Save Draft
-            </Button>
-            <Button type="submit" className="bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90">
+            <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
               <Send className="size-4" aria-hidden="true" />
-              Save &amp; Publish
+              Save & Publish
             </Button>
-          </div>
+          </Card>
         )}
       </div>
     </form>
@@ -812,76 +1326,102 @@ function HeaderActions({
   onCancel: () => void
   onEdit: () => void
 }) {
+  return isEditing ? (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-8 rounded-md px-3 text-xs"
+      onClick={onCancel}
+    >
+      <X className="size-4" aria-hidden="true" />
+      Cancel
+    </Button>
+  ) : (
+    <Button
+      type="button"
+      size="sm"
+      onClick={onEdit}
+      className="h-8 rounded-md bg-blue-600 px-4 text-xs text-white hover:bg-blue-700"
+    >
+      <Pencil className="size-3.5" aria-hidden="true" />
+      Edit
+    </Button>
+  )
+}
+
+function SectionTitle({
+  title,
+  description,
+  icon,
+}: {
+  title: string
+  description?: string
+  icon?: ReactNode
+}) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {isEditing ? (
-        <>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            <X className="size-4" aria-hidden="true" />
-            Cancel
-          </Button>
-          <Button type="button" variant="outline">
-            <Save className="size-4" aria-hidden="true" />
-            Save Draft
-          </Button>
-          <Button type="submit" className="bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90">
-            <Send className="size-4" aria-hidden="true" />
-            Save &amp; Publish
-          </Button>
-        </>
-      ) : (
-        <Button
-          type="button"
-          onClick={onEdit}
-          className="bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90"
-        >
-          <Pencil className="size-4" aria-hidden="true" />
-          Edit
-        </Button>
-      )}
+    <div>
+      <div className="flex items-center gap-2">
+        {icon}
+        <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+      </div>
+      {description && <p className="mt-2 text-xs text-slate-600">{description}</p>}
     </div>
   )
 }
 
-function SectionCard({
-  title,
-  actions,
-  children,
-}: {
-  title: string
-  actions?: ReactNode
-  children: ReactNode
-}) {
+function ReadField({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <Card className="border-slate-200 bg-white shadow-sm">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {actions && <CardAction>{actions}</CardAction>}
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-600">
+        {label}
+      </dt>
+      <dd className="mt-2 min-w-0 text-xs font-semibold leading-5 text-slate-950">
+        {value || "Pending"}
+      </dd>
+    </div>
   )
 }
 
-function ReadField({
+function ReadonlyField({
   label,
   value,
   className,
+  multiline = false,
 }: {
   label: string
   value: ReactNode
   className?: string
+  multiline?: boolean
 }) {
   return (
-    <div className={cn("min-w-0", className)}>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </dt>
-      <dd className="mt-1 min-w-0 text-sm font-medium leading-6 text-slate-900">
-        {value || "-"}
+    <div
+      className={cn(
+        "flex min-w-0 items-baseline gap-1.5 py-1 text-xs leading-5",
+        multiline && "items-start",
+        className
+      )}
+    >
+      <dt className="shrink-0 font-semibold text-slate-950">{label}:</dt>
+      <dd
+        className={cn(
+          "min-w-0 font-normal text-slate-800",
+          multiline ? "whitespace-pre-wrap" : "truncate"
+        )}
+      >
+        {value || <span className="text-slate-500">Pending</span>}
       </dd>
     </div>
   )
+}
+
+function formatReadonlyValue(value: string, type: string) {
+  if (!value) return ""
+
+  if (type !== "date") return value
+
+  const [year, month, day] = value.split("-")
+  return year && month && day ? `${day}-${month}-${year}` : value
 }
 
 function EditableField({
@@ -892,6 +1432,8 @@ function EditableField({
   className,
   type = "text",
   required = false,
+  disabled = false,
+  autoFocus = false,
 }: {
   id: string
   label: string
@@ -900,20 +1442,34 @@ function EditableField({
   className?: string
   type?: string
   required?: boolean
+  disabled?: boolean
+  autoFocus?: boolean
 }) {
+  if (disabled) {
+    return (
+      <ReadonlyField
+        className={className}
+        label={label}
+        value={formatReadonlyValue(value, type)}
+      />
+    )
+  }
+
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={id}>
+    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
+      <Label htmlFor={id} className="text-xs font-semibold text-slate-950">
         {label}
-        {required && <span className="text-rose-600"> *</span>}
+        {required && <span className="text-blue-600"> *</span>}
       </Label>
       <Input
         id={id}
         type={type}
         value={value}
         required={required}
+        disabled={disabled}
+        autoFocus={autoFocus}
         onChange={(event) => onChange(event.target.value)}
-        className="bg-white"
+        className="h-[29px] rounded-[10px] border-slate-200 bg-white px-3 text-xs shadow-none disabled:cursor-default disabled:opacity-100"
       />
     </div>
   )
@@ -925,21 +1481,34 @@ function EditableTextarea({
   value,
   onChange,
   className,
+  required = false,
+  disabled = false,
 }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
   className?: string
+  required?: boolean
+  disabled?: boolean
 }) {
+  if (disabled) {
+    return <ReadonlyField className={className} label={label} value={value} multiline />
+  }
+
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={id}>{label}</Label>
+    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
+      <Label htmlFor={id} className="text-xs font-semibold text-slate-950">
+        {label}
+        {required && <span className="text-blue-600"> *</span>}
+      </Label>
       <Textarea
         id={id}
         value={value}
+        required={required}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-24 bg-white"
+        className="min-h-20 rounded-[10px] border-slate-200 bg-white px-3 py-2 text-xs shadow-none disabled:cursor-default disabled:opacity-100"
       />
     </div>
   )
@@ -950,17 +1519,35 @@ function EditableSelect({
   value,
   options,
   onChange,
+  required = false,
+  disabled = false,
 }: {
   label: string
   value: string
   options: string[]
   onChange: (value: string) => void
+  required?: boolean
+  disabled?: boolean
 }) {
+  if (disabled) {
+    return <ReadonlyField label={label} value={value} />
+  }
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
-      <Select value={value} onValueChange={(nextValue) => onChange(nextValue ?? "")}>
-        <SelectTrigger variant="soft" className="bg-white">
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label className="text-xs font-semibold text-slate-950">
+        {label}
+        {required && <span className="text-blue-600"> *</span>}
+      </Label>
+      <Select
+        value={value}
+        onValueChange={(nextValue) => onChange(nextValue ?? "")}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          variant="soft"
+          className="h-[29px] rounded-[10px] border border-slate-200 bg-white px-3 text-xs shadow-none disabled:cursor-default disabled:opacity-100"
+        >
           <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
         </SelectTrigger>
         <SelectContent>
@@ -978,7 +1565,7 @@ function EditableSelect({
 function StatusBadge({ status }: { status: string }) {
   if (status === "Active") {
     return (
-      <Badge className="border-transparent bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+      <Badge className="border border-emerald-200 bg-emerald-50 text-[11px] text-emerald-600 hover:bg-emerald-50">
         {status}
       </Badge>
     )
@@ -986,44 +1573,16 @@ function StatusBadge({ status }: { status: string }) {
 
   if (status === "Inactive") {
     return (
-      <Badge className="border-transparent bg-rose-100 text-rose-600 hover:bg-rose-100">
+      <Badge className="border border-red-200 bg-red-50 text-[11px] text-red-500 hover:bg-red-50">
         {status}
       </Badge>
     )
   }
 
   return (
-    <Badge className="border-transparent bg-amber-100 text-amber-700 hover:bg-amber-100">
+    <Badge className="border border-amber-200 bg-amber-50 text-[11px] text-amber-700 hover:bg-amber-50">
       {status}
     </Badge>
-  )
-}
-
-function LogoBlock({
-  brandName,
-  showAction = false,
-}: {
-  brandName: string
-  showAction?: boolean
-}) {
-  return (
-    <div>
-      <Label>Company Logo</Label>
-      <div className="mt-2 flex size-32 items-center justify-center rounded-lg bg-blue-600 text-2xl font-bold text-white">
-        {brandName
-          .split(" ")
-          .filter(Boolean)
-          .slice(0, 3)
-          .map((part) => part[0])
-          .join("")
-          .toUpperCase() || "ORG"}
-      </div>
-      {showAction && (
-        <Button type="button" variant="outline" size="sm" className="mt-3 w-32">
-          Change Logo
-        </Button>
-      )}
-    </div>
   )
 }
 
@@ -1038,7 +1597,7 @@ function WorkingDays({
 }) {
   return (
     <div className="md:col-span-2 lg:col-span-3">
-      <Label>Working Days</Label>
+      <Label className="text-xs font-semibold text-slate-950">Working Days</Label>
       <div className="mt-2 flex flex-wrap gap-2">
         {allDays.map((day) =>
           isEditing ? (
@@ -1047,6 +1606,7 @@ function WorkingDays({
               type="button"
               size="sm"
               variant={days.includes(day) ? "default" : "outline"}
+              className={cn(days.includes(day) && "bg-blue-600 text-white hover:bg-blue-700")}
               onClick={() => onToggle?.(day)}
             >
               {day}
@@ -1055,9 +1615,10 @@ function WorkingDays({
             <Badge
               key={day}
               className={cn(
+                "border text-[11px]",
                 days.includes(day)
-                  ? "border-transparent bg-blue-100 text-blue-700 hover:bg-blue-100"
-                  : "border-border text-foreground"
+                  ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-50"
+                  : "border-slate-200 bg-white text-slate-500 hover:bg-white"
               )}
             >
               {day}
