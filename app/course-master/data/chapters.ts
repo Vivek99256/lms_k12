@@ -86,6 +86,8 @@ export interface ChapterSemantic {
     knowledge?: unknown[];
     total_concepts?: number | string;
   };
+  full_intelligence_json?: ChapterSemantic['full_intelegance_json'];
+  md_content?: string;
 }
 
 export interface ChapterConcept {
@@ -406,6 +408,24 @@ export interface ChapterContentResponse {
   content_categories: Record<string, ChapterContentAsset[]>;
 }
 
+export interface SemanticIntelligenceChapter {
+  id: number;
+  document_tittle?: string;
+  subject_name?: string;
+  standard?: string;
+  syear?: string;
+  chapter_number?: string | number;
+  created_at?: string;
+  is_processed?: boolean | number;
+}
+
+export interface SemanticIntelligenceResult extends ChapterSemantic {
+  id?: number;
+  extraction_id?: number;
+  chapter_id?: number;
+  md_content?: string;
+}
+
 export type IntelligenceQuestionType = 'mcq' | 'narrative';
 
 export interface GenerateIntelligenceQuestionsRequest {
@@ -582,6 +602,36 @@ export async function generateIntelligenceQuestions(
     message: (raw.message as string) || 'Questions generated successfully.',
     data: raw.data as GenerateIntelligenceQuestionsResponse['data'],
   };
+}
+
+export async function fetchSemanticIntelligenceChapters(): Promise<SemanticIntelligenceChapter[]> {
+  const res = await fetch(`${API_BASE_URL}/api/semantic-intelligence`);
+  const raw = await readApiJson(res, 'Failed to fetch semantic intelligence chapters');
+
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to fetch semantic intelligence chapters'));
+  }
+
+  const data = Array.isArray(raw.data) ? raw.data : Array.isArray(raw) ? raw : [];
+  return data as SemanticIntelligenceChapter[];
+}
+
+export async function fetchSemanticIntelligenceResult(
+  extractionId: string | number
+): Promise<SemanticIntelligenceResult | null> {
+  const res = await fetch(`${API_BASE_URL}/api/semantic-intelligence/${extractionId}/result`);
+  const raw = await readApiJson(res, 'Failed to fetch semantic intelligence result');
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to fetch semantic intelligence result'));
+  }
+
+  const data = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as SemanticIntelligenceResult;
+  return data;
 }
 
 export async function fetchNewChapterMaster(
