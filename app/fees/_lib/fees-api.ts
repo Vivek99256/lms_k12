@@ -9,6 +9,9 @@ export type FeesSession = {
   academicYearId: string;
   hostName: string;
   termId: string;
+  userProfileId: string;
+  userProfileName: string;
+  clientId: string;
 };
 
 export type SelectOption = {
@@ -58,6 +61,75 @@ export function readStoredRecord(key: string): Record<string, unknown> {
   }
 }
 
+function getStorageSources(): Storage[] {
+  if (typeof window === 'undefined') return [];
+  return [sessionStorage, localStorage];
+}
+
+function readStoredRecordFromStorage(storage: Storage, key: string): Record<string, unknown> {
+  try {
+    return asRecord(JSON.parse(storage.getItem(key) || '{}'));
+  } catch {
+    return {};
+  }
+}
+
+function readStorageValue(keys: string[]): string {
+  for (const storage of getStorageSources()) {
+    for (const key of keys) {
+      const value = readString(storage.getItem(key));
+      if (value) return value;
+    }
+  }
+
+  return '';
+}
+
+function getSessionSources(): Record<string, unknown>[] {
+  const sources: Record<string, unknown>[] = [];
+  const recordKeys = [
+    'userData',
+    'menuContext',
+    'sessionData',
+    'sessiondata',
+    'user_data',
+    'session',
+    'academicSession',
+    'academicData',
+    'auth',
+  ];
+
+  for (const storage of getStorageSources()) {
+    for (const key of recordKeys) {
+      const record = readStoredRecordFromStorage(storage, key);
+      if (Object.keys(record).length > 0) {
+        sources.push(record);
+      }
+    }
+  }
+
+  return sources;
+}
+
+function normalizeAcademicYear(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  const yearMatch = trimmed.match(/\d{4}/);
+  return yearMatch ? yearMatch[0] : trimmed;
+}
+
+function readStoredValue(keys: string[], ...sources: Array<Record<string, unknown>>): string {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = readString(source[key]);
+      if (value) return value;
+    }
+  }
+
+  return readStorageValue(keys);
+}
+
 export function getFeesSession(): FeesSession {
   if (typeof window === 'undefined') {
     return {
@@ -67,25 +139,37 @@ export function getFeesSession(): FeesSession {
       academicYearId: '',
       hostName: API_BASE_URL,
       termId: '',
+      userProfileId: '',
+      userProfileName: '',
+      clientId: '',
     };
   }
 
-  const userData = readStoredRecord('userData');
-  const menuContext = readStoredRecord('menuContext');
-  const selectedAcademicYear = localStorage.getItem('selectedAcademicYear');
+  const sessionSources = getSessionSources();
+  const [userData = {}, menuContext = {}] = sessionSources;
+  const academicYearsSource = sessionSources.find((source) => Array.isArray(source.academicYears));
+  const academicYears = Array.isArray(academicYearsSource?.academicYears) ? academicYearsSource.academicYears : [];
+  let selectedAcademicYear = readStorageValue(['selectedAcademicYear', 'syear']);
+  if (!selectedAcademicYear && academicYears.length > 0) {
+    const firstYear = asRecord(academicYears[0]);
+    selectedAcademicYear = readString(firstYear.syear ?? firstYear.academic_year);
+  }
 
   return {
-    token: readString(userData.user_token ?? userData.token ?? menuContext.user_token ?? menuContext.token),
-    subInstituteId: readString(userData.sub_institute_id ?? menuContext.sub_institute_id),
-    userId: readString(userData.user_id ?? menuContext.user_id),
-    academicYearId: readString(selectedAcademicYear || userData.academic_year_id || userData.academicYearId || menuContext.academic_year_id),
-    hostName: readString(userData.host_name ?? menuContext.host_name) || API_BASE_URL,
-    termId: readString(userData.term_id ?? menuContext.term_id ?? userData.marking_period_id ?? menuContext.marking_period_id),
+    token: readStoredValue(['user_token', 'token'], userData, menuContext),
+    subInstituteId: readStoredValue(['sub_institute_id', 'subInstituteId'], userData, menuContext),
+    userId: readStoredValue(['user_id', 'userId'], userData, menuContext),
+    academicYearId: normalizeAcademicYear(selectedAcademicYear || readStoredValue(['academic_year_id', 'academicYearId'], userData, menuContext)),
+    hostName: readStoredValue(['host_name', 'hostName'], userData, menuContext) || API_BASE_URL,
+    termId: readStoredValue(['term_id', 'marking_period_id', 'academic_term_id', 'termId', 'markingPeriodId', 'academicTermId'], userData, menuContext),
+    userProfileId: readStoredValue(['user_profile_id', 'userProfileId', 'profile_id', 'profileId'], userData, menuContext),
+    userProfileName: readStoredValue(['user_profile_name', 'userProfileName', 'profile_name', 'profileName'], userData, menuContext),
+    clientId: readStoredValue(['client_id', 'clientId'], userData, menuContext),
   };
 }
 
 export function getApiBaseUrl(session: FeesSession): string {
-  return (session.hostName || API_BASE_URL || '').replace(/\/$/, '');
+  return (API_BASE_URL || session.hostName || '').replace(/\/$/, '');
 }
 
 export function buildApiUrl(session: FeesSession, path: string, params?: Record<string, string | number | undefined>): string {
@@ -105,6 +189,10 @@ export function appendSessionParams(params: URLSearchParams, session: FeesSessio
   if (session.academicYearId) params.set('syear', session.academicYearId);
   if (session.userId) params.set('user_id', session.userId);
   if (session.termId) params.set('term_id', session.termId);
+  if (session.token) params.set('token', session.token);
+  if (session.userProfileId) params.set('user_profile_id', session.userProfileId);
+  if (session.userProfileName) params.set('user_profile_name', session.userProfileName);
+  if (session.clientId) params.set('client_id', session.clientId);
 }
 
 export function appendSessionFormData(form: FormData, session: FeesSession) {
@@ -113,20 +201,40 @@ export function appendSessionFormData(form: FormData, session: FeesSession) {
   if (session.academicYearId) form.set('syear', session.academicYearId);
   if (session.userId) form.set('user_id', session.userId);
   if (session.termId) form.set('term_id', session.termId);
+  if (session.token) form.set('token', session.token);
+  if (session.userProfileId) form.set('user_profile_id', session.userProfileId);
+  if (session.userProfileName) form.set('user_profile_name', session.userProfileName);
+  if (session.clientId) form.set('client_id', session.clientId);
+}
+
+function summarizeResponseText(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().slice(0, 500);
+}
+
+function parseJsonResponseBody<T>(text: string, contentType: string): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      `Laravel returned a non-JSON response (${contentType || 'unknown content type'}). ${summarizeResponseText(text) || 'Empty response body.'}`
+    );
+  }
 }
 
 export async function fetchLaravelJson<T>(session: FeesSession, url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set('Accept', 'application/json');
   if (session.token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${session.token}`);
+  headers.set('X-Requested-With', 'XMLHttpRequest');
 
   const response = await fetch(url, {
     ...init,
     headers,
-    credentials: init?.credentials ?? 'omit',
+    credentials: init?.credentials ?? 'include',
   });
+  const contentType = response.headers.get('content-type') || '';
   const text = await response.text();
-  const payload = parseJsonText<T>(text);
+  const payload = parseJsonResponseBody<T>(text, contentType);
 
   if (!response.ok) {
     const message = readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to complete request.`;
