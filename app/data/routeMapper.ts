@@ -48,6 +48,22 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (cleanLink.toLowerCase() === 'other_fees_title.index') {
     return '/fees/master/other-fees-title';
   }
+
+  if (
+    cleanLink.toLowerCase() === 'exam_master.index' ||
+    cleanLink.toLowerCase() === 'result/exam_master' ||
+    cleanLink.toLowerCase() === 'result/exam_master/index'
+  ) {
+    return '/exam/exam-master';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'marks_entry.index' ||
+    cleanLink.toLowerCase() === 'result/marks_entry' ||
+    cleanLink.toLowerCase() === 'result/marks_entry/index'
+  ) {
+    return '/exam/marks-entry';
+  }
   
   if (!cleanLink) return '#';
   

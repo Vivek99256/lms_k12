@@ -283,9 +283,12 @@ function getConceptIntelligence(chapter: Chapter, conceptTitle: string): Concept
     ? `DOK ${asText(dokEntry.level)} — Skills & concepts`
     : 'DOK 2 — Skills & concepts';
 
-  const knowledge = (chapter.concepts ?? []).find((item) => item.title === conceptTitle)?.description
-    ? [(chapter.concepts ?? []).find((item) => item.title === conceptTitle)?.description as string]
-    : intel.knowledge;
+  const conceptDescription = (chapter.concepts ?? []).find(
+    (item) => item.title === conceptTitle
+  )?.description;
+  const knowledge = Array.from(
+    new Set([conceptDescription, ...intel.knowledge].map(asText).filter(Boolean))
+  );
 
   const abilities = abilitiesForConcept.map((item) => asText(item.ability)).filter(Boolean);
   const skills = intel.skills.map((item) => asText(item.skill)).filter(Boolean);
@@ -295,7 +298,9 @@ function getConceptIntelligence(chapter: Chapter, conceptTitle: string): Concept
   const competencies = (intel.competencies ?? []).map((item) => asText(item?.competency)).filter(Boolean);
   const learningObjectives = (intel.learningObjectives ?? []).map((item) => asText(item?.objective)).filter(Boolean);
   const teachingPedagogies = (intel.pedagogy ?? []).map((item) => asText(item?.strategy)).filter(Boolean);
-  const realWorldApplications = (intel.realWorld ?? []).map((item) => asText(item?.application)).filter(Boolean);
+  const realWorldApplications = (intel.realWorld ?? [])
+    .map((item) => asText(item?.application ?? item?.example))
+    .filter(Boolean);
 
   return {
     domain: `Bloom · ${primaryVerb}`,
