@@ -66,6 +66,7 @@ export interface ChapterSemantic {
   real_world_applications?: Array<{
     application_type?: string;
     application?: string;
+    example?: string;
   }>;
   skill?: Array<{
     skill?: string;
@@ -335,7 +336,13 @@ export function getConceptIntelligenceData(
   const semantic = chapter.semantic ?? {};
   const concept = (chapter.concepts ?? []).find((item) => item.title === conceptTitle);
 
-  const entries = (concept?.semantic?.full_intelegance_json?.concepts as ConceptIntelEntry[] | undefined) ?? [];
+  // new_chapter_master now returns the concept list beside the chapter semantic
+  // payload. Prefer a legacy concept-level payload when present, then fall back
+  // to the chapter-level intelligence returned by the new response shape.
+  const entries =
+    (concept?.semantic?.full_intelegance_json?.concepts as ConceptIntelEntry[] | undefined) ??
+    (semantic.full_intelegance_json?.concepts as ConceptIntelEntry[] | undefined) ??
+    [];
   const entry =
     entries.find((item) => item?.concept?.concept_name === conceptTitle) ?? entries[0] ?? {};
 

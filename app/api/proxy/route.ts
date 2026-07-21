@@ -14,12 +14,18 @@ export async function GET(request: NextRequest) {
 
   const upstreamParams = new URLSearchParams(request.nextUrl.searchParams);
   upstreamParams.delete('path');
+  const authorization = request.headers.get('authorization');
+  const cookie = request.headers.get('cookie');
+  const referer = request.headers.get('referer');
 
   try {
     const upstream = await fetch(`${url}?${upstreamParams.toString()}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
+        ...(authorization ? { Authorization: authorization } : {}),
+        ...(cookie ? { Cookie: cookie } : {}),
+        ...(referer ? { Referer: referer } : {}),
       },
       cache: 'no-store',
     });
@@ -48,20 +54,21 @@ export async function POST(request: NextRequest) {
   const base = API_BASE_URL.replace(/\/$/, '');
   const url = `${base}/${targetPath.replace(/^\//, '')}`;
 
-  let body: string | undefined;
   const contentType = request.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    body = await request.text();
-  }
+  const body = await request.text();
+  const authorization = request.headers.get('authorization');
+  const cookie = request.headers.get('cookie');
 
   try {
     const upstream = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        ...(contentType ? { 'Content-Type': contentType } : {}),
         Accept: 'application/json',
+        ...(authorization ? { Authorization: authorization } : {}),
+        ...(cookie ? { Cookie: cookie } : {}),
       },
-      body,
+      body: body || undefined,
       cache: 'no-store',
     });
 

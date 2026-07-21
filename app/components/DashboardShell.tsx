@@ -10,6 +10,7 @@ import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/men
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import { usePathname, useRouter } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
+import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 interface SelectedBranch {
   level1Key: string;
@@ -108,6 +109,33 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return false;
   }, [menuItems]);
 
+  useEffect(() => {
+    if (!menuItems.length || selectedBranch) return;
+
+    const currentPath = pathname.toLowerCase();
+    for (const level1 of menuItems) {
+      for (const level2 of level1.submenus ?? []) {
+        const level2Route = level2.link ? mapApiLinkToRoute(level2.link) : level2.href;
+        const level3Match = level2.submenus?.some((level3) => {
+          const route = level3.link ? mapApiLinkToRoute(level3.link) : level3.href;
+          return route !== '#' && currentPath === route.toLowerCase();
+        });
+        const level2Match = level2Route !== '#' && currentPath.startsWith(level2Route.toLowerCase());
+
+        if (level2Match || level3Match) {
+          // Restore the active menu branch on refresh/direct navigation so its
+          // permission-filtered Master menu can be fetched for the sub-header.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setSelectedBranch({
+            level1Key: getMenuKey(level1),
+            level2Key: getMenuKey(level2),
+          });
+          return;
+        }
+      }
+    }
+  }, [menuItems, pathname, selectedBranch]);
+
    const fetchMasterMenu = useCallback(async (mainMenuId: number | string | undefined, menuItem: SubmenuItem | undefined) => {
     if (!mainMenuId || !menuItem) return;
 
@@ -119,7 +147,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
     setMasterMenuLoading(true);
     try {
-      const url = new URL(`/api/proxy?path=api/master-menu-rights`);
+      const url = new URL(`${API_BASE_URL.replace(/\/$/, '')}/api/master-menu-rights`);
       url.searchParams.set('menu_id', String(menuItem.id));
       url.searchParams.set('main_menu_id', String(mainMenuId));
       url.searchParams.set('type', 'API');
@@ -170,7 +198,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       setFetchedMasterMenuItems(filtered);
       setMasterMenuGroups(rawData.length > 0 && (rawData[0] as Record<string, unknown>).url ? [] : rawData);
       setMasterMenuFetchedFor(cacheKey);
-    } catch {
+    } catch (error) {
+      console.error('Master menu request failed:', error);
       setFetchedMasterMenuItems([]);
       setMasterMenuGroups([]);
     } finally {

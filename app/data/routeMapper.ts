@@ -49,40 +49,20 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return '/fees/master/other-fees-title';
   }
 
-  if (cleanLink.toLowerCase() === 'fees_collection_report.index') {
-    return '/fees/reports/fees-collection';
+  if (
+    cleanLink.toLowerCase() === 'exam_master.index' ||
+    cleanLink.toLowerCase() === 'result/exam_master' ||
+    cleanLink.toLowerCase() === 'result/exam_master/index'
+  ) {
+    return '/exam/exam-master';
   }
 
-  if (cleanLink.toLowerCase() === 'fees_type_wise_report.index') {
-    return '/fees/reports/fees-type-wise';
-  }
-
-  if (cleanLink.toLowerCase() === 'othernew_fees_report.index') {
-    return '/fees/reports/other-fees';
-  }
-
-  if (cleanLink.toLowerCase() === 'othernew_cancel_fees_report.index') {
-    return '/fees/reports/other-fees-cancel';
-  }
-
-  if (cleanLink.toLowerCase() === 'fees_defaulter_report.index') {
-    return '/fees/reports/fees-defaulter';
-  }
-
-  if (cleanLink.toLowerCase() === 'student_breakoff_report.index') {
-    return '/fees/reports/student-breakoff';
-  }
-
-  if (cleanLink.toLowerCase() === 'fees_report_datewise.index') {
-    return '/fees/reports/datewise-summary';
-  }
-
-  if (cleanLink.toLowerCase() === 'fees_structure_report_index') {
-    return '/fees/reports/fees-structure';
-  }
-
-  if (cleanLink.toLowerCase() === 'fees_cancel_report_index') {
-    return '/fees/reports/fees-cancel';
+  if (
+    cleanLink.toLowerCase() === 'marks_entry.index' ||
+    cleanLink.toLowerCase() === 'result/marks_entry' ||
+    cleanLink.toLowerCase() === 'result/marks_entry/index'
+  ) {
+    return '/exam/marks-entry';
   }
   
   if (!cleanLink) return '#';

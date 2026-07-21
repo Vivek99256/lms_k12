@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Plus, Pencil, Trash2, Search, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -16,48 +16,23 @@ import {
 
 interface ExamMaster {
   id: string;
+  code: string;
   srNo: number;
   examType: string;
   standard: string;
+  standardId: string;
   term: string;
+  termId: string;
   weightage: number;
   sortOrder: number;
+  totalCount: number;
 }
 
-const standardOptions = [
-  { value: '', label: 'Select Standard' },
-  { value: 'NR', label: 'Nursery' },
-  { value: 'KG', label: 'KG' },
-  { value: '1', label: '1' },
-  { value: '2', label: '2' },
-  { value: '3', label: '3' },
-  { value: '4', label: '4' },
-  { value: '5', label: '5' },
-  { value: '6', label: '6' },
-  { value: '7', label: '7' },
-  { value: '8', label: '8' },
-  { value: '9', label: '9' },
-  { value: '10', label: '10' },
-  { value: '11', label: '11' },
-  { value: '12', label: '12' },
-];
-
-const termOptions = [
-  { value: '', label: 'Select Term' },
-  { value: 'SEMESTER-1', label: 'SEMESTER-1' },
-  { value: 'SEMESTER-2', label: 'SEMESTER-2' },
-];
-
-const sampleData: ExamMaster[] = [
-  { srNo: 1, id: '1', examType: 'F.P', standard: '', term: '', weightage: 0, sortOrder: 2 },
-  { srNo: 2, id: '2', examType: 'S.P', standard: '', term: '', weightage: 0, sortOrder: 3 },
-  { srNo: 3, id: '3', examType: 'Final', standard: '', term: '', weightage: 0, sortOrder: 4 },
-  { srNo: 4, id: '4', examType: 'ST', standard: '', term: '', weightage: 0, sortOrder: 5 },
-  { srNo: 5, id: '5', examType: 'PERIODIC TEST', standard: 'NR', term: 'SEMESTER-1', weightage: 10, sortOrder: 1 },
-];
-
 export default function ExamMasterPage() {
-  const [data, setData] = useState<ExamMaster[]>(sampleData);
+  const [data, setData] = useState<ExamMaster[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -73,6 +48,56 @@ export default function ExamMasterPage() {
     weightage: '',
     sortOrder: '',
   });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadExamMasters = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+        const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+        const hostName = String(userData.host_name ?? '').replace(/\/$/, '');
+        const subInstituteId = String(userData.sub_institute_id ?? menuContext.sub_institute_id ?? '');
+        const token = String(userData.user_token ?? userData.token ?? '');
+        if (!hostName || !subInstituteId) throw new Error('Session data is missing.');
+
+        const params = new URLSearchParams({ type: 'API', sub_institute_id: subInstituteId });
+        const response = await fetch(`${hostName}/result/exam_master?${params}`, {
+          headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}: Unable to load exam masters`);
+        const payload = (await response.json()) as { data?: unknown[] };
+        const rows = Array.isArray(payload.data) ? payload.data : [];
+        setData(rows.map((value, index) => {
+          const row = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+          return {
+            id: String(row.Id ?? row.id ?? ''),
+            code: String(row.Code ?? ''),
+            srNo: Number(row.SrNo ?? index + 1),
+            examType: String(row.ExamTitle ?? ''),
+            standard: String(row.std_name ?? row.standard_name ?? ''),
+            standardId: String(row.standard_id ?? ''),
+            term: String(row.term ?? ''),
+            termId: String(row.term_id ?? ''),
+            weightage: Number(row.weightage ?? 0),
+            sortOrder: Number(row.SortOrder ?? 0),
+            totalCount: Number(row.total_count ?? 0),
+          };
+        }).filter((row) => row.id));
+      } catch (reason) {
+        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to load exam masters.');
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+    void loadExamMasters();
+    return () => controller.abort();
+  }, []);
+
+  const standardOptions = useMemo(() => Array.from(new Map(data.filter((item) => item.standardId).map((item) => [item.standardId, { value: item.standardId, label: item.standard }])).values()), [data]);
+  const termOptions = useMemo(() => Array.from(new Map(data.filter((item) => item.termId).map((item) => [item.termId, { value: item.termId, label: item.term }])).values()), [data]);
 
   const filteredData = useMemo(() => {
     return data.filter(item =>
@@ -109,8 +134,6 @@ export default function ExamMasterPage() {
     }));
   };
 
-  const handleSelectChange = (value: string | null) => value ?? '';
-
   const openAddModal = () => {
     setEditingItem(null);
     setFormData({ examType: '', standard: '', term: '', weightage: '', sortOrder: '' });
@@ -121,8 +144,8 @@ export default function ExamMasterPage() {
     setEditingItem(item);
     setFormData({
       examType: item.examType,
-      standard: item.standard,
-      term: item.term,
+      standard: item.standardId,
+      term: item.termId,
       weightage: String(item.weightage),
       sortOrder: String(item.sortOrder),
     });
@@ -134,42 +157,82 @@ export default function ExamMasterPage() {
     setShowDeleteModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.examType || !formData.standard || !formData.term || !formData.weightage || !formData.sortOrder) {
       return;
     }
 
-    if (editingItem) {
-      setData(prev => prev.map(item =>
-        item.id === editingItem.id
-          ? { ...item, examType: formData.examType, standard: formData.standard, term: formData.term, weightage: Number(formData.weightage), sortOrder: Number(formData.sortOrder) }
-          : item
-      ));
-    } else {
-      const newItem: ExamMaster = {
-        id: Date.now().toString(),
-        srNo: data.length + 1,
-        examType: formData.examType,
-        standard: formData.standard,
-        term: formData.term,
-        weightage: Number(formData.weightage),
-        sortOrder: Number(formData.sortOrder),
-      };
-      setData(prev => [...prev, newItem]);
+    setSubmitting(true);
+    setError(null);
+    try {
+      const session = getExamSession();
+      const body = new URLSearchParams();
+      body.append('type', 'API');
+      body.append('sub_institute_id', session.subInstituteId);
+      body.append('user_id', session.userId);
+      body.append('Code', editingItem?.code || String(Math.max(0, ...data.map((item) => Number(item.code) || 0)) + 1));
+      body.append('ExamTitle', formData.examType.trim());
+      body.append('SortOrder', formData.sortOrder);
+      body.append('weightage', formData.weightage);
+      body.append('all_standard[]', formData.standard);
+      body.append('all_term[]', formData.term);
+      if (editingItem) body.append('_method', 'PUT');
+
+      const targetPath = `result/exam_master${editingItem ? `/${editingItem.id}` : ''}`;
+      const endpoint = `/api/proxy?path=${encodeURIComponent(targetPath)}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
+        body: body.toString(),
+      });
+      const payload = await readWriteResponse(response);
+      if (!response.ok || String(payload.status ?? '') !== '1') throw new Error(payload.message || `HTTP ${response.status}: Unable to save exam master`);
+      setShowModal(false);
+      window.location.reload();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to save exam master.');
+      setShowModal(false);
+    } finally {
+      setSubmitting(false);
     }
-    setShowModal(false);
   };
 
-  const handleDelete = () => {
-    if (deleteItem) {
-      setData(prev => prev.filter(item => item.id !== deleteItem.id));
+  const handleDelete = async () => {
+    if (!deleteItem) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const session = getExamSession();
+      const body = new URLSearchParams({ type: 'API', sub_institute_id: session.subInstituteId, user_id: session.userId, _method: 'DELETE' });
+      const targetPath = `result/exam_master/${deleteItem.id}`;
+      const response = await fetch(`/api/proxy?path=${encodeURIComponent(targetPath)}`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
+        body: body.toString(),
+      });
+      const payload = await readWriteResponse(response);
+      if (!response.ok || String(payload.status ?? '') !== '1') throw new Error(payload.message || `HTTP ${response.status}: Unable to delete exam master`);
+      setShowDeleteModal(false);
+      window.location.reload();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to delete exam master.');
+      setShowDeleteModal(false);
+    } finally {
+      setSubmitting(false);
     }
-    setShowDeleteModal(false);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen p-6">
+      <div className="mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -185,9 +248,11 @@ export default function ExamMasterPage() {
             className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
           >
             <Plus className="h-4 w-4" />
-            + Add New
+             Add New
           </Button>
         </div>
+
+        {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
 
         <Card className="border-slate-200/80 bg-white shadow-sm">
           <div className="border-b border-slate-200 p-3">
@@ -248,7 +313,9 @@ export default function ExamMasterPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedData.length > 0 ? (
+                {loading ? (
+                  <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-500">Loading exam masters...</td></tr>
+                ) : paginatedData.length > 0 ? (
                   paginatedData.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50/60">
                       <td className="px-5 py-4 text-slate-600">{item.srNo}</td>
@@ -267,14 +334,16 @@ export default function ExamMasterPage() {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => openDeleteModal(item)}
-                            className="h-8 w-8 rounded-lg p-0 text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {item.totalCount === 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openDeleteModal(item)}
+                              className="h-8 w-8 rounded-lg p-0 text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -349,7 +418,7 @@ export default function ExamMasterPage() {
                       <SelectValue placeholder="Select Standard" />
                     </SelectTrigger>
                     <SelectContent>
-                      {standardOptions.slice(1).map(opt => (
+                      {standardOptions.map(opt => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -362,7 +431,7 @@ export default function ExamMasterPage() {
                       <SelectValue placeholder="Select Term" />
                     </SelectTrigger>
                     <SelectContent>
-                      {termOptions.slice(1).map(opt => (
+                      {termOptions.map(opt => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -393,8 +462,8 @@ export default function ExamMasterPage() {
                 <Button variant="outline" onClick={() => setShowModal(false)} className="h-10 rounded-lg">
                   Cancel
                 </Button>
-                <Button onClick={handleSave} className="h-10 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-                  {editingItem ? 'Update' : 'Save'}
+                <Button disabled={submitting} onClick={handleSave} className="h-10 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                  {submitting ? 'Saving...' : editingItem ? 'Update' : 'Save'}
                 </Button>
               </div>
             </div>
@@ -413,8 +482,8 @@ export default function ExamMasterPage() {
                 <Button variant="outline" onClick={() => setShowDeleteModal(false)} className="h-9 rounded-lg">
                   Cancel
                 </Button>
-                <Button onClick={handleDelete} className="h-9 rounded-lg bg-red-600 text-white hover:bg-red-700">
-                  Delete
+                <Button disabled={submitting} onClick={handleDelete} className="h-9 rounded-lg bg-red-600 text-white hover:bg-red-700">
+                  {submitting ? 'Deleting...' : 'Delete'}
                 </Button>
               </div>
             </div>
@@ -423,4 +492,25 @@ export default function ExamMasterPage() {
       </div>
     </div>
   );
+}
+
+function getExamSession() {
+  const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+  const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+  const hostName = String(userData.host_name ?? '').replace(/\/$/, '');
+  const subInstituteId = String(userData.sub_institute_id ?? menuContext.sub_institute_id ?? '');
+  const token = String(userData.user_token ?? userData.token ?? '');
+  const userId = String(userData.user_id ?? userData.id ?? menuContext.user_id ?? '');
+  if (!hostName || !subInstituteId || !userId) throw new Error('Session data is missing.');
+  return { hostName, subInstituteId, userId, token };
+}
+
+async function readWriteResponse(response: Response): Promise<{ status?: string | number; message?: string }> {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as { status?: string | number; message?: string };
+  } catch {
+    throw new Error(response.ok ? 'Laravel returned an invalid response.' : `HTTP ${response.status}: ${text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)}`);
+  }
 }

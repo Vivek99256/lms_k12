@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SubmenuItem } from '@/app/data/menuItems';
@@ -25,11 +26,6 @@ interface Level3SubheaderProps {
 }
 
 
-
-function hasMasterAccess(userProfileName: string): boolean {
-  const role = userProfileName.trim().toLowerCase();
-  return role === 'admin' || role === 'teacher';
-}
 
 /**
  * Get navigation route from item - prioritizes 'route_name' if available, then 'link', then 'href'
@@ -60,7 +56,7 @@ function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null 
   return null;
 }
 
-export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [], userProfileName = '' }: Level3SubheaderProps) {
+export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
   const [showMasterDropdown, setShowMasterDropdown] = useState(() => {
@@ -90,6 +86,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
   const containerRef = useRef<HTMLDivElement>(null);
   const tabsWrapperRef = useRef<HTMLDivElement>(null);
   const masterPanelRef = useRef<HTMLDivElement>(null);
+  const masterPanelContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -121,7 +118,8 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
     const handleOutsideClick = (event: MouseEvent) => {
       if (
         masterPanelRef.current &&
-        !masterPanelRef.current.contains(event.target as Node)
+        !masterPanelRef.current.contains(event.target as Node) &&
+        !masterPanelContentRef.current?.contains(event.target as Node)
       ) {
         setShowMasterDropdown(false);
       }
@@ -268,7 +266,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
           )}
         </div>
 
-        {hasMasterAccess(userProfileName) && (masterMenuGroups.length > 0 || masterItems.length > 0) && (
+        {(items.length > 0 || masterLoading || masterMenuGroups.length > 0 || masterItems.length > 0) && (
           <div className="relative shrink-0" data-master-dropdown ref={masterPanelRef}>
             <button
               type="button"
@@ -278,8 +276,11 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
               Master
             </button>
 
-            {showMasterDropdown && (
-              <div className="absolute right-0 top-full mt-3 w-[640px] max-h-[420px] overflow-hidden bg-white rounded-2xl shadow-[0_20px_50px_rgb(0,0,0,0.15)] border border-gray-100 z-50">
+            {showMasterDropdown && typeof document !== 'undefined' && createPortal(
+              <div
+                ref={masterPanelContentRef}
+                className="fixed right-5 top-[104px] w-[min(760px,calc(100vw-2rem))] max-h-[calc(100vh-124px)] overflow-hidden bg-white rounded-2xl shadow-[0_24px_70px_rgba(15,23,42,0.22)] border border-slate-200 z-[100]"
+              >
                 {masterLoading && (
                   <div className="flex items-center justify-center py-12">
                     <div className="w-6 h-6 border-2 border-[#0D6EFD] border-t-transparent rounded-full animate-spin mr-3" />
@@ -380,7 +381,12 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                         </div>
                       </>
                     ) : (
-                      <div className="p-2">
+                      <div className="p-2 min-w-[280px]">
+                        {!masterLoading && masterItems.length === 0 && (
+                          <div className="px-4 py-8 text-center text-sm font-medium text-gray-500">
+                            No master items available for this menu.
+                          </div>
+                        )}
                         {!masterLoading && masterItems.map((item) => {
                           const Icon = item.icon;
                           return (
@@ -405,7 +411,8 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                     )}
                   </div>
                 )}
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         )}
