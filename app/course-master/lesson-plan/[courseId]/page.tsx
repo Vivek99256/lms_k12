@@ -406,6 +406,7 @@ type SessionContext = {
   token: string;
   termId: string;
   standardId: string;
+  hostName: string;
 };
 
 type CreateLessonPlanDialogProps = {
@@ -849,6 +850,7 @@ export default function LessonPlanPage() {
     token: '',
     termId: '',
     standardId: '',
+    hostName: '',
   });
   const currentStandardId = Number(sessionContext.standardId || routeStandardId || 0) || null;
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(
@@ -916,6 +918,7 @@ export default function LessonPlanPage() {
         standardId: readString(
           userData.standard_id ?? menuContext.standard_id ?? routeStandardId
         ),
+        hostName: readString(userData.host_name ?? menuContext.host_name) || API_BASE_URL,
       };
 
       console.log('Current Session:', {
@@ -956,15 +959,16 @@ export default function LessonPlanPage() {
       }
 
       console.log('Division request values:', {
+        hostName: sessionContext.hostName,
         subInstituteId: sessionContext.subInstituteId,
         standardId: currentStandardId,
         hasToken: Boolean(sessionContext.token),
       });
 
-      if (!sessionContext.token || !sessionContext.subInstituteId) {
+      if (!sessionContext.hostName || !sessionContext.token || !sessionContext.subInstituteId) {
         if (!cancelled) {
           setDivisionLoading(false);
-          setDivisionError('Current session is missing token or institute.');
+          setDivisionError('Current session is missing API host, token, or institute.');
         }
         return;
       }
@@ -974,21 +978,22 @@ export default function LessonPlanPage() {
           setDivisionLoading(true);
         }
 
-        const url = new URL('${API_BASE_URL}/get_adminDivision');
+        const url = new URL(
+          `${sessionContext.hostName.replace(/\/$/, '')}/get_adminDivision`
+        );
         url.searchParams.set('standard_id', String(currentStandardId));
         url.searchParams.set('token', sessionContext.token);
         url.searchParams.set('sub_institute_id', sessionContext.subInstituteId);
 
         const response = await fetch(url.toString(), {
           method: 'POST',
-          headers: {  
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            standard_id: currentStandardId,
-            token: sessionContext.token,
-            sub_institute_id: sessionContext.subInstituteId,
-          }),
+          body: (() => {
+            const formData = new FormData();
+            formData.append('standard_id', String(currentStandardId));
+            formData.append('token', sessionContext.token);
+            formData.append('sub_institute_id', sessionContext.subInstituteId);
+            return formData;
+          })(),
         });
 
         if (!response.ok) {
@@ -1028,7 +1033,7 @@ export default function LessonPlanPage() {
     return () => {
       cancelled = true;
     };
-  }, [currentStandardId, sessionContext.subInstituteId, sessionContext.token]);
+  }, [currentStandardId, sessionContext.hostName, sessionContext.subInstituteId, sessionContext.token]);
 
   useEffect(() => {
     if (!selectedDivisionId) {
