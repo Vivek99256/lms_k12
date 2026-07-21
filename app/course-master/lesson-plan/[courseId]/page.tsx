@@ -45,6 +45,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { cn } from '@/lib/utils';
 import { getRequestContext } from '../../page';
 import { courses } from '../../data/courses';
