@@ -363,7 +363,7 @@ function DepartmentDetailsHeader({
         }}
         className=" px-3 py-2 text-black"
       >
-        CLOSE
+        <X className="h-4 w-4" />
       </button>
     </div>
   );

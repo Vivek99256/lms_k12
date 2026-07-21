@@ -137,6 +137,35 @@ export function NativeSelect({
   );
 }
 
+export function NativeMultiSelect({
+  value,
+  onChange,
+  children,
+  disabled,
+  required,
+  minHeightClassName = 'min-h-32',
+}: {
+  value: string[];
+  onChange: (value: string[]) => void;
+  children: ReactNode;
+  disabled?: boolean;
+  required?: boolean;
+  minHeightClassName?: string;
+}) {
+  return (
+    <select
+      multiple
+      value={value}
+      onChange={(event) => onChange(Array.from(event.target.selectedOptions).map((option) => option.value))}
+      disabled={disabled}
+      required={required}
+      className={`${minHeightClassName} w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-[var(--primary-blue)] focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100`}
+    >
+      {children}
+    </select>
+  );
+}
+
 export function ReceiptPreviewModal({
   title,
   html,

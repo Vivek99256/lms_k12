@@ -11,13 +11,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import type { Chapter } from '../../data/chapters';
+import { fetchSemanticIntelligenceResult } from '../../data/chapters';
+import type { Chapter, SemanticIntelligenceResult } from '../../data/chapters';
 import type { Course } from '../../data/courses';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { getRequestContext, getSyear } from '../../page';
 
-const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
-const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
+const DEFAULT_SLIDE_COUNT = 30;
+const GAMMA_GENERATION_TIMEOUT_MS = 10 * 60 * 1000;
 
 interface GeneratePresentationDrawerProps {
   isOpen: boolean;
@@ -46,7 +47,6 @@ export function GeneratePresentationDrawer({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [generationSuccess, setGenerationSuccess] = useState<string | null>(null);
-  const [selectedSlideCount, setSelectedSlideCount] = useState(10);
 
   const exportFormat = 'pdf';
 
@@ -68,44 +68,82 @@ export function GeneratePresentationDrawer({
     const chapter = allChapters.find((ch) => ch.id === presentationChapterId);
     const concepts = chapter?.concepts ?? [];
     const currentConceptExists = concepts.some((concept) => concept.id === presentationConcept);
+    const nextConcept = !currentConceptExists && concepts.length > 0
+      ? concepts[0].id
+      : concepts.length === 0
+        ? ''
+        : null;
     
-    if (!currentConceptExists && concepts.length > 0) {
-      setPresentationConcept(concepts[0].id);
-    } else if (concepts.length === 0) {
-      setPresentationConcept('');
-    }
+    if (nextConcept === null) return;
+
+    const timeoutId = window.setTimeout(() => setPresentationConcept(nextConcept), 0);
+    return () => window.clearTimeout(timeoutId);
   }, [presentationChapterId, presentationMode, allChapters, presentationConcept]);
 
   // Reset form when drawer opens
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+
+    const timeoutId = window.setTimeout(() => {
       setPresentationChapterId(initialChapterId);
       setPresentationConcept(initialConcept);
       setGenerationError(null);
       setGenerationSuccess(null);
       setIsGenerating(false);
-    }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [isOpen, initialChapterId, initialConcept]);
 
   const extractText = (arr: unknown[] | undefined, key: string): string => {
     if (!Array.isArray(arr) || arr.length === 0) return 'Not specified';
-    return arr.map((a) => (a as Record<string, unknown>)?.[key]).filter(Boolean).join('; ');
+    const text = arr.map((a) => (a as Record<string, unknown>)?.[key]).filter(Boolean).join('; ');
+    return text || 'Not specified';
   };
 
-  const constructPrompt = (chapter: Chapter): string => {
+  const extractAnyText = (arr: unknown[] | undefined, keys: string[]): string => {
+    if (!Array.isArray(arr) || arr.length === 0) return 'Not specified';
+    for (const key of keys) {
+      const text = arr.map((a) => (a as Record<string, unknown>)?.[key]).filter(Boolean).join('; ');
+      if (text) return text;
+    }
+    return 'Not specified';
+  };
+
+  const getSemanticPayload = (chapter: Chapter, result?: SemanticIntelligenceResult | null) => {
+    const raw = result?.full_intelligence_json ?? result?.full_intelegance_json ?? chapter.semantic?.full_intelligence_json ?? chapter.semantic?.full_intelegance_json;
+    const intelligence = raw && typeof raw === 'object' && 'intelligence' in raw
+      ? (raw as Record<string, unknown>).intelligence as Record<string, unknown>
+      : raw;
+
+    return {
+      intelligence: (intelligence ?? {}) as Record<string, unknown>,
+      mdContent: result?.md_content ?? chapter.semantic?.md_content ?? '',
+    };
+  };
+
+  const getConceptEntries = (semantic: Record<string, unknown>) => {
+    const list = semantic.concepts ?? semantic.topics ?? semantic.teaching_units;
+    return Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
+  };
+
+  const getEntryConceptName = (entry: Record<string, unknown>) => {
+    const concept = entry.concept as Record<string, unknown> | undefined;
+    return String(concept?.concept_name ?? entry.topic_title ?? entry.topic_name ?? 'Concept');
+  };
+
+  const constructPrompt = (chapter: Chapter, semanticResult?: SemanticIntelligenceResult | null): string => {
     const standard = course?.classGrade || 'Standard';
     const subject = course?.subject || 'Subject';
     const chapterName = chapter.title || 'Chapter';
 
-    const semantic = chapter.semantic?.full_intelegance_json;
-    const entries = semantic?.concepts ? (semantic.concepts as Record<string, unknown>[]) : [];
+    const semanticPayload = getSemanticPayload(chapter, semanticResult);
+    const entries = getConceptEntries(semanticPayload.intelligence);
 
     let conceptsYaml = '';
     if (entries.length > 0) {
       for (const entry of entries) {
-        const conceptName = (entry as Record<string, unknown>)?.concept
-          ? ((entry as Record<string, unknown>).concept as Record<string, unknown>)?.concept_name || 'Concept'
-          : 'Concept';
+        const conceptName = getEntryConceptName(entry);
         const knowledge = extractText((entry as Record<string, unknown>)?.knowledge_items as unknown[] | undefined, 'knowledge');
         const ability = extractText((entry as Record<string, unknown>)?.abilities as unknown[] | undefined, 'ability');
         const skill = extractText((entry as Record<string, unknown>)?.skills as unknown[] | undefined, 'skill');
@@ -113,7 +151,7 @@ export function GeneratePresentationDrawer({
         const blooms = extractText((entry as Record<string, unknown>)?.blooms as unknown[] | undefined, 'level');
         const dok = extractText((entry as Record<string, unknown>)?.dok as unknown[] | undefined, 'level');
         const pedagogy = extractText((entry as Record<string, unknown>)?.pedagogy_recommendations as unknown[] | undefined, 'strategy');
-        const rwa = extractText((entry as Record<string, unknown>)?.real_world_applications as unknown[] | undefined, 'application');
+        const rwa = extractAnyText((entry as Record<string, unknown>)?.real_world_applications as unknown[] | undefined, ['example', 'application']);
         const misconceptions = extractText((entry as Record<string, unknown>)?.misconceptions as unknown[] | undefined, 'misconception');
         const objectives = extractText((entry as Record<string, unknown>)?.learning_objectives as unknown[] | undefined, 'objective');
         const outcomes = extractText((entry as Record<string, unknown>)?.learning_outcomes as unknown[] | undefined, 'outcome');
@@ -177,24 +215,42 @@ Recommended range:
 5-10 slides per concept cluster
 20-60 slides per chapter
 
+Generation Compliance Contract
+You must follow the prompt requirements exactly. Do not add unrelated pedagogical theory, generic instructional strategy explanations, or extra content sections unless they directly satisfy one of the required slide fields below.
+Every major concept must have visible competency mapping, assessment design, classroom interaction, and image guidance.
+Every slide must be usable by a teacher without additional interpretation.
+If a required data item is "Not specified", write a brief classroom-appropriate placeholder based only on the Ground Truth Chapter Content and clearly keep it within the chapter scope.
+
 Output Requirements
-For every slide generate:
+For every slide, generate exactly these sections in this order:
 Slide Number
 Slide Title
-Concept Coverage
-Concept Intelligence Mapping
+Concept Coverage: list the concept or concept cluster addressed.
+Concept Intelligence Mapping:
 Knowledge:
 Ability:
 Skill:
 Competency:
 BloomLevel:
 DOKLevel:
-Purpose
-Content
-Speaker Notes
-Student Interaction
-Assessment Opportunity
-Image Prompt
+Purpose: explain why this slide is needed in the learning progression.
+Content: detailed classroom-ready explanation using the Ground Truth Chapter Content.
+Speaker Notes: facilitation guidance for the teacher.
+Student Interaction: include a question, discussion, investigation, reflection, pair task, or class activity.
+Assessment Design: include assessment type, observable evidence, success criteria, and one quick teacher check.
+Lesson Planning Link: include timing, materials/preparation, grouping, and transition to the next slide or activity.
+Digital Tool Integration: include a relevant tool or "No digital tool required" with a reason.
+Image Prompt: provide one detailed visual prompt with age-appropriate style, realistic classroom or contextual scene, no readable text, no labels, no UI screenshots, no decorative abstract-only image.
+
+Final Slide Audit
+At the end of the response, include a "Compliance Audit" with:
+All concepts covered: Yes/No
+Competency mapping present on every slide: Yes/No
+Assessment design present on every slide: Yes/No
+Lesson planning details present on every slide: Yes/No
+Digital tool guidance present where useful: Yes/No
+Image prompt present on every slide: Yes/No
+No extra unrelated content added: Yes/No
 
 Quality Requirements
 The presentation must:
@@ -219,21 +275,19 @@ Ground Truth Chapter Content (No Hallucinations)
 Below is the exact, raw textbook content for this chapter. 
 CRITICAL INSTRUCTION: You MUST use the exact definitions, examples, and terminology found in this text when generating the slide content. 
 
-${semantic?.chapter_summary || chapter.title || 'Content not available.'}`;
+${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
   };
 
-  const constructTeacherTrainingPrompt = (chapter: Chapter, conceptId: string): string => {
+  const constructTeacherTrainingPrompt = (chapter: Chapter, conceptId: string, semanticResult?: SemanticIntelligenceResult | null): string => {
     const standard = course?.classGrade || 'Standard';
     const subject = course?.subject || 'Subject';
     const chapterName = chapter.title || 'Chapter';
 
-    const semantic = chapter.semantic?.full_intelegance_json;
+    const semanticPayload = getSemanticPayload(chapter, semanticResult);
     const conceptTitle = chapter.concepts?.find((c) => c.id === conceptId)?.title ?? 'Concept';
-    const entries = semantic?.concepts ? (semantic.concepts as Record<string, unknown>[]) : [];
+    const entries = getConceptEntries(semanticPayload.intelligence);
     const conceptEntry = entries.find((entry) => {
-      const entryConceptName = (entry as Record<string, unknown>)?.concept
-        ? ((entry as Record<string, unknown>).concept as Record<string, unknown>)?.concept_name
-        : '';
+      const entryConceptName = getEntryConceptName(entry);
       return entryConceptName === conceptTitle;
     });
 
@@ -245,7 +299,7 @@ ${semantic?.chapter_summary || chapter.title || 'Content not available.'}`;
     const blooms = extractText((conceptEntry as Record<string, unknown>)?.blooms as unknown[] | undefined, 'level');
     const dok = extractText((conceptEntry as Record<string, unknown>)?.dok as unknown[] | undefined, 'level');
     const pedagogy = extractText((conceptEntry as Record<string, unknown>)?.pedagogy_recommendations as unknown[] | undefined, 'strategy');
-    const rwa = extractText((conceptEntry as Record<string, unknown>)?.real_world_applications as unknown[] | undefined, 'application');
+    const rwa = extractAnyText((conceptEntry as Record<string, unknown>)?.real_world_applications as unknown[] | undefined, ['example', 'application']);
     const misconceptions = extractText((conceptEntry as Record<string, unknown>)?.misconceptions as unknown[] | undefined, 'misconception');
     const objectives = extractText((conceptEntry as Record<string, unknown>)?.learning_objectives as unknown[] | undefined, 'objective');
     const outcomes = extractText((conceptEntry as Record<string, unknown>)?.learning_outcomes as unknown[] | undefined, 'outcome');
@@ -269,6 +323,8 @@ Learning Outcomes: ${outcomes}
 Prerequisites: ${prerequisites}
 
 Slide-by-Slide Prompt
+Follow exactly the 18-slide structure below.Do not add extra slides, extra frameworks, or generic pedagogy explanations unless they are directly i nside the named slide's required content.
+
 Slide 1: Title Slide
  Title: Teacher Training through ${pedagogy} Pedagogy-Oriented Learning Design for ${conceptName} (${standard}, ${subject}, ${chapterName})
  Sub-title: Aligned with NCERT, NEP 2020, NCTE, NPST | Concept-Specific Pedagogy & Differentiated Instruction
@@ -349,7 +405,7 @@ Below is the exact, raw textbook content for this chapter.
 CRITICAL INSTRUCTION: You MUST use the exact definitions, examples, and terminology found in this text when generating the slide content. Do not invent outside examples unless explicitly requested by the pedagogy. 
 CRITICAL INSTRUCTION 2: Ensure all generated slide content is highly detailed, comprehensive, and perfectly explained. Do not use short or superficial bullet points. Provide deep, clear, and perfectly articulated explanations suitable for a professional presentation.
 
-${semantic?.chapter_summary || chapter.title || 'Content not available.'}`;
+${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
   };
 
   const handleGenerate = async () => {
@@ -372,9 +428,34 @@ ${semantic?.chapter_summary || chapter.title || 'Content not available.'}`;
         return;
       }
 
+      let semanticResult: SemanticIntelligenceResult | null = null;
+      try {
+        semanticResult = await fetchSemanticIntelligenceResult(chapter.id);
+      } catch (error) {
+        console.warn('[GeneratePresentation] Falling back to chapter semantic data:', error);
+      }
       const prompt = presentationMode === 'Teacher training'
-        ? constructTeacherTrainingPrompt(chapter, presentationConcept)
-        : constructPrompt(chapter);
+        ? constructTeacherTrainingPrompt(chapter, presentationConcept, semanticResult)
+        : constructPrompt(chapter, semanticResult);
+
+      console.log('[GeneratePresentation] Data used to generate content:', {
+        presentationMode,
+        courseId,
+        course,
+        chapter: {
+          id: chapter.id,
+          title: chapter.title,
+          semanticResultId: semanticResult?.id,
+          semanticExtractionId: semanticResult?.extraction_id,
+          hasGroundTruthContent: Boolean(semanticResult?.md_content),
+        },
+        presentationChapterId,
+        presentationConcept,
+        exportFormat,
+        slideCount: DEFAULT_SLIDE_COUNT,
+        prompt,
+      });
+
       const requestContext = getRequestContext();
       let sub_institute_id = 0;
       let user_id = 0;
@@ -387,25 +468,42 @@ ${semantic?.chapter_summary || chapter.title || 'Content not available.'}`;
         user_profile_name = String(requestContext?.user_profile_name ?? userData.user_profile_name ?? menuContext.user_profile_name ?? '');
       } catch {}
 
-      const res = await fetch(`${API_BASE_URL}/lms/gamma_content_master/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'API',
-          sub_institute_id,
-          syear: getSyear(),
-          user_id,
-          user_profile_name,
-          chapter_name: chapter.title,
-          prompt,
-          format: 'presentation',
-          export_format: exportFormat,
-          slide_count: selectedSlideCount,
-        }),
-      });
+      const payload = {
+        type: 'API',
+        sub_institute_id,
+        syear: getSyear(),
+        user_id,
+        user_profile_name,
+        chapter_name: chapter.title,
+        prompt,
+        format: 'presentation',
+        export_format: exportFormat,
+        slide_count: DEFAULT_SLIDE_COUNT,
+      };
+      console.log('[GeneratePresentation] API request payload:', payload);
 
-      const raw = (await res.json()) as Record<string, unknown>;
-      if (!res.ok || Number(raw.status_code) !== 1) {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), GAMMA_GENERATION_TIMEOUT_MS);
+
+      const res = await (async () => {
+        try {
+          return await fetch(`${API_BASE_URL}/api/lms/gamma-content-master`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify(payload),
+          });
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+      })();
+
+      const contentType = res.headers.get('content-type') || '';
+      const raw = contentType.includes('application/json')
+        ? ((await res.json()) as Record<string, unknown>)
+        : ({ message: await res.text() } as Record<string, unknown>);
+      const isSuccess = raw.success === true || Number(raw.status_code) === 1;
+      if (!res.ok || !isSuccess) {
         throw new Error((raw.message as string) || 'Failed to generate presentation');
       }
 
@@ -417,7 +515,10 @@ ${semantic?.chapter_summary || chapter.title || 'Content not available.'}`;
       }, 2000);
     } catch (err) {
       console.error(err);
-      setGenerationError(err instanceof Error ? err.message : 'Generation failed');
+      const message = err instanceof Error && err.name === 'AbortError'
+        ? 'Gamma generation is taking longer than expected. Please try again in a few minutes.'
+        : err instanceof Error ? err.message : 'Generation failed';
+      setGenerationError(message);
     } finally {
       setIsGenerating(false);
     }
