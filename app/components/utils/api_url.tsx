@@ -36,10 +36,14 @@ const isProductionEnvironment = () => {
   );
 };
 
+function normalizeApiBaseUrl(value: string | undefined) {
+  return (value || '').trim().replace(/\/$/, '');
+}
+
 // Conditionally set the API base URL
 export const API_BASE_URL: string = isProductionEnvironment()
-  ? process.env.NEXT_PUBLIC_API_BASE_URL_PROD!
-  : process.env.NEXT_PUBLIC_API_BASE_URL_DEV!;
+  ? normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL_PROD)
+  : normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL_DEV);
 
 // Runtime validation
 if (!API_BASE_URL) {
