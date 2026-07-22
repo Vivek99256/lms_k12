@@ -6,6 +6,7 @@ export type SessionContext = {
   subInstituteId: string;
   syear: string;
   userId: string;
+  termId: string;
 };
 
 export type ApiEnvelope = {
@@ -32,6 +33,11 @@ export function normalizeAcademicYear(value: string): string {
   return yearMatch ? yearMatch[0] : trimmed;
 }
 
+export function normalizeNumericId(value: unknown): string {
+  const normalized = readString(value).trim();
+  return /^\d+$/.test(normalized) ? normalized : '';
+}
+
 export function normalizeApiStatus(payload: ApiEnvelope | null | undefined): string {
   if (!payload) return '';
   return String(payload.status ?? payload.status_code ?? '');
@@ -45,6 +51,7 @@ export function buildSessionContext(): SessionContext {
       subInstituteId: '',
       syear: '',
       userId: '',
+      termId: '',
     };
   }
 
@@ -98,6 +105,17 @@ export function buildSessionContext(): SessionContext {
           menuContext.user_id ??
           menuContext.userId
       ),
+      termId: readString(
+        normalizeNumericId(
+          userData.term_id ??
+            menuContext.term_id ??
+            userData.marking_period_id ??
+            menuContext.marking_period_id ??
+            userData.academic_term_id ??
+            menuContext.academic_term_id ??
+            localStorage.getItem('term_id')
+        )
+      ),
     };
   } catch {
     return {
@@ -106,6 +124,7 @@ export function buildSessionContext(): SessionContext {
       subInstituteId: '',
       syear: '',
       userId: '',
+      termId: '',
     };
   }
 }

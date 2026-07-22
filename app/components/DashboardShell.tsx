@@ -221,7 +221,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const toggleChatbot = () => {
     setIsChatbotOpen((prev) => {
       const next = !prev;
-      setIsRightToolbarOpen(false);
+      setIsRightToolbarOpen(!next);
       return next;
     });
   };

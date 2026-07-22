@@ -4,14 +4,9 @@ import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
-  ChartColumnIncreasing,
-  Image as ImageIcon,
-  LayoutGrid,
-  PencilLine,
-  Search,
-  SquareStack,
-  Table2,
-  Type,
+  Bot,
+  Network,
+  Sparkle,
   Sparkles,
 } from 'lucide-react';
 
@@ -30,108 +25,51 @@ type ToolbarMenu = {
 
 const toolbarMenus: ToolbarMenu[] = [
   {
-    id: 'search',
-    label: 'Search',
-    icon: Search,
+    id: 'conversational-ai',
+    label: 'AI STACK - Conversational AI',
+    icon: Bot,
     accent: 'from-sky-500 to-cyan-500',
     options: [
-      { title: 'Quick Search', description: 'Find pages, blocks, or content instantly.' },
-      { title: 'Advanced Filter', description: 'Search by tags, type, or usage frequency.' },
-      { title: 'Recent Items', description: 'Jump back into recently used elements.' },
-      { title: 'Saved Searches', description: 'Reuse common searches with one click.' },
+      {
+        title: 'AI STACK - Conversational AI',
+        description: 'Launch chat-driven experiences for guided support, Q&A, and interactive workflows.',
+      },
     ],
   },
   {
-    id: 'text',
-    label: 'Text / Basic Blocks',
-    icon: Type,
+    id: 'generative-ai',
+    label: 'AI STACK - Generative AI',
+    icon: Sparkle,
     accent: 'from-indigo-500 to-blue-500',
     options: [
-      { title: 'Heading 1', description: 'Large title for primary sections.' },
-      { title: 'Heading 2', description: 'Secondary heading for grouped content.' },
-      { title: 'Heading 3', description: 'Tertiary heading for cards and fields.' },
-      { title: 'Heading 4', description: 'Compact section label or subheading.' },
-      { title: 'Blockquote', description: 'Call out quoted or highlighted content.' },
-      { title: 'Label', description: 'Small uppercase label for forms and metadata.' },
-      { title: 'Tables', description: 'Structured tabular content and comparisons.' },
-      { title: 'Lists', description: 'Bulleted or numbered content blocks.' },
+      {
+        title: 'AI STACK - Generative AI',
+        description: 'Create content, drafts, visuals, and structured outputs from prompts and context.',
+      },
     ],
   },
   {
-    id: 'image',
-    label: 'Image',
-    icon: ImageIcon,
+    id: 'knowledge-graph',
+    label: 'AI STACK - Knowledge Graph',
+    icon: Network,
     accent: 'from-emerald-500 to-teal-500',
     options: [
-      { title: 'Upload Image', description: 'Add an image from local storage.' },
-      { title: 'Image Gallery', description: 'Browse reusable assets and media.' },
-      { title: 'Hero Banner', description: 'Insert a wide visual with text overlay.' },
-      { title: 'Image Card', description: 'Combine an image with title and description.' },
+      {
+        title: 'AI STACK - Knowledge Graph',
+        description: 'Connect entities, topics, and relationships for richer discovery and reasoning.',
+      },
     ],
   },
   {
-    id: 'layout',
-    label: 'Layout / Components',
-    icon: LayoutGrid,
-    accent: 'from-violet-500 to-fuchsia-500',
-    options: [
-      { title: 'Two Column', description: 'Split the canvas into two balanced areas.' },
-      { title: 'Three Column', description: 'Create a wider multi-column layout.' },
-      { title: 'Stack', description: 'Vertical content flow with generous spacing.' },
-      { title: 'Tabs', description: 'Segment content into switchable panels.' },
-      { title: 'Accordion', description: 'Hide and reveal grouped sections.' },
-      { title: 'Modal', description: 'Open focused actions without leaving the page.' },
-    ],
-  },
-  {
-    id: 'chart',
-    label: 'Chart',
-    icon: ChartColumnIncreasing,
+    id: 'recommendation-engine',
+    label: 'AI STACK - Recommendation Engine',
+    icon: Sparkles,
     accent: 'from-amber-500 to-orange-500',
     options: [
-      { title: 'Bar Chart', description: 'Compare values across categories.' },
-      { title: 'Line Chart', description: 'Show trends over time.' },
-      { title: 'Pie Chart', description: 'Display proportions of a whole.' },
-      { title: 'Area Chart', description: 'Visualize a cumulative trend.' },
-      { title: 'Metric Card', description: 'Highlight a key KPI or summary.' },
-    ],
-  },
-  {
-    id: 'table',
-    label: 'Table',
-    icon: Table2,
-    accent: 'from-slate-600 to-slate-900',
-    options: [
-      { title: 'Data Table', description: 'Grid rows and columns for structured data.' },
-      { title: 'Compact Table', description: 'Dense layout for admin screens.' },
-      { title: 'Sortable Table', description: 'Enable column sorting controls.' },
-      { title: 'Export Table', description: 'Prepare a table for CSV or print export.' },
-    ],
-  },
-  {
-    id: 'card',
-    label: 'Card / Section',
-    icon: SquareStack,
-    accent: 'from-rose-500 to-pink-500',
-    options: [
-      { title: 'Content Card', description: 'Framed section for any block of content.' },
-      { title: 'Stat Card', description: 'Display a quick summary or number.' },
-      { title: 'Section Header', description: 'Introduce a grouped area with title and note.' },
-      { title: 'Feature Card', description: 'Show a prominent item with icon and copy.' },
-    ],
-  },
-  {
-    id: 'design',
-    label: 'Edit / Design',
-    icon: PencilLine,
-    accent: 'from-slate-500 to-gray-800',
-    options: [
-      { title: 'Align Left', description: 'Keep content aligned to the left edge.' },
-      { title: 'Center Align', description: 'Center content in the available space.' },
-      { title: 'Align Right', description: 'Push content to the right side.' },
-      { title: 'Code Block', description: 'Insert a monospaced code region.' },
-      { title: 'Divider', description: 'Separate sections with a visual rule.' },
-      { title: 'Shape', description: 'Add a decorative shape or callout.' },
+      {
+        title: 'AI STACK - Recommendation Engine',
+        description: 'Surface personalized suggestions, next-best actions, and relevant content paths.',
+      },
     ],
   },
 ];
@@ -163,7 +101,7 @@ export default function RightFloatingToolbar({
   onOpenChange: (isOpen: boolean) => void;
   toggleButtonRef: React.RefObject<HTMLButtonElement | null>;
 }) {
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(toolbarMenus[0]?.id ?? null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const activeMenu = toolbarMenus.find((menu) => menu.id === activeMenuId) ?? null;
@@ -217,7 +155,7 @@ export default function RightFloatingToolbar({
     <div
       ref={containerRef}
       className="fixed bottom-4 right-3 z-[70] flex items-end md:bottom-auto md:right-4 md:top-1/2 md:-translate-y-1/2 md:items-center"
-      aria-label="Floating editor toolbar"
+      aria-label="Floating AI Stack toolbar"
     >
       <div
         className="flex flex-col-reverse items-end gap-3 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-3"
@@ -230,11 +168,11 @@ export default function RightFloatingToolbar({
           >
             <div className={`bg-gradient-to-r ${activeMenu.accent} px-5 py-4 text-white`}>
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">
-                Toolbox
+                AI Stack
               </p>
               <h2 className="mt-1 text-lg font-semibold leading-tight">{activeMenu.label}</h2>
               <p className="mt-1 text-sm text-white/80">
-                Browse the matching components and insert the one you need.
+                Explore the available AI capabilities from the floating stack.
               </p>
             </div>
 
