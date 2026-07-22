@@ -19,6 +19,12 @@ import { getRequestContext, getSyear } from '../../page';
 
 const DEFAULT_SLIDE_COUNT = 30;
 const GAMMA_GENERATION_TIMEOUT_MS = 10 * 60 * 1000;
+const CONTENT_TYPE_OPTIONS = [
+  { label: 'Presentation', value: 'Presentation', apiValue: 'presentation' },
+  { label: 'Revision Notes', value: 'Revision Notes', apiValue: 'Revision Notes' },
+  { label: 'Classroom Activity', value: 'Classroom Activity', apiValue: 'Classroom Activity' },
+  { label: 'Remedial Class', value: 'Remedial Class', apiValue: 'remedial_class' },
+] as const;
 const PDF_FORMATTING_INSTRUCTIONS = `PDF formatting instructions:
 - Generate the final answer as clean HTML suitable for direct PDF conversion.
 - Use semantic HTML tags such as <h2>, <h3>, <p>, <strong>, <ul>, <ol>, <li>, and <table> where appropriate.
@@ -455,6 +461,22 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
     const subject = course?.subject || 'Subject';
     const chapterName = chapter.title || 'Chapter';
     const semanticPayload = getSemanticPayload(chapter, semanticResult);
+    const groundTruthContent = semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.');
+
+    if (selectedContentType.trim().toLowerCase() === 'remedial class') {
+      return `You are an AI-powered Remedial Education Specialist, Instructional Designer, and Inclusive Education Expert specializing in CBSE, NCERT, NEP 2020, NCF, Competency-Based Education (CBE), and Inquiry-Based Learning (IBL).
+
+Analyze the attached chapter PDF and generate a comprehensive Chapter-wise Remedial Class for CBSE Standard ${standard}, Subject ${subject}, Chapter "${chapterName}".
+
+The remedial content should support slow learners, below-average performers, students with learning gaps, and students requiring additional reinforcement after the regular classroom teaching.
+
+The remedial class should not repeat the classroom lesson. Instead, it should identify learning gaps, simplify difficult concepts, provide alternative teaching strategies, and build confidence through interactive and activity-based learning.
+
+${PDF_FORMATTING_INSTRUCTIONS}
+
+Attached Chapter PDF / Ground Truth Chapter Content:
+${groundTruthContent}`;
+    }
 
     if (selectedContentType.trim().toLowerCase() === 'classroom activity') {
       return `Generate Presentation with an attached chapter PDF to a classroom activity using Inquiry-based learning on ${chapterName} for ${getBoardStandardLabel(course?.classGrade)} ${subject}. The Inquiry-based learning should include interactive elements such as role-playing, quizzes, puzzles, or simulations tailored to best practices. It must align with the chapter's learning objectives, focus on student engagement, and enhance knowledge retention & application of knowledge.
@@ -468,7 +490,7 @@ Incorporate the following elements:
 ${PDF_FORMATTING_INSTRUCTIONS}
 
 Attached Chapter PDF / Ground Truth Chapter Content:
-${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
+${groundTruthContent}`;
     }
 
     const entries = getConceptEntries(semanticPayload.intelligence);
@@ -485,7 +507,7 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
 ${PDF_FORMATTING_INSTRUCTIONS}
 
 Attached PDF / Ground Truth Chapter Content:
-${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
+${groundTruthContent}`;
   };
 
   const handleGenerate = async () => {
@@ -505,6 +527,7 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
       const normalizedContentType = contentType.trim().toLowerCase();
       const isPresentation = normalizedContentType === 'presentation';
       const exportFormat = isPresentation ? 'pptx' : 'pdf';
+      const apiContentType = CONTENT_TYPE_OPTIONS.find((option) => option.value === contentType)?.apiValue ?? contentType;
 
       if (isPresentation && presentationMode === 'Teacher training' && !presentationConcept) {
         setGenerationError('Please select a concept for teacher training.');
@@ -542,6 +565,7 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
         exportFormat,
         slideCount: DEFAULT_SLIDE_COUNT,
         contentType,
+        apiContentType,
         prompt,
       });
 
@@ -565,7 +589,7 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
         user_profile_name,
         chapter_name: chapter.title,
         prompt,
-        content_type: contentType,
+        content_type: apiContentType,
         format: isPresentation ? 'presentation' : 'document',
         export_format: exportFormat,
         slide_count: DEFAULT_SLIDE_COUNT,
@@ -724,13 +748,15 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
             >
               <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
                 <SelectValue placeholder="Select content type">
-                  {contentType === 'Presentation' ? 'Presentation' : contentType === 'Revision Notes' ? 'Revision Notes' : contentType === 'Classroom Activity' ? 'Classroom Activity' : contentType}
+                  {CONTENT_TYPE_OPTIONS.find((option) => option.value === contentType)?.label ?? contentType}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Presentation">Presentation</SelectItem>
-                <SelectItem value="Revision Notes">Revision Notes</SelectItem>
-                <SelectItem value="Classroom Activity">Classroom Activity</SelectItem>
+                {CONTENT_TYPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
