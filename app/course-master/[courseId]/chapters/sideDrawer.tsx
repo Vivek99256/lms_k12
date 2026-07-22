@@ -20,6 +20,43 @@ import { getRequestContext, getSyear } from '../../page';
 const DEFAULT_SLIDE_COUNT = 30;
 const GAMMA_GENERATION_TIMEOUT_MS = 10 * 60 * 1000;
 
+function readErrorMessage(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (!value || typeof value !== 'object') return '';
+
+  const record = value as Record<string, unknown>;
+  const errors = record.errors;
+  if (errors && typeof errors === 'object') {
+    for (const errorValue of Object.values(errors as Record<string, unknown>)) {
+      if (Array.isArray(errorValue)) {
+        const firstMessage = errorValue.map(readErrorMessage).find(Boolean);
+        if (firstMessage) return firstMessage;
+      } else {
+        const message = readErrorMessage(errorValue);
+        if (message) return message;
+      }
+    }
+  }
+
+  const nestedError = readErrorMessage(record.error);
+  if (nestedError) return nestedError;
+
+  const directMessage = readErrorMessage(record.message);
+  if (directMessage) return directMessage;
+
+  return '';
+}
+
+function getBoardStandardLabel(classGrade?: string) {
+  const rawGrade = (classGrade || '').replace(/^Class\s+/i, '').trim();
+  const boardMatch = rawGrade.match(/^([A-Za-z]+)[-\s]+(.+)$/);
+  if (boardMatch) {
+    return `${boardMatch[1].toUpperCase()} Standard ${boardMatch[2].trim()}`;
+  }
+
+  return `CBSE Standard ${rawGrade || 'Standard'}`;
+}
+
 interface GeneratePresentationDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -42,13 +79,12 @@ export function GeneratePresentationDrawer({
   onSuccess,
 }: GeneratePresentationDrawerProps) {
   const [presentationMode, setPresentationMode] = useState<'Classroom' | 'Teacher training'>('Classroom');
+  const [contentType, setContentType] = useState('Presentation');
   const [presentationChapterId, setPresentationChapterId] = useState(initialChapterId);
   const [presentationConcept, setPresentationConcept] = useState(initialConcept);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [generationSuccess, setGenerationSuccess] = useState<string | null>(null);
-
-  const exportFormat = 'pdf';
 
   // Get concept options for the selected chapter from API-loaded chapter data
   const presentationConceptOptions = useMemo(() => {
@@ -408,6 +444,40 @@ CRITICAL INSTRUCTION 2: Ensure all generated slide content is highly detailed, c
 ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
   };
 
+  const constructDocumentPrompt = (chapter: Chapter, selectedContentType: string, semanticResult?: SemanticIntelligenceResult | null): string => {
+    const standard = course?.classGrade || 'Standard';
+    const subject = course?.subject || 'Subject';
+    const chapterName = chapter.title || 'Chapter';
+    const semanticPayload = getSemanticPayload(chapter, semanticResult);
+
+    if (selectedContentType.trim().toLowerCase() === 'classroom activity') {
+      return `Generate Presentation with an attached chapter PDF to a classroom activity using Inquiry-based learning on ${chapterName} for ${getBoardStandardLabel(course?.classGrade)} ${subject}. The Inquiry-based learning should include interactive elements such as role-playing, quizzes, puzzles, or simulations tailored to best practices. It must align with the chapter's learning objectives, focus on student engagement, and enhance knowledge retention & application of knowledge.
+
+Incorporate the following elements:
+- Clear activity instructions for the teacher.
+- Materials/resources required for the activity.
+- Steps to implement the activity in the classroom.
+- Assessment criteria to measure learning outcomes.
+
+Attached Chapter PDF / Ground Truth Chapter Content:
+${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
+    }
+
+    const entries = getConceptEntries(semanticPayload.intelligence);
+    const keyConcepts = entries.length > 0
+      ? entries.map(getEntryConceptName).filter(Boolean).join(', ')
+      : (chapter.concepts ?? []).map((concept) => concept.title).filter(Boolean).join(', ') || 'all key concepts from the chapter';
+
+    const isRevisionNotes = selectedContentType.trim().toLowerCase() === 'revision notes';
+    const contentTypePhrase = isRevisionNotes ? 'a comprehensive set of revision notes' : `${selectedContentType} content`;
+    const coveragePhrase = isRevisionNotes ? 'The revision notes should cover' : 'The content should cover';
+
+    return `Generate ${contentTypePhrase} as per the attached PDF for ${standard} ${subject} students. ${coveragePhrase} the Chapter: ${chapterName}, with a focus on the following key concepts: ${keyConcepts}. Structure the content clearly with headings and subheadings for easy understanding, write it for students engaging in Inquiry-based teaching, and include short descriptions, diagrams where applicable, bullet points, and key takeaways. Ensure the format is optimized for PDF conversion.
+
+Attached PDF / Ground Truth Chapter Content:
+${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
+  };
+
   const handleGenerate = async () => {
     if (!presentationChapterId) return;
 
@@ -422,7 +492,11 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
         return;
       }
 
-      if (presentationMode === 'Teacher training' && !presentationConcept) {
+      const normalizedContentType = contentType.trim().toLowerCase();
+      const isPresentation = normalizedContentType === 'presentation';
+      const exportFormat = isPresentation ? 'pptx' : 'pdf';
+
+      if (isPresentation && presentationMode === 'Teacher training' && !presentationConcept) {
         setGenerationError('Please select a concept for teacher training.');
         setIsGenerating(false);
         return;
@@ -434,9 +508,13 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
       } catch (error) {
         console.warn('[GeneratePresentation] Falling back to chapter semantic data:', error);
       }
-      const prompt = presentationMode === 'Teacher training'
-        ? constructTeacherTrainingPrompt(chapter, presentationConcept, semanticResult)
-        : constructPrompt(chapter, semanticResult);
+      const prompt = isPresentation
+        ? presentationMode === 'Teacher training'
+          ? constructTeacherTrainingPrompt(chapter, presentationConcept, semanticResult)
+          : constructPrompt(chapter, semanticResult)
+        : constructDocumentPrompt(chapter, contentType, semanticResult);
+
+      console.log(`[GeneratePresentation] ${contentType} prompt:`, prompt);
 
       console.log('[GeneratePresentation] Data used to generate content:', {
         presentationMode,
@@ -453,6 +531,7 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
         presentationConcept,
         exportFormat,
         slideCount: DEFAULT_SLIDE_COUNT,
+        contentType,
         prompt,
       });
 
@@ -476,7 +555,8 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
         user_profile_name,
         chapter_name: chapter.title,
         prompt,
-        format: 'presentation',
+        content_type: contentType,
+        format: isPresentation ? 'presentation' : 'document',
         export_format: exportFormat,
         slide_count: DEFAULT_SLIDE_COUNT,
       };
@@ -498,17 +578,17 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
         }
       })();
 
-      const contentType = res.headers.get('content-type') || '';
-      const raw = contentType.includes('application/json')
+      const responseContentType = res.headers.get('content-type') || '';
+      const raw = responseContentType.includes('application/json')
         ? ((await res.json()) as Record<string, unknown>)
         : ({ message: await res.text() } as Record<string, unknown>);
       const isSuccess = raw.success === true || Number(raw.status_code) === 1;
       if (!res.ok || !isSuccess) {
-        throw new Error((raw.message as string) || 'Failed to generate presentation');
+        throw new Error(readErrorMessage(raw) || 'Failed to generate presentation');
       }
 
       onSuccess?.(raw);
-      setGenerationSuccess((raw.message as string) || 'Gamma content generated and stored successfully');
+      setGenerationSuccess(readErrorMessage(raw) || 'Gamma content generated and stored successfully');
       setTimeout(() => {
         onClose();
         window.location.reload();
@@ -571,7 +651,7 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
                 <Sparkles size={16} />
               </div>
               <p className="text-[15px] leading-7">
-                Slides are drafted with <span className="font-semibold text-slate-900">Gamma</span> from concept intelligence, then added to your content library.
+                Slides are drafted with <span className="font-semibold text-slate-900">AI</span> from concept intelligence, then added to your content library.
               </p>
             </div>
           </div>
@@ -595,6 +675,8 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
               ))}
             </div>
           </div>
+
+          
 
           {presentationMode === 'Classroom' ? (
             // Classroom tab - only chapter selection
@@ -621,7 +703,30 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
                   </SelectContent>
                 </Select>
               </div>
+
+               <div className="mt-6 space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Content Type <span className="text-rose-500">*</span>
+            </Label>
+            <Select
+              value={contentType}
+              onValueChange={(value) => setContentType(value ?? 'Presentation')}
+            >
+              <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                <SelectValue placeholder="Select content type">
+                  {contentType === 'Presentation' ? 'Presentation' : contentType === 'Revision Notes' ? 'Revision Notes' : contentType === 'Classroom Activity' ? 'Classroom Activity' : contentType}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Presentation">Presentation</SelectItem>
+                <SelectItem value="Revision Notes">Revision Notes</SelectItem>
+                <SelectItem value="Classroom Activity">Classroom Activity</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
             </div>
+
+            
           ) : (
             // Teacher training tab - chapter and concept selection
             <div className="mt-6 space-y-4">
@@ -676,6 +781,8 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
               </div>
             </div>
           )}
+
+         
           {generationError && (
             <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {generationError}
@@ -710,7 +817,7 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
             ) : (
               <>
                 <Sparkles size={16} className="mr-2" />
-                Generate with Gamma
+                Generate with AI
               </>
             )}
           </Button>
