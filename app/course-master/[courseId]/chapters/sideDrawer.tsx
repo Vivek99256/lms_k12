@@ -19,6 +19,12 @@ import { getRequestContext, getSyear } from '../../page';
 
 const DEFAULT_SLIDE_COUNT = 30;
 const GAMMA_GENERATION_TIMEOUT_MS = 10 * 60 * 1000;
+const PDF_FORMATTING_INSTRUCTIONS = `PDF formatting instructions:
+- Generate the final answer as clean HTML suitable for direct PDF conversion.
+- Use semantic HTML tags such as <h2>, <h3>, <p>, <strong>, <ul>, <ol>, <li>, and <table> where appropriate.
+- Do not use Markdown syntax such as #, ##, **, *, backticks, or code fences in the final answer.
+- Use clear section headings, bold emphasis, readable lists, adequate spacing, and a professional document layout.
+- Return only the document body content, without wrapping it in markdown fences.`;
 
 function readErrorMessage(value: unknown): string {
   if (typeof value === 'string') return value.trim();
@@ -459,6 +465,8 @@ Incorporate the following elements:
 - Steps to implement the activity in the classroom.
 - Assessment criteria to measure learning outcomes.
 
+${PDF_FORMATTING_INSTRUCTIONS}
+
 Attached Chapter PDF / Ground Truth Chapter Content:
 ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
     }
@@ -472,7 +480,9 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
     const contentTypePhrase = isRevisionNotes ? 'a comprehensive set of revision notes' : `${selectedContentType} content`;
     const coveragePhrase = isRevisionNotes ? 'The revision notes should cover' : 'The content should cover';
 
-    return `Generate ${contentTypePhrase} as per the attached PDF for ${standard} ${subject} students. ${coveragePhrase} the Chapter: ${chapterName}, with a focus on the following key concepts: ${keyConcepts}. Structure the content clearly with headings and subheadings for easy understanding, write it for students engaging in Inquiry-based teaching, and include short descriptions, diagrams where applicable, bullet points, and key takeaways. Ensure the format is optimized for PDF conversion.
+    return `Generate ${contentTypePhrase} as per the attached PDF for ${standard} ${subject} students. ${coveragePhrase} the Chapter: ${chapterName}, with a focus on the following key concepts: ${keyConcepts}. Structure the content clearly with headings and subheadings for easy understanding, write it for students engaging in Inquiry-based teaching, and include short descriptions, diagrams where applicable, bullet points, and key takeaways.
+
+${PDF_FORMATTING_INSTRUCTIONS}
 
 Attached PDF / Ground Truth Chapter Content:
 ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
