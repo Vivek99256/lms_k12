@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   Download,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   Plus,
@@ -698,11 +699,6 @@ export default function ChapterListPage() {
   const [isAddChapterOpen, setIsAddChapterOpen] = useState(false);
   const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
   const [uploadChapter, setUploadChapter] = useState<Chapter | null>(null);
-  const [conceptDrawer, setConceptDrawer] = useState<{
-    chapter: Chapter;
-    conceptTitle: string;
-    conceptIndex: number;
-  } | null>(null);
   const [isPresentationMenuOpen, setIsPresentationMenuOpen] = useState(false);
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
   const [isPresentationReady, setIsPresentationReady] = useState(false);
@@ -1060,7 +1056,6 @@ export default function ChapterListPage() {
     isAddChapterOpen ||
     editingChapter !== null ||
     uploadChapter !== null ||
-    conceptDrawer !== null ||
     selectedContentItem !== null ||
     isGeneratePresentationDrawerOpen ||
     isAddQuestionBankModalOpen ||
@@ -1075,7 +1070,6 @@ export default function ChapterListPage() {
         setIsAddChapterOpen(false);
         setEditingChapter(null);
         setUploadChapter(null);
-        setConceptDrawer(null);
         setIsPresentationMenuOpen(false);
         setIsGeneratingPresentation(false);
         setIsPresentationReady(false);
@@ -1143,17 +1137,6 @@ export default function ChapterListPage() {
     }
   };
 
-  const closeConceptDrawer = () => {
-    setConceptDrawer(null);
-    setIsPresentationMenuOpen(false);
-    setIsGeneratingPresentation(false);
-    setIsPresentationReady(false);
-    if (presentationTimerRef.current) {
-      clearTimeout(presentationTimerRef.current);
-      presentationTimerRef.current = null;
-    }
-  };
-
   const closeEditChapterModal = () => {
     setEditingChapter(null);
     setChapterForm(EMPTY_CHAPTER_FORM);
@@ -1175,34 +1158,25 @@ export default function ChapterListPage() {
     }
   };
 
-  const openConceptDrawer = (chapter: Chapter, conceptTitle: string, conceptIndex: number) => {
-    setConceptDrawer({
-      chapter,
-      conceptTitle,
-      conceptIndex,
-    });
-    setIsPresentationMenuOpen(false);
-    setIsGeneratingPresentation(false);
-    setIsPresentationReady(false);
-    if (presentationTimerRef.current) {
-      clearTimeout(presentationTimerRef.current);
-      presentationTimerRef.current = null;
-    }
-
-    // Lazy-load this chapter's semantic intelligence on first open. The list
-    // endpoint no longer ships the heavy full_intelegance_json blob, so we fetch
-    // it here per chapter and cache the result. Only real (numeric) chapter ids
-    // exist in semantic_intelligence; skip static/demo chapters.
+  const loadChapterIntelligence = (chapterId: string) => {
+    // Lazy-load a chapter's semantic intelligence. The list endpoint no longer
+    // ships the heavy full_intelegance_json blob, so we fetch it per chapter and
+    // cache the result. Only real (numeric) chapter ids exist in
+    // semantic_intelligence; skip static/demo chapters.
     setIntelligenceError('');
-    if (!/^\d+$/.test(chapter.id) || chapterIntelligence[chapter.id]) {
+    if (
+      !/^\d+$/.test(chapterId) ||
+      chapterIntelligence[chapterId] ||
+      intelligenceLoadingId === chapterId
+    ) {
       return;
     }
 
-    setIntelligenceLoadingId(chapter.id);
-    fetchSemanticIntelligenceResult(chapter.id)
+    setIntelligenceLoadingId(chapterId);
+    fetchSemanticIntelligenceResult(chapterId)
       .then((result) => {
         if (result) {
-          setChapterIntelligence((current) => ({ ...current, [chapter.id]: result }));
+          setChapterIntelligence((current) => ({ ...current, [chapterId]: result }));
         } else {
           setIntelligenceError('No concept intelligence has been generated for this chapter yet.');
         }
@@ -1213,9 +1187,34 @@ export default function ChapterListPage() {
         );
       })
       .finally(() => {
-        setIntelligenceLoadingId((current) => (current === chapter.id ? null : current));
+        setIntelligenceLoadingId((current) => (current === chapterId ? null : current));
       });
   };
+
+  const buildConceptIntelligenceUrl = (chapterId: string, conceptIndex: number) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('view', 'concept-intelligence');
+    nextParams.set('chapterId', chapterId);
+    nextParams.set('concept', String(conceptIndex));
+    nextParams.set('expandedChapterId', chapterId);
+    return `/course-master/${courseId}/chapters?${nextParams.toString()}`;
+  };
+
+  // Concept Intelligence opens as a full page view (?view=concept-intelligence)
+  // instead of a popup drawer. Kick off the fetch before navigating so the data
+  // is usually ready by the time the view renders.
+  const openConceptIntelligenceView = (chapter: Chapter, conceptIndex: number) => {
+    loadChapterIntelligence(chapter.id);
+    router.push(buildConceptIntelligenceUrl(chapter.id, conceptIndex));
+  };
+
+  // When the concept-intelligence view is opened directly (deep link, refresh,
+  // browser back), the click handler never ran — fetch the chapter here.
+  useEffect(() => {
+    if (view !== 'concept-intelligence' || !activeChapterId) return;
+    loadChapterIntelligence(activeChapterId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, activeChapterId]);
 
   const generateTeacherTrainingPresentation = () => {
     setIsPresentationMenuOpen(false);
@@ -3106,6 +3105,229 @@ export default function ChapterListPage() {
     );
   }
 
+  if (view === 'concept-intelligence') {
+    const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
+    const intelChapter = allChapters.find((chapter) => chapter.id === activeChapterId) ?? null;
+    const conceptRows = intelChapter
+      ? Object.keys(intelChapter.content_categories ?? {}).filter((concept) => concept.trim())
+      : [];
+    const requestedConceptIndex = Number(searchParams.get('concept') ?? '0');
+    const conceptIndex =
+      conceptRows.length > 0
+        ? Math.min(
+            Math.max(
+              Number.isFinite(requestedConceptIndex) ? Math.trunc(requestedConceptIndex) : 0,
+              0
+            ),
+            conceptRows.length - 1
+          )
+        : 0;
+    const conceptTitle = conceptRows[conceptIndex] ?? '';
+
+    const fetchedSemantic = intelChapter ? chapterIntelligence[intelChapter.id] : undefined;
+    const chapterForIntel =
+      intelChapter && fetchedSemantic
+        ? { ...intelChapter, semantic: fetchedSemantic }
+        : intelChapter;
+    const isIntelligenceLoading =
+      intelChapter !== null && intelligenceLoadingId === intelChapter.id && !fetchedSemantic;
+    const hasIntelligenceError = Boolean(intelligenceError) && !fetchedSemantic;
+
+    const conceptsList = (fetchedSemantic?.full_intelegance_json?.concepts ??
+      []) as ConceptIntelEntry[];
+    const rawEntry =
+      conceptsList.find((item) => (item?.concept?.concept_name ?? '') === conceptTitle) ??
+      conceptsList[conceptIndex] ??
+      null;
+
+    const details =
+      chapterForIntel && conceptTitle ? getConceptIntelligence(chapterForIntel, conceptTitle) : null;
+    const detailSections = details
+      ? [
+          { title: 'Knowledge', icon: BookOpen, items: details.knowledge, kind: 'list' as const },
+          { title: 'Abilities', icon: Lightbulb, items: details.abilities, kind: 'list' as const },
+          { title: 'Skills', icon: WandSparkles, items: details.skills, kind: 'tags' as const },
+          { title: 'Misconceptions', icon: TriangleAlert, items: details.misconceptions, kind: 'list' as const },
+          { title: 'Prerequisites', icon: Orbit, items: details.prerequisites, kind: 'tags' as const },
+          { title: 'Learning outcomes', icon: Target, items: details.learningOutcomes, kind: 'list' as const },
+          { title: 'Competencies', icon: BriefcaseBusiness, items: details.competencies, kind: 'tags' as const },
+          { title: 'Learning objectives', icon: CircleDot, items: details.learningObjectives, kind: 'list' as const },
+          { title: 'Teaching pedagogies', icon: ClipboardList, items: details.teachingPedagogies, kind: 'tags' as const },
+          { title: 'Real-world applications', icon: GraduationCap, items: details.realWorldApplications, kind: 'list' as const },
+        ]
+      : [];
+
+    const goToConcept = (index: number) => {
+      if (!intelChapter || index < 0 || index >= conceptRows.length) return;
+      router.replace(buildConceptIntelligenceUrl(intelChapter.id, index));
+    };
+
+    const backToChapters = () => {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.delete('view');
+      nextParams.delete('concept');
+      nextParams.delete('chapterId');
+      const nextQuery = nextParams.toString();
+      router.push(`/course-master/${courseId}/chapters${nextQuery ? `?${nextQuery}` : ''}`);
+    };
+
+    const conceptPager =
+      conceptRows.length > 0 ? (
+        <div className="flex shrink-0 items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={conceptIndex <= 0}
+            onClick={() => goToConcept(conceptIndex - 1)}
+            className="h-10 rounded-xl border-slate-200 bg-white px-4 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            <ChevronLeft size={16} className="mr-1.5" />
+            Previous
+          </Button>
+          <span className="whitespace-nowrap text-sm font-medium text-slate-500">
+            {conceptIndex + 1} of {conceptRows.length}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={conceptIndex >= conceptRows.length - 1}
+            onClick={() => goToConcept(conceptIndex + 1)}
+            className="h-10 rounded-xl border-slate-200 bg-white px-4 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            Next
+            <ChevronRight size={16} className="ml-1.5" />
+          </Button>
+        </div>
+      ) : null;
+
+    return (
+      <div className="min-h-full">
+        <div className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+            <button
+              type="button"
+              onClick={backToChapters}
+              className="font-medium text-slate-500 transition-colors hover:text-slate-900"
+            >
+              Teach / learn
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <span className="font-medium text-slate-500">
+              {course.subject} - {gradeLabel}
+            </span>
+            <ChevronRight size={14} className="text-slate-400" />
+            <span className="font-medium text-slate-500">{intelChapter?.title ?? 'Chapter'}</span>
+            <ChevronRight size={14} className="text-slate-400" />
+            <span className="font-semibold text-[#4f46e5]">Concept Intelligence</span>
+          </div>
+
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={backToChapters}
+                aria-label="Back to chapters"
+                className="h-10 w-10 shrink-0 rounded-xl border-slate-200 bg-white p-0 text-slate-600 hover:bg-slate-50"
+              >
+                <ArrowLeft size={17} />
+              </Button>
+              <div className="min-w-0">
+                <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                  {conceptTitle || 'Concept Intelligence'}
+                </h1>
+              </div>
+            </div>
+
+            {conceptPager}
+          </div>
+
+          {/* Fixed-height card: clamped to the viewport so switching tabs never
+              resizes the layout — content scrolls inside instead. The card itself
+              carries no padding; each region (tab band / body / footer) manages
+              its own, matching the app's card pattern. */}
+          <div className="flex h-[max(420px,calc(100vh_-_260px))] flex-col overflow-hidden rounded-[18px] border border-slate-200/80 bg-white shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+            {!intelChapter ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                <TriangleAlert size={24} className="text-amber-500" />
+                <p className="text-sm font-medium text-slate-600">
+                  Chapter not found. Go back and pick a concept from the chapter list.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={backToChapters}
+                  className="mt-1 h-10 rounded-xl border-slate-200 bg-white px-4 font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <ArrowLeft size={16} className="mr-2" />
+                  Back to chapters
+                </Button>
+              </div>
+            ) : isIntelligenceLoading ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#4f46e5]" />
+                <p className="text-sm font-medium text-slate-500">Loading concept intelligence…</p>
+              </div>
+            ) : hasIntelligenceError ? (
+              <div className="m-5 flex flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center sm:m-6">
+                <TriangleAlert size={22} className="text-amber-500" />
+                <p className="max-w-[420px] text-sm font-medium text-slate-600">{intelligenceError}</p>
+              </div>
+            ) : rawEntry ? (
+              <div className="min-h-0 flex-1">
+                <ConceptIntelligenceTabs
+                  key={`${intelChapter.id}-${conceptTitle}`}
+                  entry={rawEntry}
+                  chapterTitle={intelChapter.title}
+                />
+              </div>
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+                <div className="grid gap-x-10 gap-y-6 md:grid-cols-2">
+                {detailSections.map((section) => {
+                  const SectionIcon = section.icon;
+
+                  return (
+                    <section key={section.title}>
+                      <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        <SectionIcon size={14} className="text-slate-500" />
+                        {section.title}
+                      </div>
+
+                      {section.kind === 'list' ? (
+                        <ul className="space-y-2 text-[15px] leading-6 text-slate-700">
+                          {section.items.map((item) => (
+                            <li key={item} className="flex gap-2">
+                              <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {section.items.map((item) => (
+                            <Badge
+                              key={item}
+                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                            >
+                              {item}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  );
+                })}
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'content' && contentChapter) {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const totalItems = chapterContentItems.length;
@@ -3722,7 +3944,7 @@ export default function ChapterListPage() {
                               <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => openConceptDrawer(chapter, concept, index)}
+                                onClick={() => openConceptIntelligenceView(chapter, index)}
                                 className="h-9 rounded-xl border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
                               >
                                 <Brain size={16} className="mr-2 text-[#4f46e5]" />
@@ -3751,156 +3973,6 @@ export default function ChapterListPage() {
 
       {uploadContentModal}
       {generateQuestionsModal}
-
-      {conceptDrawer && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-slate-950/45 backdrop-blur-[2px]"
-          onClick={closeConceptDrawer}
-        >
-          <aside
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="concept-intelligence-title"
-            className="flex h-full w-full max-w-[520px] flex-col overflow-hidden rounded-l-[28px] border-l border-slate-200/80 bg-white shadow-[-24px_0_70px_rgba(15,23,42,0.18)] transition-transform duration-300"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {(() => {
-              // Prefer the lazily-fetched intelligence for this chapter; fall back to
-              // whatever light semantic came with the chapter list.
-              const fetchedSemantic = chapterIntelligence[conceptDrawer.chapter.id];
-              const chapterForIntel = fetchedSemantic
-                ? { ...conceptDrawer.chapter, semantic: fetchedSemantic }
-                : conceptDrawer.chapter;
-              const isIntelligenceLoading =
-                intelligenceLoadingId === conceptDrawer.chapter.id && !fetchedSemantic;
-              const hasIntelligenceError = Boolean(intelligenceError) && !fetchedSemantic;
-
-              // The raw, per-concept intelligence entry from full_intelegance_json —
-              // carries every dimension (knowledge, abilities, blueprint, evidence…)
-              // that the flattened `details` view drops. Used to drive the tabbed UI.
-              const conceptsList = (fetchedSemantic?.full_intelegance_json?.concepts ??
-                []) as ConceptIntelEntry[];
-              const rawEntry =
-                conceptsList.find(
-                  (item) => (item?.concept?.concept_name ?? '') === conceptDrawer.conceptTitle
-                ) ??
-                conceptsList[conceptDrawer.conceptIndex] ??
-                conceptsList[0] ??
-                null;
-
-              const details = getConceptIntelligence(
-                chapterForIntel,
-                conceptDrawer.conceptTitle
-              );
-
-              const detailSections = [
-                { title: 'Knowledge', icon: BookOpen, items: details.knowledge, kind: 'list' as const },
-                { title: 'Abilities', icon: Lightbulb, items: details.abilities, kind: 'list' as const },
-                { title: 'Skills', icon: WandSparkles, items: details.skills, kind: 'tags' as const },
-                { title: 'Misconceptions', icon: TriangleAlert, items: details.misconceptions, kind: 'list' as const },
-                { title: 'Prerequisites', icon: Orbit, items: details.prerequisites, kind: 'tags' as const },
-                { title: 'Learning outcomes', icon: Target, items: details.learningOutcomes, kind: 'list' as const },
-                { title: 'Competencies', icon: BriefcaseBusiness, items: details.competencies, kind: 'tags' as const },
-                { title: 'Learning objectives', icon: CircleDot, items: details.learningObjectives, kind: 'list' as const },
-                { title: 'Teaching pedagogies', icon: ClipboardList, items: details.teachingPedagogies, kind: 'tags' as const },
-                { title: 'Real-world applications', icon: GraduationCap, items: details.realWorldApplications, kind: 'list' as const },
-              ];
-
-              return (
-                <>
-                  <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-5 py-5 sm:px-6">
-                    <div>
-                      <h2 id="concept-intelligence-title" className="text-[18px] font-bold tracking-tight text-slate-950 sm:text-[20px]">
-                        {conceptDrawer.conceptTitle}
-                      </h2>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={closeConceptDrawer}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                      aria-label="Close drawer"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
-                        <Sparkles size={12} className="mr-1.5" />
-                        {details.domain}
-                      </Badge>
-                      <Badge className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
-                        <Orbit size={12} className="mr-1.5" />
-                        {details.dok}
-                      </Badge>
-                      <Badge className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
-                        <BookOpen size={12} className="mr-1.5" />
-                        {conceptDrawer.chapter.title}
-                      </Badge>
-                    </div>
-
-                    {isIntelligenceLoading ? (
-                      <div className="mt-6 flex flex-col items-center justify-center gap-3 py-16 text-center">
-                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#4f46e5]" />
-                        <p className="text-sm font-medium text-slate-500">Loading concept intelligence…</p>
-                      </div>
-                    ) : hasIntelligenceError ? (
-                      <div className="mt-6 flex flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 py-12 text-center">
-                        <TriangleAlert size={22} className="text-amber-500" />
-                        <p className="max-w-[320px] text-sm font-medium text-slate-600">{intelligenceError}</p>
-                      </div>
-                    ) : rawEntry ? (
-                      <ConceptIntelligenceTabs
-                        key={conceptDrawer.conceptTitle}
-                        entry={rawEntry}
-                        chapterTitle={conceptDrawer.chapter.title}
-                      />
-                    ) : (
-                      <div className="mt-6 space-y-5">
-                        {detailSections.map((section) => {
-                          const SectionIcon = section.icon;
-
-                          return (
-                            <section key={section.title}>
-                              <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                                <SectionIcon size={14} className="text-slate-500" />
-                                {section.title}
-                              </div>
-
-                              {section.kind === 'list' ? (
-                                <ul className="space-y-2 text-[15px] leading-6 text-slate-700">
-                                  {section.items.map((item) => (
-                                    <li key={item} className="flex gap-2">
-                                      <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-                                      <span>{item}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <div className="flex flex-wrap gap-2">
-                                  {section.items.map((item) => (
-                                    <Badge
-                                      key={item}
-                                      className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                                    >
-                                      {item}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              )}
-                            </section>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-          </aside>
-        </div>
-      )}
 
       {isAddChapterOpen && (
         <div

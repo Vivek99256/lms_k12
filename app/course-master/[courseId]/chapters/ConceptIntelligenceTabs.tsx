@@ -1,4 +1,4 @@
-'use client';
+ 'use client';
 
 import { useMemo, useState, type ComponentType } from 'react';
 import {
@@ -632,9 +632,12 @@ export function ConceptIntelligenceTabs({
   };
 
   return (
-    <div className="mt-5">
-      {/* Tab bar */}
-      <div className="-mx-1 flex gap-1 overflow-x-auto pb-2">
+    // Fill the parent's fixed height: tab band and footer stay pinned while the
+    // active tab's content scrolls. Each region carries its own padding and
+    // border so the component sits flush inside an unpadded card.
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Tab band — pinned card header */}
+      <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200/80 bg-white px-4 py-3 sm:px-5">
         {tabs.map((tab) => {
           const TabIcon = tab.Icon;
           const isActive = tab.id === activeTab;
@@ -665,10 +668,11 @@ export function ConceptIntelligenceTabs({
         })}
       </div>
 
-      {/* Active tab content */}
-      <div className="mt-4">{renderActive()}</div>
+      {/* Active tab content — the only scrolling region */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-5 sm:px-6">{renderActive()}</div>
 
-      <p className="mt-6 text-center text-[11px] text-slate-400">
+      {/* Footer — pinned card footer */}
+      <p className="shrink-0 border-t border-slate-200/80 bg-slate-50/60 px-6 py-3 text-center text-[11px] text-slate-400">
         Concept intelligence for {chapterTitle}
       </p>
     </div>
