@@ -51,14 +51,19 @@ import { cn } from '@/lib/utils';
 import { courses, type Course } from '../../data/courses';
 import {
   fetchChapterContent,
+  fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
   getChaptersByCourseid,
   getConceptIntelligenceData,
   getSubjectAndChapters,
+  resolveSubjectDisplayName,
   type ChapterContentAsset,
+  type ChapterSemantic,
+  type ConceptIntelEntry,
   type GeneratedQuestionPreview,
   type SubjectWithChapters,
 } from '../../data/chapters';
+import { ConceptIntelligenceTabs } from './ConceptIntelligenceTabs';
 import { getRequestContext } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
@@ -622,13 +627,40 @@ export default function ChapterListPage() {
     queueMicrotask(() => {
       if (!cancelled) setSubjectLoading(true);
     });
-    getSubjectAndChapters(subjectId, standardId)
+
+    // Phase 1 — render chapters immediately. resolveDisplayNames:false skips the
+    // slow (~8s / 1.3MB) course-catalog lookup that only supplies cosmetic names.
+    getSubjectAndChapters(subjectId, standardId, { resolveDisplayNames: false })
       .then((data) => {
         if (!cancelled) setSubjectData(data);
       })
       .finally(() => {
         if (!cancelled) setSubjectLoading(false);
       });
+
+    // Phase 2 — enrich the header's subject/standard names in the background,
+    // without blocking the chapter list from rendering.
+    resolveSubjectDisplayName(subjectId, standardId).then((matched) => {
+      if (cancelled || !matched) return;
+      setSubjectData((current) => {
+        if (!current?.subject) return current;
+        return {
+          ...current,
+          subject: {
+            ...current.subject,
+            subject_name: matched.subject_name ?? current.subject.subject_name,
+            standard_name: matched.standard_name ?? current.subject.standard_name,
+            section_id: matched.section_id ?? current.subject.section_id,
+            section_name: matched.section_name ?? current.subject.section_name,
+            division_id: matched.division_id ?? current.subject.division_id,
+            division_name: matched.division_name ?? current.subject.division_name,
+            display_image: matched.display_image ?? current.subject.display_image,
+            content_category: matched.content_category ?? current.subject.content_category,
+          },
+        };
+      });
+    });
+
     return () => {
       cancelled = true;
     };
@@ -748,6 +780,12 @@ export default function ChapterListPage() {
   const [questionGenerationError, setQuestionGenerationError] = useState('');
   const [questionGenerationSuccess, setQuestionGenerationSuccess] = useState('');
   const [generatedQuestionPreviews, setGeneratedQuestionPreviews] = useState<GeneratedQuestionPreview[]>([]);
+  // Lazy-loaded, per-chapter semantic intelligence (the heavy full_intelegance_json
+  // blob). Fetched on first Concept Intelligence click and cached by chapter id so a
+  // chapter is only ever fetched once.
+  const [chapterIntelligence, setChapterIntelligence] = useState<Record<string, ChapterSemantic>>({});
+  const [intelligenceLoadingId, setIntelligenceLoadingId] = useState<string | null>(null);
+  const [intelligenceError, setIntelligenceError] = useState('');
 
   const view = searchParams.get('view');
   const activeChapterId = searchParams.get('chapterId') ?? '';
@@ -1150,6 +1188,33 @@ export default function ChapterListPage() {
       clearTimeout(presentationTimerRef.current);
       presentationTimerRef.current = null;
     }
+
+    // Lazy-load this chapter's semantic intelligence on first open. The list
+    // endpoint no longer ships the heavy full_intelegance_json blob, so we fetch
+    // it here per chapter and cache the result. Only real (numeric) chapter ids
+    // exist in semantic_intelligence; skip static/demo chapters.
+    setIntelligenceError('');
+    if (!/^\d+$/.test(chapter.id) || chapterIntelligence[chapter.id]) {
+      return;
+    }
+
+    setIntelligenceLoadingId(chapter.id);
+    fetchSemanticIntelligenceResult(chapter.id)
+      .then((result) => {
+        if (result) {
+          setChapterIntelligence((current) => ({ ...current, [chapter.id]: result }));
+        } else {
+          setIntelligenceError('No concept intelligence has been generated for this chapter yet.');
+        }
+      })
+      .catch((error: unknown) => {
+        setIntelligenceError(
+          error instanceof Error ? error.message : 'Failed to load concept intelligence.'
+        );
+      })
+      .finally(() => {
+        setIntelligenceLoadingId((current) => (current === chapter.id ? null : current));
+      });
   };
 
   const generateTeacherTrainingPresentation = () => {
@@ -3700,8 +3765,31 @@ export default function ChapterListPage() {
             onClick={(event) => event.stopPropagation()}
           >
             {(() => {
+              // Prefer the lazily-fetched intelligence for this chapter; fall back to
+              // whatever light semantic came with the chapter list.
+              const fetchedSemantic = chapterIntelligence[conceptDrawer.chapter.id];
+              const chapterForIntel = fetchedSemantic
+                ? { ...conceptDrawer.chapter, semantic: fetchedSemantic }
+                : conceptDrawer.chapter;
+              const isIntelligenceLoading =
+                intelligenceLoadingId === conceptDrawer.chapter.id && !fetchedSemantic;
+              const hasIntelligenceError = Boolean(intelligenceError) && !fetchedSemantic;
+
+              // The raw, per-concept intelligence entry from full_intelegance_json —
+              // carries every dimension (knowledge, abilities, blueprint, evidence…)
+              // that the flattened `details` view drops. Used to drive the tabbed UI.
+              const conceptsList = (fetchedSemantic?.full_intelegance_json?.concepts ??
+                []) as ConceptIntelEntry[];
+              const rawEntry =
+                conceptsList.find(
+                  (item) => (item?.concept?.concept_name ?? '') === conceptDrawer.conceptTitle
+                ) ??
+                conceptsList[conceptDrawer.conceptIndex] ??
+                conceptsList[0] ??
+                null;
+
               const details = getConceptIntelligence(
-                conceptDrawer.chapter,
+                chapterForIntel,
                 conceptDrawer.conceptTitle
               );
 
@@ -3752,42 +3840,60 @@ export default function ChapterListPage() {
                       </Badge>
                     </div>
 
-                    <div className="mt-6 space-y-5">
-                      {detailSections.map((section) => {
-                        const SectionIcon = section.icon;
+                    {isIntelligenceLoading ? (
+                      <div className="mt-6 flex flex-col items-center justify-center gap-3 py-16 text-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#4f46e5]" />
+                        <p className="text-sm font-medium text-slate-500">Loading concept intelligence…</p>
+                      </div>
+                    ) : hasIntelligenceError ? (
+                      <div className="mt-6 flex flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 py-12 text-center">
+                        <TriangleAlert size={22} className="text-amber-500" />
+                        <p className="max-w-[320px] text-sm font-medium text-slate-600">{intelligenceError}</p>
+                      </div>
+                    ) : rawEntry ? (
+                      <ConceptIntelligenceTabs
+                        key={conceptDrawer.conceptTitle}
+                        entry={rawEntry}
+                        chapterTitle={conceptDrawer.chapter.title}
+                      />
+                    ) : (
+                      <div className="mt-6 space-y-5">
+                        {detailSections.map((section) => {
+                          const SectionIcon = section.icon;
 
-                        return (
-                          <section key={section.title}>
-                            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                              <SectionIcon size={14} className="text-slate-500" />
-                              {section.title}
-                            </div>
-
-                            {section.kind === 'list' ? (
-                              <ul className="space-y-2 text-[15px] leading-6 text-slate-700">
-                                {section.items.map((item) => (
-                                  <li key={item} className="flex gap-2">
-                                    <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-                                    <span>{item}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <div className="flex flex-wrap gap-2">
-                                {section.items.map((item) => (
-                                  <Badge
-                                    key={item}
-                                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                                  >
-                                    {item}
-                                  </Badge>
-                                ))}
+                          return (
+                            <section key={section.title}>
+                              <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                                <SectionIcon size={14} className="text-slate-500" />
+                                {section.title}
                               </div>
-                            )}
-                          </section>
-                        );
-                      })}
-                    </div>
+
+                              {section.kind === 'list' ? (
+                                <ul className="space-y-2 text-[15px] leading-6 text-slate-700">
+                                  {section.items.map((item) => (
+                                    <li key={item} className="flex gap-2">
+                                      <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                                      <span>{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="flex flex-wrap gap-2">
+                                  {section.items.map((item) => (
+                                    <Badge
+                                      key={item}
+                                      className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                                    >
+                                      {item}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </section>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </>
               );
