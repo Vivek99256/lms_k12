@@ -41,6 +41,23 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return '/fees/master/fees-breakoff';
   }
 
+  const inwardOutwardRoutes: Record<string, string> = {
+    'add_inward.index': '/inward_outward/add_inward',
+    'inward_outward/add_inward': '/inward_outward/add_inward',
+    'add_outward.index': '/inward_outward/add_outward',
+    'inward_outward/add_outward': '/inward_outward/add_outward',
+    'add_place_master.index': '/inward_outward/add_place_master',
+    'inward_outward/add_place_master': '/inward_outward/add_place_master',
+    'add_physical_file_location.index': '/inward_outward/add_physical_file_location',
+    'inward_outward/add_physical_file_location': '/inward_outward/add_physical_file_location',
+    'show_inward_report.index': '/inward_outward/show_inward_report',
+    'inward_outward/show_inward_report': '/inward_outward/show_inward_report',
+    'show_outward_report.index': '/inward_outward/show_outward_report',
+    'inward_outward/show_outward_report': '/inward_outward/show_outward_report',
+  };
+  const inwardOutwardRoute = inwardOutwardRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (inwardOutwardRoute) return inwardOutwardRoute;
+
   if (cleanLink.toLowerCase() === 'other_fee_map.index') {
     return '/fees/master/additional-fees-mapping';
   }
@@ -54,7 +71,7 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     cleanLink.toLowerCase() === 'result/exam_master' ||
     cleanLink.toLowerCase() === 'result/exam_master/index'
   ) {
-    return '/exam/exam-master';
+    return '/result/master/exam-master';
   }
 
   if (

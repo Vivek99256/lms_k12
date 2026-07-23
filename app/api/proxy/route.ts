@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function forwardMutation(request: NextRequest) {
   const targetPath = request.nextUrl.searchParams.get('path');
   if (!targetPath) {
     return NextResponse.json({ message: 'Missing path parameter' }, { status: 400 });
@@ -55,20 +55,20 @@ export async function POST(request: NextRequest) {
   const url = `${base}/${targetPath.replace(/^\//, '')}`;
 
   const contentType = request.headers.get('content-type') || '';
-  const body = await request.text();
+  const body = await request.arrayBuffer();
   const authorization = request.headers.get('authorization');
   const cookie = request.headers.get('cookie');
 
   try {
     const upstream = await fetch(url, {
-      method: 'POST',
+      method: request.method,
       headers: {
         ...(contentType ? { 'Content-Type': contentType } : {}),
         Accept: 'application/json',
         ...(authorization ? { Authorization: authorization } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
       },
-      body: body || undefined,
+      body: body.byteLength > 0 ? body : undefined,
       cache: 'no-store',
     });
 
@@ -86,3 +86,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message }, { status: 502 });
   }
 }
+
+export const POST = forwardMutation;
+export const PUT = forwardMutation;
+export const PATCH = forwardMutation;
+export const DELETE = forwardMutation;
