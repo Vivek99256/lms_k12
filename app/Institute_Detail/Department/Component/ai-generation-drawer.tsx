@@ -50,6 +50,7 @@ type AiGenerationDrawerProps = {
     document: AiGeneratedDocumentSave
   ) => void | AiGeneratedDocumentSavedResult | Promise<void | AiGeneratedDocumentSavedResult>;
   departmentName?: string;
+  departmentId?: string | number;
 };
 
 const includeSections = [
@@ -100,6 +101,21 @@ type AiSopGenerationResponse = {
   data?: {
     content?: string;
   };
+  errors?: Record<string, string[]>;
+};
+
+type DepartmentJobRole = {
+  id?: string | number | null;
+  name?: string;
+  label?: string;
+  value?: string;
+};
+
+type DepartmentJobRolesResponse = {
+  status_code?: number | string;
+  message?: string;
+  data?: DepartmentJobRole[] | { roles?: DepartmentJobRole[] };
+  roles?: DepartmentJobRole[];
   errors?: Record<string, string[]>;
 };
 
@@ -177,6 +193,46 @@ function stripMarkdown(value: string): string {
     .replace(/[#*_`]+/g, "")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .trim();
+}
+
+function resolveRoleRecords(payload: DepartmentJobRolesResponse | null): DepartmentJobRole[] {
+  if (!payload) return [];
+
+  if (Array.isArray(payload.data)) {
+    return payload.data;
+  }
+
+  if (payload.data && typeof payload.data === "object" && Array.isArray(payload.data.roles)) {
+    return payload.data.roles;
+  }
+
+  if (Array.isArray(payload.roles)) {
+    return payload.roles;
+  }
+
+  return [];
+}
+
+function normalizeRoleRecords(records: DepartmentJobRole[]): DepartmentJobRole[] {
+  const seen = new Set<string>();
+
+  return records.reduce<DepartmentJobRole[]>((items, record, index) => {
+    const name = readString(record.name ?? record.label ?? record.value).trim();
+    if (!name) return items;
+
+    const key = name.toLowerCase();
+    if (seen.has(key)) return items;
+    seen.add(key);
+
+    items.push({
+      id: record.id ?? `${key}-${index}`,
+      name,
+      label: name,
+      value: name,
+    });
+
+    return items;
+  }, []);
 }
 
 function SectionCheckbox({
@@ -272,6 +328,7 @@ export default function AiGenerationDrawer({
   onClose,
   onSave,
   departmentName,
+  departmentId,
 }: AiGenerationDrawerProps) {
   const [hasGenerated, setHasGenerated] = useState(false);
   const handleClose = useCallback(() => {
@@ -289,7 +346,10 @@ export default function AiGenerationDrawer({
   const [category] = useState(categoryOptions[kind][0]);
   const [title, setTitle] = useState(selectedDepartmentName || defaultTitles[kind]);
   const [purpose, setPurpose] = useState("");
-  const [roles, setRoles] = useState("");
+  const [selectedRoles, setSelectedRoles] = useState<DepartmentJobRole[]>([]);
+  const [customRole, setCustomRole] = useState("");
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesError, setRolesError] = useState("");
   const [keywords, setKeywords] = useState("");
   const [language, setLanguage] = useState("English");
   const [documentType, setDocumentType] = useState(typeOptions[kind][0]);
@@ -307,6 +367,10 @@ export default function AiGenerationDrawer({
   const editorTitle = `AI-Generated ${kind} Editor`;
   const isGenerating = generationMode !== null;
   const isSaving = saveMode !== null;
+  const roles = useMemo(
+    () => selectedRoles.map((role) => readString(role.name ?? role.label ?? role.value).trim()).filter(Boolean).join(", "),
+    [selectedRoles]
+  );
 
   useEffect(() => {
     if (hasGenerated) {
@@ -328,6 +392,80 @@ export default function AiGenerationDrawer({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleClose, open]);
 
+  useEffect(() => {
+    if (!open || kind !== "SOP") return;
+
+    const selectedDepartmentId = readString(departmentId).trim();
+
+    if (!selectedDepartmentId) {
+      queueMicrotask(() => {
+        setSelectedRoles([]);
+        setRolesError("");
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadDepartmentRoles() {
+      const session = getAiGenerationSession();
+      const baseUrl = session.baseUrl.replace(/\/$/, "");
+      const url = new URL(`${baseUrl}/api/ai-sop/department-job-roles`);
+      url.searchParams.set("department_id", selectedDepartmentId);
+
+      try {
+        const userData = JSON.parse(localStorage.getItem("userData") || "{}") as Record<string, unknown>;
+        const menuContext = JSON.parse(localStorage.getItem("menuContext") || "{}") as Record<string, unknown>;
+        const subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
+        if (subInstituteId) {
+          url.searchParams.set("sub_institute_id", subInstituteId);
+        }
+      } catch {
+        // Optional context only.
+      }
+
+      setRolesLoading(true);
+      setRolesError("");
+
+      try {
+        const response = await fetch(url.toString(), {
+          method: "GET",
+          signal: controller.signal,
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          },
+        });
+
+        const payload = (await response.json().catch(() => null)) as DepartmentJobRolesResponse | null;
+
+        if (!response.ok || !payload || String(payload.status_code ?? "0") !== "1") {
+          throw new Error(
+            getFirstValidationError(payload?.errors) ||
+              payload?.message ||
+              "Unable to load mapped job roles."
+          );
+        }
+
+        setSelectedRoles(normalizeRoleRecords(resolveRoleRecords(payload)));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+
+        setSelectedRoles([]);
+        setRolesError(error instanceof Error ? error.message : "Unable to load mapped job roles.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setRolesLoading(false);
+        }
+      }
+    }
+
+    void loadDepartmentRoles();
+
+    return () => controller.abort();
+  }, [departmentId, kind, open]);
+
   const keywordChips = useMemo(
     () =>
       keywords
@@ -337,6 +475,32 @@ export default function AiGenerationDrawer({
         .slice(0, 4),
     [keywords]
   );
+
+  const addCustomRole = () => {
+    const name = customRole.trim();
+    if (!name) return;
+
+    setSelectedRoles((current) => {
+      const exists = current.some(
+        (role) =>
+          readString(role.name ?? role.label ?? role.value).trim().toLowerCase() ===
+          name.toLowerCase()
+      );
+
+      if (exists) return current;
+
+      return [
+        ...current,
+        {
+          id: `custom-${Date.now()}-${name.toLowerCase()}`,
+          name,
+          label: name,
+          value: name,
+        },
+      ];
+    });
+    setCustomRole("");
+  };
 
   const requestAiContent = async (mode: AiGenerationMode) => {
     if (kind !== "SOP") {
@@ -520,15 +684,76 @@ export default function AiGenerationDrawer({
                 />
               </label>
 
-                <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
-                Applicable Roles/Users
-                <Input
-                  value={roles}
-                  onChange={(event) => setRoles(event.target.value)}
-                  placeholder="e.g. Accounts Department, Front Office"
-                  className="h-9 rounded-lg border-[#d7e0eb] bg-white text-[12px] placeholder:text-[#7c8da8]"
-                />
-              </label>
+              <div className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
+                <span>Applicable Roles/Users</span>
+                <div className="space-y-2 rounded-lg border border-[#d7e0eb] bg-white px-2 py-2">
+                  {rolesLoading ? (
+                    <p className="px-1 py-1 text-[11px] font-medium text-[#52657d]">
+                      Loading mapped roles...
+                    </p>
+                  ) : selectedRoles.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedRoles.map((role, roleIndex) => {
+                        const name = readString(role.name ?? role.label ?? role.value).trim();
+
+                        return (
+                          <span
+                            key={`${role.id ?? name}-${name}`}
+                            className="inline-flex min-h-6 max-w-full items-center gap-1 rounded-md bg-[#eaf1ff] px-2 py-1 text-[11px] font-medium text-[#004cff]"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <span className="truncate">{name}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${name}`}
+                              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm hover:bg-[#d7e6ff]"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedRoles((current) =>
+                                  current.filter((_, index) => index !== roleIndex)
+                                );
+                              }}
+                            >
+                              <X className="h-3 w-3" aria-hidden="true" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="px-1 py-1 text-[11px] font-medium text-[#7c8da8]">
+                      No mapped job roles found for this department.
+                    </p>
+                  )}
+                  <div className="flex gap-2 border-t border-[#edf2f8] pt-2">
+                    <Input
+                      value={customRole}
+                      onChange={(event) => setCustomRole(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addCustomRole();
+                        }
+                      }}
+                      placeholder="Add another role or user"
+                      className="h-8 rounded-md border-[#d7e0eb] bg-white text-[12px] placeholder:text-[#7c8da8]"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 shrink-0 px-3 text-[12px]"
+                      onClick={addCustomRole}
+                      disabled={!customRole.trim()}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </div>
+                {rolesError ? (
+                  <p className="text-[11px] font-medium text-red-600">{rolesError}</p>
+                ) : null}
+              </div>
 
               <label className="space-y-1.5 text-[12px] font-semibold text-[#061632]">
                 Keywords
