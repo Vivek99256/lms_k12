@@ -1135,6 +1135,16 @@ export default function StudentHomeworkIndexPage() {
   const [questions, setQuestions] = useState<ApiQuestionRecord[]>([]);
   const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState('');
+  // DOK / Bloom filter options for the question-bank step. Fetched from
+  // /api/question-mapping-levels (lms_mapping_type rows) — never hardcoded, so
+  // new levels added in the DB appear automatically.
+  const [mappingLevels, setMappingLevels] = useState<{
+    dok: Array<{ id: number; name: string }>;
+    bloom: Array<{ id: number; name: string }>;
+  }>({ dok: [], bloom: [] });
+  const [selectedDokLevels, setSelectedDokLevels] = useState<number[]>([]);
+  const [selectedBloomLevels, setSelectedBloomLevels] = useState<number[]>([]);
+  const [openLevelDropdown, setOpenLevelDropdown] = useState<'dok' | 'bloom' | null>(null);
   const [studentChapterProgressList, setStudentChapterProgressList] =
     useState<StudentChapterProgress[]>(studentChapterProgressData);
   const [studentSelectedChapterId, setStudentSelectedChapterId] = useState<number>(
@@ -1756,6 +1766,9 @@ export default function StudentHomeworkIndexPage() {
     setIsConceptLoading(false);
     setIsQuestionsLoading(false);
     setQuestionsError('');
+    setSelectedDokLevels([]);
+    setSelectedBloomLevels([]);
+    setOpenLevelDropdown(null);
     setExamName('');
     setExamDescription('');
     setExamType('');
@@ -2347,6 +2360,14 @@ export default function StudentHomeworkIndexPage() {
           formData.append('concept_id[]', String(conceptId));
         });
 
+        selectedDokLevels.forEach((levelId) => {
+          formData.append('dok_id[]', String(levelId));
+        });
+
+        selectedBloomLevels.forEach((levelId) => {
+          formData.append('bloom_id[]', String(levelId));
+        });
+
         const response = await fetch(`${API_BASE_URL}/api/lms-questions`, {
           method: 'POST',
           headers: {
@@ -2388,7 +2409,43 @@ export default function StudentHomeworkIndexPage() {
     return () => {
       controller.abort();
     };
-  }, [createExamStep, isCreateExamOpen, selectedChapters, selectedConcepts, selectedSubjectId]);
+  }, [createExamStep, isCreateExamOpen, selectedBloomLevels, selectedChapters, selectedConcepts, selectedDokLevels, selectedSubjectId]);
+
+  // Load DOK / Bloom level options from the DB once per modal open.
+  useEffect(() => {
+    if (!isCreateExamOpen || mappingLevels.dok.length > 0 || mappingLevels.bloom.length > 0) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/question-mapping-levels`, {
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+        });
+        const result = (await response.json()) as {
+          status_code?: number;
+          data?: { dok?: Array<{ id: number; name: string }>; bloom?: Array<{ id: number; name: string }> };
+        };
+        if (controller.signal.aborted || !response.ok || !result?.data) return;
+
+        setMappingLevels({
+          dok: result.data.dok ?? [],
+          bloom: result.data.bloom ?? [],
+        });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error('Mapping levels API error:', error);
+        }
+      }
+    })();
+
+    return () => {
+      controller.abort();
+    };
+  }, [isCreateExamOpen, mappingLevels.bloom.length, mappingLevels.dok.length]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3935,6 +3992,113 @@ export default function StudentHomeworkIndexPage() {
                       </div>
                     </div>
 
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      {(
+                        [
+                          {
+                            key: 'dok' as const,
+                            label: 'DOK level',
+                            options: mappingLevels.dok,
+                            selected: selectedDokLevels,
+                            setSelected: setSelectedDokLevels,
+                          },
+                          {
+                            key: 'bloom' as const,
+                            label: "Bloom's level",
+                            options: mappingLevels.bloom,
+                            selected: selectedBloomLevels,
+                            setSelected: setSelectedBloomLevels,
+                          },
+                        ]
+                      ).map((filter) => (
+                        <div key={filter.key} className="relative">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenLevelDropdown(openLevelDropdown === filter.key ? null : filter.key)
+                            }
+                            className="inline-flex items-center gap-2 rounded-[12px] border border-[#D8E1EE] bg-white px-4 py-2.5 text-[14px] font-medium text-[#334155] shadow-sm transition hover:border-[#B9C7DD]"
+                          >
+                            {filter.label}
+                            {filter.selected.length > 0 ? (
+                              <span className="rounded-full bg-[#5B4FE9] px-2 py-0.5 text-[11px] font-semibold text-white">
+                                {filter.selected.length}
+                              </span>
+                            ) : null}
+                            <ChevronDown
+                              className={`h-4 w-4 text-[#94A3B8] transition-transform ${
+                                openLevelDropdown === filter.key ? 'rotate-180' : ''
+                              }`}
+                            />
+                          </button>
+
+                          {openLevelDropdown === filter.key ? (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setOpenLevelDropdown(null)}
+                              />
+                              <div className="absolute left-0 z-20 mt-2 w-60 rounded-[14px] border border-[#DCE4F0] bg-white p-2 shadow-[0_16px_40px_rgba(15,23,42,0.14)]">
+                                {filter.options.length === 0 ? (
+                                  <p className="px-3 py-2 text-[13px] text-[#64748B]">
+                                    No levels available.
+                                  </p>
+                                ) : (
+                                  filter.options.map((level) => {
+                                    const isSelected = filter.selected.includes(level.id);
+
+                                    return (
+                                      <label
+                                        key={level.id}
+                                        className="flex cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 text-[14px] text-[#334155] transition hover:bg-[#F4F6FB]"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          className="sr-only"
+                                          checked={isSelected}
+                                          onChange={() =>
+                                            filter.setSelected((current) =>
+                                              current.includes(level.id)
+                                                ? current.filter((id) => id !== level.id)
+                                                : [...current, level.id]
+                                            )
+                                          }
+                                        />
+                                        <span
+                                          className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border transition ${
+                                            isSelected
+                                              ? 'border-[#5B4FE9] bg-[#5B4FE9] text-white'
+                                              : 'border-[#CBD5E1] bg-white text-transparent'
+                                          }`}
+                                        >
+                                          <Check size={13} strokeWidth={3} />
+                                        </span>
+                                        {level.name}
+                                      </label>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </>
+                          ) : null}
+                        </div>
+                      ))}
+
+                      {selectedDokLevels.length > 0 || selectedBloomLevels.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDokLevels([]);
+                            setSelectedBloomLevels([]);
+                            setOpenLevelDropdown(null);
+                          }}
+                          className="text-[13px] font-medium text-[#5B4FE9] transition hover:text-[#4338CA]"
+                        >
+                          Clear filters
+                        </button>
+                      ) : null}
+                    </div>
+
                     {isQuestionsLoading ? (
                       <div className="mt-5 rounded-[20px] border border-[#DCE4F0] p-6 text-center text-[14px] text-[#64748B]">
                         Loading questions...
@@ -3945,7 +4109,9 @@ export default function StudentHomeworkIndexPage() {
                       </div>
                     ) : questionRows.length === 0 ? (
                       <div className="mt-5 rounded-[20px] border border-[#DCE4F0] p-6 text-center text-[14px] text-slate-500">
-                        No questions found for the selected concepts.
+                        {selectedDokLevels.length > 0 || selectedBloomLevels.length > 0
+                          ? 'No questions match the selected DOK / Bloom levels. Try clearing the filters.'
+                          : 'No questions found for the selected concepts.'}
                       </div>
                     ) : (
                       <div className="mt-5 overflow-hidden rounded-[20px] border border-[#DCE4F0] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">

@@ -34,6 +34,7 @@ import {
   Play,
   FolderOpen,
   Database,
+  Layers3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -3922,6 +3923,26 @@ export default function ChapterListPage() {
                     >
                       <Database size={16} className="mr-2" />
                       Question Bank
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        router.push(
+                          `/h5p/html_contents?${new URLSearchParams({
+                            chapter_id: String(chapter.id),
+                            subject_id: String(subjectData?.subject?.subject_id ?? subjectId),
+                            standard_id: String(subjectData?.subject?.standard_id ?? standardId ?? ''),
+                            chapter_name: chapter.title,
+                            subject_name: subjectData?.subject?.subject_name ?? course.subject,
+                            standard_name: subjectData?.subject?.standard_name ?? getCourseGradeLabel(course.classGrade),
+                          }).toString()}`
+                        )
+                      }
+                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                    >
+                      <Layers3 size={16} className="mr-2" />
+                      H5P Content
                     </Button>
                   </div>
 
