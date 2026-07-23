@@ -2003,47 +2003,6 @@ export default function LessonPlanPage() {
   ) : (
     <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-5 rounded-xl border border-slate-200 bg-white p-5">
-          <label className="mb-2 block text-sm font-medium text-slate-700">
-            Select Division
-          </label>
-          <select
-            value={selectedDivisionId ?? ''}
-            onChange={(event) => {
-              const divisionId = event.target.value ? Number(event.target.value) : null;
-              setSelectedDivisionId(divisionId);
-            }}
-            disabled={!currentStandardId || divisionLoading || divisions.length === 0}
-            className="w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-          >
-            <option value="">
-              {divisionLoading
-                ? 'Loading divisions...'
-                : divisions.length === 0
-                  ? 'No divisions available'
-                  : 'Select Division'}
-            </option>
-            {divisions.map((division) => (
-              <option
-                key={division.division_id ?? division.id}
-                value={division.division_id ?? division.id}
-              >
-                {division.division_name ??
-                  division.name ??
-                  division.title ??
-                  `Division ${division.division_id ?? division.id}`}
-              </option>
-            ))}
-          </select>
-          {divisionError ? (
-            <p className="mt-2 text-xs text-red-600">
-              {divisionError}
-            </p>
-          ) : null}
-        </div>
-
-        {selectedDivisionId ? (
-          <>
         <div className="mb-5 flex flex-wrap items-center gap-2 text-[15px] text-[#475569]">
           <span className="inline-flex items-center gap-2">
             <BookOpen size={14} className="text-[#475569]" />
@@ -2068,7 +2027,7 @@ export default function LessonPlanPage() {
                   {course.subject} - {gradeLabel} - {sectionLabel}
                 </h1>
                 <p className="mt-1 text-[16px] text-[#475569]">
-                  {chapterCount} chapters Ã‚Â· {totalKeyConcepts} key concepts Ã‚Â· {curriculumLabel}
+                  {chapterCount} chapters · {totalKeyConcepts} key concepts · {curriculumLabel}
                 </p>
               </div>
             </div>
@@ -2109,6 +2068,55 @@ export default function LessonPlanPage() {
           </div>
         </div>
 
+        <div className="mb-5 rounded-[18px] border border-[#D8E1F0] bg-white px-5 py-4 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-[#EEF2FF] text-[#4F46E5]">
+                <School size={20} />
+              </div>
+              <div>
+                <p className="text-[15px] font-semibold text-[#0F172A]">Select division</p>
+                <p className="text-[13px] text-[#64748B]">
+                  Choose a division to load its lesson plan calendar
+                </p>
+              </div>
+            </div>
+            <select
+              value={selectedDivisionId ?? ''}
+              onChange={(event) => {
+                const divisionId = event.target.value ? Number(event.target.value) : null;
+                setSelectedDivisionId(divisionId);
+              }}
+              disabled={!currentStandardId || divisionLoading || divisions.length === 0}
+              className="h-11 w-full rounded-[12px] border border-[#D8E1F0] bg-white px-3 text-[15px] text-[#0F172A] shadow-[0_1px_4px_rgba(15,23,42,0.04)] outline-none transition focus:border-[#4F46E5] focus:ring-2 focus:ring-[#C7D2FE] disabled:cursor-not-allowed disabled:bg-[#F1F5F9] sm:w-[280px]"
+            >
+              <option value="">
+                {divisionLoading
+                  ? 'Loading divisions...'
+                  : divisions.length === 0
+                    ? 'No divisions available'
+                    : 'Select division'}
+              </option>
+              {divisions.map((division) => (
+                <option
+                  key={division.division_id ?? division.id}
+                  value={division.division_id ?? division.id}
+                >
+                  {division.division_name ??
+                    division.name ??
+                    division.title ??
+                    `Division ${division.division_id ?? division.id}`}
+                </option>
+              ))}
+            </select>
+          </div>
+          {divisionError ? (
+            <p className="mt-3 text-[13px] font-medium text-[#DC2626]">{divisionError}</p>
+          ) : null}
+        </div>
+
+        {selectedDivisionId ? (
+          <>
         <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -2150,15 +2158,6 @@ export default function LessonPlanPage() {
                 </button>
               ))}
             </div>
-
-            <Button
-              type="button"
-              onClick={() => setIsCreateLessonPlanOpen(true)}
-              className="h-11 rounded-[14px] bg-[#4F46E5] px-5 text-[15px] font-medium text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] hover:bg-[#4338CA]"
-            >
-              <Plus size={16} className="mr-2" />
-              Create lesson plan
-            </Button>
           </div>
         </div>
 
@@ -2627,7 +2626,19 @@ export default function LessonPlanPage() {
           </div>
         ) : null}
           </>
-        ) : null}
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-4 rounded-[18px] border border-dashed border-[#C7D2E5] bg-white/70 px-6 py-20 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-[16px] bg-[#EEF2FF] text-[#4F46E5]">
+              <Calendar size={26} />
+            </div>
+            <div>
+              <h2 className="text-[18px] font-semibold text-[#0F172A]">No division selected</h2>
+              <p className="mt-1 max-w-[420px] text-[15px] text-[#64748B]">
+                Select a division above to view and plan its lesson calendar.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
