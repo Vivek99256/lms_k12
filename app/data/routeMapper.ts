@@ -55,6 +55,21 @@ const RESULT_ROUTE_NAME_MAP: Record<string, string> = {
   'cnse_11_result.index': '/result/cnse_11_result',
 };
 
+/**
+ * LMS → H5P content module: legacy Laravel route names (and the old
+ * `/lms/h5p` library path) → Next.js routes under /h5p.
+ */
+const H5P_ROUTE_NAME_MAP: Record<string, string> = {
+  'h5p.index': '/h5p/html_contents',
+  'lms/h5p': '/h5p/html_contents',
+  'html_contents.index': '/h5p/html_contents',
+  'h5p/html_contents': '/h5p/html_contents',
+  'scenario_based.index': '/h5p/scenario_based',
+  'h5p_mcq.index': '/h5p/h5p_mcq',
+  'h5p_interactive_video.index': '/h5p/h5p_interactive_video',
+  'h5p_flashacard.index': '/h5p/h5p_flashacard',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -72,6 +87,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const resultRoute = RESULT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (resultRoute) {
     return resultRoute;
+  }
+
+  // LMS → H5P content: legacy Laravel route-name / path links → Next routes.
+  const h5pRoute = H5P_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (h5pRoute) {
+    return h5pRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
