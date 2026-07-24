@@ -70,6 +70,21 @@ const H5P_ROUTE_NAME_MAP: Record<string, string> = {
   'h5p_flashacard.index': '/h5p/h5p_flashacard',
 };
 
+/**
+ * LMS → PAL (Personalized Adaptive Learning): legacy Laravel route names /
+ * paths → Next.js routes under /pal. The PAL (ENTRY) and PAL Report (REPORT)
+ * menu rows live in the shared backend menu; these map their links to the new
+ * frontend screens. Keys must be lowercase (lookups are lowercased).
+ */
+const PAL_ROUTE_NAME_MAP: Record<string, string> = {
+  'pal.index': '/pal',
+  'lms/pal': '/pal',
+  'palreport.index': '/pal/report',
+  'lms/palreport': '/pal/report',
+  'result_personalize_marks.index': '/pal/personalize-marks',
+  'result_personalize_marks/index': '/pal/personalize-marks',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -93,6 +108,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const h5pRoute = H5P_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (h5pRoute) {
     return h5pRoute;
+  }
+
+  // LMS → PAL: legacy Laravel route-name / path links → Next routes.
+  const palRoute = PAL_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (palRoute) {
+    return palRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
