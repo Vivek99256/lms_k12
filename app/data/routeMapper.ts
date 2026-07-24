@@ -25,6 +25,49 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   // Remove trailing slashes only
   cleanLink = cleanLink.replace(/\/+$/, '');
 
+  const easyCommunicationRoutes: Record<string, string> = {
+    'send_sms_parents.index': '/easy_com/send_sms_parents',
+    'result/send_sms_parents': '/easy_com/send_sms_parents',
+    'easy_com/send_sms_parents': '/easy_com/send_sms_parents',
+    'send_sms_staff.index': '/easy_com/send_sms_staff',
+    'result/send_sms_staff': '/easy_com/send_sms_staff',
+    'easy_com/send_sms_staff': '/easy_com/send_sms_staff',
+    'send_notification_parents.index': '/easy_com/send_notification_parents',
+    'result/send_notification_parents': '/easy_com/send_notification_parents',
+    'easy_com/send_notification_parents': '/easy_com/send_notification_parents',
+    'send_email_parents.index': '/easy_com/send_email_parents',
+    'result/send_email_parents': '/easy_com/send_email_parents',
+    'easy_com/send_email_parents': '/easy_com/send_email_parents',
+    'send_email_report.index': '/easy_com/email_report',
+    'result/send_email_report': '/easy_com/email_report',
+    'easy_com/send_email_report': '/easy_com/email_report',
+    'manage_sms_api.index': '/easy_com/manage_sms_api',
+    'result/manage_sms_api': '/easy_com/manage_sms_api',
+    'easy_com/manage_sms_api': '/easy_com/manage_sms_api',
+    'sms_api.index': '/easy_com/sms_api',
+    'result/sms_api': '/easy_com/sms_api',
+    'smtp_setting.index': '/easy_com/smtp',
+    'settings/smtp_setting': '/easy_com/smtp',
+    'whatsapp_user_details.index': '/easy_com/whatsapp_api',
+    'whatsapp-user-details': '/easy_com/whatsapp_api',
+    'whatsapp_send_message.create': '/easy_com/send_whatsapp_parents',
+    'whatsapp-send-messages/create': '/easy_com/send_whatsapp_parents',
+    'send_sms_report.index': '/easy_com/send_sms_report',
+    'result/send_sms_report': '/easy_com/send_sms_report',
+    'easy_com/send_sms_report': '/easy_com/send_sms_report',
+    'register_parents_report.index': '/easy_com/register_parent_report',
+    'result/register_parents_report': '/easy_com/register_parent_report',
+    'easy_com/register_parents_report': '/easy_com/register_parent_report',
+    'whatsapp_send_messages.generate_report': '/easy_com/whatsapp_report',
+    'whatsapp-sent-generate-report': '/easy_com/whatsapp_report',
+    'notification_report.index': '/easy_com/notification_report',
+    'result/notification_report': '/easy_com/notification_report',
+    'easy_com/notification_report': '/easy_com/notification_report',
+  };
+  const easyCommunicationRoute =
+    easyCommunicationRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (easyCommunicationRoute) return easyCommunicationRoute;
+
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
     return '/fees/master/fees-config-master';
   }
