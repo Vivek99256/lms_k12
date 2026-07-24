@@ -66,7 +66,10 @@ export async function POST(request: NextRequest) {
   }
 
   const base = API_BASE_URL.replace(/\/$/, '');
-  const url = `${base}/${resolveTargetPath(targetPath)}`;
+  const upstreamParams = new URLSearchParams(request.nextUrl.searchParams);
+  upstreamParams.delete('path');
+  const queryString = upstreamParams.toString();
+  const url = `${base}/${targetPath.replace(/^\//, '')}${queryString ? `?${queryString}` : ''}`;
 
   const contentType = request.headers.get('content-type') || '';
   const body = await request.text();
