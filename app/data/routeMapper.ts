@@ -96,6 +96,16 @@ const RESULT_ROUTE_NAME_MAP: Record<string, string> = {
   'transportation/van_wise_report': '/Transportation/van_wise_report',
   'van_wise_students_detail_report.index': '/Transportation/van_summery_report',
   'transportation/van_wise_students_detail_report': '/Transportation/van_summery_report',
+  'templatemaster.index': '/general/template_management',
+  'settings/templatemaster': '/general/template_management',
+  'formbuild.list': '/general/form_builder',
+  'formbuilder/list': '/general/form_builder',
+  'add_user_profile.index': '/general/user_profile_masters',
+  'user/add_user_profile': '/general/user_profile_masters',
+  'add_implementation.index': '/general/implementation_management',
+  'implementation/add_implementation': '/general/implementation_management',
+  'bulk_chapter_upload.index': '/general/bulk_upload',
+  'lms/bulk_chapter_upload': '/general/bulk_upload',
 };
 
 export function mapApiLinkToRoute(link: string | null | undefined): string {
