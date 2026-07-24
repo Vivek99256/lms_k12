@@ -53,6 +53,15 @@ const RESULT_ROUTE_NAME_MAP: Record<string, string> = {
   'cbse_result_t2.index': '/result/cbse_result_t2',
   'cbse_11_result.index': '/result/cbse_11_result',
   'cnse_11_result.index': '/result/cnse_11_result',
+  'add_user': '/user/add_user',
+  'add_user.index': '/user/add_user',
+  'add_user.create': '/user/add_user',
+  'proxy_report.index': '/proxy_report',
+  'classteacherreport.index': '/classteacherReport',
+  'classteacherreport.create': '/classteacherReport',
+  'todays_proxy_report.index': '/todays_proxy_report',
+  'user_log.index': '/user_log',
+  'teacher_daily_report.index': '/teacher_daily_report',
 };
 
 export function mapApiLinkToRoute(link: string | null | undefined): string {
