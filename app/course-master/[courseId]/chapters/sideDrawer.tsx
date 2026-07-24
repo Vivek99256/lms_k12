@@ -1,3 +1,5 @@
+'use client';
+
 // sideDrawer.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Sparkles, Loader2 } from 'lucide-react';
@@ -692,14 +694,14 @@ ${groundTruthContent}`;
 
           <div className="mt-6 rounded-2xl bg-slate-100/90 p-1">
             <div className="grid grid-cols-2 gap-1">
-              {(['Classroom resource', 'Teacher resource'] as const).map((mode) => (
+              {(['Classroom', 'Teacher training'] as const).map((mode) => (
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => setContentGenerationMode(mode)}
+                  onClick={() => setPresentationMode(mode)}
                   className={cn(
                     'rounded-xl px-4 py-3 text-left text-[15px] font-semibold transition-colors',
-                    contentTypeMode === mode
+                    presentationMode === mode
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   )}
