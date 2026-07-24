@@ -58,6 +58,33 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const inwardOutwardRoute = inwardOutwardRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (inwardOutwardRoute) return inwardOutwardRoute;
 
+  const frontDeskRoutes: Record<string, string> = {
+    'create-timetable.index': '/front_desk/create-timetable',
+    'front_desk/create-timetable': '/front_desk/create-timetable',
+    'timetable.index': '/front_desk/create-timetable',
+    'photo_video_gallary.index': '/front_desk/photo_video_gallary',
+    'front_desk/photo_video_gallary': '/front_desk/photo_video_gallary',
+    'calendar.index': '/front_desk/calendar',
+    'calendar/calendar': '/front_desk/calendar',
+    'circular.index': '/front_desk/circular',
+    'front_desk/circular': '/front_desk/circular',
+    'parent_communication.index': '/front_desk/parent_communication',
+    'front_desk/parent_communication': '/front_desk/parent_communication',
+    'leave_application.index': '/front_desk/leave_application',
+    'front_desk/leave_application': '/front_desk/leave_application',
+    'exam_schedule.index': '/front_desk/exam_schedule',
+    'front_desk/exam_schedule': '/front_desk/exam_schedule',
+    'classwisetimetable.index': '/front_desk/classwisetimetable',
+    'school_setup/classwisetimetable': '/front_desk/classwisetimetable',
+    'facultywisetimetable.index': '/front_desk/facultywisetimetable',
+    'school_setup/facultywisetimetable': '/front_desk/facultywisetimetable',
+    'circular.report.index': '/front_desk/circular/report',
+    'front_desk/circular/report': '/front_desk/circular/report',
+  };
+  const frontDeskRoute =
+    frontDeskRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (frontDeskRoute) return frontDeskRoute;
+
   if (cleanLink.toLowerCase() === 'other_fee_map.index') {
     return '/fees/master/additional-fees-mapping';
   }
