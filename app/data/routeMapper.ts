@@ -249,6 +249,86 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   ) {
     return '/student/student_attendance';
   }
+
+  if (
+    cleanLink.toLowerCase() === 'lms_teacherresource.index' ||
+    cleanLink.toLowerCase() === 'lms/lms_teacherresource' ||
+    cleanLink.toLowerCase() === 'lms/lms_teacherresource/index'
+  ) {
+    return '/library/book_resources';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'scan_books.index' ||
+    cleanLink.toLowerCase() === 'scan_books' ||
+    cleanLink.toLowerCase() === 'scan_books/index'
+  ) {
+    return '/library/scan_book';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'scan_books_remarks.index' ||
+    cleanLink.toLowerCase() === 'scan_books_remarks' ||
+    cleanLink.toLowerCase() === 'scan_books_remarks/index'
+  ) {
+    return '/library/add_book_remark';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'quick_return.index' ||
+    cleanLink.toLowerCase() === 'quick_return' ||
+    cleanLink.toLowerCase() === 'quick_return/index'
+  ) {
+    return '/library/quick_return';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'library_report.index' ||
+    cleanLink.toLowerCase() === 'library_report' ||
+    cleanLink.toLowerCase() === 'library_report/index'
+  ) {
+    return '/library/report';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'book_issue_report.index' ||
+    cleanLink.toLowerCase() === 'book_issue_report' ||
+    cleanLink.toLowerCase() === 'book_issue_report/index'
+  ) {
+    return '/library/issue_overdue_report';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'print_barcode.index' ||
+    cleanLink.toLowerCase() === 'print_barcode' ||
+    cleanLink.toLowerCase() === 'print_barcode/index'
+  ) {
+    return '/library/print_barcode';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'verified_report.index' ||
+    cleanLink.toLowerCase() === 'verified_book_report' ||
+    cleanLink.toLowerCase() === 'verified_book_report/index'
+  ) {
+    return '/library/scanned_book_report';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'verifiypending_report.index' ||
+    cleanLink.toLowerCase() === 'verified_book_report_pending' ||
+    cleanLink.toLowerCase() === 'verified_book_report_pending/index'
+  ) {
+    return '/library/pending_scan_report';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'lost_and_damage.index' ||
+    cleanLink.toLowerCase() === 'lost_and_damage' ||
+    cleanLink.toLowerCase() === 'lost_and_damage/index'
+  ) {
+    return '/library/lost_damage_report';
+  }
   
   if (!cleanLink) return '#';
   

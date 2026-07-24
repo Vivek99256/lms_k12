@@ -72,7 +72,8 @@ export async function POST(request: NextRequest) {
   const url = `${base}/${targetPath.replace(/^\//, '')}${queryString ? `?${queryString}` : ''}`;
 
   const contentType = request.headers.get('content-type') || '';
-  const body = await request.text();
+  const isMultipart = contentType.toLowerCase().includes('multipart/form-data');
+  const body = isMultipart ? await request.formData() : await request.text();
   const authorization = request.headers.get('authorization');
   const cookie = request.headers.get('cookie');
 
@@ -80,12 +81,12 @@ export async function POST(request: NextRequest) {
     const upstream = await fetch(url, {
       method: 'POST',
       headers: {
-        ...(contentType ? { 'Content-Type': contentType } : {}),
+        ...(!isMultipart && contentType ? { 'Content-Type': contentType } : {}),
         Accept: 'application/json',
         ...(authorization ? { Authorization: authorization } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
       },
-      body: body || undefined,
+      body: isMultipart ? body : body || undefined,
       cache: 'no-store',
     });
 
