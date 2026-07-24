@@ -406,6 +406,7 @@ export interface ChapterContentAsset {
   url: string | null;
   file_type: string | null;
   content_category: string | null;
+  concept_id?: number | string | null;
   created_at: string | null;
 }
 

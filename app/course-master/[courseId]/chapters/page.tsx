@@ -73,9 +73,6 @@ const EMPTY_CHAPTER_FORM = {
   show: true,
 };
 
-const RESOURCE_MAPPING_TYPES = ['Pedagogical Process', 'Material Type', 'Learning Outcome'] as const;
-const RESOURCE_MATERIAL_TYPES = ['Mindmap', 'Teacher Training', 'Worksheet', 'Reference Notes', 'Assessment Aid'] as const;
-const RESOURCE_FILE_TYPES = ['PDF', 'PPT', 'DOCX', 'Video Link'] as const;
 const UPLOAD_CONTENT_TYPES = ['Presentation', 'Video', 'Revision notes', 'Classroom activity'] as const;
 const UPLOAD_PRESENTATION_TYPES = ['Classroom presentation', 'Teacher training presentation'] as const;
 const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
@@ -159,6 +156,7 @@ interface ChapterContentItem {
   subtitle: string;
   chapterTitle: string;
   conceptTitle: string;
+  contentCategory: string;
   type: ChapterContentType;
   source: ChapterContentSource;
   preview: ChapterContentPreview;
@@ -233,6 +231,7 @@ function buildApiChapterContentItems(
         subtitle: category,
         chapterTitle: chapter.title,
         conceptTitle: category,
+        contentCategory: category,
         type,
         source: 'Uploaded',
         preview: getChapterContentPreview(type),
@@ -330,44 +329,6 @@ function getCourseGradeLabel(classGrade: string) {
 
 function getCurriculumLabel() {
   return 'CBSE curriculum';
-}
-
-function buildTeacherResources(chapterTitle: string) {
-  return [
-    {
-      id: 'tr-1',
-      title: 'Mindmap',
-      file: 'chemical-reactions-mindmap.pdf',
-      type: 'PDF',
-      mappedValues: [
-        'Pedagogical Process / Instructor-led',
-        'Material Type / Mindmap',
-      ],
-      updatedAt: 'Updated 2 days ago',
-    },
-    {
-      id: 'tr-2',
-      title: 'Teacher Training',
-      file: 'teacher-training-module.pptx',
-      type: 'PPT',
-      mappedValues: [
-        'Pedagogical Process / Guided practice',
-        'Content Type / Training Deck',
-      ],
-      updatedAt: 'Updated 5 days ago',
-    },
-    {
-      id: 'tr-3',
-      title: `${chapterTitle} Notes`,
-      file: 'chapter-reference-notes.docx',
-      type: 'DOCX',
-      mappedValues: [
-        'Material Type / Reference Notes',
-        'Learning Outcome / Chapter Reinforcement',
-      ],
-      updatedAt: 'Updated 1 week ago',
-    },
-  ];
 }
 
 function getCourseClassroomLabel(courseId: string, classGrade: string) {
@@ -472,6 +433,7 @@ function buildChapterContentItems(
     const preview = getChapterContentPreview(type);
     const { slideCount, statValue } = getChapterContentStat(type, index);
     const updatedDate = `${28 - (index % 9)} Jun 2026`;
+    const contentCategory = type === 'Teacher training presentation' ? 'Teacher Training' : 'Classroom';
 
     return {
       id: `${chapter.id}-content-${index + 1}`,
@@ -479,6 +441,7 @@ function buildChapterContentItems(
       subtitle: `${chapterLabel} - ${gradeLabel}`,
       chapterTitle: chapter.title,
       conceptTitle,
+      contentCategory,
       type,
       source,
       preview,
@@ -642,21 +605,21 @@ export default function ChapterListPage() {
       staticCourse ??
       (apiSubject
         ? {
-            id: courseId,
-            title: apiSubject.subject_name,
-            code: '',
-            subject: apiSubject.subject_name,
-            category: apiSubject.content_category,
-            classGrade: `Class ${apiSubject.standard_name}`,
-            status: 'Active',
-            chapters: subjectData?.chapters.length ?? 0,
-            enrollments: 0,
-            progress: 0,
-            instructor: '',
-            createdAt: '',
-            accentColor: '#5648E8',
-            icon: 'book-open',
-          }
+          id: courseId,
+          title: apiSubject.subject_name,
+          code: '',
+          subject: apiSubject.subject_name,
+          category: apiSubject.content_category,
+          classGrade: `Class ${apiSubject.standard_name}`,
+          status: 'Active',
+          chapters: subjectData?.chapters.length ?? 0,
+          enrollments: 0,
+          progress: 0,
+          instructor: '',
+          createdAt: '',
+          accentColor: '#5648E8',
+          icon: 'book-open',
+        }
         : undefined)
     );
   }, [courseId, subjectData?.chapters, subjectData?.subject]);
@@ -698,11 +661,6 @@ export default function ChapterListPage() {
   const [uploadError, setUploadError] = useState('');
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const [chapterForm, setChapterForm] = useState(EMPTY_CHAPTER_FORM);
-  const [resourceTitle, setResourceTitle] = useState('');
-  const [resourceMappingType, setResourceMappingType] = useState('');
-  const [resourceMappingValue, setResourceMappingValue] = useState('');
-  const [resourceFileType, setResourceFileType] = useState('');
-  const [resourceSearch, setResourceSearch] = useState('');
   const [contentSearch, setContentSearch] = useState('');
   const [contentSourceFilter, setContentSourceFilter] = useState('all');
   const [questionBankChapterFilter, setQuestionBankChapterFilter] = useState('all');
@@ -750,12 +708,19 @@ export default function ChapterListPage() {
   const [generatedQuestionPreviews, setGeneratedQuestionPreviews] = useState<GeneratedQuestionPreview[]>([]);
 
   const view = searchParams.get('view');
+  const resourceType =
+    searchParams.get('resourceType') === 'teacher' || view === 'teacher-resource' ? 'teacher' : 'classroom';
+  const normalizedView = view === 'teacher-resource' ? 'content' : view;
+  const availableUploadContentTypes =
+    resourceType === 'teacher' ? (['Presentation'] as const) : UPLOAD_CONTENT_TYPES;
+  const availableContentLibraryTabs =
+    resourceType === 'teacher'
+      ? (['All content', 'Presentations'] as const)
+      : CONTENT_LIBRARY_TABS;
   const activeChapterId = searchParams.get('chapterId') ?? '';
   const resourceChapter =
     allChapters.find((chapter) => chapter.id === activeChapterId) || allChapters[0] || null;
   const contentChapter = resourceChapter;
-  const contentChapterConcepts =
-    course && contentChapter ? getChapterKeyConcepts(course.id, contentChapter.id) : null;
 
   const activeLibraryChapter = useMemo(
     () => allChapters.find((chapter) => chapter.id === selectedLibraryChapterId) ?? contentChapter,
@@ -776,32 +741,6 @@ export default function ChapterListPage() {
     });
   }, [allChapters, searchTerm]);
 
-  const teacherResources = useMemo(
-    () =>
-      resourceChapter
-        ? buildTeacherResources(resourceChapter.title)
-        : [],
-    [resourceChapter]
-  );
-
-  const filteredTeacherResources = useMemo(() => {
-    return teacherResources.filter((resource) => {
-      const haystack = [
-        resource.title,
-        resource.file,
-        resource.type,
-        resource.mappedValues.join(' '),
-      ]
-        .join(' ')
-        .toLowerCase();
-
-      const matchesSearch = haystack.includes(resourceSearch.toLowerCase());
-      const matchesFileType = !resourceFileType || resource.type === resourceFileType;
-
-      return matchesSearch && matchesFileType;
-    });
-  }, [resourceFileType, resourceSearch, teacherResources]);
-
   const chapterContentItems = useMemo(() => {
     if (!course || !activeLibraryChapter) return [];
     const apiCategories = chapterContentCategories[activeLibraryChapter.id];
@@ -809,6 +748,17 @@ export default function ChapterListPage() {
     if (/^\d+$/.test(activeLibraryChapter.id)) return [];
     return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
   }, [activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, course]);
+
+  const visibleChapterContentItems = useMemo(() => {
+    const isTeacherTraining = (item: ChapterContentItem) =>
+      item.contentCategory.toLowerCase().includes('teacher training');
+
+    if (resourceType === 'teacher') {
+      return chapterContentItems.filter(isTeacherTraining);
+    }
+
+    return chapterContentItems.filter((item) => !isTeacherTraining(item));
+  }, [chapterContentItems, resourceType]);
 
   const contentSourceOptions = useMemo(
     () => Array.from(new Set(chapterContentItems.map((item) => item.source))),
@@ -938,7 +888,7 @@ export default function ChapterListPage() {
   }, [allChapters, contentChapter, selectedLibraryChapterId]);
 
   useEffect(() => {
-    if (view !== 'question-bank' || !activeChapterId) return;
+    if (normalizedView !== 'question-bank' || !activeChapterId) return;
     const hasMatchingChapter = allChapters.some((chapter) => chapter.id === activeChapterId);
     if (!hasMatchingChapter || questionBankChapterFilter === activeChapterId) return;
 
@@ -946,10 +896,10 @@ export default function ChapterListPage() {
       setQuestionBankChapterFilter(activeChapterId);
       setQuestionBankConceptFilter('all');
     });
-  }, [activeChapterId, allChapters, questionBankChapterFilter, view]);
+  }, [activeChapterId, allChapters, questionBankChapterFilter, normalizedView]);
 
   useEffect(() => {
-    if (view !== 'content' || !activeLibraryChapter || !/^\d+$/.test(activeLibraryChapter.id)) return;
+    if (normalizedView !== 'content' || !activeLibraryChapter || !/^\d+$/.test(activeLibraryChapter.id)) return;
     if (chapterContentCategories[activeLibraryChapter.id]) return;
 
     const requestContext = getRequestContext();
@@ -987,10 +937,10 @@ export default function ChapterListPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeLibraryChapter, chapterContentCategories, view]);
+  }, [activeLibraryChapter, chapterContentCategories, normalizedView]);
 
   const filteredChapterContentItems = useMemo(() => {
-    return chapterContentItems.filter((item) => {
+    return visibleChapterContentItems.filter((item) => {
       const matchesSearch =
         !contentSearch ||
         [item.title, item.subtitle, item.type, item.chapterTitle, item.source]
@@ -1001,7 +951,9 @@ export default function ChapterListPage() {
       const matchesTab =
         contentLibraryTab === 'All content' ||
         (contentLibraryTab === 'Presentations' &&
-          (item.type === 'Classroom presentation' || item.type === 'Teacher training presentation')) ||
+          (item.type === 'Classroom presentation' ||
+            item.type === 'Teacher training presentation' ||
+            item.contentCategory.toLowerCase().includes('teacher training'))) ||
         (contentLibraryTab === 'Videos' && item.type === 'Video') ||
         (contentLibraryTab === 'Revision notes' &&
           (item.type === 'Revision notes' || item.type === 'PDF')) ||
@@ -1009,12 +961,7 @@ export default function ChapterListPage() {
 
       return matchesSearch && matchesSource && matchesTab;
     });
-  }, [
-    chapterContentItems,
-    contentLibraryTab,
-    contentSearch,
-    contentSourceFilter,
-  ]);
+  }, [contentLibraryTab, contentSearch, contentSourceFilter, visibleChapterContentItems]);
 
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const presentationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1027,7 +974,7 @@ export default function ChapterListPage() {
     isGeneratePresentationDrawerOpen ||
     isAddQuestionBankModalOpen ||
     questionModalConcept !== null;
-  const expandedChapterId = view === 'teacher-resource' ? null : expandedChapterParam;
+  const expandedChapterId = expandedChapterParam;
 
   useEffect(() => {
     if (!isAnyModalOpen) return;
@@ -1075,6 +1022,18 @@ export default function ChapterListPage() {
       document.body.style.overflow = '';
     };
   }, [isAnyModalOpen]);
+
+  useEffect(() => {
+    if (resourceType !== 'teacher') return;
+
+    if (uploadContentType !== 'Presentation') {
+      queueMicrotask(() => setUploadContentType('Presentation'));
+    }
+
+    if (contentLibraryTab !== 'All content' && contentLibraryTab !== 'Presentations') {
+      queueMicrotask(() => setContentLibraryTab('All content'));
+    }
+  }, [contentLibraryTab, resourceType, uploadContentType]);
 
   useEffect(() => {
     return () => {
@@ -1245,9 +1204,20 @@ export default function ChapterListPage() {
     router.replace(`/course-master/${courseId}/chapters${nextQuery ? `?${nextQuery}` : ''}`);
   };
 
-  const openChapterContentView = (chapter: Chapter) => {
+  const openClassroomResourceView = (chapter: Chapter) => {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set('view', 'content');
+    nextParams.set('resourceType', 'classroom');
+    nextParams.set('chapterId', chapter.id);
+    nextParams.set('expandedChapterId', chapter.id);
+
+    router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
+  };
+
+  const openTeacherResourceView = (chapter: Chapter) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('view', 'content');
+    nextParams.set('resourceType', 'teacher');
     nextParams.set('chapterId', chapter.id);
     nextParams.set('expandedChapterId', chapter.id);
 
@@ -1339,7 +1309,7 @@ export default function ChapterListPage() {
     const conceptOptions = getQuestionBankConceptTitles(course, targetChapter);
     const targetConcept =
       effectiveQuestionBankConceptFilter !== 'all' &&
-      conceptOptions.includes(effectiveQuestionBankConceptFilter)
+        conceptOptions.includes(effectiveQuestionBankConceptFilter)
         ? effectiveQuestionBankConceptFilter
         : targetQuestion?.chapterId === targetChapter.id && conceptOptions.includes(targetQuestion.conceptTitle)
           ? targetQuestion.conceptTitle
@@ -1449,10 +1419,10 @@ export default function ChapterListPage() {
       options:
         manualQuestionType === 'MCQ'
           ? QUESTION_OPTION_LABELS.map((label) => ({
-              label,
-              text: manualQuestionOptions[label].trim(),
-              isCorrect: label === manualCorrectOption,
-            }))
+            label,
+            text: manualQuestionOptions[label].trim(),
+            isCorrect: label === manualCorrectOption,
+          }))
           : undefined,
       modelAnswer:
         manualQuestionType === 'Narrative'
@@ -1601,14 +1571,14 @@ export default function ChapterListPage() {
                 <Select
                   value={uploadContentType}
                   onValueChange={(value) =>
-                    setUploadContentType(value as (typeof UPLOAD_CONTENT_TYPES)[number])
+                    setUploadContentType(value as (typeof availableUploadContentTypes)[number])
                   }
                 >
                   <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
                     <SelectValue placeholder="Select content type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {UPLOAD_CONTENT_TYPES.map((type) => (
+                    {availableUploadContentTypes.map((type) => (
                       <SelectItem key={type} value={type}>
                         {type}
                       </SelectItem>
@@ -2354,7 +2324,7 @@ export default function ChapterListPage() {
         <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-5 py-5 sm:px-6">
           <div>
             <h2 id="generate-presentation-title" className="text-[18px] font-bold tracking-tight text-slate-950 sm:text-[20px]">
-              Generate presentation
+              Generate content
             </h2>
           </div>
           <button
@@ -2534,358 +2504,6 @@ export default function ChapterListPage() {
     );
   }
 
-  if (view === 'teacher-resource' && resourceChapter) {
-    const mappingValueOptions =
-      resourceMappingType === 'Pedagogical Process'
-        ? ['Instructor-led', 'Guided practice', 'Independent reinforcement']
-        : resourceMappingType === 'Material Type'
-          ? [...RESOURCE_MATERIAL_TYPES]
-          : ['Chapter Reinforcement', 'Concept Mastery', 'Assessment Readiness'];
-
-    return (
-      <div className="min-h-full">
-        <div className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-              <button
-                type="button"
-                onClick={() => router.push(`/course-master/${course.id}/chapters`)}
-                className="font-medium text-slate-500 transition-colors hover:text-slate-900"
-              >
-                LMS
-              </button>
-              <ChevronRight size={14} className="text-slate-400" />
-              <span className="font-medium text-slate-500">{course.subject}</span>
-              <ChevronRight size={14} className="text-slate-400" />
-              <span className="font-medium text-slate-500">{resourceChapter.title}</span>
-              <ChevronRight size={14} className="text-slate-400" />
-              <span className="font-semibold text-blue-600">Teacher Resources</span>
-            </div>
-
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">
-                  <Sparkles size={13} />
-                  Resource Studio
-                </div>
-                <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">Teacher Resources</h1>
-                <p className="mt-2 text-slate-600">
-                  Curate supporting assets for <span className="font-semibold text-slate-900">{resourceChapter.title}</span> with a cleaner upload flow and a professional resource library.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push(`/course-master/${course.id}/chapters`)}
-                  className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700"
-                >
-                  <ArrowLeft size={16} className="mr-2" />
-                  Back to Chapters
-                </Button>
-                <Button
-                  type="button"
-                  className="h-11 rounded-2xl bg-slate-900 px-5 font-semibold text-white shadow-lg shadow-slate-900/15 hover:bg-slate-800"
-                >
-                  <Download size={16} className="mr-2" />
-                  Export List
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-3xl border border-slate-200/70 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                  <GraduationCap size={20} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Teacher Assets</p>
-                  <p className="mt-1 text-2xl font-bold text-slate-900">{resourceChapter.resources.teacherResource}</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-3xl border border-slate-200/70 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                  <Link2 size={20} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Mapped Values</p>
-                  <p className="mt-1 text-2xl font-bold text-slate-900">{filteredTeacherResources.length * 2}</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-3xl border border-slate-200/70 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Active Files</p>
-                  <p className="mt-1 text-2xl font-bold text-slate-900">{teacherResources.length}</p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-3xl border border-slate-200/70 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
-                  <Upload size={20} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Chapter Code</p>
-                  <p className="mt-1 text-lg font-bold text-slate-900">{course.code}-{resourceChapter.number}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-8 rounded-[28px] border border-slate-200/70 bg-white shadow-sm">
-            <div className="border-b border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.05),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] px-6 py-5 sm:px-8">
-              <h2 className="text-xl font-bold text-slate-900">Add Teacher Resource</h2>
-              <p className="mt-1 text-sm text-slate-500">Upload files, tag them to the right pedagogy, and keep instructor materials easy to discover.</p>
-            </div>
-
-            <div className="grid gap-8 px-6 py-6 sm:px-8 xl:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="resource-title" className="text-sm font-medium text-slate-700">
-                    Title
-                  </Label>
-                  <Input
-                    id="resource-title"
-                    value={resourceTitle}
-                    onChange={(event) => setResourceTitle(event.target.value)}
-                    placeholder="Enter resource title"
-                    className="h-12 rounded-2xl border-slate-200 bg-slate-50/70 px-4 text-slate-900 focus-visible:bg-white"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="resource-file" className="text-sm font-medium text-slate-700">
-                    Resource File
-                  </Label>
-                  <div className="flex h-12 items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 transition hover:border-blue-300 hover:bg-white">
-                    <input
-                      id="resource-file"
-                      type="file"
-                      className="w-full text-sm text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-700"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700">Mapping Type</Label>
-                  <Select value={resourceMappingType} onValueChange={(val) => setResourceMappingType(val ?? '')}>
-                    <SelectTrigger variant="soft" size="lg">
-                      <SelectValue placeholder="Select mapping type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RESOURCE_MAPPING_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700">Mapping Value</Label>
-                  <Select value={resourceMappingValue} onValueChange={(val) => setResourceMappingValue(val ?? '')}>
-                    <SelectTrigger variant="soft" size="lg">
-                      <SelectValue placeholder="Select mapping value" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mappingValueOptions.map((value) => (
-                        <SelectItem key={value} value={value}>
-                          {value}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="md:col-span-2 flex flex-wrap items-center gap-3 pt-2">
-                  <Button
-                    type="button"
-                    className="h-11 rounded-2xl bg-cyan-500 px-5 font-semibold text-white shadow-lg shadow-cyan-500/20 hover:bg-cyan-600"
-                  >
-                    <Plus size={16} className="mr-2" />
-                    Save Resource
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700"
-                  >
-                    Save and Add Another
-                  </Button>
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-slate-200/70 bg-slate-50/70 p-5">
-                <h3 className="text-base font-semibold text-slate-900">Chapter Mapping Summary</h3>
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Chapter</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">{resourceChapter.title}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Recommended Focus</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {['Mindmap', 'Reference Notes', 'Assessment Aid'].map((method) => (
-                        <Badge key={method} className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                          {method}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Teacher Resource Target</p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Aim to keep at least {resourceChapter.resources.teacherResource} curated assets available for instructors in this chapter.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-slate-200/70 bg-white shadow-sm">
-            <div className="flex flex-col gap-4 border-b border-slate-200/80 px-6 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Resource Library</h2>
-                <p className="mt-1 text-sm text-slate-500">Review uploaded files, mapped values, and quick actions for this chapter.</p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                {['PDF', 'CSV', 'Excel', 'Print'].map((action) => (
-                  <Button
-                    key={action}
-                    type="button"
-                    variant="outline"
-                    className="h-10 rounded-xl border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
-                  >
-                    {action}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4 px-6 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative w-full max-w-md">
-                <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <Input
-                  value={resourceSearch}
-                  onChange={(event) => setResourceSearch(event.target.value)}
-                  placeholder="Search title, file, type, or mapped values"
-                  className="h-11 rounded-2xl border-slate-200 bg-slate-50/70 pl-11 text-slate-900 focus-visible:bg-white"
-                />
-              </div>
-
-              <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto">
-                <Select value={resourceFileType} onValueChange={(val) => setResourceFileType(val ?? '')}>
-                  <SelectTrigger variant="soft" className="min-w-[180px]">
-                    <SelectValue placeholder="Filter by file type" />
-                  </SelectTrigger>
-                  <SelectContent align="end">
-                    {RESOURCE_FILE_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setResourceSearch('');
-                    setResourceFileType('');
-                  }}
-                  className="h-10 rounded-xl border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
-                    <TableHead className="min-w-[80px] font-semibold text-slate-700">Sr No</TableHead>
-                    <TableHead className="min-w-[240px] font-semibold text-slate-700">Chapter Name</TableHead>
-                    <TableHead className="min-w-[180px] font-semibold text-slate-700">Title</TableHead>
-                    <TableHead className="min-w-[180px] font-semibold text-slate-700">File</TableHead>
-                    <TableHead className="min-w-[300px] font-semibold text-slate-700">Mapped Values</TableHead>
-                    <TableHead className="min-w-[140px] font-semibold text-slate-700">Updated</TableHead>
-                    <TableHead className="min-w-[130px] text-right font-semibold text-slate-700">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTeacherResources.map((resource, index) => (
-                    <TableRow key={resource.id} className="hover:bg-slate-50/60">
-                      <TableCell className="font-medium text-slate-800">{index + 1}</TableCell>
-                      <TableCell className="font-medium text-slate-900">{resourceChapter.title}</TableCell>
-                      <TableCell className="text-slate-700">{resource.title}</TableCell>
-                      <TableCell>
-                        <button
-                          type="button"
-                          className="font-medium text-blue-600 transition-colors hover:text-blue-700"
-                        >
-                          View {resource.file}
-                        </button>
-                        <div className="mt-1 text-xs text-slate-400">{resource.type}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {resource.mappedValues.map((value) => (
-                            <Badge
-                              key={value}
-                              className={cn(
-                                'rounded-full border px-3 py-1 text-xs font-semibold',
-                                value.startsWith('Pedagogical Process')
-                                  ? 'border-cyan-100 bg-cyan-50 text-cyan-700'
-                                  : 'border-slate-200 bg-slate-100 text-slate-700'
-                              )}
-                            >
-                              {value}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-slate-600">{resource.updatedAt}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (view === 'question-bank') {
     const questionCountLabel = `${filteredQuestionBankItems.length} of ${questionBankItems.length} questions`;
 
@@ -2936,7 +2554,7 @@ export default function ChapterListPage() {
                     {questionBankChapterFilter === 'all'
                       ? 'All Chapters'
                       : questionBankChapterOptions.find((chapter) => chapter.id === questionBankChapterFilter)
-                          ?.title ?? 'All Chapters'}
+                        ?.title ?? 'All Chapters'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -2958,7 +2576,7 @@ export default function ChapterListPage() {
                     {effectiveQuestionBankConceptFilter === 'all'
                       ? 'All Concepts'
                       : questionBankConceptOptions.find((concept) => concept === effectiveQuestionBankConceptFilter)
-                          ?? 'All Concepts'}
+                      ?? 'All Concepts'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -3041,8 +2659,12 @@ export default function ChapterListPage() {
     );
   }
 
-  if (view === 'content' && contentChapter) {
+  if (normalizedView === 'content' && contentChapter) {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
+    const resourceLabel = resourceType === 'teacher' ? 'Teacher Resources' : 'Classroom Resources';
+    const resourceSummary = resourceType === 'teacher'
+      ? 'teacher resource library'
+      : 'classroom resource library';
     const totalItems = chapterContentItems.length;
     const gammaItems = chapterContentItems.filter((item) => item.source === 'Gamma AI').length;
     const uploadedItems = chapterContentItems.filter((item) => item.source === 'Uploaded').length;
@@ -3066,39 +2688,43 @@ export default function ChapterListPage() {
                 {course.subject} - {gradeLabel}
               </span>
               <ChevronRight size={14} className="text-slate-400" />
-              <span className="font-semibold text-[#4f46e5]">Content</span>
+              <span className="font-semibold text-[#4f46e5]">{resourceLabel}</span>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl">
                 <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                  Content - {course.subject} - {gradeLabel}
+                  {resourceLabel} - {course.subject} - {gradeLabel}
                 </h1>
                 <p className="mt-2 text-slate-600">
-                  Generate presentations with AI, upload videos, notes and PDFs, and manage the content library for{' '}
+                  {resourceType === 'teacher'
+                    ? `Generate presentations with AI, upload videos, notes and PDFs, and manage the ${resourceSummary} for `
+                    : `View and manage the ${resourceSummary} for `}{' '}
                   <span className="font-semibold text-slate-900">{activeChapterTitle}</span>.
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  onClick={openGeneratePresentationDrawer}
-                  className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
-                >
-                  <Sparkles size={16} className="mr-2" />
-                  Generate presentation
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
-                  className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                >
-                  <Upload size={16} className="mr-2" />
-                  Upload content
-                </Button>
-              </div>
+              {resourceType === 'teacher' ? (
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    type="button"
+                    onClick={openGeneratePresentationDrawer}
+                    className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
+                  >
+                    <Sparkles size={16} className="mr-2" />
+                    Generate content
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
+                    className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    <Upload size={16} className="mr-2" />
+                    Upload content
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -3140,11 +2766,10 @@ export default function ChapterListPage() {
                       key={option}
                       type="button"
                       onClick={() => setContentGroupBy(option)}
-                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                        contentGroupBy === option
+                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${contentGroupBy === option
                           ? 'bg-white text-[#4f46e5] shadow-sm'
                           : 'text-slate-500 hover:text-slate-900'
-                      }`}
+                        }`}
                     >
                       {option}
                     </button>
@@ -3192,16 +2817,15 @@ export default function ChapterListPage() {
 
           <div className="mb-4 border-b border-slate-200/80">
             <div className="flex flex-wrap items-center gap-6 text-[15px]">
-              {CONTENT_LIBRARY_TABS.map((tab) => (
+              {availableContentLibraryTabs.map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setContentLibraryTab(tab)}
-                  className={`inline-flex items-center border-b-2 px-1 py-3 font-medium transition-colors ${
-                    contentLibraryTab === tab
+                  className={`inline-flex items-center border-b-2 px-1 py-3 font-medium transition-colors ${contentLibraryTab === tab
                       ? 'border-[#4f46e5] text-[#4f46e5]'
                       : 'border-transparent text-slate-500 hover:text-slate-900'
-                  }`}
+                    }`}
                 >
                   {tab}
                 </button>
@@ -3254,64 +2878,62 @@ export default function ChapterListPage() {
               No content is available for this chapter.
             </div>
           ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {filteredChapterContentItems.map((item) => {
-              const PreviewIcon = getContentPreviewIcon(item.preview);
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {filteredChapterContentItems.map((item) => {
+                const PreviewIcon = getContentPreviewIcon(item.preview);
 
-              return (
-                <article
-                  key={item.id}
-                  className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
-                >
-                  <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
-                    <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
-                      {item.type}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                      {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
-                      {item.source}
-                    </span>
-                  </div>
-
-                  <div className="-mt-[74px] flex justify-center px-4">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
-                      <PreviewIcon size={28} />
+                return (
+                  <article
+                    key={item.id}
+                    className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
+                  >
+                    <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
+                      <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
+                        {truncateToWords(item.subtitle, 150)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                        {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
+                        {item.source}
+                      </span>
                     </div>
-                  </div>
 
-                  <div className="px-4 pb-4 pt-3">
-                    <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
-                      {item.chapterTitle}
+                    <div className="-mt-[74px] flex justify-center px-4">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
+                        <PreviewIcon size={28} />
+                      </div>
                     </div>
-                     <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-                     <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-600">{truncateToWords(item.subtitle, 150)}</p>
 
-                    <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
-                      <p className="text-xs text-slate-500">
-                        {item.statValue} - {item.updatedAt}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleOpenContent(item);
-                        }}
-                        className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
-                      >
-                        {item.actionLabel === 'Play' ? (
-                          <Play size={14} className="mr-2" />
-                        ) : (
-                          <Eye size={14} className="mr-2" />
-                        )}
-                        {item.actionLabel}
-                      </Button>
+                    <div className="px-4 pb-4 pt-3">
+                      <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
+                        {item.chapterTitle}
+                      </div>
+                      <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
+                      {/* <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-600">{truncateToWords(item.subtitle, 150)}</p> */}
+
+                      <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
+                      
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleOpenContent(item);
+                          }}
+                          className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
+                        >
+                          {item.actionLabel === 'Play' ? (
+                            <Play size={14} className="mr-2" />
+                          ) : (
+                            <Eye size={14} className="mr-2" />
+                          )}
+                          {item.actionLabel}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                  </article>
+                );
+              })}
+            </div>
           )}
 
           <div
@@ -3361,93 +2983,93 @@ export default function ChapterListPage() {
 
                       return (
                         <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
-                        {selectedContentItem.type}
-                      </Badge>
-                      <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
-                        {selectedContentItem.source === 'Gamma AI' ? (
-                          <Sparkles size={12} className="mr-1.5" />
-                        ) : (
-                          <Upload size={12} className="mr-1.5" />
-                        )}
-                        {selectedContentItem.source}
-                      </Badge>
-                    </div>
-
-                    {selectedContentItem.subtitle ? (
-                      <p className="mt-4 text-sm leading-7 text-slate-600">{selectedContentItem.subtitle}</p>
-                    ) : null}
-
-                    <dl className="mt-6 grid gap-y-4 text-sm sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-5">
-                      <dt className="text-slate-500">Chapter</dt>
-                      <dd className="font-medium text-slate-900">{selectedContentItem.chapterTitle}</dd>
-                      <dt className="text-slate-500">Concept</dt>
-                      <dd className="font-medium text-slate-900">{selectedContentItem.conceptTitle}</dd>
-                      <dt className="text-slate-500">Format</dt>
-                      <dd className="font-medium text-slate-900">{selectedContentItem.type}</dd>
-                      <dt className="text-slate-500">Source</dt>
-                      <dd className="font-medium text-slate-900">{selectedContentItem.source}</dd>
-                      <dt className="text-slate-500">{isVideoContent ? 'Duration' : 'Slides'}</dt>
-                      <dd className="font-medium text-slate-900">
-                        {isVideoContent ? selectedContentItem.statValue : selectedContentItem.slideCount}
-                      </dd>
-                      <dt className="text-slate-500">Updated</dt>
-                      <dd className="font-medium text-slate-900">{selectedContentItem.updatedDate}</dd>
-                    </dl>
-
-                    {selectedContentItem.contentUrl ? (
-                      <a
-                        href={selectedContentItem.contentUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-6 inline-flex h-10 items-center rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#4338ca]"
-                      >
-                        {isVideoContent ? 'Play content' : 'Open content'}
-                      </a>
-                    ) : null}
-
-                    {isVideoContent ? (
-                      <section className="mt-8">
-                        <div className="rounded-2xl border border-[#d9e3f1] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] px-6 py-12 shadow-[0_2px_10px_rgba(15,23,42,0.03)]">
-                          <div className="flex flex-col items-center justify-center text-center">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#c9d7f2] bg-white text-slate-500 shadow-sm">
-                              <Play size={24} className="ml-0.5 text-slate-500" />
-                            </div>
-                            <p className="mt-4 text-sm font-medium text-slate-500">
-                              Video preview placeholder - {selectedContentItem.statValue}
-                            </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
+                              {selectedContentItem.type}
+                            </Badge>
+                            <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
+                              {selectedContentItem.source === 'Gamma AI' ? (
+                                <Sparkles size={12} className="mr-1.5" />
+                              ) : (
+                                <Upload size={12} className="mr-1.5" />
+                              )}
+                              {selectedContentItem.source}
+                            </Badge>
                           </div>
-                        </div>
-                      </section>
-                    ) : (
-                      <section className="mt-8">
-                        <div className="mb-4 border-b border-slate-200/80 pb-3">
-                          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Slides</h3>
-                        </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {selectedContentItem.slides.map((slide) => (
-                            <article
-                              key={slide.id}
-                              className="rounded-xl border border-[#d9e3f1] bg-white p-3 shadow-[0_2px_10px_rgba(15,23,42,0.03)]"
+                          {selectedContentItem.subtitle ? (
+                            <p className="mt-4 text-sm leading-7 text-slate-600">{selectedContentItem.subtitle}</p>
+                          ) : null}
+
+                          <dl className="mt-6 grid gap-y-4 text-sm sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-5">
+                            <dt className="text-slate-500">Chapter</dt>
+                            <dd className="font-medium text-slate-900">{selectedContentItem.chapterTitle}</dd>
+                            <dt className="text-slate-500">Concept</dt>
+                            <dd className="font-medium text-slate-900">{selectedContentItem.conceptTitle}</dd>
+                            <dt className="text-slate-500">Format</dt>
+                            <dd className="font-medium text-slate-900">{selectedContentItem.type}</dd>
+                            <dt className="text-slate-500">Source</dt>
+                            <dd className="font-medium text-slate-900">{selectedContentItem.source}</dd>
+                            <dt className="text-slate-500">{isVideoContent ? 'Duration' : 'Slides'}</dt>
+                            <dd className="font-medium text-slate-900">
+                              {isVideoContent ? selectedContentItem.statValue : selectedContentItem.slideCount}
+                            </dd>
+                            <dt className="text-slate-500">Updated</dt>
+                            <dd className="font-medium text-slate-900">{selectedContentItem.updatedDate}</dd>
+                          </dl>
+
+                          {selectedContentItem.contentUrl ? (
+                            <a
+                              href={selectedContentItem.contentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-6 inline-flex h-10 items-center rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#4338ca]"
                             >
-                              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                                Slide {slide.number}
-                              </p>
-                              <h4 className="mt-2 min-h-[40px] text-[13px] font-semibold leading-5 text-slate-900">
-                                {slide.title}
-                              </h4>
-                              <div className="mt-6 space-y-2">
-                                <div className="h-1.5 w-full rounded-full bg-slate-100" />
-                                <div className="h-1.5 w-[78%] rounded-full bg-slate-100" />
-                                <div className="h-1.5 w-[56%] rounded-full bg-slate-100" />
+                              {isVideoContent ? 'Play content' : 'Open content'}
+                            </a>
+                          ) : null}
+
+                          {isVideoContent ? (
+                            <section className="mt-8">
+                              <div className="rounded-2xl border border-[#d9e3f1] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] px-6 py-12 shadow-[0_2px_10px_rgba(15,23,42,0.03)]">
+                                <div className="flex flex-col items-center justify-center text-center">
+                                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#c9d7f2] bg-white text-slate-500 shadow-sm">
+                                    <Play size={24} className="ml-0.5 text-slate-500" />
+                                  </div>
+                                  <p className="mt-4 text-sm font-medium text-slate-500">
+                                    Video preview placeholder - {selectedContentItem.statValue}
+                                  </p>
+                                </div>
                               </div>
-                            </article>
-                          ))}
-                        </div>
-                      </section>
-                    )}
+                            </section>
+                          ) : (
+                            <section className="mt-8">
+                              <div className="mb-4 border-b border-slate-200/80 pb-3">
+                                <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Slides</h3>
+                              </div>
+
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                {selectedContentItem.slides.map((slide) => (
+                                  <article
+                                    key={slide.id}
+                                    className="rounded-xl border border-[#d9e3f1] bg-white p-3 shadow-[0_2px_10px_rgba(15,23,42,0.03)]"
+                                  >
+                                    <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                                      Slide {slide.number}
+                                    </p>
+                                    <h4 className="mt-2 min-h-[40px] text-[13px] font-semibold leading-5 text-slate-900">
+                                      {slide.title}
+                                    </h4>
+                                    <div className="mt-6 space-y-2">
+                                      <div className="h-1.5 w-full rounded-full bg-slate-100" />
+                                      <div className="h-1.5 w-[78%] rounded-full bg-slate-100" />
+                                      <div className="h-1.5 w-[56%] rounded-full bg-slate-100" />
+                                    </div>
+                                  </article>
+                                ))}
+                              </div>
+                            </section>
+                          )}
                         </>
                       );
                     })()}
@@ -3519,7 +3141,7 @@ export default function ChapterListPage() {
             </div>
             <div>
               <h1 className="text-[22px] font-bold tracking-tight text-slate-950">
-                {course.subject} - {getCourseGradeLabel(course.classGrade)} 
+                {course.subject} - {getCourseGradeLabel(course.classGrade)}
               </h1>
               <p className="mt-1 text-[15px] text-slate-600">
                 {allChapters.length} chapters -{' '}
@@ -3621,11 +3243,20 @@ export default function ChapterListPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => openChapterContentView(chapter)}
+                      onClick={() => openClassroomResourceView(chapter)}
                       className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                     >
                       <FolderOpen size={16} className="mr-2" />
-                      Content
+                      Classroom Resource
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => openTeacherResourceView(chapter)}
+                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                    >
+                      <GraduationCap size={16} className="mr-2" />
+                      Teacher Resource
                     </Button>
                     <Button
                       type="button"

@@ -665,7 +665,7 @@ ${groundTruthContent}`;
         <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-5 py-5 sm:px-6">
           <div>
             <h2 id="generate-presentation-title" className="text-[18px] font-bold tracking-tight text-slate-950 sm:text-[20px]">
-              Generate presentation
+              Generate content
             </h2>
           </div>
           <button
@@ -692,14 +692,14 @@ ${groundTruthContent}`;
 
           <div className="mt-6 rounded-2xl bg-slate-100/90 p-1">
             <div className="grid grid-cols-2 gap-1">
-              {(['Classroom', 'Teacher training'] as const).map((mode) => (
+              {(['Classroom resource', 'Teacher resource'] as const).map((mode) => (
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => setPresentationMode(mode)}
+                  onClick={() => setContentGenerationMode(mode)}
                   className={cn(
                     'rounded-xl px-4 py-3 text-left text-[15px] font-semibold transition-colors',
-                    presentationMode === mode
+                    contentTypeMode === mode
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   )}
