@@ -66,14 +66,10 @@ export async function POST(request: NextRequest) {
   }
 
   const base = API_BASE_URL.replace(/\/$/, '');
-  const upstreamParams = new URLSearchParams(request.nextUrl.searchParams);
-  upstreamParams.delete('path');
-  const queryString = upstreamParams.toString();
-  const url = `${base}/${targetPath.replace(/^\//, '')}${queryString ? `?${queryString}` : ''}`;
+  const url = `${base}/${resolveTargetPath(targetPath)}`;
 
   const contentType = request.headers.get('content-type') || '';
-  const isMultipart = contentType.toLowerCase().includes('multipart/form-data');
-  const body = isMultipart ? await request.formData() : await request.text();
+  const body = await request.text();
   const authorization = request.headers.get('authorization');
   const cookie = request.headers.get('cookie');
 
@@ -81,12 +77,12 @@ export async function POST(request: NextRequest) {
     const upstream = await fetch(url, {
       method: 'POST',
       headers: {
-        ...(!isMultipart && contentType ? { 'Content-Type': contentType } : {}),
+        ...(contentType ? { 'Content-Type': contentType } : {}),
         Accept: 'application/json',
         ...(authorization ? { Authorization: authorization } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
       },
-      body: isMultipart ? body : body || undefined,
+      body: body || undefined,
       cache: 'no-store',
     });
 

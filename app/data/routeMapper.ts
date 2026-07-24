@@ -96,58 +96,6 @@ const RESULT_ROUTE_NAME_MAP: Record<string, string> = {
   'transportation/van_wise_report': '/Transportation/van_wise_report',
   'van_wise_students_detail_report.index': '/Transportation/van_summery_report',
   'transportation/van_wise_students_detail_report': '/Transportation/van_summery_report',
-  'templatemaster.index': '/general/template_management',
-  'settings/templatemaster': '/general/template_management',
-  'formbuild.list': '/general/form_builder',
-  'formbuilder/list': '/general/form_builder',
-  'add_user_profile.index': '/general/user_profile_masters',
-  'user/add_user_profile': '/general/user_profile_masters',
-  'add_implementation.index': '/general/implementation_management',
-  'implementation/add_implementation': '/general/implementation_management',
-  'bulk_chapter_upload.index': '/general/bulk_upload',
-  'lms/bulk_chapter_upload': '/general/bulk_upload',
-  'add_requisition.index': '/Inventory/requisition_form',
-  'inventory/add_requisition': '/Inventory/requisition_form',
-  'requisition_approved.index': '/Inventory/requisition_form_approved',
-  'inventory/requisition_approved': '/Inventory/requisition_form_approved',
-  'add_inventory_item_quotation.index': '/Inventory/item_quotation',
-  'inventory/add_inventory_item_quotation': '/Inventory/item_quotation',
-  'add_inventory_generate_po.index': '/Inventory/generate_po',
-  'inventory/add_inventory_generate_po': '/Inventory/generate_po',
-  'add_inventory_negotiate_po.index': '/Inventory/negotiate_po',
-  'inventory/add_inventory_negotiate_po': '/Inventory/negotiate_po',
-  'show_inventory_item_receivable.index': '/Inventory/item_receivable',
-  'inventory/show_inventory_item_receivable': '/Inventory/item_receivable',
-  'show_inventory_item_allocation.index': '/Inventory/inventory_allocation',
-  'inventory/show_inventory_item_allocation': '/Inventory/inventory_allocation',
-  'show_inventory_item_return.index': '/Inventory/inventory_return',
-  'inventory/show_inventory_item_return': '/Inventory/inventory_return',
-  'add_inventory_item_defective.index': '/Inventory/inventory_defective',
-  'inventory/add_inventory_item_defective': '/Inventory/inventory_defective',
-  'add_inventory_master_setup.index': '/Inventory/inventory_master_setup',
-  'inventory/add_inventory_master_setup': '/Inventory/inventory_master_setup',
-  'add_inventory_item_category_master.index': '/Inventory/item_category_master',
-  'inventory/add_inventory_item_category_master': '/Inventory/item_category_master',
-  'add_inventory_item_sub_category_master.index': '/Inventory/item_sub_category_master',
-  'inventory/add_inventory_item_sub_category_master': '/Inventory/item_sub_category_master',
-  'add_inventory_item.index': '/Inventory/inventory_item_master',
-  'inventory/add_inventory_item': '/Inventory/inventory_item_master',
-  'add_inventory_item_tax_master.index': '/Inventory/tax_master',
-  'inventory/add_inventory_item_tax_master': '/Inventory/tax_master',
-  'add_inventory_vendor_master.index': '/Inventory/vendor_master',
-  'inventory/add_inventory_vendor_master': '/Inventory/vendor_master',
-  'inventory_staff_wise_report.index': '/Inventory/staff_wise_report',
-  'inventory/inventory_staff_wise_report': '/Inventory/staff_wise_report',
-  'inventory_delivery_status_report.index': '/Inventory/item_delivery_status_report',
-  'inventory/inventory_delivery_status_report': '/Inventory/item_delivery_status_report',
-  'add_item_direct_purchase.index': '/Inventory/item_direct_purchase',
-  'inventory/add_item_direct_purchase': '/Inventory/item_direct_purchase',
-  'inventory_requisition_report.index': '/Inventory/requisition_report',
-  'inventory/inventory_requisition_report': '/Inventory/requisition_report',
-  'inventory_item_wise_report.index': '/Inventory/item_wise_report',
-  'inventory/inventory_item_wise_report': '/Inventory/item_wise_report',
-  'inventory_overall_item_report.index': '/Inventory/overall_item_report',
-  'inventory/inventory_overall_item_report': '/Inventory/overall_item_report',
 };
 
 /**
@@ -163,21 +111,6 @@ const H5P_ROUTE_NAME_MAP: Record<string, string> = {
   'h5p_mcq.index': '/h5p/h5p_mcq',
   'h5p_interactive_video.index': '/h5p/h5p_interactive_video',
   'h5p_flashacard.index': '/h5p/h5p_flashacard',
-};
-
-/**
- * LMS → PAL (Personalized Adaptive Learning): legacy Laravel route names /
- * paths → Next.js routes under /pal. The PAL (ENTRY) and PAL Report (REPORT)
- * menu rows live in the shared backend menu; these map their links to the new
- * frontend screens. Keys must be lowercase (lookups are lowercased).
- */
-const PAL_ROUTE_NAME_MAP: Record<string, string> = {
-  'pal.index': '/pal',
-  'lms/pal': '/pal',
-  'palreport.index': '/pal/report',
-  'lms/palreport': '/pal/report',
-  'result_personalize_marks.index': '/pal/personalize-marks',
-  'result_personalize_marks/index': '/pal/personalize-marks',
 };
 
 export function mapApiLinkToRoute(link: string | null | undefined): string {
@@ -203,12 +136,6 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const h5pRoute = H5P_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (h5pRoute) {
     return h5pRoute;
-  }
-
-  // LMS → PAL: legacy Laravel route-name / path links → Next routes.
-  const palRoute = PAL_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
-  if (palRoute) {
-    return palRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
@@ -249,127 +176,6 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     cleanLink.toLowerCase() === 'result/marks_entry/index'
   ) {
     return '/exam/marks-entry';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'daywise_student_attendance' ||
-    cleanLink.toLowerCase() === 'show_daywise_student_attendance' ||
-    cleanLink.toLowerCase() === 'show_daywise_student_attendance_report' ||
-    cleanLink.toLowerCase() === 'daywise_student_attendance_report' ||
-    cleanLink.toLowerCase() === 'student/daywise_student_attendance' ||
-    cleanLink.toLowerCase() === 'student/daywise_student_attendance/index'
-  ) {
-    return '/student/daywise_student_attendance';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'monthwise_student_attendance' ||
-    cleanLink.toLowerCase() === 'show_monthwise_student_attendance' ||
-    cleanLink.toLowerCase() === 'show_monthwise_student_attendance_report' ||
-    cleanLink.toLowerCase() === 'monthwise_student_attendance_report' ||
-    cleanLink.toLowerCase() === 'student/monthwise_student_attendance' ||
-    cleanLink.toLowerCase() === 'student/monthwise_student_attendance/index'
-  ) {
-    return '/student/monthwise_student_attendance';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'yearly_student_attendance' ||
-    cleanLink.toLowerCase() === 'show_yearly_student_attendance' ||
-    cleanLink.toLowerCase() === 'student/yearly_student_attendance' ||
-    cleanLink.toLowerCase() === 'student/yearly_student_attendance/index'
-  ) {
-    return '/student/yearly_student_attendance';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'student_attendance' ||
-    cleanLink.toLowerCase() === 'show_student_attendance' ||
-    cleanLink.toLowerCase() === 'save_student_attendance' ||
-    cleanLink.toLowerCase() === 'student/student_attendance' ||
-    cleanLink.toLowerCase() === 'student/student_attendance/index'
-  ) {
-    return '/student/student_attendance';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'lms_teacherresource.index' ||
-    cleanLink.toLowerCase() === 'lms/lms_teacherresource' ||
-    cleanLink.toLowerCase() === 'lms/lms_teacherresource/index'
-  ) {
-    return '/library/book_resources';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'scan_books.index' ||
-    cleanLink.toLowerCase() === 'scan_books' ||
-    cleanLink.toLowerCase() === 'scan_books/index'
-  ) {
-    return '/library/scan_book';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'scan_books_remarks.index' ||
-    cleanLink.toLowerCase() === 'scan_books_remarks' ||
-    cleanLink.toLowerCase() === 'scan_books_remarks/index'
-  ) {
-    return '/library/add_book_remark';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'quick_return.index' ||
-    cleanLink.toLowerCase() === 'quick_return' ||
-    cleanLink.toLowerCase() === 'quick_return/index'
-  ) {
-    return '/library/quick_return';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'library_report.index' ||
-    cleanLink.toLowerCase() === 'library_report' ||
-    cleanLink.toLowerCase() === 'library_report/index'
-  ) {
-    return '/library/report';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'book_issue_report.index' ||
-    cleanLink.toLowerCase() === 'book_issue_report' ||
-    cleanLink.toLowerCase() === 'book_issue_report/index'
-  ) {
-    return '/library/issue_overdue_report';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'print_barcode.index' ||
-    cleanLink.toLowerCase() === 'print_barcode' ||
-    cleanLink.toLowerCase() === 'print_barcode/index'
-  ) {
-    return '/library/print_barcode';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'verified_report.index' ||
-    cleanLink.toLowerCase() === 'verified_book_report' ||
-    cleanLink.toLowerCase() === 'verified_book_report/index'
-  ) {
-    return '/library/scanned_book_report';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'verifiypending_report.index' ||
-    cleanLink.toLowerCase() === 'verified_book_report_pending' ||
-    cleanLink.toLowerCase() === 'verified_book_report_pending/index'
-  ) {
-    return '/library/pending_scan_report';
-  }
-
-  if (
-    cleanLink.toLowerCase() === 'lost_and_damage.index' ||
-    cleanLink.toLowerCase() === 'lost_and_damage' ||
-    cleanLink.toLowerCase() === 'lost_and_damage/index'
-  ) {
-    return '/library/lost_damage_report';
   }
   
   if (!cleanLink) return '#';
