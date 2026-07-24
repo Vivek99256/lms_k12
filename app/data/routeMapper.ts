@@ -62,6 +62,18 @@ const RESULT_ROUTE_NAME_MAP: Record<string, string> = {
   'todays_proxy_report.index': '/todays_proxy_report',
   'user_log.index': '/user_log',
   'teacher_daily_report.index': '/teacher_daily_report',
+  'std_div_map.index': '/academic_setup/standard_division_mapping',
+  'school_setup/std_div_map': '/academic_setup/standard_division_mapping',
+  'sub_std_map.index': '/academic_setup/subject_standard_mapping',
+  'school_setup/sub_std_map': '/academic_setup/subject_standard_mapping',
+  'period_master.index': '/academic_setup/create_periods',
+  'school_setup/period_master': '/academic_setup/create_periods',
+  'batch_master.index': '/academic_setup/create_batch',
+  'school_setup/batch_master': '/academic_setup/create_batch',
+  'division_capacity_master.index': '/academic_setup/division_capacity_mapping',
+  'school_setup/division_capacity_master': '/academic_setup/division_capacity_mapping',
+  'subject_master.index': '/academic_setup/create_subject',
+  'school_setup/subject_master': '/academic_setup/create_subject',
 };
 
 /**
