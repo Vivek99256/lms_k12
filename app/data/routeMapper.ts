@@ -53,6 +53,74 @@ const RESULT_ROUTE_NAME_MAP: Record<string, string> = {
   'cbse_result_t2.index': '/result/cbse_result_t2',
   'cbse_11_result.index': '/result/cbse_11_result',
   'cnse_11_result.index': '/result/cnse_11_result',
+  'add_user': '/user/add_user',
+  'add_user.index': '/user/add_user',
+  'add_user.create': '/user/add_user',
+  'proxy_report.index': '/proxy_report',
+  'classteacherreport.index': '/classteacherReport',
+  'classteacherreport.create': '/classteacherReport',
+  'todays_proxy_report.index': '/todays_proxy_report',
+  'user_log.index': '/user_log',
+  'teacher_daily_report.index': '/teacher_daily_report',
+  'std_div_map.index': '/academic_setup/standard_division_mapping',
+  'school_setup/std_div_map': '/academic_setup/standard_division_mapping',
+  'sub_std_map.index': '/academic_setup/subject_standard_mapping',
+  'school_setup/sub_std_map': '/academic_setup/subject_standard_mapping',
+  'period_master.index': '/academic_setup/create_periods',
+  'school_setup/period_master': '/academic_setup/create_periods',
+  'batch_master.index': '/academic_setup/create_batch',
+  'school_setup/batch_master': '/academic_setup/create_batch',
+  'division_capacity_master.index': '/academic_setup/division_capacity_mapping',
+  'school_setup/division_capacity_master': '/academic_setup/division_capacity_mapping',
+  'subject_master.index': '/academic_setup/create_subject',
+  'school_setup/subject_master': '/academic_setup/create_subject',
+  'map_student.index': '/Transportation/student_transport_mapping',
+  'transportation/map_student': '/Transportation/student_transport_mapping',
+  'add_driver.index': '/Transportation/add_driver_conductor',
+  'transportation/add_driver': '/Transportation/add_driver_conductor',
+  'add_vehicle.index': '/Transportation/add_vehicle',
+  'transportation/add_vehicle': '/Transportation/add_vehicle',
+  'add_route.index': '/Transportation/add_route',
+  'transportation/add_route': '/Transportation/add_route',
+  'add_stop.index': '/Transportation/add_stop',
+  'transportation/add_stop': '/Transportation/add_stop',
+  'transport_rate.index': '/Transportation/add_transport_rate',
+  'transportation/transport_rate': '/Transportation/add_transport_rate',
+  'map_route_bus.index': '/Transportation/map_route_bus',
+  'transportation/map_route_bus': '/Transportation/map_route_bus',
+  'map_route_stop.index': '/Transportation/map_route_stop',
+  'transportation/map_route_stop': '/Transportation/map_route_stop',
+  'transport_shift.index': '/Transportation/add_shift',
+  'transportation/transport_shift': '/Transportation/add_shift',
+  'van_wise_report.index': '/Transportation/van_wise_report',
+  'transportation/van_wise_report': '/Transportation/van_wise_report',
+  'van_wise_students_detail_report.index': '/Transportation/van_summery_report',
+  'transportation/van_wise_students_detail_report': '/Transportation/van_summery_report',
+  'templatemaster.index': '/general/template_management',
+  'settings/templatemaster': '/general/template_management',
+  'formbuild.list': '/general/form_builder',
+  'formbuilder/list': '/general/form_builder',
+  'add_user_profile.index': '/general/user_profile_masters',
+  'user/add_user_profile': '/general/user_profile_masters',
+  'add_implementation.index': '/general/implementation_management',
+  'implementation/add_implementation': '/general/implementation_management',
+  'bulk_chapter_upload.index': '/general/bulk_upload',
+  'lms/bulk_chapter_upload': '/general/bulk_upload',
+};
+
+/**
+ * LMS → H5P content module: legacy Laravel route names (and the old
+ * `/lms/h5p` library path) → Next.js routes under /h5p.
+ */
+const H5P_ROUTE_NAME_MAP: Record<string, string> = {
+  'h5p.index': '/h5p/html_contents',
+  'lms/h5p': '/h5p/html_contents',
+  'html_contents.index': '/h5p/html_contents',
+  'h5p/html_contents': '/h5p/html_contents',
+  'scenario_based.index': '/h5p/scenario_based',
+  'h5p_mcq.index': '/h5p/h5p_mcq',
+  'h5p_interactive_video.index': '/h5p/h5p_interactive_video',
+  'h5p_flashacard.index': '/h5p/h5p_flashacard',
 };
 
 export function mapApiLinkToRoute(link: string | null | undefined): string {
@@ -72,6 +140,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const resultRoute = RESULT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (resultRoute) {
     return resultRoute;
+  }
+
+  // LMS → H5P content: legacy Laravel route-name / path links → Next routes.
+  const h5pRoute = H5P_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (h5pRoute) {
+    return h5pRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {

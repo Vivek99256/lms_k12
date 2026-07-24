@@ -1,3 +1,5 @@
+'use client';
+
 // sideDrawer.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Sparkles, Loader2 } from 'lucide-react';
@@ -665,7 +667,7 @@ ${groundTruthContent}`;
         <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-5 py-5 sm:px-6">
           <div>
             <h2 id="generate-presentation-title" className="text-[18px] font-bold tracking-tight text-slate-950 sm:text-[20px]">
-              Generate presentation
+              Generate content
             </h2>
           </div>
           <button

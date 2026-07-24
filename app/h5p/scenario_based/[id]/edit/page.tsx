@@ -1,0 +1,447 @@
+'use client';
+
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { Loader2, Save, Trash2, X } from 'lucide-react';
+import {
+  fetchScenario,
+  h5pContextQuery,
+  hasH5pContext,
+  readH5pContext,
+  updateScenario,
+  type ScenarioPointInput,
+} from '../../../data/h5p';
+import {
+  H5pPageHeader,
+  InlineBanner,
+  LoadingState,
+  MissingContextNotice,
+} from '../../../components/shared';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+
+/**
+ * Scenario based learning — edit page.
+ * Mirrors Laravel `resources/views/lms/h5p/scenario/edit.blade.php`:
+ * existing points keep their numeric ids so the backend updates them;
+ * new points are sent with `id: null`; removed points are simply omitted
+ * (the backend soft-deletes missing ones).
+ */
+
+interface PointModalState {
+  /** Index in the points array; null while adding a new point. */
+  index: number | null;
+  title: string;
+  description: string;
+  x: number;
+  y: number;
+}
+
+function ScenarioEditContent() {
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? '';
+  const searchParams = useSearchParams();
+  const ctx = useMemo(
+    () => readH5pContext(new URLSearchParams(searchParams.toString())),
+    [searchParams]
+  );
+  const contextQuery = h5pContextQuery(ctx);
+
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [existingImage, setExistingImage] = useState('');
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [newImagePreview, setNewImagePreview] = useState('');
+  const [points, setPoints] = useState<ScenarioPointInput[]>([]);
+  const [modal, setModal] = useState<PointModalState | null>(null);
+  const [modalError, setModalError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string }>({});
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const displayedImage = newImagePreview || existingImage;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!hasH5pContext(ctx) || !id) {
+      queueMicrotask(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setLoadError('');
+      }
+    });
+    fetchScenario(id, ctx)
+      .then((scenario) => {
+        if (cancelled) return;
+        setTitle(scenario.title);
+        setDescription(scenario.description ?? '');
+        setExistingImage(scenario.file_path);
+        setPoints(
+          (scenario.points ?? []).map((point) => ({
+            id: point.id,
+            title: point.title,
+            description: point.description ?? '',
+            x: point.position_x,
+            y: point.position_y,
+          }))
+        );
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : 'Failed to load scenario');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx, id]);
+
+  const modalOpen = modal !== null;
+  useEffect(() => {
+    if (!modalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModal(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [modalOpen]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setNewImageFile(file);
+    if (!file) {
+      setNewImagePreview('');
+      return;
+    }
+    // Points keep their coordinates when the image is replaced, as in Laravel.
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setNewImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(e.clientX - rect.left);
+    const y = Math.round(e.clientY - rect.top);
+    setModalError('');
+    setModal({ index: null, title: '', description: '', x, y });
+  };
+
+  const openPoint = (index: number) => {
+    const point = points[index];
+    if (!point) return;
+    setModalError('');
+    setModal({ index, title: point.title, description: point.description, x: point.x, y: point.y });
+  };
+
+  const savePoint = () => {
+    if (!modal) return;
+    const pointTitle = modal.title.trim();
+    if (!pointTitle) {
+      setModalError('Point title is required.');
+      return;
+    }
+    if (modal.index === null) {
+      setPoints((prev) => [
+        ...prev,
+        { id: null, title: pointTitle, description: modal.description, x: modal.x, y: modal.y },
+      ]);
+    } else {
+      setPoints((prev) =>
+        prev.map((point, i) =>
+          i === modal.index ? { ...point, title: pointTitle, description: modal.description } : point
+        )
+      );
+    }
+    setModal(null);
+  };
+
+  const deletePoint = () => {
+    if (!modal) return;
+    if (modal.index !== null) {
+      const removeIndex = modal.index;
+      setPoints((prev) => prev.filter((_, i) => i !== removeIndex));
+    }
+    setModal(null);
+  };
+
+  const handleSubmit = async () => {
+    const errs: { title?: string } = {};
+    if (!title.trim()) errs.title = 'Title is required.';
+    setFieldErrors(errs);
+    if (errs.title) return;
+    if (points.length === 0 && !window.confirm('No interactive points added. Continue without points?')) {
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const result = await updateScenario(id, ctx, {
+        title: title.trim(),
+        description,
+        points,
+        image: newImageFile,
+      });
+      router.push(`/h5p/scenario_based?${h5pContextQuery(ctx, { flash: result.message })}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update scenario');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex-1 overflow-auto p-4 sm:p-6">
+      <div className="mx-auto max-w-5xl">
+        <H5pPageHeader
+          title="Edit scenario"
+          description="Update the scenario, replace the image or adjust interactive points"
+          ctx={ctx}
+          backHref={`/h5p/scenario_based?${contextQuery}`}
+        />
+
+        {!hasH5pContext(ctx) ? (
+          <MissingContextNotice />
+        ) : loading ? (
+          <LoadingState label="Loading scenario…" />
+        ) : loadError ? (
+          <InlineBanner kind="error" message={loadError} onDismiss={() => setLoadError('')} />
+        ) : (
+          <>
+            <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="space-y-5">
+                <div>
+                  <Label htmlFor="scenario-title">
+                    Title <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="scenario-title"
+                    value={title}
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      setFieldErrors({});
+                    }}
+                    placeholder="Scenario title"
+                    className="mt-1.5"
+                  />
+                  {fieldErrors.title ? (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.title}</p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <Label htmlFor="scenario-image">Replace image</Label>
+                  <Input
+                    id="scenario-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="mt-1.5"
+                  />
+                  <p className="mt-1 text-xs text-slate-400">
+                    Leave empty to keep the current image. Points keep their positions.
+                  </p>
+                </div>
+
+                {displayedImage ? (
+                  <div>
+                    <p className="mb-2 text-xs text-slate-500">
+                      Click anywhere on the image to add an interactive point. Click a numbered
+                      marker to edit or remove it.
+                    </p>
+                    <div className="relative inline-block max-w-full">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        ref={imgRef}
+                        src={displayedImage}
+                        alt="Scenario"
+                        onClick={handleImageClick}
+                        className="block h-auto max-w-full cursor-crosshair rounded-xl border border-slate-200"
+                      />
+                      {points.map((point, index) => (
+                        <button
+                          key={`${point.id ?? 'new'}-${index}`}
+                          type="button"
+                          onClick={() => openPoint(index)}
+                          style={{ left: point.x, top: point.y }}
+                          className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow"
+                          title={point.title}
+                          aria-label={`Point ${index + 1}: ${point.title}`}
+                        >
+                          {index + 1}
+                        </button>
+                      ))}
+                    </div>
+                    {points.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {points.map((point, index) => (
+                          <button
+                            key={`badge-${index}`}
+                            type="button"
+                            onClick={() => openPoint(index)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:border-indigo-200 hover:text-indigo-600"
+                          >
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                              {index + 1}
+                            </span>
+                            {point.title}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div>
+                  <Label htmlFor="scenario-description">
+                    Description
+                    <span className="text-xs font-normal text-slate-400">Rich HTML supported</span>
+                  </Label>
+                  <Textarea
+                    id="scenario-description"
+                    rows={6}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe the scenario (HTML allowed)…"
+                    className="mt-1.5"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push(`/h5p/scenario_based?${contextQuery}`)}
+                    className="rounded-xl"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={saving}
+                    className="rounded-xl bg-[#4f46e5] text-white hover:bg-[#4338ca]"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="h-3.5 w-3.5" />
+                    )}
+                    {saving ? 'Saving…' : 'Update Scenario'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {modal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-slate-900">
+                {modal.index === null ? 'Add interactive point' : `Edit point ${modal.index + 1}`}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="text-slate-400 transition hover:text-slate-600"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <Label htmlFor="point-title">
+                  Point title <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="point-title"
+                  value={modal.title}
+                  maxLength={100}
+                  onChange={(e) => {
+                    setModal({ ...modal, title: e.target.value });
+                    setModalError('');
+                  }}
+                  placeholder="Short point title"
+                  className="mt-1.5"
+                />
+                {modalError ? <p className="mt-1 text-xs text-red-600">{modalError}</p> : null}
+              </div>
+              <div>
+                <Label htmlFor="point-description">
+                  Description
+                  <span className="text-xs font-normal text-slate-400">HTML supported</span>
+                </Label>
+                <Textarea
+                  id="point-description"
+                  rows={4}
+                  value={modal.description}
+                  onChange={(e) => setModal({ ...modal, description: e.target.value })}
+                  placeholder="What does this point highlight?"
+                  className="mt-1.5"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-2">
+              {modal.index !== null ? (
+                <Button variant="destructive" onClick={deletePoint} className="rounded-xl">
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete point
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setModal(null)} className="rounded-xl">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={savePoint}
+                  className="rounded-xl bg-[#4f46e5] text-white hover:bg-[#4338ca]"
+                >
+                  Save point
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export default function ScenarioEditPage() {
+  return (
+    <Suspense fallback={<LoadingState label="Loading scenario…" />}>
+      <ScenarioEditContent />
+    </Suspense>
+  );
+}
