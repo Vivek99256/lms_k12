@@ -65,21 +65,45 @@ export function buildSessionContext(): SessionContext {
     const academicYears = Array.isArray(userData.academicYears)
       ? userData.academicYears
       : [];
+    const academicTerms = Array.isArray(userData.academicTerms)
+      ? userData.academicTerms
+      : [];
 
-    let syear =
+    // Resolve the academic year the way the Laravel session does: the *active*
+    // year — the academic term whose date range covers today — which the login
+    // payload surfaces via `academicTerms`. `academicYears[0]` is merely the
+    // earliest year on file (often empty of data), so it must not be the
+    // primary fallback. A `selectedAcademicYear` left in localStorage is only
+    // honored when it matches one of this session's real years; a stale or
+    // wrong-format value (e.g. a previous "2024-2025") is ignored so it cannot
+    // silently blank out reports. Switching years in the header still works
+    // because the chosen year is always a valid one.
+    const yearOf = (entry: unknown): string => {
+      const record =
+        entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : {};
+      return normalizeAcademicYear(readString(record.syear ?? record.academic_year));
+    };
+    const activeYear =
+      (academicTerms.length > 0 ? yearOf(academicTerms[0]) : '') ||
+      (academicYears.length > 0 ? yearOf(academicYears[0]) : '');
+    const validYears = new Set(
+      [...academicTerms, ...academicYears].map(yearOf).filter(Boolean)
+    );
+    const selectedYear = normalizeAcademicYear(
       readString(localStorage.getItem('selectedAcademicYear')) ||
-      readString(localStorage.getItem('syear'));
-    if (!syear && academicYears.length > 0) {
-      syear = readString(
-        (academicYears[0] as Record<string, unknown>).syear ??
-          (academicYears[0] as Record<string, unknown>).academic_year
-      );
-    }
+        readString(localStorage.getItem('syear'))
+    );
+    let syear =
+      selectedYear && (validYears.size === 0 || validYears.has(selectedYear))
+        ? selectedYear
+        : activeYear;
     if (!syear) {
-      syear = readString(
-        userData.academic_year_id ??
-          userData.academicYearId ??
-          menuContext.academic_year_id
+      syear = normalizeAcademicYear(
+        readString(
+          userData.academic_year_id ??
+            userData.academicYearId ??
+            menuContext.academic_year_id
+        )
       );
     }
 
@@ -98,7 +122,7 @@ export function buildSessionContext(): SessionContext {
           menuContext.sub_institute_id ??
           localStorage.getItem('sub_institute_id')
       ),
-      syear: normalizeAcademicYear(syear),
+      syear,
       userId: readString(
         userData.user_id ??
           userData.userId ??

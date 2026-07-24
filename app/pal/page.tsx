@@ -12,6 +12,7 @@ import {
   GraduationCap,
   Lightbulb,
   Loader2,
+  Monitor,
   Play,
   RefreshCw,
   Sparkles,
@@ -23,6 +24,7 @@ import {
   buildQuizStartQuery,
   fetchMisconceptions,
   fetchPalLanding,
+  fetchPalPreview,
   fetchPedagogySuggestedContent,
   generateMisconceptionContent,
   incrementContentVisit,
@@ -31,10 +33,15 @@ import {
   type PalChapterContext,
   type PalContentCategory,
   type PalLandingData,
+  type PalStudentSelection,
   type PalSubject,
   type PedagogyContentItem,
   type PedagogyResult,
 } from '@/app/pal/data/pal';
+import { isStudentSession } from '@/app/pal/data/pal-lookups';
+import { getViewAsStudent, setViewAsStudent } from '@/app/pal/data/pal-view-as';
+import StudentPicker from '@/app/pal/_components/StudentPicker';
+import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 
 type ModalKind = 'pedagogy' | 'misconception';
 
@@ -43,6 +50,8 @@ interface ActiveModal {
   context: PalChapterContext;
   chapterName: string;
   subjectName: string;
+  /** Learner whose engine data to fetch (viewed student, or self). */
+  learnerId: string;
 }
 
 const CATEGORY_STYLES: Record<PalContentCategory, { label: string; badge: string }> = {
@@ -52,26 +61,89 @@ const CATEGORY_STYLES: Record<PalContentCategory, { label: string; badge: string
   misconception: { label: 'Misconception', badge: 'bg-sky-50 text-sky-700 border-sky-200' },
 };
 
+type AudienceMode = 'Teacher' | 'Student';
+
 export default function PalEntryPage() {
   const router = useRouter();
+  const [isStaff, setIsStaff] = useState(false);
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('Teacher');
+  const [selectedStudent, setSelectedStudent] = useState<PalStudentSelection | null>(null);
   const [data, setData] = useState<PalLandingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openSubjects, setOpenSubjects] = useState<Record<string, boolean>>({});
   const [modal, setModal] = useState<ActiveModal | null>(null);
 
+  // Students see their own PAL; staff/admin pick a student first. A persisted
+  // "view as student" choice is restored so it survives navigation.
   useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const staff = !isStudentSession();
+      setIsStaff(staff);
+      if (staff) {
+        const viewing = getViewAsStudent();
+        if (viewing) setSelectedStudent(viewing);
+        const storedMode = localStorage.getItem('palAudienceMode');
+        if (storedMode === 'Student' || storedMode === 'Teacher') setAudienceMode(storedMode);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('palAudienceMode', audienceMode);
+  }, [audienceMode]);
+
+  // Enter/leave "view as student": persist so the Intelligence page picks it up.
+  const enterStudentView = (student: PalStudentSelection | null) => {
+    setSelectedStudent(student);
+    setViewAsStudent(student);
+  };
+  const exitStudentView = () => {
+    setSelectedStudent(null);
+    setViewAsStudent(null);
+  };
+
+  // Staff must choose a student before anything loads; students load their own.
+  const needsStudent = isStaff && !selectedStudent;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (needsStudent) {
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setData(null);
+          setLoading(false);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     const controller = new AbortController();
     const load = async () => {
-      setLoading(true);
-      setError(null);
       try {
-        const result = await fetchPalLanding(controller.signal);
+        // Guest "view as student" preview → class curriculum; otherwise a real
+        // learner's workspace (self, or a picked student).
+        const result =
+          selectedStudent?.guest
+            ? await fetchPalPreview({
+                standardId: selectedStudent.standardId,
+                gradeId: selectedStudent.gradeId,
+                divisionId: selectedStudent.divisionId,
+                signal: controller.signal,
+              })
+            : await fetchPalLanding({
+                student: selectedStudent ?? undefined,
+                signal: controller.signal,
+              });
         setData(result);
         // Expand the first subject by default for immediate context.
-        if (result.subjects[0]) {
-          setOpenSubjects({ [result.subjects[0].id]: true });
-        }
+        setOpenSubjects(result.subjects[0] ? { [result.subjects[0].id]: true } : {});
       } catch (reason) {
         if (controller.signal.aborted) return;
         setError(reason instanceof Error ? reason.message : 'Unable to load PAL subjects.');
@@ -79,9 +151,18 @@ export default function PalEntryPage() {
         if (!controller.signal.aborted) setLoading(false);
       }
     };
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError(null);
+      }
+    });
     void load();
-    return () => controller.abort();
-  }, []);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [needsStudent, selectedStudent]);
 
   const toggleSubject = (subjectId: string) =>
     setOpenSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
@@ -98,7 +179,12 @@ export default function PalEntryPage() {
   );
 
   const startQuiz = (chapter: PalChapter, subject: PalSubject) => {
-    router.push(`/pal/exam?${buildQuizStartQuery(chapterContext(chapter, subject))}`);
+    const query = buildQuizStartQuery(chapterContext(chapter, subject));
+    // Any staff-launched quiz (guest preview OR reviewing a real student) is a
+    // preview: the submit would run under the staff session, not the student, so
+    // it is scored client-side instead of writing a misattributed attempt.
+    const previewFlag = isStaff ? '&guest=1' : '';
+    router.push(`/pal/exam?${query}${previewFlag}`);
   };
 
   const openModal = (kind: ModalKind, chapter: PalChapter, subject: PalSubject) => {
@@ -107,6 +193,7 @@ export default function PalEntryPage() {
       context: chapterContext(chapter, subject),
       chapterName: chapter.name,
       subjectName: subject.name,
+      learnerId: data?.student.studentId ?? '',
     });
   };
 
@@ -116,11 +203,11 @@ export default function PalEntryPage() {
   );
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="mx-auto space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-full px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-[1800px] space-y-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
               <Brain className="h-6 w-6" />
             </div>
             <div>
@@ -131,16 +218,73 @@ export default function PalEntryPage() {
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-            onClick={() => router.push('/pal/intelligence')}
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            Intelligence
-          </Button>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {isStaff && (
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+                <span className="text-[13px] font-medium text-[#6B7B91]">Viewing as</span>
+                <div className="inline-flex rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
+                  <button
+                    type="button"
+                    onClick={() => setAudienceMode('Teacher')}
+                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
+                      audienceMode === 'Teacher'
+                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
+                        : 'text-[#6B7B91]'
+                    }`}
+                  >
+                    <Monitor size={16} />
+                    Teacher
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAudienceMode('Student')}
+                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
+                      audienceMode === 'Student'
+                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
+                        : 'text-[#6B7B91]'
+                    }`}
+                  >
+                    <GraduationCap size={16} />
+                    Student
+                  </button>
+                </div>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              onClick={() => router.push('/pal/intelligence')}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Intelligence
+            </Button>
+          </div>
         </div>
+
+        {isStaff && !selectedStudent && (
+          <StudentPicker audience={audienceMode} onSelect={enterStudentView} />
+        )}
+
+        {isStaff && selectedStudent && (
+          <ViewAsBanner
+            student={selectedStudent}
+            audience={audienceMode}
+            onExit={exitStudentView}
+            actions={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push('/pal/intelligence')}
+                className="border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-100"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Intelligence
+              </Button>
+            }
+          />
+        )}
 
         {error && (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -148,41 +292,44 @@ export default function PalEntryPage() {
           </div>
         )}
 
-        {loading ? (
-          <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-16 text-sm text-slate-500">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Loading PAL subjects...
-          </div>
-        ) : !data || data.subjects.length === 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-white px-6 py-16 text-center">
-            <p className="text-sm font-medium text-slate-700">No PAL subjects found.</p>
-            <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
-              PAL lists the signed-in student&rsquo;s subjects for the selected academic year. This
-              is empty for staff/admin accounts, or for a student with no enrollment or PAL activity
-              in this year.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="text-xs font-medium text-slate-500">
-              {data.subjects.length} subject{data.subjects.length === 1 ? '' : 's'} &middot;{' '}
-              {totalChapters} chapter{totalChapters === 1 ? '' : 's'}
+        {/* When staff haven't picked a student yet, the picker above is the
+            only prompt — no separate empty card. */}
+        {!needsStudent &&
+          (loading ? (
+            <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-16 text-sm text-slate-500">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading PAL subjects...
             </div>
-            <div className="space-y-3">
-              {data.subjects.map((subject) => (
-                <SubjectCard
-                  key={subject.id}
-                  subject={subject}
-                  expanded={Boolean(openSubjects[subject.id])}
-                  onToggle={() => toggleSubject(subject.id)}
-                  attemptsByChapter={data.attemptsByChapter}
-                  onStartQuiz={(chapter) => startQuiz(chapter, subject)}
-                  onOpenModal={(kind, chapter) => openModal(kind, chapter, subject)}
-                />
-              ))}
+          ) : !data || data.subjects.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-6 py-16 text-center">
+              <p className="text-sm font-medium text-slate-700">No PAL subjects found.</p>
+              <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+                {isStaff
+                  ? 'This student has no mapped subjects or PAL activity for the selected academic year. Try a different academic year in the header, or another student.'
+                  : 'PAL lists your subjects for the selected academic year. This is empty if you have no enrollment or PAL activity in this year — try switching the academic year in the header.'}
+              </p>
             </div>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="text-xs font-medium text-slate-500">
+                {data.subjects.length} subject{data.subjects.length === 1 ? '' : 's'} &middot;{' '}
+                {totalChapters} chapter{totalChapters === 1 ? '' : 's'}
+              </div>
+              <div className="space-y-3">
+                {data.subjects.map((subject) => (
+                  <SubjectCard
+                    key={subject.id}
+                    subject={subject}
+                    expanded={Boolean(openSubjects[subject.id])}
+                    onToggle={() => toggleSubject(subject.id)}
+                    attemptsByChapter={data.attemptsByChapter}
+                    onStartQuiz={(chapter) => startQuiz(chapter, subject)}
+                    onOpenModal={(kind, chapter) => openModal(kind, chapter, subject)}
+                  />
+                ))}
+              </div>
+            </>
+          ))}
       </div>
 
       {modal?.kind === 'pedagogy' && (
@@ -424,7 +571,9 @@ function PedagogyModal({ modal, onClose }: { modal: ActiveModal; onClose: () => 
       setLoading(true);
       setError(null);
       try {
-        setResult(await fetchPedagogySuggestedContent(modal.context, controller.signal));
+        setResult(
+          await fetchPedagogySuggestedContent(modal.context, controller.signal, modal.learnerId)
+        );
       } catch (reason) {
         if (controller.signal.aborted) return;
         setError(reason instanceof Error ? reason.message : 'Unable to load suggested content.');
@@ -442,6 +591,7 @@ function PedagogyModal({ modal, onClose }: { modal: ActiveModal; onClose: () => 
       standardId: modal.context.standardId,
       subjectId: modal.context.subjectId,
       chapterId: modal.context.chapterId,
+      learnerUserId: modal.learnerId,
     });
   };
 
@@ -696,7 +846,7 @@ function MisconceptionModal({ modal, onClose }: { modal: ActiveModal; onClose: (
       setLoading(true);
       setError(null);
       try {
-        setQuestions(await fetchMisconceptions(modal.context.chapterId, signal));
+        setQuestions(await fetchMisconceptions(modal.context.chapterId, signal, modal.learnerId));
       } catch (reason) {
         if (signal?.aborted) return;
         setError(reason instanceof Error ? reason.message : 'Unable to load misconceptions.');
@@ -704,7 +854,7 @@ function MisconceptionModal({ modal, onClose }: { modal: ActiveModal; onClose: (
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [modal.context.chapterId]
+    [modal.context.chapterId, modal.learnerId]
   );
 
   useEffect(() => {
@@ -719,7 +869,7 @@ function MisconceptionModal({ modal, onClose }: { modal: ActiveModal; onClose: (
     setNotice(null);
     setError(null);
     try {
-      const result = await generateMisconceptionContent(modal.context.chapterId);
+      const result = await generateMisconceptionContent(modal.context.chapterId, modal.learnerId);
       setNotice(
         result.message ||
           `Generated ${result.generated}, skipped ${result.skipped}.`

@@ -39,6 +39,8 @@ import {
   type V4RiskKind,
   type V4Velocity,
 } from '@/app/pal/data/pal-v4';
+import { getViewAsStudent, setViewAsStudent, useViewAsStudent } from '@/app/pal/data/pal-view-as';
+import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 
 interface LearnerBundle {
   state: V4LearnerState | null;
@@ -121,8 +123,12 @@ export default function PalIntelligencePage() {
     []
   );
 
+  const viewingStudent = useViewAsStudent();
+
   useEffect(() => {
-    const id = defaultLearnerId();
+    // Prefer the "view as student" learner (set from the PAL landing picker) so
+    // staff see a real learner's intelligence rather than their own empty one.
+    const id = getViewAsStudent()?.studentId || defaultLearnerId();
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate learner id + initial load on mount
     setLearnerId(id);
@@ -133,8 +139,8 @@ export default function PalIntelligencePage() {
   }, [load]);
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="mx-auto space-y-6">
+    <div className="min-h-full px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-[1800px] space-y-5">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
             <Brain className="h-6 w-6" />
@@ -146,6 +152,18 @@ export default function PalIntelligencePage() {
             </p>
           </div>
         </div>
+
+        {viewingStudent && (
+          <ViewAsBanner
+            student={viewingStudent}
+            onExit={() => {
+              setViewAsStudent(null);
+              const self = defaultLearnerId();
+              setLearnerId(self);
+              if (self) void load(self, period);
+            }}
+          />
+        )}
 
         {/* Controls */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

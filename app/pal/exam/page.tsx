@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, Clock, Loader2, Send } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clock, GraduationCap, Loader2, Send } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -44,6 +44,9 @@ function PalExamContent() {
   );
 
   const hasContext = Boolean(context.chapterId && context.standardId);
+  // Guest "view as student" preview: there is no real learner to record against,
+  // so the quiz is scored client-side instead of writing to the backend.
+  const isGuest = searchParams.get('guest') === '1';
 
   const [quiz, setQuiz] = useState<PalQuizData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +55,7 @@ function PalExamContent() {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [previewResult, setPreviewResult] = useState<{ correct: number; total: number } | null>(null);
 
   const startedAtRef = useRef<string>('');
   const attemptTimesRef = useRef<Record<string, number>>({});
@@ -100,6 +104,16 @@ function PalExamContent() {
         }
       }
       submittedRef.current = true;
+
+      // Guest preview → score client-side (answer values are "id##correctFlag").
+      if (isGuest) {
+        const correct = quiz.questions.filter(
+          (q) => (answers[q.questionId] ?? '').split('##')[1] === '1'
+        ).length;
+        setPreviewResult({ correct, total: quiz.questions.length });
+        return;
+      }
+
       setSubmitting(true);
       setSubmitError(null);
       try {
@@ -124,7 +138,7 @@ function PalExamContent() {
         setSubmitting(false);
       }
     },
-    [quiz, answers, router]
+    [quiz, answers, router, isGuest]
   );
 
   // --- countdown timer (auto-submit on expiry) ---------------------------
@@ -209,6 +223,38 @@ function PalExamContent() {
             <ArrowLeft className="h-4 w-4" />
             Back to PAL
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (previewResult) {
+    const pct = Math.round((previewResult.correct / Math.max(1, previewResult.total)) * 100);
+    const tone = pct >= 70 ? 'text-emerald-600' : pct >= 40 ? 'text-amber-600' : 'text-rose-600';
+    return (
+      <div className="mx-auto max-w-lg p-6">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+            <GraduationCap className="h-7 w-7" />
+          </span>
+          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-indigo-500">
+            Guest preview — not saved
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">{quiz.paperName} complete</h1>
+          <p className={`mt-4 text-5xl font-black tabular-nums ${tone}`}>{pct}%</p>
+          <p className="mt-1 text-sm text-slate-600">
+            {previewResult.correct} of {previewResult.total} correct
+          </p>
+          <p className="mx-auto mt-3 max-w-sm text-xs text-slate-500">
+            This is a student-experience preview. Results are scored locally and are not recorded —
+            log in as the student to save real attempts.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <Button variant="outline" onClick={() => router.push('/pal')}>
+              <ArrowLeft className="h-4 w-4" />
+              Back to PAL
+            </Button>
+          </div>
         </div>
       </div>
     );
