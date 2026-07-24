@@ -129,9 +129,27 @@ export async function fetchPalReport(signal?: AbortSignal): Promise<PalReportRes
 // ===========================================================================
 
 export interface PalStudentDetails {
+  /** The learner/user id whose PAL this landing represents (self, or picked). */
+  studentId: string;
+  name: string;
   gradeId: string;
   standardId: string;
   enrollmentNo: string;
+}
+
+/**
+ * A student an admin/teacher has selected to view. When present it overrides the
+ * signed-in user for the PAL landing and the per-chapter engine calls.
+ */
+export interface PalStudentSelection {
+  studentId: string;
+  name: string;
+  gradeId: string;
+  standardId: string;
+  divisionId?: string;
+  enrollmentNo?: string;
+  /** True for the "guest student" class preview (no specific learner). */
+  guest?: boolean;
 }
 
 export interface PalChapter {
@@ -309,57 +327,115 @@ export function buildQuizStartQuery(context: PalChapterContext): string {
   return params.toString();
 }
 
-export async function fetchPalLanding(signal?: AbortSignal): Promise<PalLandingData> {
-  const session = requireSession();
-  const params = commonEntryParams(session);
-
-  const response = await fetch(`${session.baseUrl}/lms/pal?${params.toString()}`, {
-    headers: ajaxHeaders(session),
-    signal,
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load PAL subjects.`);
-  }
-
-  const payload = toRecord(await response.json());
-  const studentDetails = toRecord(payload.studentDetails);
-  const subjectList = toRecord(payload.subjectList);
-  const chapterList = toRecord(payload.chapterList);
-  const perChapterQuiz = toRecord(payload.perChapterQuiz);
-
-  const subjects: PalSubject[] = Object.entries(subjectList).map(([subjectId, name]) => {
-    const chapterRecord = toRecord(chapterList[subjectId]);
-    const chapters: PalChapter[] = Object.entries(chapterRecord).map(
-      ([chapterId, chapterName]) => ({
-        id: chapterId,
-        name: readString(chapterName),
-        quizCount: readNumber(perChapterQuiz[chapterId]),
-      })
-    );
-    return { id: subjectId, name: readString(name), chapters };
-  });
+/** Map the shared PAL Workspace/Preview `{success,data}` payload to landing data. */
+function mapWorkspacePayload(
+  payload: Record<string, unknown>,
+  fallback: { studentId: string; name?: string }
+): PalLandingData {
+  const data = toRecord(payload.data);
+  const studentRow = toRecord(data.student);
+  const perChapterQuiz = toRecord(data.per_chapter_quiz);
 
   const attemptsByChapter: Record<string, PalAttempt[]> = {};
-  toArray(payload.attemptExams).forEach((entry) => {
-    const record = toRecord(entry);
-    const chapterId = readString(record.paper_desc);
-    if (!chapterId) return;
-    const totalRight = readNumber(record.total_right);
-    const total = totalRight + readNumber(record.total_wrong);
-    const percent = total > 0 ? Math.min(100, Math.round((totalRight / total) * 100)) : 0;
-    (attemptsByChapter[chapterId] ??= []).push({ chapterId, totalRight, total, percent });
+  Object.entries(toRecord(data.attempts_by_chapter)).forEach(([chapterId, entries]) => {
+    toArray(entries).forEach((entry) => {
+      const record = toRecord(entry);
+      const totalRight = readNumber(record.total_right);
+      const total = readNumber(record.total) || totalRight + readNumber(record.total_wrong);
+      const percent =
+        readNumber(record.percent) ||
+        (total > 0 ? Math.min(100, Math.round((totalRight / total) * 100)) : 0);
+      (attemptsByChapter[chapterId] ??= []).push({ chapterId, totalRight, total, percent });
+    });
+  });
+
+  const subjects: PalSubject[] = toArray(data.subjects).map((entry) => {
+    const subject = toRecord(entry);
+    return {
+      id: readString(subject.subject_id),
+      name: readString(subject.subject_name),
+      chapters: toArray(subject.chapters).map((chapterEntry) => {
+        const chapter = toRecord(chapterEntry);
+        const id = readString(chapter.id);
+        return { id, name: readString(chapter.chapter_name), quizCount: readNumber(perChapterQuiz[id]) };
+      }),
+    };
   });
 
   return {
     student: {
-      gradeId: readString(studentDetails.grade_id),
-      standardId: readString(studentDetails.standard_id),
-      enrollmentNo: readString(studentDetails.enrollment_no),
+      studentId: readString(studentRow.student_id) || fallback.studentId,
+      name: fallback.name || readString(studentRow.name),
+      gradeId: readString(studentRow.grade_id),
+      standardId: readString(studentRow.standard_id),
+      enrollmentNo: readString(studentRow.enrollment_no),
     },
     subjects,
     attemptsByChapter,
     message: readString(payload.message),
   };
+}
+
+export async function fetchPalLanding(
+  opts: { student?: PalStudentSelection; signal?: AbortSignal } = {}
+): Promise<PalLandingData> {
+  const { student, signal } = opts;
+  const session = requireSession();
+  // The learner: an explicit picker selection, otherwise the signed-in student.
+  const learnerId = student?.studentId || session.userId;
+
+  const url = new URL(`${session.baseUrl}/api/pal/workspace/${encodeURIComponent(learnerId)}`);
+  url.searchParams.set('syear', session.syear);
+
+  const response = await fetch(url.toString(), { headers: createAuthHeaders(session), signal });
+  // Backend not deployed yet → fall back to the legacy /lms/pal + catalog path.
+  if (response.status === 404) {
+    const { legacyPalLanding } = await import('@/app/pal/data/pal-legacy');
+    return legacyPalLanding(student, signal);
+  }
+  if (response.status === 401 || response.status === 403) {
+    const denied = toRecord(await response.json().catch(() => ({})));
+    throw new Error(readString(denied.message) || 'You are not allowed to view this learner.');
+  }
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: Unable to load PAL subjects.`);
+  }
+
+  const payload = toRecord(await response.json());
+  return mapWorkspacePayload(payload, { studentId: learnerId, name: student?.name });
+}
+
+/**
+ * "Guest student" class preview: the student-facing PAL for a whole standard
+ * (subjects + chapters, no learner/attempts). Powers the "View as student"
+ * audience mode where staff experience what a class's students see.
+ */
+export async function fetchPalPreview(
+  opts: { standardId: string; gradeId?: string; divisionId?: string; signal?: AbortSignal }
+): Promise<PalLandingData> {
+  const session = requireSession();
+  const url = new URL(`${session.baseUrl}/api/pal/workspace/preview`);
+  url.searchParams.set('syear', session.syear);
+  url.searchParams.set('standard_id', opts.standardId);
+  if (opts.gradeId) url.searchParams.set('grade_id', opts.gradeId);
+  if (opts.divisionId) url.searchParams.set('division_id', opts.divisionId);
+
+  const response = await fetch(url.toString(), { headers: createAuthHeaders(session), signal: opts.signal });
+  // Backend not deployed yet → build the class preview from the LMS catalog.
+  if (response.status === 404) {
+    const { legacyPalPreview } = await import('@/app/pal/data/pal-legacy');
+    return legacyPalPreview(opts);
+  }
+  if (response.status === 401 || response.status === 403) {
+    const denied = toRecord(await response.json().catch(() => ({})));
+    throw new Error(readString(denied.message) || 'You are not allowed to preview this class.');
+  }
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: Unable to load the class preview.`);
+  }
+
+  const payload = toRecord(await response.json());
+  return mapWorkspacePayload(payload, { studentId: '', name: 'Guest student' });
 }
 
 // --- pedagogy engine suggested content -------------------------------------
@@ -392,10 +468,14 @@ function mapPedagogyContent(
 
 export async function fetchPedagogySuggestedContent(
   context: PalChapterContext,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  learnerUserId?: string
 ): Promise<PedagogyResult> {
   const session = requireSession();
   const params = commonEntryParams(session);
+  // Admin/teacher viewing a specific student: the pedagogy engine keys on
+  // user_id (request param), so override it with the viewed learner.
+  if (learnerUserId) params.set('user_id', learnerUserId);
   params.set('grade_id', context.gradeId);
   params.set('subject_id', context.subjectId);
   params.set('chapter_id', context.chapterId);
@@ -463,10 +543,15 @@ export async function fetchPedagogySuggestedContent(
 
 export async function fetchMisconceptions(
   chapterId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  learnerUserId?: string
 ): Promise<MisconceptionQuestion[]> {
   const session = requireSession();
   const params = commonEntryParams(session);
+  // NOTE: on the live backend `misconception()` reads the learner from the
+  // Laravel session; user_id here only takes effect where the request-param
+  // fallback has been deployed. Harmless otherwise.
+  if (learnerUserId) params.set('user_id', learnerUserId);
   params.set('chapter_id', chapterId);
 
   const response = await fetch(
@@ -491,10 +576,12 @@ export async function fetchMisconceptions(
 }
 
 export async function generateMisconceptionContent(
-  chapterId: string
+  chapterId: string,
+  learnerUserId?: string
 ): Promise<GenerateMisconceptionResult> {
   const session = requireSession();
   const body = commonEntryParams(session);
+  if (learnerUserId) body.set('user_id', learnerUserId);
   body.set('chapter_id', chapterId);
 
   const response = await fetch(
@@ -526,11 +613,13 @@ export async function incrementContentVisit(input: {
   subjectId: string;
   chapterId: string;
   contentType?: string;
+  learnerUserId?: string;
 }): Promise<void> {
   const session = buildSessionContext();
   if (!session.baseUrl || !input.contentId) return;
 
   const body = commonEntryParams(session);
+  if (input.learnerUserId) body.set('user_id', input.learnerUserId);
   body.set('content_id', input.contentId);
   body.set('standard_id', input.standardId);
   body.set('subject_id', input.subjectId);
