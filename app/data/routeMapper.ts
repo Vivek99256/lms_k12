@@ -113,6 +113,47 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   ) {
     return '/exam/marks-entry';
   }
+
+  if (
+    cleanLink.toLowerCase() === 'daywise_student_attendance' ||
+    cleanLink.toLowerCase() === 'show_daywise_student_attendance' ||
+    cleanLink.toLowerCase() === 'show_daywise_student_attendance_report' ||
+    cleanLink.toLowerCase() === 'daywise_student_attendance_report' ||
+    cleanLink.toLowerCase() === 'student/daywise_student_attendance' ||
+    cleanLink.toLowerCase() === 'student/daywise_student_attendance/index'
+  ) {
+    return '/student/daywise_student_attendance';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'monthwise_student_attendance' ||
+    cleanLink.toLowerCase() === 'show_monthwise_student_attendance' ||
+    cleanLink.toLowerCase() === 'show_monthwise_student_attendance_report' ||
+    cleanLink.toLowerCase() === 'monthwise_student_attendance_report' ||
+    cleanLink.toLowerCase() === 'student/monthwise_student_attendance' ||
+    cleanLink.toLowerCase() === 'student/monthwise_student_attendance/index'
+  ) {
+    return '/student/monthwise_student_attendance';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'yearly_student_attendance' ||
+    cleanLink.toLowerCase() === 'show_yearly_student_attendance' ||
+    cleanLink.toLowerCase() === 'student/yearly_student_attendance' ||
+    cleanLink.toLowerCase() === 'student/yearly_student_attendance/index'
+  ) {
+    return '/student/yearly_student_attendance';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'student_attendance' ||
+    cleanLink.toLowerCase() === 'show_student_attendance' ||
+    cleanLink.toLowerCase() === 'save_student_attendance' ||
+    cleanLink.toLowerCase() === 'student/student_attendance' ||
+    cleanLink.toLowerCase() === 'student/student_attendance/index'
+  ) {
+    return '/student/student_attendance';
+  }
   
   if (!cleanLink) return '#';
   
