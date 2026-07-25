@@ -130,6 +130,29 @@ const EXAM_ROUTE_NAME_MAP: Record<string, string> = {
 };
 
 /**
+ * LMS → Reports: legacy Laravel route names (and path-style variants) for the
+ * LMS report screens → their Next.js routes under /lms.
+ * (Examwise Progress Report lives in EXAM_ROUTE_NAME_MAP → /exam/progress-report.)
+ */
+const LMS_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
+  'lmsactivitystream.index': '/lms/activity-stream',
+  'lms/lmsactivitystream': '/lms/activity-stream',
+  'lmsstudent_report.index': '/lms/student-analysis',
+  'lms/lmsstudent_report': '/lms/student-analysis',
+  'question_wise_report': '/lms/question-wise-report',
+  'lms/questionreport': '/lms/question-wise-report',
+  'questionreport': '/lms/question-wise-report',
+  'lmsdashboard.index': '/lms/dashboard',
+  'lms/lmsdashboard': '/lms/dashboard',
+  'lmsdashboard_teacher': '/lms/dashboard',
+  'teacherindex': '/lms/dashboard',
+  // Message is a legacy placeholder (no backend data) — the page honestly
+  // reflects that, but the menu link still needs to resolve rather than 404.
+  'lmscommunication.index': '/lms/message',
+  'lms/lmscommunication': '/lms/message',
+};
+
+/**
  * Utility module: legacy Laravel route names (and their path-style variants)
  * → the Next.js pages under /Utility.
  *
@@ -207,6 +230,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const examRoute = EXAM_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (examRoute) {
     return examRoute;
+  }
+
+  // LMS → Reports (Activity Stream, Student Analysis, Question Wise, Dashboard).
+  const lmsReportRoute = LMS_REPORT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (lmsReportRoute) {
+    return lmsReportRoute;
   }
 
   const resultRoute = RESULT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
