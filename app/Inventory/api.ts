@@ -58,9 +58,10 @@ async function request(module: string, session: SessionContext, suffix = "", ini
   params.set("user_id", session.userId);
   if (session.termId) params.set("term_id", session.termId);
   const separator = suffix.includes("?") ? "&" : "?";
+  const contentType = init?.body && !(init.body instanceof FormData) ? "application/json" : undefined;
   const response = await fetch(`${session.baseUrl}/api/inventory/${module}${suffix}${separator}${params}`, {
     cache: "no-store", ...init,
-    headers: { ...createAuthHeaders(session, init?.body ? "application/json" : undefined), ...init?.headers },
+    headers: { ...createAuthHeaders(session, contentType), ...init?.headers },
   });
   const payload = (await response.json().catch(() => ({}))) as unknown;
   if (!response.ok) {
@@ -79,11 +80,21 @@ export async function loadInventory(module: string, filters: Record<string, stri
   const suffix = query.size ? `?${query}` : "";
   return normalize(await request(module, session, suffix));
 }
-export async function saveInventory(module: string, values: Record<string, unknown>, id?: number): Promise<string> {
+export async function saveInventory(module: string, values: Record<string, unknown>, id?: number, files: Record<string, File> = {}): Promise<string> {
   const session = getInventorySession();
+  const fileEntries = Object.entries(files);
+  const body = fileEntries.length ? (() => {
+    const form = new FormData();
+    Object.entries(values).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) form.set(key, String(value));
+    });
+    fileEntries.forEach(([key, file]) => form.set(key, file));
+    if (id) form.set("_method", "PUT");
+    return form;
+  })() : JSON.stringify({ ...values, type: "API", sub_institute_id: session.subInstituteId, syear: session.syear, user_id: session.userId });
   const payload = await request(module, session, id ? `/${id}` : "", {
-    method: id ? "PUT" : "POST",
-    body: JSON.stringify({ ...values, type: "API", sub_institute_id: session.subInstituteId, syear: session.syear, user_id: session.userId }),
+    method: fileEntries.length ? "POST" : id ? "PUT" : "POST",
+    body,
   });
   return message(payload, id ? "Record updated successfully." : "Record created successfully.");
 }
