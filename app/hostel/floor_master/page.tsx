@@ -1,3 +1,4 @@
+//
 import { HostelModulePage } from "../_components/HostelModulePage";
 
 export default function Page() {
