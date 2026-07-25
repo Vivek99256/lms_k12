@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ExternalLink,
   GraduationCap,
+  Info,
   Lightbulb,
   Loader2,
   Monitor,
@@ -284,6 +285,29 @@ export default function PalEntryPage() {
               </Button>
             }
           />
+        )}
+
+        {isStaff && selectedStudent?.guest && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              This is a <span className="font-semibold">class preview</span> — you can browse subjects,
+              chapters and take quizzes as a student would. Personalized insights (the{' '}
+              <span className="font-semibold">Pedagogy Engine</span> and{' '}
+              <span className="font-semibold">Misconceptions</span>) are per-student, so switch to{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  exitStudentView();
+                  setAudienceMode('Teacher');
+                }}
+                className="font-semibold text-sky-900 underline underline-offset-2 hover:text-sky-950"
+              >
+                Teacher
+              </button>{' '}
+              and pick a student with quiz attempts to explore them.
+            </p>
+          </div>
         )}
 
         {error && (
