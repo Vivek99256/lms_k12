@@ -101,6 +101,15 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const inwardOutwardRoute = inwardOutwardRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (inwardOutwardRoute) return inwardOutwardRoute;
 
+  const sqaaRoutes: Record<string, string> = {
+    'sqaa_master.index': '/sqaa_master',
+    'sqaa_master': '/sqaa_master',
+    'sqaa_document_report.index': '/sqaa_document_report',
+    'sqaa_document_report': '/sqaa_document_report',
+  };
+  const sqaaRoute = sqaaRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (sqaaRoute) return sqaaRoute;
+
   const frontDeskRoutes: Record<string, string> = {
     'create-timetable.index': '/front_desk/create-timetable',
     'front_desk/create-timetable': '/front_desk/create-timetable',
