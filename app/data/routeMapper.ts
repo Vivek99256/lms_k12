@@ -129,6 +129,30 @@ const EXAM_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/online_exam': '/exam/online',
 };
 
+/**
+ * Utility module: legacy Laravel route names (and their path-style variants)
+ * → the Next.js pages under /Utility.
+ *
+ * "Breakoff rollover" has no dedicated Laravel route — it is the fee slice of
+ * the rollover and bulk-update controllers — so it is matched on its menu slug.
+ */
+const UTILITY_ROUTE_NAME_MAP: Record<string, string> = {
+  'student_transfer.index': '/Utility/student-transfer',
+  'student/student_transfer': '/Utility/student-transfer',
+  'rollover.index': '/Utility/rollover',
+  'student/rollover': '/Utility/rollover',
+  'breakoff_rollover.index': '/Utility/breakoff-rollover',
+  'utility/breakoff-rollover': '/Utility/breakoff-rollover',
+  'student_bulk_update.index': '/Utility/update-all-data',
+  'student/student_bulk_update': '/Utility/update-all-data',
+  'update_all_data.index': '/Utility/update-all-data',
+  'custom-module.tables': '/Utility/custom-module',
+  'custom_module.tables': '/Utility/custom-module',
+  'custom-module/tables': '/Utility/custom-module',
+  'transfer_student.index': '/Utility/transfer-student',
+  'student/transfer_student': '/Utility/transfer-student',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -157,6 +181,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const h5pRoute = H5P_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (h5pRoute) {
     return h5pRoute;
+  }
+
+  // Utility → year-end / low-code maintenance pages under /Utility.
+  const utilityRoute = UTILITY_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (utilityRoute) {
+    return utilityRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
