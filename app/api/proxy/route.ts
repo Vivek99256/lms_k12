@@ -60,6 +60,22 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  return forwardWithBody(request, 'POST');
+}
+
+export async function PUT(request: NextRequest) {
+  return forwardWithBody(request, 'PUT');
+}
+
+export async function PATCH(request: NextRequest) {
+  return forwardWithBody(request, 'PATCH');
+}
+
+export async function DELETE(request: NextRequest) {
+  return forwardWithBody(request, 'DELETE');
+}
+
+async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE') {
   const targetPath = request.nextUrl.searchParams.get('path');
   if (!targetPath) {
     return NextResponse.json({ message: 'Missing path parameter' }, { status: 400 });
@@ -79,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const upstream = await fetch(url, {
-      method: 'POST',
+      method,
       headers: {
         ...(!isMultipart && contentType ? { 'Content-Type': contentType } : {}),
         Accept: 'application/json',
