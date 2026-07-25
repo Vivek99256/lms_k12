@@ -64,6 +64,16 @@ export const ROUTES = {
     otherFeesCancel: '/fees/other_fees_cancel',
     onlineFeesCollect: '/fees/online_fees_collect',
   },
+
+  // Utility routes (year-end and low-code maintenance tools)
+  utility: {
+    studentTransfer: '/Utility/student-transfer',
+    rollover: '/Utility/rollover',
+    breakoffRollover: '/Utility/breakoff-rollover',
+    updateAllData: '/Utility/update-all-data',
+    customModule: '/Utility/custom-module',
+    transferStudent: '/Utility/transfer-student',
+  },
 } as const;
 
 export type RouteName = string;
