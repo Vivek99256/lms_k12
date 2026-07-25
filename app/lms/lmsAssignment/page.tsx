@@ -30,8 +30,8 @@ import {
   createAssignment,
   listAssignmentStudents,
   listExamPapers,
-  type AssignmentStudent,
-  type ExamPaper,
+  type AssignmentStudentRow,
+  type ExamPaperRow,
 } from "@/app/lms/lmsAssignment/api";
 
 const academicFields: DropdownField[] = [
@@ -41,8 +41,8 @@ const academicFields: DropdownField[] = [
   "subject",
 ];
 
-const controlClass =
-  "h-9 w-full rounded-lg border border-input bg-white px-2.5 text-sm outline-none transition focus:border-ring focus:ring-3 focus:ring-ring/50";
+const selectClassName =
+  "h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400";
 
 function readValue(
   value: SearchDropdownValues[keyof SearchDropdownValues]
@@ -57,18 +57,17 @@ export default function CreateAssignmentPage() {
     division: "",
     subject: "",
   });
-  const [students, setStudents] = useState<AssignmentStudent[]>([]);
+  const [students, setStudents] = useState<AssignmentStudentRow[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [examPapers, setExamPapers] = useState<ExamPaperRow[]>([]);
+  const [examPaper, setExamPaper] = useState(""); // packed "<pdfName>####<id>"
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [submissionDate, setSubmissionDate] = useState("");
 
-  const [examPapers, setExamPapers] = useState<ExamPaper[]>([]);
-  const [examId, setExamId] = useState("");
-  const [papersLoading, setPapersLoading] = useState(false);
-
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingExams, setLoadingExams] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -80,28 +79,27 @@ export default function CreateAssignmentPage() {
 
   const allChecked = students.length > 0 && selected.size === students.length;
 
-  // The exam-paper dropdown reloads whenever the subject changes — mirrors the
-  // old ERP where the Exam select is populated from offline question papers for
-  // the selected subject.
+  // Load offline question papers whenever the selected subject changes.
   useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setExamId("");
-    setExamPapers([]);
-    if (!subject) return;
-    setPapersLoading(true);
+    let active = true;
+    if (!subject) {
+      setExamPapers([]);
+      setExamPaper("");
+      return;
+    }
+    setLoadingExams(true);
     listExamPapers(subject)
-      .then((papers) => {
-        if (!cancelled) setExamPapers(papers);
+      .then((rows) => {
+        if (active) setExamPapers(rows);
       })
       .catch(() => {
-        if (!cancelled) setExamPapers([]);
+        if (active) setExamPapers([]);
       })
       .finally(() => {
-        if (!cancelled) setPapersLoading(false);
+        if (active) setLoadingExams(false);
       });
     return () => {
-      cancelled = true;
+      active = false;
     };
   }, [subject]);
 
@@ -150,13 +148,13 @@ export default function CreateAssignmentPage() {
   const validationError = useMemo(() => {
     if (!standard) return "Select a standard.";
     if (!subject) return "Select a subject.";
+    if (!examPaper) return "Select an exam paper.";
     if (!title.trim()) return "Enter an assignment title.";
-    if (!examId) return "Select an exam paper.";
     if (selected.size === 0) return "Select at least one student.";
     return "";
-  }, [standard, subject, title, examId, selected.size]);
+  }, [standard, subject, examPaper, title, selected.size]);
 
-  async function handleAssign(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     setSuccess("");
@@ -164,25 +162,23 @@ export default function CreateAssignmentPage() {
       setError(validationError);
       return;
     }
+    const [pdfName, examId] = examPaper.split("####");
     setSaving(true);
     try {
-      const paper = examPapers.find((item) => String(item.id) === examId);
       const count = await createAssignment({
         studentIds: Array.from(selected),
         title: title.trim(),
         description: description.trim(),
         submissionDate,
-        standardId: standard,
-        divisionId: division,
         subjectId: subject,
-        examId,
-        examPdf: paper?.pdfName ?? "",
+        examId: examId ?? "",
+        examPdf: pdfName ?? "",
       });
       setSuccess(`Assignment created for ${count} student(s) successfully.`);
       setTitle("");
       setDescription("");
       setSubmissionDate("");
-      setExamId("");
+      setExamPaper("");
       setSelected(new Set());
     } catch (saveError: unknown) {
       setError(
@@ -200,7 +196,7 @@ export default function CreateAssignmentPage() {
       <header>
         <h1 className="text-2xl font-bold text-slate-900">Create Assignment</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Search students by class and assign an exam paper.
+          Search students by class, attach an offline exam paper, and assign it.
         </p>
       </header>
 
@@ -244,10 +240,41 @@ export default function CreateAssignmentPage() {
 
       {searched ? (
         <form
-          onSubmit={handleAssign}
+          onSubmit={handleSubmit}
           className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="asg-exam">
+                Exam paper <span className="text-red-500">*</span>
+              </Label>
+              <select
+                id="asg-exam"
+                value={examPaper}
+                onChange={(event) => setExamPaper(event.target.value)}
+                disabled={loadingExams || !subject}
+                className={selectClassName}
+              >
+                <option value="">
+                  {loadingExams
+                    ? "Loading exam papers..."
+                    : !subject
+                      ? "Select a subject first"
+                      : examPapers.length
+                        ? "Select Exam Paper"
+                        : "No offline exam paper found"}
+                </option>
+                {examPapers.map((paper) => (
+                  <option
+                    key={paper.id}
+                    value={`${paper.pdfName}####${paper.id}`}
+                  >
+                    {paper.paperName}
+                    {paper.totalMarks ? ` (${paper.totalMarks} marks)` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="asg-title">
                 Title <span className="text-red-500">*</span>
@@ -268,33 +295,6 @@ export default function CreateAssignmentPage() {
                 value={submissionDate}
                 onChange={(event) => setSubmissionDate(event.target.value)}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="asg-exam">
-                Exam paper <span className="text-red-500">*</span>
-              </Label>
-              <select
-                id="asg-exam"
-                className={controlClass}
-                value={examId}
-                onChange={(event) => setExamId(event.target.value)}
-                disabled={papersLoading || !subject}
-              >
-                <option value="">
-                  {!subject
-                    ? "Select a subject first"
-                    : papersLoading
-                    ? "Loading papers..."
-                    : examPapers.length
-                    ? "Select exam paper"
-                    : "No exam papers found"}
-                </option>
-                {examPapers.map((paper) => (
-                  <option key={paper.id} value={String(paper.id)}>
-                    {paper.paperName}
-                  </option>
-                ))}
-              </select>
             </div>
             <div className="space-y-2 md:col-span-2 xl:col-span-3">
               <Label htmlFor="asg-desc">Description</Label>
@@ -322,7 +322,7 @@ export default function CreateAssignmentPage() {
                     />
                   </TableHead>
                   <TableHead>Student Name</TableHead>
-                  <TableHead>Enrollment Code</TableHead>
+                  <TableHead>Enrollment</TableHead>
                   <TableHead>Standard</TableHead>
                   <TableHead>Division</TableHead>
                   <TableHead>Gender</TableHead>
@@ -332,7 +332,10 @@ export default function CreateAssignmentPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-slate-500">
+                    <TableCell
+                      colSpan={7}
+                      className="h-24 text-center text-slate-500"
+                    >
                       <LoaderCircle className="mx-auto size-6 animate-spin text-slate-300" />
                     </TableCell>
                   </TableRow>
@@ -357,7 +360,10 @@ export default function CreateAssignmentPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-28 text-center text-slate-500">
+                    <TableCell
+                      colSpan={7}
+                      className="h-28 text-center text-slate-500"
+                    >
                       <Users className="mx-auto mb-2 size-8 text-slate-300" />
                       No students found for the selected class.
                     </TableCell>
