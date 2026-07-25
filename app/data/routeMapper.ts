@@ -113,6 +113,22 @@ const H5P_ROUTE_NAME_MAP: Record<string, string> = {
   'h5p_flashacard.index': '/h5p/h5p_flashacard',
 };
 
+/**
+ * LMS → Test → Exam: AI question-paper generator route names → Next route.
+ * (The manual picker lives at /student_homework; this is the AI DOK/Bloom one.)
+ */
+const EXAM_ROUTE_NAME_MAP: Record<string, string> = {
+  'generate_ai_questionpaper': '/exam/exam-creation',
+  'generate_ai_questionpaper.index': '/exam/exam-creation',
+  'lms/generate_ai_questionpaper': '/exam/exam-creation',
+  'ai_questionpaper.index': '/exam/exam-creation',
+  'lmsexamwise_progress_report.index': '/exam/progress-report',
+  'lms/lmsexamwise_progress_report': '/exam/progress-report',
+  'examwise_progress_report.index': '/exam/progress-report',
+  'online_exam.index': '/exam/online',
+  'lms/online_exam': '/exam/online',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -126,6 +142,11 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
 
   // Remove trailing slashes only
   cleanLink = cleanLink.replace(/\/+$/, '');
+
+  const examRoute = EXAM_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (examRoute) {
+    return examRoute;
+  }
 
   const resultRoute = RESULT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (resultRoute) {
