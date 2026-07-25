@@ -153,6 +153,22 @@ const LMS_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
 };
 
 /**
+ * LMS → Entry modules: Teacher Diary (lesson-planning report), Book List,
+ * Syllabus Plan and Leader Board. Legacy Laravel route names (from
+ * tblmenumaster.link) + path-style variants → the Next.js pages under /lms.
+ */
+const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
+  'lessonplanningreport.index': '/lms/teacher-diary',
+  'lessonplanningreport': '/lms/teacher-diary',
+  'book_list.index': '/lms/book-list',
+  'frontdesk/book_list': '/lms/book-list',
+  'lms_syllabus.index': '/lms/syllabus-plan',
+  'lms/lms_syllabus': '/lms/syllabus-plan',
+  'lmsleaderboard.index': '/lms/leader-board',
+  'lms/lmsleaderboard': '/lms/leader-board',
+};
+
+/**
  * Utility module: legacy Laravel route names (and their path-style variants)
  * → the Next.js pages under /Utility.
  *
@@ -236,6 +252,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const lmsReportRoute = LMS_REPORT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (lmsReportRoute) {
     return lmsReportRoute;
+  }
+
+  // LMS → Entry (Teacher Diary, Book List, Syllabus Plan, Leader Board).
+  const lmsEntryRoute = LMS_ENTRY_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (lmsEntryRoute) {
+    return lmsEntryRoute;
   }
 
   const resultRoute = RESULT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
