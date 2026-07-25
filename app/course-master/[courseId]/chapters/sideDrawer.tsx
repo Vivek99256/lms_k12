@@ -94,6 +94,7 @@ export function GeneratePresentationDrawer({
 }: GeneratePresentationDrawerProps) {
   const [presentationMode, setPresentationMode] = useState<'Classroom' | 'Teacher training'>('Classroom');
   const [contentType, setContentType] = useState('Presentation');
+  const [teacherContentType, setTeacherContentType] = useState('Teacher Presentation');
   const [presentationChapterId, setPresentationChapterId] = useState(initialChapterId);
   const [presentationConcept, setPresentationConcept] = useState(initialConcept);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -706,7 +707,7 @@ ${groundTruthContent}`;
                       : 'text-slate-600 hover:text-slate-900'
                   )}
                 >
-                  {mode}
+                  {mode === 'Classroom' ? 'Classroom Resource' : 'Teacher Resource'}
                 </button>
               ))}
             </div>
@@ -814,6 +815,25 @@ ${groundTruthContent}`;
                     ) : (
                       <SelectItem value="" disabled>No concepts available</SelectItem>
                     )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Content Type <span className="text-rose-500">*</span>
+                </Label>
+                <Select
+                  value={teacherContentType}
+                  onValueChange={(value) => setTeacherContentType(value ?? 'Teacher Presentation')}
+                >
+                  <SelectTrigger className="h-12 rounded-xl border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                    <SelectValue placeholder="Select content type">
+                      {teacherContentType}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Teacher Presentation">Teacher Presentation</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

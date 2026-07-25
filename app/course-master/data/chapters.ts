@@ -573,6 +573,83 @@ async function readApiJson(res: Response, fallback: string): Promise<Record<stri
   throw new Error(`${fallback}: ${message}${responseContext(res)}`);
 }
 
+// TODO(backend): confirm the real store endpoint + field contract with the API team.
+// Once known, uncomment the fetch in `uploadChapterContent` below and remove the stub return.
+export const CHAPTER_CONTENT_STORE_ENDPOINT = '/api/lms-chapter-content/store';
+
+export interface UploadChapterContentInput {
+  chapter_id: number;
+  sub_institute_id: number;
+  user_id: number;
+  subject_id?: number;
+  standard_id?: number;
+  syear?: string;
+  /** Presentation | Video | Revision notes | Classroom activity */
+  content_type: string;
+  /** Presentation type / Video type kept as the stored content_category. */
+  content_category: string;
+  /** Selected concept id, or null for chapter-wise content. */
+  concept_id?: number | string | null;
+  title: string;
+  /** File upload (Upload file tab). */
+  file?: File | null;
+  /** External link (Add link tab). */
+  url?: string | null;
+}
+
+export interface UploadChapterContentResult {
+  status: boolean;
+  message: string;
+  asset?: ChapterContentAsset;
+}
+
+/**
+ * Persists an uploaded content item for a chapter.
+ *
+ * NOTE: The backend store endpoint is not wired yet (see task decision:
+ * "frontend only for now"). This assembles the multipart payload exactly as the
+ * API is expected to receive it and is ready to switch on — flip `PERSIST_ENABLED`
+ * to true (and confirm CHAPTER_CONTENT_STORE_ENDPOINT) once the endpoint exists.
+ */
+export async function uploadChapterContent(
+  input: UploadChapterContentInput
+): Promise<UploadChapterContentResult> {
+  const form = new FormData();
+  form.append('chapter_id', String(input.chapter_id));
+  form.append('sub_institute_id', String(input.sub_institute_id));
+  form.append('user_id', String(input.user_id));
+  if (input.subject_id != null) form.append('subject_id', String(input.subject_id));
+  if (input.standard_id != null) form.append('standard_id', String(input.standard_id));
+  if (input.syear) form.append('syear', input.syear);
+  form.append('content_type', input.content_type);
+  form.append('content_category', input.content_category);
+  if (input.concept_id != null && input.concept_id !== '') {
+    form.append('concept_id', String(input.concept_id));
+  }
+  form.append('title', input.title);
+  if (input.file) form.append('file', input.file);
+  if (input.url) form.append('url', input.url);
+
+  const PERSIST_ENABLED = false; // TODO(backend): set true once the store endpoint is live.
+  if (!PERSIST_ENABLED) {
+    return { status: true, message: 'Saved locally (backend endpoint not wired yet).' };
+  }
+
+  const res = await fetch(`${API_BASE_URL}${CHAPTER_CONTENT_STORE_ENDPOINT}`, {
+    method: 'POST',
+    body: form,
+  });
+  const raw = await readApiJson(res, 'Failed to save content');
+  if (!res.ok || Number(raw.status_code) !== 1) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to save content'));
+  }
+  return {
+    status: true,
+    message: (raw.message as string) || 'Content saved.',
+    asset: (raw.data ?? undefined) as ChapterContentAsset | undefined,
+  };
+}
+
 export async function fetchChapterContent(
   chapterId: number,
   subInstituteId: number

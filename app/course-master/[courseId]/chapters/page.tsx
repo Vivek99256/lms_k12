@@ -59,6 +59,7 @@ import {
   getConceptIntelligenceData,
   getSubjectAndChapters,
   resolveSubjectDisplayName,
+  uploadChapterContent,
   type ChapterContentAsset,
   type ChapterSemantic,
   type ConceptIntelEntry,
@@ -85,6 +86,7 @@ const RESOURCE_MATERIAL_TYPES = ['Mindmap', 'Teacher Training', 'Worksheet', 'Re
 const RESOURCE_FILE_TYPES = ['PDF', 'PPT', 'DOCX', 'Video Link'] as const;
 const UPLOAD_CONTENT_TYPES = ['Presentation', 'Video', 'Revision notes', 'Classroom activity'] as const;
 const UPLOAD_PRESENTATION_TYPES = ['Classroom presentation', 'Teacher training presentation'] as const;
+const UPLOAD_VIDEO_TYPES = ['Recorded video', 'External video'] as const;
 const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
 const QUESTION_TYPE_OPTIONS = ['MCQ', 'Narrative'] as const;
 const QUESTION_OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
@@ -166,6 +168,8 @@ interface ChapterContentItem {
   subtitle: string;
   chapterTitle: string;
   conceptTitle: string;
+  contentCategory: string;
+  conceptId: string | null;
   type: ChapterContentType;
   source: ChapterContentSource;
   preview: ChapterContentPreview;
@@ -233,6 +237,10 @@ function buildApiChapterContentItems(
       const type = getApiContentType(category, asset);
       const contentUrl = asset.url || asset.filename || undefined;
       const updatedDate = asset.created_at?.split(' ')[0] ?? '—';
+      const rawConceptId =
+        asset.concept_id === null || asset.concept_id === undefined
+          ? null
+          : String(asset.concept_id).trim();
 
       return {
         id: String(asset.id),
@@ -240,6 +248,8 @@ function buildApiChapterContentItems(
         subtitle: category,
         chapterTitle: chapter.title,
         conceptTitle: category,
+        contentCategory: asset.content_category ?? category,
+        conceptId: rawConceptId && rawConceptId !== '0' ? rawConceptId : null,
         type,
         source: 'Uploaded',
         preview: getChapterContentPreview(type),
@@ -486,6 +496,10 @@ function buildChapterContentItems(
       subtitle: `${chapterLabel} - ${gradeLabel}`,
       chapterTitle: chapter.title,
       conceptTitle,
+      contentCategory: type === 'Teacher training presentation' ? 'Teacher Training' : conceptTitle,
+      // Demo data has no real concept_id; approximate chapter-wise vs concept-wise
+      // by alternating so both grouping views show sample content.
+      conceptId: concept && index % 2 === 1 ? `${chapter.id}-concept-${index}` : null,
       type,
       source,
       preview,
@@ -509,6 +523,10 @@ function getContentPreviewIcon(preview: ChapterContentPreview) {
   }
 
   return BookOpen;
+}
+
+function isTeacherTrainingContent(item: ChapterContentItem): boolean {
+  return `${item.contentCategory ?? ''} ${item.type}`.toLowerCase().includes('teacher');
 }
 
 function truncateToWords(value: string, maxWords = 150): string {
@@ -717,6 +735,9 @@ export default function ChapterListPage() {
   const [uploadPresentationType, setUploadPresentationType] = useState<
     (typeof UPLOAD_PRESENTATION_TYPES)[number]
   >(UPLOAD_PRESENTATION_TYPES[0]);
+  const [uploadVideoType, setUploadVideoType] = useState<(typeof UPLOAD_VIDEO_TYPES)[number]>(
+    UPLOAD_VIDEO_TYPES[0]
+  );
   const [uploadChapterId, setUploadChapterId] = useState('');
   const [uploadConcept, setUploadConcept] = useState('all');
   const [uploadMethod, setUploadMethod] = useState<(typeof UPLOAD_METHOD_TABS)[number]>(
@@ -785,6 +806,8 @@ export default function ChapterListPage() {
   const [intelligenceError, setIntelligenceError] = useState('');
 
   const view = searchParams.get('view');
+  const contentResourceType = searchParams.get('resourceType') === 'teacher' ? 'teacher' : 'classroom';
+  const contentResourceLabel = contentResourceType === 'teacher' ? 'Teacher Resource' : 'Classroom Resource';
   const activeChapterId = searchParams.get('chapterId') ?? '';
   const resourceChapter =
     allChapters.find((chapter) => chapter.id === activeChapterId) || allChapters[0] || null;
@@ -948,13 +971,33 @@ export default function ChapterListPage() {
     () => allChapters.find((chapter) => chapter.id === uploadChapterId) ?? uploadChapter,
     [allChapters, uploadChapter, uploadChapterId]
   );
-  const uploadConceptOptions = useMemo(() => {
-    if (!course || !uploadChapterId) return [];
-    return getChapterKeyConcepts(course.id, uploadChapterId)?.concepts ?? [];
-  }, [course, uploadChapterId]);
+  const uploadConceptOptions = useMemo<{ id: string | null; title: string }[]>(() => {
+    if (!uploadSelectedChapter) return [];
+    // Prefer the chapter's real concepts (they carry concept ids); fall back to the
+    // static key-concept list and finally to the content_categories keys so the
+    // dropdown is populated for API-backed chapters too.
+    const chapterConcepts = uploadSelectedChapter.concepts ?? [];
+    if (chapterConcepts.length > 0) {
+      return chapterConcepts
+        .filter((concept) => concept.title?.trim())
+        .map((concept) => ({ id: concept.id ?? null, title: concept.title }));
+    }
+    const keyConcepts = course
+      ? getChapterKeyConcepts(course.id, uploadChapterId)?.concepts ?? []
+      : [];
+    if (keyConcepts.length > 0) {
+      return keyConcepts
+        .filter((concept) => concept.title?.trim())
+        .map((concept) => ({ id: null, title: concept.title }));
+    }
+    return Object.keys(uploadSelectedChapter.content_categories ?? {})
+      .filter((title) => title.trim())
+      .map((title) => ({ id: null, title }));
+  }, [course, uploadChapterId, uploadSelectedChapter]);
   const uploadTypeConfig = UPLOAD_TYPE_CONFIG[uploadContentType];
   const canSaveUploadContent =
-    uploadMethod === 'Upload file' ? Boolean(uploadFile) : uploadLink.trim().length > 0;
+    Boolean(uploadChapterId) &&
+    (uploadMethod === 'Upload file' ? Boolean(uploadFile) : uploadLink.trim().length > 0);
   const totalQuestionsNumber = Number(totalQuestions);
   const isTotalQuestionsValid =
     totalQuestions.trim() !== '' &&
@@ -1033,20 +1076,38 @@ export default function ChapterListPage() {
           .toLowerCase()
           .includes(contentSearch.toLowerCase());
       const matchesSource = contentSourceFilter === 'all' || item.source === contentSourceFilter;
-      const matchesTab =
-        contentLibraryTab === 'All content' ||
-        (contentLibraryTab === 'Presentations' &&
-          (item.type === 'Classroom presentation' || item.type === 'Teacher training presentation')) ||
-        (contentLibraryTab === 'Videos' && item.type === 'Video') ||
-        (contentLibraryTab === 'Revision notes' &&
-          (item.type === 'Revision notes' || item.type === 'PDF')) ||
-        (contentLibraryTab === 'Classroom activity' && item.type === 'Revision notes');
 
-      return matchesSearch && matchesSource && matchesTab;
+      const isTeacherTraining = isTeacherTrainingContent(item);
+      // Teacher Resources only ever shows Teacher Training content; Classroom
+      // Resources never shows it.
+      const matchesResourceType =
+        contentResourceType === 'teacher' ? isTeacherTraining : !isTeacherTraining;
+
+      const matchesTab =
+        contentResourceType === 'teacher'
+          ? // In Teacher Resources, both "All content" and "Presentations" surface
+            // every Teacher Training item regardless of its underlying type.
+            true
+          : contentLibraryTab === 'All content' ||
+            (contentLibraryTab === 'Presentations' &&
+              (item.type === 'Classroom presentation' || item.type === 'Teacher training presentation')) ||
+            (contentLibraryTab === 'Videos' && item.type === 'Video') ||
+            (contentLibraryTab === 'Revision notes' &&
+              (item.type === 'Revision notes' || item.type === 'PDF')) ||
+            (contentLibraryTab === 'Classroom activity' && item.type === 'Revision notes');
+
+      // Chapter-wise shows only records without a concept_id; Concept-wise shows
+      // only records that carry a concept_id.
+      const matchesGroup =
+        contentGroupBy === 'Concept wise' ? item.conceptId !== null : item.conceptId === null;
+
+      return matchesSearch && matchesSource && matchesResourceType && matchesTab && matchesGroup;
     });
   }, [
     chapterContentItems,
+    contentGroupBy,
     contentLibraryTab,
+    contentResourceType,
     contentSearch,
     contentSourceFilter,
   ]);
@@ -1126,6 +1187,7 @@ export default function ChapterListPage() {
     setUploadChapter(null);
     setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
     setUploadPresentationType(UPLOAD_PRESENTATION_TYPES[0]);
+    setUploadVideoType(UPLOAD_VIDEO_TYPES[0]);
     setUploadChapterId('');
     setUploadConcept('all');
     setUploadMethod(UPLOAD_METHOD_TABS[0]);
@@ -1147,6 +1209,7 @@ export default function ChapterListPage() {
     setUploadChapter(chapter);
     setUploadContentType(UPLOAD_CONTENT_TYPES[0]);
     setUploadPresentationType(UPLOAD_PRESENTATION_TYPES[0]);
+    setUploadVideoType(UPLOAD_VIDEO_TYPES[0]);
     setUploadChapterId(chapter.id);
     setUploadConcept('all');
     setUploadMethod(UPLOAD_METHOD_TABS[0]);
@@ -1264,7 +1327,25 @@ export default function ChapterListPage() {
     setUploadError('');
   };
 
-  const saveUploadContent = () => {
+  // The stored content_category also drives library filtering (teacher vs
+  // classroom, presentation/video/notes tabs), so it mirrors the selected
+  // secondary field per content type.
+  const getUploadContentCategory = () => {
+    switch (uploadContentType) {
+      case 'Presentation':
+        return uploadPresentationType;
+      case 'Video':
+        return uploadVideoType;
+      default:
+        return uploadContentType;
+    }
+  };
+
+  const saveUploadContent = async () => {
+    if (!uploadChapterId) {
+      setUploadError('Please select a chapter before saving.');
+      return;
+    }
     if (uploadMethod === 'Upload file') {
       if (!uploadFile) {
         setUploadError('Please select a file before saving.');
@@ -1275,7 +1356,65 @@ export default function ChapterListPage() {
       return;
     }
 
-    closeUploadContentModal();
+    const requestContext = getRequestContext();
+    if (!requestContext) {
+      setUploadError('Course master session data is missing.');
+      return;
+    }
+
+    const category = getUploadContentCategory();
+    // "All concepts" means chapter-wise (null). Otherwise resolve the concept's
+    // real id when available, falling back to its title.
+    const selectedConcept =
+      uploadConcept !== 'all'
+        ? uploadConceptOptions.find((concept) => concept.title === uploadConcept)
+        : null;
+    const conceptTitle =
+      uploadConcept !== 'all' ? selectedConcept?.id ?? uploadConcept : null;
+    const linkValue = uploadMethod === 'Add link' ? uploadLink.trim() : null;
+    const title = uploadFile?.name ?? linkValue ?? category;
+
+    try {
+      const result = await uploadChapterContent({
+        chapter_id: Number(uploadChapterId),
+        sub_institute_id: requestContext.sub_institute_id,
+        user_id: requestContext.user_id,
+        subject_id: Number(subjectData?.subject?.subject_id ?? subjectId) || undefined,
+        standard_id: Number(subjectData?.subject?.standard_id ?? standardId) || undefined,
+        content_type: uploadContentType,
+        content_category: category,
+        concept_id: conceptTitle,
+        title,
+        file: uploadMethod === 'Upload file' ? uploadFile : null,
+        url: linkValue,
+      });
+
+      // Optimistically surface the new item in the library (only the numeric,
+      // API-backed chapters read from this store).
+      if (/^\d+$/.test(uploadChapterId)) {
+        const newAsset: ChapterContentAsset = result.asset ?? {
+          id: Date.now(),
+          title,
+          description: null,
+          filename: uploadFile?.name ?? null,
+          url: linkValue,
+          file_type: uploadFile?.type || (uploadFile?.name.split('.').pop() ?? null),
+          content_category: category,
+          concept_id: conceptTitle,
+          created_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        };
+        setChapterContentCategories((current) => {
+          const chapterCategories = { ...(current[uploadChapterId] ?? {}) };
+          chapterCategories[category] = [newAsset, ...(chapterCategories[category] ?? [])];
+          return { ...current, [uploadChapterId]: chapterCategories };
+        });
+      }
+
+      setSuccessMessage(result.message || 'Content saved.');
+      closeUploadContentModal();
+    } catch (error: unknown) {
+      setUploadError(error instanceof Error ? error.message : 'Failed to save content.');
+    }
   };
 
   useEffect(() => {
@@ -1310,9 +1449,10 @@ export default function ChapterListPage() {
     router.replace(`/course-master/${courseId}/chapters${nextQuery ? `?${nextQuery}` : ''}`);
   };
 
-  const openChapterContentView = (chapter: Chapter) => {
+  const openChapterContentView = (chapter: Chapter, resourceType: 'classroom' | 'teacher' = 'classroom') => {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set('view', 'content');
+    nextParams.set('resourceType', resourceType);
     nextParams.set('chapterId', chapter.id);
     nextParams.set('expandedChapterId', chapter.id);
 
@@ -1682,28 +1822,61 @@ export default function ChapterListPage() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Presentation Type
-                </Label>
-                <Select
-                  value={uploadPresentationType}
-                  onValueChange={(value) =>
-                    setUploadPresentationType(value as (typeof UPLOAD_PRESENTATION_TYPES)[number])
-                  }
-                >
-                  <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                    <SelectValue placeholder="Select presentation type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {UPLOAD_PRESENTATION_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {uploadContentType === 'Presentation' && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Presentation Type
+                  </Label>
+                  <Select
+                    value={uploadPresentationType}
+                    onValueChange={(value) =>
+                      setUploadPresentationType(value as (typeof UPLOAD_PRESENTATION_TYPES)[number])
+                    }
+                  >
+                    <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                      <SelectValue placeholder="Select presentation type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UPLOAD_PRESENTATION_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {uploadContentType === 'Video' && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Video Type
+                  </Label>
+                  <Select
+                    value={uploadVideoType}
+                    onValueChange={(value) =>
+                      setUploadVideoType(value as (typeof UPLOAD_VIDEO_TYPES)[number])
+                    }
+                  >
+                    <SelectTrigger className="h-11 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
+                      <SelectValue placeholder="Select video type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UPLOAD_VIDEO_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Keeps Chapter/Concept aligned on the next row when there is no
+                  secondary type field (Revision notes / Classroom activity). */}
+              {uploadContentType !== 'Presentation' && uploadContentType !== 'Video' && (
+                <div aria-hidden className="hidden md:block" />
+              )}
 
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -3354,13 +3527,13 @@ export default function ChapterListPage() {
                 {course.subject} - {gradeLabel}
               </span>
               <ChevronRight size={14} className="text-slate-400" />
-              <span className="font-semibold text-[#4f46e5]">Content</span>
+              <span className="font-semibold text-[#4f46e5]">{contentResourceLabel}</span>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl">
                 <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                  Content - {course.subject} - {gradeLabel}
+                  {contentResourceLabel} - {course.subject} - {gradeLabel}
                 </h1>
                 <p className="mt-2 text-slate-600">
                   Generate presentations with AI, upload videos, notes and PDFs, and manage the content library for{' '}
@@ -3368,25 +3541,27 @@ export default function ChapterListPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  onClick={openGeneratePresentationDrawer}
-                  className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
-                >
-                  <Sparkles size={16} className="mr-2" />
-                  Generate presentation
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
-                  className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                >
-                  <Upload size={16} className="mr-2" />
-                  Upload content
-                </Button>
-              </div>
+              {contentResourceType === 'teacher' && (
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    type="button"
+                    onClick={openGeneratePresentationDrawer}
+                    className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
+                  >
+                    <Sparkles size={16} className="mr-2" />
+                    Generate content
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
+                    className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    <Upload size={16} className="mr-2" />
+                    Upload content
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -3480,7 +3655,13 @@ export default function ChapterListPage() {
 
           <div className="mb-4 border-b border-slate-200/80">
             <div className="flex flex-wrap items-center gap-6 text-[15px]">
-              {CONTENT_LIBRARY_TABS.map((tab) => (
+              {CONTENT_LIBRARY_TABS.filter(
+                (tab) =>
+                  contentResourceType !== 'teacher' ||
+                  !(['Videos', 'Revision notes', 'Classroom activity'] as const).includes(
+                    tab as 'Videos' | 'Revision notes' | 'Classroom activity'
+                  )
+              ).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -3553,7 +3734,7 @@ export default function ChapterListPage() {
                 >
                   <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
                     <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
-                      {item.type}
+                      {truncateToWords(item.subtitle, 150)}
                     </span>
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
                       {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
@@ -3572,12 +3753,9 @@ export default function ChapterListPage() {
                       {item.chapterTitle}
                     </div>
                      <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-                     <p className="mt-2 min-h-[44px] text-sm leading-6 text-slate-600">{truncateToWords(item.subtitle, 150)}</p>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
-                      <p className="text-xs text-slate-500">
-                        {item.statValue} - {item.updatedAt}
-                      </p>
+                      
                       <Button
                         type="button"
                         variant="ghost"
@@ -3909,11 +4087,20 @@ export default function ChapterListPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => openChapterContentView(chapter)}
+                      onClick={() => openChapterContentView(chapter, 'classroom')}
                       className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                     >
                       <FolderOpen size={16} className="mr-2" />
-                      Content
+                      Classroom Resource
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => openChapterContentView(chapter, 'teacher')}
+                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                    >
+                      <FolderOpen size={16} className="mr-2" />
+                      Teacher Resource
                     </Button>
                     <Button
                       type="button"
