@@ -74,6 +74,25 @@ export const ROUTES = {
     customModule: '/Utility/custom-module',
     transferStudent: '/Utility/transfer-student',
   },
+
+  // Admin services routes (front-office desks)
+  adminServices: {
+    addVisitor: '/admin-services/add-visitor',
+    visitorReport: '/admin-services/visitor-report',
+    complaintManagement: '/admin-services/complaint-management',
+    complaintReport: '/admin-services/complaint-report',
+    consentMaster: '/admin-services/consent-master',
+    deleteConsentMaster: '/admin-services/delete-consent-master',
+    consentReport: '/admin-services/consent-report',
+    frontDesk: '/admin-services/front-desk',
+    frontDeskReport: '/admin-services/front-desk-report',
+    pettyCash: '/admin-services/petty-cash',
+    pettyCashMaster: '/admin-services/petty-cash-master',
+    pettyCashReport: '/admin-services/petty-cash-report',
+    ptmAttendedStatus: '/admin-services/ptm-attended-status',
+    ptmTimeSlotMaster: '/admin-services/ptm-time-slot-master',
+    ptmReport: '/admin-services/ptm-report',
+  },
 } as const;
 
 export type RouteName = string;
