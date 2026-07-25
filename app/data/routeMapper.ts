@@ -137,6 +137,43 @@ const UTILITY_ROUTE_NAME_MAP: Record<string, string> = {
   'student/transfer_student': '/Utility/transfer-student',
 };
 
+/**
+ * Admin services: legacy Laravel route names (and their path-style variants)
+ * → the Next.js pages under /admin-services.
+ */
+const ADMIN_SERVICES_ROUTE_NAME_MAP: Record<string, string> = {
+  'add_visitor_master.index': '/admin-services/add-visitor',
+  'visitor_management/add_visitor_master': '/admin-services/add-visitor',
+  'show_visitor_report': '/admin-services/visitor-report',
+  'visitor_management/show_visitor_report': '/admin-services/visitor-report',
+  'complaint.index': '/admin-services/complaint-management',
+  'frontdesk/complaint': '/admin-services/complaint-management',
+  'complaint_report_index': '/admin-services/complaint-report',
+  'frontdesk/complaint_report': '/admin-services/complaint-report',
+  'add_consent_master.index': '/admin-services/consent-master',
+  'consent/add_consent_master': '/admin-services/consent-master',
+  'delete_consent_master.index': '/admin-services/delete-consent-master',
+  'consent/delete_consent_master': '/admin-services/delete-consent-master',
+  'report_consent_master.index': '/admin-services/consent-report',
+  'consent/report_consent_master': '/admin-services/consent-report',
+  'frontdesk.index': '/admin-services/front-desk',
+  'frontdesk/frontdesk': '/admin-services/front-desk',
+  'frontdesk_report_index': '/admin-services/front-desk-report',
+  'frontdesk/frontdesk_report_index': '/admin-services/front-desk-report',
+  'pettycash.index': '/admin-services/petty-cash',
+  'frontdesk/pettycash': '/admin-services/petty-cash',
+  'pettycashmaster.index': '/admin-services/petty-cash-master',
+  'frontdesk/pettycashmaster': '/admin-services/petty-cash-master',
+  'pettycashreport.index': '/admin-services/petty-cash-report',
+  'frontdesk/pettycashreport': '/admin-services/petty-cash-report',
+  'add_ptm_attened_status.index': '/admin-services/ptm-attended-status',
+  'ptm/add_ptm_attened_status': '/admin-services/ptm-attended-status',
+  'add_ptm_time_slot_master.index': '/admin-services/ptm-time-slot-master',
+  'ptm/add_ptm_time_slot_master': '/admin-services/ptm-time-slot-master',
+  'ptm_report.index': '/admin-services/ptm-report',
+  'ptm/ptm_report': '/admin-services/ptm-report',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -166,6 +203,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const utilityRoute = UTILITY_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (utilityRoute) {
     return utilityRoute;
+  }
+
+  // Admin services → front-office desks under /admin-services.
+  const adminServicesRoute = ADMIN_SERVICES_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (adminServicesRoute) {
+    return adminServicesRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
