@@ -166,6 +166,11 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lms_syllabus': '/lms/syllabus-plan',
   'lmsleaderboard.index': '/lms/leader-board',
   'lms/lmsleaderboard': '/lms/leader-board',
+  // MASTER modules
+  'lb_master.index': '/lms/leader-board-master',
+  'lms/lb_master': '/lms/leader-board-master',
+  'lmsmapping.index': '/lms/global-mapping',
+  'lms/lmsmapping': '/lms/global-mapping',
 };
 
 /**
