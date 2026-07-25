@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { deleteInventory, loadInventory, saveInventory, type InventoryData, type InventoryRecord } from "../api";
 
 export type InventoryField = {
-  key: string; label: string; kind?: "text" | "number" | "date" | "textarea" | "select";
+  key: string; label: string; kind?: "text" | "number" | "date" | "textarea" | "select" | "file";
   required?: boolean; source?: string; options?: string[]; filter?: boolean;
 };
 export type InventoryConfig = {
@@ -26,6 +26,7 @@ const text = (value: unknown) => value == null ? "" : String(value);
 export function InventoryPage({ config }: { config: InventoryConfig }) {
   const [data, setData] = useState(EMPTY);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<Record<string, File>>({});
   const [editing, setEditing] = useState<InventoryRecord | null>(null);
   const [open, setOpen] = useState(config.mode !== "master");
   const [loading, setLoading] = useState(true);
@@ -53,7 +54,7 @@ export function InventoryPage({ config }: { config: InventoryConfig }) {
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);
   const visible = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-  function reset() { setForm({}); setEditing(null); setOpen(config.mode !== "master"); }
+  function reset() { setForm({}); setFiles({}); setEditing(null); setOpen(config.mode !== "master"); }
   function edit(row: InventoryRecord) {
     setForm(Object.fromEntries(config.fields.map((field) => [field.key, text(row.values[field.key])])));
     setEditing(row); setOpen(true);
@@ -62,7 +63,7 @@ export function InventoryPage({ config }: { config: InventoryConfig }) {
     const missing = config.fields.find((field) => field.required && !form[field.key]?.trim());
     if (missing) { setError(`${missing.label} is required.`); return; }
     setBusy(true); setError("");
-    try { setNotice(await saveInventory(config.module, form, editing?.id)); reset(); await load(); }
+    try { setNotice(await saveInventory(config.module, form, editing?.id, files)); reset(); await load(); }
     catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Record could not be saved."); }
     finally { setBusy(false); }
   }
@@ -88,7 +89,8 @@ export function InventoryPage({ config }: { config: InventoryConfig }) {
     {open && <Card><CardHeader className="border-b"><div className="flex items-center justify-between"><CardTitle>{config.mode === "report" ? "Report Filters" : editing ? `Edit ${config.singular}` : config.title}</CardTitle>{config.mode === "master" && <Button size="icon" variant="ghost" onClick={reset}><X className="size-4" /></Button>}</div></CardHeader><CardContent>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{config.fields.map((field) => <div key={field.key} className={field.kind === "textarea" ? "sm:col-span-2 lg:col-span-3" : ""}><Label htmlFor={field.key}>{field.label}{field.required ? " *" : ""}</Label>
         {field.kind === "textarea" ? <Textarea id={field.key} className="mt-1" value={form[field.key] || ""} onChange={(event) => setForm((value) => ({ ...value, [field.key]: event.target.value }))} />
-          : field.kind === "select" ? <select id={field.key} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={form[field.key] || ""} onChange={(event) => setForm((value) => ({ ...value, [field.key]: event.target.value }))}><option value="">All / Select {field.label}</option>{field.options?.map((item) => <option key={item} value={item}>{item}</option>)}{(data.options[field.source || ""] || []).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+          : field.kind === "file" ? <Input id={field.key} type="file" className="mt-1" onChange={(event) => { const file = event.target.files?.[0]; setFiles((value) => { const next = { ...value }; if (file) next[field.key] = file; else delete next[field.key]; return next; }); }} />
+          : field.kind === "select" ? <select id={field.key} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={form[field.key] || ""} onChange={(event) => setForm((value) => ({ ...value, [field.key]: event.target.value, ...(field.key === "category_id" ? { sub_category_id: "" } : {}) }))}><option value="">All / Select {field.label}</option>{field.options?.map((item) => <option key={item} value={item}>{item}</option>)}{(data.options[field.source || ""] || []).filter((item) => field.source !== "sub_categories" || !form.category_id || item.parentId === Number(form.category_id)).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
           : <Input id={field.key} type={field.kind || "text"} min={field.kind === "number" ? 0 : undefined} className="mt-1" value={form[field.key] || ""} onChange={(event) => setForm((value) => ({ ...value, [field.key]: event.target.value }))} />}</div>)}</div>
       <div className="mt-5"><Button onClick={() => config.mode === "report" ? void load() : void save()} disabled={busy}>{busy && <LoaderCircle className="size-4 animate-spin" />}{config.mode === "report" ? "Generate Report" : "Save"}</Button></div>
     </CardContent></Card>}
