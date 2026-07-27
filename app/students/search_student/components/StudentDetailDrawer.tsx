@@ -30,21 +30,31 @@ ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, 
 // Edit Profile Form Component
 interface EditProfileFormProps {
   student: Student;
-  onSave: (updatedStudent: Student) => void;
+  onSave: (updatedStudent: Student) => Promise<void> | void;
   onCancel: () => void;
 }
 
 function EditProfileForm({ student, onSave, onCancel }: EditProfileFormProps) {
   const [formData, setFormData] = useState(student);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      await onSave(formData);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Unable to update student.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -176,7 +186,7 @@ function EditProfileForm({ student, onSave, onCancel }: EditProfileFormProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Father's Name</label>
+          <label className="block text-xs font-medium text-slate-700 mb-1">Father&apos;s Name</label>
           <input
             type="text"
             name="fatherName"
@@ -186,7 +196,7 @@ function EditProfileForm({ student, onSave, onCancel }: EditProfileFormProps) {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Mother's Name</label>
+          <label className="block text-xs font-medium text-slate-700 mb-1">Mother&apos;s Name</label>
           <input
             type="text"
             name="motherName"
@@ -231,13 +241,17 @@ function EditProfileForm({ student, onSave, onCancel }: EditProfileFormProps) {
         />
       </div>
 
+      {saveError && (
+        <p className="text-sm text-red-600">{saveError}</p>
+      )}
       <div className="flex items-center gap-3 pt-2">
         <button
           type="submit"
+          disabled={isSaving}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-[#0D6EFD] text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
         >
           <Save className="w-4 h-4" />
-          Save Changes
+          {isSaving ? 'Saving...' : 'Save Changes'}
         </button>
         <button
           type="button"
@@ -363,7 +377,7 @@ function DummyIDCard({ student }: { student: Student }) {
 interface StudentDetailDrawerProps {
   student: Student | null;
   onClose: () => void;
-  onEdit: (student: Student) => void;
+  onEdit: (student: Student) => Promise<void> | void;
   onGenerateCertificate: (student: Student) => void;
   onPrintIDCard: (student: Student) => void;
 }
@@ -405,10 +419,10 @@ export function StudentDetailDrawer({
     setActiveTab('overview');
   };
 
-  const handleSaveEdit = (updatedStudent: Student) => {
+  const handleSaveEdit = async (updatedStudent: Student) => {
+    await onEdit(updatedStudent);
     setEditStudent(null);
     setIsEditing(false);
-    onEdit(updatedStudent);
     setActiveTab('overview');
   };
 
@@ -766,11 +780,11 @@ export function StudentDetailDrawer({
           {/* Tab Navigation */}
           <div className="border-b border-slate-200 bg-slate-50/50 px-6">
             <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-              {['overview', 'form', 'academics', 'attendance', 'documents'].map((tab) => (
+              {(['overview', 'form', 'academics', 'attendance', 'documents'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => {
-                    setActiveTab(tab as any);
+                    setActiveTab(tab);
                     setShowCertificate(false);
                     setShowIDCard(false);
                   }}
