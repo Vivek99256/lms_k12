@@ -248,6 +248,46 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   // Remove trailing slashes only
   cleanLink = cleanLink.replace(/\/+$/, '');
 
+  if (
+    cleanLink.toLowerCase() === 'bulk_student_update.index' ||
+    cleanLink.toLowerCase() === 'student/bulk_student_update'
+  ) {
+    return '/student/bulk_student_update';
+  }
+
+  if (
+    cleanLink.toLowerCase() === 'student_infirmary.index' ||
+    cleanLink.toLowerCase() === 'student/student_infirmary'
+  ) {
+    return '/student/student_infirmary';
+  }
+
+    const studentCareRoutes: Record<string, string> = {
+    'student_vaccination.index': '/student/student_vaccination',
+    'student/student_vaccination': '/student/student_vaccination',
+    'student_hw.index': '/student/student_hw',
+    'student/student_hw': '/student/student_hw',
+    'student_health.index': '/student/student_health',
+    'student/student_health': '/student/student_health',
+    'dicipline.index': '/student/dicipline',
+    'student/dicipline': '/student/dicipline',
+    };
+    if (studentCareRoutes[cleanLink.toLowerCase()]) {
+      return studentCareRoutes[cleanLink.toLowerCase()];
+    }
+
+    const studentAdminRoutes: Record<string, string> = {
+      'student_quota.index': '/student/student_quota',
+      'student/student_quota': '/student/student_quota',
+      'add_student.index': '/student/add_student',
+      'student/add_student': '/student/add_student',
+      'add_house.index': '/student/add_house',
+      'student/add_house': '/student/add_house',
+      'student_optional_subject.index': '/student/student_optional_subject',
+      'student/student_optional_subject': '/student/student_optional_subject',
+    };
+    if (studentAdminRoutes[cleanLink.toLowerCase()]) return studentAdminRoutes[cleanLink.toLowerCase()];
+
   const examRoute = EXAM_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (examRoute) {
     return examRoute;

@@ -36,7 +36,7 @@ export default function HealthAndMedicalPage() {
 
   return (
    
-      <div className="max-w-7xl mx-auto shadow-sm p-6">
+      <div className="mx-auto shadow-sm p-6">
 
         {/* Top Analytics KPI Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
