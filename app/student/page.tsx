@@ -177,6 +177,7 @@ type StudentContentItem = {
   chapterId: number;
   chapterName: string;
   conceptName: string;
+  conceptId: number | null;
   id: number;
   source: string;
   statText: string;
@@ -470,6 +471,25 @@ function normalizeContentType(rawType: string, asset: Record<string, unknown>) {
   return { key: 'revision_notes' as const, label: 'Revision notes' };
 }
 
+function resolveChapterConceptId(chapter: StudentChapterView, conceptName: string, asset: ChapterContentAsset & Record<string, unknown>) {
+  const rawConceptId = asset.concept_id ?? asset.conceptId ?? asset.conceptID;
+  if (rawConceptId != null && rawConceptId !== '') {
+    const parsedConceptId = Number(rawConceptId);
+    if (Number.isFinite(parsedConceptId)) return parsedConceptId;
+  }
+
+  const normalizedConceptName = conceptName.trim().toLowerCase();
+  if (!normalizedConceptName || normalizedConceptName === 'all concepts') {
+    return null;
+  }
+
+  const matchedConcept = chapter.concepts.find((concept) => concept.name.trim().toLowerCase() === normalizedConceptName);
+  if (!matchedConcept) return null;
+
+  const parsedConceptId = Number(matchedConcept.id);
+  return Number.isFinite(parsedConceptId) ? parsedConceptId : null;
+}
+
 function formatUpdatedLabel(value: unknown) {
   const raw = readString(value);
   if (!raw) return 'updated date unavailable';
@@ -527,6 +547,7 @@ function normalizeChapterContent(
         chapterId: Number(chapter.id),
         chapterName: chapter.name,
         conceptName: conceptName || 'All concepts',
+        conceptId: resolveChapterConceptId(chapter, conceptName, asset),
         source:
           readString(asset.source) ||
           readString(asset.upload_type) ||
@@ -880,7 +901,7 @@ export default function StudentPage() {
 
   const selectedChapterContent = selectedChapter ? contentItemsByChapter[selectedChapter.id] ?? [] : [];
 
-  const filteredContent = useMemo(
+  const baseFilteredContent = useMemo(
     () =>
       selectedChapterContent.filter((item) => {
         const matchesSearch =
@@ -893,6 +914,14 @@ export default function StudentPage() {
       }),
     [contentSearch, selectedChapter, selectedChapterContent, selectedContentType]
   );
+
+  const filteredContent = useMemo(() => {
+    if (contentGroupBy === 'chapter') {
+      return baseFilteredContent.filter((item) => item.conceptId === null);
+    }
+
+    return baseFilteredContent.filter((item) => item.conceptId !== null);
+  }, [baseFilteredContent, contentGroupBy]);
 
   const groupedConceptContent = useMemo(() => {
     return filteredContent.reduce<Record<string, StudentContentItem[]>>((groups, item) => {

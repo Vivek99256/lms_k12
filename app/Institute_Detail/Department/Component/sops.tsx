@@ -1139,6 +1139,7 @@ export default function SopsModule({
         onClose={() => setAiDrawerOpen(false)}
         onSave={handleAiSave}
         departmentName={departmentName}
+        departmentId={departmentId}
       />
     </div>
   );

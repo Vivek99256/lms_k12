@@ -5,40 +5,60 @@ import {
   type Subject,
 } from "./types";
 
-import { API_BASE_URL } from "@/app/components/utils/api_url";
-
 interface ApiResponse<T> {
-  status: number | string;
+  status?: number | string;
+  status_code?: number | string;
   message?: string;
-  data?: T[];
+  data?: T[] | Record<string, T> | null;
+}
+
+function normalizeItems<T>(payload: ApiResponse<T>): T[] {
+  if (Array.isArray(payload.data)) {
+    return payload.data;
+  }
+
+  if (payload.data && typeof payload.data === "object") {
+    return Object.values(payload.data);
+  }
+
+  return [];
 }
 
 async function postFormData<T>(
   endpoint: string,
   payload: Record<string, string>
 ): Promise<T[]> {
-  const formData = new FormData();
-
+  const body = new URLSearchParams();
   Object.entries(payload).forEach(([key, value]) => {
-    formData.append(key, value);
+    body.set(key, value);
   });
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const proxyParams = new URLSearchParams({
+    path: endpoint.replace(/^\//, ""),
+  });
+
+  const response = await fetch(`/api/proxy?${proxyParams.toString()}`, {
     method: "POST",
-    body: formData,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+    },
+    body: body.toString(),
   });
-
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
-  }
 
   const result: ApiResponse<T> = await response.json();
 
-  if (Number(result.status) !== 1) {
+  if (!response.ok) {
+    throw new Error(
+      result.message || `Request failed with status ${response.status}`
+    );
+  }
+
+  if (Number(result.status ?? result.status_code) !== 1) {
     throw new Error(result.message || "No records found.");
   }
 
-  return Array.isArray(result.data) ? result.data : [];
+  return normalizeItems(result);
 }
 
 export function getAcademicSections(params: {

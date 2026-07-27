@@ -303,6 +303,30 @@ export interface ConceptIntelEntry {
   real_world_applications?: ConceptIntelRealWorld[];
   pedagogy_recommendations?: ConceptIntelPedagogy[];
   assessment_blueprint?: ConceptIntelAssessment[];
+  concept_relationships?: Array<{
+    source_concept?: string;
+    target_concept?: string;
+    relation_type?: string;
+    [key: string]: unknown;
+  }>;
+  evidence?: Array<{
+    source_type?: string;
+    source_text?: string;
+    [key: string]: unknown;
+  }>;
+  assessment_rubrics?: {
+    concept_name?: string;
+    teaching_notes?: string;
+    items?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+  };
+  agent_reasoning?: {
+    cognitive?: string;
+    pedagogy?: string;
+    assessment?: string;
+    rubrics?: string;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -406,6 +430,7 @@ export interface ChapterContentAsset {
   url: string | null;
   file_type: string | null;
   content_category: string | null;
+  concept_id?: number | string | null;
   created_at: string | null;
 }
 
@@ -548,6 +573,83 @@ async function readApiJson(res: Response, fallback: string): Promise<Record<stri
   throw new Error(`${fallback}: ${message}${responseContext(res)}`);
 }
 
+// TODO(backend): confirm the real store endpoint + field contract with the API team.
+// Once known, uncomment the fetch in `uploadChapterContent` below and remove the stub return.
+export const CHAPTER_CONTENT_STORE_ENDPOINT = '/api/lms-chapter-content/store';
+
+export interface UploadChapterContentInput {
+  chapter_id: number;
+  sub_institute_id: number;
+  user_id: number;
+  subject_id?: number;
+  standard_id?: number;
+  syear?: string;
+  /** Presentation | Video | Revision notes | Classroom activity */
+  content_type: string;
+  /** Presentation type / Video type kept as the stored content_category. */
+  content_category: string;
+  /** Selected concept id, or null for chapter-wise content. */
+  concept_id?: number | string | null;
+  title: string;
+  /** File upload (Upload file tab). */
+  file?: File | null;
+  /** External link (Add link tab). */
+  url?: string | null;
+}
+
+export interface UploadChapterContentResult {
+  status: boolean;
+  message: string;
+  asset?: ChapterContentAsset;
+}
+
+/**
+ * Persists an uploaded content item for a chapter.
+ *
+ * NOTE: The backend store endpoint is not wired yet (see task decision:
+ * "frontend only for now"). This assembles the multipart payload exactly as the
+ * API is expected to receive it and is ready to switch on — flip `PERSIST_ENABLED`
+ * to true (and confirm CHAPTER_CONTENT_STORE_ENDPOINT) once the endpoint exists.
+ */
+export async function uploadChapterContent(
+  input: UploadChapterContentInput
+): Promise<UploadChapterContentResult> {
+  const form = new FormData();
+  form.append('chapter_id', String(input.chapter_id));
+  form.append('sub_institute_id', String(input.sub_institute_id));
+  form.append('user_id', String(input.user_id));
+  if (input.subject_id != null) form.append('subject_id', String(input.subject_id));
+  if (input.standard_id != null) form.append('standard_id', String(input.standard_id));
+  if (input.syear) form.append('syear', input.syear);
+  form.append('content_type', input.content_type);
+  form.append('content_category', input.content_category);
+  if (input.concept_id != null && input.concept_id !== '') {
+    form.append('concept_id', String(input.concept_id));
+  }
+  form.append('title', input.title);
+  if (input.file) form.append('file', input.file);
+  if (input.url) form.append('url', input.url);
+
+  const PERSIST_ENABLED = false; // TODO(backend): set true once the store endpoint is live.
+  if (!PERSIST_ENABLED) {
+    return { status: true, message: 'Saved locally (backend endpoint not wired yet).' };
+  }
+
+  const res = await fetch(`${API_BASE_URL}${CHAPTER_CONTENT_STORE_ENDPOINT}`, {
+    method: 'POST',
+    body: form,
+  });
+  const raw = await readApiJson(res, 'Failed to save content');
+  if (!res.ok || Number(raw.status_code) !== 1) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to save content'));
+  }
+  return {
+    status: true,
+    message: (raw.message as string) || 'Content saved.',
+    asset: (raw.data ?? undefined) as ChapterContentAsset | undefined,
+  };
+}
+
 export async function fetchChapterContent(
   chapterId: number,
   subInstituteId: number
@@ -671,7 +773,17 @@ export async function fetchNewChapterMaster(
   };
 }
 
-export async function getSubjectAndChapters(subjectId: string, standardId?: string): Promise<SubjectWithChapters> {
+export async function getSubjectAndChapters(
+  subjectId: string,
+  standardId?: string,
+  options?: { resolveDisplayNames?: boolean }
+): Promise<SubjectWithChapters> {
+  // Display-name resolution calls fetchLmsCourses, which pulls the whole course
+  // catalog (~1.3MB / several seconds). It only supplies cosmetic subject/standard
+  // names. Callers that want the page to render immediately can pass
+  // { resolveDisplayNames: false } and enrich the names separately via
+  // resolveSubjectDisplayName().
+  const resolveDisplayNames = options?.resolveDisplayNames ?? true;
   const requestContext = getRequestContext();
   if (!requestContext) return { subject: null, chapters: [] };
 
@@ -686,23 +798,25 @@ export async function getSubjectAndChapters(subjectId: string, standardId?: stri
     });
 
     let matchedCourse: LmsSubject | undefined;
-    try {
-      const coursesResponse = await fetchLmsCourses({
-        type: 'API',
-        sub_institute_id: requestContext.sub_institute_id,
-        syear: getSyear(),
-        user_id: requestContext.user_id,
-        user_profile_name: requestContext.user_profile_name,
-        user_profile_id: requestContext.user_profile_id,
-        client_id: requestContext.client_id,
-      });
-      matchedCourse = coursesResponse.lms_subject.find(
-        (course) =>
-          Number(course.subject_id) === numericSubjectId &&
-          Number(course.standard_id) === numericStandardId
-      );
-    } catch {
-      // Chapter data remains usable if the course catalog is temporarily unavailable.
+    if (resolveDisplayNames) {
+      try {
+        const coursesResponse = await fetchLmsCourses({
+          type: 'API',
+          sub_institute_id: requestContext.sub_institute_id,
+          syear: getSyear(),
+          user_id: requestContext.user_id,
+          user_profile_name: requestContext.user_profile_name,
+          user_profile_id: requestContext.user_profile_id,
+          client_id: requestContext.client_id,
+        });
+        matchedCourse = coursesResponse.lms_subject.find(
+          (course) =>
+            Number(course.subject_id) === numericSubjectId &&
+            Number(course.standard_id) === numericStandardId
+        );
+      } catch {
+        // Chapter data remains usable if the course catalog is temporarily unavailable.
+      }
     }
 
     const firstChapter = response.data[0];
@@ -755,6 +869,46 @@ export async function getSubjectAndChapters(subjectId: string, standardId?: stri
     return { subject, chapters };
   } catch {
     return { subject: null, chapters: [] };
+  }
+}
+
+/**
+ * Resolve only the cosmetic display fields for a subject (subject_name,
+ * standard_name, section/division names, etc.) from the course catalog.
+ * This is the slow part of getSubjectAndChapters, isolated so a page can render
+ * chapters first and enrich the header names afterwards without blocking.
+ * Returns the matched course, or null if it can't be resolved.
+ */
+export async function resolveSubjectDisplayName(
+  subjectId: string,
+  standardId?: string
+): Promise<LmsSubject | null> {
+  const requestContext = getRequestContext();
+  if (!requestContext) return null;
+
+  const numericSubjectId = Number(subjectId);
+  const numericStandardId = standardId != null && standardId !== '' ? Number(standardId) : numericSubjectId;
+
+  try {
+    const coursesResponse = await fetchLmsCourses({
+      type: 'API',
+      sub_institute_id: requestContext.sub_institute_id,
+      syear: getSyear(),
+      user_id: requestContext.user_id,
+      user_profile_name: requestContext.user_profile_name,
+      user_profile_id: requestContext.user_profile_id,
+      client_id: requestContext.client_id,
+    });
+
+    return (
+      coursesResponse.lms_subject.find(
+        (course) =>
+          Number(course.subject_id) === numericSubjectId &&
+          Number(course.standard_id) === numericStandardId
+      ) ?? null
+    );
+  } catch {
+    return null;
   }
 }
 

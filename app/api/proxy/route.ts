@@ -3,6 +3,20 @@ import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 export const runtime = 'nodejs';
 
+function resolveTargetPath(targetPath: string): string {
+  const normalized = targetPath.replace(/^\/+/, '');
+
+  if (
+    normalized === 'proxy_master' ||
+    normalized.startsWith('proxy_master/') ||
+    normalized === 'ajax_getproxyperiod'
+  ) {
+    return `school_setup/${normalized}`;
+  }
+
+  return normalized;
+}
+
 export async function GET(request: NextRequest) {
   const targetPath = request.nextUrl.searchParams.get('path');
   if (!targetPath) {
@@ -10,7 +24,7 @@ export async function GET(request: NextRequest) {
   }
 
   const base = API_BASE_URL.replace(/\/$/, '');
-  const url = `${base}/${targetPath.replace(/^\//, '')}`;
+  const url = `${base}/${resolveTargetPath(targetPath)}`;
 
   const upstreamParams = new URLSearchParams(request.nextUrl.searchParams);
   upstreamParams.delete('path');
@@ -46,13 +60,30 @@ export async function GET(request: NextRequest) {
 }
 
 async function forwardMutation(request: NextRequest) {
+export async function POST(request: NextRequest) {
+  return forwardWithBody(request, 'POST');
+}
+
+export async function PUT(request: NextRequest) {
+  return forwardWithBody(request, 'PUT');
+}
+
+export async function PATCH(request: NextRequest) {
+  return forwardWithBody(request, 'PATCH');
+}
+
+export async function DELETE(request: NextRequest) {
+  return forwardWithBody(request, 'DELETE');
+}
+
+async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE') {
   const targetPath = request.nextUrl.searchParams.get('path');
   if (!targetPath) {
     return NextResponse.json({ message: 'Missing path parameter' }, { status: 400 });
   }
 
   const base = API_BASE_URL.replace(/\/$/, '');
-  const url = `${base}/${targetPath.replace(/^\//, '')}`;
+  const url = `${base}/${resolveTargetPath(targetPath)}`;
 
   const contentType = request.headers.get('content-type') || '';
   const body = await request.arrayBuffer();

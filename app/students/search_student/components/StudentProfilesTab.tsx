@@ -8,6 +8,8 @@ import { TableHeader } from './TableHeader';
 
 export interface Student {
   id: string;
+  standardId?: string;
+  divisionId?: string;
   admissionNo: string;
   name: string;
   class: string;
@@ -52,6 +54,7 @@ export interface StudentProfilesTabProps {
   setHouseFilter: (filter: string) => void;
   setShowAddModal: (show: boolean) => void;
   setSelectedStudent: (student: Student | null) => void;
+  onStudentUpdated: (student: Student) => void;
   classOptions: { value: string; label: string }[];
   statusOptions: { value: string; label: string }[];
   houseOptions: { value: string; label: string }[];
