@@ -1,51 +1,20 @@
 // page.tsx
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Plus, X, Calendar, Users, UserCog, Building2, Phone, Mail, Home } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Plus, X, Calendar, Users, UserCog, Building2, Phone, Mail, Home, Search } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { StudentProfilesDashboard } from './components/StudentProfilesDashboard';
-
-// Types
-interface Student {
-  id: string;
-  admissionNo: string;
-  name: string;
-  class: string;
-  section: string;
-  rollNo: string;
-  gender: string;
-  dob: string;
-  fatherName: string;
-  motherName: string;
-  guardian: string;
-  phone: string;
-  email: string;
-  address: string;
-  house: string;
-  bloodGroup: string;
-  status: 'active' | 'inactive' | 'transferred' | 'alumni';
-  attendance: number;
-  lastActive: string;
-  docsMissing: number;
-  vaccination: string;
-  allergy: string | null;
-  infirmary: number;
-}
-
-// Sample Data
-const sampleStudents: Student[] = [
-  { id: 'STU001', admissionNo: 'ADM/2024/001', name: 'Aarav Sharma', class: '9', section: 'A', rollNo: '01', gender: 'Male', dob: '2011-03-15', fatherName: 'Rajesh Sharma', motherName: 'Priya Sharma', guardian: 'Rajesh Sharma', phone: '+91 98765 43210', email: 'rajesh.sharma@email.com', address: '42, Green Park Colony, Sector 15', house: 'Red', bloodGroup: 'B+', status: 'active', attendance: 94, lastActive: 'Today', docsMissing: 0, vaccination: 'Up to date', allergy: null, infirmary: 2 },
-  { id: 'STU002', admissionNo: 'ADM/2024/002', name: 'Ananya Patel', class: '9', section: 'A', rollNo: '02', gender: 'Female', dob: '2011-07-22', fatherName: 'Mitesh Patel', motherName: 'Meera Patel', guardian: 'Mitesh Patel', phone: '+91 98765 43211', email: 'mitesh.patel@email.com', address: '15, Lake View Apartments, MG Road', house: 'Blue', bloodGroup: 'O+', status: 'active', attendance: 97, lastActive: 'Today', docsMissing: 0, vaccination: 'Up to date', allergy: null, infirmary: 0 },
-  { id: 'STU003', admissionNo: 'ADM/2024/003', name: 'Vihaan Gupta', class: '9', section: 'A', rollNo: '03', gender: 'Male', dob: '2011-01-08', fatherName: 'Vikram Gupta', motherName: 'Anjali Gupta', guardian: 'Vikram Gupta', phone: '+91 98765 43212', email: 'vikram.gupta@email.com', address: '28, Sunrise Enclave, Phase 2', house: 'Green', bloodGroup: 'A+', status: 'active', attendance: 91, lastActive: 'Yesterday', docsMissing: 1, vaccination: 'Up to date', allergy: 'Peanuts', infirmary: 1 },
-  { id: 'STU004', admissionNo: 'ADM/2024/004', name: 'Myra Singh', class: '9', section: 'B', rollNo: '01', gender: 'Female', dob: '2011-05-30', fatherName: 'Arjun Singh', motherName: 'Kavita Singh', guardian: 'Arjun Singh', phone: '+91 98765 43213', email: 'arjun.singh@email.com', address: '7, Harmony Lane, Civil Lines', house: 'Yellow', bloodGroup: 'AB+', status: 'active', attendance: 98, lastActive: 'Today', docsMissing: 0, vaccination: 'Up to date', allergy: null, infirmary: 0 },
-  { id: 'STU005', admissionNo: 'ADM/2024/005', name: 'Kabir Verma', class: '9', section: 'B', rollNo: '02', gender: 'Male', dob: '2011-09-12', fatherName: 'Sanjay Verma', motherName: 'Sunita Verma', guardian: 'Sanjay Verma', phone: '+91 98765 43214', email: 'sanjay.verma@email.com', address: '33, Block C, Rainbow Residency', house: 'Red', bloodGroup: 'B-', status: 'inactive', attendance: 72, lastActive: '3 days ago', docsMissing: 2, vaccination: 'Partial', allergy: null, infirmary: 3 },
-  { id: 'STU006', admissionNo: 'ADM/2024/006', name: 'Saanvi Joshi', class: '9', section: 'B', rollNo: '03', gender: 'Female', dob: '2011-11-25', fatherName: 'Rohan Joshi', motherName: 'Geetika Joshi', guardian: 'Rohan Joshi', phone: '+91 98765 43215', email: 'rohan.joshi@email.com', address: '19, Pearl Heights, Station Road', house: 'Blue', bloodGroup: 'O-', status: 'active', attendance: 95, lastActive: 'Today', docsMissing: 0, vaccination: 'Up to date', allergy: 'Dust', infirmary: 1 },
-  { id: 'STU007', admissionNo: 'ADM/2024/007', name: 'Reyansh Mehta', class: '10', section: 'A', rollNo: '01', gender: 'Male', dob: '2010-04-18', fatherName: 'Kiran Mehta', motherName: 'Dimple Mehta', guardian: 'Kiran Mehta', phone: '+91 98765 43216', email: 'kiran.mehta@email.com', address: '5, Classic Colony, Near Park', house: 'Green', bloodGroup: 'A-', status: 'active', attendance: 89, lastActive: 'Today', docsMissing: 1, vaccination: 'Up to date', allergy: null, infirmary: 0 },
-  { id: 'STU008', admissionNo: 'ADM/2024/008', name: 'Aadhira Reddy', class: '10', section: 'A', rollNo: '02', gender: 'Female', dob: '2010-08-05', fatherName: 'Pradeep Reddy', motherName: 'Lakshmi Reddy', guardian: 'Pradeep Reddy', phone: '+91 98765 43217', email: 'pradeep.reddy@email.com', address: '44, Royal Residency, Lane 3', house: 'Yellow', bloodGroup: 'B+', status: 'active', attendance: 96, lastActive: 'Yesterday', docsMissing: 0, vaccination: 'Up to date', allergy: null, infirmary: 0 },
-  { id: 'STU009', admissionNo: 'ADM/2024/009', name: 'Vivaan Shah', class: '10', section: 'B', rollNo: '01', gender: 'Male', dob: '2010-12-20', fatherName: 'Mahesh Shah', motherName: 'Nisha Shah', guardian: 'Mahesh Shah', phone: '+91 98765 43218', email: 'mahesh.shah@email.com', address: '12, Mountain View, Hill Road', house: 'Red', bloodGroup: 'AB-', status: 'transferred', attendance: 88, lastActive: 'Last week', docsMissing: 0, vaccination: 'Up to date', allergy: null, infirmary: 0 },
-  { id: 'STU010', admissionNo: 'ADM/2024/010', name: 'Inaaya Khan', class: '10', section: 'B', rollNo: '02', gender: 'Female', dob: '2010-02-14', fatherName: 'Imran Khan', motherName: 'Ayesha Khan', guardian: 'Imran Khan', phone: '+91 98765 43219', email: 'imran.khan@email.com', address: '26, Garden City, Block D', house: 'Blue', bloodGroup: 'O+', status: 'active', attendance: 92, lastActive: 'Today', docsMissing: 1, vaccination: 'Up to date', allergy: 'Pollen', infirmary: 2 },
-];
+import {
+  fetchAcademicSections,
+  fetchDivisions,
+  fetchStandards,
+  fetchStudents,
+  type StudentDivisionOption,
+  type StudentSearchOption,
+  type StudentSearchFilters,
+} from './api';
+import type { Student } from './components/StudentProfilesTab';
 
 const classOptions = [
   { value: '', label: 'All Classes' },
@@ -87,6 +56,14 @@ const subjectPerformance = [
 
 // Main Page Component
 export default function SearchStudentPage() {
+  const [students, setStudents] = useState<Student[]>([]);
+  const [studentSearch, setStudentSearch] = useState<StudentSearchFilters>({});
+  const [sectionOptions, setSectionOptions] = useState<StudentSearchOption[]>([]);
+  const [standardOptions, setStandardOptions] = useState<StudentSearchOption[]>([]);
+  const [divisionOptions, setDivisionOptions] = useState<StudentDivisionOption[]>([]);
+  const [isLoadingStandards, setIsLoadingStandards] = useState(false);
+  const [isLoadingDivisions, setIsLoadingDivisions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -98,9 +75,85 @@ export default function SearchStudentPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchStudents({}, controller.signal)
+      .then((data) => {
+        setStudents(data);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        console.error('Unable to load students:', error);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchAcademicSections(controller.signal)
+      .then(setSectionOptions)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        console.error('Unable to load academic sections:', error);
+        setSectionOptions([]);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!studentSearch.gradeId) return;
+    const controller = new AbortController();
+    fetchStandards(studentSearch.gradeId, controller.signal)
+      .then(setStandardOptions)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        console.error('Unable to load standards:', error);
+        setStandardOptions([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoadingStandards(false);
+      });
+    return () => controller.abort();
+  }, [studentSearch.gradeId]);
+
+  useEffect(() => {
+    if (!studentSearch.standardId) return;
+
+    const controller = new AbortController();
+    fetchDivisions(studentSearch.standardId, controller.signal)
+      .then(setDivisionOptions)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        console.error('Unable to load divisions:', error);
+        setDivisionOptions([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoadingDivisions(false);
+      });
+
+    return () => controller.abort();
+  }, [studentSearch.standardId]);
+
+  const handleStudentSearch = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSearching(true);
+    try {
+      const data = await fetchStudents(studentSearch);
+      setStudents(data);
+      setCurrentPage(1);
+      setSelectedStudents([]);
+    } catch (error) {
+      console.error('Unable to search students:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   // Filter students
   const filteredStudents = useMemo(() => {
-    return sampleStudents.filter(student => {
+    return students.filter(student => {
       const matchesSearch = searchQuery === '' || 
         student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         student.admissionNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -112,7 +165,7 @@ export default function SearchStudentPage() {
 
       return matchesSearch && matchesClass && matchesStatus && matchesHouse;
     });
-  }, [searchQuery, classFilter, statusFilter, houseFilter]);
+  }, [students, searchQuery, classFilter, statusFilter, houseFilter]);
 
   // Sort students
   const sortedStudents = useMemo(() => {
@@ -153,6 +206,130 @@ export default function SearchStudentPage() {
         </div>
       </div>
 
+      <form
+        onSubmit={handleStudentSearch}
+        className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+      >
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-slate-600">Section</span>
+            <select
+              value={studentSearch.gradeId ?? ''}
+              onChange={(event) => {
+                const gradeId = event.target.value;
+                setStandardOptions([]);
+                setDivisionOptions([]);
+                setIsLoadingStandards(Boolean(gradeId));
+                setIsLoadingDivisions(false);
+                setStudentSearch((current) => ({
+                  ...current,
+                  gradeId,
+                  standardId: '',
+                  divisionId: '',
+                }));
+              }}
+              className="h-9 w-full rounded border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[#3f5bf6] focus:ring-2 focus:ring-[#3f5bf6]/15"
+            >
+              <option value="">All Sections</option>
+              {sectionOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-slate-600">Standard</span>
+            <select
+              value={studentSearch.standardId ?? ''}
+              disabled={!studentSearch.gradeId || isLoadingStandards}
+              onChange={(event) => {
+                const standardId = event.target.value;
+                setDivisionOptions([]);
+                setIsLoadingDivisions(Boolean(standardId));
+                setStudentSearch((current) => ({
+                  ...current,
+                  standardId,
+                  divisionId: '',
+                }));
+              }}
+              className="h-9 w-full rounded border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[#3f5bf6] focus:ring-2 focus:ring-[#3f5bf6]/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+            >
+              <option value="">
+                {isLoadingStandards
+                  ? 'Loading standards...'
+                  : studentSearch.gradeId
+                    ? 'All Standards'
+                    : 'Select Section first'}
+              </option>
+              {standardOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-slate-600">Division</span>
+            <select
+              value={studentSearch.divisionId ?? ''}
+              disabled={!studentSearch.standardId || isLoadingDivisions}
+              onChange={(event) => setStudentSearch((current) => ({ ...current, divisionId: event.target.value }))}
+              className="h-9 w-full rounded border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[#3f5bf6] focus:ring-2 focus:ring-[#3f5bf6]/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+            >
+              <option value="">
+                {isLoadingDivisions
+                  ? 'Loading divisions...'
+                  : studentSearch.standardId
+                    ? 'All Divisions'
+                    : 'Select Standard first'}
+              </option>
+              {divisionOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-slate-600">First Name</span>
+            <input
+              type="text"
+              value={studentSearch.firstName ?? ''}
+              onChange={(event) => setStudentSearch((current) => ({ ...current, firstName: event.target.value }))}
+              placeholder="Enter first name"
+              autoComplete="off"
+              className="h-9 w-full rounded border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#3f5bf6] focus:ring-2 focus:ring-[#3f5bf6]/15"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-slate-600">Last Name</span>
+            <input
+              type="text"
+              value={studentSearch.lastName ?? ''}
+              onChange={(event) => setStudentSearch((current) => ({ ...current, lastName: event.target.value }))}
+              placeholder="Enter last name"
+              autoComplete="off"
+              className="h-9 w-full rounded border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#3f5bf6] focus:ring-2 focus:ring-[#3f5bf6]/15"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-slate-600">GR No.</span>
+            <input
+              type="text"
+              value={studentSearch.grNo ?? ''}
+              onChange={(event) => setStudentSearch((current) => ({ ...current, grNo: event.target.value }))}
+              placeholder="Enter GR number"
+              className="h-9 w-full rounded border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#3f5bf6] focus:ring-2 focus:ring-[#3f5bf6]/15"
+            />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="submit"
+            disabled={isSearching}
+            className="flex h-9 items-center gap-2 rounded bg-[#3f5bf6] px-5 text-sm font-medium text-white transition hover:bg-[#3249d8] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Search className="h-4 w-4" />
+            {isSearching ? 'Searching...' : 'Search'}
+          </button>
+        </div>
+      </form>
+
       {/* Student Profiles Dashboard */}
       <StudentProfilesDashboard
         students={sortedStudents}
@@ -174,6 +351,11 @@ export default function SearchStudentPage() {
         setHouseFilter={setHouseFilter}
         setShowAddModal={setShowAddModal}
         setSelectedStudent={setSelectedStudent}
+        onStudentUpdated={(updatedStudent) => {
+          setStudents((current) => current.map((student) => (
+            student.id === updatedStudent.id ? updatedStudent : student
+          )));
+        }}
         classOptions={classOptions}
         statusOptions={statusOptions}
         houseOptions={houseOptions}

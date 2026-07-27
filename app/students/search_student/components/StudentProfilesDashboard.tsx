@@ -34,6 +34,7 @@ import { StatusBadge } from './StatusBadge';
 import { TableHeader } from './TableHeader';
 import { StudentDetailDrawer } from './StudentDetailDrawer';
 import type { Student, StudentProfilesTabProps } from './StudentProfilesTab';
+import { updateStudent } from '../api';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
@@ -94,6 +95,7 @@ export function StudentProfilesDashboard({
   setHouseFilter,
   setShowAddModal,
   setSelectedStudent,
+  onStudentUpdated,
   classOptions,
   statusOptions,
   houseOptions,
@@ -195,9 +197,11 @@ export function StudentProfilesDashboard({
     setSelectedStudent(student);
   };
 
-  const handleEdit = (updatedStudent: Student) => {
-    console.log('Student updated:', updatedStudent);
-    // Here you would update the student in your data source
+  const handleEdit = async (updatedStudent: Student) => {
+    await updateStudent(updatedStudent);
+    onStudentUpdated(updatedStudent);
+    setDrawerStudent(updatedStudent);
+    setSelectedStudent(updatedStudent);
   };
 
   const handleGenerateCertificate = (student: Student) => {
