@@ -149,6 +149,46 @@ function flattenMenuGroup(value: unknown): ApiMenuItem[] {
    return getChildrenByParentId(groups, parentId);
  }
 
+/**
+ * The LMS → Test "Student Homework" tab is the exam-hub entry (link
+ * `student_homework`, routes to /lms/exam) and is relabelled to "Exam".
+ * NOTE: `student_homework.index` is deliberately NOT here — that is the
+ * separate, real LMS → Homework item, which must keep its own name.
+ */
+const EXAM_MENU_LINKS = new Set([
+  'student_homework',
+  '/student_homework',
+]);
+
+/**
+ * Menu links removed from the sidebar entirely:
+ *  - the "Homework Submission" item (on request), and
+ *  - the duplicate `question_paper.index` exam entry (kept hidden as before,
+ *    so LMS → Test shows a single "Exam" tab).
+ */
+const HIDDEN_MENU_LINKS = new Set([
+  'student_homework_submission.index',
+  'lms/student_homework_submission',
+  'student_homework_submission',
+  '/student_homework_submission',
+  'question_paper.index',
+  'lms/question_paper',
+]);
+
+function normalizeMenuLink(link: string | null | undefined): string {
+  return (link || '').toLowerCase().trim().replace(/\/+$/, '');
+}
+
+function isVisibleMenuLink(link: string | null | undefined): boolean {
+  return !HIDDEN_MENU_LINKS.has(normalizeMenuLink(link));
+}
+
+function overrideMenuLabel(link: string | null | undefined, fallback: string): string {
+  // Exact-link match only, so the real "Student Homework" item
+  // (student_homework.index) is never touched.
+  return EXAM_MENU_LINKS.has(normalizeMenuLink(link)) ? 'Exam' : fallback;
+}
+
 export function buildMenuTree(
   level1: ApiMenuItem[],
   level2: ApiMenuGroups | undefined,
@@ -156,22 +196,34 @@ export function buildMenuTree(
 ): MenuItem[] {
   return level1
     .filter(item => item.status === 1)
+    .filter(item => {
+      const link = (item.link || '').toLowerCase().trim();
+      return isVisibleMenuLink(link);
+    })
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
     .map(item => {
       const l2Array = getGroupedMenuItems(level2, item.id);
       const submenus: SubmenuItem[] = l2Array
         .filter(sub => sub.status === 1)
+        .filter(sub => {
+          const link = (sub.link || '').toLowerCase().trim();
+          return isVisibleMenuLink(link);
+        })
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
         .map(sub => {
           const l3Array = getGroupedMenuItems(level3, sub.id);
           const level3Items: Level3Item[] = l3Array
             .filter(l3 => l3.status === 1)
+            .filter(l3 => {
+              const link = (l3.link || '').toLowerCase().trim();
+              return isVisibleMenuLink(link);
+            })
             .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
             .map(l3 => ({
               id: l3.id,
               parentId: l3.parent_menu_id,
               menuType: l3.menu_type,
-              label: l3.name || l3.menu_title || l3.site_map_name,
+              label: overrideMenuLabel(l3.link, l3.name || l3.menu_title || l3.site_map_name),
               href: resolveRoute(l3.link),
               link: l3.link,
             }));
@@ -179,7 +231,7 @@ export function buildMenuTree(
             id: sub.id,
             parentId: sub.parent_menu_id,
             menuType: sub.menu_type,
-            label: sub.name || sub.menu_title || sub.site_map_name,
+            label: overrideMenuLabel(sub.link, sub.name || sub.menu_title || sub.site_map_name),
             href: resolveRoute(sub.link),
             icon: resolveIcon(sub.icon, 2),
             submenus: level3Items.length > 0 ? level3Items : undefined,
@@ -189,7 +241,7 @@ export function buildMenuTree(
         id: item.id,
         menuType: item.menu_type,
         icon: resolveIcon(item.icon, 1),
-        label: item.name || item.menu_title || item.site_map_name,
+        label: overrideMenuLabel(item.link, item.name || item.menu_title || item.site_map_name),
         href: resolveRoute(item.link),
         submenus: submenus.length > 0 ? submenus : undefined,
       };

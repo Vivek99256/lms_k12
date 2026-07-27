@@ -115,18 +115,24 @@ const H5P_ROUTE_NAME_MAP: Record<string, string> = {
 
 /**
  * LMS → Test → Exam: AI question-paper generator route names → Next route.
- * (The manual picker lives at /student_homework; this is the AI DOK/Bloom one.)
+ * (The exam hub lives at /lms/exam; this is the AI DOK/Bloom generator.)
  */
 const EXAM_ROUTE_NAME_MAP: Record<string, string> = {
   'generate_ai_questionpaper': '/exam/exam-creation',
   'generate_ai_questionpaper.index': '/exam/exam-creation',
   'lms/generate_ai_questionpaper': '/exam/exam-creation',
-  'ai_questionpaper.index': '/exam/exam-creation',
+  'ai_questionpaper.ind ex': '/exam/exam-creation',
   'lmsexamwise_progress_report.index': '/exam/progress-report',
   'lms/lmsexamwise_progress_report': '/exam/progress-report',
   'examwise_progress_report.index': '/exam/progress-report',
   'online_exam.index': '/exam/online',
   'lms/online_exam': '/exam/online',
+  // The LMS "Exam" menu item opens the exam hub (manual "Create exam" wizard +
+  // the "AI generated exam" button live here).
+  'question_paper.index': '/lms/exam',
+  'lms/question_paper': '/lms/exam',
+  'student_homework': '/lms/exam',
+  '/student_homework': '/lms/exam',
 };
 
 /**
@@ -171,6 +177,17 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lb_master': '/lms/leader-board-master',
   'lmsmapping.index': '/lms/global-mapping',
   'lms/lmsmapping': '/lms/global-mapping',
+  // Existing tblmenumaster LMS rows whose legacy links previously resolved to a
+  // dead path — point them at the migrated Next.js pages (PAL + Assignments).
+  'pal.index': '/pal',
+  'pal': '/pal',
+  'lms/pal': '/pal',
+  'lmsassignment.index': '/lms/lmsAssignment',
+  'lms/lmsassignment': '/lms/lmsAssignment',
+  'lmsassignment_submission.index': '/lms/lmsAssignment_submission',
+  'lms/lmsassignment_submission': '/lms/lmsAssignment_submission',
+  'lmsannotate_assignment.index': '/lms/lmsAnnotate_assignment',
+  'lms/lmsannotate_assignment': '/lms/lmsAnnotate_assignment',
 };
 
 /**
@@ -268,6 +285,20 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
 
   // Remove trailing slashes only
   cleanLink = cleanLink.replace(/\/+$/, '');
+
+  // LMS → PAL (Personalized Adaptive Learning). The backend menu link arrives
+  // in several forms (pal, pal.index, lms/pal, /lms/pal, pal/index …); normalize
+  // to a bare slug and match "pal" exactly so every variant reaches /pal while
+  // words that merely contain "pal" (e.g. principal) are left alone.
+  const palSlug = cleanLink
+    .toLowerCase()
+    .replace(/^\/+/, '')
+    .replace(/^lms\//, '')
+    .replace(/\.(index|show)$/, '')
+    .replace(/\/index$/, '');
+  if (palSlug === 'pal') {
+    return '/pal';
+  }
 
   if (
     cleanLink.toLowerCase() === 'bulk_student_update.index' ||

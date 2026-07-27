@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Award,
@@ -21,6 +22,7 @@ import {
   Printer,
   Search,
   Send,
+  Sparkles,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -2617,14 +2619,23 @@ export default function StudentHomeworkIndexPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={openCreateExamModal}
-                    className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-[12px] bg-[#5846EA] px-4 text-[14px] font-semibold text-white"
-                  >
-                    <Plus size={18} />
-                    Create exam
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 self-start">
+                    <Link
+                      href="/exam/exam-creation"
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[#5846EA] bg-white px-4 text-[14px] font-semibold text-[#5846EA] transition hover:bg-[#EEEBFF]"
+                    >
+                      <Sparkles size={18} />
+                      AI generated exam
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={openCreateExamModal}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[#5846EA] px-4 text-[14px] font-semibold text-white"
+                    >
+                      <Plus size={18} />
+                      Create exam
+                    </button>
+                  </div>
                 </div>
 
                 <p className="text-[14px] font-medium text-[#5F7087]">
