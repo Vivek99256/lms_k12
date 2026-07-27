@@ -89,7 +89,7 @@ export default function StudentAttendancePage() {
               .join(' ');
             return {
               id: readString(record.id ?? record.student_id ?? record.unique_id),
-              name: readString(record.student_name ?? record.full_name ?? fullName || record.name),
+              name: readString((record.student_name ?? record.full_name ?? fullName) || record.name),
               attendance: readString(record.attendance ?? record.present_days),
               workingDay: readString(record.working_day ?? record.working_days) || defaultWorkingDays,
               remarkId: readString(record.remark_id),

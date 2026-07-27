@@ -105,7 +105,7 @@ function toStudentRows(items: unknown): StudentRow[] {
       return {
         id: readString(record.id ?? record.student_id ?? record.unique_id),
         rollNo: readString(record.roll_no ?? record.gr_no ?? record.enrollment_no),
-        name: readString(record.student_name ?? record.full_name ?? fullName || record.name),
+        name: readString((record.student_name ?? record.full_name ?? fullName) || record.name),
         marks: readString(record.points ?? record.marks ?? record.obtained_marks),
         maxMarks: readNumber(record.outof ?? record.max_marks),
         percentage: readNumber(record.per ?? record.percentage),

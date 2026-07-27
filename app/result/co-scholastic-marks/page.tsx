@@ -109,7 +109,7 @@ export default function CoScholasticMarksPage() {
             return {
               id: readString(record.id ?? record.student_id ?? record.unique_id),
               rollNo: readString(record.roll_no ?? record.gr_no ?? record.enrollment_no),
-              name: readString(record.student_name ?? record.full_name ?? fullName || record.name),
+              name: readString((record.student_name ?? record.full_name ?? fullName) || record.name),
               value: mode === 'GRADE'
                 ? readString(record.grade ?? record.grade_id)
                 : readString(record.points ?? record.marks),

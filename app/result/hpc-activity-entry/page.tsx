@@ -156,7 +156,7 @@ export default function HpcActivityEntryPage() {
           return {
             id,
             rollNo: readString(record.roll_no ?? record.gr_no ?? record.enrollment_no),
-            name: readString(record.student_name ?? record.full_name ?? fullName || record.name),
+            name: readString((record.student_name ?? record.full_name ?? fullName) || record.name),
           };
         })
         .filter((student) => student.id);

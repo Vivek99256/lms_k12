@@ -170,7 +170,7 @@ export default function HpcEntryV1Page() {
             const fullName = [record.first_name, record.last_name].map(readString).filter(Boolean).join(' ');
             return {
               id: readString(record.id ?? record.student_id ?? record.unique_id),
-              name: readString(record.student_name ?? record.full_name ?? fullName || record.name),
+              name: readString((record.student_name ?? record.full_name ?? fullName) || record.name),
               enrollmentNo: readString(record.enrollment_no ?? record.roll_no ?? record.gr_no),
             };
           })
