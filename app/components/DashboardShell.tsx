@@ -66,7 +66,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const hasLoadedRef = useRef(false);
 
   const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(null);
-  const [isChatbotOpen, setIsChatbotOpen] = useState(true);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
   const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
 

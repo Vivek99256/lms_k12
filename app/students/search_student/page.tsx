@@ -195,7 +195,7 @@ export default function SearchStudentPage() {
           <h1 className="text-2xl font-bold text-gray-900">Student Profiles</h1>
           <p className="text-sm text-gray-500 mt-1">Manage student records, profiles and information</p>
         </div>
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-[#0D6EFD] text-white rounded-xl font-medium hover:bg-blue-600 transition-colors shadow-sm"
@@ -203,7 +203,7 @@ export default function SearchStudentPage() {
             <Plus className="w-4 h-4" />
             Add Student
           </button>
-        </div>
+        </div> */}
       </div>
 
       <form
