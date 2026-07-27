@@ -234,6 +234,27 @@ const ADMIN_SERVICES_ROUTE_NAME_MAP: Record<string, string> = {
   'ptm/ptm_report': '/admin-services/ptm-report',
 };
 
+const STUDENT_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
+  'student_report.index': '/student/report/student_report',
+  'student/student_report': '/student/report/student_report',
+  'show_student_report': '/student/report/student_report',
+  'inactive_student_report.index': '/student/report/inactive_student_report',
+  'student/inactive_student_report': '/student/report/inactive_student_report',
+  'missing_document_report.index': '/student/report/missing_document_report',
+  'student/missing_document_report': '/student/report/missing_document_report',
+  'student_request_report.index': '/student/report/student_request_report',
+  'student/student_request_report': '/student/report/student_request_report',
+  'student_health_report': '/student/report/student_health_report',
+  'student/student_health_report': '/student/report/student_health_report',
+  'show_student_health_report': '/student/report/student_health_report',
+  'dicipline_report.index': '/student/report/student_discipline_report',
+  'front_desk/dicipline_report': '/student/report/student_discipline_report',
+  'student_strength_report.index': '/student/report/student_strength_report',
+  'student/student_strength_report': '/student/report/student_strength_report',
+  'agewise.index': '/student/report/agewise_report',
+  'student/agewise': '/student/report/agewise_report',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -368,6 +389,11 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const adminServicesRoute = ADMIN_SERVICES_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (adminServicesRoute) {
     return adminServicesRoute;
+  }
+
+  const studentReportRoute = STUDENT_REPORT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (studentReportRoute) {
+    return studentReportRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
