@@ -58,9 +58,9 @@ export default function OnlineExamResultPage() {
 function OnlineExamResultContent() {
   const router = useRouter();
   const params = useParams<{ paperId: string }>();
-  const paperId = params.paperId;
+  const paperId = params?.paperId;
   const searchParams = useSearchParams();
-  const onlineExamId = searchParams.get('online_exam_id') ?? '';
+  const onlineExamId = searchParams?.get('online_exam_id') ?? '';
 
   const [result, setResult] = useState<ExamResult | null>(null);
   const [breakdowns, setBreakdowns] = useState<AttemptBreakdown[]>([]);

@@ -44,7 +44,7 @@ function tierColor(percent: number): string {
 
 export default function StudentAnalysisDetailPage() {
   const params = useParams<{ studentId: string }>();
-  const studentId = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
+  const studentId = Array.isArray(params?.studentId) ? params?.studentId[0] : params?.studentId;
 
   const [analysis, setAnalysis] = useState<StudentAnalysis | null>(null);
   const [subjectId, setSubjectId] = useState<string>('');

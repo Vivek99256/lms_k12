@@ -1,0 +1,4 @@
+'use client';
+import { ServerCog } from 'lucide-react';
+import MasterPage from '../_components/MasterPage';
+export default function Page() { return <MasterPage config={{ kind: 'smtp', title: 'SMTP', description: 'Configure outgoing email server credentials and test delivery.', icon: ServerCog, path: 'settings/smtp_setting', testEmail: true, fields: [{ key: 'email', label: 'Email', type: 'email', required: true }, { key: 'password', label: 'Password', type: 'password', required: true }, { key: 'server_address', label: 'Server Address', required: true }, { key: 'port', label: 'Port', type: 'number', required: true }], columns: [{ key: 'gmail', label: 'Email' }, { key: 'password', label: 'Password' }, { key: 'server_address', label: 'Server Address' }, { key: 'port', label: 'Port' }] }} />; }

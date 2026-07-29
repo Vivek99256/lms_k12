@@ -105,7 +105,7 @@ function validateRow(row: InteractionRow): RowErrors {
 function InteractiveVideoCreateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams.toString())), [searchParams]);
+  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
 
   const [title, setTitle] = useState('');
   const [titleError, setTitleError] = useState('');

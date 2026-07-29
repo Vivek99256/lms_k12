@@ -85,20 +85,20 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
   const url = `${base}/${resolveTargetPath(targetPath)}`;
 
   const contentType = request.headers.get('content-type') || '';
-  const body = await request.text();
+  const body = await request.arrayBuffer();
   const authorization = request.headers.get('authorization');
   const cookie = request.headers.get('cookie');
 
   try {
     const upstream = await fetch(url, {
-      method,
+      method: request.method,
       headers: {
         ...(contentType ? { 'Content-Type': contentType } : {}),
         Accept: 'application/json',
         ...(authorization ? { Authorization: authorization } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
       },
-      body: body || undefined,
+      body: body.byteLength > 0 ? body : undefined,
       cache: 'no-store',
     });
 

@@ -76,7 +76,7 @@ const categoryDetails: Record<string, { emoji: string; color: string; chapters: 
 
 export default function CategoryDetailPage() {
   const params = useParams();
-  const categoryKey = typeof params.category === 'string' ? params.category.toLowerCase() : '';
+  const categoryKey = typeof params?.category === 'string' ? params.category.toLowerCase() : '';
   const data = categoryDetails[categoryKey];
 
   if (!data) {

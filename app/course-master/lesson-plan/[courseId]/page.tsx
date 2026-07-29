@@ -751,14 +751,14 @@ function CalendarEventCard({
 export default function LessonPlanPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const rawCourseId = useParams().courseId;
+  const rawCourseId = useParams()?.courseId;
   const courseId = Array.isArray(rawCourseId) ? rawCourseId[0] : rawCourseId ?? '';
-  const view = searchParams.get('view');
+  const view = searchParams?.get('view');
   const isAssessmentView = view === 'assessment';
   const isKeyConceptsView = view === 'key-concepts';
   const isSemanticIntelligenceView = view === 'semantic-intelligence';
-  const chapterId = searchParams.get('chapterId') ?? '';
-  const conceptTitleParam = searchParams.get('concept') ?? '';
+  const chapterId = searchParams?.get('chapterId') ?? '';
+  const conceptTitleParam = searchParams?.get('concept') ?? '';
 
   const staticCourse = courses.find((c) => c.id === courseId);
   const courseIdParts = courseId.includes('-') ? courseId.split('-', 2) : [];

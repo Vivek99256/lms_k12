@@ -146,9 +146,9 @@ function interactionToRow(interaction: H5pVideoInteraction): InteractionRow {
 function InteractiveVideoEditContent() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const videoId = params.id;
+  const videoId = params?.id;
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams.toString())), [searchParams]);
+  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
 
   const [video, setVideo] = useState<H5pInteractiveVideo | null>(null);
   const [loading, setLoading] = useState(true);
