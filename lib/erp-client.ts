@@ -43,10 +43,21 @@ export function normalizeApiStatus(payload: ApiEnvelope | null | undefined): str
   return String(payload.status ?? payload.status_code ?? '');
 }
 
+/**
+ * Optional local-development override for the ERP host.
+ *
+ * The session's `host_name` normally decides which ERP server the app talks to.
+ * When you are running Laravel locally to work on an API that is not deployed
+ * yet, set NEXT_PUBLIC_ERP_BASE_URL in .env.local (e.g. http://127.0.0.1:8000)
+ * to point every module at that instance instead. Leave it unset and behaviour
+ * is exactly as before.
+ */
+const ERP_BASE_URL_OVERRIDE = (process.env.NEXT_PUBLIC_ERP_BASE_URL || '').replace(/\/$/, '');
+
 export function buildSessionContext(): SessionContext {
   if (typeof window === 'undefined') {
     return {
-      baseUrl: API_BASE_URL.replace(/\/$/, ''),
+      baseUrl: ERP_BASE_URL_OVERRIDE || API_BASE_URL.replace(/\/$/, ''),
       token: '',
       subInstituteId: '',
       syear: '',
@@ -109,6 +120,7 @@ export function buildSessionContext(): SessionContext {
 
     return {
       baseUrl:
+        ERP_BASE_URL_OVERRIDE ||
         readString(userData.host_name).replace(/\/$/, '') ||
         API_BASE_URL.replace(/\/$/, ''),
       token: readString(
@@ -143,7 +155,7 @@ export function buildSessionContext(): SessionContext {
     };
   } catch {
     return {
-      baseUrl: API_BASE_URL.replace(/\/$/, ''),
+      baseUrl: ERP_BASE_URL_OVERRIDE || API_BASE_URL.replace(/\/$/, ''),
       token: '',
       subInstituteId: '',
       syear: '',
