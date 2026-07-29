@@ -331,7 +331,7 @@ function OutcomeTree({
 export default function CurriculumPage() {
   const router = useRouter();
   const params = useParams();
-  const courseIdParam = params.courseId;
+  const courseIdParam = params?.courseId;
   const courseId = Array.isArray(courseIdParam) ? courseIdParam[0] : String(courseIdParam ?? '');
   const [subjectData, setSubjectData] = useState<SubjectWithChapters | null>(null);
   const [curriculumResponse, setCurriculumResponse] = useState<CurriculumApiResult | null>(null);

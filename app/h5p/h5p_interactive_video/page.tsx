@@ -38,8 +38,8 @@ import {
 function InteractiveVideoListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams.toString())), [searchParams]);
-  const flash = searchParams.get('flash') ?? '';
+  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
+  const flash = searchParams?.get('flash') ?? '';
 
   const [videos, setVideos] = useState<H5pInteractiveVideo[]>([]);
   const [loading, setLoading] = useState(true);

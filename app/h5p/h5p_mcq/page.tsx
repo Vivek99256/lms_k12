@@ -601,7 +601,7 @@ type McqView = 'picker' | 'quiz' | 'results';
 
 function McqContent() {
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams.toString())), [searchParams]);
+  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
 
   const [levels, setLevels] = useState<McqLevel[]>([]);
   const [levelsLoading, setLevelsLoading] = useState(true);

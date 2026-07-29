@@ -45,7 +45,7 @@ function ScenarioEditContent() {
   const id = params?.id ?? '';
   const searchParams = useSearchParams();
   const ctx = useMemo(
-    () => readH5pContext(new URLSearchParams(searchParams.toString())),
+    () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
   const contextQuery = h5pContextQuery(ctx);

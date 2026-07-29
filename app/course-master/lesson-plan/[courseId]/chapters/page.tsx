@@ -153,7 +153,7 @@ function ChapterCard({ chapter, accentColor }: ChapterCardProps) {
 
 export default function ChaptersPage() {
   const router = useRouter();
-  const { courseId } = useParams();
+  const { courseId } = useParams() ?? {};
   const course = courses.find((c) => c.id === courseId);
 
   if (!course) {

@@ -38,8 +38,8 @@ function truncate(text: string, max = 80): string {
 function FlashcardListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams.toString())), [searchParams]);
-  const flashParam = searchParams.get('flash') ?? '';
+  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
+  const flashParam = searchParams?.get('flash') ?? '';
 
   // Null until the profile check has run client-side (avoids table flash for students).
   const [allowed, setAllowed] = useState<boolean | null>(null);

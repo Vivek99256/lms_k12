@@ -47,8 +47,8 @@ const STATUS_META: Record<PalConceptStatus, { label: string; badge: string; bar:
 function PalResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const questionPaperId = searchParams.get('id') ?? '';
-  const onlineExamId = searchParams.get('online_exam_id') ?? '';
+  const questionPaperId = searchParams?.get('id') ?? '';
+  const onlineExamId = searchParams?.get('online_exam_id') ?? '';
 
   const [result, setResult] = useState<PalResultData | null>(null);
   const [loading, setLoading] = useState(true);

@@ -305,8 +305,9 @@ export default function EditRegistrationPage() {
   const params = useParams();
   const pathname = usePathname();
   const router = useRouter();
-  const recordId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const isConfirmationFlow = pathname.includes('/confirmation/');
+  const id = params?.id;
+  const recordId = Array.isArray(id) ? id[0] : id ?? '';
+  const isConfirmationFlow = pathname?.includes('/confirmation/') ?? false;
   const returnPath = isConfirmationFlow ? '/admissions/confirmation' : '/admissions/admission_registration';
 
   const [detail, setDetail] = useState<DetailState | null>(null);
