@@ -320,9 +320,9 @@ function Assessment() {
 
 export default function CareerCounselling() {
   const params = useSearchParams();
-  const pathname = usePathname();
+  const pathname = usePathname() || '';
   const router = useRouter();
-  const requested = params.get('section') as CareerSection | null;
+  const requested = params?.get('section') as CareerSection | null;
   const [active, setActive] = useState<CareerSection>(
     requested && SECTIONS.some((item) => item.id === requested) ? requested : 'plan'
   );
@@ -336,7 +336,7 @@ export default function CareerCounselling() {
 
   function selectSection(section: CareerSection) {
     setActive(section);
-    const next = new URLSearchParams(params.toString());
+    const next = new URLSearchParams(params?.toString());
     if (section === 'plan') next.delete('section');
     else next.set('section', section);
     const query = next.toString();

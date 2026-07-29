@@ -33,7 +33,7 @@ function emptyCard(): FlashcardInput {
 function FlashcardCreateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams.toString())), [searchParams]);
+  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
 
   const [cards, setCards] = useState<FlashcardInput[]>([emptyCard()]);
   const [errors, setErrors] = useState<Record<number, CardErrors>>({});

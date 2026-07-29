@@ -586,8 +586,8 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     'result': '/result',
     'result.index': '/result',
   };
-  const resultRoute = resultRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
-  if (resultRoute) return resultRoute;
+  const lateResultRoute = resultRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (lateResultRoute) return lateResultRoute;
 
   if (!cleanLink) return '#';
   

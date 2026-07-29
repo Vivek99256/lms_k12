@@ -34,11 +34,11 @@ function PalExamContent() {
 
   const context = useMemo<PalChapterContext>(
     () => ({
-      gradeId: searchParams.get('grade_id') ?? '',
-      subjectId: searchParams.get('subject_id') ?? '',
-      chapterId: searchParams.get('chapter_id') ?? '',
-      standardId: searchParams.get('standard_id') ?? '',
-      enrollmentNo: searchParams.get('enrollment_no') ?? undefined,
+      gradeId: searchParams?.get('grade_id') ?? '',
+      subjectId: searchParams?.get('subject_id') ?? '',
+      chapterId: searchParams?.get('chapter_id') ?? '',
+      standardId: searchParams?.get('standard_id') ?? '',
+      enrollmentNo: searchParams?.get('enrollment_no') ?? undefined,
     }),
     [searchParams]
   );
@@ -46,7 +46,7 @@ function PalExamContent() {
   const hasContext = Boolean(context.chapterId && context.standardId);
   // Guest "view as student" preview: there is no real learner to record against,
   // so the quiz is scored client-side instead of writing to the backend.
-  const isGuest = searchParams.get('guest') === '1';
+  const isGuest = searchParams?.get('guest') === '1';
 
   const [quiz, setQuiz] = useState<PalQuizData | null>(null);
   const [loading, setLoading] = useState(true);

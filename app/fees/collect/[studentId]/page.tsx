@@ -121,7 +121,7 @@ const currencyFormatter = new Intl.NumberFormat('en-IN', {
 export default function FeesCollectionStudentPage() {
   const router = useRouter();
   const params = useParams<{ studentId: string }>();
-  const studentId = params.studentId;
+  const studentId = params?.studentId;
   const [session] = useState(getSessionContext);
   const receiptRef = useRef<HTMLDivElement | null>(null);
 

@@ -59,7 +59,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function forwardMutation(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return forwardWithBody(request, 'POST');
 }
@@ -117,8 +116,3 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
     return NextResponse.json({ message }, { status: 502 });
   }
 }
-
-export const POST = forwardMutation;
-export const PUT = forwardMutation;
-export const PATCH = forwardMutation;
-export const DELETE = forwardMutation;
