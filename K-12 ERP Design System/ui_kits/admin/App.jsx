@@ -32,34 +32,40 @@
 
   // Sub-module registry — the "module → sub-module" IA level (ModuleTabBar).
   const SUBMODULES = {
-    fees: { label: "Fees", items: [
-      { id: "collect", label: "Fee collection", count: 13 },
-      { id: "refund", label: "Cancel / refund" },
-      { id: "circular", label: "Fee circular" },
-      { id: "imprest", label: "Imprest fees" },
-      { id: "other", label: "Other fees" },
-      { id: "structure", label: "Fee structure" },
-      { id: "concession", label: "Concessions", count: 4 },
-      { id: "discount", label: "Discounts" },
-      { id: "reports", label: "Fee reports" },
-      { id: "reminders", label: "Reminders" },
-    ] },
-    students: { label: "Students", items: [
-      { id: "directory", label: "Directory", count: "1.2k" },
-      { id: "enrollment", label: "Enrollment" },
-      { id: "attendance", label: "Attendance" },
-      { id: "health", label: "Health records" },
-      { id: "documents", label: "Documents" },
-      { id: "id-cards", label: "ID cards" },
-    ] },
-    admissions: { label: "Admissions", items: [
-      { id: "enquiries", label: "Enquiries", count: 3 },
-      { id: "applications", label: "Applications" },
-      { id: "entrance", label: "Entrance tests" },
-      { id: "interviews", label: "Interviews" },
-      { id: "offers", label: "Offers" },
-      { id: "confirmed", label: "Confirmed" },
-    ] },
+    fees: {
+      label: "Fees", items: [
+        { id: "collect", label: "Fee collection", count: 13 },
+        { id: "refund", label: "Cancel / refund" },
+        { id: "circular", label: "Fee circular" },
+        { id: "imprest", label: "Imprest fees" },
+        { id: "other", label: "Other fees" },
+        { id: "structure", label: "Fee structure" },
+        { id: "concession", label: "Concessions", count: 4 },
+        { id: "discount", label: "Discounts" },
+        { id: "reports", label: "Fee reports" },
+        { id: "reminders", label: "Reminders" },
+      ]
+    },
+    students: {
+      label: "Students", items: [
+        { id: "directory", label: "Directory", count: "1.2k" },
+        { id: "enrollment", label: "Enrollment" },
+        { id: "attendance", label: "Attendance" },
+        { id: "health", label: "Health records" },
+        { id: "documents", label: "Documents" },
+        { id: "id-cards", label: "ID cards" },
+      ]
+    },
+    admissions: {
+      label: "Admissions", items: [
+        { id: "enquiries", label: "Enquiries", count: 3 },
+        { id: "applications", label: "Applications" },
+        { id: "entrance", label: "Entrance tests" },
+        { id: "interviews", label: "Interviews" },
+        { id: "offers", label: "Offers" },
+        { id: "confirmed", label: "Confirmed" },
+      ]
+    },
   };
 
   const AGENTS = [
@@ -163,9 +169,9 @@
       <Popover placement="bottom-end" trigger={<span className="kit-bell"><IconButton icon="bell" label="Notifications" variant="ghost" /><span className="kit-bell__dot" /></span>}>
         <div style={{ width: 320 }}>
           <div className="kit-pop-head">Notifications</div>
-          <NotificationItem type="fee" unread title="Fee payment received" body="₹12,500 from Meera Sharma." timestamp="10m ago" onOpen={() => {}} />
-          <NotificationItem type="admission" unread title="New admission enquiry" body="Grade 9 · via website" timestamp="1h ago" onOpen={() => {}} />
-          <NotificationItem type="transport" title="Route 4 delayed" body="Bus running 15 min late." timestamp="Yesterday" onOpen={() => {}} />
+          <NotificationItem type="fee" unread title="Fee payment received" body="₹12,500 from Meera Sharma." timestamp="10m ago" onOpen={() => { }} />
+          <NotificationItem type="admission" unread title="New admission enquiry" body="Grade 9 · via website" timestamp="1h ago" onOpen={() => { }} />
+          <NotificationItem type="transport" title="Route 4 delayed" body="Bus running 15 min late." timestamp="Yesterday" onOpen={() => { }} />
         </div>
       </Popover>
     );
@@ -181,13 +187,15 @@
     // Command palette contents
     const cmdkGroups = [
       { label: "Navigate", items: NAV.filter((n) => n.id).map((n) => ({ id: n.id, label: n.label, icon: n.icon, keywords: "module go open", onSelect: () => go(n.id) })) },
-      { label: "Actions", items: [
-        { id: "add-student", label: "Add student", icon: "user-plus", shortcut: ["A"], onSelect: () => go("students") },
-        { id: "collect-fee", label: "Collect fee", icon: "wallet", keywords: "payment", onSelect: () => go("fees") },
-        { id: "new-admission", label: "New admission enquiry", icon: "file-plus", onSelect: () => go("admissions") },
-        { id: "ask", label: "Ask Teach Assistant", icon: "sparkles", keywords: "ai chat copilot", onSelect: () => openAssistant(null) },
-        { id: "theme", label: "Toggle theme", icon: "moon", onSelect: () => setTheme((t) => (t === "light" ? "dark" : "light")) },
-      ] },
+      {
+        label: "Actions", items: [
+          { id: "add-student", label: "Add student", icon: "user-plus", shortcut: ["A"], onSelect: () => go("students") },
+          { id: "collect-fee", label: "Collect fee", icon: "wallet", keywords: "payment", onSelect: () => go("fees") },
+          { id: "new-admission", label: "New admission enquiry", icon: "file-plus", onSelect: () => go("admissions") },
+          { id: "ask", label: "Ask Teach Assistant", icon: "sparkles", keywords: "ai chat copilot", onSelect: () => openAssistant(null) },
+          { id: "theme", label: "Toggle theme", icon: "moon", onSelect: () => setTheme((t) => (t === "light" ? "dark" : "light")) },
+        ]
+      },
     ];
 
     return (

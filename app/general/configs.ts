@@ -47,9 +47,6 @@ export const implementationConfig: GeneralConfig = {
     { key: "total_boys", label: "Total Boys", kind: "number", required: true },
     { key: "total_girls", label: "Total Girls", kind: "number", required: true },
     { key: "total_strenght", label: "Total Strength", kind: "number", required: true },
-    { key: "final_std_total_boys", label: "Final Standard Boys", kind: "number" },
-    { key: "final_std_total_girls", label: "Final Standard Girls", kind: "number" },
-    { key: "final_std_total", label: "Final Standard Total", kind: "number" },
     { key: "total_male", label: "Male Staff", kind: "number" },
     { key: "total_female", label: "Female Staff", kind: "number" },
     { key: "standard_totals", label: "Standard-wise Totals (JSON)", kind: "textarea", rows: 8, required: true },
@@ -58,6 +55,29 @@ export const implementationConfig: GeneralConfig = {
     { key: "standard_name", label: "Standard" }, { key: "std_wise_total_boys", label: "Boys" },
     { key: "std_wise_total_girls", label: "Girls" }, { key: "std_wise_total", label: "Total" },
   ],
+  validate: (form) => {
+    const boys = Number(form.total_boys || 0);
+    const girls = Number(form.total_girls || 0);
+    const strength = Number(form.total_strenght || 0);
+    if (!Number.isFinite(boys) || !Number.isFinite(girls) || !Number.isFinite(strength)) {
+      return "Please enter valid numeric values for totals.";
+    }
+    if (strength !== boys + girls) {
+      return "Total strength must equal total boys plus total girls.";
+    }
+    const raw = String(form.standard_totals || "").trim();
+    if (!raw) return "Standard-wise totals are required.";
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return "Standard-wise totals must be valid JSON.";
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return "Standard-wise totals must contain at least one row.";
+    }
+    return "";
+  },
 };
 
 export const bulkUploadConfig: GeneralConfig = {

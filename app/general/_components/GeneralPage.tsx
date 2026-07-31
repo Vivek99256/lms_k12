@@ -21,6 +21,7 @@ export type GeneralField = {
 export type GeneralConfig = {
   module: GeneralModule; title: string; description: string; singular: string;
   fields: GeneralField[]; columns: Array<{ key: string; label: string }>;
+  validate?: (form: Record<string, string | boolean>) => string;
 };
 const EMPTY: GeneralData = { records: [], profiles: [], grades: [], standards: [], subjects: [] };
 const PAGE_SIZE = 10;
@@ -91,6 +92,8 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
   async function save() {
     const validationError = validation();
     if (validationError) { setError(validationError); return; }
+    const customError = config.validate?.(form);
+    if (customError) { setError(customError); return; }
     setBusy(true); setError("");
     try {
       setNotice(await saveGeneral(config.module, getGeneralSession(), form, editing?.id));

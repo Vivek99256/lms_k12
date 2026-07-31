@@ -4,6 +4,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot, LayoutGrid } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+
+const profileMenuItems = [
+  'Implementation',
+  'Onboarding',
+  'Add Process',
+  'Fields Configuration',
+  'Group-wise Rights',
+  'Individual Rights',
+  'Mobile App Rights',
+] as const;
 
 function readAcademicSession() {
   if (typeof window === 'undefined') return null;
@@ -68,10 +79,21 @@ export default function Header({
   rightToolbarToggleRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showTermDropdown, setShowTermDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [userPosition, setUserPosition] = useState<{ top: number; left: number; bottom?: number } | null>(null);
+  const [userPosition, setUserPosition] = useState<{ top: number; right: number } | null>(null);
+
+  const menuRoutes: Record<string, string> = {
+    'Implementation': '/general/implementation_management',
+    'Onboarding': '/general/onboarding',
+    'Add Process': '/general/add_process',
+    'Fields Configuration': '/general/fields_configuration',
+    'Group-wise Rights': '/general/groupwise_rights',
+    'Individual Rights': '/general/individual_rights',
+    'Mobile App Rights': '/general/mobile_app_rights',
+  };
 
   const [selectedYear, setSelectedYear] = useState<string>(() => {
     const stored = getStoredSelection('selectedAcademicYear');
@@ -143,10 +165,9 @@ export default function Header({
 
   const handleUserToggle = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    setUserPosition({ 
-      top: rect.bottom + 4, 
-      left: rect.left,
-      bottom: rect.top 
+    setUserPosition({
+      top: rect.bottom + 8,
+      right: Math.max(12, window.innerWidth - rect.right),
     });
     setShowUserDropdown(prev => !prev);
   };
@@ -297,17 +318,29 @@ export default function Header({
         
         {showUserDropdown && userPosition && typeof document !== 'undefined' && createPortal(
           <div
-            className="fixed bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-200/50 py-2 min-w-[160px] z-[9999]"
-            style={{ top: userPosition.top, left: userPosition.left }}
+            className="fixed z-[9999] w-[210px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl"
+            style={{ top: userPosition.top, right: userPosition.right }}
             onMouseDown={(e) => e.stopPropagation()}
           >
+            {profileMenuItems.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => { setShowUserDropdown(false); router.push(menuRoutes[item] || '/'); }}
+                className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+              >
+                {item}
+              </button>
+            ))}
+            <div className="my-1.5 border-t border-gray-100" />
             <button
+              type="button"
               onClick={(e) => {
                 e.preventDefault();
                 logout();
                 setShowUserDropdown(false);
               }}
-              className="w-full text-left px-4 py-2 text-sm transition-colors text-gray-600 hover:text-red-600 hover:bg-red-50/80 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
             >
               <LogOut size={16} />
               Sign Out
