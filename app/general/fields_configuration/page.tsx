@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -23,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   buildSessionContext,
@@ -62,6 +60,8 @@ type CustomField = {
   sub_institute_id: number;
   options: CustomFieldOption[];
 };
+
+type CustomFieldRow = CustomField & { searchText: string };
 
 type FieldForm = {
   table_name: string;
@@ -121,7 +121,7 @@ function normalizeStatus(value: unknown): string {
   return text(value);
 }
 
-function mapRecord(row: CustomField): CustomField & { searchText: string } {
+function mapRecord(row: CustomField): CustomFieldRow {
   return {
     ...row,
     searchText: [
@@ -187,11 +187,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
-const PAGE_SIZE = 10;
 
 export default function FieldsConfigurationPage() {
   const [session] = useState(buildSessionContext);
-  const [fields, setFields] = useState<CustomField[]>([]);
+  const [fields, setFields] = useState<CustomFieldRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -241,13 +240,20 @@ export default function FieldsConfigurationPage() {
         headers: createAuthHeaders(session),
         cache: "no-store",
       });
-      if (!response.ok) {
-        throw new Error(`Failed to load fields (${response.status})`);
+      const text = await response.text();
+      let payload: unknown = null;
+      try {
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(`Expected JSON but received HTML (${response.status}). Check the API endpoint and CORS/proxy configuration.`);
       }
-      const payload = (await response.json()) as ApiEnvelope;
-      const status = normalizeApiStatus(payload);
+      if (!response.ok) {
+        const message = isRecord(payload) ? readString(payload.message) || `Request failed (${response.status}).` : `Request failed (${response.status}).`;
+        throw new Error(message);
+      }
+      const status = isRecord(payload) ? normalizeApiStatus(payload as ApiEnvelope) : "0";
       if (status === "2") {
-        throw new Error(readString(payload.message) || "Authentication failed.");
+        throw new Error(isRecord(payload) ? readString(payload.message) || "Authentication failed." : "Authentication failed.");
       }
       const mapped = normalizeList(payload).map(mapRecord);
       setFields(mapped);
@@ -294,7 +300,7 @@ export default function FieldsConfigurationPage() {
     setIsCreating(true);
   }
 
-  function openEdit(record: CustomField) {
+  function openEdit(record: CustomFieldRow) {
     setForm({
       table_name: record.table_name,
       table_alias: record.table_alias,
@@ -321,7 +327,8 @@ export default function FieldsConfigurationPage() {
     resetForm();
   }
 
-  function updateForm<K extends keyof FieldForm>(key: K, value: FieldForm[K]) {
+  function updateForm<K extends keyof FieldForm>(key: K, value: FieldForm[K] | null | undefined) {
+    if (value === null || value === undefined) return;
     setForm((current) => ({ ...current, [key]: value }));
   }
 
@@ -421,17 +428,22 @@ export default function FieldsConfigurationPage() {
         });
       }
 
-      const payload = (await response.json()) as ApiEnvelope;
-      const status = normalizeApiStatus(payload);
-
+      const text = await response.text();
+      let payload: unknown = null;
+      try {
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(`Expected JSON but received HTML (${response.status}). Check the API endpoint and CORS/proxy configuration.`);
+      }
+      const status = isRecord(payload) ? normalizeApiStatus(payload as ApiEnvelope) : "0";
       if (status === "2") {
-        throw new Error(readString(payload.message) || "Authentication failed.");
+        throw new Error(isRecord(payload) ? readString(payload.message) || "Authentication failed." : "Authentication failed.");
       }
       if (!response.ok || status !== "1") {
-        throw new Error(readString(payload.message) || `Request failed (${response.status}).`);
+        throw new Error(isRecord(payload) ? readString(payload.message) || `Request failed (${response.status}).` : `Request failed (${response.status}).`);
       }
 
-      setSuccess(readString(payload.message) || (isEdit ? "Record updated." : "Record created."));
+      setSuccess(readString(payload) || (isEdit ? "Record updated." : "Record created."));
       resetForm();
       await loadRecords();
     } catch (fetchError) {
@@ -441,7 +453,7 @@ export default function FieldsConfigurationPage() {
     }
   }
 
-  async function removeField(record: CustomField) {
+  async function removeField(record: CustomFieldRow) {
     if (!window.confirm(`Delete field "${record.field_label}"?`)) return;
     setError("");
     setSuccess("");
@@ -451,22 +463,28 @@ export default function FieldsConfigurationPage() {
         headers: createAuthHeaders(session, "application/json"),
         cache: "no-store",
       });
-      const payload = (await response.json()) as ApiEnvelope;
-      const status = normalizeApiStatus(payload);
+      const text = await response.text();
+      let payload: unknown = null;
+      try {
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(`Expected JSON but received HTML (${response.status}). Check the API endpoint and CORS/proxy configuration.`);
+      }
+      const status = isRecord(payload) ? normalizeApiStatus(payload as ApiEnvelope) : "0";
       if (status === "2") {
-        throw new Error(readString(payload.message) || "Authentication failed.");
+        throw new Error(isRecord(payload) ? readString(payload.message) || "Authentication failed." : "Authentication failed.");
       }
       if (!response.ok || status !== "1") {
-        throw new Error(readString(payload.message) || `Delete failed (${response.status}).`);
+        throw new Error(isRecord(payload) ? readString(payload.message) || `Delete failed (${response.status}).` : `Delete failed (${response.status}).`);
       }
-      setSuccess(readString(payload.message) || "Field deleted.");
+      setSuccess(isRecord(payload) ? readString(payload.message) || "Field deleted." : "Field deleted.");
       await loadRecords();
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to delete field.");
     }
   }
 
-  async function updateSortOrder(updated: CustomField[]) {
+  async function updateSortOrder(updated: CustomFieldRow[]) {
     try {
       const order = updated.map((record) => record.id);
       const response = await fetch(`${apiUrl.replace(/\/$/, "")}/update-sort`, {
@@ -475,15 +493,21 @@ export default function FieldsConfigurationPage() {
         body: JSON.stringify({ order }),
         cache: "no-store",
       });
-      const payload = (await response.json()) as ApiEnvelope;
-      const status = normalizeApiStatus(payload);
+      const text = await response.text();
+      let payload: unknown = null;
+      try {
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(`Expected JSON but received HTML (${response.status}). Check the API endpoint and CORS/proxy configuration.`);
+      }
+      const status = isRecord(payload) ? normalizeApiStatus(payload as ApiEnvelope) : "0";
       if (status === "2") {
-        throw new Error(readString(payload.message) || "Authentication failed.");
+        throw new Error(isRecord(payload) ? readString(payload.message) || "Authentication failed." : "Authentication failed.");
       }
       if (!response.ok || status !== "1") {
-        throw new Error(readString(payload.message) || `Sort update failed (${response.status}).`);
+        throw new Error(isRecord(payload) ? readString(payload.message) || `Sort update failed (${response.status}).` : `Sort update failed (${response.status}).`);
       }
-      setSuccess("Sort order updated.");
+      setSuccess(isRecord(payload) ? readString(payload.message) || "Sort order updated." : "Sort order updated.");
       await loadRecords();
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to update sort order.");
@@ -669,19 +693,23 @@ export default function FieldsConfigurationPage() {
                 </div>
 
                 <div className="flex flex-wrap items-end gap-4 sm:col-span-2 lg:col-span-3">
-                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                    <Checkbox
+                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
                       checked={form.required}
-                      onCheckedChange={(checked) => updateForm("required", Boolean(checked))}
+                      onChange={(event) => updateForm("required", event.target.checked)}
                       disabled={submitting}
+                      className="size-4 accent-blue-600"
                     />
                     Required
                   </label>
-                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                    <Checkbox
+                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
                       checked={form.common_to_all}
-                      onCheckedChange={(checked) => updateForm("common_to_all", Boolean(checked))}
+                      onChange={(event) => updateForm("common_to_all", event.target.checked)}
                       disabled={submitting}
+                      className="size-4 accent-blue-600"
                     />
                     Common To All
                   </label>

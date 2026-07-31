@@ -21,7 +21,6 @@ export type GeneralField = {
 export type GeneralConfig = {
   module: GeneralModule; title: string; description: string; singular: string;
   fields: GeneralField[]; columns: Array<{ key: string; label: string }>;
-  validate?: (form: Record<string, string | boolean>) => string;
 };
 const EMPTY: GeneralData = { records: [], profiles: [], grades: [], standards: [], subjects: [] };
 const PAGE_SIZE = 10;
@@ -89,10 +88,35 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
     }
     return "";
   }
+  function validateForm(module: string, form: Record<string, string | boolean>): string {
+    if (module === "implementations") {
+      const boys = Number(form.total_boys || 0);
+      const girls = Number(form.total_girls || 0);
+      const strength = Number(form.total_strenght || 0);
+      if (!Number.isFinite(boys) || !Number.isFinite(girls) || !Number.isFinite(strength)) {
+        return "Please enter valid numeric values for totals.";
+      }
+      if (strength !== boys + girls) {
+        return "Total strength must equal total boys plus total girls.";
+      }
+      const raw = String(form.standard_totals || "").trim();
+      if (!raw) return "Standard-wise totals are required.";
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return "Standard-wise totals must be valid JSON.";
+      }
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        return "Standard-wise totals must contain at least one row.";
+      }
+    }
+    return "";
+  }
   async function save() {
     const validationError = validation();
     if (validationError) { setError(validationError); return; }
-    const customError = config.validate?.(form);
+    const customError = validateForm(config.module, form);
     if (customError) { setError(customError); return; }
     setBusy(true); setError("");
     try {

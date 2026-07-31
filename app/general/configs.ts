@@ -55,29 +55,6 @@ export const implementationConfig: GeneralConfig = {
     { key: "standard_name", label: "Standard" }, { key: "std_wise_total_boys", label: "Boys" },
     { key: "std_wise_total_girls", label: "Girls" }, { key: "std_wise_total", label: "Total" },
   ],
-  validate: (form) => {
-    const boys = Number(form.total_boys || 0);
-    const girls = Number(form.total_girls || 0);
-    const strength = Number(form.total_strenght || 0);
-    if (!Number.isFinite(boys) || !Number.isFinite(girls) || !Number.isFinite(strength)) {
-      return "Please enter valid numeric values for totals.";
-    }
-    if (strength !== boys + girls) {
-      return "Total strength must equal total boys plus total girls.";
-    }
-    const raw = String(form.standard_totals || "").trim();
-    if (!raw) return "Standard-wise totals are required.";
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return "Standard-wise totals must be valid JSON.";
-    }
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return "Standard-wise totals must contain at least one row.";
-    }
-    return "";
-  },
 };
 
 export const bulkUploadConfig: GeneralConfig = {
