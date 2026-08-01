@@ -99,7 +99,7 @@ export async function createAddProcess(input: AddProcessInput): Promise<string> 
 
 export async function updateAddProcess(id: number, input: Pick<AddProcessInput, "requirements">): Promise<string> {
   const payload = await legacyRequest(`${BASE_PATH}/${id}`, {
-    method: "PUT",
+    method: "PUT" as any,
     body: {
       requirements: input.requirements,
       sub_institute_id: STATIC_SUB_INSTITUTE_ID,
@@ -111,7 +111,7 @@ export async function updateAddProcess(id: number, input: Pick<AddProcessInput, 
 
 export async function deleteAddProcess(id: number): Promise<string> {
   const payload = await legacyRequest(`${BASE_PATH}/${id}`, {
-    method: "DELETE",
+    method: "DELETE" as any,
     body: {},
   });
 
