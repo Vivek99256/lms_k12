@@ -29,7 +29,7 @@ const MODULE_ICONS: Record<string, typeof ImageIcon> = {
 
 function H5pHubContent() {
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams.toString())), [searchParams]);
+  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
 
   const [modules, setModules] = useState<H5pHubModule[]>([]);
   const [loading, setLoading] = useState(true);

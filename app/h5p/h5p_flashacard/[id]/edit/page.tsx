@@ -30,9 +30,9 @@ interface CardErrors {
 function FlashcardEditContent() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const cardId = params.id;
+  const cardId = params?.id ?? '';
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams.toString())), [searchParams]);
+  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
 
   const [card, setCard] = useState<FlashcardInput>({ question: '', content: '', correct_answer: '', hint: '' });
   const [fieldErrors, setFieldErrors] = useState<CardErrors>({});

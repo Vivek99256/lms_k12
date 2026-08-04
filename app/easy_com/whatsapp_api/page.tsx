@@ -1,0 +1,4 @@
+'use client';
+import { KeyRound } from 'lucide-react';
+import MasterPage from '../_components/MasterPage';
+export default function Page() { return <MasterPage config={{ kind: 'whatsapp-api', title: 'WhatsApp API', description: 'Configure WhatsApp Cloud API credentials.', icon: KeyRound, path: 'whatsapp-user-details', createPath: 'whatsapp-user-details/store', fields: [{ key: 'user_whatsapp_no', label: 'WhatsApp Number', required: true }, { key: 'cloud_api_access_token', label: 'Access Token', type: 'password', required: true }, { key: 'cloud_api_phone_number_id', label: 'Phone Number ID', required: true }], columns: [{ key: 'user_whatsapp_no', label: 'WhatsApp Number' }, { key: 'cloud_api_access_token', label: 'Access Token' }, { key: 'cloud_api_phone_number_id', label: 'Phone Number ID' }, { key: 'created_by_name', label: 'Created By' }] }} />; }

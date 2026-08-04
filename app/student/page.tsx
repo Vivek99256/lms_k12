@@ -762,10 +762,10 @@ export default function StudentPage() {
   useEffect(() => {
     if (studentSubjects.length === 0) return;
 
-    const subjectIdParam = searchParams.get('subject_id');
-    const standardIdParam = searchParams.get('standard_id');
-    const sectionIdParam = searchParams.get('section_id');
-    const viewParam = searchParams.get('view');
+    const subjectIdParam = searchParams?.get('subject_id');
+    const standardIdParam = searchParams?.get('standard_id');
+    const sectionIdParam = searchParams?.get('section_id');
+    const viewParam = searchParams?.get('view');
 
     if (!subjectIdParam || !viewParam) return;
 

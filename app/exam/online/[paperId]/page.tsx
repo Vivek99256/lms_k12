@@ -17,7 +17,7 @@ import {
 export default function OnlineExamAttemptPage() {
   const router = useRouter();
   const params = useParams<{ paperId: string }>();
-  const paperId = params.paperId;
+  const paperId = params?.paperId ?? '';
 
   const [paper, setPaper] = useState<OnlineExamPaper | null>(null);
   const [loading, setLoading] = useState(true);

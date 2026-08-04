@@ -39,7 +39,7 @@ function resultMessage(percentage: number): string {
 
 function FlashcardPlayerContent() {
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams.toString())), [searchParams]);
+  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
 
   const [cards, setCards] = useState<H5pFlashcard[]>([]);
   const [loading, setLoading] = useState(true);

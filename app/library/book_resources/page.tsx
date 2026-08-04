@@ -341,11 +341,11 @@ export default function BookResourcesPage() {
   const session = useMemo(() => getFeesSession(), []);
   const selectedParams = useMemo(
     () => ({
-      standard_id: searchParams.get('standard_id') ?? '',
-      subject_id: searchParams.get('subject_id') ?? '',
-      chapter_id: searchParams.get('chapter_id') ?? '',
-      topic_id: searchParams.get('topic_id') ?? '',
-      mappedValues: searchParams.get('mappedValues') ?? '',
+      standard_id: searchParams?.get('standard_id') ?? '',
+      subject_id: searchParams?.get('subject_id') ?? '',
+      chapter_id: searchParams?.get('chapter_id') ?? '',
+      topic_id: searchParams?.get('topic_id') ?? '',
+      mappedValues: searchParams?.get('mappedValues') ?? '',
     }),
     [searchParams],
   );

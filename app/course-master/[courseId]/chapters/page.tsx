@@ -632,8 +632,8 @@ export default function ChapterListPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const courseId = params.courseId as string;
-  const expandedChapterParam = searchParams.get('expandedChapterId');
+  const courseId = params?.courseId as string;
+  const expandedChapterParam = searchParams?.get('expandedChapterId');
 
   const [subjectData, setSubjectData] = useState<SubjectWithChapters | null>(null);
   const [subjectLoading, setSubjectLoading] = useState(true);
@@ -805,10 +805,10 @@ export default function ChapterListPage() {
   const [intelligenceLoadingId, setIntelligenceLoadingId] = useState<string | null>(null);
   const [intelligenceError, setIntelligenceError] = useState('');
 
-  const view = searchParams.get('view');
-  const contentResourceType = searchParams.get('resourceType') === 'teacher' ? 'teacher' : 'classroom';
+  const view = searchParams?.get('view');
+  const contentResourceType = searchParams?.get('resourceType') === 'teacher' ? 'teacher' : 'classroom';
   const contentResourceLabel = contentResourceType === 'teacher' ? 'Teacher Resource' : 'Classroom Resource';
-  const activeChapterId = searchParams.get('chapterId') ?? '';
+  const activeChapterId = searchParams?.get('chapterId') ?? '';
   const resourceChapter =
     allChapters.find((chapter) => chapter.id === activeChapterId) || allChapters[0] || null;
   const contentChapter = resourceChapter;
@@ -1256,7 +1256,7 @@ export default function ChapterListPage() {
   };
 
   const buildConceptIntelligenceUrl = (chapterId: string, conceptIndex: number) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
+    const nextParams = new URLSearchParams(searchParams?.toString());
     nextParams.set('view', 'concept-intelligence');
     nextParams.set('chapterId', chapterId);
     nextParams.set('concept', String(conceptIndex));
@@ -1438,7 +1438,7 @@ export default function ChapterListPage() {
   }, [uploadContentType, uploadMethod]);
 
   const updateExpandedChapter = (chapterId: string | null) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
+    const nextParams = new URLSearchParams(searchParams?.toString());
     if (chapterId) {
       nextParams.set('expandedChapterId', chapterId);
     } else {
@@ -1450,7 +1450,7 @@ export default function ChapterListPage() {
   };
 
   const openChapterContentView = (chapter: Chapter, resourceType: 'classroom' | 'teacher' = 'classroom') => {
-    const nextParams = new URLSearchParams(searchParams.toString());
+    const nextParams = new URLSearchParams(searchParams?.toString());
     nextParams.set('view', 'content');
     nextParams.set('resourceType', resourceType);
     nextParams.set('chapterId', chapter.id);
@@ -1460,7 +1460,7 @@ export default function ChapterListPage() {
   };
 
   const openQuestionBankView = (chapter: Chapter) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
+    const nextParams = new URLSearchParams(searchParams?.toString());
     nextParams.set('view', 'question-bank');
     nextParams.set('chapterId', chapter.id);
     nextParams.set('expandedChapterId', chapter.id);
@@ -3285,7 +3285,7 @@ export default function ChapterListPage() {
     const conceptRows = intelChapter
       ? Object.keys(intelChapter.content_categories ?? {}).filter((concept) => concept.trim())
       : [];
-    const requestedConceptIndex = Number(searchParams.get('concept') ?? '0');
+    const requestedConceptIndex = Number(searchParams?.get('concept') ?? '0');
     const conceptIndex =
       conceptRows.length > 0
         ? Math.min(
@@ -3337,7 +3337,7 @@ export default function ChapterListPage() {
     };
 
     const backToChapters = () => {
-      const nextParams = new URLSearchParams(searchParams.toString());
+      const nextParams = new URLSearchParams(searchParams?.toString());
       nextParams.delete('view');
       nextParams.delete('concept');
       nextParams.delete('chapterId');

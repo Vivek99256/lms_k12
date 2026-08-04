@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { ChevronRight, Menu, RefreshCw } from 'lucide-react';
@@ -39,16 +39,9 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [level2Panel, setLevel2Panel] = useState<Level2PanelState | null>(null);
-  const panelCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const sidebarLeaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const openLevel2Panel = (item: MenuItem, element: HTMLElement) => {
     if (!item.submenus?.length) return;
-
-    if (panelCloseTimeoutRef.current) {
-      clearTimeout(panelCloseTimeoutRef.current);
-      panelCloseTimeoutRef.current = null;
-    }
 
     const rect = element.getBoundingClientRect();
     setLevel2Panel({
@@ -91,47 +84,10 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
   const logoUrl = getLogoUrl();
   const schoolName = getSchoolName();
 
-  const schedulePanelClose = () => {
-    panelCloseTimeoutRef.current = setTimeout(() => {
-      setLevel2Panel(null);
-    }, 180);
-  };
-
-  const cancelPanelClose = () => {
-    if (panelCloseTimeoutRef.current) {
-      clearTimeout(panelCloseTimeoutRef.current);
-      panelCloseTimeoutRef.current = null;
-    }
-  };
-
-  const cancelSidebarClose = () => {
-    if (sidebarLeaveTimeoutRef.current) {
-      clearTimeout(sidebarLeaveTimeoutRef.current);
-      sidebarLeaveTimeoutRef.current = null;
-    }
-  };
-
-  const scheduleSidebarClose = () => {
-    cancelSidebarClose();
-    sidebarLeaveTimeoutRef.current = setTimeout(() => {
-      setIsCollapsed(true);
-      setLevel2Panel(null);
-    }, 300);
-  };
-
   const closeSidebarAfterSelection = () => {
-    cancelPanelClose();
-    cancelSidebarClose();
     setLevel2Panel(null);
     setIsCollapsed(true);
   };
-
-  useEffect(() => {
-    return () => {
-      if (panelCloseTimeoutRef.current) clearTimeout(panelCloseTimeoutRef.current);
-      if (sidebarLeaveTimeoutRef.current) clearTimeout(sidebarLeaveTimeoutRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -190,14 +146,18 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
   return (
     <div
       className={`${isCollapsed ? 'w-[104px]' : 'w-[280px]'} h-full p-4 shrink-0 flex flex-col transition-[width] duration-700 ease-in-out relative group z-50`}
-      onMouseEnter={() => {
-        cancelSidebarClose();
-        setIsCollapsed(false);
-      }}
-      onMouseLeave={scheduleSidebarClose}
     >
       <div className="bg-white/80 backdrop-blur-xl w-full h-full rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-200/50 flex flex-col relative">
-        <div className={`pt-8 pb-6 flex items-center transition-all duration-500 ${isCollapsed ? 'justify-center' : 'px-5 justify-between'}`}>
+        <button
+          type="button"
+          onClick={() => {
+            setIsCollapsed((collapsed) => !collapsed);
+            setLevel2Panel(null);
+          }}
+          className={`pt-8 pb-6 flex w-full items-center transition-all duration-500 ${isCollapsed ? 'justify-center' : 'px-5 justify-between'}`}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!isCollapsed}
+        >
           {isCollapsed ? (
             logoUrl ? (
               <img src={logoUrl} alt="Logo" className="w-9 h-9 rounded-xl object-contain shrink-0" />
@@ -226,7 +186,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
               </div>
             </>
           )}
-        </div>
+        </button>
 
         <div className={`flex-1 overflow-y-auto py-2 scrollbar-hide ${isCollapsed ? 'px-2' : 'px-4'}`}>
           {!isCollapsed && (
@@ -281,11 +241,6 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
                   key={`${item.label}-${index}`}
                   data-menu-item
                   className="relative"
-                  onMouseEnter={(event) => {
-                    cancelPanelClose();
-                    if (hasSubmenu) openLevel2Panel(item, event.currentTarget);
-                  }}
-                  onMouseLeave={schedulePanelClose}
                 >
                   <a
                     href={item.href || '#'}
@@ -347,15 +302,6 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
             width: '260px',
             maxHeight: 'min(520px, calc(100vh - 32px))',
             zIndex: 9999,
-          }}
-          onMouseEnter={() => {
-            cancelPanelClose();
-            cancelSidebarClose();
-            setIsCollapsed(false);
-          }}
-          onMouseLeave={() => {
-            schedulePanelClose();
-            scheduleSidebarClose();
           }}
         >
           <div className="px-4 py-2 mb-1">
