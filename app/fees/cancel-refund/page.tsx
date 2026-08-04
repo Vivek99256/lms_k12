@@ -572,7 +572,7 @@ export default function FeesCancelRefundPage() {
               </div>
             </div>
           ) : (
-            <RefundBackendGapPanel />
+            <RefundWorkflow session={session} />
           )}
         </section>
       </div>
@@ -686,49 +686,68 @@ function PaymentModeBadge({ row }: { row: CancelReceiptRow }) {
   );
 }
 
-function RefundBackendGapPanel() {
+type RefundHead = { label: string; amount: number };
+
+function RefundWorkflow({ session }: { session: SessionContext }) {
+  const [enrollment, setEnrollment] = useState('');
+  const [students, setStudents] = useState<Array<{ student_id: string; student_name: string; enrollment_no: string }>>([]);
+  const [student, setStudent] = useState<{ student_id: string; enrollment: string; name: string } | null>(null);
+  const [heads, setHeads] = useState<Record<string, RefundHead>>({});
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [paymentMode, setPaymentMode] = useState('Cash');
+  const [remark, setRemark] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const baseUrl = getApiBaseUrl(session);
+
+  const headers = () => ({ Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}) });
+  const context = () => ({ sub_institute_id: session.subInstituteId, syear: session.academicYearId, user_id: session.userId });
+
+  const search = async () => {
+    if (!enrollment.trim() || !baseUrl || !session.token || !session.userId) { setNotice({ type: 'error', text: 'Enter an enrollment number and sign in before searching.' }); return; }
+    setBusy(true); setNotice(null); setStudent(null); setHeads({});
+    try {
+      const form = new URLSearchParams({ ...context(), enrollment_no: enrollment.trim() });
+      const response = await fetch(`${baseUrl}/api/fees-refund/search`, { method: 'POST', headers: headers(), body: form });
+      const payload = await parseJsonResponse<{ status_code?: string | number; message?: string; fees_data?: unknown }>(response);
+      if (!response.ok || readStatus(payload) !== 1) throw new Error(payload.message || 'No refundable fee receipts found.');
+      const found = (Array.isArray(payload.fees_data) ? payload.fees_data : []).map(asRecord).map((row) => ({ student_id: readString(row.student_id), student_name: readString(row.student_name), enrollment_no: readString(row.enrollment_no) })).filter((row) => row.student_id);
+      setStudents(found); setNotice({ type: 'success', text: `Found ${found.length} student${found.length === 1 ? '' : 's'}. Select one to load paid fee heads.` });
+    } catch (error) { setStudents([]); setNotice({ type: 'error', text: error instanceof Error ? error.message : 'Refund search failed.' }); } finally { setBusy(false); }
+  };
+
+  const loadDetail = async (id: string) => {
+    setBusy(true); setNotice(null);
+    try {
+      const response = await fetch(`${baseUrl}/api/fees-refund/detail/${encodeURIComponent(id)}`, { method: 'POST', headers: headers(), body: new URLSearchParams(context()) });
+      const payload = await parseJsonResponse<{ status_code?: string | number; message?: string; student?: unknown; fee_heads?: unknown }>(response);
+      if (!response.ok || readStatus(payload) !== 1) throw new Error(payload.message || 'Unable to load refundable fee heads.');
+      const nextHeads = Object.fromEntries(Object.entries(asRecord(payload.fee_heads)).map(([key, value]) => [key, { label: readString(asRecord(value).label) || key, amount: readNumber(asRecord(value).amount) }]));
+      const nextStudent = asRecord(payload.student);
+      setHeads(nextHeads); setAmounts(Object.fromEntries(Object.entries(nextHeads).map(([key, value]) => [key, String(value.amount)]))); setStudent({ student_id: readString(nextStudent.student_id) || id, enrollment: readString(nextStudent.enrollment), name: readString(nextStudent.name) });
+    } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load refund detail.' }); } finally { setBusy(false); }
+  };
+
+  const save = async () => {
+    if (!student) return;
+    const form = new URLSearchParams({ ...context(), student_id: student.student_id, enrollment: student.enrollment, PAYMENT_MODE: paymentMode, receiptdate: new Date().toISOString().slice(0, 10), refund_remark: remark });
+    Object.entries(amounts).forEach(([key, value]) => { if (readNumber(value) > 0) form.set(`refund_amount[${key}]`, value); });
+    if (![...form.keys()].some((key) => key.startsWith('refund_amount['))) { setNotice({ type: 'error', text: 'Enter at least one refund amount.' }); return; }
+    setBusy(true); setNotice(null);
+    try {
+      const response = await fetch(`${baseUrl}/api/fees-refund/save`, { method: 'POST', headers: headers(), body: form });
+      const payload = await parseJsonResponse<{ status_code?: string | number; message?: string }>(response);
+      if (!response.ok || readStatus(payload) !== 1) throw new Error(payload.message || 'Refund could not be saved.');
+      setNotice({ type: 'success', text: payload.message || 'Fees refund saved successfully.' });
+    } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : 'Refund could not be saved.' }); } finally { setBusy(false); }
+  };
+
   return (
     <div className="space-y-4 p-4">
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-          <div>
-            <h2 className="text-sm font-bold text-amber-900">Refund workflow needs backend API support</h2>
-            <p className="mt-2 text-sm leading-6 text-amber-800">
-              The Laravel refund flow is currently implemented as session-backed web views. I did not recreate it with mock data because the old ERP does not expose JSON/API-safe endpoints for refund search, student refund detail, or save.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h3 className="text-sm font-bold text-slate-950">Backend endpoints needed before frontend wiring</h3>
-        </div>
-        <div className="grid gap-3 p-4 md:grid-cols-3">
-          <GapCard
-            title="Refund search"
-            body="JSON endpoint equivalent to POST fees/fees_refund that accepts grade, standard, division, enrollment_no, from_date, to_date, sub_institute_id, and syear."
-          />
-          <GapCard
-            title="Refund detail"
-            body="JSON endpoint equivalent to fees_refund/{student_id}/edit returning student data, paid fee-head totals, bank options, fee config, and validation metadata."
-          />
-          <GapCard
-            title="Refund save"
-            body="JSON endpoint equivalent to POST fees/save_fees_refund accepting refund_amount by fee head, payment mode, receipt date, cheque/DD details, bank details, and remark."
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GapCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <p className="text-sm font-bold text-slate-950">{title}</p>
-      <p className="mt-2 text-xs leading-5 text-slate-700">{body}</p>
+      <div className="grid gap-3 md:grid-cols-[1fr_auto]"><Input value={enrollment} onChange={(event) => setEnrollment(event.target.value)} placeholder="Enter enrollment number" /><Button type="button" onClick={search} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Search student</Button></div>
+      {notice ? <InlineMessage type={notice.type} text={notice.text} /> : null}
+      {students.length > 0 ? <div className="flex flex-wrap gap-2">{students.map((row) => <Button key={row.student_id} type="button" variant="outline" onClick={() => loadDetail(row.student_id)} disabled={busy}>{row.enrollment_no} — {row.student_name}</Button>)}</div> : null}
+      {student ? <div className="space-y-4 rounded-lg border border-slate-200 p-4"><div><h2 className="text-sm font-bold text-slate-950">Refund for {student.name}</h2><p className="text-xs text-slate-600">{student.enrollment}</p></div><div className="grid gap-3 md:grid-cols-2">{Object.entries(heads).map(([key, head]) => <Field key={key} label={`${head.label} (paid: ${currencyFormatter.format(head.amount)})`}><Input type="number" min="0" max={head.amount} value={amounts[key] ?? ''} onChange={(event) => setAmounts((current) => ({ ...current, [key]: event.target.value }))} /></Field>)}</div><div className="grid gap-3 md:grid-cols-2"><Field label="Payment mode"><select className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" value={paymentMode} onChange={(event) => setPaymentMode(event.target.value)}><option>Cash</option><option>Cheque</option><option>Bank Transfer</option></select></Field><Field label="Refund remark"><Textarea value={remark} onChange={(event) => setRemark(event.target.value)} /></Field></div><Button type="button" onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Save refund</Button></div> : null}
     </div>
   );
 }

@@ -272,6 +272,32 @@ const STUDENT_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'student/agewise': '/student/report/agewise_report',
 };
 
+// Legacy ERP modules now served by the stateless migration API.
+const MIGRATION_MODULE_ROUTES: Record<string, string> = {
+  'lo_master.index': '/learning-outcome/lo-master',
+  'result/lo_master': '/learning-outcome/lo-master',
+  'indicator_mapping.index': '/learning-outcome/indicator-mapping',
+  'result/indicator_mapping': '/learning-outcome/indicator-mapping',
+  'lo_marks_report.index': '/learning-outcome/reports',
+  'result/lo_marks_report': '/learning-outcome/reports',
+  'bulk_upload_sheet.index': '/bazar/bulk-upload',
+  'bazar/bulk_upload_sheet': '/bazar/bulk-upload',
+  'bazar_report.index': '/bazar/bulk-upload-report',
+  'bazar/bazar_report': '/bazar/bulk-upload-report',
+  'subject_elective.index': '/academic_setup/subject-elective-mapping',
+  'school_setup/subject_elective': '/academic_setup/subject-elective-mapping',
+  'biomatrix.index': '/settings/biomatrix',
+  'settings/biomatrix': '/settings/biomatrix',
+  'dynamic_report.index': '/reports/dynamic-report-builder',
+  'result/dynamic_report': '/reports/dynamic-report-builder',
+  'student_marks_report.index': '/reports/students-marks',
+  'result/student_marks_report': '/reports/students-marks',
+  'user_log.index': '/user_log',
+  'user_log': '/user_log',
+  'find_broken_link': '/reports/broken-link-finder',
+  'nomenclature.index': '/reports/nomenclature',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -426,6 +452,9 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (studentReportRoute) {
     return studentReportRoute;
   }
+
+  const migrationRoute = MIGRATION_MODULE_ROUTES[cleanLink.toLowerCase()];
+  if (migrationRoute) return migrationRoute;
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
     return '/fees/master/fees-config-master';
