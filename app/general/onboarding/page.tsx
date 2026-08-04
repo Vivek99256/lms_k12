@@ -80,9 +80,8 @@ export default function OnboardingPage() {
         <>
           <OnboardingPanel
             title={overview.context.schoolName || "Institute readiness"}
-            description={`Academic year ${overview.context.syear || "—"} · ${
-              overview.modules.length
-            } modules in scope`}
+            description={`Academic year ${overview.context.syear || "—"} · ${overview.modules.length
+              } modules in scope`}
           >
             <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <ProgressMeter
@@ -190,8 +189,4 @@ export default function OnboardingPage() {
       )}
     </div>
   );
-import { OnboardingPage } from "./OnboardingPage";
-
-export default function Page() {
-  return <OnboardingPage />;
 }

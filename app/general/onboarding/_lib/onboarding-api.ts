@@ -111,11 +111,19 @@ export type OnboardingMenu = {
   databaseTable: string;
 };
 
+/** A member of staff at this institute, read live from `tbluser`. */
+export type OnboardingUser = {
+  id: number;
+  name: string;
+  profileName: string;
+};
+
 export type OnboardingResources = {
   menus: OnboardingMenu[];
   requirements: string;
   importFields: Record<string, { field_name?: string; display_name?: string; is_required?: number }[]>;
   responsibilities: { profileName: string; text: string }[];
+  users: OnboardingUser[];
 };
 
 export type OnboardingJourney = {
@@ -194,9 +202,9 @@ async function request<T>(
   if (!response.ok || String(envelope.status ?? envelope.status_code ?? '') !== '1') {
     throw new Error(
       readString(envelope.message) ||
-        (response.status === 401
-          ? 'Your session has expired. Sign in again to continue.'
-          : `Request failed (${response.status}).`)
+      (response.status === 401
+        ? 'Your session has expired. Sign in again to continue.'
+        : `Request failed (${response.status}).`)
     );
   }
 
@@ -293,12 +301,12 @@ export async function loadOnboardingOverview(): Promise<OnboardingOverview> {
         summary: normalizeSummary(item.summary),
         nextStep: isRecord(item.next_step)
           ? {
-              id: readNumber(item.next_step.id),
-              stepKey: readString(item.next_step.step_key),
-              title: readString(item.next_step.title),
-              owner: readString(item.next_step.owner) === 'TRIZ' ? 'TRIZ' : 'SCHOOL',
-              status: (readString(item.next_step.status) || 'pending') as StepStatus,
-            }
+            id: readNumber(item.next_step.id),
+            stepKey: readString(item.next_step.step_key),
+            title: readString(item.next_step.title),
+            owner: readString(item.next_step.owner) === 'TRIZ' ? 'TRIZ' : 'SCHOOL',
+            status: (readString(item.next_step.status) || 'pending') as StepStatus,
+          }
           : null,
       })),
       summary: normalizeSummary(data.summary),
@@ -339,6 +347,13 @@ export async function loadModuleJourney(moduleKey: string): Promise<OnboardingJo
           profileName: readString(item.profile_name),
           text: readString(item.text),
         })),
+        users: list(resources.users)
+          .map((item) => ({
+            id: readNumber(item.id),
+            name: readString(item.name),
+            profileName: readString(item.profile_name),
+          }))
+          .filter((user) => user.id > 0 && user.name !== ''),
       },
     };
   });

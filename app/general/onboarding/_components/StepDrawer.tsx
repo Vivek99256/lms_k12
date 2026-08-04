@@ -17,9 +17,15 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { erpSelectClass } from "@/components/erp/erp-ui";
 import { mapApiLinkToRoute } from "@/app/data/routeMapper";
 import { OwnerMarker, StatusBadge } from "./onboarding-ui";
-import type { OnboardingStep, StepStatus, StepUpdate } from "../_lib/onboarding-api";
+import type {
+  OnboardingStep,
+  OnboardingUser,
+  StepStatus,
+  StepUpdate,
+} from "../_lib/onboarding-api";
 
 /**
  * Detail surface for one journey step.
@@ -37,12 +43,15 @@ export function StepDrawer({
   step,
   stepNumber,
   saving,
+  users,
   onClose,
   onSave,
 }: {
   step: OnboardingStep | null;
   stepNumber: number;
   saving: boolean;
+  /** Live staff list for this institute — never a static list. */
+  users: OnboardingUser[];
   onClose: () => void;
   onSave: (stepId: number, update: StepUpdate) => Promise<void>;
 }) {
@@ -75,16 +84,12 @@ export function StepDrawer({
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-40 bg-slate-900/20 lg:hidden"
-        onClick={onClose}
-        aria-hidden
-      />
+      <div className="fixed inset-0 z-40 bg-slate-900/20" onClick={onClose} aria-hidden />
       <aside
         role="dialog"
         aria-modal="true"
         aria-label={`Step ${stepNumber}: ${step.title}`}
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl lg:static lg:z-auto lg:h-auto lg:max-w-none lg:rounded-2xl lg:border lg:shadow-sm"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl"
       >
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 p-5">
           <div className="min-w-0">
@@ -128,11 +133,10 @@ export function StepDrawer({
 
           {/* How this step proves itself — the transparency the legacy screen lacked. */}
           <div
-            className={`rounded-xl border p-4 ${
-              step.status === "misconfigured"
+            className={`rounded-xl border p-4 ${step.status === "misconfigured"
                 ? "border-amber-200 bg-amber-50"
                 : "border-slate-200 bg-white"
-            }`}
+              }`}
           >
             <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
               {step.status === "misconfigured" ? (
@@ -211,6 +215,41 @@ export function StepDrawer({
               </div>
             </div>
           )}
+
+          <div>
+            <Label
+              htmlFor={`step-assignee-${step.id}`}
+              className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+            >
+              Assigned to
+            </Label>
+            {/* Options come straight from `tbluser` for this institute — the
+                list is whatever staff the school actually has. */}
+            <select
+              id={`step-assignee-${step.id}`}
+              value={step.state.assignedToId ? String(step.state.assignedToId) : ""}
+              disabled={saving || users.length === 0}
+              onChange={(event) => {
+                const id = Number(event.target.value);
+                const picked = users.find((user) => user.id === id);
+                void onSave(step.id, {
+                  assignedToId: picked ? picked.id : 0,
+                  assignedToName: picked ? picked.name : "",
+                });
+              }}
+              className={`mt-1.5 ${erpSelectClass}`}
+            >
+              <option value="">
+                {users.length === 0 ? "No staff records found" : "Unassigned"}
+              </option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                  {user.profileName ? ` — ${user.profileName}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <Label htmlFor={`step-notes-${step.id}`} className="text-xs font-semibold uppercase tracking-wide text-slate-500">

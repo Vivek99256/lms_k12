@@ -67,24 +67,44 @@ export const STATUS_META: Record<
   },
 };
 
-/** Fill applied to a ribbon chevron for each status. */
-export const CHEVRON_FILL: Record<StepStatus, string> = {
-  completed: "bg-violet-600 text-white",
-  in_progress: "bg-violet-500 text-white",
-  pending: "bg-violet-300 text-violet-950",
-  skipped: "bg-slate-300 text-slate-700",
-  blocked: "bg-rose-500 text-white",
-  misconfigured: "bg-amber-400 text-amber-950",
+/**
+ * Gradient applied to a ribbon segment for each status.
+ *
+ * Each entry uses the SAME hue family as that status's dot in `STATUS_META`, so
+ * the legend describes what the ribbon actually shows. An earlier pass kept the
+ * whole band violet to mirror the reference artwork, which made the legend
+ * inaccurate — it promised green/blue/grey/amber while every segment rendered
+ * violet.
+ *
+ * Colour is still never the only signal: every segment also carries the status
+ * icon and an accessible label.
+ *
+ * Consumed with `bg-gradient-to-r`, which the caller applies.
+ */
+export const RIBBON_FILL: Record<StepStatus, string> = {
+  completed: "from-emerald-500 to-emerald-600 text-white",
+  in_progress: "from-indigo-500 to-indigo-600 text-white",
+  pending: "from-slate-300 to-slate-400 text-slate-900",
+  skipped: "from-slate-400 to-slate-500 text-white",
+  blocked: "from-rose-500 to-rose-600 text-white",
+  misconfigured: "from-amber-400 to-amber-500 text-amber-950",
 };
+
+/**
+ * Colour of the hairpin turns joining the rows of the ribbon. The turns are
+ * track, not status, so they stay on the brand violet and read as the thread
+ * running through the journey rather than as a step of their own.
+ */
+export const RIBBON_TURN_COLOR = "#7c3aed"; // violet-600
 
 export const OWNER_META: Record<StepOwner, { label: string; ring: string; text: string }> = {
   TRIZ: {
-    label: "Triz user",
+    label: "scholar admin",
     ring: "border-sky-500 bg-sky-50 text-sky-700",
     text: "text-sky-700",
   },
   SCHOOL: {
-    label: "School user",
+    label: "School admin",
     ring: "border-orange-400 bg-orange-50 text-orange-700",
     text: "text-orange-700",
   },
@@ -117,14 +137,13 @@ export function OwnerMarker({
   lead?: boolean;
 }) {
   const meta = OWNER_META[owner];
-  const initials = owner === "TRIZ" ? "TZ" : "SC";
+  const initials = owner === "TRIZ" || owner === "SCHOOL" ? "SA" : "SA";
 
   return (
     <span className="flex items-center gap-1.5">
       <span
-        className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-semibold ${meta.ring} ${
-          lead ? "" : "opacity-60"
-        }`}
+        className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-semibold ${meta.ring} ${lead ? "" : "opacity-60"
+          }`}
         aria-hidden
       >
         {initials}
@@ -166,9 +185,8 @@ export function ProgressMeter({
         aria-label={label ?? "Onboarding progress"}
       >
         <div
-          className={`h-full rounded-full transition-[width] duration-500 ${
-            tone === "brand" ? "bg-violet-600" : "bg-slate-400"
-          }`}
+          className={`h-full rounded-full transition-[width] duration-500 ${tone === "brand" ? "bg-violet-600" : "bg-slate-400"
+            }`}
           style={{ width: `${safe}%` }}
         />
       </div>
