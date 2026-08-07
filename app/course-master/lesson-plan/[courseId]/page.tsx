@@ -1009,11 +1009,20 @@ export default function LessonPlanPage() {
           payload.division ??
           payload;
         const nextDivisions = Array.isArray(divisionData) ? (divisionData as Division[]) : [];
+        const sortedDivisions = [...nextDivisions].sort((a, b) => {
+          const aName = a.division_name ?? a.name ?? a.title ?? String(a.division_id ?? a.id ?? '');
+          const bName = b.division_name ?? b.name ?? b.title ?? String(b.division_id ?? b.id ?? '');
+          return aName.localeCompare(bName, undefined, { numeric: true, sensitivity: 'base' });
+        });
 
         if (!cancelled) {
-          setDivisions(nextDivisions);
+          setDivisions(sortedDivisions);
           if (nextDivisions.length === 0) {
             setDivisionError('No divisions are available for the selected standard.');
+          } else {
+            const firstDivision = sortedDivisions[0];
+            const firstDivisionId = firstDivision.division_id ?? firstDivision.id;
+            setSelectedDivisionId(firstDivisionId != null ? Number(firstDivisionId) : null);
           }
         }
       } catch (error) {
@@ -1622,7 +1631,7 @@ export default function LessonPlanPage() {
       </div>
     </div>
   ) : isKeyConceptsView ? (
-   <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
+   <div className="min-h-screen  rounded-t-3xl">
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center gap-2 text-[15px] text-[#475569]">
           <span className="inline-flex items-center gap-2">
@@ -2001,7 +2010,7 @@ export default function LessonPlanPage() {
       </div>
     </div>
   ) : (
-    <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
+    <div className="min-h-screen  rounded-t-3xl">
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center gap-2 text-[15px] text-[#475569]">
           <span className="inline-flex items-center gap-2">
