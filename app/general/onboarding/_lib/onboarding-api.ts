@@ -97,7 +97,7 @@ export type OnboardingModuleOverview = OnboardingModule & {
 export type OnboardingOverview = {
   modules: OnboardingModuleOverview[];
   summary: OnboardingSummary;
-  context: { subInstituteId: string; syear: string; schoolName: string };
+  context: { subInstituteId: string; syear: string; schoolName: string; currentUserName: string };
 };
 
 export type OnboardingMenu = {
@@ -131,6 +131,7 @@ export type OnboardingJourney = {
   steps: OnboardingStep[];
   summary: OnboardingSummary;
   resources: OnboardingResources;
+  context: { subInstituteId: string; syear: string; currentUserName: string };
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -314,6 +315,7 @@ export async function loadOnboardingOverview(): Promise<OnboardingOverview> {
         subInstituteId: readString(context.sub_institute_id),
         syear: readString(context.syear),
         schoolName: readString(context.school_name),
+        currentUserName: readString(context.current_user_name),
       },
     };
   });
@@ -354,6 +356,11 @@ export async function loadModuleJourney(moduleKey: string): Promise<OnboardingJo
             profileName: readString(item.profile_name),
           }))
           .filter((user) => user.id > 0 && user.name !== ''),
+      },
+      context: {
+        subInstituteId: readString(record(data.context).sub_institute_id),
+        syear: readString(record(data.context).syear),
+        currentUserName: readString(record(data.context).current_user_name),
       },
     };
   });

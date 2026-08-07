@@ -77,18 +77,15 @@ function useColumns(): number {
   return columns;
 }
 
-/** The ringed avatar that sits on a hairline above or below the band. */
-function Marker({ owner, above }: { owner: StepOwner; above: boolean }) {
-  const triz = owner === "TRIZ";
-  const label = triz ? "scholar admin" : "School admin";
+function Marker({ label, above }: { label: string; above: boolean }) {
+  const initials = (label || "US").substring(0, 2).toUpperCase();
 
   const dot = (
     <span
       title={label}
-      className={`flex size-7 shrink-0 items-center justify-center rounded-full border-2 bg-white ${triz ? "border-sky-500 text-sky-600" : "border-orange-500 text-orange-500"
-        }`}
+      className={`flex size-7 shrink-0 items-center justify-center rounded-full border-2 bg-white border-sky-500 text-sky-600 font-semibold text-[10px]`}
     >
-      {triz ? <Users className="size-3.5" aria-hidden /> : null}
+      {initials}
       <span className="sr-only">{label}</span>
     </span>
   );
@@ -105,12 +102,7 @@ function Marker({ owner, above }: { owner: StepOwner; above: boolean }) {
           {dot}
           {line}
         </>
-      ) : (
-        <>
-          {line}
-          {dot}
-        </>
-      )}
+      ) : null}
     </span>
   );
 }
@@ -122,6 +114,7 @@ function StepSegment({
   head,
   tail,
   selected,
+  currentUserName,
   onSelect,
 }: {
   step: OnboardingStep;
@@ -130,15 +123,15 @@ function StepSegment({
   head: boolean;
   tail: boolean;
   selected: boolean;
+  currentUserName: string;
   onSelect: (step: OnboardingStep) => void;
 }) {
   const meta = STATUS_META[step.status] ?? STATUS_META.pending;
   const Icon = meta.icon;
-  const other: StepOwner = step.owner === "TRIZ" ? "SCHOOL" : "TRIZ";
 
   return (
     <div className="relative flex min-w-0 flex-1 flex-col items-center">
-      <Marker owner={step.owner} above />
+      <Marker label={currentUserName} above />
 
       <button
         type="button"
@@ -161,7 +154,8 @@ function StepSegment({
         </span>
       </button>
 
-      <Marker owner={other} above={false} />
+      {/* Empty space below to keep the chevron centered */}
+      <span style={{ height: MARKER_ZONE }} />
     </div>
   );
 }
@@ -199,10 +193,12 @@ function Turn({ side }: { side: "left" | "right" }) {
 function VerticalStepper({
   steps,
   selectedId,
+  currentUserName,
   onSelect,
 }: {
   steps: OnboardingStep[];
   selectedId: number | null;
+  currentUserName: string;
   onSelect: (step: OnboardingStep) => void;
 }) {
   return (
@@ -234,7 +230,7 @@ function VerticalStepper({
                   <Icon className="size-3.5" aria-hidden />
                   {meta.label}
                   <span aria-hidden>·</span>
-                  {step.owner === "TRIZ" ? "scholar admin" : "School admin"}
+                  {currentUserName}
                 </span>
               </span>
             </button>
@@ -248,10 +244,12 @@ function VerticalStepper({
 export function JourneyRibbon({
   steps,
   selectedId,
+  currentUserName,
   onSelect,
 }: {
   steps: OnboardingStep[];
   selectedId: number | null;
+  currentUserName: string;
   onSelect: (step: OnboardingStep) => void;
 }) {
   const columns = useColumns();
@@ -274,7 +272,7 @@ export function JourneyRibbon({
 
   return (
     <div>
-      <VerticalStepper steps={steps} selectedId={selectedId} onSelect={onSelect} />
+      <VerticalStepper steps={steps} selectedId={selectedId} currentUserName={currentUserName} onSelect={onSelect} />
 
       <div className="relative hidden sm:block" aria-label="Onboarding journey">
         {rows.map((row, rowIndex) => {
@@ -333,6 +331,7 @@ export function JourneyRibbon({
                         // …and the edge where it leaves into one.
                         tail={last && !isLastRow}
                         selected={selectedId === step.id}
+                        currentUserName={currentUserName}
                         onSelect={onSelect}
                       />
                     </div>
