@@ -3940,7 +3940,7 @@ export default function ChapterListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#E9EEF7] rounded-t-3xl">
+    <div className="min-h-screen rounded-t-3xl">
       <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8 ">
         {successMessage && (
           <div className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
