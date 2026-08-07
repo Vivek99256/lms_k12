@@ -44,6 +44,7 @@ export function StepDrawer({
   stepNumber,
   saving,
   users,
+  currentUserName,
   onClose,
   onSave,
 }: {
@@ -52,6 +53,7 @@ export function StepDrawer({
   saving: boolean;
   /** Live staff list for this institute — never a static list. */
   users: OnboardingUser[];
+  currentUserName: string;
   onClose: () => void;
   onSave: (stepId: number, update: StepUpdate) => Promise<void>;
 }) {
@@ -120,69 +122,14 @@ export function StepDrawer({
             </p>
             <div className="flex flex-col gap-3">
               <OwnerMarker
-                owner={step.owner}
+                label={currentUserName}
                 role={step.owner === "TRIZ" ? step.trizRole : step.schoolRole}
                 lead
-              />
-              <OwnerMarker
-                owner={step.owner === "TRIZ" ? "SCHOOL" : "TRIZ"}
-                role={step.owner === "TRIZ" ? step.schoolRole : step.trizRole}
               />
             </div>
           </div>
 
-          {/* How this step proves itself — the transparency the legacy screen lacked. */}
-          <div
-            className={`rounded-xl border p-4 ${step.status === "misconfigured"
-                ? "border-amber-200 bg-amber-50"
-                : "border-slate-200 bg-white"
-              }`}
-          >
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {step.status === "misconfigured" ? (
-                <TriangleAlert className="size-3.5 text-amber-600" aria-hidden />
-              ) : (
-                <Database className="size-3.5" aria-hidden />
-              )}
-              How completion is measured
-            </p>
 
-            {derived ? (
-              <div className="space-y-1.5 text-sm text-slate-600">
-                <p>
-                  Completed automatically once at least{" "}
-                  <strong className="text-slate-900">{step.proof.minRows}</strong>{" "}
-                  {step.proof.minRows === 1 ? "record exists" : "records exist"} in{" "}
-                  <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700">
-                    {step.proof.table}
-                  </code>
-                  {step.proof.scope === "tenant_year"
-                    ? " for this institute and academic year."
-                    : " for this institute."}
-                </p>
-                {step.proof.reason ? (
-                  <p
-                    className={
-                      step.status === "misconfigured" ? "text-amber-800" : "text-slate-500"
-                    }
-                  >
-                    {step.proof.reason}
-                  </p>
-                ) : (
-                  <p className="text-emerald-700">
-                    Found {step.proof.atLeast ? "at least " : ""}
-                    {step.proof.rowCount} matching{" "}
-                    {step.proof.rowCount === 1 ? "record" : "records"}.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-600">
-                This step has no records to check, so it is completed by an explicit sign-off
-                from the person who did the work.
-              </p>
-            )}
-          </div>
 
           {(step.action.youtubeLink || step.action.pdfLink) && (
             <div>
@@ -216,40 +163,7 @@ export function StepDrawer({
             </div>
           )}
 
-          <div>
-            <Label
-              htmlFor={`step-assignee-${step.id}`}
-              className="text-xs font-semibold uppercase tracking-wide text-slate-500"
-            >
-              Assigned to
-            </Label>
-            {/* Options come straight from `tbluser` for this institute — the
-                list is whatever staff the school actually has. */}
-            <select
-              id={`step-assignee-${step.id}`}
-              value={step.state.assignedToId ? String(step.state.assignedToId) : ""}
-              disabled={saving || users.length === 0}
-              onChange={(event) => {
-                const id = Number(event.target.value);
-                const picked = users.find((user) => user.id === id);
-                void onSave(step.id, {
-                  assignedToId: picked ? picked.id : 0,
-                  assignedToName: picked ? picked.name : "",
-                });
-              }}
-              className={`mt-1.5 ${erpSelectClass}`}
-            >
-              <option value="">
-                {users.length === 0 ? "No staff records found" : "Unassigned"}
-              </option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                  {user.profileName ? ` — ${user.profileName}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+
 
           <div>
             <Label htmlFor={`step-notes-${step.id}`} className="text-xs font-semibold uppercase tracking-wide text-slate-500">

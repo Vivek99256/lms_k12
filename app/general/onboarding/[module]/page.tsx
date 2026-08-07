@@ -157,7 +157,7 @@ export default function ModuleOnboardingPage() {
           >
             <ProgressMeter percent={journey.summary.percentComplete} label="Module completion" />
             <div className="mt-4 border-t border-slate-100 pt-4">
-              <OnboardingLegend />
+              <OnboardingLegend currentUserName={journey.context.currentUserName} />
             </div>
           </OnboardingPanel>
 
@@ -170,6 +170,7 @@ export default function ModuleOnboardingPage() {
               <JourneyRibbon
                 steps={journey.steps}
                 selectedId={selectedId}
+                currentUserName={journey.context.currentUserName}
                 onSelect={(step) => setSelectedId(step.id)}
               />
             </div>
@@ -180,6 +181,7 @@ export default function ModuleOnboardingPage() {
             stepNumber={selectedIndex}
             saving={saving}
             users={journey.resources.users}
+            currentUserName={journey.context.currentUserName}
             onClose={() => setSelectedId(null)}
             onSave={handleSave}
           />
