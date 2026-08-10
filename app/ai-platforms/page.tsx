@@ -1,4 +1,15 @@
-import { ArrowUpRight, Bot, Image as ImageIcon, Presentation, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Bot, Image as ImageIcon, Presentation, Sparkles, type LucideIcon } from 'lucide-react';
+
+type Platform = {
+  name: string;
+  description: string;
+  category: string;
+  website: string;
+  logo: string;
+  accent: string;
+  surface: string;
+  Icon: LucideIcon;
+};
 
 const platforms = [
   {
@@ -61,7 +72,7 @@ const platforms = [
     surface: '#E7FBF2',
     Icon: ImageIcon,
   },
-] as const;
+] satisfies readonly Platform[];
 
 const platformGroups = ['Video generation', 'Presentation generation', 'Image generation', 'AI assistants'].map(
   (category) => ({
