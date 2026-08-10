@@ -432,6 +432,7 @@ export interface ChapterContentAsset {
   content_category: string | null;
   concept_id?: number | string | null;
   created_at: string | null;
+  source?: string | null;
 }
 
 export interface ChapterContentResponse {
@@ -575,7 +576,7 @@ async function readApiJson(res: Response, fallback: string): Promise<Record<stri
 
 // TODO(backend): confirm the real store endpoint + field contract with the API team.
 // Once known, uncomment the fetch in `uploadChapterContent` below and remove the stub return.
-export const CHAPTER_CONTENT_STORE_ENDPOINT = '/api/lms-chapter-content/store';
+export const CHAPTER_CONTENT_STORE_ENDPOINT = '/api/lms-chapter-content/upload';
 
 export interface UploadChapterContentInput {
   chapter_id: number;
@@ -627,10 +628,10 @@ export async function uploadChapterContent(
     form.append('concept_id', String(input.concept_id));
   }
   form.append('title', input.title);
-  if (input.file) form.append('file', input.file);
-  if (input.url) form.append('url', input.url);
+  if (input.file) form.append('filename', input.file);
+  if (input.url) form.append('link', input.url);
 
-  const PERSIST_ENABLED = false; // TODO(backend): set true once the store endpoint is live.
+  const PERSIST_ENABLED = true;
   if (!PERSIST_ENABLED) {
     return { status: true, message: 'Saved locally (backend endpoint not wired yet).' };
   }
@@ -652,15 +653,32 @@ export async function uploadChapterContent(
 
 export async function fetchChapterContent(
   chapterId: number,
-  subInstituteId: number
+  subInstituteId: number,
+  options?: {
+    contentCategory?: string;
+    conceptWise?: boolean;
+    source?: string;
+  }
 ): Promise<ChapterContentResponse> {
+  const body: Record<string, unknown> = {
+    chapter_id: chapterId,
+    sub_institute_id: subInstituteId,
+  };
+
+  if (options?.contentCategory) {
+    body.content_category = options.contentCategory;
+  }
+  if (options?.conceptWise !== undefined) {
+    body.concept_wise = options.conceptWise;
+  }
+  if (options?.source) {
+    body.source = options.source;
+  }
+
   const res = await fetch(`${API_BASE_URL}/api/lms-chapter-content`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chapter_id: chapterId,
-      sub_institute_id: subInstituteId,
-    }),
+    body: JSON.stringify(body),
   });
 
   const raw = await readApiJson(res, 'Failed to fetch chapter content');
@@ -770,6 +788,46 @@ export async function fetchNewChapterMaster(
     message: raw.message as string | undefined,
     pagination: raw.pagination as NewChapterMasterResponse['pagination'] | undefined,
     data: (raw.data as ApiChapterSource[]) ?? [],
+  };
+}
+
+export interface QuestionBankApiQuestion {
+  id: number;
+  chapter_id: number;
+  topic_id?: number;
+  question: string;
+  question_type: string;
+  options?: Array<{
+    label: string;
+    text: string;
+    is_correct?: boolean;
+  }>;
+  model_answer?: string;
+  marks?: number;
+}
+
+export interface QuestionBankApiResponse {
+  status: boolean;
+  message: string;
+  data: QuestionBankApiQuestion[];
+}
+
+export async function fetchQuestionBank(chapterId: number): Promise<QuestionBankApiResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-question-bank`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chapter_id: chapterId }),
+  });
+
+  const raw = await readApiJson(res, 'Failed to fetch question bank');
+  if (!res.ok || raw.status === false) {
+    throw new Error((raw.message as string) || 'Failed to fetch question bank');
+  }
+
+  return {
+    status: Boolean(raw.status),
+    message: (raw.message as string) || 'Questions fetched successfully.',
+    data: (raw.data as QuestionBankApiQuestion[]) ?? [],
   };
 }
 

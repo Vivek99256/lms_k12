@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -53,6 +53,7 @@ import { cn } from '@/lib/utils';
 import { courses, type Course } from '../../data/courses';
 import {
   fetchChapterContent,
+  fetchQuestionBank,
   fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
   getChaptersByCourseid,
@@ -64,6 +65,7 @@ import {
   type ChapterSemantic,
   type ConceptIntelEntry,
   type GeneratedQuestionPreview,
+  type QuestionBankApiQuestion,
   type SubjectWithChapters,
 } from '../../data/chapters';
 import { ConceptIntelligenceTabs } from './ConceptIntelligenceTabs';
@@ -158,9 +160,9 @@ const UPLOAD_TYPE_CONFIG: Record<
   },
 };
 
-type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF';
+type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity';
 type ChapterContentSource = 'Gamma AI' | 'Uploaded';
-type ChapterContentPreview = 'presentation' | 'notes' | 'video' | 'pdf';
+type ChapterContentPreview = 'presentation' | 'notes' | 'video' | 'pdf' | 'activity';
 
 interface ChapterContentItem {
   id: string;
@@ -219,11 +221,16 @@ interface QuestionBankGroup {
 }
 
 function getApiContentType(category: string, asset: ChapterContentAsset): ChapterContentType {
-  const contentLabel = `${category} ${asset.file_type ?? ''} ${asset.title}`.toLowerCase();
+  const normalizedCategory = category.toLowerCase().replace(/[_\s]+/g, ' ').trim();
+  const contentCategory = (asset.content_category ?? '').toLowerCase().replace(/[_\s]+/g, ' ').trim();
+  const contentLabel = `${normalizedCategory} ${contentCategory} ${asset.file_type ?? ''} ${asset.title}`.toLowerCase();
+
   if (contentLabel.includes('video') || /\.(mp4|mov|webm)(?:$|\?)/.test(asset.filename ?? '')) return 'Video';
   if (contentLabel.includes('presentation') || /\.(ppt|pptx)(?:$|\?)/.test(asset.filename ?? '')) {
+    if (contentLabel.includes('teacher training')) return 'Teacher training presentation';
     return 'Classroom presentation';
   }
+  if (contentLabel.includes('classroom activity')) return 'Classroom activity';
   if (contentLabel.includes('pdf')) return 'PDF';
   return 'Revision notes';
 }
@@ -241,6 +248,7 @@ function buildApiChapterContentItems(
         asset.concept_id === null || asset.concept_id === undefined
           ? null
           : String(asset.concept_id).trim();
+      const source = asset.source === 'Gamma AI' ? 'Gamma AI' : 'Uploaded';
 
       return {
         id: String(asset.id),
@@ -251,7 +259,7 @@ function buildApiChapterContentItems(
         contentCategory: asset.content_category ?? category,
         conceptId: rawConceptId && rawConceptId !== '0' ? rawConceptId : null,
         type,
-        source: 'Uploaded',
+        source,
         preview: getChapterContentPreview(type),
         actionLabel: type === 'Video' ? 'Play' : 'Open',
         slideCount: 0,
@@ -400,6 +408,7 @@ function getChapterContentType(index: number): ChapterContentType {
     'Teacher training presentation',
     'Video',
     'Revision notes',
+    'Classroom activity',
     'PDF',
   ];
 
@@ -410,6 +419,7 @@ function getChapterContentPreview(type: ChapterContentType): ChapterContentPrevi
   if (type === 'Video') return 'video';
   if (type === 'Revision notes') return 'notes';
   if (type === 'PDF') return 'pdf';
+  if (type === 'Classroom activity') return 'activity';
   return 'presentation';
 }
 
@@ -423,6 +433,8 @@ function getChapterContentTitle(conceptTitle: string, type: ChapterContentType, 
       return `${conceptTitle} demonstration`;
     case 'PDF':
       return `NCERT ${chapterTitle} - reference chapter`;
+    case 'Classroom activity':
+      return `${chapterTitle} - classroom activity`;
     default:
       return conceptTitle;
   }
@@ -438,7 +450,7 @@ function getChapterContentStat(type: ChapterContentType, index: number) {
     };
   }
 
-  if (type === 'Revision notes' || type === 'PDF') {
+  if (type === 'Revision notes' || type === 'PDF' || type === 'Classroom activity') {
     return {
       slideCount,
       statValue: `${6 + index} pages`,
@@ -522,6 +534,10 @@ function getContentPreviewIcon(preview: ChapterContentPreview) {
     return FileText;
   }
 
+  if (preview === 'activity') {
+    return ClipboardList;
+  }
+
   return BookOpen;
 }
 
@@ -561,6 +577,83 @@ function getQuestionBankCategory(course: Course, chapter: Chapter, conceptTitle:
   if (/life|cell|organ|plant|animal|nutrition|respiration/.test(haystack)) return 'Biology';
 
   return course.subject || 'Concept';
+}
+
+function isLikelyJson(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.startsWith('{') && trimmed.endsWith('}');
+}
+
+function deriveQuestionBankAnswer(
+  q: QuestionBankApiQuestion
+): { type: QuestionBankQuestionType; options?: QuestionBankOption[]; modelAnswer?: string } {
+  if (q.options && q.options.length > 0) {
+    return {
+      type: q.question_type === 'MCQ' ? 'MCQ' : 'Narrative',
+      options: q.options.map((o) => ({ label: o.label, text: o.text, isCorrect: o.is_correct })),
+      modelAnswer: q.question_type === 'MCQ' ? undefined : q.model_answer,
+    };
+  }
+
+  if (q.model_answer) {
+    try {
+      const parsed = JSON.parse(q.model_answer) as {
+        question_type?: string;
+        options?: Array<{ label: string; text: string; is_correct?: boolean }>;
+        correct_option?: string;
+      };
+
+      if (Array.isArray(parsed.options) && parsed.options.length > 0) {
+        const isMcq = (parsed.question_type ?? '').toLowerCase() === 'mcq';
+        return {
+          type: isMcq ? 'MCQ' : 'Narrative',
+          options: parsed.options.map((o) => ({
+            label: o.label,
+            text: o.text,
+            isCorrect: o.is_correct ?? o.label === parsed.correct_option,
+          })),
+          modelAnswer: undefined,
+        };
+      }
+    } catch {
+      // model_answer isn't structured JSON — treat it as a plain-text model answer below.
+    }
+  }
+
+  return {
+    type: q.question_type === 'MCQ' ? 'MCQ' : 'Narrative',
+    options: undefined,
+    modelAnswer: q.model_answer,
+  };
+}
+
+async function fetchMappedQuestionBank(
+  chapterId: number,
+  chapter: Chapter | undefined,
+  course: Course | null | undefined
+): Promise<QuestionBankItem[]> {
+  const response = await fetchQuestionBank(chapterId);
+
+  return response.data.map((q: QuestionBankApiQuestion) => {
+    const conceptTitle =
+      chapter?.concepts?.find((c) => Number(c.id) === q.topic_id)?.title ??
+      (q.topic_id ? `Topic ${q.topic_id}` : 'General');
+    const { type, options, modelAnswer } = deriveQuestionBankAnswer(q);
+
+    return {
+      id: String(q.id),
+      displayId: `QB-${q.id}`,
+      chapterId: String(q.chapter_id),
+      chapterTitle: chapter?.title ?? 'Unknown Chapter',
+      conceptTitle,
+      category: course ? getQuestionBankCategory(course, chapter ?? ({} as Chapter), conceptTitle) : 'Question Bank',
+      type,
+      marks: q.marks ?? 1,
+      question: q.question,
+      options,
+      modelAnswer,
+    };
+  });
 }
 
 function buildQuestionBankItems(course: Course, chapters: Chapter[]): QuestionBankItem[] {
@@ -761,6 +854,9 @@ export default function ChapterListPage() {
   const [manualQuestionBankItems, setManualQuestionBankItems] = useState<QuestionBankItem[]>([]);
   const [questionBankItemEdits, setQuestionBankItemEdits] = useState<Record<string, QuestionBankItem>>({});
   const [editingQuestionBankItem, setEditingQuestionBankItem] = useState<QuestionBankItem | null>(null);
+  const [apiQuestionBankItems, setApiQuestionBankItems] = useState<QuestionBankItem[]>([]);
+  const [questionBankLoading, setQuestionBankLoading] = useState(false);
+  const [questionBankError, setQuestionBankError] = useState('');
   const [isAddQuestionBankModalOpen, setIsAddQuestionBankModalOpen] = useState(false);
   const [manualQuestionChapterId, setManualQuestionChapterId] = useState('');
   const [manualQuestionConcept, setManualQuestionConcept] = useState('');
@@ -862,11 +958,12 @@ export default function ChapterListPage() {
 
   const chapterContentItems = useMemo(() => {
     if (!course || !activeLibraryChapter) return [];
-    const apiCategories = chapterContentCategories[activeLibraryChapter.id];
+    const cacheKey = `${activeLibraryChapter.id}:${contentLibraryTab}:${contentGroupBy}:${contentSourceFilter}:${contentResourceType}`;
+    const apiCategories = chapterContentCategories[cacheKey];
     if (apiCategories) return buildApiChapterContentItems(activeLibraryChapter, apiCategories);
     if (/^\d+$/.test(activeLibraryChapter.id)) return [];
     return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
-  }, [activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, course]);
+  }, [activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, contentLibraryTab, contentGroupBy, contentSourceFilter, contentResourceType, course]);
 
   const contentSourceOptions = useMemo(
     () => Array.from(new Set(chapterContentItems.map((item) => item.source))),
@@ -879,10 +976,10 @@ export default function ChapterListPage() {
   );
   const questionBankItems = useMemo(
     () =>
-      [...generatedQuestionBankItems, ...manualQuestionBankItems].map(
+      [...(apiQuestionBankItems.length > 0 ? apiQuestionBankItems : generatedQuestionBankItems), ...manualQuestionBankItems].map(
         (question) => questionBankItemEdits[question.id] ?? question
       ),
-    [generatedQuestionBankItems, manualQuestionBankItems, questionBankItemEdits]
+    [apiQuestionBankItems, generatedQuestionBankItems, manualQuestionBankItems, questionBankItemEdits]
   );
   const questionBankChapterOptions = useMemo(
     () => allChapters.map((chapter) => ({ id: chapter.id, title: chapter.title })),
@@ -1015,20 +1112,72 @@ export default function ChapterListPage() {
     }
   }, [allChapters, contentChapter, selectedLibraryChapterId]);
 
+  const questionBankChapterSyncedFromUrlRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (view !== 'question-bank' || !activeChapterId) return;
+    if (questionBankChapterSyncedFromUrlRef.current === activeChapterId) return;
     const hasMatchingChapter = allChapters.some((chapter) => chapter.id === activeChapterId);
-    if (!hasMatchingChapter || questionBankChapterFilter === activeChapterId) return;
+    if (!hasMatchingChapter) return;
 
+    questionBankChapterSyncedFromUrlRef.current = activeChapterId;
     queueMicrotask(() => {
       setQuestionBankChapterFilter(activeChapterId);
       setQuestionBankConceptFilter('all');
     });
-  }, [activeChapterId, allChapters, questionBankChapterFilter, view]);
+  }, [activeChapterId, allChapters, view]);
+
+  const loadQuestionBankItems = useCallback(
+    (filterValue: string) => {
+      let cancelled = false;
+
+      setQuestionBankLoading(true);
+      setQuestionBankError('');
+
+      const request =
+        filterValue === 'all'
+          ? Promise.all(
+              allChapters
+                .filter((chapter) => /^\d+$/.test(chapter.id))
+                .map((chapter) => fetchMappedQuestionBank(Number(chapter.id), chapter, course).catch(() => []))
+            ).then((results) => results.flat())
+          : fetchMappedQuestionBank(
+              Number(filterValue),
+              allChapters.find((chapter) => chapter.id === filterValue),
+              course
+            );
+
+      request
+        .then((mappedItems) => {
+          if (!cancelled) setApiQuestionBankItems(mappedItems);
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) {
+            setQuestionBankError(error instanceof Error ? error.message : 'Failed to load questions.');
+            setApiQuestionBankItems([]);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setQuestionBankLoading(false);
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    },
+    [allChapters, course]
+  );
+
+  useEffect(() => {
+    if (view !== 'question-bank') return;
+    return loadQuestionBankItems(questionBankChapterFilter);
+  }, [loadQuestionBankItems, questionBankChapterFilter, view]);
 
   useEffect(() => {
     if (view !== 'content' || !activeLibraryChapter || !/^\d+$/.test(activeLibraryChapter.id)) return;
-    if (chapterContentCategories[activeLibraryChapter.id]) return;
+
+    const cacheKey = `${activeLibraryChapter.id}:${contentLibraryTab}:${contentGroupBy}:${contentSourceFilter}:${contentResourceType}`;
+    if (chapterContentCategories[cacheKey]) return;
 
     const requestContext = getRequestContext();
     if (!requestContext) {
@@ -1043,13 +1192,19 @@ export default function ChapterListPage() {
           setContentLoading(true);
           setContentError('');
         }
-        return fetchChapterContent(Number(activeLibraryChapter.id), requestContext.sub_institute_id);
+        const conceptWise = contentGroupBy === 'Concept wise';
+        const contentCategory = contentLibraryTab === 'All content' ? undefined : contentLibraryTab;
+        return fetchChapterContent(Number(activeLibraryChapter.id), requestContext.sub_institute_id, {
+          contentCategory,
+          conceptWise,
+          source: contentSourceFilter === 'all' ? undefined : contentSourceFilter,
+        });
       })
       .then((response) => {
         if (!cancelled) {
           setChapterContentCategories((current) => ({
             ...current,
-            [activeLibraryChapter.id]: response.content_categories,
+            [cacheKey]: response.content_categories,
           }));
         }
       })
@@ -1065,7 +1220,7 @@ export default function ChapterListPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeLibraryChapter, chapterContentCategories, view]);
+  }, [activeLibraryChapter, contentLibraryTab, contentGroupBy, contentSourceFilter, contentResourceType, view, chapterContentCategories]);
 
   const filteredChapterContentItems = useMemo(() => {
     return chapterContentItems.filter((item) => {
@@ -1089,12 +1244,11 @@ export default function ChapterListPage() {
             // every Teacher Training item regardless of its underlying type.
             true
           : contentLibraryTab === 'All content' ||
-            (contentLibraryTab === 'Presentations' &&
-              (item.type === 'Classroom presentation' || item.type === 'Teacher training presentation')) ||
+            (contentLibraryTab === 'Presentations' && item.type === 'Classroom presentation') ||
             (contentLibraryTab === 'Videos' && item.type === 'Video') ||
             (contentLibraryTab === 'Revision notes' &&
               (item.type === 'Revision notes' || item.type === 'PDF')) ||
-            (contentLibraryTab === 'Classroom activity' && item.type === 'Revision notes');
+             (contentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity');
 
       // Chapter-wise shows only records without a concept_id; Concept-wise shows
       // only records that carry a concept_id.
@@ -2176,7 +2330,7 @@ export default function ChapterListPage() {
           </div>
         ) : null}
 
-        {question.modelAnswer ? (
+        {question.modelAnswer && !isLikelyJson(question.modelAnswer) ? (
           <div className="mt-4 rounded-[6px] border border-slate-200 border-l-4 border-l-[#4f46e5] bg-[#f3f7fc] px-4 py-3">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
               Model answer
@@ -3125,7 +3279,11 @@ export default function ChapterListPage() {
   }
 
   if (view === 'question-bank') {
-    const questionCountLabel = `${filteredQuestionBankItems.length} of ${questionBankItems.length} questions`;
+    const questionCountLabel = questionBankLoading
+      ? 'Loading questions…'
+      : questionBankError
+        ? 'Error loading questions'
+        : `${filteredQuestionBankItems.length} of ${questionBankItems.length} questions`;
 
     return (
       <div className="min-h-screen rounded-t-3xl bg-[#E9EEF7]">
@@ -3159,7 +3317,9 @@ export default function ChapterListPage() {
           </div>
 
           <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <p className="text-[16px] font-medium text-slate-700">{questionCountLabel}</p>
+            <p className={`text-[16px] font-medium ${questionBankError ? 'text-rose-600' : 'text-slate-700'}`}>
+              {questionCountLabel}
+            </p>
 
             <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[225px_275px_215px_auto]">
               <Select
@@ -3228,7 +3388,7 @@ export default function ChapterListPage() {
               <Button
                 type="button"
                 onClick={openQuestionBankAddQuestion}
-                disabled={questionBankItems.length === 0}
+                disabled={questionBankItems.length === 0 || questionBankLoading}
                 className="h-10 rounded-xl bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
               >
                 <Plus size={18} className="mr-2" />
@@ -3237,7 +3397,23 @@ export default function ChapterListPage() {
             </div>
           </div>
 
-          {groupedQuestionBankItems.length === 0 ? (
+          {questionBankLoading ? (
+            <div className="rounded-[8px] border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
+              <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapter…</p>
+            </div>
+          ) : questionBankError ? (
+            <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-5 py-12 text-center shadow-sm">
+              <h2 className="text-lg font-bold text-rose-900">Unable to load questions</h2>
+              <p className="mt-2 text-sm text-rose-700">{questionBankError}</p>
+              <button
+                type="button"
+                onClick={() => loadQuestionBankItems(questionBankChapterFilter)}
+                className="mt-4 inline-flex items-center rounded-lg bg-rose-100 px-4 py-2 text-sm font-semibold text-rose-800 transition-colors hover:bg-rose-200"
+              >
+                Retry
+              </button>
+            </div>
+          ) : groupedQuestionBankItems.length === 0 ? (
             <div className="rounded-[8px] border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
               <h2 className="text-lg font-bold text-slate-950">No questions found</h2>
               <p className="mt-2 text-sm text-slate-500">
@@ -3575,7 +3751,19 @@ export default function ChapterListPage() {
                   Viewing Chapter
                 </p>
                 <div className="min-w-0 w-full max-w-[320px] shrink">
-                  <Select value={selectedLibraryChapterId} onValueChange={(value) => setSelectedLibraryChapterId(value ?? '')}>
+                  <Select
+                    value={selectedLibraryChapterId}
+                    onValueChange={(value) => {
+                      const nextChapterId = value ?? '';
+                      setSelectedLibraryChapterId(nextChapterId);
+                      if (nextChapterId) {
+                        const nextParams = new URLSearchParams(searchParams?.toString());
+                        nextParams.set('chapterId', nextChapterId);
+                        nextParams.set('expandedChapterId', nextChapterId);
+                        router.replace(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
+                      }
+                    }}
+                  >
                     <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 shadow-sm">
                       <span className="truncate">{activeChapterTitle}</span>
                     </SelectTrigger>
@@ -3722,63 +3910,143 @@ export default function ChapterListPage() {
             <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500">
               No content is available for this chapter.
             </div>
-          ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {filteredChapterContentItems.map((item) => {
-              const PreviewIcon = getContentPreviewIcon(item.preview);
-
+          ) : contentGroupBy === 'Concept wise' ? (() => {
+              const groups = new Map<string, { title: string; items: ChapterContentItem[] }>();
+              filteredChapterContentItems.forEach((item) => {
+                const key = item.conceptId ?? 'unknown';
+                const title = item.conceptTitle || 'Unnamed concept';
+                const existing = groups.get(key);
+                if (existing) {
+                  existing.items.push(item);
+                } else {
+                  groups.set(key, { title, items: [item] });
+                }
+              });
+              const groupEntries = Array.from(groups.entries()).map(([key, value]) => ({ key, ...value }));
               return (
-                <article
-                  key={item.id}
-                  className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
-                >
-                  <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
-                    <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
-                      {truncateToWords(item.subtitle, 150)}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                      {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
-                      {item.source}
-                    </span>
-                  </div>
-
-                  <div className="-mt-[74px] flex justify-center px-4">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
-                      <PreviewIcon size={28} />
-                    </div>
-                  </div>
-
-                  <div className="px-4 pb-4 pt-3">
-                    <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
-                      {item.chapterTitle}
-                    </div>
-                     <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-
-                    <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
-                      
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleOpenContent(item);
-                        }}
-                        className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
-                      >
-                        {item.actionLabel === 'Play' ? (
-                          <Play size={14} className="mr-2" />
-                        ) : (
-                          <Eye size={14} className="mr-2" />
-                        )}
-                        {item.actionLabel}
-                      </Button>
-                    </div>
-                  </div>
-                </article>
+                <div className="space-y-10">
+                  {groupEntries.map((group) => (
+                    <section key={group.key}>
+                      <div className="mb-4 flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
+                          <Brain size={16} className="text-[#4f46e5]" />
+                        </div>
+                        <h2 className="text-[20px] font-bold leading-7 text-slate-950">{group.title}</h2>
+                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200">
+                          {group.items.length} item{group.items.length === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {group.items.map((item) => {
+                          const PreviewIcon = getContentPreviewIcon(item.preview);
+                          return (
+                            <article
+                              key={item.id}
+                              className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
+                            >
+                              <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
+                                <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
+                                  {truncateToWords(item.subtitle, 150)}
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                                  {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
+                                  {item.source}
+                                </span>
+                              </div>
+                              <div className="-mt-[74px] flex justify-center px-4">
+                                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
+                                  <PreviewIcon size={28} />
+                                </div>
+                              </div>
+                              <div className="px-4 pb-4 pt-3">
+                                <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
+                                  {item.chapterTitle}
+                                </div>
+                                <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
+                                <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleOpenContent(item);
+                                    }}
+                                    className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
+                                  >
+                                    {item.actionLabel === 'Play' ? (
+                                      <Play size={14} className="mr-2" />
+                                    ) : (
+                                      <Eye size={14} className="mr-2" />
+                                    )}
+                                    {item.actionLabel}
+                                  </Button>
+                                </div>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
+                </div>
               );
-            })}
-          </div>
-          )}
+            })() : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {filteredChapterContentItems.map((item) => {
+                  const PreviewIcon = getContentPreviewIcon(item.preview);
+
+                  return (
+                    <article
+                      key={item.id}
+                      className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
+                    >
+                      <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
+                        <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
+                          {truncateToWords(item.subtitle, 150)}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                          {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
+                          {item.source}
+                        </span>
+                      </div>
+
+                      <div className="-mt-[74px] flex justify-center px-4">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
+                          <PreviewIcon size={28} />
+                        </div>
+                      </div>
+
+                      <div className="px-4 pb-4 pt-3">
+                        <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
+                          {item.chapterTitle}
+                        </div>
+                         <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
+
+                        <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
+                          
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleOpenContent(item);
+                            }}
+                            className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
+                          >
+                            {item.actionLabel === 'Play' ? (
+                              <Play size={14} className="mr-2" />
+                            ) : (
+                              <Eye size={14} className="mr-2" />
+                            )}
+                            {item.actionLabel}
+                          </Button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
 
           <div
             className={cn(
