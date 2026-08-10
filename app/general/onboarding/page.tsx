@@ -106,7 +106,7 @@ export default function OnboardingPage() {
               </dl>
             </div>
             <div className="mt-5 border-t border-slate-100 pt-4">
-              <OnboardingLegend />
+              <OnboardingLegend currentUserName={overview.context.currentUserName} />
             </div>
           </OnboardingPanel>
 
