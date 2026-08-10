@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   BookOpen,
@@ -587,6 +587,7 @@ function CurriculumSkeleton() {
 }
 
 export default function StudentPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { menuContext } = useAuth();
 
@@ -994,6 +995,11 @@ export default function StudentPage() {
     window.open(item.url, '_blank', 'noopener,noreferrer');
   };
 
+  const returnToCourseMaster = () => {
+    localStorage.setItem('learningManagementAudienceMode', 'Student');
+    router.push('/course-master');
+  };
+
   const renderSubjectCard = (subject: StudentSubjectItem) => {
     const category = subject.category_name || subject.content_category;
     const SubjectIcon = CATEGORY_ICON_MAP[category] ?? BookOpen;
@@ -1204,7 +1210,7 @@ export default function StudentPage() {
 
               <button
                 type="button"
-                onClick={() => setStudentView('subjects')}
+                onClick={returnToCourseMaster}
                 className="inline-flex items-center gap-2 self-start rounded-xl border border-[#C8D3E3] bg-white px-4 py-2.5 text-sm font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF]"
               >
                 <ArrowLeft size={16} />
