@@ -531,7 +531,7 @@ export default function EditRegistrationPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6 lg:p-8">
+      <div className="mx-auto space-y-6 p-4 md:p-6 lg:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Button
