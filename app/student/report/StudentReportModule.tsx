@@ -21,10 +21,13 @@ import {
   HeartPulse,
   Loader2,
   Search,
+  Settings2,
   ShieldAlert,
   Users,
 } from 'lucide-react';
 
+import { searchInfirmaryStudents, type StudentOption } from '../student_infirmary/api';
+import { Modal } from '@/components/result/primitives';
 import SearchDropdown from '@/components/search-dropdown/SearchDropdown';
 import type {
   AcademicSection,
@@ -160,6 +163,30 @@ function SummaryCard({ label, value }: { label: string; value: string | number }
   );
 }
 
+function DynamicFieldPickerButton({
+  groups,
+  selected,
+  onChange,
+}: {
+  groups: DynamicFieldGroup[];
+  selected: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button type="button" variant="outline" className="h-10" onClick={() => setOpen(true)}>
+        <Settings2 className="h-4 w-4" />
+        Choose Field {selected.length > 0 ? `(${selected.length})` : ''}
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Choose Field" size="xl">
+        <DynamicFieldPicker groups={groups} selected={selected} onChange={onChange} />
+      </Modal>
+    </>
+  );
+}
+
 function DynamicFieldPicker({
   groups,
   selected,
@@ -174,59 +201,103 @@ function DynamicFieldPicker({
       {groups.length === 0 ? (
         <p className="text-sm text-slate-500">No dynamic fields were returned for this report.</p>
       ) : null}
-      {groups.map((group) => (
-        <div key={group.title} className="rounded-lg border border-slate-200 p-4">
-          <h4 className="mb-3 text-sm font-semibold text-slate-900">{group.title}</h4>
-          <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-4">
-            {group.options.map((option) => {
-              const checked = selected.includes(option.id);
-              return (
-                <label
-                  key={option.id}
-                  className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(event) => {
-                      if (event.target.checked) {
-                        onChange([...selected, option.id]);
-                        return;
-                      }
-                      onChange(selected.filter((value) => value !== option.id));
-                    }}
-                  />
-                  <span>{option.label}</span>
-                </label>
-              );
-            })}
+      {groups.map((group) => {
+        const groupIds = group.options.map((option) => option.id);
+        const allChecked = groupIds.length > 0 && groupIds.every((id) => selected.includes(id));
+
+        const toggleAll = () => {
+          if (allChecked) {
+            onChange(selected.filter((value) => !groupIds.includes(value)));
+            return;
+          }
+          onChange([...new Set([...selected, ...groupIds])]);
+        };
+
+        return (
+          <div key={group.title} className="rounded-lg border border-slate-200 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-slate-900">{group.title}</h4>
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                <input type="checkbox" checked={allChecked} onChange={toggleAll} />
+                Check All
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+              {group.options.map((option) => {
+                const checked = selected.includes(option.id);
+                return (
+                  <label key={option.id} className="flex items-start gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={checked}
+                      onChange={(event) => {
+                        if (event.target.checked) {
+                          onChange([...selected, option.id]);
+                          return;
+                        }
+                        onChange(selected.filter((value) => value !== option.id));
+                      }}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-function buildFlatColumns(headers: LabelledKey[]): Array<RecordColumn<FlatRow>> {
-  return headers.map((header) => ({
-    key: header.key,
-    label: header.label,
-    value: (row) => formatCellValue(header.key, row[header.key]),
-    render: (row) => {
-      const value = formatCellValue(header.key, row[header.key]);
-      if (value === 'Submitted') return <span className="font-medium text-emerald-700">Submitted</span>;
-      if (value === 'Missing') return <span className="font-medium text-red-600">Missing</span>;
-      if (header.key === 'flag_text') {
-        return (
-          <span className={value === 'Positive' ? 'font-medium text-emerald-700' : value === 'Negative' ? 'font-medium text-red-600' : ''}>
-            {value}
-          </span>
-        );
-      }
-      return value;
-    },
-    sortable: true,
-  }));
+function buildFlatColumns(headers: LabelledKey[], kind?: StudentReportKind): Array<RecordColumn<FlatRow>> {
+  return headers.map((header) => {
+    // Same Student Name + GR No pairing used by the "Add Student Infirmary" picker
+    // (app/student/student_infirmary/page.tsx): bold name, muted GR No alongside it.
+    if (kind === 'student_discipline_report' && header.key === 'student_name') {
+      return {
+        key: header.key,
+        label: header.label,
+        value: (row) => {
+          const name = formatCellValue('student_name', row.student_name);
+          const grNo = row.enrollment_no == null || row.enrollment_no === '' ? '' : String(row.enrollment_no);
+          return grNo ? `${name} (${grNo})` : name;
+        },
+        render: (row) => {
+          const name = formatCellValue('student_name', row.student_name);
+          const grNo = row.enrollment_no == null || row.enrollment_no === '' ? '' : String(row.enrollment_no);
+          return (
+            <span>
+              <span className="font-medium">{name}</span>
+              {grNo && <span className="ml-2 text-slate-400">{grNo}</span>}
+            </span>
+          );
+        },
+        sortable: true,
+      };
+    }
+
+    return {
+      key: header.key,
+      label: header.label,
+      value: (row) => formatCellValue(header.key, row[header.key]),
+      render: (row) => {
+        const value = formatCellValue(header.key, row[header.key]);
+        if (value === 'Submitted') return <span className="font-medium text-emerald-700">Submitted</span>;
+        if (value === 'Missing') return <span className="font-medium text-red-600">Missing</span>;
+        if (header.key === 'flag_text') {
+          return (
+            <span className={value === 'Positive' ? 'font-medium text-emerald-700' : value === 'Negative' ? 'font-medium text-red-600' : ''}>
+              {value}
+            </span>
+          );
+        }
+        return value;
+      },
+      sortable: true,
+    };
+  });
 }
 
 function selectionSummary(sectionLabel: string, standardLabel: string, divisionLabel: string) {
@@ -256,6 +327,9 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
   const [uniqueId, setUniqueId] = useState('');
   const [mobile, setMobile] = useState('');
   const [grno, setGrno] = useState('');
+  const [studentQuery, setStudentQuery] = useState('');
+  const [studentOptions, setStudentOptions] = useState<StudentOption[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   const [oneDate, setOneDate] = useState('add');
   const [standardWise, setStandardWise] = useState<string[]>(['standard']);
@@ -316,7 +390,35 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
     };
   }, [kind]);
 
-  const flatColumns = useMemo(() => buildFlatColumns(headers), [headers]);
+  // Same debounced Student Name + GR No lookup used by the Add Student Infirmary
+  // picker (app/student/student_infirmary/page.tsx), reused as-is for this report's
+  // combined student search filter.
+  useEffect(() => {
+    if (kind !== 'student_discipline_report') return;
+    if (studentQuery.trim().length < 2) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      searchInfirmaryStudents(studentQuery.trim(), controller.signal)
+        .then(setStudentOptions)
+        .catch(() => setStudentOptions([]));
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [kind, studentQuery]);
+
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [studentOptions]);
+
+  useEffect(() => {
+    if (highlightedIndex < 0 || studentOptions.length === 0) return;
+    const option = document.querySelector(`#student-options [data-index="${highlightedIndex}"]`);
+    (option as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
+  }, [highlightedIndex, studentOptions]);
+
+  const flatColumns = useMemo(() => buildFlatColumns(headers, kind), [headers, kind]);
   const selectedClassSummary = useMemo(
     () => selectionSummary(sectionLabel, standardLabel, divisionLabel),
     [divisionLabel, sectionLabel, standardLabel]
@@ -484,7 +586,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
         setRows(response.rows);
         setMessage({ type: response.rows.length > 0 ? 'success' : 'info', text: response.message });
       } else if (kind === 'student_request_report') {
-        const response = await fetchStudentRequestReport({ fromDate, toDate });
+        const response = await fetchStudentRequestReport({ grade: section, standard, division, fromDate, toDate });
         setHeaders(response.headers);
         setRows(response.rows);
         setMessage({ type: response.rows.length > 0 ? 'success' : 'info', text: response.message });
@@ -541,7 +643,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
         setRows(response.rows);
         setMessage({ type: response.rows.length > 0 ? 'success' : 'info', text: response.message });
       } else if (kind === 'agewise_report') {
-        const response = await fetchAgewiseReport({ grade: section });
+        const response = await fetchAgewiseReport({ grade: section, standard, division });
         const bucketSummary = response.buckets.map((bucket) => {
           const totals = response.classes.reduce(
             (accumulator, className) => {
@@ -596,7 +698,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
 
   function renderFilterActions() {
     return (
-      <Button type="button" className="h-10 w-full" onClick={() => void runSearch()} disabled={loading || bootstrapping}>
+      <Button type="button" className="h-10 flex-1" onClick={() => void runSearch()} disabled={loading || bootstrapping}>
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
         Search
       </Button>
@@ -618,9 +720,15 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
                 ))}
               </NativeSelect>
             </Field>
-            <div className="flex items-end">{renderFilterActions()}</div>
+            <div className="flex items-end gap-2">
+              <DynamicFieldPickerButton
+                groups={dynamicGroups}
+                selected={selectedDynamicFields}
+                onChange={setSelectedDynamicFields}
+              />
+              {renderFilterActions()}
+            </div>
           </div>
-          <DynamicFieldPicker groups={dynamicGroups} selected={selectedDynamicFields} onChange={setSelectedDynamicFields} />
         </div>
       );
     }
@@ -644,14 +752,17 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
 
     if (kind === 'student_request_report') {
       return (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Field label="From Date">
-            <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-          </Field>
-          <Field label="To Date">
-            <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-          </Field>
-          <div className="flex items-end">{renderFilterActions()}</div>
+        <div className="space-y-4">
+          {renderAcademicFilters()}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="From Date">
+              <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+            </Field>
+            <Field label="To Date">
+              <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+            </Field>
+            <div className="flex items-end">{renderFilterActions()}</div>
+          </div>
         </div>
       );
     }
@@ -686,18 +797,68 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
       return (
         <div className="space-y-4">
           {renderAcademicFilters()}
-          <div className="grid gap-4 md:grid-cols-4">
-            <Field label="Student Name">
-              <Input value={studentName} onChange={(event) => setStudentName(event.target.value)} />
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="Student">
+              <div className="relative">
+                <Input
+                  value={studentQuery}
+                  onChange={(event) => {
+                    setStudentQuery(event.target.value);
+                    setStudentOptions([]);
+                    setStudentName('');
+                    setGrno('');
+                  }}
+                  onKeyDown={(event) => {
+                    if (studentOptions.length === 0) return;
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setHighlightedIndex((prev) => (prev < 0 ? 0 : Math.min(prev + 1, studentOptions.length - 1)));
+                    } else if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setHighlightedIndex((prev) => (prev <= 0 ? -1 : prev - 1));
+                    } else if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const student = studentOptions[highlightedIndex >= 0 ? highlightedIndex : 0];
+                      setStudentQuery(`${student.name} - - ${student.enrollmentNo}`);
+                      setStudentName('');
+                      setGrno('');
+                      setStudentOptions([]);
+                      setHighlightedIndex(-1);
+                    } else if (event.key === 'Escape') {
+                      setStudentOptions([]);
+                      setHighlightedIndex(-1);
+                    }
+                  }}
+                  placeholder="Type student name or GR No."
+                />
+                {studentOptions.length > 0 && (
+                  <div id="student-options" className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
+                    {studentOptions.map((student, index) => (
+                      <button
+                        key={student.id}
+                        type="button"
+                        data-index={index}
+                        onClick={() => {
+                          setStudentQuery(`${student.name} - - ${student.enrollmentNo}`);
+                          setStudentName('');
+                          setGrno('');
+                          setStudentOptions([]);
+                        }}
+                        className={`block w-full px-3 py-2 text-left text-sm ${index === highlightedIndex ? 'bg-indigo-100' : 'hover:bg-slate-50'}`}
+                      >
+                        <span className="font-medium">{student.name}</span>
+                        <span className="ml-2 text-slate-400">{student.enrollmentNo}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </Field>
             <Field label="Unique ID">
               <Input value={uniqueId} onChange={(event) => setUniqueId(event.target.value)} />
             </Field>
             <Field label="Mobile">
               <Input value={mobile} onChange={(event) => setMobile(event.target.value)} />
-            </Field>
-            <Field label="GR No">
-              <Input value={grno} onChange={(event) => setGrno(event.target.value)} />
             </Field>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
@@ -802,15 +963,41 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
 
   function renderFlatReport() {
     return (
-      <RecordTable
-        rows={rows}
-        columns={flatColumns}
-        getRowKey={(row, index) => `${String(row.id || row.enrollment_no || row.student_name || 'row')}-${index}`}
-        exportFilename={kind}
-        exportTitle={toTitle(kind)}
-        exportSubtitle={selectedClassSummary}
-        emptyTitle={hasSearched ? 'No rows match the current filters.' : 'Search to load report data.'}
-      />
+      <div className="space-y-3">
+        {kind === 'student_request_report' ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={rows.length === 0}
+              onClick={() =>
+                exportRowsAsPdf({
+                  filename: 'student-request-report.pdf',
+                  title: toTitle(kind),
+                  subtitle: selectedClassSummary || 'All records',
+                  columns: headers.map((header) => ({ key: header.key, label: header.label })),
+                  rows: rows.map((row) =>
+                    Object.fromEntries(
+                      headers.map((header) => [header.key, formatCellValue(header.key, row[header.key])])
+                    )
+                  ),
+                })
+              }
+            >
+              PDF
+            </Button>
+          </div>
+        ) : null}
+        <RecordTable
+          rows={rows}
+          columns={flatColumns}
+          getRowKey={(row, index) => `${String(row.id || row.enrollment_no || row.student_name || 'row')}-${index}`}
+          exportFilename={kind}
+          exportTitle={toTitle(kind)}
+          exportSubtitle={selectedClassSummary}
+          emptyTitle={hasSearched ? 'No rows match the current filters.' : 'Search to load report data.'}
+        />
+      </div>
     );
   }
 
