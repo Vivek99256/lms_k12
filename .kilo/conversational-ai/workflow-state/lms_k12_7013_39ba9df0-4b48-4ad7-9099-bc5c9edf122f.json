@@ -1,0 +1,42 @@
+{
+  "conversationId": "39ba9df0-4b48-4ad7-9099-bc5c9edf122f",
+  "projectId": "lms_k12",
+  "currentStage": "failed",
+  "matchedEntities": [
+    {
+      "id": "13",
+      "label": "Gajera Vivek Babubhai",
+      "metadata": {
+        "id": "13",
+        "enquiryId": "13",
+        "studentName": "Gajera Vivek Babubhai",
+        "status": "new",
+        "canConfirm": false,
+        "readiness": "blocked",
+        "missingFields": [],
+        "missingSlots": [],
+        "detail": null
+      }
+    }
+  ],
+  "collectedSlots": {},
+  "missingSlots": [],
+  "module": "admissions",
+  "intent": "confirm_admission",
+  "workflowId": "admission_confirmation",
+  "selectedEntity": {
+    "id": "13",
+    "label": "Gajera Vivek Babubhai",
+    "metadata": {
+      "id": "13",
+      "enquiryId": "13",
+      "studentName": "Gajera Vivek Babubhai",
+      "status": "new",
+      "canConfirm": false,
+      "readiness": "blocked",
+      "missingFields": [],
+      "missingSlots": [],
+      "detail": null
+    }
+  }
+}

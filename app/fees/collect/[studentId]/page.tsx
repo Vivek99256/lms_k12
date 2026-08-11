@@ -80,6 +80,7 @@ type CollectionResponse = {
   payment_modes?: unknown;
   cheque_return_charges?: unknown;
   data?: {
+
     [key: string]: unknown;
     student?: unknown;
     stu_data?: unknown;

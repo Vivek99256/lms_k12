@@ -1,0 +1,301 @@
+{
+  "conversationId": "4517f1ae-c322-413d-ba73-d5d0e920f424",
+  "projectId": "lms_k12",
+  "currentStage": "hydrating_context",
+  "matchedEntities": [
+    {
+      "id": "10",
+      "label": "EVAAN RAJESH RAFALIYA",
+      "reference": "10",
+      "secondary": "7",
+      "metadata": {
+        "id": "10",
+        "studentName": "EVAAN RAJESH RAFALIYA",
+        "standard": "7",
+        "division": "C",
+        "enrollmentNo": "10",
+        "mobileNo": "9979176562",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "102",
+      "label": "GREEVA RAJESH RAFALIYA",
+      "reference": "102",
+      "secondary": "7",
+      "metadata": {
+        "id": "102",
+        "studentName": "GREEVA RAJESH RAFALIYA",
+        "standard": "7",
+        "division": "A",
+        "enrollmentNo": "102",
+        "mobileNo": "9979176562",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "664",
+      "label": "komal H vala",
+      "reference": "664",
+      "secondary": "7",
+      "metadata": {
+        "id": "664",
+        "studentName": "komal H vala",
+        "standard": "7",
+        "division": "A",
+        "enrollmentNo": "664",
+        "mobileNo": "9910952225",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "233",
+      "label": "Zeel J Tank",
+      "reference": "233",
+      "secondary": "7",
+      "metadata": {
+        "id": "233",
+        "studentName": "Zeel J Tank",
+        "standard": "7",
+        "division": "C",
+        "enrollmentNo": "233",
+        "mobileNo": "9909906514",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "100234",
+      "label": "Sonika P Pansuriya",
+      "reference": "100234",
+      "secondary": "7",
+      "metadata": {
+        "id": "100234",
+        "studentName": "Sonika P Pansuriya",
+        "standard": "7",
+        "division": "C",
+        "enrollmentNo": "100234",
+        "mobileNo": "7412590123",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "668",
+      "label": "hemanshu b trivedi",
+      "reference": "668",
+      "secondary": "7",
+      "metadata": {
+        "id": "668",
+        "studentName": "hemanshu b trivedi",
+        "standard": "7",
+        "division": "A",
+        "enrollmentNo": "668",
+        "mobileNo": "9044069616",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "669",
+      "label": "Dharmishtha A dve",
+      "reference": "669",
+      "secondary": "7",
+      "metadata": {
+        "id": "669",
+        "studentName": "Dharmishtha A dve",
+        "standard": "7",
+        "division": "A",
+        "enrollmentNo": "669",
+        "mobileNo": "9758556131",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "100238",
+      "label": "Darshna R Hirani",
+      "reference": "100238",
+      "secondary": "7",
+      "metadata": {
+        "id": "100238",
+        "studentName": "Darshna R Hirani",
+        "standard": "7",
+        "division": "C",
+        "enrollmentNo": "100238",
+        "mobileNo": "6353662940",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "100239",
+      "label": "Moncey k Patel",
+      "reference": "100239",
+      "secondary": "7",
+      "metadata": {
+        "id": "100239",
+        "studentName": "Moncey k Patel",
+        "standard": "7",
+        "division": "C",
+        "enrollmentNo": "100239",
+        "mobileNo": "7600476945",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "673",
+      "label": "kirti H ptodiya",
+      "reference": "673",
+      "secondary": "7",
+      "metadata": {
+        "id": "673",
+        "studentName": "kirti H ptodiya",
+        "standard": "7",
+        "division": "A",
+        "enrollmentNo": "673",
+        "mobileNo": "9839127789",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "unknown",
+      "label": "- - -",
+      "secondary": "0",
+      "metadata": {
+        "id": "unknown",
+        "studentName": "- - -",
+        "standard": "0",
+        "division": "",
+        "enrollmentNo": null,
+        "mobileNo": null,
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "unknown",
+      "label": "- - -",
+      "secondary": "0",
+      "metadata": {
+        "id": "unknown",
+        "studentName": "- - -",
+        "standard": "0",
+        "division": "",
+        "enrollmentNo": null,
+        "mobileNo": null,
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "1020",
+      "label": "Abhi D. Raval",
+      "reference": "1020",
+      "secondary": "6",
+      "metadata": {
+        "id": "1020",
+        "studentName": "Abhi D. Raval",
+        "standard": "6",
+        "division": "C",
+        "enrollmentNo": "1020",
+        "mobileNo": "9265973856",
+        "pendingFees": 4988
+      }
+    },
+    {
+      "id": "21800",
+      "label": "Milan . Baldaniya",
+      "reference": "21800",
+      "secondary": "7",
+      "metadata": {
+        "id": "21800",
+        "studentName": "Milan . Baldaniya",
+        "standard": "7",
+        "division": "A",
+        "enrollmentNo": "21800",
+        "mobileNo": "8849438965",
+        "pendingFees": 4000
+      }
+    },
+    {
+      "id": "9979176587",
+      "label": "Shivraj . Singh",
+      "reference": "9979176587",
+      "secondary": "7",
+      "metadata": {
+        "id": "9979176587",
+        "studentName": "Shivraj . Singh",
+        "standard": "7",
+        "division": "C",
+        "enrollmentNo": "9979176587",
+        "mobileNo": "6355497748",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "9979765627",
+      "label": "Testing Testing Testing",
+      "reference": "9979765627",
+      "secondary": "5",
+      "metadata": {
+        "id": "9979765627",
+        "studentName": "Testing Testing Testing",
+        "standard": "5",
+        "division": "A",
+        "enrollmentNo": "9979765627",
+        "mobileNo": "9714830414",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "9979765628",
+      "label": "Rajesh2 H Rafaliya2",
+      "reference": "9979765628",
+      "secondary": "6",
+      "metadata": {
+        "id": "9979765628",
+        "studentName": "Rajesh2 H Rafaliya2",
+        "standard": "6",
+        "division": "A",
+        "enrollmentNo": "9979765628",
+        "mobileNo": "9909906512",
+        "pendingFees": 0
+      }
+    },
+    {
+      "id": "9979765629",
+      "label": "Rajesh3 Himatbhai3 Rafaliya3",
+      "reference": "9979765629",
+      "secondary": "6",
+      "metadata": {
+        "id": "9979765629",
+        "studentName": "Rajesh3 Himatbhai3 Rafaliya3",
+        "standard": "6",
+        "division": "C",
+        "enrollmentNo": "9979765629",
+        "mobileNo": "9979765629",
+        "pendingFees": 0
+      }
+    }
+  ],
+  "collectedSlots": {},
+  "missingSlots": [],
+  "module": "fees",
+  "intent": "fee_collection",
+  "workflowId": "fee_collection",
+  "selectedEntity": {
+    "id": "233",
+    "label": "Zeel J Tank",
+    "reference": "233",
+    "secondary": "7",
+    "metadata": {
+      "id": "233",
+      "label": "Zeel J Tank",
+      "reference": "233",
+      "secondary": "7",
+      "metadata": {
+        "id": "233",
+        "studentName": "Zeel J Tank",
+        "standard": "7",
+        "division": "C",
+        "enrollmentNo": "233",
+        "mobileNo": "9909906514",
+        "pendingFees": 0
+      }
+    }
+  }
+}
