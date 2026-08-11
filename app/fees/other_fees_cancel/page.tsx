@@ -18,10 +18,8 @@ import {
   appendSessionFormData,
   appendSessionParams,
   asRecord,
-  buildApiUrl,
   fetchLaravelJson,
   formatCurrency,
-  getApiBaseUrl,
   getFeesSession,
   readFirstString,
   readNumber,
@@ -117,7 +115,7 @@ export default function OtherFeesCancelPage() {
     try {
       const params = new URLSearchParams();
       appendSessionParams(params, nextSession);
-      const payload = await fetchLaravelJson<OtherFeesCancelResponse>(nextSession, `${getApiBaseUrl(nextSession)}/fees/other_fees_cancel?${params.toString()}`);
+      const payload = await fetchLaravelJson<OtherFeesCancelResponse>(nextSession, buildLaravelProxyUrl('fees/other_fees_cancel', params));
       const nextTitles = toOtherFeesTitles(payload.other_fees_title);
       setTitles(nextTitles);
       if (nextTitles.length === 0) {
@@ -171,7 +169,7 @@ export default function OtherFeesCancelPage() {
       appendIfValue(params, 'mobile_no', mobileNo.trim());
       appendIfValue(params, 'uniqueid', uniqueId.trim());
 
-      const payload = await fetchLaravelJson<OtherFeesCancelResponse>(currentSession, `${getApiBaseUrl(currentSession)}/fees/other_fees_cancel/create?${params.toString()}`);
+      const payload = await fetchLaravelJson<OtherFeesCancelResponse>(currentSession, buildLaravelProxyUrl('fees/other_fees_cancel/create', params));
       const nextRows = toCancelRows(payload.student_data);
       setRows(nextRows);
       setInputs(Object.fromEntries(nextRows.map((row) => [row.id, { date: todayIsoDate(), reason: '' }])));
@@ -249,7 +247,7 @@ export default function OtherFeesCancelPage() {
         form.set(`reason_of_cancel[${row.id}]`, values.reason.trim());
       });
 
-      const payload = await fetchLaravelJson<ApiStatusPayload>(currentSession, buildApiUrl(currentSession, '/fees/other_fees_cancel'), {
+      const payload = await fetchLaravelJson<ApiStatusPayload>(currentSession, buildLaravelProxyUrl('fees/other_fees_cancel'), {
         method: 'POST',
         body: form,
       });
@@ -452,6 +450,13 @@ export default function OtherFeesCancelPage() {
 
 function appendIfValue(params: URLSearchParams, key: string, value: string) {
   if (value) params.set(key, value);
+}
+
+function buildLaravelProxyUrl(path: string, params?: URLSearchParams) {
+  const query = new URLSearchParams();
+  query.set('path', path);
+  params?.forEach((value, key) => query.append(key, value));
+  return `/api/proxy?${query.toString()}`;
 }
 
 function getSingleValue(value: DropdownValue | undefined): string {

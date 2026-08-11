@@ -84,7 +84,7 @@ const platformGroups = ['Video generation', 'Presentation generation', 'Image ge
 export default function AiPlatformsPage() {
   return (
     <main className="min-h-full px-5 py-6 sm:px-8 lg:px-10">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto">
         <section className="overflow-hidden rounded-[28px] bg-[#172554] px-6 py-10 text-white shadow-[0_16px_40px_rgba(23,37,84,0.2)] sm:px-10 sm:py-12">
           <div className="max-w-2xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#DDE8FF]">
