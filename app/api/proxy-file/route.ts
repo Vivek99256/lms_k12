@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     const upstream = await fetch(url, {
       method: 'POST',
       headers: {
+        Accept: 'application/json',
         ...(!isMultipart && contentType ? { 'Content-Type': contentType } : {}),
         ...(authorization ? { Authorization: authorization } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
