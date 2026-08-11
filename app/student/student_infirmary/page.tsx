@@ -35,6 +35,7 @@ export default function StudentInfirmaryPage() {
   const [editingId, setEditingId] = useState('');
   const [studentQuery, setStudentQuery] = useState('');
   const [studentOptions, setStudentOptions] = useState<StudentOption[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [showForm, setShowForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -74,6 +75,23 @@ export default function StudentInfirmaryPage() {
       controller.abort();
     };
   }, [studentQuery, form.student_id]);
+
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [studentOptions]);
+
+  useEffect(() => {
+    if (highlightedIndex < 0 || studentOptions.length === 0) return;
+    const option = document.querySelector(`#infirmary-student-options [data-index="${highlightedIndex}"]`);
+    (option as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
+  }, [highlightedIndex, studentOptions]);
+
+  const selectStudent = (student: StudentOption) => {
+    setStudentQuery(`${student.enrollmentNo} / ${student.name}`);
+    setForm((current) => ({ ...current, student_id: student.id, student_name: student.name }));
+    setStudentOptions([]);
+    setHighlightedIndex(-1);
+  };
 
   const filteredRecords = useMemo(() => {
     const query = filter.toLowerCase().trim();
@@ -205,13 +223,24 @@ export default function StudentInfirmaryPage() {
                   setStudentQuery(event.target.value);
                   setStudentOptions([]);
                   setForm((current) => ({ ...current, student_id: '', student_name: event.target.value }));
-                }} placeholder="Type student name or GR No." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 read-only:bg-slate-50" />
-                {studentOptions.length > 0 && <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
-                  {studentOptions.map((student) => <button key={student.id} type="button" onClick={() => {
-                    setStudentQuery(`${student.enrollmentNo} / ${student.name}`);
-                    setForm((current) => ({ ...current, student_id: student.id, student_name: student.name }));
+                }} onKeyDown={(event) => {
+                  if (studentOptions.length === 0) return;
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    setHighlightedIndex((prev) => (prev < 0 ? 0 : Math.min(prev + 1, studentOptions.length - 1)));
+                  } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    setHighlightedIndex((prev) => (prev <= 0 ? -1 : prev - 1));
+                  } else if (event.key === 'Enter') {
+                    event.preventDefault();
+                    selectStudent(studentOptions[highlightedIndex >= 0 ? highlightedIndex : 0]);
+                  } else if (event.key === 'Escape') {
                     setStudentOptions([]);
-                  }} className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"><span className="font-medium">{student.name}</span><span className="ml-2 text-slate-400">{student.enrollmentNo}</span></button>)}
+                    setHighlightedIndex(-1);
+                  }
+                }} placeholder="Type student name or GR No." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 read-only:bg-slate-50" />
+                {studentOptions.length > 0 && <div id="infirmary-student-options" className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
+                  {studentOptions.map((student, index) => <button key={student.id} type="button" data-index={index} onClick={() => selectStudent(student)} className={`block w-full px-3 py-2 text-left text-sm ${index === highlightedIndex ? 'bg-indigo-100' : 'hover:bg-slate-50'}`}><span className="font-medium">{student.name}</span><span className="ml-2 text-slate-400">{student.enrollmentNo}</span></button>)}
                 </div>}
               </label>
               <Field label="Medical Case No." value={form.medical_case_no} onChange={(value) => setForm((current) => ({ ...current, medical_case_no: value }))} readOnly />
