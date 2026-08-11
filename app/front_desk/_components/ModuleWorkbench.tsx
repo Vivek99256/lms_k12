@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type ChangeEvent,
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import PageHeader from '@/components/result/PageHeader';
 import { toast } from '@/components/result/toast';
-import { loadModuleRows, saveModuleRecord, type JsonRecord } from '../_lib/api';
+import { loadModuleOptions, loadModuleRows, saveModuleRecord, type JsonRecord } from '../_lib/api';
 import type { FrontDeskModule, ModuleField } from '../_lib/modules';
 
 const emptyClassValues: SearchDropdownValues = {
@@ -47,10 +48,41 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
   const [rows, setRows] = useState<JsonRecord[]>([]);
   const [classValues, setClassValues] = useState(emptyClassValues);
   const [fieldValues, setFieldValues] = useState<Record<string, string | boolean>>({});
+  const [fieldOptions, setFieldOptions] = useState<Record<string, Array<{ label: string; value: string }>>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fields = [...(module.filters ?? []), ...(module.fields ?? [])].filter(
+      (field) => field.optionsEndpoint
+    );
+    if (!fields.length) {
+      return;
+    }
+
+    let active = true;
+    void Promise.all(
+      fields.map(async (field) => [
+        field.name,
+        await loadModuleOptions(field.optionsEndpoint!, field.optionsDataKey ?? 'data'),
+      ] as const)
+    )
+      .then((entries) => {
+        if (active) setFieldOptions(Object.fromEntries(entries));
+      })
+      .catch((loadError) => {
+        if (active) {
+          setFieldOptions({});
+          setError(loadError instanceof Error ? loadError.message : 'Unable to load options.');
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [module.fields, module.filters]);
 
   const query = useMemo(() => {
     const params: Record<string, string> = {};
@@ -60,11 +92,17 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
     const sections = scalar(classValues.section);
     const standards = scalar(classValues.standard);
     const divisions = scalar(classValues.division);
-    if (sections.length) params.academic_section_id = sections[0];
-    if (standards.length) params.standard_id = standards[0];
-    if (divisions.length) params.division_id = divisions[0];
+    const classFieldParams = {
+      section: 'academic_section_id',
+      standard: 'standard_id',
+      division: 'division_id',
+      ...module.classFieldParams,
+    };
+    if (sections.length) params[classFieldParams.section] = sections[0];
+    if (standards.length) params[classFieldParams.standard] = standards[0];
+    if (divisions.length) params[classFieldParams.division] = divisions[0];
     return params;
-  }, [classValues, fieldValues, module.report]);
+  }, [classValues, fieldValues, module.classFieldParams, module.report]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,6 +142,9 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
     setError('');
     try {
       const form = new FormData(event.currentTarget);
+      for (const [name, value] of Object.entries(module.defaultFormValues ?? {})) {
+        if (!form.has(name)) form.set(name, value);
+      }
       addClassValues(form);
       const schoolDate = form.get('school_date');
       if (typeof schoolDate === 'string' && schoolDate) {
@@ -158,7 +199,7 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
         ) : field.type === 'select' ? (
           <select {...common} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm">
             <option value="">Select {field.label.toLowerCase()}</option>
-            {field.options?.map((option) => (
+            {(fieldOptions[field.name] ?? field.options ?? []).map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
