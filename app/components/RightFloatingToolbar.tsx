@@ -19,7 +19,8 @@ type ToolbarMenu = {
   id: string;
   label: string;
   icon: LucideIcon;
-  accent: string;
+  accentFrom: string;
+  accentTo: string;
   options: ToolbarOption[];
 };
 
@@ -28,7 +29,8 @@ const toolbarMenus: ToolbarMenu[] = [
     id: 'conversational-ai',
     label: 'AI STACK - Conversational AI',
     icon: Bot,
-    accent: 'from-sky-500 to-cyan-500',
+    accentFrom: '#0D6EFD',
+    accentTo: '#7ED957',
     options: [
       {
         title: 'AI STACK - Conversational AI',
@@ -40,7 +42,8 @@ const toolbarMenus: ToolbarMenu[] = [
     id: 'generative-ai',
     label: 'AI STACK - Generative AI',
     icon: Sparkle,
-    accent: 'from-indigo-500 to-blue-500',
+    accentFrom: '#2563EB',
+    accentTo: '#0D6EFD',
     options: [
       {
         title: 'AI STACK - Generative AI',
@@ -52,7 +55,8 @@ const toolbarMenus: ToolbarMenu[] = [
     id: 'knowledge-graph',
     label: 'AI STACK - Knowledge Graph',
     icon: Network,
-    accent: 'from-emerald-500 to-teal-500',
+    accentFrom: '#0D6EFD',
+    accentTo: '#10B981',
     options: [
       {
         title: 'AI STACK - Knowledge Graph',
@@ -64,7 +68,8 @@ const toolbarMenus: ToolbarMenu[] = [
     id: 'recommendation-engine',
     label: 'AI STACK - Recommendation Engine',
     icon: Sparkles,
-    accent: 'from-amber-500 to-orange-500',
+    accentFrom: '#16A34A',
+    accentTo: '#84CC16',
     options: [
       {
         title: 'AI STACK - Recommendation Engine',
@@ -76,14 +81,14 @@ const toolbarMenus: ToolbarMenu[] = [
 
 function OptionCard({ option }: { option: ToolbarOption }) {
   return (
-    <button className="group w-full rounded-2xl border border-slate-200/80 bg-white p-4 text-left shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-all hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
+    <button className="group w-full rounded-2xl border border-gray-200/80 bg-white p-4 text-left shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-all hover:-translate-y-0.5 hover:border-[#0D6EFD]/20 hover:bg-blue-50/40 hover:shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-600 ring-1 ring-slate-200 transition-colors group-hover:bg-sky-50 group-hover:text-sky-600 group-hover:ring-sky-200">
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-600 ring-1 ring-gray-200 transition-colors group-hover:bg-blue-50 group-hover:text-[#0D6EFD] group-hover:ring-[#0D6EFD]/15">
           <Sparkles className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-slate-900">{option.title}</div>
-          <div className="mt-1 text-xs leading-5 text-slate-500">{option.description}</div>
+          <div className="text-sm font-semibold text-gray-900">{option.title}</div>
+          <div className="mt-1 text-xs leading-5 text-gray-500">{option.description}</div>
         </div>
       </div>
     </button>
@@ -162,11 +167,16 @@ export default function RightFloatingToolbar({
       >
         {activeMenu && (
           <aside
-            className="w-[min(88vw,20rem)] overflow-hidden rounded-[28px] border border-slate-200/70 bg-white/95 shadow-[0_22px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl md:w-[22rem] lg:w-[24rem]"
+            className="w-[min(88vw,20rem)] overflow-hidden rounded-[28px] border border-gray-200/70 bg-white/95 shadow-[0_22px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl md:w-[22rem] lg:w-[24rem]"
             role="dialog"
             aria-label={activeMenu.label}
           >
-            <div className={`bg-gradient-to-r ${activeMenu.accent} px-5 py-4 text-white`}>
+            <div
+              className="px-5 py-4 text-white"
+              style={{
+                background: `linear-gradient(135deg, ${activeMenu.accentFrom} 0%, ${activeMenu.accentTo} 100%)`,
+              }}
+            >
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">
                 AI Stack
               </p>
@@ -186,7 +196,7 @@ export default function RightFloatingToolbar({
           </aside>
         )}
 
-        <div className="flex flex-col gap-2 rounded-[28px] border border-slate-200/70 bg-white/90 p-2 shadow-[0_18px_50px_rgba(15,23,42,0.14)] backdrop-blur-xl">
+        <div className="flex flex-col gap-2 rounded-[28px] border border-gray-200/70 bg-white/90 p-2 shadow-[0_18px_50px_rgba(15,23,42,0.14)] backdrop-blur-xl">
           {toolbarMenus.map((menu) => {
             const isActive = activeMenuId === menu.id;
             const Icon = menu.icon;
@@ -198,16 +208,19 @@ export default function RightFloatingToolbar({
                 onClick={() => setActiveMenuId((current) => (current === menu.id ? null : menu.id))}
                 className={`group relative flex h-12 w-12 items-center justify-center rounded-2xl border transition-all duration-200 ${
                   isActive
-                    ? 'border-sky-200 bg-sky-50 text-sky-700 shadow-[0_10px_22px_rgba(14,165,233,0.18)]'
-                    : 'border-transparent bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                    ? 'border-[#0D6EFD]/15 bg-blue-50 text-[#0D6EFD] shadow-[0_10px_22px_rgba(13,110,253,0.16)]'
+                    : 'border-transparent bg-white text-gray-500 hover:border-gray-200 hover:bg-gray-50 hover:text-gray-900'
                 }`}
                 title={menu.label}
                 aria-pressed={isActive}
                 >
                 <span
-                  className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${menu.accent} opacity-0 transition-opacity duration-200 group-hover:opacity-[0.08] ${
+                  className={`absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-200 group-hover:opacity-[0.08] ${
                     isActive ? 'opacity-10' : ''
                   }`}
+                  style={{
+                    background: `linear-gradient(135deg, ${menu.accentFrom} 0%, ${menu.accentTo} 100%)`,
+                  }}
                 />
                 <Icon className="relative h-5 w-5" />
               </button>

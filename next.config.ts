@@ -2,11 +2,11 @@ import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Pin the workspace root. A stray package-lock.json further up the tree
-  // (C:\Users\MILAN) made Turbopack infer that directory as the root, which
-  // served client chunks from the wrong prefix and left `next dev` pages blank.
+  // Pin Turbopack to the shared parent directory so LMS can import the
+  // centralized conversational AI packages hosted in the sibling G2G repo
+  // without widening all the way to unrelated machine roots.
   turbopack: {
-    root: path.resolve(__dirname),
+    root: path.resolve(__dirname, ".."),
   },
   async rewrites() {
     return [

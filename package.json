@@ -6,13 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.28",
     "@base-ui/react": "^1.6.0",
     "@craftjs/core": "^0.2.12",
     "@craftjs/layers": "^0.2.7",
     "@hookform/resolvers": "^5.4.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@radix-ui/react-radio-group": "^1.4.1",
     "@tiptap/core": "^3.29.2",
     "@tiptap/extension-color": "^3.29.2",
@@ -37,6 +40,7 @@
     "jspdf": "^4.2.1",
     "geist": "^1.7.2",
     "lucide-react": "^1.16.0",
+    "ai": "^7.0.42",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-chartjs-2": "^5.3.1",

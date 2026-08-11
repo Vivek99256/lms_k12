@@ -592,7 +592,7 @@ export default function FeesCollectPage() {
 
           <CardContent className="space-y-4 pt-4">
             <form
-              className="grid grid-cols-1 gap-3 lg:grid-cols-12"
+              className="space-y-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 fetchStudents({
@@ -606,20 +606,23 @@ export default function FeesCollectPage() {
                 });
               }}
             >
-              <div className="relative lg:col-span-3">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={searchTerm}
-                  onChange={(event) => {
-                    setSearchTerm(event.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Search student"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-3 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
-                />
-              </div>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(360px,1.9fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)]">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-600">Search student</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={searchTerm}
+                      onChange={(event) => {
+                        setSearchTerm(event.target.value);
+                        setCurrentPage(1);
+                      }}
+                      placeholder="Search student"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                    />
+                  </div>
+                </div>
 
-              <div className="lg:col-span-4">
                 <SearchDropdown
                   fields={['section', 'standard', 'division']}
                   values={academicFilters}
@@ -633,73 +636,78 @@ export default function FeesCollectPage() {
                     standard: 'All standards',
                     division: 'All divisions',
                   }}
-                  className="min-w-0 gap-3 grid-cols-1 md:grid-cols-3 [&>div]:min-w-0 [&_label]:text-xs [&_label]:font-semibold [&_select]:h-11 [&_select]:rounded-xl [&_select]:border-slate-200 [&_select]:bg-slate-50/70 [&_select]:text-sm"
+                  className="min-w-0 grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-3 [&>div]:min-w-0 [&_label]:text-xs [&_label]:font-semibold [&_label]:text-slate-600 [&_select]:h-11 [&_select]:min-w-0 [&_select]:w-full [&_select]:rounded-xl [&_select]:border-slate-200 [&_select]:bg-slate-50/70 [&_select]:pr-10 [&_select]:text-sm"
                   onChange={handleAcademicDropdownChange}
                   onStandardChange={handleStandardChange}
                   onDivisionChange={handleDivisionChange}
                 />
               </div>
 
-              <div className="lg:col-span-2">
-                <label className="mb-1 block text-xs font-semibold text-slate-600">From date</label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(event) => {
-                    setFromDate(event.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
-                />
-              </div>
-
-              <div className="lg:col-span-2">
-                <label className="mb-1 block text-xs font-semibold text-slate-600">To date</label>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(event) => {
-                    setToDate(event.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
-                />
-              </div>
-
-              <div className="lg:col-span-1">
-                <label className="mb-1 block text-xs font-semibold text-slate-600">Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(event) => {
-                    setStatusFilter(event.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
-                >
-                  <option value={ALL_FILTER_VALUE}>All</option>
-                  {availableStatuses.map((status) => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-end gap-3 lg:col-span-12">
-                <label className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-xs font-semibold text-slate-700">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_minmax(160px,0.7fr)_auto_auto]">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">From date</label>
                   <input
-                    type="checkbox"
-                    checked={includeInactive}
+                    type="date"
+                    value={fromDate}
                     onChange={(event) => {
-                      setIncludeInactive(event.target.checked);
+                      setFromDate(event.target.value);
                       setCurrentPage(1);
                     }}
-                    className="h-4 w-4 rounded border-slate-300 accent-[var(--primary-blue)]"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
                   />
-                  In-active
-                </label>
-                <Button type="submit" disabled={loading || dashboardLoading} className="h-11 rounded-xl bg-[var(--primary-blue)] px-4 text-sm text-white hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)]">
-                  {(loading || dashboardLoading) ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-1.5 h-3.5 w-3.5" />}
-                  Apply filters
-                </Button>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">To date</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(event) => {
+                      setToDate(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => {
+                      setStatusFilter(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 pr-10 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                  >
+                    <option value={ALL_FILTER_VALUE}>All</option>
+                    {availableStatuses.map((status) => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <label className="flex h-11 w-full cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-xs font-semibold text-slate-700 md:w-auto md:min-w-[132px]">
+                    <input
+                      type="checkbox"
+                      checked={includeInactive}
+                      onChange={(event) => {
+                        setIncludeInactive(event.target.checked);
+                        setCurrentPage(1);
+                      }}
+                      className="h-4 w-4 rounded border-slate-300 accent-[var(--primary-blue)]"
+                    />
+                    In-active
+                  </label>
+                </div>
+
+                <div className="flex items-end">
+                  <Button type="submit" disabled={loading || dashboardLoading} className="h-11 w-full rounded-xl bg-[var(--primary-blue)] px-5 text-sm text-white hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)] md:w-auto md:min-w-[176px]">
+                    {(loading || dashboardLoading) ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-1.5 h-3.5 w-3.5" />}
+                    Apply filters
+                  </Button>
+                </div>
               </div>
             </form>
 
