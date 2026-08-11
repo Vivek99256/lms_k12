@@ -26,6 +26,7 @@ export default function StudentCareModule({ config }: { config: CareConfig }) {
   const [editingId, setEditingId] = useState('');
   const [studentQuery, setStudentQuery] = useState('');
   const [studentOptions, setStudentOptions] = useState<StudentOption[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [filter, setFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,23 @@ export default function StudentCareModule({ config }: { config: CareConfig }) {
     const timer = window.setTimeout(() => searchInfirmaryStudents(studentQuery, controller.signal).then(setStudentOptions).catch(() => setStudentOptions([])), 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [studentQuery, form.student_id]);
+
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [studentOptions]);
+
+  useEffect(() => {
+    if (highlightedIndex < 0 || studentOptions.length === 0) return;
+    const option = document.querySelector(`#care-student-options [data-index="${highlightedIndex}"]`);
+    (option as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
+  }, [highlightedIndex, studentOptions]);
+
+  const selectStudent = (student: StudentOption) => {
+    setStudentQuery(`${student.enrollmentNo} / ${student.name}`);
+    setForm((current) => ({ ...current, student_id: student.id, student_name: student.name }));
+    setStudentOptions([]);
+    setHighlightedIndex(-1);
+  };
 
   const shown = useMemo(() => {
     const query = filter.toLowerCase();
@@ -107,7 +125,22 @@ export default function StudentCareModule({ config }: { config: CareConfig }) {
     {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><button type="button" aria-label="Close" onClick={() => setShowForm(false)} className="absolute inset-0 bg-slate-950/50" /><div className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-2xl">
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4"><h2 className="text-lg font-bold">{editingId ? 'Edit' : 'Add'} {config.singular}</h2><button type="button" onClick={() => setShowForm(false)} className="rounded p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
       <form onSubmit={submit} className="space-y-4 p-6">
-        <label className="relative block space-y-1"><span className="text-xs font-medium text-slate-700">Student</span><input required readOnly={Boolean(editingId)} value={studentQuery} onChange={(event) => { setStudentQuery(event.target.value); setStudentOptions([]); setValue('student_id', ''); }} placeholder="Type student name or GR No." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm read-only:bg-slate-50" />{studentOptions.length > 0 && <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border bg-white shadow-lg">{studentOptions.map((student) => <button key={student.id} type="button" onClick={() => { setStudentQuery(`${student.enrollmentNo} / ${student.name}`); setForm((current) => ({ ...current, student_id: student.id, student_name: student.name })); setStudentOptions([]); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50">{student.name}<span className="ml-2 text-slate-400">{student.enrollmentNo}</span></button>)}</div>}</label>
+        <label className="relative block space-y-1"><span className="text-xs font-medium text-slate-700">Student</span><input required readOnly={Boolean(editingId)} value={studentQuery} onChange={(event) => { setStudentQuery(event.target.value); setStudentOptions([]); setValue('student_id', ''); }} onKeyDown={(event) => {
+          if (studentOptions.length === 0) return;
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setHighlightedIndex((prev) => (prev < 0 ? 0 : Math.min(prev + 1, studentOptions.length - 1)));
+          } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setHighlightedIndex((prev) => (prev <= 0 ? -1 : prev - 1));
+          } else if (event.key === 'Enter') {
+            event.preventDefault();
+            selectStudent(studentOptions[highlightedIndex >= 0 ? highlightedIndex : 0]);
+          } else if (event.key === 'Escape') {
+            setStudentOptions([]);
+            setHighlightedIndex(-1);
+          }
+        }} placeholder="Type student name or GR No." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm read-only:bg-slate-50" />{studentOptions.length > 0 && <div id="care-student-options" className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border bg-white shadow-lg">{studentOptions.map((student, index) => <button key={student.id} type="button" data-index={index} onClick={() => selectStudent(student)} className={`block w-full px-3 py-2 text-left text-sm ${index === highlightedIndex ? 'bg-indigo-100' : 'hover:bg-slate-50'}`}>{student.name}<span className="ml-2 text-slate-400">{student.enrollmentNo}</span></button>)}</div>}</label>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{config.fields.map((field) => <CareInput key={field.key} field={field} value={form[field.key] ?? ''} onChange={(value) => setValue(field.key, value)} onFile={(name, data) => setForm((current) => ({ ...current, file_name: name, file_data: data }))} />)}</div>
         <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowForm(false)} className="h-10 rounded-md border px-4 text-sm font-medium">Cancel</button><button disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-indigo-600 px-5 text-sm font-medium text-white disabled:opacity-60">{saving && <Loader2 className="h-4 w-4 animate-spin" />}{editingId ? 'Update' : 'Save'}</button></div>
       </form>

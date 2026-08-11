@@ -57,7 +57,8 @@ body {
 /* LMS Premium Styles */
 :root {
   --app-shell-background: #EAF0F8;
-  --primary-blue: #0D6EFD;
+  /* K-12 brand primary (Design System: --color-brand-600). */
+  --primary-blue: #4F46E5;
   --primary-green: #7ED957;
   --accent-gradient: linear-gradient(135deg, #0D6EFD 0%, #7ED957 100%);
   --background: oklch(1 0 0);

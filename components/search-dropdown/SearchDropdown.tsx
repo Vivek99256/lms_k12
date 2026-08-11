@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -625,7 +626,7 @@ export default function SearchDropdown({
   };
 
   const selectClassName = cn(
-    "w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition",
+    "w-full appearance-none rounded-xl border border-slate-300 bg-white px-4 pr-11 text-sm text-slate-700 outline-none transition",
     "focus:border-blue-500 focus:ring-2 focus:ring-blue-100",
     "disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
   );
@@ -652,33 +653,38 @@ export default function SearchDropdown({
             )}
           </label>
 
-          <select
-            id="academic-section-dropdown"
-            name="section_id"
-            value={formValues.section}
-            multiple={Boolean(multiple.section)}
-            required={required.section}
-            disabled={disabled.section || loading.section}
-            onChange={handleSectionChange}
-            className={cn(
-              selectClassName,
-              multiple.section ? "min-h-28 py-2" : "h-11"
-            )}
-          >
-            {!multiple.section && (
-              <option value="">
-                {loading.section
-                  ? "Loading sections..."
-                  : placeholders.section || "Select Section"}
-              </option>
-            )}
+          <div className="relative">
+            <select
+              id="academic-section-dropdown"
+              name="section_id"
+              value={formValues.section}
+              multiple={Boolean(multiple.section)}
+              required={required.section}
+              disabled={disabled.section || loading.section}
+              onChange={handleSectionChange}
+              className={cn(
+                selectClassName,
+                multiple.section ? "min-h-28 py-2 pr-4" : "h-11"
+              )}
+            >
+              {!multiple.section && (
+                <option value="">
+                  {loading.section
+                    ? "Loading sections..."
+                    : placeholders.section || "Select Section"}
+                </option>
+              )}
 
-            {uniqueSections.map((section) => (
-              <option key={section.id} value={String(section.id)}>
-                {section.title}
-              </option>
-            ))}
-          </select>
+              {uniqueSections.map((section) => (
+                <option key={section.id} value={String(section.id)}>
+                  {section.title}
+                </option>
+              ))}
+            </select>
+            {!multiple.section ? (
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            ) : null}
+          </div>
 
           {errors.section && (
             <p className="text-xs text-red-600">{errors.section}</p>
@@ -698,33 +704,38 @@ export default function SearchDropdown({
             )}
           </label>
 
-          <select
-            id="standard-dropdown"
-            name="standard_id"
-            value={formValues.standard}
-            multiple={Boolean(multiple.standard)}
-            required={required.standard}
-            disabled={disabled.standard || loading.standard || !canUseStandard}
-            onChange={handleStandardChange}
-            className={cn(
-              selectClassName,
-              multiple.standard ? "min-h-28 py-2" : "h-11"
-            )}
-          >
-            {!multiple.standard && (
-              <option value="">
-                {loading.standard
-                  ? "Loading standards..."
-                  : placeholders.standard || "Select Standard"}
-              </option>
-            )}
+          <div className="relative">
+            <select
+              id="standard-dropdown"
+              name="standard_id"
+              value={formValues.standard}
+              multiple={Boolean(multiple.standard)}
+              required={required.standard}
+              disabled={disabled.standard || loading.standard || !canUseStandard}
+              onChange={handleStandardChange}
+              className={cn(
+                selectClassName,
+                multiple.standard ? "min-h-28 py-2 pr-4" : "h-11"
+              )}
+            >
+              {!multiple.standard && (
+                <option value="">
+                  {loading.standard
+                    ? "Loading standards..."
+                    : placeholders.standard || "Select Standard"}
+                </option>
+              )}
 
-            {uniqueStandards.map((standard) => (
-              <option key={standard.id} value={String(standard.id)}>
-                {standard.name}
-              </option>
-            ))}
-          </select>
+              {uniqueStandards.map((standard) => (
+                <option key={standard.id} value={String(standard.id)}>
+                  {standard.name}
+                </option>
+              ))}
+            </select>
+            {!multiple.standard ? (
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            ) : null}
+          </div>
 
           {errors.standard && (
             <p className="text-xs text-red-600">{errors.standard}</p>
@@ -744,35 +755,40 @@ export default function SearchDropdown({
             )}
           </label>
 
-          <select
-            id="division-dropdown"
-            name="division_id"
-            value={formValues.division}
-            multiple={Boolean(multiple.division)}
-            required={required.division}
-            disabled={
-              disabled.division || loading.division || !canUseStandardChild
-            }
-            onChange={handleDivisionChange}
-            className={cn(
-              selectClassName,
-              multiple.division ? "min-h-28 py-2" : "h-11"
-            )}
-          >
-            {!multiple.division && (
-              <option value="">
-                {loading.division
-                  ? "Loading divisions..."
-                  : placeholders.division || "Select Division"}
-              </option>
-            )}
+          <div className="relative">
+            <select
+              id="division-dropdown"
+              name="division_id"
+              value={formValues.division}
+              multiple={Boolean(multiple.division)}
+              required={required.division}
+              disabled={
+                disabled.division || loading.division || !canUseStandardChild
+              }
+              onChange={handleDivisionChange}
+              className={cn(
+                selectClassName,
+                multiple.division ? "min-h-28 py-2 pr-4" : "h-11"
+              )}
+            >
+              {!multiple.division && (
+                <option value="">
+                  {loading.division
+                    ? "Loading divisions..."
+                    : placeholders.division || "Select Division"}
+                </option>
+              )}
 
-            {uniqueDivisions.map((division) => (
-              <option key={division.id} value={String(division.id)}>
-                {division.name}
-              </option>
-            ))}
-          </select>
+              {uniqueDivisions.map((division) => (
+                <option key={division.id} value={String(division.id)}>
+                  {division.name}
+                </option>
+              ))}
+            </select>
+            {!multiple.division ? (
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            ) : null}
+          </div>
 
           {errors.division && (
             <p className="text-xs text-red-600">{errors.division}</p>

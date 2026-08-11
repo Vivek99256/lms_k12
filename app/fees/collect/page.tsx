@@ -13,11 +13,11 @@ import {
   ReceiptText,
   Search,
   Target,
-  TrendingDown,
-  TrendingUp,
   Users,
+  Wallet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   SearchDropdown,
   type Division,
@@ -57,9 +57,8 @@ type StudentFeeRow = {
 };
 
 type ChartPoint = {
-  month: string;
-  collected: number;
-  target: number;
+  label: string;
+  amount: number;
 };
 
 type HeadBreakdown = {
@@ -85,11 +84,13 @@ type DashboardSnapshot = {
 };
 
 type DashboardData = {
-  collectedThisTerm: number;
-  outstandingTotal: number;
+  todayCollection: number;
+  totalPaidFees: number;
+  totalPendingFees: number;
+  paidStudents: number;
+  pendingStudents: number;
   collectionRate: number;
-  defaulters: number;
-  chartTrend: ChartPoint[];
+  dailyTrend: ChartPoint[];
   headBreakdown: HeadBreakdown[];
   paymentMix: PaymentMix[];
 };
@@ -99,6 +100,9 @@ type StudentFetchFilters = {
   selectedSection?: string;
   selectedStandard?: string;
   selectedDivision?: string;
+  fromDate?: string;
+  toDate?: string;
+  status?: string;
 };
 
 type StudentFetchOptions = {
@@ -117,10 +121,6 @@ const currencyFormatter = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0,
 });
 
-const currencySymbol = currencyFormatter
-  .formatToParts(0)
-  .find((part) => part.type === 'currency')?.value ?? 'Rs.';
-
 const paymentMixColors = ['#4f46e5', '#0f9b6e', '#2563eb', '#e17a00', '#0891b2', '#be185d'];
 
 export default function FeesCollectPage() {
@@ -129,20 +129,24 @@ export default function FeesCollectPage() {
   const currentFetchFiltersRef = useRef<StudentFetchFilters>({});
   const cachedStudentsRef = useRef<StudentFeeRow[]>([]);
   const [students, setStudents] = useState<StudentFeeRow[]>([]);
+  const [dashboardRows, setDashboardRows] = useState<StudentFeeRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [academicFilters, setAcademicFilters] = useState<Partial<SearchDropdownValues>>({
     section: '',
     standard: '',
     division: '',
   });
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState(ALL_FILTER_VALUE);
   const [selectedStandardName, setSelectedStandardName] = useState('');
   const [selectedDivisionName, setSelectedDivisionName] = useState('');
   const [feeHeadFilter] = useState(ALL_FILTER_VALUE);
-  const [statusFilter] = useState(ALL_FILTER_VALUE);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMoreStudents, setHasMoreStudents] = useState(false);
   const [totalStudentCount, setTotalStudentCount] = useState<number | null>(null);
@@ -154,6 +158,7 @@ export default function FeesCollectPage() {
   const clearStudentData = useCallback((message: string) => {
     cachedStudentsRef.current = [];
     setStudents([]);
+    setDashboardRows([]);
     setDashboardSnapshot({});
     setSelectedStudentIds([]);
     setCurrentPage(1);
@@ -161,6 +166,73 @@ export default function FeesCollectPage() {
     setTotalStudentCount(0);
     setError(message);
   }, []);
+
+  const fetchDashboardRows = useCallback(async (filters: StudentFetchFilters = {}) => {
+    if (!session.subInstituteId) {
+      setDashboardRows([]);
+      return;
+    }
+
+    setDashboardLoading(true);
+
+    try {
+      let token = '';
+      let subInstituteId = '';
+      let hostName = '';
+
+      if (typeof window !== 'undefined') {
+        try {
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+          const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+
+          token = readString(userData.user_token ?? userData.token);
+          subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
+          hostName = readString(userData.host_name);
+        } catch {}
+      }
+
+      const academicYearId = readString(localStorage.getItem('selectedAcademicYear') || session.academicYearId);
+
+      if (!hostName || !token || !subInstituteId) {
+        setDashboardRows([]);
+        return;
+      }
+
+      const form = new URLSearchParams();
+      form.append('sub_institute_id', String(subInstituteId));
+      form.append('syear', String(academicYearId));
+      appendStudentSearchFilters(form, filters);
+      if (includeInactive) form.append('include_inactive', '1');
+      form.append('type', 'API');
+
+      const response = await fetch(`${hostName.replace(/\/$/, '')}/fees/fees_collect/show_student`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: form.toString(),
+      });
+
+      if (!response.ok) {
+        setDashboardRows([]);
+        return;
+      }
+
+      const result = await readStudentsResponseProgressively(response, { onRows: () => {} });
+      const snapshot = toDashboardSnapshot(result.payload, result.source);
+      setDashboardRows(result.rows);
+      setDashboardSnapshot(snapshot);
+      if (result.totalCount != null && totalStudentCount == null) {
+        setTotalStudentCount(result.totalCount);
+      }
+    } catch {
+      setDashboardRows([]);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, [includeInactive, session, totalStudentCount]);
 
   const fetchStudents = useCallback(async (filters: StudentFetchFilters = {}, options: StudentFetchOptions = {}) => {
     const pageNumber = Math.max(options.page ?? 1, 1);
@@ -188,11 +260,11 @@ export default function FeesCollectPage() {
     if (append) {
       setLoadingMore(true);
     } else {
+      void fetchDashboardRows(filters);
       currentFetchFiltersRef.current = filters;
       cachedStudentsRef.current = [];
       setLoading(true);
       setStudents([]);
-      setDashboardSnapshot({});
       setSelectedStudentIds([]);
       setCurrentPage(1);
       setHasMoreStudents(false);
@@ -280,9 +352,7 @@ export default function FeesCollectPage() {
       }
 
       const responseSnapshot = toDashboardSnapshot(responseData.payload, responseData.source);
-      if (!append || hasDashboardSnapshotData(responseSnapshot)) {
-        setDashboardSnapshot(responseSnapshot);
-      }
+      if (hasDashboardSnapshotData(responseSnapshot)) setDashboardSnapshot(responseSnapshot);
       if (!append) {
         setSelectedStudentIds([]);
       }
@@ -311,7 +381,7 @@ export default function FeesCollectPage() {
         }
       }
     }
-  }, [clearStudentData, includeInactive, session]);
+  }, [clearStudentData, fetchDashboardRows, includeInactive, session]);
 
   useEffect(() => {
     // The collect dashboard loads the current dues once the browser session is available.
@@ -367,10 +437,10 @@ export default function FeesCollectPage() {
   const selectedStandardId = getSingleDropdownValue(academicFilters.standard);
   const selectedDivisionId = getSingleDropdownValue(academicFilters.division);
 
-  const filteredStudents = useMemo(() => {
+  const applyLocalFilters = useCallback((rows: StudentFeeRow[]) => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    return students.filter((student) => {
+    return rows.filter((student) => {
       const searchableText = [
         student.name,
         student.admissionNo,
@@ -385,10 +455,23 @@ export default function FeesCollectPage() {
       const matchesDivision = !selectedDivisionId || matchesStudentDivision(student, selectedDivisionId, selectedDivisionName);
       const matchesFeeHead = feeHeadFilter === ALL_FILTER_VALUE || student.feeHead === feeHeadFilter;
       const matchesStatus = statusFilter === ALL_FILTER_VALUE || student.status === statusFilter;
+      const date = parseFeeDate(student.collectionDateRaw || student.dueDateRaw || student.dueDate);
+      const matchesDateRange = isWithinDateRange(date, fromDate, toDate);
 
-      return matchesSearch && matchesStandard && matchesDivision && matchesFeeHead && matchesStatus;
+      return matchesSearch && matchesStandard && matchesDivision && matchesFeeHead && matchesStatus && matchesDateRange;
     });
-  }, [feeHeadFilter, searchTerm, selectedDivisionId, selectedDivisionName, selectedStandardId, selectedStandardName, statusFilter, students]);
+  }, [feeHeadFilter, fromDate, searchTerm, selectedDivisionId, selectedDivisionName, selectedStandardId, selectedStandardName, statusFilter, toDate]);
+
+  const filteredStudents = useMemo(() => applyLocalFilters(students), [applyLocalFilters, students]);
+  const dashboardSourceRows = useMemo(() => {
+    if (dashboardRows.length > 0) return dashboardRows;
+    if (dashboardLoading) return [];
+    return students;
+  }, [dashboardLoading, dashboardRows, students]);
+  const filteredDashboardRows = useMemo(
+    () => applyLocalFilters(dashboardSourceRows),
+    [applyLocalFilters, dashboardSourceRows]
+  );
 
   const loadedPageCount = Math.max(Math.ceil(filteredStudents.length / PAGE_SIZE), 1);
   const pageCount = Math.max(loadedPageCount + (hasMoreStudents ? 1 : 0), 1);
@@ -401,7 +484,53 @@ export default function FeesCollectPage() {
 
   const currentPageIds = pagedStudents.map((student) => student.id);
   const allPageRowsSelected = currentPageIds.length > 0 && currentPageIds.every((id) => selectedStudentIds.includes(id));
-  const dashboardData = useMemo(() => buildDashboardData(students, dashboardSnapshot), [dashboardSnapshot, students]);
+  const dashboardData = useMemo(() => buildDashboardData(filteredDashboardRows, dashboardSnapshot), [dashboardSnapshot, filteredDashboardRows]);
+  const availableStatuses = useMemo(
+    () => Array.from(new Set(dashboardSourceRows.map((student) => student.status))),
+    [dashboardSourceRows]
+  );
+  const totalPayableFees = dashboardData.totalPaidFees + dashboardData.totalPendingFees;
+  const hasDailyTrend = dashboardData.dailyTrend.length > 0;
+  const hasDashboardData = dashboardData.todayCollection > 0
+    || dashboardData.totalPaidFees > 0
+    || dashboardData.totalPendingFees > 0
+    || dashboardData.paidStudents > 0
+    || dashboardData.pendingStudents > 0
+    || dashboardData.dailyTrend.length > 0
+    || dashboardData.headBreakdown.length > 0
+    || dashboardData.paymentMix.length > 0;
+  const summaryCards = [
+    {
+      title: 'Total Payable Fees',
+      value: currencyFormatter.format(totalPayableFees),
+      icon: <Wallet className="h-4 w-4" />,
+    },
+    {
+      title: 'Total Collected Fees',
+      value: currencyFormatter.format(dashboardData.totalPaidFees),
+      icon: <Banknote className="h-4 w-4" />,
+    },
+    {
+      title: 'Total Pending Fees',
+      value: currencyFormatter.format(dashboardData.totalPendingFees),
+      icon: <AlertCircle className="h-4 w-4" />,
+    },
+    {
+      title: 'Paid Students',
+      value: String(dashboardData.paidStudents),
+      icon: <Users className="h-4 w-4" />,
+    },
+    {
+      title: 'Pending Students',
+      value: String(dashboardData.pendingStudents),
+      icon: <AlertCircle className="h-4 w-4" />,
+    },
+    {
+      title: 'Collection Rate',
+      value: `${dashboardData.collectionRate}%`,
+      icon: <Target className="h-4 w-4" />,
+    },
+  ];
 
   const handleAcademicDropdownChange = (values: SearchDropdownValues, changedField: DropdownField) => {
     setAcademicFilters({
@@ -454,133 +583,206 @@ export default function FeesCollectPage() {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto max-w-[1500px] space-y-4 p-4 md:p-5 lg:p-6">
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            title="Collected this term"
-            value={formatLakhs(dashboardData.collectedThisTerm)}
-            trend="up"
-            icon={<Banknote className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Outstanding"
-            value={formatLakhs(dashboardData.outstandingTotal)}
-            trend="down"
-            icon={<AlertCircle className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Collection rate"
-            value={`${dashboardData.collectionRate}%`}
-            icon={<Target className="h-4 w-4" />}
-          />
-          <MetricCard
-            title="Defaulters"
-            value={String(dashboardData.defaulters)}
-            icon={<Users className="h-4 w-4" />}
-          />
-        </section>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#f8fafc_38%,#f1f5f9_100%)]">
+      <div className="mx-auto max-w-[1500px] space-y-5 p-4 md:p-5 lg:p-6">
+        <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-sm ring-1 ring-slate-200/70">
+          <CardHeader className="border-b border-slate-100 pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-900">Fees Collection Dashboard</CardTitle>
+          </CardHeader>
 
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1.3fr_1fr]">
-          <ChartCard title="Collection vs target" subtitle="Monthly, current academic year (INR lakh)">
-            <CollectionLineChart data={dashboardData.chartTrend} />
-          </ChartCard>
-          <ChartCard title="Head-wise: collected vs pending" subtitle="Current term (INR lakh)">
-            <HeadWiseBars data={dashboardData.headBreakdown} />
-          </ChartCard>
-          <ChartCard title="Payment mode mix" subtitle="Share of collection">
-            <PaymentDonut data={dashboardData.paymentMix} />
-          </ChartCard>
-        </section>
-
-        <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <form
-            className="grid grid-cols-1 gap-3 p-4 lg:grid-cols-[280px_minmax(0,1fr)_104px_120px] lg:items-end"
-            onSubmit={(event) => {
-              event.preventDefault();
-              fetchStudents({
-                query: searchTerm,
-                selectedSection: getSingleDropdownValue(academicFilters.section),
-                selectedStandard: getSingleDropdownValue(academicFilters.standard),
-                selectedDivision: getSingleDropdownValue(academicFilters.division),
-              });
-            }}
-          >
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={searchTerm}
-                onChange={(event) => {
-                  setSearchTerm(event.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Search student, admission"
-                className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 shadow-none outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--primary-blue)] focus:ring-1 focus:ring-[var(--primary-blue)]"
-              />
-            </div>
-
-            <SearchDropdown
-              fields={['section', 'standard', 'division']}
-              values={academicFilters}
-              labels={{
-                section: 'Section',
-                standard: 'Standard',
-                division: 'Division',
+          <CardContent className="space-y-4 pt-4">
+            <form
+              className="space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                fetchStudents({
+                  query: searchTerm,
+                  selectedSection: getSingleDropdownValue(academicFilters.section),
+                  selectedStandard: getSingleDropdownValue(academicFilters.standard),
+                  selectedDivision: getSingleDropdownValue(academicFilters.division),
+                  fromDate,
+                  toDate,
+                  status: statusFilter === ALL_FILTER_VALUE ? '' : statusFilter,
+                });
               }}
-              placeholders={{
-                section: 'All sections',
-                standard: 'All standards',
-                division: 'All divisions',
-              }}
-              className="min-w-0 gap-3 grid-cols-1 md:grid-cols-3 xl:grid-cols-3 [&>div]:min-w-0 [&_label]:text-xs [&_select]:h-10 [&_select]:rounded-md [&_select]:text-sm"
-              onChange={handleAcademicDropdownChange}
-              onStandardChange={handleStandardChange}
-              onDivisionChange={handleDivisionChange}
-            />
+            >
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(360px,1.9fr)_minmax(180px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)]">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-600">Search student</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={searchTerm}
+                      onChange={(event) => {
+                        setSearchTerm(event.target.value);
+                        setCurrentPage(1);
+                      }}
+                      placeholder="Search student"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                    />
+                  </div>
+                </div>
 
-            <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700">
-              <input
-                type="checkbox"
-                checked={includeInactive}
-                onChange={(event) => {
-                  setIncludeInactive(event.target.checked);
-                  setCurrentPage(1);
-                }}
-                className="h-4 w-4 rounded border-slate-300 accent-[var(--primary-blue)]"
-              />
-              In-active
-            </label>
+                <SearchDropdown
+                  fields={['section', 'standard', 'division']}
+                  values={academicFilters}
+                  labels={{
+                    section: 'Section',
+                    standard: 'Standard',
+                    division: 'Division',
+                  }}
+                  placeholders={{
+                    section: 'All sections',
+                    standard: 'All standards',
+                    division: 'All divisions',
+                  }}
+                  className="min-w-0 grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-3 [&>div]:min-w-0 [&_label]:text-xs [&_label]:font-semibold [&_label]:text-slate-600 [&_select]:h-11 [&_select]:min-w-0 [&_select]:w-full [&_select]:rounded-xl [&_select]:border-slate-200 [&_select]:bg-slate-50/70 [&_select]:pr-10 [&_select]:text-sm"
+                  onChange={handleAcademicDropdownChange}
+                  onStandardChange={handleStandardChange}
+                  onDivisionChange={handleDivisionChange}
+                />
+              </div>
 
-            <Button type="submit" disabled={loading} className="h-10 rounded-md bg-[var(--primary-blue)] px-4 text-sm text-white hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)]">
-              {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-1.5 h-3.5 w-3.5" />}
-              Refresh
-            </Button>
-          </form>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_minmax(160px,0.7fr)_auto_auto]">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">From date</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(event) => {
+                      setFromDate(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                  />
+                </div>
 
-          <div className="flex flex-col gap-2 border-t border-slate-100 px-4 pb-4 text-xs font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              {filteredStudents.length} loaded of {duesCountLabel} dues
-            </span>
-            {(loadingMore || (loading && students.length > 0)) && (
-              <span className="inline-flex items-center gap-1.5 text-[var(--primary-blue)]" aria-live="polite">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {loadingMore ? 'Loading next 10 records...' : 'Loading first 10 records...'}
-              </span>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">To date</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(event) => {
+                      setToDate(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => {
+                      setStatusFilter(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 pr-10 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+                  >
+                    <option value={ALL_FILTER_VALUE}>All</option>
+                    {availableStatuses.map((status) => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <label className="flex h-11 w-full cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-xs font-semibold text-slate-700 md:w-auto md:min-w-[132px]">
+                    <input
+                      type="checkbox"
+                      checked={includeInactive}
+                      onChange={(event) => {
+                        setIncludeInactive(event.target.checked);
+                        setCurrentPage(1);
+                      }}
+                      className="h-4 w-4 rounded border-slate-300 accent-[var(--primary-blue)]"
+                    />
+                    In-active
+                  </label>
+                </div>
+
+                <div className="flex items-end">
+                  <Button type="submit" disabled={loading || dashboardLoading} className="h-11 w-full rounded-xl bg-[var(--primary-blue)] px-5 text-sm text-white hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)] md:w-auto md:min-w-[176px]">
+                    {(loading || dashboardLoading) ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-1.5 h-3.5 w-3.5" />}
+                    Apply filters
+                  </Button>
+                </div>
+              </div>
+            </form>
+
+            {error && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {error}
+              </div>
             )}
+
+            {hasDashboardData ? (
+              <div className="space-y-4">
+                <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                  {summaryCards.map((card) => (
+                    <MetricCard key={card.title} title={card.title} value={card.value} icon={card.icon} />
+                  ))}
+                </section>
+
+                <section className={`grid gap-4 ${hasDailyTrend ? 'xl:grid-cols-[1.15fr_1fr]' : 'grid-cols-1'}`}>
+                  <ChartCard title="Collected vs Pending Fees" subtitle="Calculated directly from the current API response.">
+                    <PaidPendingComparisonChart
+                      paid={dashboardData.totalPaidFees}
+                      pending={dashboardData.totalPendingFees}
+                      totalPayable={totalPayableFees}
+                      paidStudents={dashboardData.paidStudents}
+                      pendingStudents={dashboardData.pendingStudents}
+                      trendData={dashboardData.dailyTrend}
+                    />
+                  </ChartCard>
+
+                  {hasDailyTrend ? (
+                    <ChartCard title="Daily Fee Collection Trend" subtitle="Shown only when date-wise collection transactions exist.">
+                      <DailyCollectionTrendChart data={dashboardData.dailyTrend} />
+                    </ChartCard>
+                  ) : null}
+                </section>
+              </div>
+            ) : (
+              <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center">
+                <p className="text-sm font-medium text-slate-700">No collection transactions found for the selected filters</p>
+                <p className="mt-1 max-w-xl text-sm text-slate-500">
+                  We could not find usable fee collection or pending fee records for the current filter combination.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <section className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-sm ring-1 ring-slate-200/70">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Fee collection details</h2>
+                <p className="mt-1 text-sm text-slate-500">Student-wise fee records from the existing collection workflow.</p>
+              </div>
+              <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                {filteredStudents.length} visible
+              </div>
+            </div>
+            <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3 text-xs font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  Page {safeCurrentPage} of {pageCount} • {pageStartIndex}-{pageEndIndex} visible
+                </span>
+                {(loadingMore || (loading && students.length > 0)) && (
+                  <span className="inline-flex items-center gap-1.5 text-[var(--primary-blue)]" aria-live="polite">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {loadingMore ? 'Loading next 10 records...' : 'Refreshing current records...'}
+                  </span>
+                )}
+            </div>
           </div>
 
-          {error && (
-            <div className="mx-4 mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              {error}
-            </div>
-          )}
-        </section>
-
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-300 bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-700">
+                <tr className="border-b border-slate-200 bg-slate-50/90 text-xs font-semibold uppercase tracking-wide text-slate-600">
                   <th className="w-12 px-3 py-3">
                     <input
                       type="checkbox"
@@ -608,7 +810,7 @@ export default function FeesCollectPage() {
                   </tr>
                 ) : pagedStudents.length > 0 ? (
                   pagedStudents.map((student) => (
-                    <tr key={student.id} className="border-b border-slate-200 odd:bg-white even:bg-slate-50/80 hover:bg-blue-50/30">
+                    <tr key={student.id} className="border-b border-slate-100 odd:bg-white even:bg-slate-50/50 hover:bg-sky-50/40">
                       <td className="px-3 py-3">
                         <input
                           type="checkbox"
@@ -618,11 +820,17 @@ export default function FeesCollectPage() {
                         />
                       </td>
                       <td className="px-5 py-3">
-                        <p className="font-semibold text-slate-950">{student.name || '-'}</p>
-                        <p className="mt-1 text-xs text-slate-500">{student.admissionNo || student.grNo || '-'}</p>
+                        <div className="space-y-1">
+                          <p className="font-semibold text-slate-950">{student.name || '-'}</p>
+                          <p className="text-xs text-slate-500">{student.admissionNo || student.grNo || '-'}</p>
+                        </div>
                       </td>
                       <td className="px-5 py-3 text-slate-950">{getClassLabel(student) || '-'}</td>
-                      <td className="px-5 py-3 text-slate-950">{student.feeHead || '-'}</td>
+                      <td className="px-5 py-3 text-slate-950">
+                        <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {student.feeHead || '-'}
+                        </div>
+                      </td>
                       <td className="px-5 py-3 text-slate-950">{student.dueDate || '-'}</td>
                       <td className="px-5 py-3 text-right font-bold text-slate-950">{currencyFormatter.format(student.pendingFees)}</td>
                       <td className="px-5 py-3">
@@ -667,7 +875,7 @@ export default function FeesCollectPage() {
             </table>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 border-t border-slate-100 bg-white px-4 py-3 text-sm text-slate-700 md:flex-row md:items-center md:justify-between">
             <span>{pageStartIndex}-{pageEndIndex} of {duesCountLabel}</span>
             <div className="flex items-center justify-end gap-1.5">
               <button
@@ -716,74 +924,56 @@ export default function FeesCollectPage() {
 function MetricCard({
   title,
   value,
-  delta,
-  deltaLabel,
-  trend,
   icon,
 }: {
   title: string;
   value: string;
-  delta?: string;
-  deltaLabel?: string;
-  trend?: 'up' | 'down';
   icon: React.ReactNode;
 }) {
-  const isPositive = trend === 'up';
-
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-slate-700">{title}</p>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-700">
           {icon}
         </div>
       </div>
       <p className="mt-4 text-2xl font-bold leading-none text-slate-950">{value}</p>
-      {delta && (
-        <p className={`mt-3 flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-          {isPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-          <span>{delta}</span>
-          <span className="font-medium text-slate-600">{deltaLabel}</span>
-        </p>
-      )}
     </div>
   );
 }
 
 function ChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-[486px] rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-6 py-5">
-        <h2 className="text-xl font-bold leading-none text-slate-950">{title}</h2>
-        <p className="mt-3 text-sm text-slate-700">{subtitle}</p>
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 px-5 py-4">
+        <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
       </div>
-      <div className="p-6">
+      <div className="p-5">
         {children}
-      </div>
-      <div className="flex justify-end px-6 pb-6">
-        <button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-700">
-          View breakdown
-          <ChevronRight className="h-4 w-4" />
-        </button>
       </div>
     </div>
   );
 }
 
-function CollectionLineChart({ data }: { data: ChartPoint[] }) {
+function DailyCollectionTrendChart({ data }: { data: ChartPoint[] }) {
+  if (data.length === 0) {
+    return <EmptyChartState message="No fee collection data available" />;
+  }
+
   const width = 520;
   const height = 180;
   const padding = { top: 18, right: 20, bottom: 34, left: 34 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
-  const highestValue = Math.max(0, ...data.flatMap((item) => [item.collected, item.target]));
+  const highestValue = Math.max(0, ...data.map((item) => item.amount));
   const maxValue = Math.max(1, Math.ceil(highestValue / 5) * 5);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => Math.round(maxValue * ratio * 10) / 10);
-
-  const buildPoints = (key: 'collected' | 'target') => data
+  const buildPoints = data
     .map((item, index) => {
       const x = padding.left + (plotWidth / Math.max(data.length - 1, 1)) * index;
-      const y = padding.top + plotHeight - (item[key] / maxValue) * plotHeight;
+      const y = padding.top + plotHeight - (item.amount / maxValue) * plotHeight;
       return `${x},${y}`;
     })
     .join(' ');
@@ -800,58 +990,15 @@ function CollectionLineChart({ data }: { data: ChartPoint[] }) {
             </g>
           );
         })}
-        <polyline points={buildPoints('target')} fill="none" stroke="#94a3b8" strokeWidth="2.2" />
-        <polyline points={buildPoints('collected')} fill="none" stroke="#4f46e5" strokeWidth="2.6" />
+        <polyline points={buildPoints} fill="none" stroke="#2563eb" strokeWidth="2.8" />
         {data.map((item, index) => {
           const x = padding.left + (plotWidth / Math.max(data.length - 1, 1)) * index;
-          const targetY = padding.top + plotHeight - (item.target / maxValue) * plotHeight;
-          const collectedY = padding.top + plotHeight - (item.collected / maxValue) * plotHeight;
-
-          return (
-            <g key={item.month}>
-              <circle cx={x} cy={targetY} r="3" fill="white" stroke="#94a3b8" strokeWidth="2" />
-              <circle cx={x} cy={collectedY} r="3.2" fill="white" stroke="#4f46e5" strokeWidth="2" />
-              <text x={x} y={height - 12} textAnchor="middle" className="fill-slate-500 text-[10px]">{item.month}</text>
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-function HeadWiseBars({ data }: { data: HeadBreakdown[] }) {
-  const width = 520;
-  const height = 180;
-  const padding = { top: 18, right: 16, bottom: 36, left: 34 };
-  const plotWidth = width - padding.left - padding.right;
-  const plotHeight = height - padding.top - padding.bottom;
-  const maxValue = Math.max(10, ...data.map((item) => item.collected + item.pending));
-  const groupWidth = plotWidth / Math.max(data.length, 1);
-
-  return (
-    <div className="pt-2">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[190px] w-full">
-        {[0, 2.5, 5, 7.5, 10].map((tick) => {
-          const normalizedTick = (tick / 10) * maxValue;
-          const y = padding.top + plotHeight - (normalizedTick / maxValue) * plotHeight;
-          return (
-            <g key={tick}>
-              <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#e2e8f0" strokeWidth="1" />
-              <text x={padding.left - 10} y={y + 4} textAnchor="end" className="fill-slate-500 text-[9px]">{Math.round(normalizedTick)}</text>
-            </g>
-          );
-        })}
-        {data.map((item, index) => {
-          const x = padding.left + groupWidth * index + groupWidth / 2;
-          const collectedHeight = (item.collected / maxValue) * plotHeight;
-          const pendingHeight = (item.pending / maxValue) * plotHeight;
+          const amountY = padding.top + plotHeight - (item.amount / maxValue) * plotHeight;
 
           return (
             <g key={item.label}>
-              <rect x={x - 14} y={padding.top + plotHeight - collectedHeight} width="20" height={collectedHeight} rx="1.5" fill="#07966f" />
-              <rect x={x + 10} y={padding.top + plotHeight - pendingHeight} width="20" height={pendingHeight} rx="1.5" fill="#e17a00" />
-              <text x={x + 2} y={height - 12} textAnchor="middle" className="fill-slate-500 text-[9px]">{shortenLabel(item.label)}</text>
+              <circle cx={x} cy={amountY} r="3.2" fill="white" stroke="#2563eb" strokeWidth="2" />
+              <text x={x} y={height - 12} textAnchor="middle" className="fill-slate-500 text-[10px]">{item.label}</text>
             </g>
           );
         })}
@@ -860,39 +1007,392 @@ function HeadWiseBars({ data }: { data: HeadBreakdown[] }) {
   );
 }
 
-function PaymentDonut({ data }: { data: PaymentMix[] }) {
-  const radius = 74;
-  const circumference = 2 * Math.PI * radius;
-  const totalShare = data.reduce((total, item) => total + item.value, 0);
-  const segments = data.reduce<Array<PaymentMix & { dash: number; offset: number }>>((accumulator, item) => {
-    const offset = accumulator.reduce((total, segment) => total + segment.dash, 0);
-    const dash = (item.value / 100) * circumference;
-    return [...accumulator, { ...item, dash, offset }];
-  }, []);
-
+function PaidPendingComparisonChart({
+  paid,
+  pending,
+  totalPayable,
+  paidStudents,
+  pendingStudents,
+  trendData,
+}: {
+  paid: number;
+  pending: number;
+  totalPayable: number;
+  paidStudents: number;
+  pendingStudents: number;
+  trendData: ChartPoint[];
+}) {
   return (
-    <div className="flex min-h-[306px] flex-col items-center justify-center">
-      <svg viewBox="0 0 220 220" className="h-[306px] w-full max-w-[306px]">
-        <circle cx="110" cy="110" r={radius} fill="none" stroke="#f1f5f9" strokeWidth="44" />
-        {segments.map((item) => (
-          <circle
-            key={item.label}
-            cx="110"
-            cy="110"
-            r={radius}
-            fill="none"
-            stroke={item.color}
-            strokeWidth="44"
-            strokeDasharray={`${item.dash} ${circumference - item.dash}`}
-            strokeDashoffset={-item.offset}
-            transform="rotate(-90 110 110)"
-          />
-        ))}
-        <circle cx="110" cy="110" r="46" fill="white" />
-        <text x="110" y="120" textAnchor="middle" className="fill-slate-950 text-[28px] font-bold">{Math.round(totalShare)}</text>
-      </svg>
+    <CompactPaidPendingComparisonChart
+      paid={paid}
+      pending={pending}
+      totalPayable={totalPayable}
+      paidStudents={paidStudents}
+      pendingStudents={pendingStudents}
+      trendData={trendData}
+    />
+  );
+}
+
+/*
+function EmptyChartState({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center text-sm text-slate-500">
+      {message}
     </div>
   );
+}
+
+function CompactPaidPendingComparisonChart({
+  paid,
+  pending,
+  totalPayable,
+  paidStudents,
+  pendingStudents,
+  trendData,
+}: {
+  paid: number;
+  pending: number;
+  totalPayable: number;
+  paidStudents: number;
+  pendingStudents: number;
+  trendData: ChartPoint[];
+}) {
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
+  const rows = [
+    {
+      label: 'Collected',
+      amount: paid,
+      students: paidStudents,
+      color: '#059669',
+      percentage: totalPayable > 0 ? Math.round((paid / totalPayable) * 100) : 0,
+    },
+    {
+      label: 'Pending',
+      amount: pending,
+      students: pendingStudents,
+      color: '#d97706',
+      percentage: totalPayable > 0 ? Math.round((pending / totalPayable) * 100) : 0,
+    },
+  ].filter((row) => row.amount > 0);
+
+  if (paid <= 0 && pending <= 0) {
+    return <EmptyChartState message="No fee collection data available" />;
+  }
+
+  const radius = 72;
+  const circumference = 2 * Math.PI * radius;
+  let runningOffset = 0;
+  const segments = rows.map((row) => {
+    const dash = totalPayable > 0 ? (row.amount / totalPayable) * circumference : 0;
+    const segment = { ...row, dash, offset: runningOffset };
+    runningOffset += dash;
+    return segment;
+  });
+  const activeSegment = segments.find((segment) => segment.label === activeLabel) ?? null;
+  const trend = getCollectionTrendIndicator(trendData);
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-center">
+      <div className="relative mx-auto w-full max-w-[240px]">
+        <svg viewBox="0 0 220 220" className="h-[220px] w-full">
+          <circle cx="110" cy="110" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="28" />
+          {segments.map((segment) => (
+            <circle
+              key={segment.label}
+              cx="110"
+              cy="110"
+              r={radius}
+              fill="none"
+              stroke={segment.color}
+              strokeWidth={activeLabel === segment.label ? 34 : 28}
+              strokeDasharray={`${segment.dash} ${circumference - segment.dash}`}
+              strokeDashoffset={-segment.offset}
+              strokeLinecap="round"
+              transform="rotate(-90 110 110)"
+              className="cursor-pointer transition-all"
+              onMouseEnter={() => setActiveLabel(segment.label)}
+              onMouseLeave={() => setActiveLabel(null)}
+            />
+          ))}
+        </svg>
+
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Total Payable</p>
+          <p className="mt-2 text-xl font-bold text-slate-950">{currencyFormatter.format(totalPayable)}</p>
+          <p className="mt-1 text-xs text-slate-500">{Math.round((paid / Math.max(totalPayable, 1)) * 100)}% collected</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {rows.map((row) => (
+            <div key={row.label} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
+              <span>{row.label}</span>
+            </div>
+          ))}
+          {trend ? (
+            <div className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${trend.direction === 'up' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+              <span>{trend.direction === 'up' ? '▲' : '▼'}</span>
+              <span>{trend.label}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-3">
+          {rows.map((row) => {
+            const isActive = activeLabel === row.label;
+            return (
+              <button
+                key={row.label}
+                type="button"
+                onMouseEnter={() => setActiveLabel(row.label)}
+                onMouseLeave={() => setActiveLabel(null)}
+                className={`rounded-2xl border px-4 py-3 text-left transition-colors ${isActive ? 'border-sky-200 bg-sky-50/70' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
+                    <span className="text-sm font-semibold text-slate-900">{row.label}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">{row.percentage}%</span>
+                </div>
+                <p className="mt-2 text-sm text-slate-700">
+                  {row.label}: {currencyFormatter.format(row.amount)} ({row.percentage}%)
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {row.students > 0 ? `${row.students} student${row.students === 1 ? '' : 's'}` : 'Student count unavailable'}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        {activeSegment ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">{activeSegment.label}</p>
+            <p className="mt-1">Amount: {currencyFormatter.format(activeSegment.amount)}</p>
+            <p className="mt-1">Percentage: {activeSegment.percentage}%</p>
+            <p className="mt-1">
+              Students: {activeSegment.students > 0 ? activeSegment.students : 'Unavailable'}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+*/
+
+function EmptyChartState({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center text-sm text-slate-500">
+      {message}
+    </div>
+  );
+}
+
+function CompactPaidPendingComparisonChart({
+  paid,
+  pending,
+  totalPayable,
+  paidStudents,
+  pendingStudents,
+  trendData,
+}: {
+  paid: number;
+  pending: number;
+  totalPayable: number;
+  paidStudents: number;
+  pendingStudents: number;
+  trendData: ChartPoint[];
+}) {
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null);
+  const [chartReady, setChartReady] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setChartReady(true), 60);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const rows = [
+    {
+      label: 'Collected',
+      amount: paid,
+      students: paidStudents,
+      color: '#059669',
+      percentage: totalPayable > 0 ? Math.round((paid / totalPayable) * 100) : 0,
+      badge: 'OK',
+    },
+    {
+      label: 'Pending',
+      amount: pending,
+      students: pendingStudents,
+      color: '#d97706',
+      percentage: totalPayable > 0 ? Math.round((pending / totalPayable) * 100) : 0,
+      badge: 'PD',
+    },
+  ].filter((row) => row.amount > 0);
+
+  if (paid <= 0 && pending <= 0) {
+    return <EmptyChartState message="No fee collection data available" />;
+  }
+
+  const radius = 80;
+  const circumference = 2 * Math.PI * radius;
+  let runningOffset = 0;
+  const segments = rows.map((row) => {
+    const dash = totalPayable > 0 ? (row.amount / totalPayable) * circumference : 0;
+    const segment = { ...row, dash, offset: runningOffset };
+    runningOffset += dash;
+    return segment;
+  });
+  const activeSegment = segments.find((segment) => segment.label === activeLabel) ?? null;
+  const collectionPercentage = Math.round((paid / Math.max(totalPayable, 1)) * 100);
+  const trend = getCollectionTrendIndicator(trendData);
+
+  const setHoveredSegment = (
+    label: string,
+    event: React.MouseEvent<SVGCircleElement | HTMLButtonElement>,
+  ) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setActiveLabel(label);
+    setTooltip({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    });
+  };
+
+  const clearHover = () => {
+    setActiveLabel(null);
+    setTooltip(null);
+  };
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(320px,1fr)_260px] xl:items-center">
+      <div className="space-y-4">
+        <div className="relative mx-auto w-full max-w-[310px]">
+          {tooltip && activeSegment ? (
+            <div
+              className="pointer-events-none absolute z-10 min-w-[168px] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg"
+              style={{ left: tooltip.x, top: tooltip.y - 18 }}
+            >
+              <p className="font-semibold text-slate-900">{activeSegment.label}</p>
+              <p className="mt-1 text-slate-600">Amount: {currencyFormatter.format(activeSegment.amount)}</p>
+              <p className="mt-1 text-slate-600">Percentage: {activeSegment.percentage}%</p>
+              <p className="mt-1 text-slate-600">
+                Students: {activeSegment.students > 0 ? activeSegment.students : 'Unavailable'}
+              </p>
+            </div>
+          ) : null}
+
+          <svg viewBox="0 0 220 220" className="mx-auto h-[270px] w-full">
+            <circle cx="110" cy="110" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="28" />
+            {segments.map((segment) => (
+              <circle
+                key={segment.label}
+                cx="110"
+                cy="110"
+                r={radius}
+                fill="none"
+                stroke={segment.color}
+                strokeWidth={activeLabel === segment.label ? 34 : 28}
+                strokeDasharray={`${segment.dash} ${circumference - segment.dash}`}
+                strokeDashoffset={chartReady ? -segment.offset : circumference}
+                strokeLinecap="round"
+                transform="rotate(-90 110 110)"
+                className="cursor-pointer transition-all duration-700 ease-out"
+                style={{ transitionProperty: 'stroke-dashoffset, stroke-width' }}
+                onMouseEnter={(event) => setHoveredSegment(segment.label, event)}
+                onMouseMove={(event) => setHoveredSegment(segment.label, event)}
+                onMouseLeave={clearHover}
+              />
+            ))}
+          </svg>
+
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Total Payable</p>
+            <p className="mt-2 text-2xl font-bold text-slate-950">{currencyFormatter.format(totalPayable)}</p>
+            <p className="mt-1 text-xs text-slate-500">{collectionPercentage}% collected</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {rows.map((row) => (
+            <div key={row.label} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} />
+              <span>{row.label}</span>
+              <span>{row.percentage}%</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Collected Amount</p>
+            <p className="mt-2 text-sm font-bold text-emerald-700">{currencyFormatter.format(paid)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Pending Amount</p>
+            <p className="mt-2 text-sm font-bold text-amber-700">{currencyFormatter.format(pending)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Collection Percentage</p>
+            <p className="mt-2 text-sm font-bold text-slate-900">{collectionPercentage}%</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {trend ? (
+          <div className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${trend.direction === 'up' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+            <span>{trend.direction === 'up' ? '▲' : '▼'}</span>
+            <span>{trend.label}</span>
+          </div>
+        ) : null}
+
+        {rows.map((row) => {
+          const isActive = activeLabel === row.label;
+          return (
+            <button
+              key={row.label}
+              type="button"
+              onMouseEnter={(event) => setHoveredSegment(row.label, event)}
+              onMouseMove={(event) => setHoveredSegment(row.label, event)}
+              onMouseLeave={clearHover}
+              className={`w-full rounded-2xl border px-4 py-4 text-left transition-colors ${isActive ? 'border-sky-200 bg-sky-50/70' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-700">{row.badge}</span>
+                  <span className="text-sm font-semibold text-slate-900">{row.label}</span>
+                </div>
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{row.percentage}%</span>
+              </div>
+              <p className="mt-3 text-xl font-bold text-slate-950">{currencyFormatter.format(row.amount)}</p>
+              <p className="mt-1 text-sm text-slate-500">{row.students} student{row.students === 1 ? '' : 's'}</p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function getCollectionTrendIndicator(data: ChartPoint[]) {
+  if (data.length < 2) return null;
+
+  const current = data[data.length - 1];
+  const previous = data[data.length - 2];
+  if (!current || !previous || previous.amount <= 0 || current.amount === previous.amount) return null;
+
+  const delta = ((current.amount - previous.amount) / previous.amount) * 100;
+  return {
+    direction: delta > 0 ? 'up' as const : 'down' as const,
+    label: `${Math.abs(Math.round(delta))}% vs previous period`,
+  };
 }
 
 function SortableHeader({ label, align = 'left' }: { label: string; align?: 'left' | 'right' }) {
@@ -968,6 +1468,9 @@ function appendStudentSearchFilters(form: URLSearchParams, filters: StudentFetch
   if (filters.selectedSection) form.append('grade', filters.selectedSection);
   if (filters.selectedStandard) form.append('standard', filters.selectedStandard);
   if (filters.selectedDivision) form.append('division', filters.selectedDivision);
+  if (filters.fromDate) form.append('from_date', filters.fromDate);
+  if (filters.toDate) form.append('to_date', filters.toDate);
+  if (filters.status) form.append('status', filters.status);
 }
 
 function appendStudentPaginationFilters(form: URLSearchParams, pageNumber: number) {
@@ -1314,21 +1817,25 @@ function appendUniqueStudents(current: StudentFeeRow[], next: StudentFeeRow[]): 
 }
 
 function buildDashboardData(students: StudentFeeRow[], snapshot: DashboardSnapshot): DashboardData {
-  const collectedThisTerm = snapshot.collectedThisTerm ?? getCollectedTotal(students);
-  const outstandingTotal = snapshot.outstandingTotal ?? students.reduce((total, student) => total + student.pendingFees, 0);
+  void snapshot;
+  const totalPaidFees = getCollectedTotal(students);
+  const totalPendingFees = students.reduce((total, student) => total + student.pendingFees, 0);
   const calculatedTotal = students.reduce((total, student) => total + getStudentTotalFees(student), 0);
-  const collectionBase = Math.max(calculatedTotal, collectedThisTerm + outstandingTotal);
-  const collectionRate = snapshot.collectionRate ?? (collectionBase > 0 ? Math.round((collectedThisTerm / collectionBase) * 100) : 0);
-  const defaulters = snapshot.defaulters ?? students.filter((student) => student.pendingFees > 0 && student.status !== 'paid').length;
+  const collectionBase = Math.max(calculatedTotal, totalPaidFees + totalPendingFees);
+  const collectionRate = collectionBase > 0 ? Math.round((totalPaidFees / collectionBase) * 100) : 0;
+  const pendingStudents = students.filter((student) => student.pendingFees > 0 && student.status !== 'paid').length;
+  const paidStudents = Math.max(students.filter((student) => student.status === 'paid' || student.pendingFees <= 0).length, 0);
 
   return {
-    collectedThisTerm,
-    outstandingTotal,
+    todayCollection: getTodayCollection(students),
+    totalPaidFees,
+    totalPendingFees,
+    paidStudents,
+    pendingStudents,
     collectionRate: normalizePercentage(collectionRate),
-    defaulters,
-    chartTrend: snapshot.chartTrend?.length ? snapshot.chartTrend : getCollectionTrend(students),
-    headBreakdown: snapshot.headBreakdown?.length ? snapshot.headBreakdown : getHeadBreakdown(students),
-    paymentMix: snapshot.paymentMix?.length ? snapshot.paymentMix : getPaymentMix(students),
+    dailyTrend: getDailyCollectionTrend(students),
+    headBreakdown: getHeadBreakdown(students),
+    paymentMix: getPaymentMix(students),
   };
 }
 
@@ -1552,6 +2059,19 @@ function getCollectedTotal(students: StudentFeeRow[]): number {
   return students.reduce((total, student) => total + getStudentPaidFees(student), 0);
 }
 
+function getTodayCollection(students: StudentFeeRow[]): number {
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+
+  return students.reduce((total, student) => {
+    const collectedOn = parseFeeDate(student.collectionDateRaw);
+    if (!collectedOn) return total;
+
+    const collectedKey = `${collectedOn.getFullYear()}-${collectedOn.getMonth()}-${collectedOn.getDate()}`;
+    return collectedKey === todayKey ? total + getStudentPaidFees(student) : total;
+  }, 0);
+}
+
 function getStudentPaidFees(student: StudentFeeRow): number {
   const paidFees = readNumber(student.paidFees);
   if (paidFees > 0) return paidFees;
@@ -1570,36 +2090,33 @@ function getStudentTotalFees(student: StudentFeeRow): number {
   return getStudentPaidFees(student) + student.pendingFees;
 }
 
-function getCollectionTrend(students: StudentFeeRow[]): ChartPoint[] {
-  type TrendBucket = { month: string; collected: number; target: number; sortValue: number };
+function getDailyCollectionTrend(students: StudentFeeRow[]): ChartPoint[] {
+  type TrendBucket = { label: string; amount: number; sortValue: number };
 
   const grouped = new Map<string, TrendBucket>();
 
   students.forEach((student) => {
-    const date = parseFeeDate(student.collectionDateRaw || student.dueDateRaw || student.dueDate);
-    const key = date ? `${date.getFullYear()}-${date.getMonth()}` : 'current';
+    const date = parseFeeDate(student.collectionDateRaw);
+    if (!date) return;
+
+    const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
     const current = grouped.get(key) ?? {
-      month: date ? date.toLocaleDateString('en-IN', { month: 'short' }) : 'Current',
-      collected: 0,
-      target: 0,
-      sortValue: date ? new Date(date.getFullYear(), date.getMonth(), 1).getTime() : Number.MAX_SAFE_INTEGER,
+      label: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+      amount: 0,
+      sortValue: new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime(),
     };
 
-    current.collected += getStudentPaidFees(student) / 100000;
-    current.target += getStudentTotalFees(student) / 100000;
+    current.amount += getStudentPaidFees(student);
     grouped.set(key, current);
   });
 
-  const rows = Array.from(grouped.values())
+  return Array.from(grouped.values())
     .sort((first, second) => first.sortValue - second.sortValue)
     .slice(-6)
     .map((item) => ({
-      month: item.month,
-      collected: roundChartValue(item.collected),
-      target: roundChartValue(item.target),
+      label: item.label,
+      amount: roundChartValue(amountToLakhs(item.amount)),
     }));
-
-  return rows.length ? rows : [{ month: 'Current', collected: 0, target: 0 }];
 }
 
 function toChartPoints(items: unknown[]): ChartPoint[] {
@@ -1617,30 +2134,11 @@ function toChartPoints(items: unknown[]): ChartPoint[] {
       'receivedAmount',
       'value',
     ]) ?? 0;
-    const pendingAmount = readFirstNumber([record], [
-      'pending',
-      'pending_amount',
-      'pendingAmount',
-      'outstanding',
-      'balance',
-    ]) ?? 0;
-    const targetAmount = readFirstNumber([record], [
-      'target',
-      'target_amount',
-      'targetAmount',
-      'total',
-      'total_amount',
-      'totalAmount',
-      'demand',
-      'demand_amount',
-    ]) ?? collectedAmount + pendingAmount;
-
     return {
-      month: getChartPointLabel(record, index),
-      collected: roundChartValue(amountToLakhs(collectedAmount)),
-      target: roundChartValue(amountToLakhs(targetAmount)),
+      label: getChartPointLabel(record, index),
+      amount: roundChartValue(amountToLakhs(collectedAmount)),
     };
-  }).filter((item) => item.collected > 0 || item.target > 0).slice(-6);
+  }).filter((item) => item.amount > 0).slice(-6);
 }
 
 function getChartPointLabel(record: Record<string, unknown>, index: number): string {
@@ -1660,6 +2158,27 @@ function getChartPointLabel(record: Record<string, unknown>, index: number): str
   if (date) return date.toLocaleDateString('en-IN', { month: 'short' });
 
   return rawLabel.length > 12 ? rawLabel.slice(0, 12) : rawLabel;
+}
+
+function isWithinDateRange(date: Date | null, fromDate: string, toDate: string): boolean {
+  if (!fromDate && !toDate) return true;
+  if (!date) return false;
+
+  const value = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const start = fromDate ? parseFeeDate(fromDate) : null;
+  const end = toDate ? parseFeeDate(toDate) : null;
+
+  if (start) {
+    const startValue = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+    if (value < startValue) return false;
+  }
+
+  if (end) {
+    const endValue = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+    if (value > endValue) return false;
+  }
+
+  return true;
 }
 
 function toHeadBreakdown(items: unknown[]): HeadBreakdown[] {
@@ -1901,14 +2420,6 @@ function getHeadBreakdown(students: StudentFeeRow[]): HeadBreakdown[] {
 function fallbackFeeHead(index: number): string {
   const feeHeads = ['Tuition · Term 2', 'Transport · Term 2', 'Lab · Term 2', 'Exam · Term 2', 'Hostel · Term 2', 'Activity · Term 2'];
   return feeHeads[index % feeHeads.length];
-}
-
-function shortenLabel(value: string): string {
-  return value.length > 9 ? `${value.slice(0, 7)}.` : value;
-}
-
-function formatLakhs(value: number): string {
-  return `${currencySymbol}${(value / 100000).toFixed(value >= 1000000 ? 1 : 1)}L`;
 }
 
 function formatAxisValue(value: number): string {

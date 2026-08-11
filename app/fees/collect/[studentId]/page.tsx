@@ -65,6 +65,7 @@ type SelectOption = {
 };
 
 type CollectionResponse = {
+  [key: string]: unknown;
   student?: unknown;
   stu_data?: unknown;
   fee_summary?: unknown;
@@ -79,6 +80,8 @@ type CollectionResponse = {
   payment_modes?: unknown;
   cheque_return_charges?: unknown;
   data?: {
+
+    [key: string]: unknown;
     student?: unknown;
     stu_data?: unknown;
     fee_summary?: unknown;
@@ -123,7 +126,7 @@ export default function FeesCollectionStudentPage() {
   const params = useParams<{ studentId: string }>();
   const studentId = params?.studentId;
   const [session] = useState(getSessionContext);
-  const receiptRef = useRef<HTMLDivElement | null>(null);
+  const printCompletionHandledRef = useRef(false);
 
   const [student, setStudent] = useState<StudentInfo | null>(null);
   const [summaryRows, setSummaryRows] = useState<SummaryRow[]>([]);
@@ -139,7 +142,7 @@ export default function FeesCollectionStudentPage() {
   const [receiptDate, setReceiptDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [chequeDate, setChequeDate] = useState('');
   const [transactionNo, setTransactionNo] = useState('');
-  const [bankName, setBankName] = useState('');
+  const [selectedBankId, setSelectedBankId] = useState('');
   const [bankBranch, setBankBranch] = useState('');
   const [sendSms, setSendSms] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -147,6 +150,8 @@ export default function FeesCollectionStudentPage() {
   const [error, setError] = useState<string | null>(null);
   const [collectionData, setCollectionData] = useState<CollectionResponse | null>(null);
   const [receiptHtml, setReceiptHtml] = useState('');
+  const [printReceiptOnLoad, setPrintReceiptOnLoad] = useState(false);
+  const [printViewOpen, setPrintViewOpen] = useState(false);
 
   const clearCollectionData = useCallback((message: string) => {
     setStudent(null);
@@ -156,6 +161,8 @@ export default function FeesCollectionStudentPage() {
     setPaymentModes(defaultPaymentModes);
     setCollectionData(null);
     setReceiptHtml('');
+    setPrintReceiptOnLoad(false);
+    setPrintViewOpen(false);
     setSelectedMonthIds([]);
     setExpandedMonthId(null);
     setError(message);
@@ -169,16 +176,48 @@ export default function FeesCollectionStudentPage() {
       source.final_fee,
       source.final_fee_name
     );
+    const bankOptions = toOptions(source.bank_data ?? source.banks);
+    const savedBankId = resolveSelectedBankId(
+      source.bank_id
+        ?? source.bankId
+        ?? source.bank_name
+        ?? source.bankName
+        ?? source.bank,
+      bankOptions,
+      source.bank_name ?? source.bankName
+    );
+    const savedPaymentMode = readString(source.payment_mode ?? source.PAYMENT_MODE ?? source.mode);
+    const savedReceiptDate = toInputDateString(source.receiptdate ?? source.receipt_date ?? source.receiptDate);
+    const savedChequeDate = toInputDateString(source.cheque_date ?? source.chequeDate);
+    const savedTransactionNo = readString(
+      source.cheque_no
+        ?? source.chequeNo
+        ?? source.transaction_no
+        ?? source.transactionNo
+        ?? source.reference_no
+        ?? source.referenceNo
+    );
+    const savedBankBranch = readString(source.bank_branch ?? source.bankBranch ?? source.branch);
+    const savedRemarks = readString(source.remarks ?? source.note ?? source.description);
 
     setStudent(toStudentInfo(source.stu_data ?? source.student));
     setSummaryRows(toSummaryRows(source.total_fees ?? source.fee_summary ?? source.summary));
     setMonths(loadedMonths);
-    setBanks(toOptions(source.bank_data ?? source.banks));
+    setBanks(bankOptions);
     setPaymentModes(toPaymentModes(source.payment_modes));
     setSelectedMonthIds(loadedMonths.map((month) => month.id));
     setExpandedMonthId(loadedMonths[0]?.id ?? null);
+    setPaymentMode(savedPaymentMode || 'Cash');
+    setSelectedBankId(savedBankId);
+    setBankBranch(savedBankBranch);
+    setTransactionNo(savedTransactionNo);
+    setRemarks(savedRemarks);
+    setReceiptDate(savedReceiptDate || new Date().toISOString().slice(0, 10));
+    setChequeDate(savedChequeDate);
     setCollectionData(source as CollectionResponse);
     setReceiptHtml('');
+    setPrintReceiptOnLoad(false);
+    setPrintViewOpen(false);
   }, []);
 
   const loadFees = useCallback(async () => {
@@ -249,6 +288,69 @@ export default function FeesCollectionStudentPage() {
   const showBankFields = paymentMode === 'Cheque' || paymentMode === 'Online';
   const showChequeDate = paymentMode === 'Cheque';
   const showBranch = paymentMode === 'Cheque';
+  const totalSummaryFees = summaryRows.reduce((total, row) => total + row.fees, 0);
+  const totalSummaryPaid = summaryRows.reduce((total, row) => total + row.paid, 0);
+  const totalSummaryDiscount = summaryRows.reduce((total, row) => total + row.discount, 0);
+  const totalSummaryRemaining = summaryRows.reduce((total, row) => total + row.remaining, 0);
+  const selectedMonthCount = selectedMonthIds.length;
+  const selectedParticularCount = selectedParticulars.length;
+  const selectedBankName = useMemo(() => {
+    const selectedBank = banks.find((bank) => bank.id === selectedBankId);
+    return selectedBank?.label ?? '';
+  }, [banks, selectedBankId]);
+  const printableReceiptHtml = useMemo(
+    () => normalizeReceiptHtml(receiptHtml, selectedBankId, selectedBankName),
+    [receiptHtml, selectedBankId, selectedBankName]
+  );
+  const collectionProgress = totalSummaryFees > 0
+    ? Math.min(100, Math.round(((totalSummaryPaid + grandTotal + totalSummaryDiscount) / totalSummaryFees) * 100))
+    : 0;
+
+  const returnToCollectDashboard = useCallback(() => {
+    if (printCompletionHandledRef.current) return;
+    printCompletionHandledRef.current = true;
+    setPrintReceiptOnLoad(false);
+    setPrintViewOpen(false);
+    setReceiptHtml('');
+    router.replace(`/fees/collect?refresh=${Date.now()}`);
+  }, [router]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !printViewOpen) return undefined;
+
+    const handleAfterPrint = () => {
+      returnToCollectDashboard();
+    };
+
+    window.addEventListener('afterprint', handleAfterPrint);
+
+    const mediaQueryList = window.matchMedia('print');
+    const handleMediaQueryChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) {
+        handleAfterPrint();
+      }
+    };
+
+    mediaQueryList.addEventListener?.('change', handleMediaQueryChange);
+
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint);
+      mediaQueryList.removeEventListener?.('change', handleMediaQueryChange);
+    };
+  }, [printViewOpen, returnToCollectDashboard]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !printViewOpen || !printReceiptOnLoad || !printableReceiptHtml) return undefined;
+
+    const printTimer = window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        setPrintReceiptOnLoad(false);
+        window.print();
+      });
+    }, 180);
+
+    return () => window.clearTimeout(printTimer);
+  }, [printReceiptOnLoad, printViewOpen, printableReceiptHtml]);
 
   const handleParticularAmountChange = (monthId: string, particularId: string, amount: number) => {
     setMonths((currentMonths) =>
@@ -347,7 +449,8 @@ export default function FeesCollectionStudentPage() {
       form.append('receiptdate', receiptDate);
       form.append('cheque_date', chequeDate || receiptDate);
       form.append('cheque_no', paymentMode !== 'Cash' ? transactionNo : '');
-      form.append('bank_name', showBankFields ? bankName : '');
+      form.append('bank_id', showBankFields ? selectedBankId : '');
+      form.append('bank_name', showBankFields ? selectedBankName : '');
       form.append('bank_branch', showBranch ? bankBranch : 'N/A');
       form.append('submit', 'Save');
       form.append('sub_institute_id', session.subInstituteId);
@@ -375,33 +478,19 @@ export default function FeesCollectionStudentPage() {
           throw new Error('Fee collection saved, but receipt HTML was not found in the API response.');
         }
 
+        printCompletionHandledRef.current = false;
         setReceiptHtml(html);
-        window.setTimeout(() => receiptRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+        setPrintViewOpen(true);
+        setPrintReceiptOnLoad(true);
         return;
       }
 
-      router.push('/fees/collect');
+      router.replace('/fees/collect');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save fee collection.');
     } finally {
       setSaving(false);
     }
-  };
-
-  const printCurrentReceipt = () => {
-    if (!receiptHtml || typeof window === 'undefined') return;
-
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-      setError('Receipt is ready, but the print window was blocked by the browser.');
-      return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(`<!doctype html><html><head><title>Fees Receipt</title></head><body>${receiptHtml}</body></html>`);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
   };
 
   if (loading) {
@@ -433,37 +522,70 @@ export default function FeesCollectionStudentPage() {
   }
 
   return (
-    <div className="min-h-screen ">
-      <div className="mx-auto max-w-[1500px] space-y-6 p-3 sm:p-4 md:p-6 lg:p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-lg bg-white" onClick={() => router.push('/fees/collect')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Collect Fees</h1>
-              <p className="mt-1 truncate text-sm text-slate-500">{student?.studentName || 'Student fee collection'}</p>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#f8fafc_38%,#f1f5f9_100%)]">
+      <div data-print-exclude="true" className="mx-auto max-w-[1500px] space-y-6 p-3 sm:p-4 md:p-6 lg:p-8">
+        <section className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/95 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="grid gap-6 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-6 lg:py-6">
+            <div className="space-y-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl bg-white" onClick={() => router.push('/fees/collect')}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div className="min-w-0">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                    Fees Collection
+                  </div>
+                  <h1 className="mt-3 truncate text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{student.studentName || 'Student fee collection'}</h1>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Review the same fee data, select due months, adjust charges if needed, and continue with the existing save and receipt flow.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <SummaryStatCard label="Pending amount" value={currencyFormatter.format(student.pendingFees)} tone="rose" />
+                <SummaryStatCard label="Selected months" value={String(selectedMonthCount)} tone="sky" />
+                <SummaryStatCard label="Line items" value={String(selectedParticularCount)} tone="amber" />
+                <SummaryStatCard label="Current total" value={currencyFormatter.format(grandTotal)} tone="emerald" />
+              </div>
             </div>
+
+            <Card className="border-0 bg-slate-950 text-white ring-0">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold text-white">Collection progress</CardTitle>
+                <p className="text-sm text-slate-300">Current academic-year position for this student.</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-300">
+                    <span>Paid and adjusted</span>
+                    <span>{collectionProgress}%</span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-white/10">
+                    <div className="h-2.5 rounded-full bg-emerald-400" style={{ width: `${collectionProgress}%` }} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <MiniInfo label="Assigned" value={currencyFormatter.format(totalSummaryFees)} />
+                  <MiniInfo label="Paid" value={currencyFormatter.format(totalSummaryPaid)} />
+                  <MiniInfo label="Discount" value={currencyFormatter.format(totalSummaryDiscount)} />
+                  <MiniInfo label="Remaining" value={currencyFormatter.format(totalSummaryRemaining)} />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-left sm:text-right">
-            <p className="text-xs font-medium text-rose-600">Pending Fees</p>
-            <p className="text-lg font-bold text-rose-700">{currencyFormatter.format(student?.pendingFees ?? 0)}</p>
-          </div>
-        </div>
+        </section>
 
         {error && <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
 
-        {receiptHtml && (
-          <Card ref={receiptRef} className="border-emerald-200 bg-white shadow-sm">
+        {printableReceiptHtml && !printViewOpen && (
+          <Card className="border-emerald-200 bg-white shadow-sm">
             <CardHeader className="flex flex-col gap-3 border-b border-emerald-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-base font-bold text-emerald-800">Receipt Preview</CardTitle>
-              <Button type="button" size="sm" className="h-9 rounded-lg bg-slate-900 text-white hover:bg-slate-800" onClick={printCurrentReceipt}>
-                <Printer className="mr-2 h-4 w-4" />
-                Print Receipt
-              </Button>
+              <div className="text-sm text-emerald-700">Saved receipt preview</div>
             </CardHeader>
             <CardContent className="overflow-x-auto bg-slate-50 p-4">
-              <div className="mx-auto min-w-[720px] max-w-[900px] bg-white p-4 shadow-sm" dangerouslySetInnerHTML={{ __html: receiptHtml }} />
+              <div className="mx-auto min-w-[720px] max-w-[900px] bg-white p-4 shadow-sm" dangerouslySetInnerHTML={{ __html: printableReceiptHtml }} />
             </CardContent>
           </Card>
         )}
@@ -474,8 +596,9 @@ export default function FeesCollectionStudentPage() {
               <Banknote className="h-4 w-4 text-[#0D6EFD]" />
               Student Information
             </CardTitle>
+            <p className="text-sm text-slate-500">Core profile values returned by the fee collection API.</p>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-3 p-4 sm:p-5 md:grid-cols-2">
+          <CardContent className="grid grid-cols-1 gap-3 p-4 sm:p-5 md:grid-cols-2 xl:grid-cols-3">
             <Info label="Unique ID" value={student?.uniqueId} />
             <Info label="Student Name" value={student?.studentName} />
             <Info label="GR No." value={student?.grNo} />
@@ -489,11 +612,12 @@ export default function FeesCollectionStudentPage() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
           <div className="min-w-0 space-y-5">
             <Card className="border-slate-200/80 bg-white shadow-sm">
               <CardHeader className="border-b border-slate-100 px-5 py-4">
                 <CardTitle className="text-base font-bold text-slate-800">Fee Summary</CardTitle>
+                <p className="text-sm text-slate-500">Month-wise totals already returned for this student record.</p>
               </CardHeader>
               <CardContent className="p-0">
                 <DataTable
@@ -522,18 +646,26 @@ export default function FeesCollectionStudentPage() {
                   <CalendarDays className="h-4 w-4 text-[#0D6EFD]" />
                   Month Selection
                 </CardTitle>
+                <p className="text-sm text-slate-500">Choose the fee months to include. Expanding a month shows the same line items and editable collection amounts.</p>
               </CardHeader>
               <CardContent className="space-y-3 p-4 sm:p-5">
                 {months.map((month) => {
                   const isExpanded = expandedMonthId === month.id;
                   const isSelected = selectedMonthIds.includes(month.id);
+                  const monthCollection = month.particulars.reduce((total, item) => total + item.collectionAmount, 0);
+                  const monthAmount = month.particulars.reduce((total, item) => total + item.amount, 0);
 
                   return (
-                    <div key={month.id} className="rounded-lg border border-slate-200 bg-white">
+                    <div key={month.id} className={`rounded-2xl border ${isSelected ? 'border-sky-200 bg-sky-50/40' : 'border-slate-200 bg-white'}`}>
                       <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
                         <input type="checkbox" checked={isSelected} onChange={(event) => toggleMonth(month.id, event.target.checked)} className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#0D6EFD]" />
-                        <button type="button" className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left text-sm font-semibold text-slate-800" onClick={() => setExpandedMonthId(isExpanded ? null : month.id)}>
-                          {month.label}
+                        <button type="button" className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left" onClick={() => setExpandedMonthId(isExpanded ? null : month.id)}>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-800">{month.label}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {month.particulars.length} line item{month.particulars.length === 1 ? '' : 's'} • {currencyFormatter.format(monthCollection)} selected of {currencyFormatter.format(monthAmount)}
+                            </p>
+                          </div>
                           <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                         </button>
                       </div>
@@ -554,6 +686,7 @@ export default function FeesCollectionStudentPage() {
             <Card className="border-slate-200/80 bg-white shadow-sm">
               <CardHeader className="border-b border-slate-100 px-5 py-4">
                 <CardTitle className="text-base font-bold text-slate-800">Fee Adjustment</CardTitle>
+                <p className="text-sm text-slate-500">Optional adjustments applied before the final save request.</p>
               </CardHeader>
               <CardContent className="space-y-4 p-4 sm:p-5">
                 <Field label="Remarks">
@@ -576,6 +709,7 @@ export default function FeesCollectionStudentPage() {
             <Card className="border-slate-200/80 bg-white shadow-sm">
               <CardHeader className="border-b border-slate-100 px-5 py-4">
                 <CardTitle className="text-base font-bold text-slate-800">Payment Information</CardTitle>
+                <p className="text-sm text-slate-500">Receipt metadata and banking details sent with the same backend request.</p>
               </CardHeader>
               <CardContent className="space-y-4 p-4 sm:p-5">
                 <Field label="Payment Mode">
@@ -605,9 +739,11 @@ export default function FeesCollectionStudentPage() {
                 )}
                 {showBankFields && (
                   <Field label="Bank Name">
-                    <Select value={bankName} onValueChange={(value) => setBankName(value ?? '')}>
+                    <Select value={selectedBankId} onValueChange={(value) => setSelectedBankId(value ?? '')}>
                       <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
-                        <SelectValue placeholder="Select bank" />
+                        <SelectValue placeholder="Select bank">
+                          {selectedBankName || 'Select bank'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {banks.map((bank) => (
@@ -628,11 +764,13 @@ export default function FeesCollectionStudentPage() {
                 </label>
               </CardContent>
             </Card>
+
+           
           </div>
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
+      <div data-print-exclude="true" className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
         <div className="mx-auto flex max-w-[1500px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-medium text-slate-500">Grand Total</p>
@@ -651,6 +789,51 @@ export default function FeesCollectionStudentPage() {
           </div>
         </div>
       </div>
+
+      {printViewOpen && printableReceiptHtml ? (
+        <div data-print-receipt="true" className="fixed inset-0 z-[100] overflow-auto bg-white p-4 sm:p-6">
+          <div data-print-receipt-container="true" className="mx-auto max-w-[900px] bg-white">
+            <div dangerouslySetInnerHTML={{ __html: printableReceiptHtml }} />
+          </div>
+        </div>
+      ) : null}
+
+      <style jsx global>{`
+        @media print {
+          html, body {
+            background: #ffffff !important;
+          }
+
+          body * {
+            visibility: hidden;
+          }
+
+          [data-print-receipt="true"],
+          [data-print-receipt="true"] * {
+            visibility: visible;
+          }
+
+          [data-print-exclude="true"] {
+            display: none !important;
+          }
+
+          [data-print-receipt="true"] {
+            position: static !important;
+            inset: auto !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: #ffffff !important;
+          }
+
+          [data-print-receipt-container="true"] {
+            max-width: 100% !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -779,9 +962,45 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Info({ label, value, valueClassName = 'text-slate-900' }: { label: string; value?: string; valueClassName?: string }) {
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-1 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-3 text-sm sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-4 sm:px-4">
+    <div className="grid min-w-0 grid-cols-1 gap-1 rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-3 text-sm sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-4 sm:px-4">
       <span className="font-medium text-slate-500">{label}</span>
       <span className={`min-w-0 break-words ${valueClassName}`}>{value || '-'}</span>
+    </div>
+  );
+}
+
+function SummaryStatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: 'rose' | 'sky' | 'amber' | 'emerald';
+}) {
+  const toneClasses = {
+    rose: 'border-rose-100 bg-rose-50 text-rose-700',
+    sky: 'border-sky-100 bg-sky-50 text-sky-700',
+    amber: 'border-amber-100 bg-amber-50 text-amber-700',
+    emerald: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+  } satisfies Record<'rose' | 'sky' | 'amber' | 'emerald', string>;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
+      <p className="mt-3 text-xl font-bold text-slate-950">{value}</p>
+      <div className={`mt-3 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${toneClasses[tone]}`}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function MiniInfo({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
+      <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">{label}</p>
+      <p className={`mt-2 text-sm ${strong ? 'font-bold text-white' : 'font-semibold text-slate-100'}`}>{value}</p>
     </div>
   );
 }
@@ -918,6 +1137,79 @@ function toOptions(items: unknown): SelectOption[] {
     const label = readString(record.name ?? record.bank_name ?? record.label);
     return { id, label: label || id };
   }).filter((item) => item.id && item.label);
+}
+
+function resolveSelectedBankId(value: unknown, options: SelectOption[], fallbackLabel?: unknown): string {
+  const rawValue = readString(value).trim();
+  const rawLabel = readString(fallbackLabel).trim();
+
+  if (!rawValue && !rawLabel) return '';
+
+  const directMatch = options.find((option) => option.id === rawValue);
+  if (directMatch) return directMatch.id;
+
+  const normalizedValue = rawValue.toLowerCase();
+  const normalizedLabel = rawLabel.toLowerCase();
+
+  const labelMatch = options.find((option) => {
+    const optionLabel = option.label.trim().toLowerCase();
+    return optionLabel === normalizedValue || optionLabel === normalizedLabel;
+  });
+
+  return labelMatch?.id ?? '';
+}
+
+function toInputDateString(value: unknown): string {
+  const rawValue = readString(value).trim();
+  if (!rawValue) return '';
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+    return rawValue;
+  }
+
+  const parsedDate = new Date(rawValue);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '';
+  }
+
+  return parsedDate.toISOString().slice(0, 10);
+}
+
+function normalizeReceiptHtml(html: string, bankId: string, bankName: string): string {
+  if (!html || !bankId || !bankName || bankId === bankName || typeof window === 'undefined') {
+    return html;
+  }
+
+  try {
+    const parser = new window.DOMParser();
+    const documentNode = parser.parseFromString(html, 'text/html');
+    const bankLabelMatcher = /bank\s*name|bank\b/i;
+
+    const labeledNodes = Array.from(documentNode.querySelectorAll('td, th, div, p, span, strong, b, label'));
+    labeledNodes.forEach((node) => {
+      const labelText = node.textContent?.trim() ?? '';
+      if (!bankLabelMatcher.test(labelText)) return;
+
+      const sibling = node.nextElementSibling;
+      if (sibling && sibling.textContent?.trim() === bankId) {
+        sibling.textContent = bankName;
+      }
+    });
+
+    const allNodes = Array.from(documentNode.querySelectorAll('td, div, span, p'));
+    allNodes.forEach((node) => {
+      if (node.textContent?.trim() === bankId) {
+        const previousText = node.previousElementSibling?.textContent?.trim() ?? '';
+        if (bankLabelMatcher.test(previousText)) {
+          node.textContent = bankName;
+        }
+      }
+    });
+
+    return documentNode.body.innerHTML || html;
+  } catch {
+    return html;
+  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

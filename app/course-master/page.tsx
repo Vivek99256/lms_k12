@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   BookOpen,
   Briefcase,
+  CalendarDays,
   ClipboardList,
   Compass,
   Cpu,
@@ -23,14 +24,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import {
@@ -40,7 +33,6 @@ import {
   type LmsSubject,
 } from './data/lmsCourses';
 import { type Course } from './data/courses';
-
 const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
   'My Course': BookOpen,
   SEL: Music,
@@ -53,20 +45,6 @@ const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
   'Hobbies and Activities': Palette,
   Library: Library,
 };
-
-const CATEGORY_ACCENT_MAP: Record<string, string> = {
-  'My Course': '#5648E8',
-  SEL: '#EC4899',
-  'STEM Resources': '#0891B2',
-  'Career Counselling': '#7C3AED',
-  'Foundational Skills': '#3B82F6',
-  'Soft Skills': '#F43F5E',
-  Sports: '#84CC16',
-  'Vocational Traning': '#D97706',
-  'Hobbies and Activities': '#6366F1',
-  Library: '#DB2777',
-};
-
 const SECTION_BADGES = ['Section A', 'Section A', 'Section B', 'Section B'] as const;
 const LEARNING_TABS = [
   { key: 'learn', label: 'Learn', icon: BookOpen },
@@ -88,6 +66,27 @@ const SUBJECT_ICON_MAP: Record<Course['icon'], LucideIcon> = {
   compass: Compass,
 };
 
+const SUBJECT_CARD_PALETTES = [
+  { accent: '#6366F1', soft: '#EEEEFF' },
+  { accent: '#10B981', soft: '#E6F8F1' },
+  { accent: '#8B5CF6', soft: '#F1EAFF' },
+  { accent: '#F59E0B', soft: '#FFF4D9' },
+  { accent: '#06B6D4', soft: '#E1F8FC' },
+  { accent: '#EC4899', soft: '#FDE9F3' },
+  { accent: '#EF4444', soft: '#FDEBEC' },
+  { accent: '#D97706', soft: '#FFF0DF' },
+  { accent: '#65C600', soft: '#F0FAE7' },
+  { accent: '#4F7DF3', soft: '#EAF0FF' },
+] as const;
+
+function getSubjectCardPalette(subjectId: number | string) {
+  const numericId = Number(subjectId);
+  const index = Number.isFinite(numericId)
+    ? Math.abs(numericId) % SUBJECT_CARD_PALETTES.length
+    : String(subjectId).length % SUBJECT_CARD_PALETTES.length;
+  return SUBJECT_CARD_PALETTES[index];
+}
+
 function getCourseRoutes(courseId: number | string, standardId?: number | string) {
   const id = standardId != null && standardId !== '' ? `${courseId}-${standardId}` : courseId;
   return {
@@ -95,10 +94,6 @@ function getCourseRoutes(courseId: number | string, standardId?: number | string
     lessonPlan: `/course-master/lesson-plan/${id}`,
     curriculum: `/course-master/lesson-plan/${id}/curriculum`,
   };
-}
-
-function getGradeLabel(standardName: string) {
-  return `Grade ${standardName}`;
 }
 
 function buildStudentPageRoute(
@@ -208,9 +203,6 @@ export default function CourseMasterPage() {
   const [search, setSearch] = useState('');
   const [standardFilter, setStandardFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [studentSearch, setStudentSearch] = useState('');
-  const [studentStandardFilter, setStudentStandardFilter] = useState('all');
-  const [studentSectionFilter, setStudentSectionFilter] = useState('all');
 
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -363,61 +355,18 @@ export default function CourseMasterPage() {
     [filteredGroups]
   );
 
-  const studentStandardOptions = useMemo(() => {
-    const standardsMap = new Map<string, { id: string; label: string }>();
-
-    studentSubjects.forEach((subject) => {
-      const key = String(subject.standard_id ?? subject.standard_name);
-      if (!standardsMap.has(key)) {
-        standardsMap.set(key, {
-          id: key,
-          label: getGradeLabel(subject.standard_name),
-        });
-      }
-    });
-
-    return Array.from(standardsMap.values()).sort((a, b) =>
-      a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' })
-    );
-  }, [studentSubjects]);
-
-  const studentSectionOptions = useMemo(() => {
-    const sectionMap = new Map<string, string>();
-
-    studentSubjects
-      .filter(
-        (subject) =>
-          studentStandardFilter === 'all' ||
-          String(subject.standard_id) === String(studentStandardFilter)
-      )
-      .forEach((subject) => {
-        if (!sectionMap.has(subject.sectionId)) {
-          sectionMap.set(subject.sectionId, subject.sectionName);
-        }
-      });
-
-    return Array.from(sectionMap.entries())
-      .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
-  }, [studentStandardFilter, studentSubjects]);
-
   const filteredStudentSubjects = useMemo(() => {
     return studentSubjects.filter((subject) => {
-      const matchesSearch = subject.subject_name
-        ?.toLowerCase()
-        .includes(studentSearch.toLowerCase());
-
       const matchesStandard =
-        studentStandardFilter === 'all' ||
-        String(subject.standard_id) === String(studentStandardFilter);
+        standardFilter === 'all' || subject.standard_name === standardFilter;
 
-      const matchesSection =
-        studentSectionFilter === 'all' ||
-        String(subject.sectionId) === String(studentSectionFilter);
+      const matchesCategory =
+        categoryFilter === 'all' ||
+        (subject.category_name || subject.content_category) === categoryFilter;
 
-      return matchesSearch && matchesStandard && matchesSection;
+      return matchesStandard && matchesCategory;
     });
-  }, [studentSearch, studentSectionFilter, studentStandardFilter, studentSubjects]);
+  }, [categoryFilter, standardFilter, studentSubjects]);
 
   const visibleGroups = useMemo(() => {
     if (visibleCount >= totalSubjects) return filteredGroups;
@@ -459,10 +408,6 @@ export default function CourseMasterPage() {
   }, [audienceMode]);
 
   useEffect(() => {
-    setStudentSectionFilter('all');
-  }, [studentStandardFilter]);
-
-  useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
@@ -485,7 +430,7 @@ export default function CourseMasterPage() {
     const routes = getCourseRoutes(subject.subject_id, subject.standard_id);
     const category = subject.category_name || subject.content_category;
     const SubjectIcon = CATEGORY_ICON_MAP[category] ?? BookOpen;
-    const accent = CATEGORY_ACCENT_MAP[category] ?? '#5648E8';
+    const { accent, soft } = getSubjectCardPalette(subject.subject_id);
     const chapterCount = Array.isArray(subject.chapters) ? subject.chapters.length : 0;
     const keyConceptCount = Number(
       subject.key_concepts_count ??
@@ -522,52 +467,56 @@ export default function CourseMasterPage() {
     return (
       <div
         key={subject.subject_id}
-        className="rounded-[14px] border border-[#DCE4F0] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.05)] sm:p-[18px]"
+        role="button"
+        tabIndex={0}
+        onClick={() => router.push(routes.chapters)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            router.push(routes.chapters);
+          }
+        }}
+        className="relative cursor-pointer rounded-[22px] border border-[#DCE3ED] bg-white p-5 shadow-[0_2px_5px_rgba(15,23,42,0.12)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5648E8] focus-visible:ring-offset-2"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] sm:h-12 sm:w-12"
-              style={{ backgroundColor: `${accent}1A`, color: accent }}
+        <div className="flex items-start justify-between">
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-3">
+            {/* <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-[0_3px_8px_rgba(15,23,42,0.08)]"
+              style={{ backgroundColor: soft, color: accent }}
             >
-              <SubjectIcon className="h-[18px] w-[18px] sm:h-5 sm:w-5" strokeWidth={1.9} />
-            </div>
-            <div className="min-w-0">
-              <h3 className="truncate text-[16px] font-semibold leading-5 text-[#0F172A] sm:text-[17px]">
+              <SubjectIcon className="h-6 w-6" strokeWidth={1.8} />
+            </div> */}
+            <div className="min-w-0 ">
+              <h3 className="min-h-10 text-center line-clamp-2 mt-10 text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[#1E293B]">
                 {subject.subject_name}
               </h3>
-              <p className="mt-1 text-[13px] leading-5 text-[#475569] sm:text-[14px]">
-                {getGradeLabel(subject.standard_name)}
-                <span className="mx-1">{'\u00B7'}</span>
-                {category}
-              </p>
+              <p className="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-[#94A3B8]"><BookOpen className="h-3.5 w-3.5" strokeWidth={1.8} />{chapterCount} chapters</p>
             </div>
           </div>
 
-          <span className="shrink-0 whitespace-nowrap rounded-full bg-[#F2F5FA] px-3 py-1 text-[12px] font-medium text-[#51657F] sm:text-[13px]">
-            {chapterCount} chapters
-          </span>
+          <div className="absolute right-5 top-5 flex items-center gap-1.5">
+            <button type="button" title="Lesson plans" aria-label={`Open ${subject.subject_name} lesson plans`} onClick={(event) => { event.stopPropagation(); router.push(routes.lessonPlan); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDD6FE] bg-[#F3F0FF] text-[#6D4AFF] transition hover:bg-[#E8E1FF]"><CalendarDays className="h-4 w-4" strokeWidth={1.9} /></button>
+            <button type="button" title="Curriculum" aria-label={`Open ${subject.subject_name} curriculum`} onClick={(event) => { event.stopPropagation(); router.push(routes.curriculum); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BAE6FD] bg-[#ECF9FF] text-[#0284C7] transition hover:bg-[#DDF4FF]"><ListTree className="h-4 w-4" strokeWidth={1.9} /></button>
+            <button type="button" title="Chapters" aria-label={`Open ${subject.subject_name} chapters`} onClick={(event) => { event.stopPropagation(); router.push(routes.chapters); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BBF7D0] bg-[#ECFDF3] text-[#16A34A] transition hover:bg-[#DCFBE8]"><BookOpen className="h-4 w-4" strokeWidth={1.9} /></button>
+          </div>
         </div>
 
-        <p className="mt-4 text-[13px] leading-5 text-[#3F5572] sm:text-[14px]">
+        <p className="hidden">
           {keyConceptCount} key concepts
           <span className="mx-1">{'\u00B7'}</span>
           {lessonPlanCount} lesson plans created
         </p>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-[14px] font-medium text-[#334155] sm:text-[15px]">Lesson planning coverage</span>
-          <span className="text-[14px] font-semibold text-[#334155] sm:text-[15px]">{progress}%</span>
-        </div>
+        <div className="hidden" />
 
-        <div className="mt-2.5 h-[7px] overflow-hidden rounded-full bg-[#EEF2F7]">
+        <div className="mt-1 h-[5px] overflow-hidden rounded-full bg-[#EEF1F5]">
           <div
-            className="h-full rounded-full bg-[#5648E8]"
-            style={{ width: `${progress}%` }}
+            className="h-full rounded-full"
+            style={{ width: `${progress}%`, backgroundColor: accent }}
           />
         </div>
 
-        <div className="mt-4 border-t border-[#E4EAF2] pt-4">
+        <div className="hidden">
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
@@ -602,80 +551,68 @@ export default function CourseMasterPage() {
   function renderStudentSubjectCard(
     subject: (typeof studentSubjects)[number]
   ) {
-    const routes = getCourseRoutes(subject.subject_id, subject.standard_id);
-    const category = subject.category_name || subject.content_category;
-    const SubjectIcon = CATEGORY_ICON_MAP[category] ?? BookOpen;
-    const accent = CATEGORY_ACCENT_MAP[category] ?? '#5648E8';
+    const { accent } = getSubjectCardPalette(subject.subject_id);
 
     return (
       <div
         key={`${subject.subject_id}-${subject.standard_id}-${subject.sectionId}`}
-        className="rounded-[14px] border border-[#DCE4F0] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.05)] sm:p-[18px]"
+        role="button"
+        tabIndex={0}
+        onClick={() => router.push(buildStudentPageRoute(subject, 'chapters'))}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            router.push(buildStudentPageRoute(subject, 'chapters'));
+          }
+        }}
+        className="relative cursor-pointer rounded-[22px] border border-[#DCE3ED] bg-white p-5 shadow-[0_2px_5px_rgba(15,23,42,0.12)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5648E8] focus-visible:ring-offset-2"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
-            <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] sm:h-12 sm:w-12"
-              style={{ backgroundColor: `${accent}1A`, color: accent }}
-            >
-              <SubjectIcon className="h-[18px] w-[18px] sm:h-5 sm:w-5" strokeWidth={1.9} />
-            </div>
-
+        <div className="flex items-start justify-between">
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-3">
             <div className="min-w-0">
-              <h3 className="truncate text-[16px] font-semibold leading-5 text-[#0F172A] sm:text-[17px]">
+              <h3 className="mt-10 min-h-10 text-center text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[#1E293B] line-clamp-2">
                 {subject.subject_name}
               </h3>
-
-              <p className="mt-1 text-[13px] leading-5 text-[#475569] sm:text-[14px]">
-                {getGradeLabel(subject.standard_name)}
-                <span className="mx-1">{'\u00B7'}</span>
-                {subject.sectionName}
+              <p className="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-[#94A3B8]">
+                <BookOpen className="h-3.5 w-3.5" strokeWidth={1.8} />
+                {subject.chapterCount} chapters
               </p>
             </div>
           </div>
 
-          <Badge className="shrink-0 rounded-full bg-[#F2F5FA] px-3 py-1 text-[12px] font-medium text-[#51657F] hover:bg-[#F2F5FA] sm:text-[13px]">
-            {subject.chapterCount} chapters
-          </Badge>
-        </div>
-
-        <p className="mt-4 text-[13px] leading-5 text-[#3F5572] sm:text-[14px]">
-          {subject.keyConceptCount} key concepts
-          <span className="mx-1">{'\u00B7'}</span>
-          {subject.lessonPlanCount} lesson plans created
-        </p>
-
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-[14px] font-medium text-[#334155] sm:text-[15px]">Lesson planning coverage</span>
-          <span className="text-[14px] font-semibold text-[#334155] sm:text-[15px]">{subject.coverage}%</span>
-        </div>
-
-        <div className="mt-2.5 h-[7px] overflow-hidden rounded-full bg-[#EEF2F7]">
-          <div
-            className="h-full rounded-full bg-[#5648E8]"
-            style={{ width: `${subject.coverage}%` }}
-          />
-        </div>
-
-        <div className="mt-4 border-t border-[#E4EAF2] pt-4">
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="absolute left-1/2 top-5 flex -translate-x-1/2 items-center gap-1.5">
             <button
               type="button"
-              onClick={() => router.push(buildStudentPageRoute(subject, 'curriculum'))}
-              className="inline-flex min-w-0 items-center justify-center rounded-[16px] border border-[#C8D3E3] bg-white px-3 py-2.5 text-[14px] font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF] sm:px-4 sm:text-[15px]"
+              title="Curriculum"
+              aria-label={`Open ${subject.subject_name} curriculum`}
+              onClick={(event) => {
+                event.stopPropagation();
+                router.push(buildStudentPageRoute(subject, 'curriculum'));
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BAE6FD] bg-[#ECF9FF] text-[#0284C7] transition hover:bg-[#DDF4FF]"
             >
-              <ListTree size={16} className="mr-2" />
-              Curriculum
+              <ListTree className="h-4 w-4" strokeWidth={1.9} />
             </button>
             <button
               type="button"
-              onClick={() => router.push(buildStudentPageRoute(subject, 'chapters'))}
-              className="inline-flex min-w-0 items-center justify-center rounded-[16px] border border-[#C8D3E3] bg-white px-3 py-2.5 text-[14px] font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF] sm:px-4 sm:text-[15px]"
+              title="Chapters"
+              aria-label={`Open ${subject.subject_name} chapters`}
+              onClick={(event) => {
+                event.stopPropagation();
+                router.push(buildStudentPageRoute(subject, 'chapters'));
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BBF7D0] bg-[#ECFDF3] text-[#16A34A] transition hover:bg-[#DCFBE8]"
             >
-              <BookOpen size={16} className="mr-2" />
-              Chapters
+              <BookOpen className="h-4 w-4" strokeWidth={1.9} />
             </button>
           </div>
+        </div>
+
+        <div className="mt-1 h-[5px] overflow-hidden rounded-full bg-[#EEF1F5]">
+          <div
+            className="h-full rounded-full bg-[#5648E8]"
+            style={{ width: `${subject.coverage}%`, backgroundColor: accent }}
+          />
         </div>
       </div>
     );
@@ -687,15 +624,9 @@ export default function CourseMasterPage() {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7A889D]">
-                Academic year 2026-27 - Term 1
-              </p>
-              <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.03em] text-[#172554] sm:text-[34px]">
+              <h1 className=" text-[28px] font-semibold tracking-[-0.03em] text-[#172554] sm:text-[34px]">
                 Learning management
               </h1>
-              <p className="mt-2 max-w-3xl text-[14px] leading-6 text-[#5B6B82]">
-                Plan lessons, manage concept-level content, and run mastery-based assessments.
-              </p>
             </div>
 
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
@@ -732,8 +663,8 @@ export default function CourseMasterPage() {
          
 
           {audienceMode === 'Teacher' ? (
-            <div className="mt-4 flex flex-col gap-4 xl:flex-row xl:flex-nowrap xl:items-end">
-                  <div className="w-full xl:max-w-[360px]">
+            <div className="mt-1 flex flex-col gap-4">
+                  {/* <div className="w-full xl:max-w-[360px]">
                     <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">
                       Search Subjects
                     </Label>
@@ -750,106 +681,115 @@ export default function CourseMasterPage() {
                         className="h-12 w-full rounded-[14px] border border-[#C7D2E4] bg-white pl-11 pr-4 text-[14px] text-[#0F172A] outline-none shadow-[0_2px_8px_rgba(15,23,42,0.04)] placeholder:text-[#94A3B8] focus:border-[#5648E8]"
                       />
                     </div>
+                  </div> */}
+
+                  <div>
+                    <p className="mb-2 text-[13px] font-medium text-[#52637A]">Standard</p>
+                    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter by standard">
+                      {['all', ...standardOptions].map((standard) => {
+                        const selected = standardFilter === standard;
+                        return (
+                          <button
+                            key={standard}
+                            type="button"
+                            role="tab"
+                            aria-selected={selected}
+                            onClick={() => {
+                              setStandardFilter(standard);
+                              setVisibleCount(PAGE_SIZE);
+                            }}
+                            className={`shrink-0 rounded-full border px-4 py-2 text-[14px] font-semibold transition ${
+                              selected
+                                ? 'border-[#5648E8] bg-[#5648E8] text-white shadow-[0_3px_8px_rgba(86,72,232,0.22)]'
+                                : 'border-[#D8E0EB] bg-white text-[#52637A] hover:border-[#A99FF7] hover:text-[#5648E8]'
+                            }`}
+                          >
+                            {standard === 'all' ? 'All standards' : `Grade ${standard}`}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  <div className="w-full sm:w-56">
-                    <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">Grade</Label>
-                    <Select
-                      value={standardFilter}
-                      onValueChange={(value) => {
-                        setStandardFilter(value ?? 'all');
-                        setVisibleCount(PAGE_SIZE);
-                      }}
-                    >
-                      <SelectTrigger className="h-12 rounded-[14px] border-[#C7D2E4] bg-white text-[14px] text-[#0F172A] shadow-[0_2px_8px_rgba(15,23,42,0.04)] focus:ring-0 focus:ring-offset-0">
-                        <SelectValue placeholder="Select grade" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All standards</SelectItem>
-                        {standardOptions.map((standard) => (
-                          <SelectItem key={standard} value={standard}>
-                            Grade {standard}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="w-full sm:w-64">
-                    <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">Category</Label>
-                    <Select
-                      value={categoryFilter}
-                      onValueChange={(value) => {
-                        setCategoryFilter(value ?? 'all');
-                        setVisibleCount(PAGE_SIZE);
-                      }}
-                    >
-                      <SelectTrigger className="h-12 rounded-[14px] border-[#C7D2E4] bg-white text-[14px] text-[#0F172A] shadow-[0_2px_8px_rgba(15,23,42,0.04)] focus:ring-0 focus:ring-offset-0">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        {categoryOptions.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div>
+                    <p className="mb-2 text-[13px] font-medium text-[#52637A]">Category</p>
+                    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter by category">
+                      {['all', ...categoryOptions].map((category) => {
+                        const selected = categoryFilter === category;
+                        return (
+                          <button
+                            key={category}
+                            type="button"
+                            role="tab"
+                            aria-selected={selected}
+                            onClick={() => {
+                              setCategoryFilter(category);
+                              setVisibleCount(PAGE_SIZE);
+                            }}
+                            className={`shrink-0 rounded-full border px-4 py-2 text-[14px] font-semibold transition ${
+                              selected
+                                ? 'border-[#172554] bg-[#172554] text-white shadow-[0_3px_8px_rgba(23,37,84,0.18)]'
+                                : 'border-[#D8E0EB] bg-white text-[#52637A] hover:border-[#8FA1BC] hover:text-[#172554]'
+                            }`}
+                          >
+                            {category === 'all' ? 'All categories' : category}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
             </div>
           ) : (
-            <div className="mt-4 flex flex-col gap-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-                    <div className="relative w-full lg:max-w-[300px]">
-                      <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
-                      <input
-                        type="text"
-                        value={studentSearch}
-                        onChange={(event) => setStudentSearch(event.target.value)}
-                        placeholder="Search subjects..."
-                        className="h-10 w-full rounded-[10px] border border-[#C7D2E4] bg-white pl-11 pr-4 text-[14px] text-[#0F172A] outline-none placeholder:text-[#94A3B8] focus:border-[#5648E8]"
-                      />
-                    </div>
-
-                    <Select
-                      value={studentStandardFilter}
-                      onValueChange={(value) => setStudentStandardFilter(value ?? 'all')}
-                    >
-                      <SelectTrigger className="h-10 w-full rounded-[10px] border-[#C7D2E4] bg-white text-[14px] text-[#0F172A] shadow-none focus:ring-0 focus:ring-offset-0 lg:w-[165px]">
-                        <SelectValue placeholder="All standards" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All standards</SelectItem>
-                        {studentStandardOptions.map((standard) => (
-                          <SelectItem key={standard.id} value={standard.id}>
-                            {standard.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select
-                      value={studentSectionFilter}
-                      onValueChange={(value) => setStudentSectionFilter(value ?? 'all')}
-                    >
-                      <SelectTrigger className="h-10 w-full rounded-[10px] border-[#C7D2E4] bg-white text-[14px] text-[#0F172A] shadow-none focus:ring-0 focus:ring-offset-0 lg:w-[165px]">
-                        <SelectValue placeholder="All sections" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All sections</SelectItem>
-                        {studentSectionOptions.map((section) => (
-                          <SelectItem key={section.id} value={section.id}>
-                            {section.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+            <div className="mt-1 flex flex-col gap-4">
+              <div>
+                <p className="mb-2 text-[13px] font-medium text-[#52637A]">Standard</p>
+                <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter by standard">
+                  {['all', ...standardOptions].map((standard) => {
+                    const selected = standardFilter === standard;
+                    return (
+                      <button
+                        key={standard}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        onClick={() => setStandardFilter(standard)}
+                        className={`shrink-0 rounded-full border px-4 py-2 text-[14px] font-semibold transition ${
+                          selected
+                            ? 'border-[#5648E8] bg-[#5648E8] text-white shadow-[0_3px_8px_rgba(86,72,232,0.22)]'
+                            : 'border-[#D8E0EB] bg-white text-[#52637A] hover:border-[#A99FF7] hover:text-[#5648E8]'
+                        }`}
+                      >
+                        {standard === 'all' ? 'All standards' : `Grade ${standard}`}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <p className="text-[15px] font-medium text-[#334155]">
-                {filteredStudentSubjects.length} of {studentSubjects.length} subjects
-              </p>
+              <div>
+                <p className="mb-2 text-[13px] font-medium text-[#52637A]">Category</p>
+                <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter by category">
+                  {['all', ...categoryOptions].map((category) => {
+                    const selected = categoryFilter === category;
+                    return (
+                      <button
+                        key={category}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        onClick={() => setCategoryFilter(category)}
+                        className={`shrink-0 rounded-full border px-4 py-2 text-[14px] font-semibold transition ${
+                          selected
+                            ? 'border-[#172554] bg-[#172554] text-white shadow-[0_3px_8px_rgba(23,37,84,0.18)]'
+                            : 'border-[#D8E0EB] bg-white text-[#52637A] hover:border-[#8FA1BC] hover:text-[#172554]'
+                        }`}
+                      >
+                        {category === 'all' ? 'All categories' : category}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -865,11 +805,7 @@ export default function CourseMasterPage() {
         ) : (
           <>
             {audienceMode === 'Teacher' ? (
-              <>
-                <p className="mt-4 text-[15px] font-medium text-[#334155]">
-                  {totalSubjects} subjects
-                </p>
-
+              <>  
                 {totalSubjects === 0 ? (
                   <div className="mt-8 rounded-[18px] border border-[#D9E1EE] bg-white px-6 py-16 text-center text-[#64748B] shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
                     No subjects found for the selected filters.
@@ -879,17 +815,18 @@ export default function CourseMasterPage() {
                     <div className="mt-5 flex flex-col gap-10">
                       {visibleGroups.map((group) => (
                         <section key={group.standardName}>
-                          <h2 className="mb-4 text-[20px] font-semibold text-[#0F172A]">
-                            {getGradeLabel(group.standardName)}
-                          </h2>
-
+        
                           <div className="flex flex-col gap-6">
-                            {group.categories.map((category) => (
-                              <div key={category.categoryName}>
-                                <h3 className="mb-3 text-[15px] font-medium text-[#475569]">
-                                  {category.categoryName}
-                                </h3>
-                                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+                            {group.categories.map((category, categoryIndex) => (
+                              <div key={category.categoryName} className={categoryIndex > 0 ? '' : ''}>
+                                <div className="mb-4 flex items-center gap-3">
+                                  <span className="h-px flex-1 bg-[#D9E2EE]" aria-hidden="true" />
+                                  <h3 className="shrink-0 text-[14px] font-semibold text-[#334155]">
+                                    {category.categoryName}
+                                  </h3>
+                                  <span className="h-px flex-1 bg-[#D9E2EE]" aria-hidden="true" />
+                                </div>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
                                   {category.subjects.map((subject) => renderSubjectCard(subject))}
                                 </div>
                               </div>
@@ -916,7 +853,7 @@ export default function CourseMasterPage() {
                   No subjects found for the selected filters.
                 </div>
               ) : (
-                <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
                   {filteredStudentSubjects.map((subject) => renderStudentSubjectCard(subject))}
                 </div>
               )
