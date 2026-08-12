@@ -36,9 +36,6 @@ type SortField = string;
 type ConfirmationRecord = {
   id: string;
   registrationNumber: string;
-  enrollmentNo: string;
-  division: string;
-  amount: string;
   enquiryNumber: string;
   inquiryDate: string;
   followUpDate: string;
@@ -50,8 +47,6 @@ type ConfirmationRecord = {
   dateOfBirth: string;
   age: string;
   admissionStandard: string;
-  motherName: string;
-  enquiryRemark: string;
   status: string;
   detail: RegistrationPipelineDetail;
   canConfirm: boolean;
@@ -68,10 +63,7 @@ type ColumnDef = {
 const columns: ColumnDef[] = [
   { key: 'action', label: 'Action', sortable: false, width: '70px' },
   { key: 'confirm', label: 'Confirm', sortable: false, width: '100px' },
-  { key: 'id', label: 'Id', sortable: true, width: '100px' },
   { key: 'registrationNumber', label: 'Registration No', sortable: true },
-  { key: 'enrollmentNo', label: 'Enrollment No', sortable: true },
-  { key: 'division', label: 'Division', sortable: true },
   { key: 'enquiryNumber', label: 'Enquiry Number', sortable: true },
   { key: 'inquiryDate', label: 'Enquiry Date', sortable: true },
   { key: 'followUpDate', label: 'Follow Up Date', sortable: true },
@@ -83,9 +75,6 @@ const columns: ColumnDef[] = [
   { key: 'dateOfBirth', label: 'Date of Birth', sortable: true },
   { key: 'age', label: 'Age', sortable: true, width: '60px' },
   { key: 'admissionStandard', label: 'Admission Standard', sortable: true },
-  { key: 'amount', label: 'Amount', sortable: true },
-  { key: 'enquiryRemark', label: 'Enquiry Remark', sortable: true },
-  { key: 'motherName', label: 'Mother Name', sortable: true },
   { key: 'status', label: 'Status', sortable: true },
 ];
 
@@ -157,12 +146,12 @@ export default function AdmissionConfirmationPage() {
               return {
                 id: readString(detail.record.id),
                 registrationNumber: readString(detail.record.registration_no || detail.record.admission_docket_no || detail.record.id),
-                enrollmentNo: readString(detail.record.enrollment_no),
-                division: readString(detail.record.admission_division),
-                amount: readString(detail.record.amount),
-                enquiryNumber: readString(detail.record.enquiry_no),
+                enquiryNumber: readString(row.enquiry_no || detail.record.enquiry_no),
                 inquiryDate: readString(detail.record.created_on),
-                followUpDate: readString(detail.record.followup_date),
+                // Enquiry-list row is the reliable source: the registration "edit" endpoint
+                // left-joins admission_form/admission_registration, so a missing form/registration
+                // row nulls these out even though the enquiry itself has real values.
+                followUpDate: readString(row.followup_date || detail.record.followup_date),
                 firstName: readString(detail.record.first_name),
                 middleName: readString(detail.record.middle_name),
                 lastName: readString(detail.record.last_name),
@@ -170,9 +159,7 @@ export default function AdmissionConfirmationPage() {
                 email: readString(detail.record.email),
                 dateOfBirth: readString(detail.record.date_of_birth),
                 age: readString(detail.record.age),
-                admissionStandard: readString(detail.record.std_name || detail.record.admission_standard),
-                motherName: readString(detail.record.mother_name),
-                enquiryRemark: readString(detail.record.enquiry_remark || detail.record.remarks),
+                admissionStandard: readString(row.admission_standard || detail.record.std_name || detail.record.admission_standard),
                 status: Number(detail.record.total_student_count ?? 0) > 0 ? 'Confirmed' : 'Open',
                 detail,
                 canConfirm:
@@ -234,9 +221,7 @@ export default function AdmissionConfirmationPage() {
             ? {
                 ...item,
                 registrationNumber: readString(refreshed.record.registration_no || refreshed.record.admission_docket_no || refreshed.record.id),
-                enrollmentNo: readString(refreshed.record.enrollment_no),
-                division: readString(refreshed.record.admission_division),
-                amount: readString(refreshed.record.amount),
+                followUpDate: readString(refreshed.record.followup_date || item.followUpDate),
                 firstName: readString(refreshed.record.first_name),
                 middleName: readString(refreshed.record.middle_name),
                 lastName: readString(refreshed.record.last_name),
@@ -244,9 +229,7 @@ export default function AdmissionConfirmationPage() {
                 email: readString(refreshed.record.email),
                 dateOfBirth: readString(refreshed.record.date_of_birth),
                 age: readString(refreshed.record.age),
-                admissionStandard: readString(refreshed.record.std_name || refreshed.record.admission_standard),
-                motherName: readString(refreshed.record.mother_name),
-                enquiryRemark: readString(refreshed.record.enquiry_remark || refreshed.record.remarks),
+                admissionStandard: readString(refreshed.record.std_name || refreshed.record.admission_standard || item.admissionStandard),
                 status: 'Confirmed',
                 detail: refreshed,
                 canConfirm: false,
@@ -292,8 +275,6 @@ export default function AdmissionConfirmationPage() {
           record.mobile,
           record.email,
           record.enquiryNumber,
-          record.enquiryRemark,
-          record.motherName,
           record.admissionStandard,
         ]
           .join(' ')
@@ -324,11 +305,8 @@ export default function AdmissionConfirmationPage() {
   const visibleExportRows = useMemo(
     () =>
       paginatedData.map((record) => ({
-        id: record.id,
         enquiryNumber: record.enquiryNumber,
         registrationNumber: record.registrationNumber,
-        enrollmentNo: record.enrollmentNo,
-        division: record.division,
         inquiryDate: parseDate(record.inquiryDate),
         followUpDate: parseDate(record.followUpDate),
         firstName: record.firstName,
@@ -339,9 +317,6 @@ export default function AdmissionConfirmationPage() {
         dateOfBirth: parseDate(record.dateOfBirth),
         age: record.age,
         admissionStandard: record.admissionStandard,
-        amount: record.amount,
-        enquiryRemark: record.enquiryRemark,
-        motherName: record.motherName,
         status: record.status,
       })),
     [paginatedData]
@@ -489,10 +464,7 @@ export default function AdmissionConfirmationPage() {
                             {record.status === 'Confirmed' ? 'Confirmed' : 'Confirm'}
                           </Button>
                         </TableCell>
-                        <TableCell className="px-4 py-3 text-xs font-medium text-slate-700">{record.id}</TableCell>
                         <TableCell className="px-4 py-3 text-xs font-medium text-slate-700">{record.registrationNumber || '-'}</TableCell>
-                        <TableCell className="px-4 py-3 text-xs text-slate-600">{record.enrollmentNo || '-'}</TableCell>
-                        <TableCell className="px-4 py-3 text-xs text-slate-600">{record.division || '-'}</TableCell>
                         <TableCell className="px-4 py-3 text-xs font-medium text-[#0D6EFD]">{record.enquiryNumber}</TableCell>
                         <TableCell className="px-4 py-3 text-xs text-slate-600">{parseDate(record.inquiryDate)}</TableCell>
                         <TableCell className="px-4 py-3 text-xs text-slate-600">{parseDate(record.followUpDate)}</TableCell>
@@ -503,10 +475,7 @@ export default function AdmissionConfirmationPage() {
                         <TableCell className="px-4 py-3 text-xs text-slate-600">{record.email}</TableCell>
                         <TableCell className="px-4 py-3 text-xs text-slate-600">{parseDate(record.dateOfBirth)}</TableCell>
                         <TableCell className="px-4 py-3 text-xs text-slate-600 text-center">{record.age}</TableCell>
-                        <TableCell className="px-4 py-3 text-xs text-slate-600">{record.admissionStandard}</TableCell>
-                        <TableCell className="px-4 py-3 text-xs text-slate-600">{record.amount || '-'}</TableCell>
-                        <TableCell className="px-4 py-3 text-xs text-slate-600">{record.enquiryRemark}</TableCell>
-                        <TableCell className="px-4 py-3 text-xs text-slate-600">{record.motherName}</TableCell>
+                        <TableCell className="px-4 py-3 text-xs text-slate-600">{record.admissionStandard || '-'}</TableCell>
                         <TableCell className="px-4 py-3 text-xs">
                           <span className={cn('inline-flex rounded-full px-2 py-0.5 font-medium', record.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700')}>
                             {record.status}

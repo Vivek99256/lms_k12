@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   X,
   FileText,
@@ -35,17 +35,56 @@ interface SideDrawerProps {
 
 type TabType = 'Student details' | 'Registration' | 'Documents' | 'Activity';
 
+const AADHAR_NUMBER_PATTERN = /^\d{12}$/;
+
+function sanitizeAadharInput(event: React.FormEvent<HTMLInputElement>): void {
+  const input = event.currentTarget;
+  const digitsOnly = input.value.replace(/\D/g, '').slice(0, 12);
+  if (digitsOnly !== input.value) {
+    input.value = digitsOnly;
+  }
+}
+
+function getAadharError(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return 'Aadhaar Number is required.';
+  return AADHAR_NUMBER_PATTERN.test(trimmed) ? '' : 'Enter a valid 12-digit Aadhaar number.';
+}
+
+function getPlaceOfBirthError(value: string): string {
+  return value.trim() ? '' : 'Place of Birth is required.';
+}
+
+/** Returns the first non-empty string among the given keys of `item`. Master-data lookups
+ *  (blood group / religion / caste) are tolerant of a few plausible column-name variants so a
+ *  label still resolves even if the API's exact serialization differs from what's expected. */
+function pickLabel(item: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = readString(item[key]);
+    if (value) return value;
+  }
+  return '';
+}
+
 function Field({
   label,
   children,
+  required = false,
+  error,
 }: {
   label: string;
   children: React.ReactNode;
+  required?: boolean;
+  error?: string;
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</Label>
+      <Label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        {label}
+        {required && <span className="ml-0.5 text-red-500">*</span>}
+      </Label>
       {children}
+      {error && <p className="text-xs font-medium text-red-600">{error}</p>}
     </div>
   );
 }
@@ -63,6 +102,23 @@ export default function SideDrawer({
   const [formState, setFormState] = useState<RegistrationFormState>(() =>
     detail ? buildInitialFormState(detail.record, detail.customFields) : {}
   );
+  const [formErrors, setFormErrors] = useState<{ place_of_birth?: string; aadhar_number?: string }>({});
+
+  // Detail often arrives asynchronously after the drawer mounts (row not pre-hydrated yet),
+  // so re-sync the form whenever the fetched record changes rather than only on first mount.
+  useEffect(() => {
+    if (!detail) return;
+
+    // register_number has no server-side "next number" concept the same way enrollment_no
+    // does, so the backend computes it as COUNT(admission_registration rows) + 1 for records
+    // that don't already have one (see admissionRegistrationAPIController::edit()).
+    const base = buildInitialFormState(detail.record, detail.customFields);
+    if (!base.register_number && detail.nextRegisterNumber) {
+      base.register_number = detail.nextRegisterNumber;
+    }
+    setFormState(base);
+    setFormErrors({});
+  }, [detail]);
 
   const studentName = useMemo(() => {
     return [formState.first_name, formState.middle_name, formState.last_name].filter(Boolean).join(' ');
@@ -88,41 +144,79 @@ export default function SideDrawer({
     return buildOptions(detail?.dataFields ?? {}, 'student_quota', fallback);
   }, [detail]);
 
-  const divisionOptions = useMemo(() => {
-    const fallback = (detail?.division ?? [])
-      .map((item) => ({
-        label: readString(item.name),
-        value: readString(item.id),
-      }))
-      .filter((item) => item.label && item.value);
-
-    return buildOptions(detail?.dataFields ?? {}, 'admission_division', fallback);
-  }, [detail]);
-
   const paymentModeOptions = useMemo(
     () => buildOptions(detail?.dataFields ?? {}, 'payment_mode'),
     [detail]
   );
 
-  const bloodGroupOptions = useMemo(
-    () => buildOptions(detail?.dataFields ?? {}, 'blood_group'),
-    [detail]
-  );
+  const bloodGroupOptions = useMemo(() => {
+    const fallback = (detail?.bloodgroupData ?? [])
+      .map((item) => ({
+        label: pickLabel(item as Record<string, unknown>, ['bloodgroup', 'blood_group', 'name', 'title']),
+        value: readString(item.id),
+      }))
+      .filter((item) => item.label && item.value);
 
-  const religionOptions = useMemo(
-    () => buildOptions(detail?.dataFields ?? {}, 'religion'),
-    [detail]
-  );
+    return buildOptions(detail?.dataFields ?? {}, 'blood_group', fallback);
+  }, [detail]);
 
-  const casteOptions = useMemo(
-    () => buildOptions(detail?.dataFields ?? {}, 'cast'),
-    [detail]
-  );
+  const religionOptions = useMemo(() => {
+    const fallback = (detail?.religionData ?? [])
+      .map((item) => ({
+        label: pickLabel(item as Record<string, unknown>, ['religion_name', 'religion', 'name', 'title']),
+        value: readString(item.id),
+      }))
+      .filter((item) => item.label && item.value);
 
+    return buildOptions(detail?.dataFields ?? {}, 'religion', fallback);
+  }, [detail]);
+
+  const casteOptions = useMemo(() => {
+    const fallback = (detail?.casteData ?? [])
+      .map((item) => ({
+        label: pickLabel(item as Record<string, unknown>, ['caste_name', 'cast', 'caste', 'name', 'title']),
+        value: readString(item.id),
+      }))
+      .filter((item) => item.label && item.value);
+
+    return buildOptions(detail?.dataFields ?? {}, 'cast', fallback);
+  }, [detail]);
+
+  // Legacy Laravel form (edit_admission_registration.blade.php) uses literal YES/NO, not a master table.
   const admissionStatusOptions = useMemo(
-    () => buildOptions(detail?.dataFields ?? {}, 'admission_status'),
+    () =>
+      buildOptions(detail?.dataFields ?? {}, 'admission_status', [
+        { label: 'Yes', value: 'YES' },
+        { label: 'No', value: 'NO' },
+      ]),
     [detail]
   );
+
+  /** Falls back to showing the raw stored value as a selectable option when it doesn't
+   *  match any fetched master-data option (e.g. stale/legacy data) — keeps the select from
+   *  silently showing a bare id/code with no context. */
+  function withStoredValueOption(
+    options: Array<{ label: string; value: string }>,
+    storedValue: string
+  ): Array<{ label: string; value: string }> {
+    if (!storedValue || options.some((option) => option.value === storedValue)) return options;
+    return [{ label: storedValue, value: storedValue }, ...options];
+  }
+
+  /** Base UI's <Select.Value> resolves its label from items registered by mounted
+   *  <Select.Item>s — since SelectContent is portal-rendered and its items don't mount until
+   *  the popup is first opened, a pre-set value has nothing to resolve against on first paint
+   *  and falls back to showing the raw stored value (e.g. "3" instead of "B+"). Resolving the
+   *  label ourselves from the same options array (as a `children` render function, per Base
+   *  UI's documented pattern) sidesteps that timing gap entirely. A function `children` always
+   *  wins over the built-in placeholder, so an empty value must fall back to it manually. */
+  function renderSelectValue(options: Array<{ label: string; value: string }>, placeholder: string) {
+    return (value: unknown) => {
+      const stringValue = readString(value);
+      if (!stringValue) return placeholder;
+      return options.find((option) => option.value === stringValue)?.label || stringValue;
+    };
+  }
 
   const documentChecklist = useMemo(() => {
     const customFields = (detail?.customFields ?? []).map((field) => {
@@ -159,9 +253,24 @@ export default function SideDrawer({
       ...current,
       [field]: value,
     }));
+    if (field === 'place_of_birth' || field === 'aadhar_number') {
+      setFormErrors((current) => ({ ...current, [field]: undefined }));
+    }
   };
 
   const handleSave = () => {
+    const errors = {
+      place_of_birth: getPlaceOfBirthError(readString(formState.place_of_birth)),
+      aadhar_number: getAadharError(readString(formState.aadhar_number)),
+    };
+
+    if (errors.place_of_birth || errors.aadhar_number) {
+      setFormErrors(errors);
+      setActiveTab('Registration');
+      return;
+    }
+
+    setFormErrors({});
     void onSave?.(formState);
   };
 
@@ -195,7 +304,7 @@ export default function SideDrawer({
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Stage</div>
               <div className="mt-1 text-sm font-semibold text-slate-800">{readString(formState.status).toUpperCase() === 'OPEN' ? 'Confirmation' : 'Registration'}</div>
@@ -208,10 +317,10 @@ export default function SideDrawer({
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Fee Status</div>
               <div className="mt-1 text-sm font-semibold text-slate-800">{data.feeStatus}</div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Enrollment</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{formState.enrollment_no || readString(detail?.newEnrollmentNo) || '-'}</div>
-            </div>
+              {/* <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Enrollment</div>
+                <div className="mt-1 text-sm font-semibold text-slate-800">{readString(detail?.newEnrollmentNo) || '-'}</div>
+              </div> */}
           </div>
         </div>
 
@@ -290,7 +399,7 @@ export default function SideDrawer({
                   <Field label="Register Number"><Input value={formState.register_number || ''} onChange={(event) => handleChange('register_number', event.target.value)} /></Field>
                   <Field label="Status">
                     <Select value={formState.status || 'CLOSE'} onValueChange={(value) => handleChange('status', (value ?? '').toUpperCase())}>
-                      <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select status">{renderSelectValue(statusOptions, 'Select status')}</SelectValue></SelectTrigger>
                       <SelectContent>
                         {statusOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -300,11 +409,26 @@ export default function SideDrawer({
                   </Field>
                   <Field label="Mother Name"><Input value={formState.mother_name || ''} onChange={(event) => handleChange('mother_name', event.target.value)} /></Field>
                   <Field label="Mother Mobile"><Input value={formState.mother_mobile_number || ''} onChange={(event) => handleChange('mother_mobile_number', event.target.value)} /></Field>
-                  <Field label="Aadhar Number"><Input value={formState.aadhar_number || ''} onChange={(event) => handleChange('aadhar_number', event.target.value)} /></Field>
-                  <Field label="Place of Birth"><Input value={formState.place_of_birth || ''} onChange={(event) => handleChange('place_of_birth', event.target.value)} /></Field>
+                  <Field label="Aadhar Number" required error={formErrors.aadhar_number}>
+                    <Input
+                      value={formState.aadhar_number || ''}
+                      onChange={(event) => handleChange('aadhar_number', event.target.value)}
+                      onInput={sanitizeAadharInput}
+                      inputMode="numeric"
+                      maxLength={12}
+                      aria-invalid={Boolean(formErrors.aadhar_number)}
+                    />
+                  </Field>
+                  <Field label="Place of Birth" required error={formErrors.place_of_birth}>
+                    <Input
+                      value={formState.place_of_birth || ''}
+                      onChange={(event) => handleChange('place_of_birth', event.target.value)}
+                      aria-invalid={Boolean(formErrors.place_of_birth)}
+                    />
+                  </Field>
                   <Field label="Student Quota">
                     <Select value={formState.student_quota || ''} onValueChange={(value) => handleChange('student_quota', value ?? '')}>
-                      <SelectTrigger><SelectValue placeholder="Select quota" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select quota">{renderSelectValue(quotaOptions, 'Select quota')}</SelectValue></SelectTrigger>
                       <SelectContent>
                         {quotaOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -312,23 +436,12 @@ export default function SideDrawer({
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field label="Division">
-                    <Select value={formState.admission_division || ''} onValueChange={(value) => handleChange('admission_division', value ?? '')}>
-                      <SelectTrigger><SelectValue placeholder="Select division" /></SelectTrigger>
-                      <SelectContent>
-                        {divisionOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="Enrollment No"><Input value={formState.enrollment_no || ''} onChange={(event) => handleChange('enrollment_no', event.target.value)} /></Field>
                   <Field label="Amount"><Input value={formState.amount || ''} onChange={(event) => handleChange('amount', event.target.value)} /></Field>
                   <Field label="Blood Group">
                     <Select value={formState.blood_group || ''} onValueChange={(value) => handleChange('blood_group', value ?? '')}>
-                      <SelectTrigger><SelectValue placeholder="Select blood group" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select blood group">{renderSelectValue(bloodGroupOptions, 'Select blood group')}</SelectValue></SelectTrigger>
                       <SelectContent>
-                        {bloodGroupOptions.map((option) => (
+                        {withStoredValueOption(bloodGroupOptions, formState.blood_group || '').map((option) => (
                           <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -336,9 +449,9 @@ export default function SideDrawer({
                   </Field>
                   <Field label="Admission Status">
                     <Select value={formState.admission_status || ''} onValueChange={(value) => handleChange('admission_status', value ?? '')}>
-                      <SelectTrigger><SelectValue placeholder="Select admission status" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select admission status">{renderSelectValue(admissionStatusOptions, 'Select admission status')}</SelectValue></SelectTrigger>
                       <SelectContent>
-                        {admissionStatusOptions.map((option) => (
+                        {withStoredValueOption(admissionStatusOptions, formState.admission_status || '').map((option) => (
                           <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -346,9 +459,9 @@ export default function SideDrawer({
                   </Field>
                   <Field label="Religion">
                     <Select value={formState.religion || ''} onValueChange={(value) => handleChange('religion', value ?? '')}>
-                      <SelectTrigger><SelectValue placeholder="Select religion" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select religion">{renderSelectValue(religionOptions, 'Select religion')}</SelectValue></SelectTrigger>
                       <SelectContent>
-                        {religionOptions.map((option) => (
+                        {withStoredValueOption(religionOptions, formState.religion || '').map((option) => (
                           <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -356,9 +469,9 @@ export default function SideDrawer({
                   </Field>
                   <Field label="Cast">
                     <Select value={formState.cast || ''} onValueChange={(value) => handleChange('cast', value ?? '')}>
-                      <SelectTrigger><SelectValue placeholder="Select cast" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select cast">{renderSelectValue(casteOptions, 'Select cast')}</SelectValue></SelectTrigger>
                       <SelectContent>
-                        {casteOptions.map((option) => (
+                        {withStoredValueOption(casteOptions, formState.cast || '').map((option) => (
                           <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -375,7 +488,7 @@ export default function SideDrawer({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <Field label="Payment Mode">
                     <Select value={formState.payment_mode || ''} onValueChange={(value) => handleChange('payment_mode', value ?? '')}>
-                      <SelectTrigger><SelectValue placeholder="Select payment mode" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select payment mode">{renderSelectValue(paymentModeOptions, 'Select payment mode')}</SelectValue></SelectTrigger>
                       <SelectContent>
                         {paymentModeOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
