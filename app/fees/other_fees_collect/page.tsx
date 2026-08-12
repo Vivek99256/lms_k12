@@ -18,10 +18,8 @@ import {
   appendSessionFormData,
   appendSessionParams,
   asRecord,
-  buildApiUrl,
   fetchLaravelJson,
   formatCurrency,
-  getApiBaseUrl,
   getFeesSession,
   readFirstString,
   readNumber,
@@ -138,7 +136,7 @@ export default function OtherFeesCollectPage() {
     try {
       const params = new URLSearchParams();
       appendSessionParams(params, nextSession);
-      const payload = await fetchLaravelJson<OtherFeesCollectResponse>(nextSession, `${getApiBaseUrl(nextSession)}/fees/other_fees_collect?${params.toString()}`);
+      const payload = await fetchLaravelJson<OtherFeesCollectResponse>(nextSession, buildLaravelProxyUrl('fees/other_fees_collect', params));
       const nextTitles = toOtherFeesTitles(payload.other_fees_title);
       setTitles(nextTitles);
       if (nextTitles.length === 0) {
@@ -197,7 +195,7 @@ export default function OtherFeesCollectPage() {
       appendIfValue(params, 'mobile_no', mobileNo.trim());
       appendIfValue(params, 'uniqueid', uniqueId.trim());
 
-      const payload = await fetchLaravelJson<OtherFeesCollectResponse>(currentSession, `${getApiBaseUrl(currentSession)}/fees/other_fees_collect/create?${params.toString()}`);
+      const payload = await fetchLaravelJson<OtherFeesCollectResponse>(currentSession, buildLaravelProxyUrl('fees/other_fees_collect/create', params));
       const nextRows = toStudentRows(payload.student_data, readNumber(payload.get_amount_of_head || selectedTitle?.amount));
       const headName = readString(payload.get_name_of_head) || selectedTitle?.label || '';
       const headAmount = readNumber(payload.get_amount_of_head || selectedTitle?.amount);
@@ -268,7 +266,7 @@ export default function OtherFeesCollectPage() {
         form.set(`amount_of_deduction[${row.studentId}]`, String(readNumber(amounts[row.studentId])));
       });
 
-      const payload = await fetchLaravelJson<OtherFeesCollectResponse>(currentSession, buildApiUrl(currentSession, '/fees/other_fees_collect'), {
+      const payload = await fetchLaravelJson<OtherFeesCollectResponse>(currentSession, buildLaravelProxyUrl('fees/other_fees_collect'), {
         method: 'POST',
         body: form,
       });
@@ -486,6 +484,13 @@ export default function OtherFeesCollectPage() {
       )}
     </PageFrame>
   );
+}
+
+function buildLaravelProxyUrl(path: string, params?: URLSearchParams) {
+  const query = new URLSearchParams();
+  query.set('path', path);
+  params?.forEach((value, key) => query.append(key, value));
+  return `/api/proxy?${query.toString()}`;
 }
 
 function appendIfValue(params: URLSearchParams, key: string, value: string) {

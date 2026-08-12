@@ -5,7 +5,7 @@ export const reportModules = {
     title: 'Parent communication',
     description: 'Review parent messages and the replies recorded by school staff.',
     endpoint: 'front_desk/parent_communication/create',
-    method: 'POST',
+    method: 'GET',
     report: true,
     filters: [
       { name: 'from_date', label: 'From date', type: 'date', required: true },
@@ -27,7 +27,7 @@ export const reportModules = {
     title: 'Leave application',
     description: 'Review student leave requests, supporting files, replies and decisions.',
     endpoint: 'front_desk/leave_application/create',
-    method: 'POST',
+    method: 'GET',
     report: true,
     filters: [
       { name: 'from_date', label: 'From date', type: 'date' },
@@ -69,6 +69,11 @@ export const reportModules = {
     report: true,
     supportsPrint: true,
     classFields: ['section', 'standard', 'division'],
+    classFieldParams: {
+      section: 'grade',
+      standard: 'standard',
+      division: 'division',
+    },
     columns: [
       { key: 'week_day', label: 'Weekday' },
       { key: 'period', label: 'Period' },
@@ -85,7 +90,14 @@ export const reportModules = {
     report: true,
     supportsPrint: true,
     filters: [
-      { name: 'teacher_id', label: 'Teacher ID', type: 'text', required: true },
+      {
+        name: 'teacher_id',
+        label: 'Teacher',
+        type: 'select',
+        required: true,
+        optionsEndpoint: 'school_setup/proxy_master/create',
+        optionsDataKey: 'teacher_data',
+      },
     ],
     columns: [
       { key: 'week_day', label: 'Weekday' },

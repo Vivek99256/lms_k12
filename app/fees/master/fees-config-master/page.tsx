@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { exportRowsAsPdf } from '@/lib/table-export';
 
 type FeeConfigApiRow = {
   id?: number | string | null;
@@ -903,7 +904,27 @@ export default function FeesConfigMasterPage() {
 
   const visiblePageNumbers = getPageNumbers(safeCurrentPage, totalPages);
 
-  const pdfDownloadUrl = `${session.baseUrl.replace(/\/$/, '')}/storage/fees/final.pdf`;
+  const downloadPdf = () => {
+    exportRowsAsPdf({
+      filename: 'fees-config-master.pdf',
+      title: 'Fees Config Master',
+      subtitle: `Active records: ${configs.length}`,
+      columns: [
+        { key: 'institute', label: 'Institute' },
+        { key: 'pan', label: 'PAN no.' },
+        { key: 'account', label: 'Account to be credited' },
+        { key: 'cms', label: 'CMS client code' },
+        { key: 'challan', label: 'Bank challan template' },
+      ],
+      rows: configs.map((config) => ({
+        institute: config.instituteName || '-',
+        pan: config.panNo || '-',
+        account: config.accountToBeCredited || '-',
+        cms: config.cmsClientCode || '-',
+        challan: config.feesBankChallanTemplate || '-',
+      })),
+    });
+  };
   const currentLogoUrl =
     logoPreviewName && session.baseUrl
       ? `${session.baseUrl.replace(/\/$/, '')}/storage/fees/${logoPreviewName}`
@@ -911,8 +932,8 @@ export default function FeesConfigMasterPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-[#e9eef7] p-4 sm:p-5 lg:p-6">
-        <div className="mx-auto max-w-7xl space-y-4">
+      <div className="min-h-screen p-4 sm:p-5 lg:p-6">
+        <div className="mx-auto space-y-4">
           <Card className="rounded-2xl border border-slate-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <CardHeader className="gap-3 border-b border-slate-200/80 px-4 py-4 sm:px-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -931,14 +952,9 @@ export default function FeesConfigMasterPage() {
                     <Button
                       variant="outline"
                       className="h-9 rounded-xl border-slate-300 px-4 text-[12px] font-medium text-slate-700"
-                      nativeButton={false}
-                      render={
-                        <a href={pdfDownloadUrl} download>
-                          <Download className="size-3.5" />
-                          Download PDF
-                        </a>
-                      }
-                    />
+                      onClick={downloadPdf}
+                      disabled={configs.length === 0}
+                    ><Download className="size-3.5" />Download PDF</Button>
                     <Button
                       className="h-9 rounded-xl bg-[#5b4fe9] px-4 text-[12px] font-semibold text-white hover:bg-[#4d42da]"
                       onClick={openCreateDrawer}

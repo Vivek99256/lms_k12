@@ -19,7 +19,6 @@ import {
   formatCurrency,
   getApiBaseUrl,
   getFeesSession,
-  joinUrl,
   readFirstString,
   readNumber,
   toArray,
@@ -50,17 +49,7 @@ type FeeValidation = {
   rawText: string;
 };
 
-const gatewayActions: Record<string, string> = {
-  hdfc: '/fees/hdfc/online_fees_collect',
-  axis: '/fees/axis/online_fees_collect',
-  aggre_pay: '/fees/aggre_pay/online_fees_collect',
-  icici: '/fees/icici/online_fees_collect',
-  razorpay: '/fees/razorpay/online_fees_collect',
-  payphi: '/fees/payphi/online_fees_collect',
-  hdfcrazorpay: '/fees/hdfcrazorpay/online_fees_collect',
-  hdfc_razorpay: '/fees/hdfcrazorpay/online_fees_collect',
-  icici_orange: '/fees/icici_orange/online_fees_collect',
-};
+const gatewayActions: Record<string, string> = { hdfc: 'hdfc', axis: 'axis', aggre_pay: 'aggre_pay', icici: 'icici', razorpay: 'razorpay', payphi: 'payphi', hdfcrazorpay: 'hdfcrazorpay', hdfc_razorpay: 'hdfcrazorpay', icici_orange: 'icici_orange' };
 
 export default function OnlineFeesCollectPage() {
   const [mobileNumber, setMobileNumber] = useState('');
@@ -104,7 +93,9 @@ export default function OnlineFeesCollectPage() {
       appendSessionParams(params, currentSession);
       params.set('mobile_number', mobileNumber.trim());
 
-      const payload = await fetchLaravelJson<unknown>(currentSession, `${getApiBaseUrl(currentSession)}/fees/get-student?${params.toString()}`);
+      const proxyParams = new URLSearchParams(params);
+      proxyParams.set('path', 'fees/get-student');
+      const payload = await fetchLaravelJson<unknown>(currentSession, `/api/proxy?${proxyParams.toString()}`);
       const nextStudents = toOnlineStudents(payload);
       setStudents(nextStudents);
       setMessage({
@@ -195,8 +186,8 @@ export default function OnlineFeesCollectPage() {
     if (!currentValidation) return;
 
     const currentSession = getFeesSession();
-    const actionUrl = joinUrl(getApiBaseUrl(currentSession), gatewayPath);
-    if (!gatewayPath || actionUrl === '#') {
+    const actionUrl = gatewayPath ? `/fees/online-payment/${encodeURIComponent(gatewayPath)}?student_id=${encodeURIComponent(selectedStudent.id)}&amount=${encodeURIComponent(String(currentValidation.amount))}` : '';
+    if (!actionUrl) {
       setMessage({ type: 'error', text: 'Payment gateway action is not available.' });
       return;
     }
@@ -210,6 +201,7 @@ export default function OnlineFeesCollectPage() {
       mobile_number: mobileNumber.trim(),
       amount: String(currentValidation.amount),
       medium: currentValidation.medium,
+      token: currentSession.token,
     });
   };
 
@@ -281,8 +273,8 @@ export default function OnlineFeesCollectPage() {
             {loadingStudents ? (
               <LoadingRows colSpan={6} label="Loading students" />
             ) : students.length > 0 ? (
-              students.map((student) => (
-                <TableRow key={student.id} className="odd:bg-white even:bg-slate-50/70">
+              students.map((student, index) => (
+                <TableRow key={`${student.id}-${student.bankName}-${index}`} className="odd:bg-white even:bg-slate-50/70">
                   <TableCell>
                     <input
                       type="radio"

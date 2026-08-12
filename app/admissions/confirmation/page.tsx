@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
   Pencil,
@@ -91,6 +91,7 @@ function parseDate(value: string): string {
 
 export default function AdmissionConfirmationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [records, setRecords] = useState<ConfirmationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +101,8 @@ export default function AdmissionConfirmationPage() {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const enquiryId = searchParams?.get('enquiry_id') ?? '';
+  const registrationId = searchParams?.get('registration_id') ?? '';
 
   useEffect(() => {
     const controller = new AbortController();
@@ -324,6 +327,29 @@ export default function AdmissionConfirmationPage() {
 
   const exportSubtitle = `Showing records ${startEntry} to ${endEntry} of ${totalEntries}`;
 
+  const selectedRecord = useMemo(() => {
+    if (!records.length) {
+      return null;
+    }
+
+    if (registrationId) {
+      const byRegistration = records.find((record) => record.id === registrationId);
+      if (byRegistration) {
+        return byRegistration;
+      }
+    }
+
+    if (!enquiryId) {
+      return null;
+    }
+
+    return (
+      records.find((record) => readString(record.detail.record.enquiry_id) === enquiryId) ||
+      records.find((record) => record.enquiryNumber === enquiryId) ||
+      null
+    );
+  }, [enquiryId, records, registrationId]);
+
   const getPaginationItems = () => {
     const items: (number | 'ellipsis')[] = [];
     const maxVisible = 5;
@@ -360,6 +386,44 @@ export default function AdmissionConfirmationPage() {
           <Card className="border-slate-200/80 bg-white shadow-sm"><CardContent className="p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center"><Printer className="h-5 w-5 text-amber-600" /></div><div><p className="text-xs font-medium text-slate-500">With follow up</p><p className="text-lg font-bold text-slate-900">{records.filter((record) => record.followUpDate).length}</p></div></CardContent></Card>
           <Card className="border-slate-200/80 bg-white shadow-sm"><CardContent className="p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center"><FileSpreadsheet className="h-5 w-5 text-violet-600" /></div><div><p className="text-xs font-medium text-slate-500">Current view</p><p className="text-lg font-bold text-slate-900">{filteredAndSortedData.length}</p></div></CardContent></Card>
         </div>
+
+        {enquiryId ? (
+          <Card className="border-blue-200/80 bg-blue-50/70 shadow-sm">
+            <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Selected enquiry</p>
+                {selectedRecord ? (
+                  <>
+                    <h2 className="mt-1 text-lg font-bold text-slate-900">
+                      {[selectedRecord.firstName, selectedRecord.middleName, selectedRecord.lastName].filter(Boolean).join(' ') || 'Admission candidate'}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Enquiry No. {selectedRecord.enquiryNumber || enquiryId}
+                      {selectedRecord.mobile ? ` • Mobile ${selectedRecord.mobile}` : ''}
+                      {selectedRecord.admissionStandard ? ` • Standard ${selectedRecord.admissionStandard}` : ''}
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-600">
+                    {isLoading
+                      ? `Loading authoritative admission data for enquiry ${enquiryId}.`
+                      : `No confirmation record matched enquiry ${enquiryId} yet.`}
+                  </p>
+                )}
+              </div>
+
+              {selectedRecord ? (
+                <Button
+                  type="button"
+                  className="rounded-xl bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90"
+                  onClick={() => router.push(`/admissions/confirmation/${selectedRecord.id}/follow-up`)}
+                >
+                  Continue to Candidate Form
+                </Button>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card className="border-slate-200/80 bg-white shadow-sm overflow-hidden">
           <CardHeader className="pb-4 pt-5 px-6">
