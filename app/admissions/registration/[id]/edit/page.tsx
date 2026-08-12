@@ -287,7 +287,18 @@ function SelectField({
     <FormField icon={icon} label={label} htmlFor={id}>
       <Select value={value} onValueChange={(next) => onChange(next ?? '')}>
         <SelectTrigger id={id} className="h-10 rounded-lg border-gray-200 bg-gray-50/50 focus:bg-white">
-          <SelectValue placeholder={placeholder} />
+          {/* Base UI's <Select.Value> resolves its label from items registered by mounted
+              <Select.Item>s - since SelectContent is portal-rendered and its items don't mount
+              until the popup is first opened, a pre-set value has nothing to resolve against on
+              first paint and falls back to showing the raw stored value (e.g. "2444" instead of
+              "Staff"). Resolving the label ourselves from normalizedOptions sidesteps that gap. */}
+          <SelectValue placeholder={placeholder}>
+            {(current: unknown) => {
+              const stringValue = readString(current);
+              if (!stringValue) return placeholder;
+              return normalizedOptions.find((option) => option.value === stringValue)?.label || stringValue;
+            }}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {normalizedOptions.map((option) => (
