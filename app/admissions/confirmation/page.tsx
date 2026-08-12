@@ -113,15 +113,21 @@ function parseDate(value: string): string {
 export default function AdmissionConfirmationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const registrationId = searchParams.get('registrationId');
+  const enquiryId = searchParams.get('enquiryId');
+
   const [records, setRecords] = useState<ConfirmationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [entriesPerPage, setEntriesPerPage] = useState<string>('10');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [addingStudentId, setAddingStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
