@@ -16,6 +16,7 @@ import {
   Printer,
   Loader2,
   AlertCircle,
+  UserPlus,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -28,7 +29,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { exportRowsAsCsv, exportRowsAsExcel, exportRowsAsPdf, openPrintPreview } from '@/lib/table-export';
 import { appendCommonParams, buildSessionContext, createAuthHeaders, normalizeApiStatus, readString } from '@/lib/erp-client';
 import type { AdmissionEnquiryApiResponse, RegistrationPipelineDetail } from '../admission_registration/types';
-import { confirmAdmission, fetchRegistrationDetail } from '../admission_registration/workflow';
+import { confirmAdmission, fetchRegistrationDetail, saveRegistration } from '../admission_registration/workflow';
 
 type SortDirection = 'asc' | 'desc' | null;
 type SortField = string;
@@ -51,6 +52,10 @@ type ConfirmationRecord = {
   detail: RegistrationPipelineDetail;
   canConfirm: boolean;
   confirmReason: string;
+  isConfirmed: boolean;
+  hasStudent: boolean;
+  canAddStudent: boolean;
+  addStudentReason: string;
 };
 
 type ColumnDef = {
@@ -63,6 +68,7 @@ type ColumnDef = {
 const columns: ColumnDef[] = [
   { key: 'action', label: 'Action', sortable: false, width: '70px' },
   { key: 'confirm', label: 'Confirm', sortable: false, width: '100px' },
+  { key: 'addStudent', label: 'Add Student', sortable: false, width: '130px' },
   { key: 'registrationNumber', label: 'Registration No', sortable: true },
   { key: 'enquiryNumber', label: 'Enquiry Number', sortable: true },
   { key: 'inquiryDate', label: 'Enquiry Date', sortable: true },
@@ -78,7 +84,22 @@ const columns: ColumnDef[] = [
   { key: 'status', label: 'Status', sortable: true },
 ];
 
-const exportColumns = columns.filter((column) => column.key !== 'action');
+const exportColumns = columns.filter((column) => column.key !== 'action' && column.key !== 'addStudent');
+
+function resolveEligibility(detail: RegistrationPipelineDetail): { canProceed: boolean; reason: string } {
+  const canProceed =
+    readString(detail.displaySaveStudent) === '1' &&
+    Boolean(
+      readString(detail.record.registration_enquiry_id) ||
+        readString(detail.record.enquiry_id) ||
+        readString(detail.record.id)
+    );
+
+  return {
+    canProceed,
+    reason: canProceed ? '' : 'Please complete admission enquiry and registration before confirmation.',
+  };
+}
 
 function parseDate(value: string): string {
   if (!value) return '-';
@@ -92,17 +113,21 @@ function parseDate(value: string): string {
 export default function AdmissionConfirmationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const registrationId = searchParams.get('registrationId');
+  const enquiryId = searchParams.get('enquiryId');
+
   const [records, setRecords] = useState<ConfirmationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [entriesPerPage, setEntriesPerPage] = useState<string>('10');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const enquiryId = searchParams?.get('enquiry_id') ?? '';
-  const registrationId = searchParams?.get('registration_id') ?? '';
+  const [addingStudentId, setAddingStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -146,6 +171,10 @@ export default function AdmissionConfirmationPage() {
               if (!detail) return null;
               if (readString(detail.record.status).toUpperCase() !== 'OPEN') return null;
 
+              const isConfirmed = readString(detail.record.admission_status).toUpperCase() === 'YES';
+              const hasStudent = Number(detail.record.total_student_count ?? 0) > 0;
+              const eligibility = resolveEligibility(detail);
+
               return {
                 id: readString(detail.record.id),
                 registrationNumber: readString(detail.record.registration_no || detail.record.admission_docket_no || detail.record.id),
@@ -163,19 +192,14 @@ export default function AdmissionConfirmationPage() {
                 dateOfBirth: readString(detail.record.date_of_birth),
                 age: readString(detail.record.age),
                 admissionStandard: readString(row.admission_standard || detail.record.std_name || detail.record.admission_standard),
-                status: Number(detail.record.total_student_count ?? 0) > 0 ? 'Confirmed' : 'Open',
+                status: hasStudent ? 'Student Added' : isConfirmed ? 'Confirmed' : 'Open',
                 detail,
-                canConfirm:
-                  readString(detail.displaySaveStudent) === '1' &&
-                  Boolean(
-                    readString(detail.record.registration_enquiry_id) ||
-                      readString(detail.record.enquiry_id) ||
-                      readString(detail.record.id)
-                  ),
-                confirmReason:
-                  readString(detail.displaySaveStudent) === '1'
-                    ? ''
-                    : 'Please complete admission enquiry and registration before confirmation.',
+                canConfirm: eligibility.canProceed,
+                confirmReason: eligibility.reason,
+                isConfirmed,
+                hasStudent,
+                canAddStudent: eligibility.canProceed,
+                addStudentReason: eligibility.reason,
               } satisfies ConfirmationRecord;
             } catch {
               return null;
@@ -203,9 +227,70 @@ export default function AdmissionConfirmationPage() {
     };
   }, []);
 
+  const applyRefreshedDetail = (
+    id: string,
+    refreshed: RegistrationPipelineDetail,
+    overrides: Partial<ConfirmationRecord> = {}
+  ) => {
+    const isConfirmed = readString(refreshed.record.admission_status).toUpperCase() === 'YES';
+    const hasStudent = Number(refreshed.record.total_student_count ?? 0) > 0;
+    const eligibility = resolveEligibility(refreshed);
+
+    setRecords((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              registrationNumber: readString(refreshed.record.registration_no || refreshed.record.admission_docket_no || refreshed.record.id),
+              followUpDate: readString(refreshed.record.followup_date || item.followUpDate),
+              firstName: readString(refreshed.record.first_name),
+              middleName: readString(refreshed.record.middle_name),
+              lastName: readString(refreshed.record.last_name),
+              mobile: readString(refreshed.record.mobile),
+              email: readString(refreshed.record.email),
+              dateOfBirth: readString(refreshed.record.date_of_birth),
+              age: readString(refreshed.record.age),
+              admissionStandard: readString(refreshed.record.std_name || refreshed.record.admission_standard || item.admissionStandard),
+              status: hasStudent ? 'Student Added' : isConfirmed ? 'Confirmed' : 'Open',
+              detail: refreshed,
+              isConfirmed,
+              hasStudent,
+              canAddStudent: eligibility.canProceed,
+              addStudentReason: eligibility.reason,
+              ...overrides,
+            }
+          : item
+      )
+    );
+  };
+
   const handleConfirm = async (record: ConfirmationRecord) => {
     setConfirmingId(record.id);
-    setError(null);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      await saveRegistration(record.id, record.detail, { admission_status: 'YES' });
+      const refreshed = await fetchRegistrationDetail(record.id);
+      if (!refreshed) {
+        throw new Error('Confirmation succeeded but the latest record could not be reloaded.');
+      }
+
+      applyRefreshedDetail(record.id, refreshed, { canConfirm: false, confirmReason: '' });
+      setNotice('Admission confirmed. You can now add the student.');
+    } catch (confirmError) {
+      setActionError(confirmError instanceof Error ? confirmError.message : 'Failed to confirm admission.');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
+  const handleAddStudent = async (record: ConfirmationRecord) => {
+    if (record.hasStudent || !record.canAddStudent) return;
+
+    setAddingStudentId(record.id);
+    setActionError(null);
+    setNotice(null);
 
     try {
       await confirmAdmission({
@@ -215,36 +300,15 @@ export default function AdmissionConfirmationPage() {
       });
       const refreshed = await fetchRegistrationDetail(record.id);
       if (!refreshed) {
-        throw new Error('Confirmation succeeded but the latest record could not be reloaded.');
+        throw new Error('The student was added but the latest record could not be reloaded.');
       }
 
-      setRecords((current) =>
-        current.map((item) =>
-          item.id === record.id
-            ? {
-                ...item,
-                registrationNumber: readString(refreshed.record.registration_no || refreshed.record.admission_docket_no || refreshed.record.id),
-                followUpDate: readString(refreshed.record.followup_date || item.followUpDate),
-                firstName: readString(refreshed.record.first_name),
-                middleName: readString(refreshed.record.middle_name),
-                lastName: readString(refreshed.record.last_name),
-                mobile: readString(refreshed.record.mobile),
-                email: readString(refreshed.record.email),
-                dateOfBirth: readString(refreshed.record.date_of_birth),
-                age: readString(refreshed.record.age),
-                admissionStandard: readString(refreshed.record.std_name || refreshed.record.admission_standard || item.admissionStandard),
-                status: 'Confirmed',
-                detail: refreshed,
-                canConfirm: false,
-                confirmReason: '',
-              }
-            : item
-        )
-      );
-    } catch (confirmError) {
-      setError(confirmError instanceof Error ? confirmError.message : 'Failed to confirm admission.');
+      applyRefreshedDetail(record.id, refreshed);
+      setNotice(`Student added successfully for ${record.firstName} ${record.lastName}.`.replace(/\s+/g, ' ').trim());
+    } catch (addError) {
+      setActionError(addError instanceof Error ? addError.message : 'Failed to add student.');
     } finally {
-      setConfirmingId(null);
+      setAddingStudentId(null);
     }
   };
 
@@ -380,6 +444,19 @@ export default function AdmissionConfirmationPage() {
           </div>
         </div>
 
+        {notice && (
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            {notice}
+          </div>
+        )}
+        {actionError && (
+          <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {actionError}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border-slate-200/80 bg-white shadow-sm"><CardContent className="p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center"><Table2 className="h-5 w-5 text-blue-600" /></div><div><p className="text-xs font-medium text-slate-500">Total Records</p><p className="text-lg font-bold text-slate-900">{records.length}</p></div></CardContent></Card>
           <Card className="border-slate-200/80 bg-white shadow-sm"><CardContent className="p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center"><FileDown className="h-5 w-5 text-emerald-600" /></div><div><p className="text-xs font-medium text-slate-500">Open</p><p className="text-lg font-bold text-slate-900">{records.filter((record) => record.status === 'Open').length}</p></div></CardContent></Card>
@@ -508,13 +585,13 @@ export default function AdmissionConfirmationPage() {
                         <TableCell className="px-4 py-3">
                           <Button
                             type="button"
-                            variant={record.status === 'Confirmed' ? 'outline' : 'default'}
+                            variant={record.isConfirmed ? 'outline' : 'default'}
                             size="sm"
-                            disabled={record.status === 'Confirmed' || confirmingId === record.id || !record.canConfirm}
-                            title={!record.canConfirm && record.status !== 'Confirmed' ? record.confirmReason : undefined}
+                            disabled={record.isConfirmed || confirmingId === record.id || !record.canConfirm}
+                            title={!record.canConfirm && !record.isConfirmed ? record.confirmReason : undefined}
                             className={cn(
                               'h-8 rounded-lg text-xs font-medium',
-                              record.status === 'Confirmed'
+                              record.isConfirmed
                                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50'
                                 : 'bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90'
                             )}
@@ -525,8 +602,35 @@ export default function AdmissionConfirmationPage() {
                             ) : (
                               <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
                             )}
-                            {record.status === 'Confirmed' ? 'Confirmed' : 'Confirm'}
+                            {record.isConfirmed ? 'Confirmed' : 'Confirm'}
                           </Button>
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
+                          {record.hasStudent ? (
+                            <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Student Added
+                            </span>
+                          ) : record.isConfirmed ? (
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              disabled={addingStudentId === record.id || !record.canAddStudent}
+                              title={!record.canAddStudent ? record.addStudentReason : undefined}
+                              className="h-8 rounded-lg bg-emerald-600 text-xs font-medium text-white hover:bg-emerald-600/90"
+                              onClick={() => void handleAddStudent(record)}
+                            >
+                              {addingStudentId === record.id ? (
+                                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <UserPlus className="mr-1 h-3.5 w-3.5" />
+                              )}
+                              Add Student
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-slate-400">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="px-4 py-3 text-xs font-medium text-slate-700">{record.registrationNumber || '-'}</TableCell>
                         <TableCell className="px-4 py-3 text-xs font-medium text-[#0D6EFD]">{record.enquiryNumber}</TableCell>
@@ -541,7 +645,16 @@ export default function AdmissionConfirmationPage() {
                         <TableCell className="px-4 py-3 text-xs text-slate-600 text-center">{record.age}</TableCell>
                         <TableCell className="px-4 py-3 text-xs text-slate-600">{record.admissionStandard || '-'}</TableCell>
                         <TableCell className="px-4 py-3 text-xs">
-                          <span className={cn('inline-flex rounded-full px-2 py-0.5 font-medium', record.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700')}>
+                          <span
+                            className={cn(
+                              'inline-flex rounded-full px-2 py-0.5 font-medium',
+                              record.status === 'Student Added'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : record.status === 'Confirmed'
+                                  ? 'bg-violet-50 text-violet-700'
+                                  : 'bg-blue-50 text-blue-700'
+                            )}
+                          >
                             {record.status}
                           </span>
                         </TableCell>
