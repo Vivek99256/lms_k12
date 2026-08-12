@@ -119,9 +119,9 @@ const PROGRESS_STAGES: ProgressStage[] = [
       },
       {
         title: "Fees Map",
-        helper: "Open the legacy fees map setup.",
+        helper: "Map the academic year's fee interval.",
         status: "complete",
-        action: { kind: "legacy", path: "map_year?implementation=1" },
+        action: { kind: "internal", href: "/fees/map_year" },
       },
       {
         title: "Fees Structure",

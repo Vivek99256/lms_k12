@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ClipboardList,
   Download,
@@ -63,17 +64,49 @@ function readValue(
 }
 
 export default function StudentHomeworkReportPage() {
-  const [filters, setFilters] = useState<Partial<SearchDropdownValues>>({
+  return (
+    <Suspense fallback={null}>
+      <StudentHomeworkReport />
+    </Suspense>
+  );
+}
+
+function StudentHomeworkReport() {
+  // The conversational assistant hands off a resolved homework record through
+  // these query parameters (see buildRecordNavigation in the shared AI core).
+  const searchParams = useSearchParams();
+  const selectedHomeworkId = searchParams?.get("homework_id") ?? "";
+  const handoffFilters = useMemo(
+    () => ({
+      standard: searchParams?.get("standard_id") ?? "",
+      division: searchParams?.get("division_id") ?? "",
+      subject: searchParams?.get("subject_id") ?? "",
+      fromDate: searchParams?.get("from_date") ?? "",
+      toDate: searchParams?.get("to_date") ?? "",
+      query: searchParams?.get("q") ?? "",
+    }),
+    [searchParams]
+  );
+  const hasAssistantHandoff =
+    Boolean(selectedHomeworkId) ||
+    Object.values(handoffFilters).some((value) => Boolean(value));
+  const assistantSelection = useCallback(() => {
+    const id = Number(selectedHomeworkId);
+    return Number.isFinite(id) && id > 0 ? new Set([id]) : new Set<number>();
+  }, [selectedHomeworkId]);
+  const autoLoadedRef = useRef(false);
+
+  const [filters, setFilters] = useState<Partial<SearchDropdownValues>>(() => ({
     section: "",
-    standard: "",
-    division: "",
-    subject: "",
-  });
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+    standard: handoffFilters.standard,
+    division: handoffFilters.division,
+    subject: handoffFilters.subject,
+  }));
+  const [fromDate, setFromDate] = useState(handoffFilters.fromDate);
+  const [toDate, setToDate] = useState(handoffFilters.toDate);
   const [rows, setRows] = useState<HomeworkRecord[]>([]);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(assistantSelection);
+  const [query, setQuery] = useState(handoffFilters.query);
   const [page, setPage] = useState(1);
 
   const [searched, setSearched] = useState(false);
@@ -87,7 +120,8 @@ export default function StudentHomeworkReportPage() {
     setNotice("");
     setLoading(true);
     setSearched(true);
-    setSelected(new Set());
+    // Keep the record the assistant handed over selected across reloads.
+    setSelected(assistantSelection());
     setPage(1);
     try {
       const data = await listHomework({
@@ -109,7 +143,20 @@ export default function StudentHomeworkReportPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, fromDate, toDate]);
+  }, [assistantSelection, filters, fromDate, toDate]);
+
+  // The filters are already seeded from the handoff parameters, so the report
+  // only has to run the same search the user would have run by hand.
+  useEffect(() => {
+    if (autoLoadedRef.current || !hasAssistantHandoff) return;
+    autoLoadedRef.current = true;
+    void load();
+  }, [hasAssistantHandoff, load]);
+
+  const handoffRow = useMemo(
+    () => rows.find((row) => String(row.id) === selectedHomeworkId),
+    [rows, selectedHomeworkId]
+  );
 
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -198,6 +245,23 @@ export default function StudentHomeworkReportPage() {
           Review assigned homework by class, subject and date.
         </p>
       </header>
+
+      {handoffRow ? (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+        >
+          Opened from the assistant:{" "}
+          <span className="font-semibold">
+            {handoffRow.title || handoffRow.studentName || `homework #${handoffRow.id}`}
+          </span>
+          {[handoffRow.standardName, handoffRow.divisionName, handoffRow.subjectName]
+            .filter(Boolean)
+            .join(" · ")
+            ? ` — ${[handoffRow.standardName, handoffRow.divisionName, handoffRow.subjectName].filter(Boolean).join(" · ")}`
+            : ""}
+        </div>
+      ) : null}
 
       {error ? (
         <div
@@ -359,7 +423,14 @@ export default function StudentHomeworkReportPage() {
                   </TableRow>
                 ) : visible.length ? (
                   visible.map((row, index) => (
-                    <TableRow key={row.id}>
+                    <TableRow
+                      key={row.id}
+                      className={
+                        String(row.id) === selectedHomeworkId
+                          ? "bg-amber-50"
+                          : undefined
+                      }
+                    >
                       <TableCell>
                         <input
                           type="checkbox"

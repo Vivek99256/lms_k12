@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { clearTeachAssistantStorage } from '@/lib/chatbot-storage';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -148,6 +149,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await res.json();
       if (res.ok && data) {
+        clearTeachAssistantStorage();
+
         function getValue(obj: unknown, key: string): unknown {
           if (!obj || typeof obj !== 'object') return undefined;
           return (obj as Record<string, unknown>)[key];

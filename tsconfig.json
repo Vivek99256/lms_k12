@@ -19,7 +19,11 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@shared/conversational-ai-core": ["./packages/conversational-ai-core/src/index.ts"],
+      "@shared/conversational-ai-core/*": ["./packages/conversational-ai-core/src/*"],
+      "@shared/conversational-mcp-core": ["./packages/conversational-mcp-core/src/index.ts"],
+      "@shared/conversational-mcp-core/*": ["./packages/conversational-mcp-core/src/*"]
     }
   },
   "include": [

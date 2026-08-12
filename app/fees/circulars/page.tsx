@@ -114,6 +114,16 @@ type GeneratedCircularResult = {
   html: string;
   displayMonthName: string;
   rows: GeneratedCircularStudent[];
+  challanConfig: FeeChallanConfig;
+};
+
+type FeeChallanConfig = {
+  instituteName: string;
+  panNo: string;
+  accountNo: string;
+  cmsClientCode: string;
+  bankLogo: string;
+  instituteLines: string[];
 };
 
 type FiltersResponse = ApiStatusPayload & {
@@ -140,13 +150,24 @@ type GenerateResponse = ApiStatusPayload & {
   fees_circular_remarks?: unknown;
   display_month_name?: unknown;
   html?: unknown;
+  str?: unknown;
   circular_html?: unknown;
   fees_circular_html?: unknown;
+  challan_html?: unknown;
+  print_html?: unknown;
 };
 
 const circularFields: DropdownField[] = ['section', 'standard', 'division'];
 const hillsInstituteIds = new Set(['201', '202', '203', '204', '324', '326', '327']);
 const pageSize = 12;
+const emptyChallanConfig: FeeChallanConfig = {
+  instituteName: '',
+  panNo: '',
+  accountNo: '',
+  cmsClientCode: '',
+  bankLogo: '',
+  instituteLines: [],
+};
 
 const currencyFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -174,6 +195,7 @@ export default function FeesCircularsPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [generatedResult, setGeneratedResult] = useState<GeneratedCircularResult | null>(null);
+  const [challanConfig, setChallanConfig] = useState<FeeChallanConfig>(emptyChallanConfig);
   const [page, setPage] = useState(1);
 
   const selectedSectionId = getSingleDropdownValue(academicFilters.section);
@@ -229,13 +251,17 @@ export default function FeesCircularsPage() {
 
     try {
       const form = createContextForm(currentSession);
-      const payload = await postCircularApi<FiltersResponse>('fees-circular/filters', form, currentSession);
+      const [payload, config] = await Promise.all([
+        postCircularApi<FiltersResponse>('fees-circular/filters', form, currentSession),
+        fetchChallanConfig(currentSession).catch(() => emptyChallanConfig),
+      ]);
 
       assertApiSuccess(payload, 'Unable to load fee circular filters.');
       setFilters({
         months: toMonthOptions(payload.months),
         receiptBooks: toReceiptBookOptions(payload.receipt_books),
       });
+      setChallanConfig(config);
     } catch (error) {
       setFilters({ months: [], receiptBooks: [] });
       setMessage({ type: 'error', text: toErrorMessage(error, 'Unable to load fee circular filters.') });
@@ -400,7 +426,11 @@ export default function FeesCircularsPage() {
       const payload = await postCircularApi<GenerateResponse>('fees-circular/generate', form, currentSession);
       assertApiSuccess(payload, 'Unable to generate fee circulars.');
 
-      const result = toGeneratedCircularResult(payload);
+      const selectedReceiptBook = filters.receiptBooks.find((book) => book.receiptId === selectedReceiptId);
+      const result = toGeneratedCircularResult(payload, {
+        ...challanConfig,
+        instituteLines: [selectedReceiptBook?.line2, selectedReceiptBook?.line3].filter(Boolean) as string[],
+      });
       setGeneratedResult(result);
       setMessage({
         type: result.html ? 'success' : 'info',
@@ -422,6 +452,8 @@ export default function FeesCircularsPage() {
     selectedStandardId,
     studentInputs,
     students,
+    challanConfig,
+    filters.receiptBooks,
   ]);
 
   return (
@@ -776,7 +808,7 @@ function GeneratedCircularModal({
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" onClick={handlePrint}>
               <Printer className="h-4 w-4" />
-              {result.html ? 'Print' : 'Print summary'}
+              {result.html ? 'Print' : 'Print challan'}
             </Button>
             <Button type="button" variant="outline" size="icon" onClick={onClose} aria-label="Close generated circulars">
               <X className="h-4 w-4" />
@@ -788,49 +820,7 @@ function GeneratedCircularModal({
           {result.html ? (
             <div className="min-w-[760px]" dangerouslySetInnerHTML={{ __html: result.html }} />
           ) : (
-            <div className="space-y-4">
-              <InlineMessage
-                type="info"
-                text="Laravel generated the circular log records, but this JSON endpoint does not return the exact challan HTML used by the old Blade print view."
-              />
-              <Table className="min-w-[920px]">
-                <TableHeader>
-                  <TableRow className="bg-slate-100 text-xs uppercase text-slate-700 hover:bg-slate-100">
-                    <TableHead>GR no</TableHead>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Standard</TableHead>
-                    <TableHead>Breakoff</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Remarks</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {result.rows.map((row) => (
-                    <TableRow key={row.studentId} className="odd:bg-white even:bg-slate-50/70">
-                      <TableCell className="font-mono text-xs">{row.enrollmentNo || '-'}</TableCell>
-                      <TableCell className="font-semibold text-slate-950">{row.studentName || '-'}</TableCell>
-                      <TableCell>{[row.standardName, row.divisionName].filter(Boolean).join('/') || '-'}</TableCell>
-                      <TableCell>
-                        {row.breakoff.length > 0 ? (
-                          <div className="space-y-1">
-                            {row.breakoff.map((item) => (
-                              <div key={item.title} className="flex justify-between gap-4 text-xs">
-                                <span className="text-slate-600">{item.title}</span>
-                                <span className="font-semibold text-slate-900">{currencyFormatter.format(item.amount)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-slate-500">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-slate-950">{currencyFormatter.format(row.totalAmount)}</TableCell>
-                      <TableCell className="max-w-72 whitespace-normal text-sm text-slate-700">{row.remarks || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <div className="min-w-[1060px]" dangerouslySetInnerHTML={{ __html: buildGeneratedSummaryHtml(result) }} />
           )}
         </div>
       </div>
@@ -906,6 +896,32 @@ async function postCircularApi<T extends ApiStatusPayload>(endpoint: string, for
   }
 
   return payload;
+}
+
+async function fetchChallanConfig(session: SessionContext): Promise<FeeChallanConfig> {
+  const url = new URL(`${getApiBaseUrl(session)}/fees/fees_config_master`);
+  url.searchParams.set('type', 'JSON');
+  url.searchParams.set('sub_institute_id', session.subInstituteId);
+  url.searchParams.set('syear', session.academicYearId);
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+      ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+    },
+  });
+  if (!response.ok) throw new Error('Unable to load challan configuration.');
+
+  const payload = await parseJsonResponse<{ data?: unknown }>(response);
+  const config = toRecordList(payload.data)[0] ?? {};
+  return {
+    instituteName: readString(config.institute_name),
+    panNo: readString(config.pan_no),
+    accountNo: readString(config.account_to_be_credited),
+    cmsClientCode: readString(config.cms_client_code),
+    bankLogo: readString(config.bank_logo),
+    instituteLines: [],
+  };
 }
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
@@ -1053,7 +1069,7 @@ function getSelectedRemain(student: FeeCircularStudent, selectedMonthIds: string
   }, 0);
 }
 
-function toGeneratedCircularResult(payload: GenerateResponse): GeneratedCircularResult {
+function toGeneratedCircularResult(payload: GenerateResponse, challanConfig: FeeChallanConfig): GeneratedCircularResult {
   const breakoffByStudent = asRecord(payload.breakoff);
   const amountByStudent = asRecord(payload.fees_circular_amount);
   const remarksByStudent = asRecord(payload.fees_circular_remarks);
@@ -1079,10 +1095,32 @@ function toGeneratedCircularResult(payload: GenerateResponse): GeneratedCircular
   return {
     message: payload.message || 'Success',
     lastInsertedIds: readString(payload.last_inserted_ids),
-    html: readString(payload.html ?? payload.circular_html ?? payload.fees_circular_html),
+    html: readCircularHtml(payload),
     displayMonthName: readString(payload.display_month_name),
     rows,
+    challanConfig,
   };
+}
+
+function readCircularHtml(payload: GenerateResponse) {
+  const htmlKeys = [
+    'html',
+    'str',
+    'circular_html',
+    'fees_circular_html',
+    'challan_html',
+    'print_html',
+  ];
+  const sources = [asRecord(payload), asRecord(payload.data)];
+
+  for (const source of sources) {
+    for (const key of htmlKeys) {
+      const html = readString(source[key]);
+      if (html.trim()) return html;
+    }
+  }
+
+  return '';
 }
 
 function toRecordList(value: unknown): Record<string, unknown>[] {
@@ -1116,46 +1154,63 @@ function escapeHtml(value: string) {
 }
 
 function buildGeneratedSummaryHtml(result: GeneratedCircularResult) {
-  const rows = result.rows.map((row) => {
-    const breakoffRows = row.breakoff.map((item) =>
-      `<div style="display:flex;justify-content:space-between;gap:24px;"><span>${escapeHtml(item.title)}</span><strong>${currencyFormatter.format(item.amount)}</strong></div>`
-    ).join('');
-
-    return `
-      <tr>
-        <td>${escapeHtml(row.enrollmentNo || '-')}</td>
-        <td>${escapeHtml(row.studentName || '-')}</td>
-        <td>${escapeHtml([row.standardName, row.divisionName].filter(Boolean).join('/') || '-')}</td>
-        <td>${breakoffRows || '-'}</td>
-        <td style="text-align:right;font-weight:700;">${currencyFormatter.format(row.totalAmount)}</td>
-        <td>${escapeHtml(row.remarks || '-')}</td>
-      </tr>
-    `;
-  }).join('');
-
   return `
     <style>
-      body { font-family: Arial, sans-serif; color: #0f172a; }
-      h1 { font-size: 18px; margin: 0 0 8px; }
-      p { margin: 0 0 16px; color: #475569; font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      th, td { border: 1px solid #cbd5e1; padding: 8px; vertical-align: top; }
-      th { background: #f1f5f9; text-align: left; text-transform: uppercase; font-size: 11px; }
+      .challan-sheet { display: grid; gap: 20px; font-family: Arial, sans-serif; color: #183b5b; }
+      .challan-set { display: grid; grid-template-columns: repeat(3, minmax(300px, 1fr)); gap: 40px; page-break-inside: avoid; }
+      .challan { border: 2px solid #111; min-height: 700px; font-size: 12px; background: white; }
+      .challan-copy { border-bottom: 1px solid #3e4d57; padding: 5px; text-align: center; font-size: 14px; font-weight: 700; text-decoration: underline; }
+      .challan-brand { border-bottom: 1px solid #3e4d57; padding: 8px 10px 10px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; }
+      .bank { color: #17558b; font-size: 23px; font-weight: 700; font-style: italic; } .bank i { color: #bb2b2e; }
+      .brand-mark { font-size: 34px; line-height: 1; color: #1687ee; letter-spacing: -11px; transform: skew(-12deg); } .brand-mark b { color: #60c925; }
+      .school { border-bottom: 1px solid #3e4d57; min-height: 95px; padding: 13px 8px; text-align: center; font-size: 14px; line-height: 1.9; }
+      .school strong { font-size: 15px; } .challan-body { padding: 11px 8px; }
+      .topline { display:flex; justify-content:space-between; align-items:center; border:1px solid #53616b; padding:7px; margin-bottom:7px; font-weight:700; }
+      .line { border-bottom: 1px solid #53616b; height: 17px; margin: 6px 0 13px 47px; }
+      .form-row { display:grid; grid-template-columns: 130px 1fr; align-items:center; margin:10px 0; } .form-row b { font-weight:600; }
+      .boxed { display:inline-flex; } .boxed span { width: 17px; height: 25px; border:1px solid #53616b; margin-right:-1px; display:inline-flex; justify-content:center; align-items:center; font-size:13px; }
+      .value-line { display:inline-block; min-width:120px; border-bottom:1px solid #53616b; padding:0 6px 3px; text-align:center; font-size:14px; font-weight:700; }
+      .student-name { text-align:center; font-size:16px; font-weight:700; margin:4px 0 16px; } .student-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+      .fee-table { width:100%; border-collapse:collapse; margin-top:13px; font-size:12px; } .fee-table th,.fee-table td { border:1px solid #111; padding:5px 6px; } .fee-table th { font-size:13px; } .amount { text-align:right; }
+      .total { text-align:right; font-size:14px; font-weight:700; padding-top:8px; } @media print { .challan-sheet { gap:12px; } .challan-set { gap:18px; } }
     </style>
-    <h1>Fees circular summary</h1>
-    <p>${escapeHtml(result.lastInsertedIds ? `Log IDs ${result.lastInsertedIds}` : result.message)}</p>
-    <table>
-      <thead>
-        <tr>
-          <th>GR no</th>
-          <th>Student</th>
-          <th>Standard</th>
-          <th>Breakoff</th>
-          <th>Total</th>
-          <th>Remarks</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
+    <div class="challan-sheet">${result.rows.map((row) => buildLegacyChallanSet(row, result.challanConfig)).join('')}</div>
   `;
+}
+
+function buildLegacyChallanSet(row: GeneratedCircularStudent, config: FeeChallanConfig) {
+  const copies = ['STUDENT COPY', 'SCHOOL COPY', 'BANK COPY'];
+  const feeRows = row.breakoff.map((item) => `<tr><td>${escapeHtml(item.title)}</td><td class="amount">${escapeHtml(String(item.amount))}</td><td></td><td></td></tr>`).join('') || '<tr><td>-</td><td></td><td></td><td></td></tr>';
+  const account = boxedValue(config.accountNo);
+  const instituteName = config.instituteName || 'Triz Innovation';
+  const bankBrand = config.bankLogo
+    ? `<img src="${escapeHtml(config.bankLogo)}" alt="Bank" style="max-height:42px;max-width:160px;object-fit:contain">`
+    : '<span class="bank"><i>i</i>ICICI Bank</span>';
+  const grNo = escapeHtml(row.enrollmentNo || row.studentId || '-');
+  const studentName = escapeHtml(row.studentName || '-');
+  const standard = escapeHtml([row.standardName, row.divisionName].filter(Boolean).join(' / ') || '-');
+
+  return `<section class="challan-set">${copies.map((copy) => `
+    <article class="challan">
+      <div class="challan-copy">${copy}</div>
+      <div class="challan-brand">${bankBrand}<span class="brand-mark">◢◢<b>◢</b></span></div>
+      <div class="school"><strong>${escapeHtml(instituteName)}</strong>${config.instituteLines.map((line) => `<br>${escapeHtml(line)}`).join('')}</div>
+      <div class="challan-body">
+        <div class="topline"><span>PAN No.: &nbsp; ${escapeHtml(config.panNo || '-')}</span><span>Date: ${boxedValue('')}</span></div>
+        <div>Branch <div class="line"></div></div>
+        <div class="form-row"><b>Account to be Credited :</b><span>${account}</span></div>
+        <div class="form-row"><b>CMS Client Code:</b><span>${boxedValue(config.cmsClientCode)}</span></div>
+        <div class="form-row"><b>Institution Name :</b><span>${boxedValue(instituteName)}</span></div>
+        <div class="form-row"><b>Quarter Fee (Tick)</b><span>${['Q1','Q2','Q3','Q4'].map((quarter) => `<span style="margin-right:12px">${boxedValue('')}${quarter}</span>`).join('')}</span></div>
+        <div><b>Student Name :</b><div class="student-name">${studentName}</div></div>
+        <div class="student-grid"><div><b>G.R. No. :</b><br><span class="value-line">${grNo}</span></div><div><b>Class/Div. :</b><br><span class="value-line">${standard}</span></div></div>
+        <div style="margin-top:14px"><b>Father Name :</b><br><span class="value-line" style="float:right">-</span></div>
+        <table class="fee-table"><thead><tr><th>Fee Heads</th><th>Amount</th><th>Cash Deposit</th><th>Amount</th></tr></thead><tbody>${feeRows}</tbody></table>
+        <div class="total">Total: ${escapeHtml(String(row.totalAmount))}</div>
+      </div>
+    </article>`).join('')}</section>`;
+}
+
+function boxedValue(value: string) {
+  return `<span class="boxed">${(value || '        ').slice(0, 16).split('').map((character) => `<span>${escapeHtml(character)}</span>`).join('')}</span>`;
 }
