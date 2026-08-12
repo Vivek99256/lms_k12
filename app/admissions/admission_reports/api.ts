@@ -52,6 +52,7 @@ type RawAdmissionReportResponse = {
   fields?: unknown;
   headers?: unknown;
   editData?: unknown;
+  dataCustomFields?: unknown;
 };
 
 const withoutConfirmationFallbackHeaders = [
@@ -250,7 +251,7 @@ async function buildWithoutConfirmationFallbackResult(
   const listRows = toArray(listPayload.data).map((entry) => toRecord(entry));
 
   const detailRows = await Promise.all(
-    listRows.map(async (row) => {
+    listRows.map(async (row): Promise<AdmissionReportRow | null> => {
       const id = readString(row.id);
       if (!id) return null;
 
@@ -480,7 +481,7 @@ export async function fetchAdmissionReportContext(
   if (!response.ok) {
     const responseText = await response.text();
     const backendGapMessage = buildBackendGapMessage(reportId, responseText);
-    if (reportId === 'admission_without_confirmation' && backendGapMessage) {
+    if (backendGapMessage) {
       return {
         message: 'Fallback mode enabled for Admission Without Confirmation Report.',
         rows: [],
@@ -548,7 +549,7 @@ export async function runAdmissionReport(
   if (!response.ok) {
     const responseText = await response.text();
     const backendGapMessage = buildBackendGapMessage(reportId, responseText);
-    if (reportId === 'admission_without_confirmation' && backendGapMessage) {
+    if (backendGapMessage) {
       return buildWithoutConfirmationFallbackResult(filters);
     }
     const sessionHint = sessionDrivenReportIds.includes(reportId)
