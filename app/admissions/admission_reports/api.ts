@@ -51,6 +51,7 @@ type RawAdmissionReportResponse = {
   users?: unknown;
   fields?: unknown;
   headers?: unknown;
+  editData?: unknown;
 };
 
 const withoutConfirmationFallbackHeaders = [
