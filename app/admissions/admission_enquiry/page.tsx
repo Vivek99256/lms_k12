@@ -319,6 +319,7 @@ type AdmissionEnquirySession = {
   token: string;
   subInstituteId: string;
   syear: string;
+  userId: string;
 };
 
 function readString(value: unknown): string {
@@ -336,7 +337,7 @@ function toNumberWhenPossible(value: string): number | string {
 
 function getAdmissionEnquirySession(): AdmissionEnquirySession {
   if (typeof window === 'undefined') {
-    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '' };
+    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '', userId: '' };
   }
 
   try {
@@ -358,9 +359,10 @@ function getAdmissionEnquirySession(): AdmissionEnquirySession {
       token: readString(userData.user_token ?? userData.token ?? menuContext.user_token ?? menuContext.token),
       subInstituteId: readString(userData.sub_institute_id ?? menuContext.sub_institute_id),
       syear,
+      userId: readString(userData.user_id ?? userData.userId ?? menuContext.user_id ?? menuContext.userId),
     };
   } catch {
-    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '' };
+    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '', userId: '' };
   }
 }
 
@@ -1080,6 +1082,7 @@ export default function AdmissionManagementContent() {
       url.searchParams.set('sub_institute_id', session.subInstituteId);
       url.searchParams.set('syear', session.syear);
       url.searchParams.set('type', 'API');
+      if (session.userId) url.searchParams.set('user_id', session.userId);
 
       const response = await fetch(url.toString(), {
         method: 'POST',

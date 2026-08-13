@@ -88,7 +88,7 @@ const endpointByReport: Record<AdmissionReportId, string> = {
   admission_inquiry: '/admission/admission_enquiry_report',
   admission_registration: '/admission/admission_registration_report',
   admission_without_confirmation: '/admission/admission_without_con_report',
-  admission_confirmation: '/admission/admission_confirmation_report',
+  admission_confirmation: '/admission/admission_confirmation_report_v2',
 };
 
 function requireSession(): SessionContext {
@@ -247,7 +247,7 @@ async function buildWithoutConfirmationFallbackResult(
     syear: session.syear,
   };
 
-  const listPayload = await fetchProxyPayload(session, 'api/admission_registration', baseQuery);
+  const listPayload = await fetchProxyPayload(session, 'api/admission_without_confirmation_report_v2', baseQuery);
   const listRows = toArray(listPayload.data).map((entry) => toRecord(entry));
 
   const detailRows = await Promise.all(
@@ -258,7 +258,7 @@ async function buildWithoutConfirmationFallbackResult(
       try {
         const detailPayload = await fetchProxyPayload(
           session,
-          `api/admission_registration/${encodeURIComponent(id)}/edit`,
+          `api/admission_without_confirmation_report_v2/${encodeURIComponent(id)}/edit`,
           {
             ...baseQuery,
             ...(session.termId ? { term_id: session.termId } : {}),
@@ -269,7 +269,7 @@ async function buildWithoutConfirmationFallbackResult(
         const registrationEnquiryId = readString(editData.registration_enquiry_id);
         if (registrationEnquiryId) return null;
 
-        const createdOn = readString(editData.created_on);
+        const createdOn = readString(editData.enquiry_created_on || editData.created_on);
         if (!withinDateRange(createdOn, filters.fromDate, filters.toDate)) return null;
 
         const status = readString(editData.status).toUpperCase();
@@ -305,6 +305,106 @@ async function buildWithoutConfirmationFallbackResult(
   };
 }
 
+/**
+ * Corrected variant of buildWithoutConfirmationFallbackResult() for the Admission
+ * Without Confirmation Report.
+ *
+ * Added as a new function (rather than editing buildWithoutConfirmationFallbackResult())
+ * so existing call sites/behaviour are untouched. The original silently swallows every
+ * per-row detail-fetch failure into `null` via `catch { return null; }`, so if the list
+ * call succeeds but every detail call then fails (e.g. a transient network/DB blip while
+ * fetching 8 rows in parallel), the user sees the exact same "Please revise your search.
+ * No data found." as a genuine empty result - there is no way to tell a real failure
+ * apart from a correct empty answer. This variant tracks detail-fetch failures
+ * separately and throws a real, actionable error when every candidate row failed to
+ * load (list had candidates, but zero rows/zero successes), instead of masking it as
+ * "no data".
+ */
+async function buildWithoutConfirmationFallbackResultV2(
+  filters: AdmissionReportFilters
+): Promise<AdmissionReportResult> {
+  const session = requireSession();
+  const baseQuery = {
+    type: 'API',
+    sub_institute_id: session.subInstituteId,
+    syear: session.syear,
+  };
+
+  const listPayload = await fetchProxyPayload(session, 'api/admission_without_confirmation_report_v2', baseQuery);
+  const listRows = toArray(listPayload.data).map((entry) => toRecord(entry));
+
+  let detailErrorCount = 0;
+
+  const detailRows = await Promise.all(
+    listRows.map(async (row): Promise<AdmissionReportRow | null> => {
+      const id = readString(row.id);
+      if (!id) return null;
+
+      let detailPayload: RawAdmissionReportResponse;
+      try {
+        detailPayload = await fetchProxyPayload(
+          session,
+          `api/admission_without_confirmation_report_v2/${encodeURIComponent(id)}/edit`,
+          {
+            ...baseQuery,
+            ...(session.termId ? { term_id: session.termId } : {}),
+          }
+        );
+      } catch {
+        detailErrorCount += 1;
+        return null;
+      }
+
+      const editData = toRecord(detailPayload.editData);
+      const registrationEnquiryId = readString(editData.registration_enquiry_id);
+      if (registrationEnquiryId) return null;
+
+      const createdOn = readString(editData.enquiry_created_on || editData.created_on);
+      if (!withinDateRange(createdOn, filters.fromDate, filters.toDate)) return null;
+
+      // There is no admission_registration row for anything this report lists
+      // (that's what "registrationEnquiryId" being empty just confirmed above), so
+      // there is no registration-status value (Open/Close lives on that record) to
+      // read here - admission_enquiry.status holds unrelated values like "approve"
+      // and is never Open/Close. Every row this report can show is, by definition,
+      // still pending confirmation, i.e. inherently "Open"; "Close" can never
+      // legitimately match a row here, since a closed/registered record leaves this
+      // report entirely once it gets a registration.
+      if (filters.status && filters.status.toUpperCase() !== 'OPEN') return null;
+
+      return {
+        enquiry_no: readString(editData.enquiry_no),
+        created_on: createdOn,
+        followup_date: readString(editData.followup_date),
+        first_name: readString(editData.first_name),
+        middle_name: readString(editData.middle_name),
+        last_name: readString(editData.last_name),
+        mobile: readString(editData.mobile),
+        email: readString(editData.email),
+        admission_standard: readString(editData.std_name || editData.admission_standard),
+        form_no: readString(editData.form_no),
+        status: 'OPEN',
+      } satisfies AdmissionReportRow;
+    })
+  );
+
+  const rows = detailRows.filter((row): row is AdmissionReportRow => Boolean(row));
+
+  if (rows.length === 0 && listRows.length > 0 && detailErrorCount === listRows.length) {
+    throw new Error(
+      `Failed to load ${detailErrorCount} admission record${detailErrorCount === 1 ? '' : 's'} while running this report (a network or database error, not an empty result) - please retry the search.`
+    );
+  }
+
+  return {
+    message: rows.length > 0 ? 'Success' : 'Please revise your search. No data found.',
+    rows,
+    headers: withoutConfirmationFallbackHeaders,
+    users: [],
+    fields: [],
+  };
+}
+
 async function fetchAdmissionFormDetail(
   session: SessionContext,
   id: string
@@ -312,7 +412,7 @@ async function fetchAdmissionFormDetail(
   try {
     const detailPayload = await fetchProxyPayload(
       session,
-      `admission/admission_registration/${encodeURIComponent(id)}/edit`,
+      `admission/admission_registration_report_v2/${encodeURIComponent(id)}/edit`,
       {
         type: 'API',
         sub_institute_id: session.subInstituteId,
@@ -340,7 +440,7 @@ function normalizeAdmissionFormFields(value: unknown): AdmissionReportFieldOptio
 
 async function buildAdmissionRegistrationFallbackContext(): Promise<AdmissionReportResult> {
   const session = requireSession();
-  const payload = await fetchProxyPayload(session, 'admission/admission_registration', {
+  const payload = await fetchProxyPayload(session, 'admission/admission_registration_report_v2', {
     type: 'API',
     sub_institute_id: session.subInstituteId,
     syear: session.syear,
@@ -360,7 +460,7 @@ async function buildAdmissionRegistrationFallbackResult(
   selectedFields: string[]
 ): Promise<AdmissionReportResult> {
   const session = requireSession();
-  const payload = await fetchProxyPayload(session, 'admission/admission_registration', {
+  const payload = await fetchProxyPayload(session, 'admission/admission_registration_report_v2', {
     type: 'API',
     sub_institute_id: session.subInstituteId,
     syear: session.syear,
@@ -384,8 +484,8 @@ async function buildAdmissionRegistrationFallbackResult(
       const createdOn = readString(detail.created_on);
       if (!withinDateRange(createdOn, filters.fromDate, filters.toDate)) return null;
 
-      const status = readString(detail.status).toUpperCase();
-      if (filters.status && status !== filters.status.toUpperCase()) return null;
+      const registrationStatus = readString(detail.registration_status).toUpperCase();
+      if (filters.status && registrationStatus !== filters.status.toUpperCase()) return null;
 
       return Object.fromEntries(
         headers.map((header) => [header, readString(detail[header]) || readString(row[header])])
@@ -505,11 +605,12 @@ export async function fetchAdmissionReportContext(
   }
 
   const rows = toRows(raw.data);
+  const headers = buildHeaders(raw, rows);
 
   return {
     message: readString(raw.message) || 'Success',
     rows,
-    headers: buildHeaders(raw, rows),
+    headers: headers.length > 0 ? headers : admissionRegistrationDefaultFields,
     users: normalizeUsers(raw.users),
     fields: normalizeFields(raw.fields),
   };
@@ -525,7 +626,7 @@ export async function runAdmissionReport(
   }
 
   if (reportId === 'admission_without_confirmation') {
-    return buildWithoutConfirmationFallbackResult(filters);
+    return buildWithoutConfirmationFallbackResultV2(filters);
   }
 
   const session = requireSession();
