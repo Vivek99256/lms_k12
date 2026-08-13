@@ -127,10 +127,13 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
 
   useEffect(() => {
     if (!autoLoaded.current && !searched) {
+      if (module.report) {
+        return;
+      }
       autoLoaded.current = true;
       void load();
     }
-  }, [load, searched]);
+  }, [load, searched, module.report]);
 
   function addClassValues(form: FormData) {
     const mapping = {
@@ -209,7 +212,6 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
           <Textarea {...common} rows={3} />
         ) : field.type === 'select' ? (
           <select {...common} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm">
-            <option value="">Select {field.label.toLowerCase()}</option>
             {(fieldOptions[field.name] ?? field.options ?? []).map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -310,7 +312,7 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
                     {module.columns.map((column) => <TableCell key={column.key}>{displayValue(row[column.key])}</TableCell>)}
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={module.columns.length + 1} className="h-32 text-center text-slate-500">{searched ? 'No records match the current selection.' : 'Choose filters and search to load records.'}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={module.columns.length + 1} className="h-32 text-center text-slate-500">{searched ? 'No data found.' : 'Choose filters and search to load records.'}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

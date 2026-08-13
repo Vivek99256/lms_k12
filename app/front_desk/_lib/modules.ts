@@ -97,7 +97,13 @@ export const frontDeskModules = {
     fields: [
       { name: 'date_', label: 'Date', type: 'date', required: true },
       { name: 'title', label: 'Title', type: 'text', required: true },
-      { name: 'type', label: 'Circular type ID', type: 'text', required: true },
+      {
+        name: 'type',
+        label: 'Circular type',
+        type: 'select',
+        required: true,
+        optionsEndpoint: 'circular/circular-types',
+      },
       { name: 'message', label: 'Message', type: 'textarea' },
       {
         name: 'attachment[]',
@@ -150,8 +156,8 @@ export const frontDeskModules = {
   calendar: {
     title: 'Calendar',
     description: 'Maintain class events and vacations in the academic calendar.',
-    endpoint: 'calendar/calendar',
-    storeEndpoint: 'calendar/calendar',
+    endpoint: 'calendar/calendar-api-list',
+    storeEndpoint: 'calendar/calendar-api-store',
     method: 'GET',
     classFields: ['section', 'standard'],
     multipleClassFields: true,
