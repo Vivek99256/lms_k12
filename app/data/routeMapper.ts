@@ -504,6 +504,7 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     'timetable.index': '/front_desk/create-timetable',
     'photo_video_gallary.index': '/front_desk/photo_video_gallary',
     'front_desk/photo_video_gallary': '/front_desk/photo_video_gallary',
+    'api/front-desk/photo-video-gallery': '/front_desk/photo_video_gallary',
     'calendar.index': '/front_desk/calendar',
     'calendar/calendar': '/front_desk/calendar',
     'circular.index': '/front_desk/circular',
