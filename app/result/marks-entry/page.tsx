@@ -2,8 +2,14 @@
 
 /**
  * Mark entry — scholastic marks grid with auto percentage/grade,
- * save + approve (lock) actions. Mirrors the legacy Blade screen at
- * result/marks_entry.
+ * save + approve (lock) actions.
+ *
+ * Backed by the dedicated `api/result/marks-entry` REST API. Confirmed
+ * against the Laravel controller: `create` returns `stu_data` rows keyed
+ * by `student_id`/`name`/`roll_no`/`points`/`outof`/`per`/`grade`/`comment`
+ * (no `id`, no split name fields), and an `approve_status` row (or null)
+ * rather than a boolean flag. `store` expects a `values` object keyed by
+ * student id (not a JSON-stringified `data` field).
  */
 
 import React, { useState } from 'react';
@@ -20,7 +26,7 @@ import {
 } from '@/lib/result/api';
 
 type StudentRow = {
-  id: string;
+  studentId: string;
   rollNo: string;
   name: string;
   marks: string;
@@ -60,7 +66,22 @@ const FILTER_FIELDS: FilterFieldDef[] = [
   },
 ];
 
-/** Effective validation ceiling: max marks from the payload, capped at 500. */
+/**
+ * Laravel's global `TrimStrings` + `ConvertEmptyStringsToNull` middleware
+ * pipeline trims a blank comment (dropping a plain space) and then turns
+ * the resulting `''` into `null` before the controller sees it, but
+ * `result_marks.comment` is a NOT NULL column with no default — an empty
+ * comment 500s on save. A non-breaking space isn't in PHP's default
+ * `trim()` charlist, so it survives both middlewares intact; on read,
+ * `.trim()` strips it again (JS's trim() *does* treat NBSP as whitespace),
+ * so it always displays as blank.
+ */
+const BLANK_PLACEHOLDER = ' ';
+function orSpace(value: string): string {
+  return value.trim() === '' ? BLANK_PLACEHOLDER : value;
+}
+
+/** Client-side ceiling only — the API does not enforce a marks range. */
 function markCap(maxMarks: number): number {
   return maxMarks > 0 ? Math.min(maxMarks, 500) : 500;
 }
@@ -98,22 +119,19 @@ function toStudentRows(items: unknown): StudentRow[] {
   return toCollection(items)
     .map((item) => {
       const record = asRecord(item);
-      const fullName = [record.first_name, record.middle_name, record.last_name]
-        .map(readString)
-        .filter(Boolean)
-        .join(' ');
       return {
-        id: readString(record.id ?? record.student_id ?? record.unique_id),
-        rollNo: readString(record.roll_no ?? record.gr_no ?? record.enrollment_no),
-        name: readString((record.student_name ?? record.full_name ?? fullName) || record.name),
-        marks: readString(record.points ?? record.marks ?? record.obtained_marks),
-        maxMarks: readNumber(record.outof ?? record.max_marks),
-        percentage: readNumber(record.per ?? record.percentage),
+        studentId: readString(record.student_id),
+        rollNo: readString(record.roll_no),
+        name: readString(record.name),
+        marks: readString(record.points),
+        maxMarks: readNumber(record.outof),
+        percentage: readNumber(record.per),
         grade: readString(record.grade),
-        comment: readString(record.comment ?? record.remark),
+        // .trim() collapses the NBSP blank-comment placeholder (see orSpace) back to ''.
+        comment: readString(record.comment).trim(),
       };
     })
-    .filter((student) => student.id);
+    .filter((student) => student.studentId);
 }
 
 export default function MarksEntryPage() {
@@ -125,6 +143,7 @@ export default function MarksEntryPage() {
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
   const [confirmApprove, setConfirmApprove] = useState(false);
+  const [confirmUnapprove, setConfirmUnapprove] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -143,10 +162,12 @@ export default function MarksEntryPage() {
     setSearched(true);
     setError(null);
     try {
-      const payload = await resultGet('result/marks_entry/create', { ...next });
+      const payload = await resultGet('api/result/marks-entry/create', { ...next });
       const source = asRecord(payload.data ?? payload);
       setGradeRanges(toGradeRanges(source.grd_data));
-      setApproved(readString(source.approve ?? source.is_approved) === '1');
+      // approve_status is the full row (or null) — an un-approved exam still
+      // has a row (status reset to 0), so check the status, not just existence.
+      setApproved(readString(asRecord(source.approve_status).status) === '1');
       setStudents(toStudentRows(source.stu_data));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
@@ -160,7 +181,7 @@ export default function MarksEntryPage() {
   const handleMarksChange = (studentId: string, value: string) => {
     setStudents((current) =>
       current.map((student) => {
-        if (student.id !== studentId) return student;
+        if (student.studentId !== studentId) return student;
         const percentage = calculatePercentage(value, student.maxMarks);
         return { ...student, marks: value, percentage, grade: findGrade(percentage, value, gradeRanges) };
       }),
@@ -169,7 +190,7 @@ export default function MarksEntryPage() {
 
   const handleCommentChange = (studentId: string, value: string) => {
     setStudents((current) =>
-      current.map((student) => (student.id === studentId ? { ...student, comment: value } : student)),
+      current.map((student) => (student.studentId === studentId ? { ...student, comment: value } : student)),
     );
   };
 
@@ -185,19 +206,21 @@ export default function MarksEntryPage() {
     }
     setSaving(true);
     try {
-      const marksData = Object.fromEntries(
-        students.map((student) => [
-          student.id,
-          {
-            exam_id: criteria.exam,
-            points: student.marks,
-            per: student.percentage,
-            grade: student.grade || '-',
-            comment: student.comment,
-          },
-        ]),
-      );
-      const payload = await resultPost('result/marks_entry', { data: JSON.stringify(marksData) });
+      const data: Record<string, string> = {
+        term_id: criteria.term,
+        standard_id: criteria.standard,
+        division_id: criteria.division,
+        subject_id: criteria.subject,
+        exam_id: criteria.exam,
+      };
+      for (const student of students) {
+        data[`values[${student.studentId}][exam_id]`] = criteria.exam;
+        data[`values[${student.studentId}][points]`] = student.marks;
+        data[`values[${student.studentId}][per]`] = String(student.percentage);
+        data[`values[${student.studentId}][grade]`] = student.grade || '-';
+        data[`values[${student.studentId}][comment]`] = orSpace(student.comment);
+      }
+      const payload = await resultPost('api/result/marks-entry', data);
       const message = assertOk(payload, 'Laravel did not confirm that marks were saved.');
       toast.success('Marks saved', message || undefined);
     } catch (err) {
@@ -207,12 +230,12 @@ export default function MarksEntryPage() {
     }
   };
 
-  const handleApprove = async () => {
+  const handleSetApproval = async (nextApproved: boolean) => {
     if (!criteria) return;
     setApproving(true);
     try {
-      const payload = await resultPost('result/approve', {
-        approve: '1',
+      const payload = await resultPost('api/result/marks-entry/approve', {
+        approve: nextApproved ? '1' : '0',
         term_id: criteria.term,
         standard_id: criteria.standard,
         division_id: criteria.division,
@@ -220,11 +243,18 @@ export default function MarksEntryPage() {
         exam_id: criteria.exam,
       });
       const message = assertOk(payload, 'Approval was not confirmed by the server.');
-      setApproved(true);
+      setApproved(nextApproved);
       setConfirmApprove(false);
-      toast.success('Marks approved', message || 'Entries are now locked for this exam.');
+      setConfirmUnapprove(false);
+      toast.success(
+        nextApproved ? 'Marks approved' : 'Marks unapproved',
+        message || (nextApproved ? 'Entries are now locked for this exam.' : 'Entries are editable again.'),
+      );
     } catch (err) {
-      toast.error('Could not approve marks', err instanceof Error ? err.message : undefined);
+      toast.error(
+        nextApproved ? 'Could not approve marks' : 'Could not unapprove marks',
+        err instanceof Error ? err.message : undefined,
+      );
     } finally {
       setApproving(false);
     }
@@ -277,16 +307,29 @@ export default function MarksEntryPage() {
                       <Save className="h-4 w-4" />
                       {saving ? 'Saving…' : 'Save marks'}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setConfirmApprove(true)}
-                      disabled={saving || approving || approved}
-                      className="h-9 rounded-lg px-4 text-sm font-medium"
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Approve marks
-                    </Button>
+                    {approved ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setConfirmUnapprove(true)}
+                        disabled={approving}
+                        className="h-9 rounded-lg px-4 text-sm font-medium"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Unapprove marks
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setConfirmApprove(true)}
+                        disabled={saving || approving}
+                        className="h-9 rounded-lg px-4 text-sm font-medium"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Approve marks
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -325,7 +368,7 @@ export default function MarksEntryPage() {
                       {students.map((student, index) => {
                         const invalid = !isValidMark(student.marks, student.maxMarks);
                         return (
-                          <tr key={student.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                          <tr key={student.studentId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
                             <td className="px-5 py-4 text-slate-600">{index + 1}</td>
                             <td className="px-5 py-4 font-mono text-xs text-slate-600">{student.rollNo}</td>
                             <td className="px-5 py-4 font-medium text-slate-900">{student.name}</td>
@@ -335,7 +378,7 @@ export default function MarksEntryPage() {
                                   type="text"
                                   value={student.marks}
                                   disabled={approved}
-                                  onChange={(event) => handleMarksChange(student.id, event.target.value)}
+                                  onChange={(event) => handleMarksChange(student.studentId, event.target.value)}
                                   aria-label={`Marks for ${student.name}`}
                                   aria-invalid={invalid}
                                   placeholder={`/ ${markCap(student.maxMarks)}`}
@@ -360,7 +403,7 @@ export default function MarksEntryPage() {
                               <textarea
                                 value={student.comment}
                                 disabled={approved}
-                                onChange={(event) => handleCommentChange(student.id, event.target.value)}
+                                onChange={(event) => handleCommentChange(student.studentId, event.target.value)}
                                 rows={2}
                                 aria-label={`Remark for ${student.name}`}
                                 className="min-w-44 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
@@ -381,12 +424,23 @@ export default function MarksEntryPage() {
       <ConfirmDialog
         open={confirmApprove}
         onClose={() => !approving && setConfirmApprove(false)}
-        onConfirm={handleApprove}
+        onConfirm={() => handleSetApproval(true)}
         busy={approving}
         tone="primary"
         title="Approve marks?"
         confirmLabel="Approve"
         message="Approving locks the mark entries for this exam. Teachers will no longer be able to edit them. Save any pending changes before approving."
+      />
+
+      <ConfirmDialog
+        open={confirmUnapprove}
+        onClose={() => !approving && setConfirmUnapprove(false)}
+        onConfirm={() => handleSetApproval(false)}
+        busy={approving}
+        tone="primary"
+        title="Unapprove marks?"
+        confirmLabel="Unapprove"
+        message="Unapproving unlocks the mark entries for this exam so teachers can edit them again."
       />
     </div>
   );

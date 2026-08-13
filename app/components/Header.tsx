@@ -78,7 +78,7 @@ export default function Header({
   isRightToolbarOpen: boolean;
   rightToolbarToggleRef: React.RefObject<HTMLButtonElement | null>;
 }) {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshAcademicTerms } = useAuth();
   const router = useRouter();
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showTermDropdown, setShowTermDropdown] = useState(false);
@@ -99,7 +99,7 @@ export default function Header({
     const stored = getStoredSelection('selectedAcademicYear');
     if (stored) return stored;
     const academic = readAcademicSession();
-    return academic?.selectedYear || '2024-2025';
+    return academic?.selectedYear || '';
   });
 
   const [selectedTerm, setSelectedTerm] = useState<string>(() => {
@@ -110,11 +110,28 @@ export default function Header({
   });
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && selectedYear) {
       localStorage.setItem('selectedAcademicYear', selectedYear);
       localStorage.setItem('selectedAcademicTerm', selectedTerm);
     }
   }, [selectedYear, selectedTerm]);
+
+  // `selectedYear` can still be empty on first render if login hasn't
+  // populated the academic session yet — adopt the real syear as soon as
+  // it shows up instead of staying blank (and leaving term dropdowns empty).
+  useEffect(() => {
+    if (selectedYear) return;
+    const academic = readAcademicSession();
+    if (academic?.selectedYear) setSelectedYear(academic.selectedYear);
+  }, [user, selectedYear]);
+
+  // Term dropdowns app-wide read `academicTerms`, which only ever comes
+  // from login (scoped to that syear) — refetch it whenever the switcher
+  // changes years, otherwise every term select goes empty for any other year.
+  useEffect(() => {
+    void refreshAcademicTerms(selectedYear);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear]);
 
   const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
   const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);
@@ -141,8 +158,8 @@ export default function Header({
   useEffect(() => {
     setHasLogoError(false);
   }, [logoUrl]);
-  const years = academic?.years && academic.years.length > 0 ? academic.years : ['2024-2025', '2023-2024', '2022-2023'];
-  const displayYears = years.includes(selectedYear) ? years : [selectedYear, ...years];
+  const years = academic?.years && academic.years.length > 0 ? academic.years : ['2025', '2024', '2023'];
+  const displayYears = !selectedYear || years.includes(selectedYear) ? years : [selectedYear, ...years];
 
   const terms = academic?.terms && academic.terms.length > 0 ? academic.terms : ['Term 1', 'Term 2', 'Term 3', 'Term 4'];
   const displayTerms = terms.includes(selectedTerm) ? terms : [selectedTerm, ...terms];

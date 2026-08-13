@@ -17,6 +17,7 @@ interface AuthContextType {
   } | null;
   academicTerms: Array<Record<string, unknown>>;
   academicYears: Array<Record<string, unknown>>;
+  refreshAcademicTerms: (syear: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -209,8 +210,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
   }, []);
 
+  /**
+   * `academicTerms` only ever comes back from `login()`, scoped to the
+   * syear active at login time — switching the year elsewhere in the app
+   * (Header's year switcher) never refreshed it, so every term dropdown
+   * went empty for any year other than the login one. Call this whenever
+   * the selected year changes.
+   */
+  const refreshAcademicTerms = useCallback(async (syear: string) => {
+    if (typeof window === 'undefined' || !syear) return;
+    const subInstituteId = menuContext?.sub_institute_id;
+    if (!subInstituteId) return;
+    try {
+      const query = new URLSearchParams({
+        path: 'api/academic-terms',
+        type: 'API',
+        sub_institute_id: String(subInstituteId),
+        syear,
+      });
+      const res = await fetch(`/api/proxy?${query.toString()}`);
+      const data = await res.json();
+      const terms = Array.isArray(data?.data) ? data.data : [];
+      setAcademicTerms(terms);
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_USER);
+        const parsed = stored ? JSON.parse(stored) : {};
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify({ ...parsed, academicTerms: terms }));
+      } catch {}
+    } catch {
+      // Network/parse failure — leave the previously loaded terms in place.
+    }
+  }, [menuContext]);
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, menuContext, academicTerms, academicYears }}>
+    <AuthContext.Provider
+      value={{ isAuthenticated, user, login, logout, menuContext, academicTerms, academicYears, refreshAcademicTerms }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -227,6 +262,7 @@ export function useAuth() {
       menuContext: null,
       academicTerms: [],
       academicYears: [],
+      refreshAcademicTerms: async () => {},
     };
   }
   return context;

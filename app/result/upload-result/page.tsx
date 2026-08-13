@@ -2,8 +2,16 @@
 
 /**
  * Upload result — attach a result PDF/image per student and upload the
- * checked rows as multipart form data. Mirrors the legacy Blade screen
- * at result/upload_result.
+ * checked rows as multipart form data.
+ *
+ * Backed by the dedicated `api/result/upload-result` REST API. Confirmed
+ * against the Laravel controller: the student identifier column is
+ * aliased `CHECKBOX` (not `id`/`student_id`), standard/division come back
+ * as `standard_name`/`division_name`, and — critically — uploaded files
+ * must be keyed by the student's actual id (`image[{studentId}]`), not a
+ * sequential array index. The existing `file_name` is a bare filename
+ * that only resolves against the Laravel origin, not the Next.js one, so
+ * the "View" link is built from `API_BASE_URL`.
  */
 
 import React, { useRef, useState } from 'react';
@@ -14,9 +22,8 @@ import PageHeader from '@/components/result/PageHeader';
 import FilterBar, { type FilterFieldDef, type FilterValues } from '@/components/result/FilterBar';
 import { Banner, Checkbox, EmptyState, StatusChip, TableSkeleton } from '@/components/result/primitives';
 import { toast } from '@/components/result/toast';
-import {
-  asRecord, assertOk, readString, resultGet, resultPost, toCollection,
-} from '@/lib/result/api';
+import { assertOk, extractRows, readString, resultGet, resultPost } from '@/lib/result/api';
+import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 type StudentRow = {
   id: string;
@@ -107,31 +114,20 @@ export default function UploadResultPage() {
     setFiles({});
     setMissingFiles(new Set());
     try {
-      const payload = await resultGet('result/upload_result/create', { ...next });
-      const source = payload.data ?? payload;
-      const inner = asRecord(source);
-      const list = toCollection(Array.isArray(source) ? source : inner.stu_data ?? inner.students ?? inner.data ?? source);
+      const payload = await resultGet('api/result/upload-result/create', { ...next });
+      const list = extractRows(payload);
 
       setRows(
         list
-          .map((item) => {
-            const record = asRecord(item);
-            const stdDiv =
-              readString(record.std_div) ||
-              [record.standard ?? record.standard_name, record.division ?? record.division_name]
-                .map(readString)
-                .filter(Boolean)
-                .join(' / ');
-            return {
-              id: readString(record.id ?? record.student_id ?? record.unique_id),
-              name: readString(record.student_name ?? record.name ?? record.full_name),
-              enrollmentNo: readString(record.enrollment_no ?? record.gr_no ?? record.roll_no),
-              stdDiv,
-              mobile: readString(record.mobile ?? record.mobile_no ?? record.phone),
-              termName: readString(record.term_name ?? record.term),
-              fileName: readString(record.file_name),
-            };
-          })
+          .map((record) => ({
+            id: readString(record.CHECKBOX),
+            name: readString(record.student_name),
+            enrollmentNo: readString(record.enrollment_no),
+            stdDiv: [record.standard_name, record.division_name].map(readString).filter(Boolean).join(' / '),
+            mobile: readString(record.mobile),
+            termName: readString(record.term_name),
+            fileName: readString(record.file_name),
+          }))
           .filter((student) => student.id),
       );
     } catch (err) {
@@ -196,17 +192,17 @@ export default function UploadResultPage() {
     setSaving(true);
     try {
       const form = new FormData();
-      checkedRows.forEach((row, index) => {
+      checkedRows.forEach((row) => {
         const file = files[row.id];
-        form.append(`students[${index}]`, row.id);
-        if (file) form.append(`image[${index}]`, file);
+        form.append('students[]', row.id);
+        if (file) form.append(`image[${row.id}]`, file);
       });
       form.append('division_id', criteria.division);
       form.append('standard_id', criteria.standard);
       form.append('grade_id', criteria.grade);
       form.append('term_id', criteria.term);
 
-      const payload = await resultPost('result/upload_result', form, { multipart: true });
+      const payload = await resultPost('api/result/upload-result', form, { multipart: true });
       const message = assertOk(payload, 'Laravel did not confirm the upload.');
       toast.success('Results uploaded', message || `${checkedRows.length} file(s) uploaded.`);
       setFiles({});
@@ -288,7 +284,7 @@ export default function UploadResultPage() {
                           <Checkbox checked={allChecked} indeterminate={someChecked} onChange={toggleAll} />
                         </th>
                         <th className="px-5 py-3 font-semibold">Student name</th>
-                        <th className="px-5 py-3 font-semibold">Enrollment / GR no</th>
+                        <th className="px-5 py-3 font-semibold">Enrollment no</th>
                         <th className="px-5 py-3 font-semibold">Std / Div</th>
                         <th className="px-5 py-3 font-semibold">Mobile</th>
                         <th className="px-5 py-3 font-semibold">Term</th>
@@ -325,7 +321,7 @@ export default function UploadResultPage() {
                             <td className="px-5 py-4">
                               {row.fileName ? (
                                 <a
-                                  href={`/storage/upload_result/${row.fileName}`}
+                                  href={`${API_BASE_URL}/storage/upload_result/${row.fileName}`}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:underline"

@@ -2,8 +2,15 @@
 
 /**
  * Co-scholastic marks — grade or mark entry per student for a selected
- * co-scholastic area, with approve (lock) support. Mirrors the legacy
- * Blade screen at result/co_scholastic_marks_entry.
+ * co-scholastic area, with approve (lock) support.
+ *
+ * Backed by the dedicated `api/result/co-scholastic-marks-entry` REST
+ * API. Confirmed against the Laravel controller: grade options are
+ * returned under `co_scholastic_grade_dd` (only present in GRADE mode),
+ * `approve_status` is a row/null (not a boolean), and — critically — the
+ * save endpoint only ever reads `grade_opt` for the selected grade
+ * (a plain `grade` key is silently discarded). `division_id` has no
+ * backing column and is not sent.
  */
 
 import React, { useState } from 'react';
@@ -21,7 +28,7 @@ import {
 } from '@/lib/result/api';
 
 type StudentRow = {
-  id: string;
+  studentId: string;
   rollNo: string;
   name: string;
   /** Selected grade option id (GRADE mode) or entered marks (MARK mode). */
@@ -89,34 +96,27 @@ export default function CoScholasticMarksPage() {
     setSearched(true);
     setError(null);
     try {
-      const payload = await resultGet('result/co_scholastic_marks_entry/create', { ...next });
+      const payload = await resultGet('api/result/co-scholastic-marks-entry/create', { ...next });
       const source = asRecord(payload.data ?? payload);
 
       const mode = readString(source.mark_type).toUpperCase() === 'GRADE' ? 'GRADE' : 'MARK';
       setMarkType(mode);
-      setGradeOptions(toOptions(source.grade_options ?? source.co_grade ?? source.grade_data));
-      setApproved(readString(source.approve ?? source.is_approved) === '1');
+      setGradeOptions(toOptions(source.co_scholastic_grade_dd));
+      setApproved(source.approve_status != null && typeof source.approve_status === 'object');
 
-      const sourceMax = readNumber(source.max_mark ?? source.outof ?? source.max_marks);
       setStudents(
-        toCollection(source.stu_data ?? source.students)
+        toCollection(source.stu_data)
           .map((item) => {
             const record = asRecord(item);
-            const fullName = [record.first_name, record.middle_name, record.last_name]
-              .map(readString)
-              .filter(Boolean)
-              .join(' ');
             return {
-              id: readString(record.id ?? record.student_id ?? record.unique_id),
-              rollNo: readString(record.roll_no ?? record.gr_no ?? record.enrollment_no),
-              name: readString((record.student_name ?? record.full_name ?? fullName) || record.name),
-              value: mode === 'GRADE'
-                ? readString(record.grade ?? record.grade_id)
-                : readString(record.points ?? record.marks),
-              maxMark: readNumber(record.outof ?? record.max_mark) || sourceMax,
+              studentId: readString(record.student_id),
+              rollNo: readString(record.roll_no),
+              name: readString(record.name),
+              value: mode === 'GRADE' ? readString(record.grade) : readString(record.points),
+              maxMark: readNumber(record.outof),
             };
           })
-          .filter((student) => student.id),
+          .filter((student) => student.studentId),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
@@ -129,7 +129,7 @@ export default function CoScholasticMarksPage() {
 
   const setStudentValue = (studentId: string, value: string) => {
     setStudents((current) =>
-      current.map((student) => (student.id === studentId ? { ...student, value } : student)),
+      current.map((student) => (student.studentId === studentId ? { ...student, value } : student)),
     );
   };
 
@@ -149,18 +149,17 @@ export default function CoScholasticMarksPage() {
     try {
       const data: Record<string, string> = {};
       for (const student of students) {
-        data[`values[${student.id}][term_id]`] = criteria.term;
-        data[`values[${student.id}][grade_id]`] = criteria.grade;
-        data[`values[${student.id}][standard_id]`] = criteria.standard;
-        data[`values[${student.id}][division_id]`] = criteria.division;
-        data[`values[${student.id}][co_scholastic]`] = criteria.co_scholastic;
+        data[`values[${student.studentId}][term_id]`] = criteria.term;
+        data[`values[${student.studentId}][grade_id]`] = criteria.grade;
+        data[`values[${student.studentId}][standard_id]`] = criteria.standard;
+        data[`values[${student.studentId}][co_scholastic]`] = criteria.co_scholastic;
         if (markType === 'GRADE') {
-          data[`values[${student.id}][grade]`] = student.value;
+          data[`values[${student.studentId}][grade_opt]`] = student.value;
         } else {
-          data[`values[${student.id}][points]`] = student.value;
+          data[`values[${student.studentId}][points]`] = student.value;
         }
       }
-      const payload = await resultPost('result/co_scholastic_marks_entry', data);
+      const payload = await resultPost('api/result/co-scholastic-marks-entry', data);
       const message = assertOk(payload, 'Laravel did not confirm that marks were saved.');
       toast.success('Co-scholastic marks saved', message || undefined);
     } catch (err) {
@@ -174,7 +173,7 @@ export default function CoScholasticMarksPage() {
     if (!criteria) return;
     setApproving(true);
     try {
-      const payload = await resultPost('result/co_scholastic_marks_entry_approve', {
+      const payload = await resultPost('api/result/co-scholastic-marks-entry/approve', {
         approve: '1',
         term_id: criteria.term,
         standard_id: criteria.standard,
@@ -298,7 +297,7 @@ export default function CoScholasticMarksPage() {
                       {students.map((student) => {
                         const invalid = markType === 'MARK' && !isValidMark(student.value, student.maxMark);
                         return (
-                          <tr key={student.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                          <tr key={student.studentId} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
                             <td className="px-5 py-4 font-mono text-xs text-slate-600">{student.rollNo}</td>
                             <td className="px-5 py-4 font-medium text-slate-900">{student.name}</td>
                             <td className="px-5 py-4">
@@ -307,7 +306,7 @@ export default function CoScholasticMarksPage() {
                                   <select
                                     value={student.value}
                                     disabled={approved}
-                                    onChange={(event) => setStudentValue(student.id, event.target.value)}
+                                    onChange={(event) => setStudentValue(student.studentId, event.target.value)}
                                     aria-label={`Grade for ${student.name}`}
                                     className="h-9 w-40 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 transition-all hover:border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
                                   >
@@ -323,7 +322,7 @@ export default function CoScholasticMarksPage() {
                                     type="text"
                                     value={student.value}
                                     disabled={approved}
-                                    onChange={(event) => setStudentValue(student.id, event.target.value)}
+                                    onChange={(event) => setStudentValue(student.studentId, event.target.value)}
                                     aria-label={`Marks for ${student.name}`}
                                     aria-invalid={invalid}
                                     placeholder="Enter"

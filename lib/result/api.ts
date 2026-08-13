@@ -1,12 +1,11 @@
 'use client';
 
+import { API_BASE_URL } from '@/app/components/utils/api_url';
+
 /**
  * Result module API client.
  *
- * Every call goes through the local `/api/proxy` route so the Laravel
- * backend keeps receiving the exact same query params / form bodies the
- * Blade screens sent. Session context (token, sub_institute_id, user_id,
- * syear) is read from localStorage the same way the rest of the app does.
+ * Calls the Laravel backend directly using the API_BASE_URL from .env.
  */
 
 export type SelectOption = { id: string; label: string };
@@ -53,11 +52,14 @@ export function getResultSession(): ResultSession {
   }
 }
 
-/** GET through the proxy with session params appended. */
+function getBaseUrl(): string {
+  return API_BASE_URL.replace(/\/$/, '');
+}
+
+/** GET directly to Laravel backend with session params appended. */
 export async function resultGet(path: string, params: Record<string, string> = {}): Promise<Record<string, unknown>> {
   const session = getResultSession();
   const query = new URLSearchParams({
-    path,
     type: 'API',
     ...params,
     ...(session.subInstituteId ? { sub_institute_id: session.subInstituteId } : {}),
@@ -65,7 +67,7 @@ export async function resultGet(path: string, params: Record<string, string> = {
     ...(session.syear ? { syear: session.syear } : {}),
     ...(session.token ? { token: session.token } : {}),
   });
-  const response = await fetch(`/api/proxy?${query.toString()}`, {
+  const response = await fetch(`${getBaseUrl()}/${path.replace(/^\/+/, '')}?${query.toString()}`, {
     headers: session.token ? { Authorization: `Bearer ${session.token}` } : undefined,
   });
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
@@ -85,7 +87,7 @@ export type ResultPostOptions = {
 export type PostValue = string | Blob | null | undefined;
 
 /**
- * POST through the proxy. Values may be nested (`values[12][points]`) —
+ * POST directly to Laravel backend. Values may be nested (`values[12][points]`) —
  * callers pass fully-bracketed keys exactly as the Blade forms did.
  */
 export async function resultPost(
@@ -98,9 +100,9 @@ export async function resultPost(
 
   const appendSession = (append: (key: string, value: string) => void) => {
     append('type', 'API');
-    if (session.subInstituteId) append('sub_institute_id', session.subInstituteId);
-    if (session.userId) append('user_id', session.userId);
-    if (session.syear) append('syear', session.syear);
+    append('sub_institute_id', session.subInstituteId);
+    append('user_id', session.userId);
+    append('syear', session.syear);
     if (session.token) append('token', session.token);
     if (method !== 'POST') append('_method', method);
   };
@@ -129,7 +131,7 @@ export async function resultPost(
     headers['Content-Type'] = 'application/x-www-form-urlencoded';
   }
 
-  const response = await fetch(`/api/proxy?path=${encodeURIComponent(path)}`, { method: 'POST', headers, body });
+  const response = await fetch(`${getBaseUrl()}/${path.replace(/^\/+/, '')}`, { method: 'POST', headers, body });
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
     throw new Error(readString(payload.message) || `HTTP ${response.status}: Request failed`);
@@ -137,10 +139,11 @@ export async function resultPost(
   return payload;
 }
 
-/** Interpret the standard Laravel `{status: 1, message}` envelope. */
+/** Interpret the standard Laravel `{status: 1, message}` or `{success: true, message}` envelope. */
 export function assertOk(payload: Record<string, unknown>, fallbackMessage: string): string {
   const status = readString(payload.status ?? payload.status_code ?? '');
-  if (status && status !== '1' && status.toLowerCase() !== 'success' && status !== '200') {
+  const success = payload.success === true || payload.success === 'true' || payload.success === 1 || payload.success === '1';
+  if (!success && status && status !== '1' && status.toLowerCase() !== 'success' && status !== '200') {
     throw new Error(readString(payload.message) || fallbackMessage);
   }
   return readString(payload.message);
@@ -166,7 +169,7 @@ export function toOptions(items: unknown): SelectOption[] {
     .map((item) => {
       const row = asRecord(item);
       const id = readString(
-        row.id ?? row.term_id ?? row.section_id ?? row.standard_id ?? row.division_id ??
+        row.id ?? row.Id ?? row.term_id ?? row.section_id ?? row.standard_id ?? row.division_id ??
         row.subject_id ?? row.exam_master_id ?? row.exam_id ?? row.value ?? row.key,
       );
       const label = readString(
@@ -181,9 +184,27 @@ export function toOptions(items: unknown): SelectOption[] {
 
 /** Pull the row collection out of a list payload (handles data/data.data/rows). */
 export function extractRows(payload: Record<string, unknown>, listKey?: string): Record<string, unknown>[] {
-  const source = listKey
-    ? asRecord(payload.data ?? payload)[listKey] ?? asRecord(payload)[listKey]
-    : payload.data ?? payload;
+  if (listKey) {
+    const envelope = payload.data ?? payload;
+    const directList = asRecord(envelope)[listKey] ?? asRecord(payload)[listKey];
+
+    if (directList !== undefined) {
+      return toCollection(directList).map(asRecord);
+    }
+
+    // Some endpoints (such as grade-master) return child records nested in
+    // each parent record instead of exposing a top-level child collection.
+    // Flatten them and preserve parent fields (for example, `grade_name`).
+    return toCollection(envelope).flatMap((parent) => {
+      const parentRecord = asRecord(parent);
+      return toCollection(parentRecord[listKey]).map((child) => ({
+        ...parentRecord,
+        ...asRecord(child),
+      }));
+    });
+  }
+
+  const source = payload.data ?? payload;
   const inner = asRecord(source);
   const collection = Array.isArray(source)
     ? source
