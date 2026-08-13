@@ -40,8 +40,8 @@ export const frontDeskModules = {
   gallery: {
     title: 'Photo video gallery',
     description: 'Publish class-targeted photo albums and video links.',
-    endpoint: 'front_desk/photo_video_gallary',
-    storeEndpoint: 'front_desk/photo_video_gallary',
+    endpoint: 'api/front-desk/photo-video-gallery',
+    storeEndpoint: 'api/front-desk/photo-video-gallery',
     method: 'GET',
     classFields: ['section', 'standard', 'division'],
     multipleClassFields: true,

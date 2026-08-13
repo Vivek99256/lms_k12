@@ -1,7 +1,5 @@
-import ModuleWorkbench from '../_components/ModuleWorkbench';
-import { frontDeskModules } from '../_lib/modules';
+import GalleryAlbums from '../_components/GalleryAlbums';
 
 export default function Page() {
-  return <ModuleWorkbench module={frontDeskModules.gallery} />;
+  return <GalleryAlbums />;
 }
-

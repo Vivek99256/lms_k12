@@ -20,6 +20,19 @@ function recordsFrom(value: unknown): JsonRecord[] {
     const rows = recordsFrom(record[key]);
     if (rows.length) return rows;
   }
+
+  // Some endpoints (e.g. the gallery listing) group flat rows into an object
+  // keyed by an arbitrary label, such as album title, instead of returning
+  // an array. Flatten that shape too.
+  const values = Object.values(record);
+  if (values.length && values.every((item) => Array.isArray(item))) {
+    return values.flatMap((item) =>
+      (item as unknown[]).filter(
+        (row): row is JsonRecord => Boolean(row && typeof row === 'object')
+      )
+    );
+  }
+
   return [];
 }
 
@@ -125,5 +138,26 @@ export async function saveModuleRecord(
     }
   );
   return decode(response);
+}
+
+/**
+ * Resolves a gallery row's file to a viewable URL. Photo rows store a bare
+ * filename under the Laravel `storage/photo_video_gallary/` disk; Video rows
+ * store the YouTube link directly (see PhotoVideoGallaryApiController::store).
+ */
+export function galleryFileUrl(record: JsonRecord): string {
+  const fileName = typeof record.file_name === 'string' ? record.file_name.trim() : '';
+  if (!fileName) return '';
+  if (record.type === 'Video') return fileName;
+
+  const baseUrl = buildSessionContext().baseUrl;
+  return `${baseUrl}/storage/photo_video_gallary/${encodeURIComponent(fileName)}`;
+}
+
+export function youtubeEmbedUrl(url: string): string | null {
+  const match = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{6,})/
+  );
+  return match ? `https://www.youtube.com/embed/${match[1]}` : null;
 }
 

@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -122,6 +123,15 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
     }
   }, [module.endpoint, module.method, query]);
 
+  const autoLoaded = useRef(false);
+
+  useEffect(() => {
+    if (!autoLoaded.current && !searched) {
+      autoLoaded.current = true;
+      void load();
+    }
+  }, [load, searched]);
+
   function addClassValues(form: FormData) {
     const mapping = {
       section: 'grade',
@@ -138,10 +148,11 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!module.storeEndpoint) return;
+    const formElement = event.currentTarget;
     setSaving(true);
     setError('');
     try {
-      const form = new FormData(event.currentTarget);
+      const form = new FormData(formElement);
       for (const [name, value] of Object.entries(module.defaultFormValues ?? {})) {
         if (!form.has(name)) form.set(name, value);
       }
@@ -152,7 +163,7 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
       }
       await saveModuleRecord(module.storeEndpoint, form);
       toast.success(`${module.title} saved`);
-      event.currentTarget.reset();
+      formElement.reset();
       setFieldValues({});
       await load();
     } catch (saveError) {
