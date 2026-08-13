@@ -850,8 +850,8 @@ export default function FeesReceiptBookMasterPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-[#e9eef7] p-4 sm:p-5 lg:p-6">
-        <div className="mx-auto max-w-7xl">
+      <div className="min-h-screen p-4 sm:p-5 lg:p-6">
+        <div className="mx-auto">
           <Card className="rounded-2xl border border-slate-200/90 bg-white py-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <CardHeader className="gap-4 border-b border-slate-200/80 px-4 py-4 sm:px-5">
               <div>

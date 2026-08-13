@@ -116,10 +116,11 @@ export type LegacyRegistrationDetailResponse = {
   division?: Array<{ id?: string | number; name?: string; standard_id?: string | number }>;
   category?: Array<{ id?: string | number; title?: string | null; name?: string | null }>;
   standard?: Array<{ id?: string | number; name?: string | null }>;
-  bloodgroup_data?: Array<{ id?: string | number; bloodgroup?: string | null; name?: string | null }>;
-  religion_data?: Array<{ id?: string | number; name?: string | null; religion?: string | null }>;
-  caste_data?: Array<{ id?: string | number; name?: string | null; caste?: string | null }>;
+  bloodgroup_data?: Array<{ id?: string | number; bloodgroup?: string | null; [key: string]: unknown }>;
+  religion_data?: Array<{ id?: string | number; religion_name?: string | null; [key: string]: unknown }>;
+  caste_data?: Array<{ id?: string | number; caste_name?: string | null; [key: string]: unknown }>;
   new_enrollment_no?: string | number | null;
+  next_register_number?: string | number | null;
   display_save_student?: string | number | null;
   [key: string]: unknown;
 };
@@ -131,10 +132,11 @@ export type RegistrationPipelineDetail = {
   division?: Array<{ id?: string | number; name?: string; standard_id?: string | number }>;
   category?: Array<{ id?: string | number; title?: string | null; name?: string | null }>;
   standard?: Array<{ id?: string | number; name?: string | null }>;
-  bloodgroupData?: Array<{ id?: string | number; bloodgroup?: string | null; name?: string | null }>;
-  religionData?: Array<{ id?: string | number; name?: string | null; religion?: string | null }>;
-  casteData?: Array<{ id?: string | number; name?: string | null; caste?: string | null }>;
+  bloodgroupData?: Array<{ id?: string | number; bloodgroup?: string | null; [key: string]: unknown }>;
+  religionData?: Array<{ id?: string | number; religion_name?: string | null; [key: string]: unknown }>;
+  casteData?: Array<{ id?: string | number; caste_name?: string | null; [key: string]: unknown }>;
   newEnrollmentNo?: string;
+  nextRegisterNumber?: string;
   displaySaveStudent?: string;
 };
 

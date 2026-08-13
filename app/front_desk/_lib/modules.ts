@@ -5,6 +5,8 @@ export type ModuleField = {
   required?: boolean;
   multiple?: boolean;
   options?: Array<{ label: string; value: string }>;
+  optionsEndpoint?: string;
+  optionsDataKey?: string;
   accept?: string;
   visibleWhen?: { field: string; value: string };
 };
@@ -21,8 +23,12 @@ export type FrontDeskModule = {
   storeEndpoint?: string;
   method?: 'GET' | 'POST';
   classFields?: Array<'section' | 'standard' | 'division'>;
+  /** Parameter names expected by legacy report endpoints for the class picker. */
+  classFieldParams?: Partial<Record<'section' | 'standard' | 'division', string>>;
   multipleClassFields?: boolean;
   fields?: ModuleField[];
+  /** Values required by legacy endpoints even when their related control is hidden. */
+  defaultFormValues?: Record<string, string>;
   filters?: ModuleField[];
   columns: ModuleColumn[];
   submitLabel?: string;
@@ -34,8 +40,8 @@ export const frontDeskModules = {
   gallery: {
     title: 'Photo video gallery',
     description: 'Publish class-targeted photo albums and video links.',
-    endpoint: 'front_desk/photo_video_gallary',
-    storeEndpoint: 'front_desk/photo_video_gallary',
+    endpoint: 'api/front-desk/photo-video-gallery',
+    storeEndpoint: 'api/front-desk/photo-video-gallery',
     method: 'GET',
     classFields: ['section', 'standard', 'division'],
     multipleClassFields: true,
@@ -62,12 +68,13 @@ export const frontDeskModules = {
         visibleWhen: { field: 'type', value: 'Photo' },
       },
       {
-        name: 'attachment',
+        name: 'youtube_link',
         label: 'YouTube link',
         type: 'text',
         visibleWhen: { field: 'type', value: 'Video' },
       },
     ],
+    defaultFormValues: { youtube_link: '' },
     columns: [
       { key: 'album_title', label: 'Album' },
       { key: 'title', label: 'Title' },

@@ -11,6 +11,7 @@ import {
   type InfirmaryRecord,
   type StudentOption,
 } from './api';
+import { getMobileNumberError, sanitizeMobileNumberInput } from '../_components/mobileValidation';
 
 const emptyForm = (caseNumber = ''): InfirmaryForm => ({
   student_id: '',
@@ -35,6 +36,7 @@ export default function StudentInfirmaryPage() {
   const [editingId, setEditingId] = useState('');
   const [studentQuery, setStudentQuery] = useState('');
   const [studentOptions, setStudentOptions] = useState<StudentOption[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [showForm, setShowForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -75,6 +77,23 @@ export default function StudentInfirmaryPage() {
     };
   }, [studentQuery, form.student_id]);
 
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [studentOptions]);
+
+  useEffect(() => {
+    if (highlightedIndex < 0 || studentOptions.length === 0) return;
+    const option = document.querySelector(`#infirmary-student-options [data-index="${highlightedIndex}"]`);
+    (option as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
+  }, [highlightedIndex, studentOptions]);
+
+  const selectStudent = (student: StudentOption) => {
+    setStudentQuery(`${student.enrollmentNo} / ${student.name}`);
+    setForm((current) => ({ ...current, student_id: student.id, student_name: student.name }));
+    setStudentOptions([]);
+    setHighlightedIndex(-1);
+  };
+
   const filteredRecords = useMemo(() => {
     const query = filter.toLowerCase().trim();
     if (!query) return records;
@@ -106,6 +125,10 @@ export default function StudentInfirmaryPage() {
     event.preventDefault();
     if (!form.student_id) {
       setError('Please select a student from the search results.');
+      return;
+    }
+    if (getMobileNumberError(form.doctor_contact)) {
+      setError('Enter a valid 10-digit doctor contact number starting with 6-9.');
       return;
     }
     setIsSaving(true);
@@ -205,18 +228,38 @@ export default function StudentInfirmaryPage() {
                   setStudentQuery(event.target.value);
                   setStudentOptions([]);
                   setForm((current) => ({ ...current, student_id: '', student_name: event.target.value }));
-                }} placeholder="Type student name or GR No." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 read-only:bg-slate-50" />
-                {studentOptions.length > 0 && <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
-                  {studentOptions.map((student) => <button key={student.id} type="button" onClick={() => {
-                    setStudentQuery(`${student.enrollmentNo} / ${student.name}`);
-                    setForm((current) => ({ ...current, student_id: student.id, student_name: student.name }));
+                }} onKeyDown={(event) => {
+                  if (studentOptions.length === 0) return;
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    setHighlightedIndex((prev) => (prev < 0 ? 0 : Math.min(prev + 1, studentOptions.length - 1)));
+                  } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    setHighlightedIndex((prev) => (prev <= 0 ? -1 : prev - 1));
+                  } else if (event.key === 'Enter') {
+                    event.preventDefault();
+                    selectStudent(studentOptions[highlightedIndex >= 0 ? highlightedIndex : 0]);
+                  } else if (event.key === 'Escape') {
                     setStudentOptions([]);
-                  }} className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"><span className="font-medium">{student.name}</span><span className="ml-2 text-slate-400">{student.enrollmentNo}</span></button>)}
+                    setHighlightedIndex(-1);
+                  }
+                }} placeholder="Type student name or GR No." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 read-only:bg-slate-50" />
+                {studentOptions.length > 0 && <div id="infirmary-student-options" className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
+                  {studentOptions.map((student, index) => <button key={student.id} type="button" data-index={index} onClick={() => selectStudent(student)} className={`block w-full px-3 py-2 text-left text-sm ${index === highlightedIndex ? 'bg-indigo-100' : 'hover:bg-slate-50'}`}><span className="font-medium">{student.name}</span><span className="ml-2 text-slate-400">{student.enrollmentNo}</span></button>)}
                 </div>}
               </label>
               <Field label="Medical Case No." value={form.medical_case_no} onChange={(value) => setForm((current) => ({ ...current, medical_case_no: value }))} readOnly />
               <Field label="Doctor Name" value={form.doctor_name} onChange={(value) => setForm((current) => ({ ...current, doctor_name: value }))} />
-              <Field label="Doctor Contact" value={form.doctor_contact} onChange={(value) => setForm((current) => ({ ...current, doctor_contact: value }))} />
+              <Field
+                label="Doctor Contact"
+                value={form.doctor_contact}
+                onChange={(value) => setForm((current) => ({ ...current, doctor_contact: value }))}
+                onInput={sanitizeMobileNumberInput}
+                inputMode="numeric"
+                pattern="[6-9][0-9]{9}"
+                maxLength={10}
+                error={getMobileNumberError(form.doctor_contact)}
+              />
               <Field label="Open Date" type="date" value={form.date} onChange={(value) => setForm((current) => ({ ...current, date: value }))} required />
               <Field label="Complaint" value={form.complaint} onChange={(value) => setForm((current) => ({ ...current, complaint: value }))} />
               <Field label="Symptoms" value={form.symptoms} onChange={(value) => setForm((current) => ({ ...current, symptoms: value }))} />
@@ -240,6 +283,48 @@ function Summary({ title, value, icon }: { title: string; value: number; icon: R
   return <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><div><p className="text-sm text-slate-500">{title}</p><p className="mt-1 text-2xl font-bold text-slate-900">{value}</p></div><span className="rounded-lg bg-indigo-50 p-3 text-indigo-600">{icon}</span></div>;
 }
 
-function Field({ label, value, onChange, type = 'text', readOnly = false, required = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; readOnly?: boolean; required?: boolean }) {
-  return <label className="space-y-1"><span className="text-xs font-medium text-slate-700">{label}</span><input type={type} value={value} readOnly={readOnly} required={required} onChange={(event) => onChange(event.target.value)} className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 read-only:bg-slate-50" /></label>;
+function Field({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  readOnly = false,
+  required = false,
+  onInput,
+  inputMode,
+  pattern,
+  maxLength,
+  error,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  readOnly?: boolean;
+  required?: boolean;
+  onInput?: (event: FormEvent<HTMLInputElement>) => void;
+  inputMode?: 'numeric';
+  pattern?: string;
+  maxLength?: number;
+  error?: string;
+}) {
+  return (
+    <label className="space-y-1">
+      <span className="text-xs font-medium text-slate-700">{label}</span>
+      <input
+        type={type}
+        value={value}
+        readOnly={readOnly}
+        required={required}
+        onChange={(event) => onChange(event.target.value)}
+        onInput={onInput}
+        inputMode={inputMode}
+        pattern={pattern}
+        maxLength={maxLength}
+        aria-invalid={Boolean(error)}
+        className={`h-10 w-full rounded-md border px-3 text-sm outline-none read-only:bg-slate-50 ${error ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-indigo-500'}`}
+      />
+      {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+    </label>
+  );
 }

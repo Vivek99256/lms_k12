@@ -20,6 +20,19 @@ function recordsFrom(value: unknown): JsonRecord[] {
     const rows = recordsFrom(record[key]);
     if (rows.length) return rows;
   }
+
+  // Some endpoints (e.g. the gallery listing) group flat rows into an object
+  // keyed by an arbitrary label, such as album title, instead of returning
+  // an array. Flatten that shape too.
+  const values = Object.values(record);
+  if (values.length && values.every((item) => Array.isArray(item))) {
+    return values.flatMap((item) =>
+      (item as unknown[]).filter(
+        (row): row is JsonRecord => Boolean(row && typeof row === 'object')
+      )
+    );
+  }
+
   return [];
 }
 
@@ -50,12 +63,13 @@ async function decode(response: Response): Promise<ApiEnvelope & JsonRecord> {
 export async function loadModuleRows(
   endpoint: string,
   params: Record<string, string> = {},
-  method: 'GET' | 'POST' = 'GET'
+  method: 'GET' | 'POST' = 'GET',
+  type: 'API' | 'JSON' = 'JSON'
 ) {
   const session = buildSessionContext();
   const search = new URLSearchParams(params);
   appendCommonParams(search, session);
-  search.set('type', 'JSON');
+  search.set('type', type);
   if (session.userId) search.set('user_id', session.userId);
 
   const proxyUrl = `/api/proxy?path=${encodeURIComponent(endpoint)}`;
@@ -74,18 +88,49 @@ export async function loadModuleRows(
   return { payload, rows: recordsFrom(payload) };
 }
 
+export async function loadModuleOptions(
+  endpoint: string,
+  dataKey: string
+): Promise<Array<{ label: string; value: string }>> {
+  const { payload } = await loadModuleRows(endpoint, {}, 'GET', 'API');
+  const source = payload[dataKey];
+  if (!Array.isArray(source)) return [];
+
+  return source.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const record = item as JsonRecord;
+    const value = record.id ?? record.value;
+    const label = record.teacher_name ?? record.name ?? record.label;
+    if (value == null || label == null) return [];
+    return [{ value: String(value), label: String(label).trim() }];
+  });
+}
+
 export async function saveModuleRecord(
   endpoint: string,
   form: FormData
 ) {
   const session = buildSessionContext();
-  form.set('type', 'JSON');
-  if (session.subInstituteId) form.set('sub_institute_id', session.subInstituteId);
-  if (session.syear) form.set('syear', session.syear);
+  if (!session.syear) {
+    throw new Error('Choose an academic year from the header before saving this record.');
+  }
+  if (!session.subInstituteId) {
+    throw new Error('Your login session is missing the institute. Please sign in again.');
+  }
+  form.set('sub_institute_id', session.subInstituteId);
+  form.set('syear', session.syear);
   if (session.userId) form.set('user_id', session.userId);
 
+  const proxyQuery = new URLSearchParams({
+    path: endpoint,
+    type: 'API',
+    syear: session.syear,
+    sub_institute_id: session.subInstituteId,
+  });
+  if (session.userId) proxyQuery.set('user_id', session.userId);
+
   const response = await fetch(
-    `/api/proxy?path=${encodeURIComponent(endpoint)}`,
+    `/api/proxy-file?${proxyQuery.toString()}`,
     {
       method: 'POST',
       headers: createAuthHeaders(session),
@@ -93,5 +138,26 @@ export async function saveModuleRecord(
     }
   );
   return decode(response);
+}
+
+/**
+ * Resolves a gallery row's file to a viewable URL. Photo rows store a bare
+ * filename under the Laravel `storage/photo_video_gallary/` disk; Video rows
+ * store the YouTube link directly (see PhotoVideoGallaryApiController::store).
+ */
+export function galleryFileUrl(record: JsonRecord): string {
+  const fileName = typeof record.file_name === 'string' ? record.file_name.trim() : '';
+  if (!fileName) return '';
+  if (record.type === 'Video') return fileName;
+
+  const baseUrl = buildSessionContext().baseUrl;
+  return `${baseUrl}/storage/photo_video_gallary/${encodeURIComponent(fileName)}`;
+}
+
+export function youtubeEmbedUrl(url: string): string | null {
+  const match = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{6,})/
+  );
+  return match ? `https://www.youtube.com/embed/${match[1]}` : null;
 }
 

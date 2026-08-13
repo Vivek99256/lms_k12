@@ -24,16 +24,15 @@ export async function GET(request: NextRequest) {
   }
 
   const base = API_BASE_URL.replace(/\/$/, '');
+  const queryParams = new URLSearchParams(request.nextUrl.searchParams);
+  queryParams.delete('path');
   const url = `${base}/${resolveTargetPath(targetPath)}`;
-
-  const upstreamParams = new URLSearchParams(request.nextUrl.searchParams);
-  upstreamParams.delete('path');
   const authorization = request.headers.get('authorization');
   const cookie = request.headers.get('cookie');
   const referer = request.headers.get('referer');
 
   try {
-    const upstream = await fetch(`${url}?${upstreamParams.toString()}`, {
+    const upstream = await fetch(`${url}?${queryParams.toString()}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -82,7 +81,10 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
   }
 
   const base = API_BASE_URL.replace(/\/$/, '');
-  const url = `${base}/${resolveTargetPath(targetPath)}`;
+  const requestQuery = new URLSearchParams(request.nextUrl.searchParams);
+  requestQuery.delete('path');
+  const query = requestQuery.toString();
+  const url = `${base}/${resolveTargetPath(targetPath)}${query ? `?${query}` : ''}`;
 
   const contentType = request.headers.get('content-type') || '';
   const body = await request.arrayBuffer();
@@ -91,7 +93,7 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
 
   try {
     const upstream = await fetch(url, {
-      method: request.method,
+      method,
       headers: {
         ...(contentType ? { 'Content-Type': contentType } : {}),
         Accept: 'application/json',

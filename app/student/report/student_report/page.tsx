@@ -1,5 +1,5 @@
-import StudentReportModule from '../StudentReportModule';
+import StudentReportPageContent from './StudentReportPageContent';
 
 export default function StudentReportPage() {
-  return <StudentReportModule kind="student_report" />;
+  return <StudentReportPageContent />;
 }

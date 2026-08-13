@@ -67,18 +67,35 @@ export function buildSessionContext(): SessionContext {
   }
 
   try {
-    const userData = JSON.parse(
-      localStorage.getItem('userData') || '{}'
-    ) as Record<string, unknown>;
-    const menuContext = JSON.parse(
-      localStorage.getItem('menuContext') || '{}'
-    ) as Record<string, unknown>;
-    const academicYears = Array.isArray(userData.academicYears)
-      ? userData.academicYears
-      : [];
-    const academicTerms = Array.isArray(userData.academicTerms)
-      ? userData.academicTerms
-      : [];
+    const readStoredRecord = (key: string): Record<string, unknown> => {
+      const value = localStorage.getItem(key) ?? sessionStorage.getItem(key) ?? '{}';
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        return parsed && typeof parsed === 'object'
+          ? (parsed as Record<string, unknown>)
+          : {};
+      } catch {
+        return {};
+      }
+    };
+    const userData = readStoredRecord('userData');
+    const menuContext = readStoredRecord('menuContext');
+    const sessionData = readStoredRecord('sessionData');
+    const sessionRecords = [userData, menuContext, sessionData];
+    const firstValue = (...keys: string[]) => {
+      for (const record of sessionRecords) {
+        for (const key of keys) {
+          if (record[key] != null && record[key] !== '') return record[key];
+        }
+      }
+      return undefined;
+    };
+    const academicYears = sessionRecords.flatMap((record) =>
+      Array.isArray(record.academicYears) ? record.academicYears : []
+    );
+    const academicTerms = sessionRecords.flatMap((record) =>
+      Array.isArray(record.academicTerms) ? record.academicTerms : []
+    );
 
     // Resolve the academic year the way the Laravel session does: the *active*
     // year — the academic term whose date range covers today — which the login
@@ -101,8 +118,8 @@ export function buildSessionContext(): SessionContext {
       [...academicTerms, ...academicYears].map(yearOf).filter(Boolean)
     );
     const selectedYear = normalizeAcademicYear(
-      readString(localStorage.getItem('selectedAcademicYear')) ||
-        readString(localStorage.getItem('syear'))
+      readString(localStorage.getItem('selectedAcademicYear') ?? sessionStorage.getItem('selectedAcademicYear')) ||
+        readString(localStorage.getItem('syear') ?? sessionStorage.getItem('syear'))
     );
     let syear =
       selectedYear && (validYears.size === 0 || validYears.has(selectedYear))
@@ -111,9 +128,7 @@ export function buildSessionContext(): SessionContext {
     if (!syear) {
       syear = normalizeAcademicYear(
         readString(
-          userData.academic_year_id ??
-            userData.academicYearId ??
-            menuContext.academic_year_id
+          firstValue('syear', 'academic_year', 'academic_year_id', 'academicYearId')
         )
       );
     }
@@ -121,34 +136,26 @@ export function buildSessionContext(): SessionContext {
     return {
       baseUrl:
         ERP_BASE_URL_OVERRIDE ||
-        readString(userData.host_name).replace(/\/$/, '') ||
+        readString(firstValue('host_name', 'hostName')).replace(/\/$/, '') ||
         API_BASE_URL.replace(/\/$/, ''),
       token: readString(
-        userData.user_token ??
-          userData.token ??
-          menuContext.user_token ??
-          menuContext.token
+        firstValue('user_token', 'token')
       ),
       subInstituteId: readString(
-        userData.sub_institute_id ??
-          menuContext.sub_institute_id ??
+        firstValue('sub_institute_id', 'subInstituteId') ??
           localStorage.getItem('sub_institute_id')
       ),
       syear,
       userId: readString(
-        userData.user_id ??
-          userData.userId ??
-          menuContext.user_id ??
-          menuContext.userId
+        firstValue('user_id', 'userId')
       ),
       termId: readString(
         normalizeNumericId(
-          userData.term_id ??
-            menuContext.term_id ??
-            userData.marking_period_id ??
-            menuContext.marking_period_id ??
-            userData.academic_term_id ??
-            menuContext.academic_term_id ??
+          firstValue(
+            'term_id',
+            'marking_period_id',
+            'academic_term_id'
+          ) ??
             localStorage.getItem('term_id')
         )
       ),

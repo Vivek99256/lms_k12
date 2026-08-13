@@ -114,7 +114,7 @@ export async function loadDynamicBootstrap(
   const path =
     kind === 'student_report' ? 'student/student_report' : 'student/inactive_student_report';
   const payload = rootPayload(await legacyRequest(path));
-  return parseDynamicFieldGroups(payload.data);
+  return parseDynamicFieldGroups(payload);
 }
 
 export async function loadStrengthFilterOptions(): Promise<StrengthFilterOptions> {
@@ -145,30 +145,31 @@ export async function fetchStudentListingReport(input: {
   dynamicFields: string[];
 }): Promise<FlatReportResult> {
   const path = input.inactive ? 'student/inactive_student_report/create' : 'student/show_student_report';
-  const payload = rootPayload(
-    await legacyRequest(path, {
-      method: input.inactive ? 'GET' : 'POST',
-      ...(input.inactive
-        ? {
-            query: {
-              grade: input.grade,
-              standard: input.standard,
-              division: input.division,
-              order_by: input.orderBy,
-              dynamicFields: input.dynamicFields,
-            },
-          }
-        : {
-            body: {
-              grade: input.grade,
-              standard: input.standard,
-              division: input.division,
-              order_by: input.orderBy,
-              dynamicFields: input.dynamicFields,
-            },
-          }),
-    })
-  );
+  // Not routed through rootPayload(): this endpoint's `student_data`/`headers` sit at the
+  // response root alongside an unrelated `data` object (the dynamic-field group definitions
+  // used by the field picker), and rootPayload() would wrongly unwrap into that instead.
+  const payload = await legacyRequest(path, {
+    method: input.inactive ? 'GET' : 'POST',
+    ...(input.inactive
+      ? {
+          query: {
+            grade: input.grade,
+            standard: input.standard,
+            division: input.division,
+            order_by: input.orderBy,
+            dynamicFields: input.dynamicFields,
+          },
+        }
+      : {
+          body: {
+            grade: input.grade,
+            standard: input.standard,
+            division: input.division,
+            order_by: input.orderBy,
+            dynamicFields: input.dynamicFields,
+          },
+        }),
+  });
 
   return {
     rows: normalizeFlatRows(payload.student_data),
@@ -240,12 +241,18 @@ export async function fetchMissingDocumentReport(input: {
 }
 
 export async function fetchStudentRequestReport(input: {
+  grade: string;
+  standard: string;
+  division: string;
   fromDate: string;
   toDate: string;
 }): Promise<FlatReportResult> {
   const payload = rootPayload(
-    await legacyRequest('student/student_request_report/create', {
+    await legacyRequest('student/student_request_report_fixed/create', {
       query: {
+        grade: input.grade,
+        standard: input.standard,
+        division: input.division,
         from_date: input.fromDate,
         to_date: input.toDate,
       },
@@ -257,11 +264,13 @@ export async function fetchStudentRequestReport(input: {
     headers: [
       { key: 'enrollment_no', label: 'GR No' },
       { key: 'student_name', label: 'Student Name' },
-      { key: 'standard', label: 'Standard' },
-      { key: 'division', label: 'Division' },
-      { key: 'REQUEST', label: 'Request' },
+      { key: 'REQUEST', label: 'Request Type' },
+      { key: 'PROOF_OF_DOCUMENT', label: 'Document' },
       { key: 'REASON', label: 'Reason' },
       { key: 'DESCRIPTION', label: 'Description' },
+      { key: 'grade', label: 'Section' },
+      { key: 'standard', label: 'Standard' },
+      { key: 'division', label: 'Division' },
     ],
     message: messageFrom(payload, 'Student request report loaded.'),
   };
@@ -371,11 +380,15 @@ export async function fetchStudentStrengthReport(input: {
 
 export async function fetchAgewiseReport(input: {
   grade: string;
+  standard?: string;
+  division?: string;
 }) {
   const payload = rootPayload(
     await legacyRequest('student/agewise', {
       query: {
         grade_id: input.grade,
+        standard: input.standard,
+        division: input.division,
       },
     })
   );
