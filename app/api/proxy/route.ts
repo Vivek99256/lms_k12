@@ -87,7 +87,7 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
   const url = `${base}/${resolveTargetPath(targetPath)}${query ? `?${query}` : ''}`;
 
   const contentType = request.headers.get('content-type') || '';
-  const body = await request.arrayBuffer();
+  const bodyText = await request.text();
   const authorization = request.headers.get('authorization');
   const cookie = request.headers.get('cookie');
 
@@ -100,7 +100,7 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
         ...(authorization ? { Authorization: authorization } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
       },
-      body: body.byteLength > 0 ? body : undefined,
+      body: bodyText || undefined,
       cache: 'no-store',
     });
 

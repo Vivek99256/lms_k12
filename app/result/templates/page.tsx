@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * Result templates — CRUD over the report-card HTML templates
- * (result/result-template resource). Uses the shared MasterCrud in
- * embedded mode so the page owns its own header with the
- * "View default tags" action.
+ * Result templates — CRUD over the report-card HTML templates, backed by
+ * the dedicated `api/result/result-template` REST API (validates
+ * module_name/title/html_content server-side; native PUT/DELETE routes
+ * work transparently with MasterCrud's spoofed-POST client via Laravel's
+ * method-override).
  */
 
 import React from 'react';
@@ -20,10 +21,10 @@ const SCREEN: MasterScreenDef = {
   subtitle: 'Report card HTML templates with placeholder tags',
   icon: FileCode2,
   api: {
-    index: 'result/result-template',
-    store: 'result/result-template',
-    update: 'result/result-template',
-    destroy: 'result/result-template',
+    index: 'api/result/result-template',
+    store: 'api/result/result-template',
+    update: 'api/result/result-template',
+    destroy: 'api/result/result-template',
   },
   entityName: 'template',
   columns: [
@@ -57,7 +58,7 @@ export default function ResultTemplatesPage() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => window.open('/api/proxy?path=result/view_all_result_tag', '_blank')}
+              onClick={() => window.open('/api/proxy?path=api/result/result-template/tags', '_blank')}
               className="h-9 rounded-lg px-4 text-sm font-medium"
             >
               <ExternalLink className="h-4 w-4" />

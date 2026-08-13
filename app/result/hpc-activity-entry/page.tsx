@@ -3,7 +3,15 @@
 /**
  * HPC activity entry — per-student radio matrix mapping students to an
  * activity group for the selected skillset / activity / sub-activity.
- * Mirrors the legacy Blade screen at result/result_activity_marks.
+ *
+ * Backed by the dedicated `api/result/hpc-activity-entry` REST API.
+ * Confirmed against the Laravel controller: the group-option columns are
+ * `result_activity_groups` and the student list is `student_datas`;
+ * existing selections are NOT embedded per-student but returned as a
+ * separate `get_activity_marks[studentId]` map (row + `group_id` +
+ * `group_title`, or null). `activity_id` is required by the save
+ * endpoint, so the activity filter must be required too — the original
+ * draft left it optional, which could 422 on save.
  *
  * Term is optional here, so it is rendered as a custom control instead of
  * the FilterBar term field (which would hold back the section cascade
@@ -21,7 +29,7 @@ import FilterBar, { type FilterFieldDef, type FilterValues } from '@/components/
 import { Banner, EmptyState, TableSkeleton } from '@/components/result/primitives';
 import { toast } from '@/components/result/toast';
 import {
-  asRecord, assertOk, readString, resultGet, resultPost, toCollection, toOptions,
+  asRecord, assertOk, readString, resultGet, resultPost, toCollection,
 } from '@/lib/result/api';
 
 type StudentRow = {
@@ -50,15 +58,15 @@ const FILTER_FIELDS: FilterFieldDef[] = [
   { kind: 'standard', required: true },
   { kind: 'division', required: true },
   {
-    kind: 'api', name: 'skillset_id', label: 'Select skillset', path: 'getActivityLists',
+    kind: 'api', name: 'skillset_id', label: 'Select skillset', path: 'result/getActivityLists',
     params: { standard: '{standard}', level: '2' }, required: true, icon: Activity,
   },
   {
     kind: 'api', name: 'activity_master', label: 'Select activity', path: 'api/get-activity-master-list',
-    params: { skillset_id: '{skillset_id}', standard: '{standard}' }, icon: Activity,
+    params: { skillset_id: '{skillset_id}', standard: '{standard}' }, required: true, icon: Activity,
   },
   {
-    kind: 'api', name: 'sub_activity_master', label: 'Select sub activity', path: 'getActivityLists',
+    kind: 'api', name: 'sub_activity_master', label: 'Select sub activity', path: 'result/getActivityLists',
     params: { skill_id: '{activity_master}', type: 'API', level: '4' }, icon: Activity,
   },
 ];
@@ -67,12 +75,13 @@ function TermField({ value, onChange }: { value: string; onChange: (next: string
   const { academicTerms } = useAuth();
   const options = useMemo(() => {
     const selectedAcademicYear = typeof window === 'undefined' ? '' : localStorage.getItem('selectedAcademicYear') || '';
-    return toOptions(
-      academicTerms.filter((item) => {
+    return academicTerms
+      .filter((item) => {
         const year = readString(item.syear);
         return !selectedAcademicYear || !year || year === selectedAcademicYear;
-      }),
-    );
+      })
+      .map((item) => ({ id: readString(item.term_id ?? item.id), label: readString(item.title ?? item.name) }))
+      .filter((option) => option.id && option.label);
   }, [academicTerms]);
 
   return (
@@ -98,6 +107,14 @@ function TermField({ value, onChange }: { value: string; onChange: (next: string
       </select>
     </div>
   );
+}
+
+function studentName(record: Record<string, unknown>): string {
+  const fullName = [record.first_name, record.middle_name, record.last_name]
+    .map(readString)
+    .filter(Boolean)
+    .join(' ');
+  return fullName || readString(record.name);
 }
 
 export default function HpcActivityEntryPage() {
@@ -126,41 +143,36 @@ export default function HpcActivityEntryPage() {
     setSearched(true);
     setError(null);
     try {
-      const payload = await resultGet('result/result_activity_marks/create', { ...next });
+      const payload = await resultGet('api/result/hpc-activity-entry/create', { ...next });
       const source = asRecord(payload.data ?? payload);
 
-      const groupRows: ActivityGroup[] = toCollection(
-        source.group_data ?? source.result_activity_group ?? source.groups,
-      )
+      const groupRows: ActivityGroup[] = toCollection(source.result_activity_groups)
         .map((item) => {
           const record = asRecord(item);
-          return {
-            id: readString(record.id ?? record.group_id),
-            title: readString(record.title ?? record.name ?? record.group_name),
-          };
+          return { id: readString(record.id), title: readString(record.title) };
         })
         .filter((group) => group.id && group.title);
       setGroups(groupRows);
 
-      const nextSelections: Record<string, string> = {};
-      const studentRows: StudentRow[] = toCollection(source.stu_data ?? source.students ?? source.student_data)
+      const existingMarks = asRecord(source.get_activity_marks);
+      const studentRows: StudentRow[] = toCollection(source.student_datas)
         .map((item) => {
           const record = asRecord(item);
-          const fullName = [record.first_name, record.middle_name, record.last_name]
-            .map(readString)
-            .filter(Boolean)
-            .join(' ');
-          const id = readString(record.id ?? record.student_id ?? record.unique_id);
-          const existing = readString(record.group_id ?? record.activity_group);
-          if (id && existing) nextSelections[id] = existing;
           return {
-            id,
-            rollNo: readString(record.roll_no ?? record.gr_no ?? record.enrollment_no),
-            name: readString((record.student_name ?? record.full_name ?? fullName) || record.name),
+            id: readString(record.id),
+            rollNo: readString(record.roll_no ?? record.gr_no),
+            name: studentName(record),
           };
         })
         .filter((student) => student.id);
       setStudents(studentRows);
+
+      const nextSelections: Record<string, string> = {};
+      for (const student of studentRows) {
+        const existing = existingMarks[student.id];
+        const groupId = existing && typeof existing === 'object' ? readString(asRecord(existing).group_id) : '';
+        if (groupId) nextSelections[student.id] = groupId;
+      }
       setSelections(nextSelections);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
@@ -185,7 +197,7 @@ export default function HpcActivityEntryPage() {
       data.sub_activity_master = criteria.sub_activity_master;
       data.activity_id = criteria.activity_master;
 
-      const payload = await resultPost('result/result_activity_marks', data);
+      const payload = await resultPost('api/result/hpc-activity-entry', data);
       const message = assertOk(payload, 'Laravel did not confirm that the activity marks were saved.');
       toast.success('Activity marks saved', message || undefined);
     } catch (err) {

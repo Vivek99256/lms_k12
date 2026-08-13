@@ -72,7 +72,7 @@ function buildSchema(fields: FieldDef[]) {
 export function defaultsFor(fields: FieldDef[], seed?: FormValues): FormValues {
   const defaults: FormValues = {};
   for (const field of fields) {
-    const seeded = seed?.[field.name];
+    const seeded = seed?.[field.seedKey ?? field.name];
     if (field.type === 'multiselect') {
       defaults[field.name] = Array.isArray(seeded)
         ? seeded.map(readString)
@@ -114,6 +114,8 @@ function useFieldOptions(fields: FieldDef[], values: FormValues) {
   const depsKey = selectFields
     .map((field) => {
       const source = field.options!;
+      if (source.kind === 'chain' && source.chain === 'standard') return `${field.name}:chain:${readString(values.grade)}`;
+      if (source.kind === 'chain' && source.chain === 'division') return `${field.name}:chain:${readString(values.standard)}`;
       if (source.kind !== 'api') return `${field.name}:${source.kind}`;
       const resolved: string[] = [];
       for (const template of Object.values(source.params ?? {})) {
@@ -141,17 +143,21 @@ function useFieldOptions(fields: FieldDef[], values: FormValues) {
         }
         const chainCalls: Record<string, { path: string; params: Record<string, string> }> = {
           section: { path: 'api/get-grade-list', params: {} },
-          standard: { path: 'api/get-standard-list', params: { type: 'webForm' } },
+          standard: { path: 'api/get-standard-list', params: { type: 'webForm', grade_id: readString(values.grade) } },
           division: { path: 'api/get-division-list', params: { type: 'webForm', standard_id: readString(values.standard) } },
         };
         const call = chainCalls[source.chain];
+        if (source.chain === 'standard' && !readString(values.grade)) {
+          setOptionsMap((current) => ({ ...current, [field.name]: [] }));
+          continue;
+        }
         if (source.chain === 'division' && !readString(values.standard)) {
           setOptionsMap((current) => ({ ...current, [field.name]: [] }));
           continue;
         }
         void resultGet(call.path, call.params)
           .then((payload) => { if (!cancelled) setOptionsMap((current) => ({ ...current, [field.name]: toOptions(payload.data ?? payload) })); })
-          .catch(() => { if (!cancelled) setOptionsMap((current) => ({ ...current, [field.name]: [] })); });
+          .catch(() => { if (!cancelled) setOptionsMap((current) => (current[field.name]?.length ? current : { ...current, [field.name]: [] })); });
         continue;
       }
       // api source
@@ -169,12 +175,12 @@ function useFieldOptions(fields: FieldDef[], values: FormValues) {
         }
       }
       if (!ready) {
-        setOptionsMap((current) => (current[field.name]?.length ? { ...current, [field.name]: [] } : current));
+        setOptionsMap((current) => (current[field.name]?.length ? current : { ...current, [field.name]: [] }));
         continue;
       }
       void resultGet(source.path, resolved)
         .then((payload) => { if (!cancelled) setOptionsMap((current) => ({ ...current, [field.name]: toOptions(payload.data ?? payload) })); })
-        .catch(() => { if (!cancelled) setOptionsMap((current) => ({ ...current, [field.name]: [] })); });
+        .catch(() => { if (!cancelled) setOptionsMap((current) => (current[field.name]?.length ? current : { ...current, [field.name]: [] })); });
     }
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -451,11 +457,15 @@ export default function DynamicForm({
         return (
           <Select value={readString(value)} onValueChange={(next) => onChange(next ?? '')} disabled={field.readOnly}>
             <SelectTrigger id={`field-${field.name}`} className="w-full">
-              <SelectValue placeholder={field.placeholder ?? 'Select'} />
+              <SelectValue placeholder={field.placeholder ?? 'Select'}>
+                {(fieldValue: string | null) => (fieldValue ? options.find((option) => option.id === fieldValue)?.label ?? 'Select' : 'Select')}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {options.map((option) => (
-                <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

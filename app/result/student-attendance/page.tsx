@@ -2,8 +2,14 @@
 
 /**
  * Student attendance master — per-student present/working days, remark
- * selection and teacher remark, saved as bracketed values. Mirrors the
- * legacy Blade screen at result/student_attendance_master.
+ * selection and teacher remark, saved as bracketed values.
+ *
+ * Backed by the dedicated `api/result/student-attendance-master` REST
+ * API (create + store only — there is no index route). Confirmed against
+ * the Laravel controller: student rows use `att`/`day`/`remark`/
+ * `student_id` (not `attendance`/`working_day`/`remark_id`/`id`), there
+ * is no top-level default working-days field (only per-row), and `store`
+ * reads a `standard` key (not `standard_id`) and ignores `grade` entirely.
  */
 
 import React, { useState } from 'react';
@@ -15,7 +21,7 @@ import FilterBar, { type FilterFieldDef, type FilterValues } from '@/components/
 import { Banner, EmptyState, TableSkeleton } from '@/components/result/primitives';
 import { toast } from '@/components/result/toast';
 import {
-  asRecord, assertOk, extractRows, readNumber, readString, resultGet, resultPost, toCollection,
+  asRecord, assertOk, readNumber, readString, resultGet, resultPost, toCollection,
   toOptions, type SelectOption,
 } from '@/lib/result/api';
 
@@ -29,9 +35,7 @@ type StudentRow = {
 };
 
 type Criteria = {
-  grade: string;
   standard: string;
-  division: string;
   term: string;
 };
 
@@ -63,9 +67,7 @@ export default function StudentAttendancePage() {
 
   const handleSearch = async (values: FilterValues) => {
     const next: Criteria = {
-      grade: readString(values.grade),
       standard: readString(values.standard),
-      division: readString(values.division),
       term: readString(values.term),
     };
     setCriteria(next);
@@ -74,41 +76,30 @@ export default function StudentAttendancePage() {
     setError(null);
     setInvalidIds(new Set());
     try {
-      const payload = await resultGet('result/student_attendance_master/create', { ...next });
+      const payload = await resultGet('api/result/student-attendance-master/create', {
+        grade: readString(values.grade),
+        standard: next.standard,
+        division: readString(values.division),
+        term: next.term,
+      });
       const source = asRecord(payload.data ?? payload);
 
-      const defaultWorkingDays = readString(source.total_days ?? source.working_day ?? source.working_days);
-
       setStudents(
-        toCollection(source.stu_data ?? source.students ?? source.student_data)
+        toCollection(source.stu_data)
           .map((item) => {
             const record = asRecord(item);
-            const fullName = [record.first_name, record.middle_name, record.last_name]
-              .map(readString)
-              .filter(Boolean)
-              .join(' ');
             return {
-              id: readString(record.id ?? record.student_id ?? record.unique_id),
-              name: readString((record.student_name ?? record.full_name ?? fullName) || record.name),
-              attendance: readString(record.attendance ?? record.present_days),
-              workingDay: readString(record.working_day ?? record.working_days) || defaultWorkingDays,
-              remarkId: readString(record.remark_id),
+              id: readString(record.student_id),
+              name: readString(record.name),
+              attendance: readString(record.att),
+              workingDay: readString(record.day),
+              remarkId: readString(record.remark),
               teacherRemark: readString(record.teacher_remark),
             };
           })
           .filter((student) => student.id),
       );
-
-      let remarks = toOptions(source.remark_data ?? source.remarks ?? source.remark_list ?? source.result_remark);
-      if (remarks.length === 0) {
-        try {
-          const remarkPayload = await resultGet('result/result_remark_master');
-          remarks = toOptions(extractRows(remarkPayload));
-        } catch {
-          remarks = [];
-        }
-      }
-      setRemarkOptions(remarks);
+      setRemarkOptions(toOptions(source.remark_data));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
       setStudents([]);
@@ -138,7 +129,6 @@ export default function StudentAttendancePage() {
     try {
       const data: Record<string, string> = {};
       for (const student of students) {
-        data[`values[${student.id}][grade]`] = criteria.grade;
         data[`values[${student.id}][standard]`] = criteria.standard;
         data[`values[${student.id}][term_id]`] = criteria.term;
         data[`values[${student.id}][attendance]`] = student.attendance;
@@ -146,7 +136,7 @@ export default function StudentAttendancePage() {
         data[`values[${student.id}][remark_id]`] = student.remarkId;
         data[`values[${student.id}][teacher_remark]`] = student.teacherRemark;
       }
-      const payload = await resultPost('result/student_attendance_master', data);
+      const payload = await resultPost('api/result/student-attendance-master', data);
       const message = assertOk(payload, 'Laravel did not confirm that attendance was saved.');
       toast.success('Attendance saved', message || undefined);
     } catch (err) {

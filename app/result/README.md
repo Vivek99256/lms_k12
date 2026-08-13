@@ -5,6 +5,18 @@ Modern rebuild of the 31 Laravel Blade screens described in `result_erp_contract
 contract is represented; business logic and backend endpoints are unchanged — only the
 UX layer is new.
 
+> **2026-08-13 note:** the 9 Entry/Master screens listed under §5 below (marks entry,
+> co-scholastic marks, result templates, HPC activity entry, HPC entry v1, approve
+> mobile result, upload result, student attendance master, student result remarks)
+> were rebuilt against the dedicated `api/result/*` REST controllers
+> (`app/Http/Controllers/api/result/*ApiController.php`) instead of the legacy
+> `result/*` Blade-era routes. The dedicated controllers are thin delegates to the
+> same legacy business logic, but their request/response field names differ in
+> several places (documented per-page in each file's top comment) — do not revert
+> these 9 pages to the legacy `result/{resource}` paths without re-checking the field
+> names against the controller, several of the old field-name guesses did not match
+> the real payload shape.
+
 ---
 
 ## 1. Architecture
@@ -99,23 +111,36 @@ keys Laravel expects (`title[0]`, `co_grade[2][break_off]`, `values[12][points]`
 
 ## 5. API integration points (verify on the backend)
 
-All paths are relative to the Laravel API base and follow the
-`result/{resource}` convention observed on `result/marks_entry`. Each screen's
-endpoints live in exactly one place (its config in `lib/result/masters.ts` or the
-constant at the top of its page), so corrections are one-line changes:
+Shared dropdowns and the Masters/Reports screens still call the legacy `result/{resource}`
+routes (relative to the Laravel API base, same convention as `result/marks_entry`
+originally). The 9 Entry/Master screens rebuilt on 2026-08-13 call the **dedicated**
+`api/result/{resource}` REST controllers instead (`app/Http/Controllers/api/result/*`),
+which validate requests and wrap responses as `{success,message,data,errors}`.
 
 | Area | Endpoints used |
 |---|---|
 | Shared dropdowns | `api/get-grade-list`, `api/get-standard-list`, `api/get-division-list`, `api/get-subject-list`, `api/get-exam-master-list`, `api/get-exam-list`, `api/get-co-scholastic-parent-list`, `api/get-co-scholastic-list`, `api/get-activity-master-list`, `getActivityLists`, `getCreateExamName`, `ajax_StandardwiseSubject` |
-| Marks entry | `result/marks_entry/create`, `result/marks_entry`, `result/approve` |
-| Co-scholastic | `result/co_scholastic_marks_entry(/create)`, `result/co_scholastic_marks_entry_approve`, `result/co_scholastic`, `result/co_scholastic_master` |
-| Masters (resource) | `result/result_activity_master`, `result/result_skillset`, `result/exam_master`, `result/exam_type_master`, `result/exam_creation`, `result/grade_master`, `result/std_grd_maping`, `result/result_master`, `result/result_book_master`, `result/result_remark_master`, `result/working_day_master`, `result/student_attendance_master`, `result/result-template` |
-| Entry (other) | `result/result_activity_marks(_V1)(/create)`, `result/approve_mobile_result(/create)`, `result/upload_result(/create)` |
-| Reports | `result/show_result_report`, `result/getMarksApproval`, `result/classwise_grade_report/create`, `result/consolidate_report/create`, `result/WRT_report/show_result`, `result/WRT_progress_report/show_result`, `result/cbse_1t5_result/show_result`, `result/cbse_1t5_t2_result/show_result`, `result/cbse_11_t2_result/show_result`, `result/student-result(/create)`, `result/student-result-remarks(/create)`, `result/save_result_html`, `result/save_result_html_new`, `result/cbse_1t5_result/download_overall_report`, `result/view_all_result_tag` |
+| Marks entry | `api/result/marks-entry(/create)`, `api/result/marks-entry/approve` |
+| Co-scholastic | `api/result/co-scholastic-marks-entry(/create)`, `api/result/co-scholastic-marks-entry/approve` |
+| Result templates | `api/result/result-template` (CRUD), `api/result/result-template/tags` |
+| HPC activity entry | `api/result/hpc-activity-entry(/create)` |
+| HPC entry v1 | `api/result/hpc-entry-v1(/create)` |
+| Approve mobile result | `api/result/approve-mobile-result(/create)` |
+| Upload result | `api/result/upload-result(/create)` (multipart) |
+| Student attendance master | `api/result/student-attendance-master/create` (no index route) |
+| Student result remarks | `api/result/student-result-remarks/students` (list), `api/result/student-result-remarks` (store), `api/result/result-remark-master/dropdown` (remark options) |
+| Masters (resource, unchanged) | `result/result_activity_master`, `result/result_skillset`, `result/exam_master`, `result/exam_type_master`, `result/exam_creation`, `result/grade_master`, `result/std_grd_maping`, `result/result_master`, `result/result_book_master`, `result/result_remark_master`, `result/working_day_master` |
+| Reports (unchanged) | `result/show_result_report`, `result/getMarksApproval`, `result/classwise_grade_report/create`, `result/consolidate_report/create`, `result/WRT_report/show_result`, `result/WRT_progress_report/show_result`, `result/cbse_1t5_result/show_result`, `result/cbse_1t5_t2_result/show_result`, `result/cbse_11_t2_result/show_result`, `result/student-result(/create)`, `result/save_result_html`, `result/save_result_html_new`, `result/cbse_1t5_result/download_overall_report` |
 
 Updates/deletes use Laravel method spoofing: `POST {resource}/{id}` with
 `_method=PUT|DELETE`. Payload parsing is defensive (`readString` / `asRecord` /
 `toCollection`) because list payload shapes vary between endpoints.
+
+**Known backend gaps** (not fixed here — Laravel changes are out of scope for this
+frontend rebuild): the `api/result/*` routes only run `api.session` middleware, with
+no `check_permissions`/menu-role gate equivalent to the legacy web routes; marks
+approval is not enforced server-side (client-side lock only); the co-scholastic
+approve endpoint has a duplicate-row race condition.
 
 ## 6. Accessibility
 

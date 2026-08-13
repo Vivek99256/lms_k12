@@ -60,6 +60,8 @@ export type FieldDef = {
   accept?: string;
   /** Original Laravel field name if it differs (e.g. `grade[]`). */
   apiName?: string;
+  /** Key to read this field's value from when prefilling an edit form, if it differs from `name` (e.g. list rows expose `standard_id` but the field is named `standard`). */
+  seedKey?: string;
 };
 
 /** ---------------------------------------------------------------- tables */
@@ -91,6 +93,12 @@ export type MasterScreenDef = {
     /** POST create */ store: string;
     /** POST + _method=PUT, `/{id}` appended */ update?: string;
     /** POST + _method=DELETE, `/{id}` appended */ destroy?: string;
+    /**
+     * GET `/{id}` for a full record to prefill the edit drawer, when the list
+     * payload omits fields the form needs (e.g. only display names, not the
+     * underlying option ids). Falls back to the list row when unset.
+     */
+    show?: string;
   };
   /** Key inside the index payload holding rows (defaults to `data`). */
   listKey?: string;
@@ -105,6 +113,18 @@ export type MasterScreenDef = {
   entityName: string;
   /** Extra note rendered under the page header. */
   note?: string;
+  /**
+   * Override the generic bracket-array payload serialization for this screen,
+   * for cases where create and update expect different shapes (e.g. arrays
+   * on create, scalars with different field names on update).
+   */
+  serialize?: (
+    fields: FieldDef[],
+    values: Record<string, unknown>,
+    isEdit: boolean,
+  ) => { data: Record<string, unknown>; hasFile: boolean };
+  /** Shape a fetched `api.show` record into form values before prefilling the edit drawer. */
+  deserialize?: (record: Record<string, unknown>) => Record<string, unknown>;
 };
 
 export type ScreenLink = {
