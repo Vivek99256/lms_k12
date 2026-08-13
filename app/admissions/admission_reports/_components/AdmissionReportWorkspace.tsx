@@ -390,7 +390,13 @@ export default function AdmissionReportWorkspace({ reportId }: { reportId: Repor
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select user" />
+                      <SelectValue placeholder="Select user">
+                        {(value: string) =>
+                          value === '__all__' || !value
+                            ? 'All users'
+                            : result.users.find((user) => user.id === value)?.label ?? value
+                        }
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">All users</SelectItem>
@@ -523,7 +529,7 @@ export default function AdmissionReportWorkspace({ reportId }: { reportId: Repor
               </div>
             ) : null}
 
-            {error ? (
+            {error && result.rows.length === 0 ? (
               <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 {error}
               </div>
