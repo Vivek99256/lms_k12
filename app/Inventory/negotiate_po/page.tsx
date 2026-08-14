@@ -1,2 +1,5 @@
-import { InventoryPage } from "../_components/InventoryPage"; import { configs } from "../configs";
-export default function Page() { return <InventoryPage config={configs.negotiate_po} />; }
+import NegotiatePoPage from "./NegotiatePoPage";
+
+export default function Page() {
+  return <NegotiatePoPage />;
+}

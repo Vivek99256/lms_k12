@@ -18,9 +18,10 @@ type FeePreview = {
 };
 
 export default function OnlinePaymentPage() {
-  const { gateway } = useParams<{ gateway: string }>();
+  const routeParams = useParams<{ gateway: string }>();
+  const gateway = routeParams?.gateway ?? '';
   const searchParams = useSearchParams();
-  const studentId = searchParams.get('student_id') || '';
+  const studentId = searchParams?.get('student_id') || '';
   const [preview, setPreview] = useState<FeePreview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'error' | 'info'; text: string } | null>(null);

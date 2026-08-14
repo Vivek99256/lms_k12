@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   // centralized conversational AI packages hosted in the sibling G2G repo
   // without widening all the way to unrelated machine roots.
   turbopack: {
-    root: path.resolve(__dirname, ".."),
+    root: path.resolve(__dirname),
   },
   async rewrites() {
     return [
