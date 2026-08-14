@@ -3703,15 +3703,6 @@ export default function ChapterListPage() {
                             </p>
                           )}
                         </div>
-                      ) : section.kind === 'list' ? (
-                        <ul className="space-y-2 text-[15px] leading-6 text-slate-700">
-                          {visibleItems.map((item) => (
-                            <li key={item} className="flex gap-2">
-                              <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {visibleItems.map((item) => (

@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import {
   fetchSemanticIntelligenceChapters,
   fetchSemanticIntelligenceResult,
@@ -47,6 +48,14 @@ export interface PalConceptContext {
   conceptTitle: string;
   subjectName: string;
   chapterTitle: string;
+}
+
+export interface PalContentModelResponse {
+  context: PalConceptContext | null;
+  frameworkModules: Record<FrameworkSlug, PalModuleView>;
+  uluModules: Record<UluSlug, PalModuleView>;
+  error: string;
+  isReady: boolean;
 }
 
 interface SemanticConceptEntry {
@@ -939,7 +948,7 @@ async function fetchLatestSemanticRecord(): Promise<{ record: SemanticResultReco
   return { record, sourceId };
 }
 
-export async function getPalContentModel(input: { chapterId?: string; concept?: string }) {
+export async function buildPalContentModelPayload(input: { chapterId?: string; concept?: string }): Promise<PalContentModelResponse> {
   try {
     let chapterId = asText(input.chapterId);
     const conceptParam = asText(input.concept) || '0';
@@ -986,4 +995,44 @@ export async function getPalContentModel(input: { chapterId?: string; concept?: 
       isReady: false,
     };
   }
+}
+
+function buildApiQuery(input: { chapterId?: string; concept?: string }) {
+  const query = new URLSearchParams();
+  if (input.chapterId) query.set('chapterId', input.chapterId);
+  if (input.concept) query.set('concept', input.concept);
+  const queryString = query.toString();
+  return queryString ? `?${queryString}` : '';
+}
+
+async function resolveLocalApiUrl(path: string) {
+  const headerStore = await headers();
+  const proto = headerStore.get('x-forwarded-proto') ?? 'http';
+  const host =
+    headerStore.get('x-forwarded-host') ??
+    headerStore.get('host') ??
+    'localhost:3000';
+
+  return `${proto}://${host}${path}`;
+}
+
+export async function getPalContentModel(input: { chapterId?: string; concept?: string }): Promise<PalContentModelResponse> {
+  const apiUrl = await resolveLocalApiUrl(`/api/pal/content-model${buildApiQuery(input)}`);
+  const res = await fetch(apiUrl, {
+    method: 'GET',
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    return {
+      context: null,
+      frameworkModules: {} as Record<FrameworkSlug, PalModuleView>,
+      uluModules: {} as Record<UluSlug, PalModuleView>,
+      error: `PAL backend content-model request failed with status ${res.status}.`,
+      isReady: false,
+    };
+  }
+
+  const payload = (await res.json()) as PalContentModelResponse;
+  return payload;
 }
