@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SubmenuItem } from '@/app/data/menuItems';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
@@ -59,6 +59,7 @@ function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null 
 export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
+  const searchParams = useSearchParams();
   const [showMasterDropdown, setShowMasterDropdown] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -155,6 +156,12 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
     router.push(route);
   };
 
+  const buildRouteWithQuery = (route: string) => {
+    const query = searchParams?.toString() ?? '';
+    if (!query || !route.startsWith('/pal')) return route;
+    return `${route}?${query}`;
+  };
+
   const handleMasterClick = (item: SubmenuItem) => {
     const navigateRoute = getNavigationRoute(item);
     if (navigateRoute) {
@@ -228,7 +235,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                 
                 const handleClick = () => {
                   if (navigateRoute) {
-                    router.push(navigateRoute);
+                    router.push(buildRouteWithQuery(navigateRoute));
                   }
                 };
                 

@@ -14,7 +14,7 @@ function queryStringFromSearchParams(searchParams: Record<string, string | strin
   return query.toString();
 }
 
-export default async function PalEntryPage({
+export default async function PalContentModelPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -23,3 +23,6 @@ export default async function PalEntryPage({
   const queryString = queryStringFromSearchParams(resolvedSearchParams);
   redirect(queryString ? `/pal/frameworks?${queryString}` : '/pal/frameworks');
 }
+
+
+
