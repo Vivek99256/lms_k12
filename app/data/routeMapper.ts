@@ -208,6 +208,12 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/new-pal': '/pal/new',
   'new_pal.content_model': '/pal/new/content-model',
   'lms/new-pal/content-model': '/pal/new/content-model',
+  // Administration — the second New PAL level-3 sub-module, registered by
+  // 2026_08_14_160100_add_administration_submodule_menu. Follows the same
+  // `new_pal.<sub_module>` link convention as Content Model above rather than
+  // a separate `*.index` root, so the level-3 family stays consistent.
+  'new_pal.administration': '/pal/new/administration',
+  'lms/new-pal/administration': '/pal/new/administration',
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',
