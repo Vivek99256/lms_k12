@@ -283,13 +283,13 @@ export function ImplementationManagementPage() {
   }, [load]);
 
   const currentView = useMemo<ImplementationView>(() => {
-    const value = searchParams.get("view");
+    const value = searchParams?.get("view");
     if (value === "welcome" || value === "overview" || value === "details") return value;
     return "welcome";
   }, [searchParams]);
 
   const selectedStageId = useMemo(() => {
-    const value = Number(searchParams.get("moduleId") || "1");
+    const value = Number(searchParams?.get("moduleId") || "1");
     return Number.isFinite(value) && value >= 1 && value <= 5 ? value : 1;
   }, [searchParams]);
 
@@ -307,7 +307,7 @@ export function ImplementationManagementPage() {
   const session = useMemo(() => buildSessionContext(), []);
 
   function setView(view: ImplementationView, moduleId = selectedStageId) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString());
     params.set("view", view);
     params.set("moduleId", String(moduleId));
     router.replace(`/general/implementation_management?${params.toString()}`);

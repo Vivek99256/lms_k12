@@ -35,6 +35,7 @@ export type TransportConfig = {
 const EMPTY: TransportationData = {
   records: [], drivers: [], conductors: [], vehicles: [], vehicleTypes: [],
   routes: [], stops: [], shifts: [], students: [],
+  grades: [], standards: [], divisions: [],
 };
 const PAGE_SIZE = 10;
 
