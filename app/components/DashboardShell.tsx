@@ -348,9 +348,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <Header
           onToggleChatbot={toggleChatbot}
           isChatbotOpen={isChatbotOpen}
-          onToggleRightToolbar={toggleRightToolbar}
-          isRightToolbarOpen={isRightToolbarOpen}
-          rightToolbarToggleRef={rightToolbarToggleRef}
         />
         <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main

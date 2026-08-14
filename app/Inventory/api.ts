@@ -15,34 +15,34 @@ function rows(value: unknown): UnknownRecord[] { return Array.isArray(value) ? v
 function message(value: unknown, fallback: string): string {
   return isRecord(value) ? readString(value.message) || fallback : fallback;
 }
-function normalize(value: unknown): InventoryData {
-  const data = isRecord(value) && isRecord(value.data) ? value.data : isRecord(value) ? value : {};
-  const sourceRows = rows(data.records ?? data.data ?? data.items);
-  const records = sourceRows.map((row) => {
-    const values: InventoryRecord["values"] = {};
-    Object.entries(row).forEach(([key, item]) => {
-      if (typeof item === "string" || typeof item === "number" || typeof item === "boolean" || item === null) values[key] = item;
+  function normalize(value: unknown): InventoryData {
+    const data = isRecord(value) && isRecord(value.data) ? value.data : isRecord(value) ? value : {};
+    const sourceRows = rows(data.records ?? data.data ?? data.items);
+    const records = sourceRows.map((row) => {
+      const values: InventoryRecord["values"] = {};
+      Object.entries(row).forEach(([key, item]) => {
+        if (typeof item === "string" || typeof item === "number" || typeof item === "boolean" || item === null) values[key.toLowerCase()] = item;
+      });
+      return { id: readNumber(row.id ?? row.ID), values };
     });
-    return { id: readNumber(row.id ?? row.ID), values };
-  });
-  const options: InventoryData["options"] = {};
-  Object.entries(data).forEach(([key, value]) => {
-    if (!Array.isArray(value) || ["records", "data", "items"].includes(key)) return;
-    const unique = new Map<string, InventoryOption>();
-    rows(value).forEach((row) => {
-      const rawId = row.id ?? row.ID ?? row.item_id ?? row.user_id;
-      const numericId = readNumber(rawId);
-      const id = numericId || readString(rawId);
-      const label = readString(row.label ?? row.title ?? row.name ?? row.item_name ?? row.display_name);
-      const parentId = readNumber(row.parent_id ?? row.category_id ?? row.sub_category_id ?? row.vendor_id);
-      const price = Number(row.price);
-      const key = `${String(id)}:${parentId}`;
-      if (id && label && !unique.has(key)) unique.set(key, { id, label, ...(parentId ? { parentId } : {}), ...(Number.isFinite(price) ? { price } : {}) });
+    const options: InventoryData["options"] = {};
+    Object.entries(data).forEach(([key, value]) => {
+      if (!Array.isArray(value) || ["records", "data", "items"].includes(key)) return;
+      const unique = new Map<string, InventoryOption>();
+      rows(value).forEach((row) => {
+        const rawId = row.id ?? row.ID ?? row.item_id ?? row.user_id;
+        const numericId = readNumber(rawId);
+        const id = numericId || readString(rawId);
+        const label = readString(row.label ?? row.title ?? row.name ?? row.item_name ?? row.display_name);
+        const parentId = readNumber(row.parent_id ?? row.category_id ?? row.sub_category_id ?? row.vendor_id);
+        const price = Number(row.price);
+        const optionKey = `${String(id)}:${parentId}`;
+        if (id && label && !unique.has(optionKey)) unique.set(optionKey, { id, label, ...(parentId ? { parentId } : {}), ...(Number.isFinite(price) ? { price } : {}) });
+      });
+      options[key] = [...unique.values()];
     });
-    options[key] = [...unique.values()];
-  });
-  return { records, options };
-}
+    return { records, options };
+  }
 
 export function getInventorySession(): SessionContext {
   const session = buildSessionContext();
@@ -101,4 +101,67 @@ export async function saveInventory(module: string, values: Record<string, unkno
 export async function deleteInventory(module: string, id: number): Promise<string> {
   const session = getInventorySession();
   return message(await request(module, session, `/${id}`, { method: "DELETE" }), "Record deleted successfully.");
+}
+
+export type ReceivablePoItem = {
+  item_id: number;
+  item_name: string;
+  qty: number;
+  previous_receive_qty: number;
+  actual_received_qty: number;
+  pending_qty: number;
+  remarks: string | null;
+  warranty_start_date: string | null;
+  warranty_end_date: string | null;
+  bill_no: string | null;
+  bill_date: string | null;
+  challan_no: string | null;
+  challan_date: string | null;
+};
+
+export async function loadReceivablePoItems(poNumber: string): Promise<ReceivablePoItem[]> {
+  const session = getInventorySession();
+  const params = new URLSearchParams();
+  appendCommonParams(params, session);
+  params.set("user_id", session.userId);
+  params.set("po_number", poNumber);
+  const response = await fetch(`${session.baseUrl}/api/inventory/receivables/items?${params}`, {
+    cache: "no-store",
+    headers: createAuthHeaders(session),
+  });
+  const payload = (await response.json().catch(() => ({}))) as unknown;
+  if (!response.ok) {
+    if (response.status === 404) throw new Error("Backend API required for this Inventory menu.");
+    throw new Error(message(payload, `Request failed (${response.status}).`));
+  }
+  if (isRecord(payload) && normalizeApiStatus(payload as ApiEnvelope) === "2") {
+    throw new Error(message(payload, "Authentication failed."));
+  }
+  const data = isRecord(payload) && isRecord(payload.data) ? payload.data : isRecord(payload) ? payload : {};
+  const items = rows(data ?? payload);
+  return items.map((row) => ({
+    item_id: readNumber(row.item_id),
+    item_name: readString(row.item_name),
+    qty: Number(row.qty),
+    previous_receive_qty: Number(row.previous_receive_qty),
+    actual_received_qty: Number(row.actual_received_qty),
+    pending_qty: Number(row.pending_qty),
+    remarks: readString(row.remarks),
+    warranty_start_date: readString(row.warranty_start_date),
+    warranty_end_date: readString(row.warranty_end_date),
+    bill_no: readString(row.bill_no),
+    bill_date: readString(row.bill_date),
+    challan_no: readString(row.challan_no),
+    challan_date: readString(row.challan_date),
+  }));
+}
+
+export async function saveReceivableItems(poNumber: string, items: ReceivablePoItem[]): Promise<string> {
+  const session = getInventorySession();
+  const payload = await request("receivables", session, "/multiple", {
+    method: "POST",
+    body: JSON.stringify({ po_number: poNumber, items, type: "API", sub_institute_id: session.subInstituteId, syear: session.syear, user_id: session.userId }),
+    headers: { "Content-Type": "application/json" },
+  });
+  return message(payload, "Item Received successfully.");
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot, LayoutGrid } from 'lucide-react';
+import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -68,15 +68,9 @@ const getStoredSelection = (key: string) => {
 export default function Header({
   onToggleChatbot,
   isChatbotOpen,
-  onToggleRightToolbar,
-  isRightToolbarOpen,
-  rightToolbarToggleRef,
 }: {
   onToggleChatbot: () => void;
   isChatbotOpen: boolean;
-  onToggleRightToolbar: () => void;
-  isRightToolbarOpen: boolean;
-  rightToolbarToggleRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -301,20 +295,7 @@ export default function Header({
             </span>
           </div>
           
-          <button
-            ref={rightToolbarToggleRef}
-            type="button"
-            onClick={onToggleRightToolbar}
-            className={`p-2 rounded-full transition-colors ${
-              isRightToolbarOpen ? 'text-gray-700 bg-gray-100' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Toggle Toolbox"
-            aria-pressed={isRightToolbarOpen}
-            aria-label={isRightToolbarOpen ? 'Close toolbox' : 'Open toolbox'}
-          >
-            <LayoutGrid size={18} />
-          </button>
-        </div>
+          </div>
         
         {showUserDropdown && userPosition && typeof document !== 'undefined' && createPortal(
           <div
