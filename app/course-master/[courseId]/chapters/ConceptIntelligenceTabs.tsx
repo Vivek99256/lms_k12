@@ -23,14 +23,51 @@ import {
 } from 'lucide-react';
 import type { ConceptIntelEntry } from '../../data/chapters';
 
-/** Coerce any JSON value to a trimmed display string. */
-const s = (v: unknown): string => (v === null || v === undefined ? '' : String(v).trim());
+function flattenText(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    const text = String(value).trim();
+    return text ? [text] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => flattenText(item));
+  }
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).flatMap((item) => flattenText(item));
+  }
+  return [];
+}
+
+function uniq(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+/** Coerce any JSON value to a trimmed display string without leaking raw objects. */
+const s = (v: unknown): string => uniq(flattenText(v)).join(' · ');
 /** Coerce any JSON value to an array of records. */
 const toArr = (v: unknown): Record<string, unknown>[] =>
   Array.isArray(v) ? (v as Record<string, unknown>[]) : [];
 /** Coerce a list of primitives to trimmed strings. */
-const toStrList = (v: unknown): string[] =>
-  Array.isArray(v) ? v.map((item) => s(item)).filter(Boolean) : [];
+const toStrList = (v: unknown): string[] => uniq(flattenText(v));
+
+const hasTruthy = (v: unknown) => s(v).length > 0;
+const boolish = (v: unknown) => v === true || s(v).toLowerCase() === 'true';
+
+function getDisplayTitle(
+  record: Record<string, unknown>,
+  keys: string[],
+  fallback = 'Untitled'
+) {
+  const match = keys.map((key) => s(record[key])).find(Boolean);
+  return match || fallback;
+}
+
+function getDisplayBody(
+  record: Record<string, unknown>,
+  keys: string[]
+) {
+  return keys.map((key) => s(record[key])).find(Boolean) || '';
+}
 
 type IconType = ComponentType<{ size?: number; className?: string }>;
 
@@ -175,13 +212,19 @@ export function ConceptIntelligenceTabs({
             {knowledge.map((k, i) => (
               <div key={i} className={`${CARD} border-slate-200 bg-white`}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-[15px] font-semibold text-slate-900">{s(k.knowledge)}</p>
-                  {s(k.knowledge_type) && (
+                  <p className="text-[15px] font-semibold text-slate-900">
+                    {getDisplayTitle(k, ['knowledge', 'statement', 'definition', 'concept_name'])}
+                  </p>
+                  {hasTruthy(k.knowledge_type) && (
                     <Chip className="shrink-0 bg-slate-100 text-slate-600">{s(k.knowledge_type)}</Chip>
                   )}
                 </div>
-                {s(k.statement) && <p className="mt-2 text-sm leading-6 text-slate-600">{s(k.statement)}</p>}
-                {s(k.confidence) && (
+                {getDisplayBody(k, ['statement', 'definition', 'description']) && (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {getDisplayBody(k, ['statement', 'definition', 'description'])}
+                  </p>
+                )}
+                {hasTruthy(k.confidence) && (
                   <div className="mt-3">
                     <Chip className="bg-slate-100 text-slate-500">Confidence: {s(k.confidence)}</Chip>
                   </div>
@@ -216,7 +259,9 @@ export function ConceptIntelligenceTabs({
           <div className="grid grid-cols-1 gap-3">
             {skills.map((sk, i) => (
               <div key={i} className={`${CARD} border-teal-100 bg-teal-50/40`}>
-                <p className="text-[15px] font-semibold text-teal-800">{s(sk.skill)}</p>
+                <p className="text-[15px] font-semibold text-teal-800">
+                  {getDisplayTitle(sk, ['skill', 'title', 'concept_name'])}
+                </p>
                 {toStrList(sk.ability_refs).length > 0 && (
                   <p className="mt-2 text-xs text-teal-700/80">
                     <span className="font-semibold">Ability refs:</span> {toStrList(sk.ability_refs).join(', ')}
@@ -232,8 +277,12 @@ export function ConceptIntelligenceTabs({
           <div className="grid grid-cols-1 gap-3">
             {competencies.map((c, i) => (
               <div key={i} className={`${CARD} border-indigo-100 bg-indigo-50/40`}>
-                <p className="text-[15px] font-semibold text-indigo-800">{s(c.competency)}</p>
-                {s(c.statement) && <p className="mt-2 text-sm italic leading-6 text-slate-700">“{s(c.statement)}”</p>}
+                <p className="text-[15px] font-semibold text-indigo-800">
+                  {getDisplayTitle(c, ['competency', 'statement', 'concept_name'])}
+                </p>
+                {getDisplayBody(c, ['statement', 'description']) && (
+                  <p className="mt-2 text-sm italic leading-6 text-slate-700">“{getDisplayBody(c, ['statement', 'description'])}”</p>
+                )}
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {toStrList(c.knowledge_refs).length > 0 && (
                     <Chip className="bg-indigo-100 text-indigo-700">Knowledge: {toStrList(c.knowledge_refs).join(', ')}</Chip>
@@ -371,10 +420,13 @@ export function ConceptIntelligenceTabs({
               <div key={i} className={`${CARD} flex items-start gap-3 border-slate-200 bg-white`}>
                 <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
                 <div>
-                  <p className="text-sm font-medium text-slate-800">{s(o.objective)}</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {getDisplayTitle(o, ['objective', 'statement', 'description'])}
+                  </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {s(o.objective_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.objective_type)}</Chip>}
-                    {s(o.priority) && <Chip className="bg-blue-100 text-blue-700">{s(o.priority)} priority</Chip>}
+                    {hasTruthy(o.objective_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.objective_type)}</Chip>}
+                    {hasTruthy(o.priority) && <Chip className="bg-blue-100 text-blue-700">{s(o.priority)} priority</Chip>}
+                    {hasTruthy(o.concept_name) && <Chip className="bg-slate-100 text-slate-500">Concept: {s(o.concept_name)}</Chip>}
                   </div>
                 </div>
               </div>
@@ -391,15 +443,18 @@ export function ConceptIntelligenceTabs({
                   ✓
                 </span>
                 <div>
-                  <p className="text-sm font-medium text-slate-800">{s(o.outcome)}</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {getDisplayTitle(o, ['outcome', 'statement', 'description'])}
+                  </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {s(o.outcome_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.outcome_type)}</Chip>}
-                    {(o.measurable === true || s(o.measurable) === 'true') && (
+                    {hasTruthy(o.outcome_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.outcome_type)}</Chip>}
+                    {boolish(o.measurable) && (
                       <Chip className="bg-emerald-100 text-emerald-700">Measurable</Chip>
                     )}
-                    {(o.assessment_ready === true || s(o.assessment_ready) === 'true') && (
+                    {boolish(o.assessment_ready) && (
                       <Chip className="bg-emerald-100 text-emerald-700">Assessment ready</Chip>
                     )}
+                    {hasTruthy(o.concept_name) && <Chip className="bg-white text-slate-500 ring-1 ring-slate-200">Concept: {s(o.concept_name)}</Chip>}
                   </div>
                 </div>
               </div>
@@ -591,10 +646,19 @@ export function ConceptIntelligenceTabs({
             {relationships.map((r, i) => (
               <div key={i} className={`${CARD} border-cyan-100 bg-cyan-50/40`}>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="font-semibold text-cyan-800">{s(r.source_concept)}</span>
-                  <Chip className="bg-cyan-100 text-cyan-700">{s(r.relation_type)}</Chip>
-                  <span className="font-semibold text-cyan-800">{s(r.target_concept)}</span>
+                  <span className="font-semibold text-cyan-800">
+                    {getDisplayTitle(r, ['source_concept', 'concept_name', 'title'])}
+                  </span>
+                  {hasTruthy(r.relation_type) && (
+                    <Chip className="bg-cyan-100 text-cyan-700">{s(r.relation_type)}</Chip>
+                  )}
+                  <span className="font-semibold text-cyan-800">
+                    {getDisplayTitle(r, ['target_concept', 'related_concept', 'concept_name'])}
+                  </span>
                 </div>
+                {getDisplayBody(r, ['description', 'statement']) && (
+                  <p className="mt-2 text-sm text-cyan-900/80">{getDisplayBody(r, ['description', 'statement'])}</p>
+                )}
               </div>
             ))}
           </div>

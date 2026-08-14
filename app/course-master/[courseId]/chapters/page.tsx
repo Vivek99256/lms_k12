@@ -74,6 +74,7 @@ import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import type { Chapter } from '../../data/chapters';
 import { GeneratePresentationDrawer } from './sideDrawer';
+import { persistPalConceptContext } from '@/app/pal/_components/PalContextBootstrap';
 
 const EMPTY_CHAPTER_FORM = {
   chapterName: '',
@@ -1433,6 +1434,14 @@ export default function ChapterListPage() {
     loadChapterIntelligence(activeChapterId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, activeChapterId]);
+
+  useEffect(() => {
+    if (view !== 'concept-intelligence' || !activeChapterId) return;
+    persistPalConceptContext({
+      chapterId: activeChapterId,
+      concept: searchParams?.get('concept') ?? '0',
+    });
+  }, [view, activeChapterId, searchParams]);
 
   const generateTeacherTrainingPresentation = () => {
     setIsPresentationMenuOpen(false);
@@ -3494,16 +3503,16 @@ export default function ChapterListPage() {
       chapterForIntel && conceptTitle ? getConceptIntelligence(chapterForIntel, conceptTitle) : null;
     const detailSections = details
       ? [
-          { title: 'Knowledge', icon: BookOpen, items: details.knowledge, kind: 'list' as const },
-          { title: 'Abilities', icon: Lightbulb, items: details.abilities, kind: 'list' as const },
+          { title: 'Knowledge', icon: BookOpen, items: details.knowledge, kind: 'cards' as const },
+          { title: 'Abilities', icon: Lightbulb, items: details.abilities, kind: 'cards' as const },
           { title: 'Skills', icon: WandSparkles, items: details.skills, kind: 'tags' as const },
-          { title: 'Misconceptions', icon: TriangleAlert, items: details.misconceptions, kind: 'list' as const },
+          { title: 'Misconceptions', icon: TriangleAlert, items: details.misconceptions, kind: 'cards' as const },
           { title: 'Prerequisites', icon: Orbit, items: details.prerequisites, kind: 'tags' as const },
-          { title: 'Learning outcomes', icon: Target, items: details.learningOutcomes, kind: 'list' as const },
-          { title: 'Competencies', icon: BriefcaseBusiness, items: details.competencies, kind: 'tags' as const },
-          { title: 'Learning objectives', icon: CircleDot, items: details.learningObjectives, kind: 'list' as const },
+          { title: 'Learning outcomes', icon: Target, items: details.learningOutcomes, kind: 'cards' as const },
+          { title: 'Competencies', icon: BriefcaseBusiness, items: details.competencies, kind: 'cards' as const },
+          { title: 'Learning objectives', icon: CircleDot, items: details.learningObjectives, kind: 'cards' as const },
           { title: 'Teaching pedagogies', icon: ClipboardList, items: details.teachingPedagogies, kind: 'tags' as const },
-          { title: 'Real-world applications', icon: GraduationCap, items: details.realWorldApplications, kind: 'list' as const },
+          { title: 'Real-world applications', icon: GraduationCap, items: details.realWorldApplications, kind: 'cards' as const },
         ]
       : [];
 
@@ -3633,20 +3642,70 @@ export default function ChapterListPage() {
               </div>
             ) : (
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+                <div className="mb-6 grid gap-4 lg:grid-cols-4">
+                  {[
+                    { label: 'Knowledge', value: details?.knowledge.length ?? 0 },
+                    { label: 'Objectives', value: details?.learningObjectives.length ?? 0 },
+                    { label: 'Outcomes', value: details?.learningOutcomes.length ?? 0 },
+                    { label: 'Skills', value: details?.skills.length ?? 0 },
+                  ].map((metric) => (
+                    <div
+                      key={metric.label}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 shadow-sm"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {metric.label}
+                      </p>
+                      <p className="mt-2 text-2xl font-bold text-slate-900">{metric.value}</p>
+                    </div>
+                  ))}
+                </div>
+
                 <div className="grid gap-x-10 gap-y-6 md:grid-cols-2">
                 {detailSections.map((section) => {
                   const SectionIcon = section.icon;
+                  const visibleItems = section.kind === 'tags' ? section.items.slice(0, 10) : section.items.slice(0, 4);
+                  const hiddenCount = Math.max(section.items.length - visibleItems.length, 0);
 
                   return (
-                    <section key={section.title}>
-                      <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <section key={section.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                         <SectionIcon size={14} className="text-slate-500" />
                         {section.title}
+                        </div>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                          {section.items.length}
+                        </span>
                       </div>
 
-                      {section.kind === 'list' ? (
+                      {section.kind === 'cards' ? (
+                        <div className="space-y-3">
+                          {visibleItems.map((item, index) => (
+                            <article
+                              key={`${section.title}-${index}-${item}`}
+                              className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3"
+                            >
+                              <div className="mb-2 flex items-center gap-2">
+                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                                  {index + 1}
+                                </span>
+                                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                                  {section.title.slice(0, -1) || section.title}
+                                </span>
+                              </div>
+                              <p className="text-[15px] leading-6 text-slate-800">{item}</p>
+                            </article>
+                          ))}
+                          {hiddenCount > 0 && (
+                            <p className="text-xs font-medium text-slate-500">
+                              +{hiddenCount} more {section.title.toLowerCase()} available in the detailed concept intelligence tab view.
+                            </p>
+                          )}
+                        </div>
+                      ) : section.kind === 'list' ? (
                         <ul className="space-y-2 text-[15px] leading-6 text-slate-700">
-                          {section.items.map((item) => (
+                          {visibleItems.map((item) => (
                             <li key={item} className="flex gap-2">
                               <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
                               <span>{item}</span>
@@ -3655,7 +3714,7 @@ export default function ChapterListPage() {
                         </ul>
                       ) : (
                         <div className="flex flex-wrap gap-2">
-                          {section.items.map((item) => (
+                          {visibleItems.map((item) => (
                             <Badge
                               key={item}
                               className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
@@ -3663,6 +3722,11 @@ export default function ChapterListPage() {
                               {item}
                             </Badge>
                           ))}
+                          {hiddenCount > 0 ? (
+                            <Badge className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 ring-1 ring-slate-200 hover:bg-white">
+                              +{hiddenCount} more
+                            </Badge>
+                          ) : null}
                         </div>
                       )}
                     </section>
