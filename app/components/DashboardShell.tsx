@@ -84,6 +84,11 @@ function augmentPalLevel3Items(items: Level3Item[], pathname: string): Level3Ite
       label: 'Pedagogy Engine',
       href: '/pal/pedagogy-engine',
     },
+    {
+      id: 'pal-administration',
+      label: 'Administration',
+      href: '/pal/new/administration',
+    },
   ];
 }
 
