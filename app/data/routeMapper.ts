@@ -111,6 +111,11 @@ const H5P_ROUTE_NAME_MAP: Record<string, string> = {
   'h5p_mcq.index': '/h5p/h5p_mcq',
   'h5p_interactive_video.index': '/h5p/h5p_interactive_video',
   'h5p_flashacard.index': '/h5p/h5p_flashacard',
+  // PAL V4 H5P Model workspace — pedagogy and framework tagging, chapter
+  // coverage, measured engagement and the xAPI pipeline. Reached from the
+  // H5P content hub.
+  'h5p_model.index': '/h5p/model',
+  'h5p/model': '/h5p/model',
 };
 
 /**

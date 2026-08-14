@@ -373,8 +373,15 @@ export interface ExtractedChapter {
 
 export interface ChapterList {
   count: number;
-  subjects: string[];
+  /** Every grade the institute runs — not only the ones already extracted. */
   standards: number[];
+  /** Every subject that carries chapters, across all standards. */
+  subjects: string[];
+  /** standard -> the subjects taught in it, so the subject row can narrow. */
+  subjectsByStandard: Record<string, string[]>;
+  /** The subset that actually has extracted chapters behind it. */
+  extractedStandards: number[];
+  extractedSubjects: string[];
   chapters: ExtractedChapter[];
 }
 
@@ -410,10 +417,18 @@ export async function fetchChapters(
   );
   const facets = toRecord(data.facets);
 
+  const subjectsByStandard: Record<string, string[]> = {};
+  Object.entries(toRecord(facets.subjects_by_standard)).forEach(([standard, list]) => {
+    subjectsByStandard[standard] = toStringArray(list);
+  });
+
   return {
     count: readNumber(data.count),
-    subjects: toStringArray(facets.subjects),
     standards: toArray(facets.standards).map((s) => readNumber(s)),
+    subjects: toStringArray(facets.subjects),
+    subjectsByStandard,
+    extractedStandards: toArray(facets.extracted_standards).map((s) => readNumber(s)),
+    extractedSubjects: toStringArray(facets.extracted_subjects),
     chapters: toArray(data.chapters).map(mapChapter),
   };
 }
