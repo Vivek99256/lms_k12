@@ -79,6 +79,11 @@ function augmentPalLevel3Items(items: Level3Item[], pathname: string): Level3Ite
       label: 'Unified Learning Units',
       href: '/pal/ulu',
     },
+    {
+      id: 'pal-pedagogy-engine',
+      label: 'Pedagogy Engine',
+      href: '/pal/pedagogy-engine',
+    },
   ];
 }
 
