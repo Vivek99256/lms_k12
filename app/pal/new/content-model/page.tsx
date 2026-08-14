@@ -41,6 +41,7 @@ export default function ContentModelPage() {
   const [chapters, setChapters] = useState<ExtractedChapter[]>([]);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [standards, setStandards] = useState<number[]>([]);
+  const [subjectsByStandard, setSubjectsByStandard] = useState<Record<string, string[]>>({});
 
   const [subject, setSubject] = useState('');
   const [standard, setStandard] = useState('');
@@ -63,6 +64,7 @@ export default function ContentModelPage() {
       setChapters(list.chapters);
       setSubjects(list.subjects);
       setStandards(list.standards);
+      setSubjectsByStandard(list.subjectsByStandard);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       setError((err as Error).message || 'Could not load the Content Model workspace.');
@@ -79,6 +81,24 @@ export default function ContentModelPage() {
     void run();
     return () => controller.abort();
   }, [load]);
+
+  // Subject options follow the selected grade — the institute teaches a
+  // different set in each. With no grade chosen, every subject is offered.
+  const subjectOptions = useMemo(
+    () => (standard ? (subjectsByStandard[standard] ?? []) : subjects),
+    [standard, subjects, subjectsByStandard]
+  );
+
+  // A subject that is not taught in the newly chosen grade would filter to
+  // nothing forever, so the selection is dropped as the grade changes.
+  const handleStandardChange = useCallback(
+    (next: string) => {
+      setStandard(next);
+      const allowed = next ? (subjectsByStandard[next] ?? []) : subjects;
+      setSubject((current) => (current && !allowed.includes(current) ? '' : current));
+    },
+    [subjects, subjectsByStandard]
+  );
 
   // Filtering is client-side over an already-loaded list: the estate is chapter
   // scale (tens to hundreds), so a round trip per keystroke would be worse.
@@ -224,44 +244,42 @@ export default function ContentModelPage() {
 
             {/* chapter picker */}
             <div className="rounded-2xl border border-[#DFE6F2] bg-white shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-              <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-4">
-                <h2 className="text-[15px] font-semibold text-[#1F2A44]">Extracted chapters</h2>
+              <div className="border-b border-slate-100 p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-[15px] font-semibold text-[#1F2A44]">Extracted chapters</h2>
 
-                <div className="relative ml-auto">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search chapter or subject"
-                    className="h-9 w-64 rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-indigo-400"
-                  />
+                  <div className="relative ml-auto">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search chapter or subject"
+                      className="h-9 w-64 rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-indigo-400"
+                    />
+                  </div>
                 </div>
 
-                <select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="h-9 rounded-lg border border-slate-200 px-2.5 text-sm outline-none focus:border-indigo-400"
-                >
-                  <option value="">All subjects</option>
-                  {subjects.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                {/* Both option lists come from the API's facets, computed over
+                    the extracted estate — never a hardcoded grade or subject
+                    list, so a newly extracted subject appears on its own. */}
+                <div className="mt-4 flex flex-col gap-4">
+                  <FilterPills
+                    label="Standard"
+                    allLabel="All standards"
+                    options={standards.map(String)}
+                    value={standard}
+                    onChange={handleStandardChange}
+                    renderOption={(option) => `Grade ${option}`}
+                  />
 
-                <select
-                  value={standard}
-                  onChange={(e) => setStandard(e.target.value)}
-                  className="h-9 rounded-lg border border-slate-200 px-2.5 text-sm outline-none focus:border-indigo-400"
-                >
-                  <option value="">All grades</option>
-                  {standards.map((s) => (
-                    <option key={s} value={String(s)}>
-                      Grade {s}
-                    </option>
-                  ))}
-                </select>
+                  <FilterPills
+                    label="Subject"
+                    allLabel="All subjects"
+                    options={subjectOptions}
+                    value={subject}
+                    onChange={setSubject}
+                  />
+                </div>
               </div>
 
               {visible.length === 0 ? (
@@ -335,6 +353,56 @@ export default function ContentModelPage() {
             ) : null}
           </>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A row of filter pills.
+ *
+ * Empty string is "no filter" in the page's state; 'all' is only the sentinel
+ * for the pill that clears it, so the filtering logic never has to know about
+ * a magic string.
+ */
+function FilterPills({
+  label,
+  allLabel,
+  options,
+  value,
+  onChange,
+  renderOption,
+}: {
+  label: string;
+  allLabel: string;
+  options: string[];
+  value: string;
+  onChange: (next: string) => void;
+  renderOption?: (option: string) => string;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-[13px] font-medium text-[#52637A]">{label}</p>
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label={`Filter by ${label.toLowerCase()}`}>
+        {['all', ...options].map((option) => {
+          const selected = (value || 'all') === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => onChange(option === 'all' ? '' : option)}
+              className={`shrink-0 rounded-full border px-4 py-2 text-[14px] font-semibold transition ${
+                selected
+                  ? 'border-[#5648E8] bg-[#5648E8] text-white shadow-[0_3px_8px_rgba(86,72,232,0.22)]'
+                  : 'border-[#D8E0EB] bg-white text-[#52637A] hover:border-[#A99FF7] hover:text-[#5648E8]'
+              }`}
+            >
+              {option === 'all' ? allLabel : (renderOption ? renderOption(option) : option)}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
