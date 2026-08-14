@@ -9,13 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  deleteGeneral, getGeneralSession, loadGeneral, saveGeneral,
-  type GeneralData, type GeneralModule, type GeneralOption, type GeneralRecord,
+  deleteGeneral, getGeneralSession, loadGeneral, loadTemplateTags, saveGeneral,
+  type GeneralData, type GeneralModule, type GeneralOption, type GeneralRecord, type TemplateTag,
 } from "../api";
+import { TemplateHtmlEditor } from "./TemplateHtmlEditor";
 
 type Source = keyof Pick<GeneralData, "profiles" | "grades" | "standards" | "subjects">;
 export type GeneralField = {
-  key: string; label: string; kind: "text" | "number" | "select" | "textarea" | "checkbox";
+  key: string; label: string; kind: "text" | "number" | "select" | "textarea" | "editor" | "checkbox";
   required?: boolean; source?: Source; dependsOn?: string; options?: string[]; rows?: number;
 };
 export type GeneralConfig = {
@@ -37,6 +38,7 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [templateTags, setTemplateTags] = useState<TemplateTag[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -49,6 +51,12 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+  useEffect(() => {
+    if (config.module !== "templates") return;
+    let active = true;
+    void loadTemplateTags(getGeneralSession()).then((tags) => { if (active) setTemplateTags(tags); }).catch(() => { if (active) setTemplateTags([]); });
+    return () => { active = false; };
+  }, [config.module]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -141,12 +149,13 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
     {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
     {showForm && <Card className="bg-white shadow-sm"><CardHeader className="border-b"><div className="flex items-center justify-between"><CardTitle>{editing ? `Edit ${config.singular}` : config.module === "implementations" ? "Implementation Details" : `Add ${config.singular}`}</CardTitle>{!["implementations", "bulk-upload"].includes(config.module) && <Button variant="ghost" size="icon" onClick={reset}><X className="size-4" /></Button>}</div></CardHeader><CardContent>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{config.fields.map((field) => <div key={field.key} className={field.kind === "textarea" ? "sm:col-span-2 lg:col-span-3" : ""}>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{config.fields.map((field) => <div key={field.key} className={(field.kind === "textarea" || field.kind === "editor") ? "sm:col-span-2 lg:col-span-3" : ""}>
         <Label htmlFor={field.key}>{field.label}{field.required ? " *" : ""}</Label>
         {field.kind === "select" ? <select id={field.key} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
           className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
           <option value="">Select {field.label}</option>{field.options?.map((option) => <option key={option} value={option}>{option}</option>)}{fieldOptions(field).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-        </select> : field.kind === "textarea" ? <Textarea id={field.key} rows={field.rows || 5} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1 font-mono" />
+        </select> : field.kind === "editor" ? <TemplateHtmlEditor value={text(form[field.key])} onChange={(html) => setForm((current) => ({ ...current, [field.key]: html }))} tags={templateTags} disabled={busy} />
+          : field.kind === "textarea" ? <Textarea id={field.key} rows={field.rows || 5} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1 font-mono" />
           : field.kind === "checkbox" ? <label className="mt-2 flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm"><input type="checkbox" checked={Boolean(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.checked }))} className="size-4 accent-blue-600" /> Active</label>
           : <Input id={field.key} type={field.kind} min={field.kind === "number" ? 0 : undefined} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1" />}
       </div>)}</div>
