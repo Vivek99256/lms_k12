@@ -70,6 +70,11 @@ function augmentPalLevel3Items(items: Level3Item[], pathname: string): Level3Ite
       href: '/pal/frameworks',
     },
     {
+      id: 'pal-content-model',
+      label: 'Content Model',
+      href: '/pal/new/content-model',
+    },
+    {
       id: 'pal-ulu',
       label: 'Unified Learning Units',
       href: '/pal/ulu',
