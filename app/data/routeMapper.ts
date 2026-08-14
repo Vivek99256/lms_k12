@@ -192,6 +192,17 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/pal-content/review': '/pal/content/review',
   'pal_content.misconceptions': '/pal/content/misconceptions',
   'lms/pal-content/misconceptions': '/pal/content/misconceptions',
+  // New PAL — a level-2 entry directly under LMS + PAL, alongside Homework.
+  // It is a workspace rather than a menu group, so the menu row links straight
+  // here and its sub-modules (Content Model first) are navigated inside the
+  // workspace by NewPalNav.
+  // Listed explicitly: the generic PAL slug fallback further down normalises to
+  // the bare slug "pal" and would not match "new_pal".
+  'new_pal.index': '/pal/new',
+  'new_pal': '/pal/new',
+  'lms/new-pal': '/pal/new',
+  'new_pal.content_model': '/pal/new/content-model',
+  'lms/new-pal/content-model': '/pal/new/content-model',
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',
