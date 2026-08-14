@@ -182,6 +182,16 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'pal.index': '/pal',
   'pal': '/pal',
   'lms/pal': '/pal',
+  // PAL V4 Content Intelligence Layer (tblmenumaster group "PAL", below
+  // Homework). Listed explicitly rather than relying on the generic PAL slug
+  // fallback further down — that one normalises to the bare slug "pal" and
+  // would not match "pal_content", so these would otherwise fall through.
+  'pal_content.index': '/pal/content',
+  'lms/pal-content': '/pal/content',
+  'pal_content.review': '/pal/content/review',
+  'lms/pal-content/review': '/pal/content/review',
+  'pal_content.misconceptions': '/pal/content/misconceptions',
+  'lms/pal-content/misconceptions': '/pal/content/misconceptions',
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',
@@ -504,6 +514,7 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     'timetable.index': '/front_desk/create-timetable',
     'photo_video_gallary.index': '/front_desk/photo_video_gallary',
     'front_desk/photo_video_gallary': '/front_desk/photo_video_gallary',
+    'api/front-desk/photo-video-gallery': '/front_desk/photo_video_gallary',
     'calendar.index': '/front_desk/calendar',
     'calendar/calendar': '/front_desk/calendar',
     'circular.index': '/front_desk/circular',

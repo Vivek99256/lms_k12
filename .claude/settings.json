@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/next_lms_erp/**)",
+      "Read(//tmp/**)",
+      "Bash(awk '{if\\($0==\"{\"\\)o++; else c++; print o-c}')",
+      "Bash(php -l app/Http/Controllers/result/marks_entry/marks_entry_controller.php)",
+      "Read(//d/next_lms_erp/routes/**)"
+    ]
+  }
+}

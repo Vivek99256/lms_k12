@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Edit3, FileHeart, Loader2, Plus, Search, Trash2, X } from 'lucide-react';
 import { searchInfirmaryStudents, type StudentOption } from '@/app/student/student_infirmary/api';
 import { deleteCareRecord, listCareRecords, saveCareRecord, type CareModule, type CareRecord } from './student-care-api';
+import { getMobileNumberError, sanitizeMobileNumberInput } from './mobileValidation';
 
 export type CareField = {
   key: string;
@@ -88,6 +89,10 @@ export default function StudentCareModule({ config }: { config: CareConfig }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!form.student_id) { setError('Select a student from the search results.'); return; }
+    if (getMobileNumberError(form.doctor_contact ?? '')) {
+      setError('Enter a valid 10-digit doctor contact number starting with 6-9.');
+      return;
+    }
     setSaving(true); setError('');
     try { setMessage(await saveCareRecord(config.module, form, editingId || undefined)); setShowForm(false); await load(); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save record.'); }
@@ -152,5 +157,24 @@ function CareInput({ field, value, onChange, onFile }: { field: CareField; value
   if (field.type === 'textarea') return <label className="space-y-1 md:col-span-2"><span className="text-xs font-medium text-slate-700">{field.label}</span><textarea required={field.required} value={value} onChange={(event) => onChange(event.target.value)} rows={3} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm" /></label>;
   if (field.type === 'select') return <label className="space-y-1"><span className="text-xs font-medium text-slate-700">{field.label}</span><select required={field.required} value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"><option value="">Select {field.label}</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
   if (field.type === 'file') return <label className="space-y-1 md:col-span-2"><span className="text-xs font-medium text-slate-700">{field.label}</span><input type="file" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => onFile(file.name, String(reader.result)); reader.readAsDataURL(file); }} className="block w-full rounded-md border border-slate-200 p-2 text-sm" /></label>;
+  if (field.key === 'doctor_contact') {
+    const error = getMobileNumberError(value);
+    return <label className="space-y-1">
+      <span className="text-xs font-medium text-slate-700">{field.label}</span>
+      <input
+        required={field.required}
+        type="tel"
+        inputMode="numeric"
+        pattern="[6-9][0-9]{9}"
+        maxLength={10}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onInput={sanitizeMobileNumberInput}
+        aria-invalid={Boolean(error)}
+        className={`h-10 w-full rounded-md border px-3 text-sm ${error ? 'border-red-300 focus:border-red-400' : 'border-slate-200'}`}
+      />
+      {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+    </label>;
+  }
   return <label className="space-y-1"><span className="text-xs font-medium text-slate-700">{field.label}</span><input required={field.required} type={field.type ?? 'text'} value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm" /></label>;
 }

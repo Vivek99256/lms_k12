@@ -14,7 +14,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  assertOk, extractRows, readString, resultGet, resultPost, type PostValue,
+  asRecord, assertOk, extractRows, readString, resultGet, resultPost, type PostValue,
 } from '@/lib/result/api';
 import type { FieldDef, MasterScreenDef } from '@/lib/result/types';
 import DataTable, { type TableRow } from './DataTable';
@@ -66,9 +66,10 @@ export default function MasterCrud({ screen, embedded = false }: { screen: Maste
   const [rows, setRows] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [drawer, setDrawer] = useState<{ mode: 'create' } | { mode: 'edit'; row: TableRow } | null>(null);
+  const [drawer, setDrawer] = useState<{ mode: 'create' } | { mode: 'edit'; row: TableRow; seed?: FormValues } | null>(null);
   const [deleting, setDeleting] = useState<TableRow | string[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [prefillLoading, setPrefillLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,14 +89,41 @@ export default function MasterCrud({ screen, embedded = false }: { screen: Maste
     void load();
   }, [load]);
 
+  const openEdit = async (row: TableRow) => {
+    if (!screen.api.show) {
+      setDrawer({ mode: 'edit', row });
+      return;
+    }
+    setPrefillLoading(true);
+    try {
+      const payload = await resultGet(`${screen.api.show}/${readString(row.id)}`);
+      const record = asRecord(payload.data ?? payload);
+      const seed = (screen.deserialize ? screen.deserialize(record) : record) as FormValues;
+      setDrawer({ mode: 'edit', row, seed });
+    } catch (err) {
+      toast.error(`Could not load ${screen.entityName} details`, err instanceof Error ? err.message : undefined);
+    } finally {
+      setPrefillLoading(false);
+    }
+  };
+
   const handleSubmit = async (values: FormValues) => {
     setBusy(true);
     try {
-      const { data, hasFile } = serializeForm(screen.fields, values);
       const isEdit = drawer?.mode === 'edit';
+      let submitValues = values;
+      if (!isEdit && screen.slug === 'exam-master') {
+        const nextCode = String(
+          Math.max(0, ...rows.map((row) => Number(readString(row.Code ?? row.code ?? 0)))) + 1,
+        );
+        submitValues = { ...values, Code: nextCode };
+      }
+      const { data, hasFile } = screen.serialize
+        ? screen.serialize(screen.fields, submitValues, isEdit)
+        : serializeForm(screen.fields, submitValues);
       const id = isEdit ? readString((drawer as { row: TableRow }).row.id) : '';
       const path = isEdit && screen.api.update ? `${screen.api.update}/${id}` : screen.api.store;
-      const payload = await resultPost(path, data, {
+      const payload = await resultPost(path, data as Record<string, PostValue>, {
         method: isEdit ? 'PUT' : 'POST',
         multipart: hasFile || screen.multipart,
       });
@@ -134,9 +162,36 @@ export default function MasterCrud({ screen, embedded = false }: { screen: Maste
 
   const drawerTitle = drawer?.mode === 'edit' ? `Edit ${screen.entityName}` : `Add ${screen.entityName}`;
   const initialValues = useMemo<FormValues | undefined>(
-    () => (drawer?.mode === 'edit' ? (drawer.row as FormValues) : undefined),
+    () => (drawer?.mode === 'edit' ? (drawer.seed ?? (drawer.row as FormValues)) : undefined),
     [drawer],
   );
+
+  const standardOptions = useMemo(() => {
+    if (screen.slug !== 'exam-master') return [];
+    const map = new Map<string, { id: string; label: string }>();
+    for (const row of rows) {
+      const id = readString(row.standard_id ?? '');
+      const label = readString(row.std_name ?? row.standard_name ?? '');
+      if (id && label) map.set(id, { id, label });
+    }
+    return Array.from(map.values());
+  }, [screen.slug, rows]);
+
+  const formFields = useMemo(() => {
+    if (screen.slug !== 'exam-master' || standardOptions.length === 0) return screen.fields;
+    return screen.fields.map((field) => {
+      if (field.name === 'all_standard') {
+        return {
+          ...field,
+          options: {
+            kind: 'static',
+            options: standardOptions.map((opt) => ({ value: opt.id, label: opt.label })),
+          } as const,
+        } as FieldDef;
+      }
+      return field;
+    });
+  }, [screen.slug, screen.fields, standardOptions]);
 
   return (
     <div className={embedded ? '' : 'min-h-screen p-6'}>
@@ -185,7 +240,8 @@ export default function MasterCrud({ screen, embedded = false }: { screen: Maste
                   variant="ghost"
                   size="icon-sm"
                   aria-label={`Edit ${screen.entityName}`}
-                  onClick={() => setDrawer({ mode: 'edit', row })}
+                  onClick={() => void openEdit(row)}
+                  disabled={prefillLoading}
                   className="text-slate-400 hover:text-blue-600"
                 >
                   <Pencil className="h-4 w-4" />
@@ -216,7 +272,7 @@ export default function MasterCrud({ screen, embedded = false }: { screen: Maste
       >
         {drawer && (
           <DynamicForm
-            fields={screen.fields}
+            fields={formFields}
             sectionOrder={screen.sectionOrder}
             initialValues={initialValues}
             onSubmit={handleSubmit}

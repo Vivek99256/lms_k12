@@ -2,20 +2,27 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  TrendingUp, 
-  Users, 
-  Percent, 
-  Clock, 
+import {
+  TrendingUp,
+  Users,
+  Percent,
+  Clock,
   Maximize2,
   Search,
   SlidersHorizontal,
   ChevronDown,
   Plus,
   Pencil,
-  X
+  X,
+  History
 } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import {
+  ADMISSION_FOLLOW_UP_STATUS_OPTIONS,
+  fetchAdmissionFollowUps,
+  saveAdmissionFollowUp,
+  type AdmissionFollowUpEntry,
+} from './followUpApi';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -81,24 +88,67 @@ const branchOptions = ['Main Branch', 'Primary Branch', 'Secondary Branch', 'Oth
 
 const enquiryInputClassName =
   'h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--primary-blue)] focus:bg-white focus:ring-1 focus:ring-[var(--primary-blue)]';
+const enquiryInputErrorClassName =
+  'h-10 w-full rounded-lg border border-rose-300 bg-rose-50/40 px-3 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-rose-400 focus:bg-white focus:ring-1 focus:ring-rose-400';
 const enquiryTextareaClassName =
   'min-h-24 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--primary-blue)] focus:bg-white focus:ring-1 focus:ring-[var(--primary-blue)]';
+
+const MOBILE_NUMBER_PATTERN = /^[6-9]\d{9}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type EnquiryFieldErrors = {
+  mobile?: string;
+  email?: string;
+  mobile_number_father?: string;
+  mobile_number_mother?: string;
+};
+
+function validateEnquiryContactFields(formData: FormData): EnquiryFieldErrors {
+  const errors: EnquiryFieldErrors = {};
+
+  const mobile = readFormValue(formData, 'mobile');
+  if (!mobile) {
+    errors.mobile = 'Mobile number is required.';
+  } else if (!MOBILE_NUMBER_PATTERN.test(mobile)) {
+    errors.mobile = 'Enter a valid 10-digit mobile number.';
+  }
+
+  const email = readFormValue(formData, 'email');
+  if (email && !EMAIL_PATTERN.test(email)) {
+    errors.email = 'Enter a valid email address.';
+  }
+
+  const mobileFather = readFormValue(formData, 'mobile_number_father');
+  if (mobileFather && !MOBILE_NUMBER_PATTERN.test(mobileFather)) {
+    errors.mobile_number_father = 'Enter a valid 10-digit mobile number.';
+  }
+
+  const mobileMother = readFormValue(formData, 'mobile_number_mother');
+  if (mobileMother && !MOBILE_NUMBER_PATTERN.test(mobileMother)) {
+    errors.mobile_number_mother = 'Enter a valid 10-digit mobile number.';
+  }
+
+  return errors;
+}
 
 function EnquiryModalField({
   label,
   htmlFor,
   children,
   className = '',
+  required = false,
 }: {
   label: string;
   htmlFor: string;
   children: ReactNode;
   className?: string;
+  required?: boolean;
 }) {
   return (
     <div className={`space-y-1.5 ${className}`}>
       <label htmlFor={htmlFor} className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       {children}
     </div>
@@ -165,6 +215,7 @@ type AdmissionEnquiryPostPayload = {
   email: string;
   gender: string;
   date_of_birth: string;
+  age: number | string;
   admission_standard: number | string;
   address: string;
   father_name: string;
@@ -173,14 +224,50 @@ type AdmissionEnquiryPostPayload = {
   annual_income: string;
   source_of_enquiry: string;
   previous_school_name: string;
+  previous_standard: number | string;
   remarks: string;
+  followup_date: string;
+  mobile_number_father: string;
+  mobile_number_mother: string;
+  category: string;
+  send_sms: string;
+  institute_branch: string;
+  activity_date: string;
+  activity_time: string;
+  activity_remarks: string;
+  siblings: string;
+  fees_circular_form_no: string;
 };
 
 type AdmissionEnquiryUpdatePayload = {
   first_name: string;
+  middle_name: string;
+  last_name: string;
   mobile: string;
+  email: string;
+  gender: string;
+  date_of_birth: string;
+  admission_standard: number | string;
+  address: string;
+  father_name: string;
+  mother_name: string;
   father_occupation: string;
+  annual_income: string;
+  source_of_enquiry: string;
+  previous_school_name: string;
+  previous_standard: number | string;
+  remarks: string;
   followup_date: string;
+  mobile_number_father: string;
+  mobile_number_mother: string;
+  category: string;
+  send_sms: string;
+  institute_branch: string;
+  activity_date: string;
+  activity_time: string;
+  activity_remarks: string;
+  siblings: string;
+  fees_circular_form_no: string;
 };
 
 type EnquiryRosterRow = {
@@ -232,6 +319,7 @@ type AdmissionEnquirySession = {
   token: string;
   subInstituteId: string;
   syear: string;
+  userId: string;
 };
 
 function readString(value: unknown): string {
@@ -249,7 +337,7 @@ function toNumberWhenPossible(value: string): number | string {
 
 function getAdmissionEnquirySession(): AdmissionEnquirySession {
   if (typeof window === 'undefined') {
-    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '' };
+    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '', userId: '' };
   }
 
   try {
@@ -271,9 +359,18 @@ function getAdmissionEnquirySession(): AdmissionEnquirySession {
       token: readString(userData.user_token ?? userData.token ?? menuContext.user_token ?? menuContext.token),
       subInstituteId: readString(userData.sub_institute_id ?? menuContext.sub_institute_id),
       syear,
+      userId: readString(userData.user_id ?? userData.userId ?? menuContext.user_id ?? menuContext.userId),
     };
   } catch {
-    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '' };
+    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', syear: '', userId: '' };
+  }
+}
+
+function sanitizeMobileNumberInput(event: FormEvent<HTMLInputElement>): void {
+  const input = event.currentTarget;
+  const digitsOnly = input.value.replace(/\D/g, '').slice(0, 10);
+  if (digitsOnly !== input.value) {
+    input.value = digitsOnly;
   }
 }
 
@@ -305,6 +402,28 @@ function parseApiDate(value?: string | null): Date | null {
   const date = new Date(value.replace(' ', 'T'));
   if (Number.isNaN(date.getTime())) return null;
   return date;
+}
+
+function formatFollowUpDate(value?: string | null): string {
+  const date = parseApiDate(value);
+  if (!date) return '-';
+
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+}
+
+function formatFollowUpTimestamp(value?: string | null): string {
+  const date = parseApiDate(value);
+  if (!date) return '-';
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date);
 }
 
 function isConvertedStatus(status: string): boolean {
@@ -418,6 +537,16 @@ export default function AdmissionManagementContent() {
   const [enquiryAge, setEnquiryAge] = useState('');
   const [isSavingEnquiry, setIsSavingEnquiry] = useState(false);
   const [enquiryFormError, setEnquiryFormError] = useState<string | null>(null);
+  const [enquiryFieldErrors, setEnquiryFieldErrors] = useState<EnquiryFieldErrors>({});
+  const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
+  const [followUpEntries, setFollowUpEntries] = useState<AdmissionFollowUpEntry[]>([]);
+  const [followUpContactName, setFollowUpContactName] = useState('');
+  const [followUpContactMobile, setFollowUpContactMobile] = useState('');
+  const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
+  const [followUpListError, setFollowUpListError] = useState<string | null>(null);
+  const [isSavingFollowUp, setIsSavingFollowUp] = useState(false);
+  const [followUpFormError, setFollowUpFormError] = useState<string | null>(null);
+  const [nextFollowUpByEnquiry, setNextFollowUpByEnquiry] = useState<Record<string, string>>({});
 
   const loadAdmissionEnquiries = useCallback(async (signal?: AbortSignal) => {
     const session = getAdmissionEnquirySession();
@@ -480,6 +609,40 @@ export default function AdmissionManagementContent() {
       controller.abort();
     };
   }, [loadAdmissionEnquiries]);
+
+  useEffect(() => {
+    if (rosterData.length === 0) return;
+    const controller = new AbortController();
+
+    (async () => {
+      const results = await Promise.allSettled(
+        rosterData.map(async (row) => {
+          const details = await fetchAdmissionFollowUps(row.apiId, controller.signal);
+          const latestEntry = details.entries.reduce<AdmissionFollowUpEntry | null>((latest, entry) => {
+            const entryDate = parseApiDate(entry.followUpDate);
+            if (!entryDate) return latest;
+            const latestDate = latest ? parseApiDate(latest.followUpDate) : null;
+            return !latest || (latestDate && entryDate > latestDate) ? entry : latest;
+          }, null);
+          return { apiId: row.apiId, latest: latestEntry?.followUpDate || '' };
+        })
+      );
+
+      if (controller.signal.aborted) return;
+
+      setNextFollowUpByEnquiry((prev) => {
+        const next = { ...prev };
+        results.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value.latest) {
+            next[result.value.apiId] = result.value.latest;
+          }
+        });
+        return next;
+      });
+    })();
+
+    return () => controller.abort();
+  }, [rosterData]);
 
   const filteredRosterData = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -653,6 +816,7 @@ export default function AdmissionManagementContent() {
     setEnquiryDob(editingEnquiry?.dateOfBirth || '');
     setEnquiryAge(editingEnquiry?.age || '');
     setEnquiryFormError(null);
+    setEnquiryFieldErrors({});
   };
 
   const openAddEnquiryModal = () => {
@@ -660,6 +824,7 @@ export default function AdmissionManagementContent() {
     setEnquiryDob('');
     setEnquiryAge('');
     setEnquiryFormError(null);
+    setEnquiryFieldErrors({});
     setIsEnquiryModalOpen(true);
   };
 
@@ -668,6 +833,7 @@ export default function AdmissionManagementContent() {
     setEnquiryDob(row.dateOfBirth);
     setEnquiryAge(row.age);
     setEnquiryFormError(null);
+    setEnquiryFieldErrors({});
     setIsEnquiryModalOpen(true);
   };
 
@@ -704,6 +870,79 @@ export default function AdmissionManagementContent() {
     setIsEnquiryModalOpen(false);
     setEditingEnquiry(null);
     setEnquiryFormError(null);
+    setEnquiryFieldErrors({});
+  };
+
+  const loadFollowUps = useCallback(async (enquiryId: string, signal?: AbortSignal) => {
+    setIsFollowUpLoading(true);
+    setFollowUpListError(null);
+
+    try {
+      const details = await fetchAdmissionFollowUps(enquiryId, signal);
+      setFollowUpEntries(details.entries);
+      if (details.name) setFollowUpContactName(details.name);
+      if (details.mobile) setFollowUpContactMobile(details.mobile);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setFollowUpEntries([]);
+      setFollowUpListError(error instanceof Error ? error.message : 'Failed to load admission follow-ups.');
+    } finally {
+      if (!signal?.aborted) {
+        setIsFollowUpLoading(false);
+      }
+    }
+  }, []);
+
+  const openFollowUpModal = () => {
+    if (!editingEnquiry) return;
+
+    setIsEnquiryModalOpen(false);
+    setFollowUpContactName(editingEnquiry.student);
+    setFollowUpContactMobile(editingEnquiry.mobile);
+    setFollowUpEntries([]);
+    setFollowUpFormError(null);
+    setFollowUpListError(null);
+    setIsFollowUpModalOpen(true);
+    void loadFollowUps(editingEnquiry.apiId);
+  };
+
+  const closeFollowUpModal = () => {
+    setIsFollowUpModalOpen(false);
+    setFollowUpFormError(null);
+    if (editingEnquiry) {
+      setIsEnquiryModalOpen(true);
+    }
+  };
+
+  const handleSaveFollowUp = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingEnquiry) return;
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    const followUpDate = readFormValue(formData, 'follow_up_date');
+    const status = readFormValue(formData, 'status');
+    const remarks = readFormValue(formData, 'remarks');
+
+    if (!followUpDate || !status || !remarks) {
+      setFollowUpFormError('Next followup date, remarks, and enquiry status are required.');
+      return;
+    }
+
+    setIsSavingFollowUp(true);
+    setFollowUpFormError(null);
+
+    try {
+      await saveAdmissionFollowUp({ enquiryId: editingEnquiry.apiId, followUpDate, status, remarks });
+      form.reset();
+      setNextFollowUpByEnquiry((prev) => ({ ...prev, [editingEnquiry.apiId]: followUpDate }));
+      await loadFollowUps(editingEnquiry.apiId);
+    } catch (error) {
+      setFollowUpFormError(error instanceof Error ? error.message : 'Failed to save the follow-up.');
+    } finally {
+      setIsSavingFollowUp(false);
+    }
   };
 
   const handleSaveEnquiry = async (event: FormEvent<HTMLFormElement>) => {
@@ -717,14 +956,47 @@ export default function AdmissionManagementContent() {
     }
 
     const formData = new FormData(form);
+
+    const fieldErrors = validateEnquiryContactFields(formData);
+    setEnquiryFieldErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) {
+      setEnquiryFormError('Please fix the highlighted fields before saving.');
+      return;
+    }
+    setEnquiryFormError(null);
+
     const middleName = readFormValue(formData, 'middle_name');
 
     if (editingEnquiry) {
       const payload: AdmissionEnquiryUpdatePayload = {
         first_name: readFormValue(formData, 'first_name'),
+        middle_name: readFormValue(formData, 'middle_name'),
+        last_name: readFormValue(formData, 'last_name'),
         mobile: readFormValue(formData, 'mobile'),
+        email: readFormValue(formData, 'email'),
+        gender: readFormValue(formData, 'gender'),
+        date_of_birth: readFormValue(formData, 'date_of_birth'),
+        admission_standard: toNumberWhenPossible(readFormValue(formData, 'admission_standard')),
+        address: readFormValue(formData, 'address'),
+        father_name: readFormValue(formData, 'father_name'),
+        mother_name: readFormValue(formData, 'mother_name'),
         father_occupation: readFormValue(formData, 'father_occupation'),
+        annual_income: readFormValue(formData, 'annual_income'),
+        source_of_enquiry: readFormValue(formData, 'source_of_enquiry'),
+        previous_school_name: readFormValue(formData, 'previous_school_name'),
+        previous_standard: toNumberWhenPossible(readFormValue(formData, 'previous_standard')),
+        remarks: readFormValue(formData, 'remarks'),
         followup_date: readFormValue(formData, 'followup_date'),
+        mobile_number_father: readFormValue(formData, 'mobile_number_father'),
+        mobile_number_mother: readFormValue(formData, 'mobile_number_mother'),
+        category: readFormValue(formData, 'category'),
+        send_sms: readFormValue(formData, 'send_sms'),
+        institute_branch: readFormValue(formData, 'institute_branch'),
+        activity_date: readFormValue(formData, 'activity_date'),
+        activity_time: readFormValue(formData, 'activity_time'),
+        activity_remarks: readFormValue(formData, 'activity_remarks'),
+        siblings: readFormValue(formData, 'siblings'),
+        fees_circular_form_no: readFormValue(formData, 'fees_circular_form_no'),
       };
 
       setIsSavingEnquiry(true);
@@ -777,6 +1049,7 @@ export default function AdmissionManagementContent() {
       email: readFormValue(formData, 'email'),
       gender: readFormValue(formData, 'gender'),
       date_of_birth: readFormValue(formData, 'date_of_birth'),
+      age: toNumberWhenPossible(readFormValue(formData, 'age')),
       admission_standard: toNumberWhenPossible(readFormValue(formData, 'admission_standard')),
       address: readFormValue(formData, 'address'),
       father_name: readFormValue(formData, 'father_name') || middleName,
@@ -785,7 +1058,19 @@ export default function AdmissionManagementContent() {
       annual_income: readFormValue(formData, 'annual_income'),
       source_of_enquiry: readFormValue(formData, 'source_of_enquiry'),
       previous_school_name: readFormValue(formData, 'previous_school_name'),
+      previous_standard: toNumberWhenPossible(readFormValue(formData, 'previous_standard')),
       remarks: readFormValue(formData, 'remarks'),
+      followup_date: readFormValue(formData, 'followup_date'),
+      mobile_number_father: readFormValue(formData, 'mobile_number_father'),
+      mobile_number_mother: readFormValue(formData, 'mobile_number_mother'),
+      category: readFormValue(formData, 'category'),
+      send_sms: readFormValue(formData, 'send_sms'),
+      institute_branch: readFormValue(formData, 'institute_branch'),
+      activity_date: readFormValue(formData, 'activity_date'),
+      activity_time: readFormValue(formData, 'activity_time'),
+      activity_remarks: readFormValue(formData, 'activity_remarks'),
+      siblings: readFormValue(formData, 'siblings'),
+      fees_circular_form_no: readFormValue(formData, 'form_number'),
     };
 
     setIsSavingEnquiry(true);
@@ -797,6 +1082,7 @@ export default function AdmissionManagementContent() {
       url.searchParams.set('sub_institute_id', session.subInstituteId);
       url.searchParams.set('syear', session.syear);
       url.searchParams.set('type', 'API');
+      if (session.userId) url.searchParams.set('user_id', session.userId);
 
       const response = await fetch(url.toString(), {
         method: 'POST',
@@ -1029,26 +1315,27 @@ export default function AdmissionManagementContent() {
                 <th className="p-4 font-semibold text-xs tracking-wider uppercase">Source</th>
                 <th className="p-4 font-semibold text-xs tracking-wider uppercase">Status</th>
                 <th className="p-4 font-semibold text-xs tracking-wider uppercase">Assigned</th>
-                <th className="p-4 font-semibold text-xs tracking-wider uppercase">Next Follow-Up</th>
+                <th className="p-4 font-semibold text-xs tracking-wider uppercase">Follow-up Date</th>
+                <th className="p-4 font-semibold text-xs tracking-wider uppercase">Next Follow-up Date</th>
                 <th className="p-4 w-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isRosterLoading ? (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-sm text-slate-500">
+                  <td colSpan={9} className="p-6 text-center text-sm text-slate-500">
                     Loading enquiries...
                   </td>
                 </tr>
               ) : rosterError ? (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-sm text-rose-600">
+                  <td colSpan={9} className="p-6 text-center text-sm text-rose-600">
                     {rosterError}
                   </td>
                 </tr>
               ) : filteredRosterData.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-sm text-slate-500">
+                  <td colSpan={9} className="p-6 text-center text-sm text-slate-500">
                     No enquiries found.
                   </td>
                 </tr>
@@ -1083,6 +1370,9 @@ export default function AdmissionManagementContent() {
                       </div>
                     </td>
                     <td className="p-4 text-slate-500 font-medium">{row.followUp}</td>
+                    <td className="p-4 text-slate-500 font-medium">
+                      {nextFollowUpByEnquiry[row.apiId] ? formatShortDate(nextFollowUpByEnquiry[row.apiId]) : '-'}
+                    </td>
                     <td className="p-4">
                       <button
                         type="button"
@@ -1161,27 +1451,53 @@ export default function AdmissionManagementContent() {
                   <input id="enquiryNumber" name="enquiry_no" value={editingEnquiry?.enquiryNo || nextEnquiryNumber} readOnly className={`${enquiryInputClassName} cursor-not-allowed text-slate-500`} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Student Name" htmlFor="studentName">
+                <EnquiryModalField label="Student Name" htmlFor="studentName" required>
                   <input id="studentName" name="first_name" type="text" defaultValue={editingEnquiry?.firstName || ''} placeholder="Enter student name" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Middle Name (Father Name)" htmlFor="middleName">
+                <EnquiryModalField label="Middle Name (Father Name)" htmlFor="middleName" required>
                   <input id="middleName" name="middle_name" type="text" defaultValue={editingEnquiry?.middleName || ''} placeholder="Enter father name" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Surname" htmlFor="surname">
+                <EnquiryModalField label="Surname" htmlFor="surname" required>
                   <input id="surname" name="last_name" type="text" defaultValue={editingEnquiry?.lastName || ''} placeholder="Enter surname" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Mobile (SMS Number)" htmlFor="mobile">
-                  <input id="mobile" name="mobile" type="tel" defaultValue={editingEnquiry?.mobile || ''} placeholder="Enter mobile number" className={enquiryInputClassName} />
+                <EnquiryModalField label="Mobile (SMS Number)" htmlFor="mobile" required>
+                  <input
+                    id="mobile"
+                    name="mobile"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[6-9][0-9]{9}"
+                    maxLength={10}
+                    defaultValue={editingEnquiry?.mobile || ''}
+                    placeholder="Enter 10-digit mobile number"
+                    onInput={sanitizeMobileNumberInput}
+                    aria-invalid={Boolean(enquiryFieldErrors.mobile)}
+                    className={enquiryFieldErrors.mobile ? enquiryInputErrorClassName : enquiryInputClassName}
+                  />
+                  {enquiryFieldErrors.mobile && (
+                    <p className="text-xs font-medium text-rose-600">{enquiryFieldErrors.mobile}</p>
+                  )}
                 </EnquiryModalField>
 
                 <EnquiryModalField label="Email" htmlFor="email">
-                  <input id="email" name="email" type="email" defaultValue={editingEnquiry?.email || ''} placeholder="Enter email address" className={enquiryInputClassName} />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    defaultValue={editingEnquiry?.email || ''}
+                    placeholder="Enter email address"
+                    aria-invalid={Boolean(enquiryFieldErrors.email)}
+                    className={enquiryFieldErrors.email ? enquiryInputErrorClassName : enquiryInputClassName}
+                  />
+                  {enquiryFieldErrors.email && (
+                    <p className="text-xs font-medium text-rose-600">{enquiryFieldErrors.email}</p>
+                  )}
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Admission Standard" htmlFor="admissionStandard">
+                <EnquiryModalField label="Admission Standard" htmlFor="admissionStandard" required>
                   <select id="admissionStandard" name="admission_standard" defaultValue={editingEnquiry?.admissionStandard || ''} className={enquiryInputClassName}>
                     <option value="" disabled>Select standard</option>
                     {standardOptions.map((standard) => (
@@ -1190,7 +1506,7 @@ export default function AdmissionManagementContent() {
                   </select>
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Date of Birth" htmlFor="dateOfBirth">
+                <EnquiryModalField label="Date of Birth" htmlFor="dateOfBirth" required>
                   <input
                     id="dateOfBirth"
                     name="date_of_birth"
@@ -1205,15 +1521,15 @@ export default function AdmissionManagementContent() {
                   <input id="age" name="age" type="text" value={enquiryAge} readOnly placeholder="Auto calculated" className={`${enquiryInputClassName} cursor-not-allowed text-slate-500`} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Address" htmlFor="address" className="md:col-span-2 xl:col-span-3">
+                <EnquiryModalField label="Address" htmlFor="address" className="md:col-span-2 xl:col-span-3" required>
                   <textarea id="address" name="address" defaultValue={editingEnquiry?.address || ''} placeholder="Enter full address" className={enquiryTextareaClassName} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Father Name" htmlFor="fatherName">
+                <EnquiryModalField label="Father Name" htmlFor="fatherName" required>
                   <input id="fatherName" name="father_name" type="text" defaultValue={editingEnquiry?.fatherName || ''} placeholder="Enter father name" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Mother Name" htmlFor="motherName">
+                <EnquiryModalField label="Mother Name" htmlFor="motherName" required>
                   <input id="motherName" name="mother_name" type="text" defaultValue={editingEnquiry?.motherName || ''} placeholder="Enter mother name" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
@@ -1225,7 +1541,7 @@ export default function AdmissionManagementContent() {
                   <input id="annualIncome" name="annual_income" type="text" defaultValue={editingEnquiry?.annualIncome || ''} placeholder="Enter annual income" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Gender" htmlFor="genderMale">
+                <EnquiryModalField label="Gender" htmlFor="genderMale" required>
                   <div className="flex h-10 items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700">
                     <label className="inline-flex items-center gap-2">
                       <input id="genderMale" type="radio" name="gender" value="male" defaultChecked={editingEnquiry?.gender?.toLowerCase() === 'male' || editingEnquiry?.gender?.toLowerCase() === 'm'} className="text-[var(--primary-blue)] focus:ring-[var(--primary-blue)]" />
@@ -1259,7 +1575,7 @@ export default function AdmissionManagementContent() {
                   <textarea id="remarks" name="remarks" defaultValue={editingEnquiry?.remarks || ''} placeholder="Enter remarks" className={enquiryTextareaClassName} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Source of Enquiry" htmlFor="sourceOfEnquiry">
+                <EnquiryModalField label="Source of Enquiry" htmlFor="sourceOfEnquiry" required>
                   <input id="sourceOfEnquiry" name="source_of_enquiry" type="text" defaultValue={editingEnquiry?.source || ''} placeholder="e.g. Website, Referral" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
@@ -1311,17 +1627,56 @@ export default function AdmissionManagementContent() {
                 </EnquiryModalField>
 
                 <EnquiryModalField label="Mobile Number Father" htmlFor="mobileNumberFather">
-                  <input id="mobileNumberFather" name="mobile_number_father" type="tel" defaultValue={editingEnquiry?.mobileNumberFather || ''} placeholder="Enter father's mobile" className={enquiryInputClassName} />
+                  <input
+                    id="mobileNumberFather"
+                    name="mobile_number_father"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[6-9][0-9]{9}"
+                    maxLength={10}
+                    defaultValue={editingEnquiry?.mobileNumberFather || ''}
+                    placeholder="Enter father's 10-digit mobile"
+                    onInput={sanitizeMobileNumberInput}
+                    aria-invalid={Boolean(enquiryFieldErrors.mobile_number_father)}
+                    className={enquiryFieldErrors.mobile_number_father ? enquiryInputErrorClassName : enquiryInputClassName}
+                  />
+                  {enquiryFieldErrors.mobile_number_father && (
+                    <p className="text-xs font-medium text-rose-600">{enquiryFieldErrors.mobile_number_father}</p>
+                  )}
                 </EnquiryModalField>
 
                 <EnquiryModalField label="Mobile Number Mother" htmlFor="mobileNumberMother">
-                  <input id="mobileNumberMother" name="mobile_number_mother" type="tel" defaultValue={editingEnquiry?.mobileNumberMother || ''} placeholder="Enter mother's mobile" className={enquiryInputClassName} />
+                  <input
+                    id="mobileNumberMother"
+                    name="mobile_number_mother"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[6-9][0-9]{9}"
+                    maxLength={10}
+                    defaultValue={editingEnquiry?.mobileNumberMother || ''}
+                    placeholder="Enter mother's 10-digit mobile"
+                    onInput={sanitizeMobileNumberInput}
+                    aria-invalid={Boolean(enquiryFieldErrors.mobile_number_mother)}
+                    className={enquiryFieldErrors.mobile_number_mother ? enquiryInputErrorClassName : enquiryInputClassName}
+                  />
+                  {enquiryFieldErrors.mobile_number_mother && (
+                    <p className="text-xs font-medium text-rose-600">{enquiryFieldErrors.mobile_number_mother}</p>
+                  )}
                 </EnquiryModalField>
 
               </div>
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-end">
+              {editingEnquiry && (
+                <button
+                  type="button"
+                  onClick={openFollowUpModal}
+                  className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 sm:mr-auto"
+                >
+                  <History className="h-4 w-4" /> Admission follow-up
+                </button>
+              )}
               <button
                 type="button"
                 onClick={closeEnquiryModal}
@@ -1358,6 +1713,134 @@ export default function AdmissionManagementContent() {
             </div>
           </form>
         </div>
+        </EnquiryModalPortal>
+      )}
+      {isFollowUpModalOpen && editingEnquiry && (
+        <EnquiryModalPortal>
+          <div
+            className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-slate-900/55 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admission-follow-up-title"
+          >
+            <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+                <div>
+                  <h2 id="admission-follow-up-title" className="text-lg font-semibold text-slate-900">
+                    Admission follow-up
+                  </h2>
+                  <p className="text-sm text-slate-500">Enquiry {editingEnquiry.enquiryNo} — record calls, visits and status updates.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeFollowUpModal}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Close admission follow up popup"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 space-y-6">
+                {followUpFormError && (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                    {followUpFormError}
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveFollowUp} className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <EnquiryModalField label="Next Followup Date" htmlFor="followUpDate" required>
+                      <input id="followUpDate" name="follow_up_date" type="date" required className={enquiryInputClassName} />
+                    </EnquiryModalField>
+
+                    <EnquiryModalField label="Name" htmlFor="followUpName">
+                      <input
+                        id="followUpName"
+                        type="text"
+                        value={followUpContactName}
+                        readOnly
+                        className={`${enquiryInputClassName} cursor-not-allowed text-slate-500`}
+                      />
+                    </EnquiryModalField>
+
+                    <EnquiryModalField label="Mobile Number" htmlFor="followUpMobile">
+                      <input
+                        id="followUpMobile"
+                        type="text"
+                        value={followUpContactMobile}
+                        readOnly
+                        className={`${enquiryInputClassName} cursor-not-allowed text-slate-500`}
+                      />
+                    </EnquiryModalField>
+
+                    <EnquiryModalField label="Enquiry Status" htmlFor="followUpStatus" required>
+                      <select id="followUpStatus" name="status" required defaultValue="" className={enquiryInputClassName}>
+                        <option value="" disabled>Select status</option>
+                        {ADMISSION_FOLLOW_UP_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </EnquiryModalField>
+
+                    <EnquiryModalField label="Remarks" htmlFor="followUpRemarks" className="md:col-span-2 xl:col-span-4">
+                      <textarea id="followUpRemarks" name="remarks" required placeholder="Enter remarks" className={enquiryTextareaClassName} />
+                    </EnquiryModalField>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSavingFollowUp}
+                      className="h-10 rounded-lg bg-[var(--primary-blue)] px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[color-mix(in_srgb,var(--primary-blue),#000_12%)] disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isSavingFollowUp ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </form>
+
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-900">Follow-up history</h3>
+                  <div className="overflow-x-auto rounded-lg border border-slate-100">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-400 font-medium border-b border-slate-100">
+                          <th className="p-3 font-semibold text-xs tracking-wider uppercase">Sr. No</th>
+                          <th className="p-3 font-semibold text-xs tracking-wider uppercase">Next Followup Date</th>
+                          <th className="p-3 font-semibold text-xs tracking-wider uppercase">Created On</th>
+                          <th className="p-3 font-semibold text-xs tracking-wider uppercase">Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {isFollowUpLoading ? (
+                          <tr>
+                            <td colSpan={4} className="p-4 text-center text-sm text-slate-500">Loading follow-ups...</td>
+                          </tr>
+                        ) : followUpListError ? (
+                          <tr>
+                            <td colSpan={4} className="p-4 text-center text-sm text-rose-600">{followUpListError}</td>
+                          </tr>
+                        ) : followUpEntries.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="p-4 text-center text-sm text-slate-500">No follow-ups recorded yet.</td>
+                          </tr>
+                        ) : (
+                          followUpEntries.map((entry, index) => (
+                            <tr key={entry.id || index}>
+                              <td className="p-3 text-slate-600">{index + 1}</td>
+                              <td className="p-3 text-slate-600">{formatFollowUpDate(entry.followUpDate)}</td>
+                              <td className="p-3 text-slate-600">{formatFollowUpTimestamp(entry.createdOn)}</td>
+                              <td className="p-3 text-slate-600">{entry.remarks || '-'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </EnquiryModalPortal>
       )}
     </div>

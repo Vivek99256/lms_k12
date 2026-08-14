@@ -225,12 +225,19 @@ export default function FilterBar({
 
   const termOptions = useMemo(() => {
     const selectedAcademicYear = typeof window === 'undefined' ? '' : localStorage.getItem('selectedAcademicYear') || '';
-    return toOptions(
-      academicTerms.filter((item) => {
+    return academicTerms
+      .filter((item) => {
         const year = readString((item as Record<string, unknown>).syear);
         return !selectedAcademicYear || !year || year === selectedAcademicYear;
-      }),
-    );
+      })
+      .map((item) => {
+        const row = item as Record<string, unknown>;
+        // Laravel filters exam/marks tables by the generic `term_id` (1, 2, ...),
+        // not the academic_year row's own `id` — the legacy Blade `TermDD()`
+        // helper submits `term_id` too (`pluck('title', 'term_id')`).
+        return { id: readString(row.term_id ?? row.id), label: readString(row.title ?? row.name) };
+      })
+      .filter((option) => option.id && option.label);
   }, [academicTerms]);
 
   const setValue = useCallback((name: string, value: string | string[]) => {
@@ -401,7 +408,9 @@ export default function FilterBar({
       <FieldShell key={name} label={label} icon={icon} required={required}>
         <Select value={readString(values[name])} onValueChange={(value) => setValue(name, value ?? '')} disabled={disabled}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select" />
+            <SelectValue placeholder="Select">
+              {(value: string | null) => (value ? options.find((option) => option.id === value)?.label ?? 'Select' : 'Select')}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (

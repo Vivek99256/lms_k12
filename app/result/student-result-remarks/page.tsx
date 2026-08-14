@@ -3,6 +3,15 @@
 /**
  * Student result remarks — assign a promotion/result remark (and an
  * optional custom remark) to every student of a class for a term.
+ *
+ * Backed by the dedicated `api/result/student-result-remarks` REST API.
+ * Confirmed against the Laravel controller: the "load students" call is
+ * `GET .../students` (there is no `/create` route), rows expose
+ * `first_name`/`middle_name`/`last_name` (not a combined name field) and
+ * a single combined `result_remarks` string in the form
+ * `"<remark>||<customText>"` rather than separate remark/custom-remark
+ * fields. The remark options come from the real remark-master API
+ * (`api/result/result-remark-master/dropdown`), not a hard-coded list.
  */
 
 import React, { useState } from 'react';
@@ -17,31 +26,15 @@ import PageHeader from '@/components/result/PageHeader';
 import FilterBar, { type FilterFieldDef, type FilterValues } from '@/components/result/FilterBar';
 import { Banner, EmptyState, TableSkeleton } from '@/components/result/primitives';
 import { toast } from '@/components/result/toast';
-import { assertOk, extractRows, readString, resultGet, resultPost } from '@/lib/result/api';
+import {
+  assertOk, asRecord, extractRows, readString, resultGet, resultPost, toOptions, type SelectOption,
+} from '@/lib/result/api';
 
 const FILTER_FIELDS: FilterFieldDef[] = [
   { kind: 'section', required: true },
   { kind: 'standard', required: true },
   { kind: 'division', required: true },
   { kind: 'term', required: true },
-];
-
-const REMARK_OPTIONS = [
-  'Passed & Promoted',
-  'Promoted',
-  'Promoted with condition of improvement',
-  'Detained in class 9',
-  '*Passed with grace marks',
-  'Failed',
-  'Conditionally Promoted',
-  'Needs improvement',
-  'Passed Promoted to class 10',
-  'Detain',
-  'Essential repeat',
-  'Promoted as per RTE Guidelines (Conditional Promotion)',
-  'Not appeared in Annual Exam',
-  'Not appeared in Term-II',
-  'Pass & Promoted to Class IX with Grace Marks',
 ];
 
 type RemarkRow = {
@@ -53,8 +46,14 @@ type RemarkRow = {
   customRemark: string;
 };
 
+function splitRemark(value: string): { remark: string; customRemark: string } {
+  const [remark = '', customRemark = ''] = value.split('||');
+  return { remark, customRemark };
+}
+
 export default function StudentResultRemarksPage() {
   const [rows, setRows] = useState<RemarkRow[]>([]);
+  const [remarkOptions, setRemarkOptions] = useState<SelectOption[]>([]);
   const [termId, setTermId] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,16 +67,25 @@ export default function StudentResultRemarksPage() {
     setLoading(true);
     setError(null);
     try {
-      const payload = await resultGet('result/student-result-remarks/create', flat);
-      const students = extractRows(payload).map((row): RemarkRow => ({
-        id: readString(row.id ?? row.student_id),
-        rollNo: readString(row.roll_no),
-        grNo: readString(row.gr_number ?? row.enrollment_no ?? row.gr_no),
-        studentName: readString(row.student_name ?? row.name ?? row.full_name),
-        remark: readString(row.result_remarks),
-        customRemark: readString(row.result_remarks_input ?? row.custom_remark ?? ''),
-      })).filter((row) => row.id);
+      const [studentsPayload, remarksPayload] = await Promise.all([
+        resultGet('api/result/student-result-remarks/students', flat),
+        resultGet('api/result/result-remark-master/dropdown').catch(() => ({})),
+      ]);
+
+      const students = extractRows(studentsPayload).map((row): RemarkRow => {
+        const name = [row.first_name, row.middle_name, row.last_name].map(readString).filter(Boolean).join(' ');
+        const { remark, customRemark } = splitRemark(readString(row.result_remarks));
+        return {
+          id: readString(row.id),
+          rollNo: readString(row.roll_no),
+          grNo: readString(row.enrollment_no),
+          studentName: name,
+          remark,
+          customRemark,
+        };
+      }).filter((row) => row.id);
       setRows(students);
+      setRemarkOptions(toOptions(asRecord(remarksPayload).data ?? remarksPayload));
     } catch (err) {
       setRows([]);
       setError(err instanceof Error ? err.message : 'Failed to load students.');
@@ -101,7 +109,7 @@ export default function StudentResultRemarksPage() {
         body[`result_remarks[${row.id}]`] = row.remark;
         body[`result_remarks_input[${row.id}]`] = row.customRemark;
       });
-      const payload = await resultPost('result/student-result-remarks', body);
+      const payload = await resultPost('api/result/student-result-remarks', body);
       const message = assertOk(payload, 'Failed to save result remarks.');
       toast.success('Result remarks saved', message || undefined);
     } catch (err) {
@@ -158,7 +166,7 @@ export default function StudentResultRemarksPage() {
                       <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                         <th className="px-4 py-3 font-semibold">Sr no</th>
                         <th className="px-4 py-3 font-semibold">Roll no</th>
-                        <th className="px-4 py-3 font-semibold">Gr no</th>
+                        <th className="px-4 py-3 font-semibold">Enrollment no</th>
                         <th className="px-4 py-3 font-semibold">Student name</th>
                         <th className="px-4 py-3 font-semibold">Result remarks</th>
                         <th className="px-4 py-3 font-semibold">Custom remark</th>
@@ -177,9 +185,9 @@ export default function StudentResultRemarksPage() {
                                 <SelectValue placeholder="Select remark" />
                               </SelectTrigger>
                               <SelectContent>
-                                {REMARK_OPTIONS.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
+                                {remarkOptions.map((option) => (
+                                  <SelectItem key={option.id} value={option.label}>
+                                    {option.label}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

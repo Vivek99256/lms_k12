@@ -2,8 +2,21 @@
 
 /**
  * Approve mobile result — choose which students' results are visible in
- * the parent mobile app. Mirrors the legacy Blade screen at
- * result/approve_mobile_result.
+ * the parent mobile app.
+ *
+ * Backed by the dedicated `api/result/approve-mobile-result` REST API.
+ * Confirmed against the Laravel controller: `ApproveMobileResultApiController::create()`
+ * already unwraps `result_report` server-side, so the list comes back flat
+ * under `data` (paginated) with `id`/`enrollment_no`/`student_name`/
+ * `standard`/`division`/`is_allowed` — extractRows(payload) with no listKey.
+ * Save semantics are NOT a simple
+ * "send every student's checked state" — the legacy Blade form only ever
+ * puts explicitly-UNCHECKED students (relative to what loaded as
+ * allowed) into `student_id[]`; `students[]` carries whichever ids are
+ * currently checked. Sending every student in `student_id[]` (as the
+ * original draft did) causes the backend to immediately flip every
+ * checked student back to hidden, since it processes `students[]` (→Y)
+ * then `student_id[]` (→N) in that order.
  */
 
 import React, { useState } from 'react';
@@ -14,9 +27,7 @@ import PageHeader from '@/components/result/PageHeader';
 import FilterBar, { type FilterFieldDef, type FilterValues } from '@/components/result/FilterBar';
 import { Banner, Checkbox, EmptyState, StatusChip, TableSkeleton } from '@/components/result/primitives';
 import { toast } from '@/components/result/toast';
-import {
-  asRecord, assertOk, readString, resultGet, resultPost, toCollection,
-} from '@/lib/result/api';
+import { assertOk, extractRows, readString, resultPost, resultGet } from '@/lib/result/api';
 
 type StudentRow = {
   id: string;
@@ -34,15 +45,16 @@ type Criteria = {
 };
 
 const FILTER_FIELDS: FilterFieldDef[] = [
-  { kind: 'term', name: 'term_id' },
+  { kind: 'term', name: 'term_id', required: true },
   { kind: 'section' },
   { kind: 'standard', required: true },
-  { kind: 'division' },
+  { kind: 'division', required: true },
 ];
 
 export default function ApproveMobileResultPage() {
   const [criteria, setCriteria] = useState<Criteria | null>(null);
   const [rows, setRows] = useState<StudentRow[]>([]);
+  const [originallyAllowed, setOriginallyAllowed] = useState<Set<string>>(new Set());
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -61,32 +73,31 @@ export default function ApproveMobileResultPage() {
     setSearched(true);
     setError(null);
     try {
-      const payload = await resultGet('result/approve_mobile_result/create', { ...next });
-      const source = payload.data ?? payload;
-      const inner = asRecord(source);
-      const list = toCollection(Array.isArray(source) ? source : inner.stu_data ?? inner.students ?? inner.data ?? source);
+      const payload = await resultGet('api/result/approve-mobile-result/create', { ...next });
+      const list = extractRows(payload);
 
-      const nextChecked = new Set<string>();
+      const nextAllowed = new Set<string>();
       const studentRows: StudentRow[] = list
-        .map((item) => {
-          const record = asRecord(item);
-          const id = readString(record.id ?? record.student_id ?? record.unique_id);
+        .map((record) => {
+          const id = readString(record.id);
           const allowed = readString(record.is_allowed).toUpperCase() === 'Y';
-          if (id && allowed) nextChecked.add(id);
+          if (id && allowed) nextAllowed.add(id);
           return {
             id,
-            name: readString(record.student_name ?? record.name ?? record.full_name),
-            standard: readString(record.standard ?? record.standard_name),
-            division: readString(record.division ?? record.division_name),
+            name: readString(record.student_name),
+            standard: readString(record.standard),
+            division: readString(record.division),
             allowed,
           };
         })
         .filter((student) => student.id);
       setRows(studentRows);
-      setChecked(nextChecked);
+      setOriginallyAllowed(nextAllowed);
+      setChecked(new Set(nextAllowed));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
       setRows([]);
+      setOriginallyAllowed(new Set());
       setChecked(new Set());
     } finally {
       setLoading(false);
@@ -114,20 +125,22 @@ export default function ApproveMobileResultPage() {
     setSaving(true);
     try {
       const data: Record<string, string> = {};
-      const checkedIds = rows.filter((row) => checked.has(row.id)).map((row) => row.id);
+      const checkedIds = [...checked];
       checkedIds.forEach((id, index) => {
         data[`students[${index}]`] = id;
       });
-      rows.forEach((row, index) => {
-        data[`student_id[${index}]`] = row.id;
+      const unselectedIds = [...originallyAllowed].filter((id) => !checked.has(id));
+      unselectedIds.forEach((id, index) => {
+        data[`student_id[${index}]`] = id;
       });
       data.grade_id = criteria.grade;
       data.standard_id = criteria.standard;
       data.division_id = criteria.division;
       data.term_id = criteria.term_id;
 
-      const payload = await resultPost('result/approve_mobile_result', data);
+      const payload = await resultPost('api/result/approve-mobile-result', data);
       const message = assertOk(payload, 'Laravel did not confirm the mobile visibility update.');
+      setOriginallyAllowed(new Set(checked));
       setRows((current) => current.map((row) => ({ ...row, allowed: checked.has(row.id) })));
       toast.success('Selection published', message || 'Mobile app visibility has been updated.');
     } catch (err) {

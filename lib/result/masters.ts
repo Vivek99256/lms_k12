@@ -12,6 +12,10 @@ import {
   Activity, Award, BookMarked, BookOpenCheck, CalendarCheck2, CalendarRange,
   ClipboardCheck, FileBadge, Layers3, ListChecks, MessageSquareText, Ruler, Scale,
 } from 'lucide-react';
+import {
+  serializeForm,
+} from '@/components/result/MasterCrud';
+import { readString } from './api';
 import type { MasterScreenDef } from './types';
 
 const YES_NO = [
@@ -51,7 +55,7 @@ export const hpcActivity: MasterScreenDef = {
     },
     {
       name: 'skill_id', label: 'Skill name', type: 'select', required: true, section: 'Activity details',
-      options: { kind: 'api', path: 'getActivityLists', params: { standard: '{standard}', level: '2' } },
+      options: { kind: 'api', path: 'result/getActivityLists', params: { standard: '{standard}', level: '2' } },
       helper: 'Skillsets configured for the selected standard.',
     },
     {
@@ -62,7 +66,7 @@ export const hpcActivity: MasterScreenDef = {
     {
       name: 'sub_skill_id', label: 'Sub skill name', type: 'select', section: 'Activity details',
       showIf: { field: 'levels', equals: ['4'] },
-      options: { kind: 'api', path: 'getActivityLists', params: { standard: '{standard}', skill_id: '{skill_id}', levels: '3', level: '4' } },
+      options: { kind: 'api', path: 'result/getActivityLists', params: { standard: '{standard}', skill_id: '{skill_id}', levels: '3', level: '4' } },
     },
     { name: 'title', label: 'Title', type: 'text', required: true, section: 'Activity details' },
     {
@@ -139,10 +143,10 @@ export const examMaster: MasterScreenDef = {
   icon: BookOpenCheck,
   entityName: 'exam type',
   api: {
-    index: 'result/exam_master',
-    store: 'result/exam_master',
-    update: 'result/exam_master',
-    destroy: 'result/exam_master',
+    index: 'api/result/exam-master',
+    store: 'api/result/exam-master',
+    update: 'api/result/exam-master',
+    destroy: 'api/result/exam-master',
   },
   columns: [
     { key: 'id', header: 'Sr no.', width: '70px', mono: true },
@@ -153,6 +157,7 @@ export const examMaster: MasterScreenDef = {
     { key: 'SortOrder', header: 'Sort order', sortable: true, searchable: true, align: 'center', width: '110px' },
   ],
   fields: [
+    { name: 'grade', label: 'Section', type: 'select', required: true, section: 'Exam details', options: { kind: 'chain', chain: 'section' } },
     {
       name: 'all_standard', apiName: 'all_standard[]', label: 'Standard', type: 'multiselect', required: true,
       section: 'Exam details', placeholder: '--Select standard--', options: { kind: 'chain', chain: 'standard' },
@@ -161,7 +166,17 @@ export const examMaster: MasterScreenDef = {
       name: 'all_term', apiName: 'all_term[]', label: 'Term', type: 'multiselect', required: true,
       section: 'Exam details', placeholder: '--Select term--', options: { kind: 'chain', chain: 'term' },
     },
-    { name: 'ExamTitle', label: 'Exam type', type: 'text', required: true, maxLength: 255, section: 'Exam details' },
+    { name: 'ExamTitle', apiName: 'title', label: 'Exam type', type: 'text', required: true, maxLength: 255, section: 'Exam details' },
+    {
+      name: 'app_disp_status', label: 'App display status', type: 'select', required: true, section: 'Exam details', defaultValue: '1',
+      options: {
+        kind: 'static',
+        options: [
+          { value: '1', label: 'Yes' },
+          { value: '0', label: 'No' },
+        ],
+      },
+    },
     {
       name: 'weightage', label: 'Weightage', type: 'number', section: 'Exam details',
       helper: 'Used by the weightage conversion report.',
@@ -169,6 +184,11 @@ export const examMaster: MasterScreenDef = {
     { name: 'SortOrder', label: 'Sort order', type: 'number', required: true, maxLength: 255, section: 'Exam details' },
     { name: 'Code', label: 'Code', type: 'hidden' },
   ],
+  serialize: (fields, values, isEdit) => {
+    const { data, hasFile } = serializeForm(fields, values);
+    delete data.grade;
+    return { data, hasFile };
+  },
 };
 
 export const examTypeMaster: MasterScreenDef = {
@@ -178,10 +198,10 @@ export const examTypeMaster: MasterScreenDef = {
   icon: BookMarked,
   entityName: 'exam type code',
   api: {
-    index: 'result/exam_type_master',
-    store: 'result/exam_type_master',
-    update: 'result/exam_type_master',
-    destroy: 'result/exam_type_master',
+    index: 'api/result/exam-type-master',
+    store: 'api/result/exam-type-master',
+    update: 'api/result/exam-type-master',
+    destroy: 'api/result/exam-type-master',
   },
   columns: [
     { key: 'id', header: 'Sr no.', width: '70px', mono: true },
@@ -209,10 +229,11 @@ export const examCreation: MasterScreenDef = {
   icon: ClipboardCheck,
   entityName: 'exam',
   api: {
-    index: 'result/exam_creation',
-    store: 'result/exam_creation',
-    update: 'result/exam_creation',
-    destroy: 'result/exam_creation',
+    index: 'api/result/exam-creation',
+    store: 'api/result/exam-creation',
+    update: 'api/result/exam-creation',
+    destroy: 'api/result/exam-creation',
+    show: 'api/result/exam-creation',
   },
   columns: [
     { key: 'term_name', header: 'Term', sortable: true, searchable: true },
@@ -267,7 +288,67 @@ export const examCreation: MasterScreenDef = {
     },
   ],
   sectionOrder: ['Target class', 'Exam details'],
-  note: 'Rows submit as title[], points[], app_disp_status[], sort_order[] and exam_date[] exactly like the legacy screen.',
+  note: 'On create, each exam-detail row becomes a separate exam entry per selected subject. Editing an existing exam only updates its single row (matching the legacy edit screen, which never supported multi-row edits).',
+  // Laravel's create and update actions expect different payload shapes (result/exam_creation
+  // controller): create takes parallel arrays (title[], points[], ... one per exam_rows entry,
+  // cross-joined with every selected subject); update takes scalar fields for a single existing
+  // row, keyed `exam_id` instead of `exam`. The generic bracket-array serializer can't express
+  // that divergence, so this screen supplies its own.
+  serialize: (_fields, values, isEdit) => {
+    const rows = Array.isArray(values.exam_rows) ? (values.exam_rows as Record<string, unknown>[]) : [];
+    const subjects = Array.isArray(values.subject) ? values.subject.map(readString) : [];
+    const data: Record<string, unknown> = {
+      term: readString(values.term),
+      standard: readString(values.standard),
+      medium: readString(values.medium),
+      con_point: readString(values.con_point),
+      marks_type: readString(values.marks_type),
+      report_card_status: readString(values.report_card_status),
+    };
+
+    if (isEdit) {
+      const row = rows[0] ?? {};
+      data.exam_id = readString(values.exam);
+      data.subject = subjects[0] ?? '';
+      data.title = readString(row.title);
+      data.points = readString(row.points);
+      data.app_disp_status = readString(row.app_disp_status);
+      data.sort_order = readString(row.sort_order);
+      data.exam_date = readString(row.exam_date);
+    } else {
+      data.exam = readString(values.exam);
+      subjects.forEach((subjectId, index) => { data[`subject[${index}]`] = subjectId; });
+      rows.forEach((row, index) => {
+        data[`title[${index}]`] = readString(row.title);
+        data[`points[${index}]`] = readString(row.points);
+        data[`app_disp_status[${index}]`] = readString(row.app_disp_status);
+        data[`sort_order[${index}]`] = readString(row.sort_order);
+        data[`exam_date[${index}]`] = readString(row.exam_date);
+      });
+    }
+    return { data, hasFile: false };
+  },
+  // GET .../{id} returns id-based fields (term_id, standard_id, subject_id, exam_id, grade) that
+  // the list payload never includes (it only has display names) — reshape them into this screen's
+  // field names so the edit drawer's selects/repeater actually prefill.
+  deserialize: (record) => ({
+    term: record.term_id,
+    grade: record.grade,
+    standard: record.standard_id,
+    subject: [readString(record.subject_id)],
+    exam: record.exam_id,
+    report_card_status: record.report_card_status,
+    medium: record.medium,
+    con_point: record.con_point,
+    marks_type: record.marks_type,
+    exam_rows: [{
+      title: record.title,
+      points: record.points,
+      app_disp_status: record.app_disp_status,
+      sort_order: record.sort_order,
+      exam_date: record.exam_date,
+    }],
+  }),
 };
 
 /* ------------------------------------------------------------------------ */
@@ -281,10 +362,11 @@ export const gradeScaleMaster: MasterScreenDef = {
   icon: Scale,
   entityName: 'grade scale',
   api: {
-    index: 'result/grade_master',
-    store: 'result/grade_master',
-    update: 'result/grade_master',
-    destroy: 'result/grade_master',
+    index: 'api/result/grade-master',
+    store: 'api/result/grade-master',
+    // No PUT endpoint exists in Laravel for grade scales (GradeMasterController has no update()) —
+    // backend gap reported; edit is intentionally disabled until that's built.
+    destroy: 'api/result/grade-master',
   },
   columns: [
     { key: 'id', header: 'Id', width: '70px', mono: true },
@@ -304,10 +386,11 @@ export const gradeDataMaster: MasterScreenDef = {
   icon: Ruler,
   entityName: 'grade row',
   api: {
-    index: 'result/grade_master',
-    store: 'result/grade_master',
-    update: 'result/grade_master',
-    destroy: 'result/grade_master',
+    index: 'api/result/grade-master',
+    store: 'api/result/grade-master',
+    // No PUT endpoint exists in Laravel for grade rows either — same backend gap as the grade-scale
+    // screen above; edit is intentionally disabled until that's built.
+    destroy: 'api/result/grade-master',
   },
   listKey: 'grade_data',
   columns: [
@@ -321,7 +404,7 @@ export const gradeDataMaster: MasterScreenDef = {
   fields: [
     {
       name: 'grade_id', label: 'Grade scale', type: 'select', required: true, section: 'Grade row',
-      options: { kind: 'api', path: 'result/grade_master', params: {} },
+      options: { kind: 'api', path: 'api/result/grade-master', params: {} },
       helper: 'Scale this row belongs to.',
     },
     { name: 'title', label: 'Title', type: 'text', required: true, maxLength: 255, section: 'Grade row' },
@@ -344,10 +427,10 @@ export const stdGradeMapping: MasterScreenDef = {
   icon: ListChecks,
   entityName: 'mapping',
   api: {
-    index: 'result/std_grd_maping',
-    store: 'result/std_grd_maping',
-    update: 'result/std_grd_maping',
-    destroy: 'result/std_grd_maping',
+    index: 'api/result/standard-grade-mapping',
+    store: 'api/result/standard-grade-mapping',
+    update: 'api/result/standard-grade-mapping',
+    destroy: 'api/result/standard-grade-mapping',
   },
   columns: [
     { key: 'scale_name', header: 'Grade scale', sortable: true, searchable: true },
@@ -356,15 +439,15 @@ export const stdGradeMapping: MasterScreenDef = {
   ],
   fields: [
     {
-      name: 'grade_scale', label: 'Grade scale', type: 'select', section: 'Mapping', placeholder: 'Select',
-      options: { kind: 'api', path: 'result/grade_master', params: {} },
+      name: 'grade_scale', required: true, label: 'Grade scale', type: 'select', section: 'Mapping', placeholder: 'Select',
+      options: { kind: 'api', path: 'api/result/grade-master', params: {} },
     },
     {
-      name: 'grade', apiName: 'grade[]', label: 'Search section', type: 'multiselect', section: 'Mapping',
+      name: 'grade', apiName: 'grade[]', seedKey: 'grade_id', label: 'Search section', type: 'multiselect', section: 'Mapping',
       placeholder: 'Select', options: { kind: 'chain', chain: 'section' },
     },
     {
-      name: 'standard', apiName: 'standard[]', label: 'Search standard', type: 'multiselect', section: 'Mapping',
+      name: 'standard', apiName: 'standard[]', seedKey: 'standard_id', required: true, label: 'Search standard', type: 'multiselect', section: 'Mapping',
       placeholder: 'Select', options: { kind: 'chain', chain: 'standard' },
     },
   ],
@@ -382,10 +465,10 @@ export const resultMaster: MasterScreenDef = {
   entityName: 'result configuration',
   multipart: true,
   api: {
-    index: 'result/result_master',
-    store: 'result/result_master',
-    update: 'result/result_master',
-    destroy: 'result/result_master',
+    index: 'api/result/result-master',
+    store: 'api/result/result-master',
+    update: 'api/result/result-master',
+    destroy: 'api/result/result-master',
   },
   columns: [
     { key: 'term_name', header: 'Term', sortable: true, searchable: true },
@@ -421,7 +504,7 @@ export const resultMaster: MasterScreenDef = {
         kind: 'static',
         options: [
           { value: 'grade_master', label: 'From grade master' },
-          { value: 'individual', label: 'Individual student wise' },
+          { value: 'student_wise', label: 'Individual student wise' },
         ],
       },
     },

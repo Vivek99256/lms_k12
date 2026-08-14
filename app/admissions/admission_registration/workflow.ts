@@ -172,6 +172,7 @@ export async function fetchRegistrationDetail(
     religionData: Array.isArray(payload.religion_data) ? payload.religion_data : [],
     casteData: Array.isArray(payload.caste_data) ? payload.caste_data : [],
     newEnrollmentNo: readString(payload.new_enrollment_no),
+    nextRegisterNumber: readString(payload.next_register_number),
     displaySaveStudent: readString(payload.display_save_student),
   };
 }

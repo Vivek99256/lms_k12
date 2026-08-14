@@ -287,7 +287,18 @@ function SelectField({
     <FormField icon={icon} label={label} htmlFor={id}>
       <Select value={value} onValueChange={(next) => onChange(next ?? '')}>
         <SelectTrigger id={id} className="h-10 rounded-lg border-gray-200 bg-gray-50/50 focus:bg-white">
-          <SelectValue placeholder={placeholder} />
+          {/* Base UI's <Select.Value> resolves its label from items registered by mounted
+              <Select.Item>s - since SelectContent is portal-rendered and its items don't mount
+              until the popup is first opened, a pre-set value has nothing to resolve against on
+              first paint and falls back to showing the raw stored value (e.g. "2444" instead of
+              "Staff"). Resolving the label ourselves from normalizedOptions sidesteps that gap. */}
+          <SelectValue placeholder={placeholder}>
+            {(current: unknown) => {
+              const stringValue = readString(current);
+              if (!stringValue) return placeholder;
+              return normalizedOptions.find((option) => option.value === stringValue)?.label || stringValue;
+            }}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {normalizedOptions.map((option) => (
@@ -530,8 +541,8 @@ export default function EditRegistrationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
-      <div className="mx-auto space-y-6 p-4 md:p-6 lg:p-8">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6 lg:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Button
@@ -572,8 +583,7 @@ export default function EditRegistrationPage() {
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <form onSubmit={handleSubmit} className="space-y-6">
             <Card className="overflow-hidden border-gray-200/60 shadow-lg shadow-gray-200/50">
-              <div className="h-1.5 bg-gradient-to-r from-[#0D6EFD] via-blue-500 to-[#7ED957]" />
-              <CardHeader className="bg-gradient-to-br from-gray-50/80 to-white pb-6 pt-6">
+              <CardHeader className="bg-gradient-to-br from-gray-50/80 to-white pt-2">
                 <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
                   <GraduationCap className="h-5 w-5 text-[#0D6EFD]" />
                   Student Details Verification
@@ -630,7 +640,7 @@ export default function EditRegistrationPage() {
             </Card>
 
             <Card className="border-gray-200/60 shadow-lg shadow-gray-200/50">
-              <CardHeader className="pb-4 pt-5">
+              <CardHeader className="pt-2">
                 <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
                   <CheckCircle2 className="h-5 w-5 text-[#0D6EFD]" />
                   Registration & Verification
@@ -654,7 +664,6 @@ export default function EditRegistrationPage() {
                 </FormField>
                 <SelectField id="status" label="Status" icon={ClipboardList} value={formState.status || 'CLOSE'} options={statusOptions} placeholder="Select status" onChange={(value) => handleChange('status', value.toUpperCase())} />
                 <SelectField id="student_quota" label="Student Quota" icon={ClipboardList} value={formState.student_quota || ''} options={quotaOptions} placeholder="Select quota" onChange={(value) => handleChange('student_quota', value)} />
-                <SelectField id="admission_division" label="Admission Division" icon={ClipboardList} value={formState.admission_division || ''} options={divisionOptions} placeholder="Select division" onChange={(value) => handleChange('admission_division', value)} />
                 <FormField icon={ClipboardList} label="Enrollment No." htmlFor="enrollment_no">
                   <Input id="enrollment_no" value={formState.enrollment_no || ''} onChange={(event) => handleChange('enrollment_no', event.target.value)} className="h-10 rounded-lg border-gray-200 bg-gray-50/50 focus:bg-white" />
                 </FormField>
@@ -675,7 +684,7 @@ export default function EditRegistrationPage() {
             </Card>
 
             <Card className="border-gray-200/60 shadow-lg shadow-gray-200/50">
-              <CardHeader className="pb-4 pt-5">
+              <CardHeader className="pt-2">
                 <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
                   <FileText className="h-5 w-5 text-[#0D6EFD]" />
                   Document & Payment Process
