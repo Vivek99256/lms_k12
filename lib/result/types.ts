@@ -28,7 +28,7 @@ export type OptionSource =
    * `{fieldName}` placeholders (e.g. `{ standard_id: '{standard}' }`);
    * the control reloads whenever a referenced field changes.
    */
-  | { kind: 'api'; path: string; params?: Record<string, string> }
+  | { kind: 'api'; path: string; params?: Record<string, string>; dataKey?: string }
   /** One of the standard academic dropdowns handled by FilterBar. */
   | { kind: 'chain'; chain: 'term' | 'section' | 'standard' | 'division' };
 
