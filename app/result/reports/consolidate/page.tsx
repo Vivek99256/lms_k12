@@ -31,7 +31,7 @@ type StudentRow = { rollNo: string; name: string; raw: Record<string, unknown> }
 /** Find a depth-3 nested record (term -> exam -> subject labels) in the payload. */
 function findHeaderTree(data: Record<string, unknown>): HeaderTree {
   const candidates = [
-    data.exam_data, data.header, data.header_data, data.term_data, data.terms, data.structure,
+    data.examMasterWise, data.exam_data, data.header, data.header_data, data.term_data, data.terms, data.structure,
     ...Object.values(data),
   ];
   for (const candidate of candidates) {
@@ -59,7 +59,7 @@ function findHeaderTree(data: Record<string, unknown>): HeaderTree {
 }
 
 function findStudents(data: Record<string, unknown>): StudentRow[] {
-  const candidates = [data.students, data.stu_data, data.student_data, data.student_list, data.data];
+  const candidates = [data.studentMarks, data.students, data.stu_data, data.student_data, data.student_list, data.data];
   for (const candidate of candidates) {
     const collection = toCollection(candidate).map(asRecord).filter((row) => Object.keys(row).length > 0);
     if (collection.length > 0 && collection.some((row) => row.student_name || row.name || row.full_name)) {
@@ -93,6 +93,14 @@ function cellValue(student: StudentRow, leaf: Leaf): string {
   const marks = asRecord(raw.marks ?? raw.marks_data ?? raw.points);
   const fromMarks = asRecord(asRecord(marks[leaf.term])[leaf.exam])[leaf.leaf];
   if (fromMarks != null && typeof fromMarks !== 'object') return readString(fromMarks);
+  const termMarks = asRecord(asRecord(asRecord(raw.terms)[leaf.term]).exams);
+  const examMarks = asRecord(termMarks[leaf.exam]);
+  const subjectMarks = asRecord(examMarks[leaf.leaf]);
+  const directMark = Object.values(subjectMarks)[0];
+  if (directMark != null && typeof directMark === 'object') {
+    const obtained = asRecord(directMark).ob_marks;
+    if (obtained != null) return readString(obtained);
+  }
   const flatKeys = [`${leaf.term}_${leaf.exam}_${leaf.leaf}`, `${leaf.exam}_${leaf.leaf}`, leaf.leaf];
   for (const key of flatKeys) {
     const value = raw[key];
@@ -130,7 +138,7 @@ export default function ConsolidateReportPage() {
     setLoading(true);
     setError(null);
     try {
-      const payload = await resultGet('result/consolidate_report/create', flat);
+      const payload = await resultGet('api/result/consolidate-report', flat);
       const data = asRecord(payload.data ?? payload);
       const headerTree = findHeaderTree(data);
       const studentRows = findStudents(data);
