@@ -9,13 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  deleteGeneral, getGeneralSession, loadGeneral, saveGeneral,
-  type GeneralData, type GeneralModule, type GeneralOption, type GeneralRecord,
+  deleteGeneral, getGeneralSession, loadGeneral, loadTemplateTags, saveGeneral,
+  type GeneralData, type GeneralModule, type GeneralOption, type GeneralRecord, type TemplateTag,
 } from "../api";
+import { TemplateHtmlEditor } from "./TemplateHtmlEditor";
+import FormBuilderEditor, { parseFormJson } from "../form_builder/FormBuilderEditor";
+import type { BuilderField } from "../form_builder/types";
 
 type Source = keyof Pick<GeneralData, "profiles" | "grades" | "standards" | "subjects">;
 export type GeneralField = {
-  key: string; label: string; kind: "text" | "number" | "select" | "textarea" | "checkbox";
+  key: string; label: string; kind: "text" | "number" | "select" | "textarea" | "editor" | "checkbox";
   required?: boolean; source?: Source; dependsOn?: string; options?: string[]; rows?: number;
 };
 export type GeneralConfig = {
@@ -31,12 +34,15 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
   const [form, setForm] = useState<Record<string, string | boolean>>({});
   const [editing, setEditing] = useState<GeneralRecord | null>(null);
   const [showForm, setShowForm] = useState(config.module === "implementations" || config.module === "bulk-upload");
+  const [showBuilder, setShowBuilder] = useState(false);
+  const [builderFields, setBuilderFields] = useState<BuilderField[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [templateTags, setTemplateTags] = useState<TemplateTag[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -49,6 +55,12 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+  useEffect(() => {
+    if (config.module !== "templates") return;
+    let active = true;
+    void loadTemplateTags(getGeneralSession()).then((tags) => { if (active) setTemplateTags(tags); }).catch(() => { if (active) setTemplateTags([]); });
+    return () => { active = false; };
+  }, [config.module]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -65,11 +77,23 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
     const parentId = Number(form[field.dependsOn]);
     return list.filter((option) => !option.parentId || option.parentId === parentId);
   }
-  function reset() {
+  const reset = useCallback(() => {
     setForm({}); setEditing(null);
     setShowForm(config.module === "implementations" || config.module === "bulk-upload");
-  }
+    setShowBuilder(false);
+    setBuilderFields([]);
+  }, [config.module]);
   function edit(record: GeneralRecord) {
+    if (config.module === "forms") {
+      const rawJson = text(record.values.form_json);
+      const initialFields = parseFormJson(rawJson);
+      setBuilderFields(initialFields);
+      setForm({ form_name: text(record.values.form_name) });
+      setEditing(record);
+      setShowBuilder(true);
+      setError("");
+      return;
+    }
     const next: Record<string, string | boolean> = {};
     config.fields.forEach((field) => {
       const aliases: Record<string, string> = {
@@ -133,25 +157,78 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
     finally { setBusy(false); }
   }
 
+  async function handleBuilderSave(data: { form_name: string; form_json: string; form_xml: string; form_active: boolean }) {
+    setBusy(true);
+    setError("");
+    try {
+      setNotice(await saveGeneral(config.module, getGeneralSession(), {
+        form_name: data.form_name,
+        form_json: data.form_json,
+        form_xml: data.form_xml,
+        form_active: data.form_active,
+      }, editing?.id));
+      reset();
+      await load();
+    } catch (saveError: unknown) {
+      setError(saveError instanceof Error ? saveError.message : "Record could not be saved.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleBuilderCancel() {
+    reset();
+  }
+
   return <main className="min-h-screen p-4 sm:p-6"><div className="mx-auto max-w-[1500px] space-y-5">
     <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
       <div><h1 className="text-2xl font-bold text-slate-950">{config.title}</h1><p className="mt-1 text-sm text-slate-500">{config.description}</p></div>
-      {!["implementations", "bulk-upload"].includes(config.module) && <Button onClick={() => { reset(); setShowForm(true); }}><Plus className="size-4" /> Add {config.singular}</Button>}
+      {!["implementations", "bulk-upload"].includes(config.module) && (
+        <Button onClick={() => {
+          reset();
+          if (config.module === "forms") {
+            setShowBuilder(true);
+          } else {
+            setShowForm(true);
+          }
+        }}>
+          <Plus className="size-4" /> Add {config.singular}
+        </Button>
+      )}
     </div>
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
     {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
-    {showForm && <Card className="bg-white shadow-sm"><CardHeader className="border-b"><div className="flex items-center justify-between"><CardTitle>{editing ? `Edit ${config.singular}` : config.module === "implementations" ? "Implementation Details" : `Add ${config.singular}`}</CardTitle>{!["implementations", "bulk-upload"].includes(config.module) && <Button variant="ghost" size="icon" onClick={reset}><X className="size-4" /></Button>}</div></CardHeader><CardContent>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{config.fields.map((field) => <div key={field.key} className={field.kind === "textarea" ? "sm:col-span-2 lg:col-span-3" : ""}>
-        <Label htmlFor={field.key}>{field.label}{field.required ? " *" : ""}</Label>
-        {field.kind === "select" ? <select id={field.key} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
-          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
-          <option value="">Select {field.label}</option>{field.options?.map((option) => <option key={option} value={option}>{option}</option>)}{fieldOptions(field).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-        </select> : field.kind === "textarea" ? <Textarea id={field.key} rows={field.rows || 5} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1 font-mono" />
-          : field.kind === "checkbox" ? <label className="mt-2 flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm"><input type="checkbox" checked={Boolean(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.checked }))} className="size-4 accent-blue-600" /> Active</label>
-          : <Input id={field.key} type={field.kind} min={field.kind === "number" ? 0 : undefined} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1" />}
-      </div>)}</div>
-      <div className="mt-5 flex gap-2"><Button onClick={() => void save()} disabled={busy}>{busy && <LoaderCircle className="size-4 animate-spin" />} Save</Button>{!["implementations", "bulk-upload"].includes(config.module) && <Button variant="outline" onClick={reset}>Cancel</Button>}</div>
-    </CardContent></Card>}
+    {showBuilder && config.module === "forms" ? (
+      <FormBuilderEditor
+        initialFormName={text(form.form_name)}
+        initialFields={builderFields}
+        recordId={editing?.id as number | undefined}
+        onSave={handleBuilderSave}
+        onCancel={handleBuilderCancel}
+      />
+    ) : showForm && (
+      <Card className="bg-white shadow-sm">
+        <CardHeader className="border-b">
+          <div className="flex items-center justify-between">
+            <CardTitle>{editing ? `Edit ${config.singular}` : config.module === "implementations" ? "Implementation Details" : `Add ${config.singular}`}</CardTitle>
+            {!["implementations", "bulk-upload"].includes(config.module) && <Button variant="ghost" size="icon" onClick={reset}><X className="size-4" /></Button>}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{config.fields.map((field) => <div key={field.key} className={(field.kind === "textarea" || field.kind === "editor") ? "sm:col-span-2 lg:col-span-3" : ""}>
+            <Label htmlFor={field.key}>{field.label}{field.required ? " *" : ""}</Label>
+            {field.kind === "select" ? <select id={field.key} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
+              className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+              <option value="">Select {field.label}</option>{field.options?.map((option) => <option key={option} value={option}>{option}</option>)}{fieldOptions(field).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+            </select> : field.kind === "editor" ? <TemplateHtmlEditor value={text(form[field.key])} onChange={(html) => setForm((current) => ({ ...current, [field.key]: html }))} tags={templateTags} disabled={busy} />
+              : field.kind === "textarea" ? <Textarea id={field.key} rows={field.rows || 5} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1 font-mono" />
+              : field.kind === "checkbox" ? <label className="mt-2 flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm"><input type="checkbox" checked={Boolean(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.checked }))} className="size-4 accent-blue-600" /> Active</label>
+              : <Input id={field.key} type={field.kind} min={field.kind === "number" ? 0 : undefined} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))} className="mt-1" />}
+          </div>)}</div>
+          <div className="mt-5 flex gap-2"><Button onClick={() => void save()} disabled={busy}>{busy && <LoaderCircle className="size-4 animate-spin" />} Save</Button>{!["implementations", "bulk-upload"].includes(config.module) && <Button variant="outline" onClick={reset}>Cancel</Button>}</div>
+        </CardContent>
+      </Card>
+    )}
     <Card className="bg-white shadow-sm"><CardHeader className="border-b"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="relative w-full sm:max-w-md"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={`Search ${config.title.toLowerCase()}...`} className="pl-9" /></div><Button variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} /> Refresh</Button></div></CardHeader>
       <CardContent className="p-0"><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Sr.</TableHead>{config.columns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}{config.module !== "implementations" && config.module !== "bulk-upload" && <TableHead className="text-right">Actions</TableHead>}</TableRow></TableHeader><TableBody>
         {loading ? <TableRow><TableCell colSpan={config.columns.length + 2} className="h-32 text-center"><LoaderCircle className="mx-auto size-6 animate-spin text-blue-600" /></TableCell></TableRow>
