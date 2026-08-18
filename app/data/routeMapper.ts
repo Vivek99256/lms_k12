@@ -111,6 +111,11 @@ const H5P_ROUTE_NAME_MAP: Record<string, string> = {
   'h5p_mcq.index': '/h5p/h5p_mcq',
   'h5p_interactive_video.index': '/h5p/h5p_interactive_video',
   'h5p_flashacard.index': '/h5p/h5p_flashacard',
+  // PAL V4 H5P Model workspace — pedagogy and framework tagging, chapter
+  // coverage, measured engagement and the xAPI pipeline. Reached from the
+  // H5P content hub.
+  'h5p_model.index': '/h5p/model',
+  'h5p/model': '/h5p/model',
 };
 
 /**
@@ -192,6 +197,23 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/pal-content/review': '/pal/content/review',
   'pal_content.misconceptions': '/pal/content/misconceptions',
   'lms/pal-content/misconceptions': '/pal/content/misconceptions',
+  // New PAL — a level-2 entry directly under LMS + PAL, alongside Homework.
+  // It is a workspace rather than a menu group, so the menu row links straight
+  // here and its sub-modules (Content Model first) are navigated inside the
+  // workspace by NewPalNav.
+  // Listed explicitly: the generic PAL slug fallback further down normalises to
+  // the bare slug "pal" and would not match "new_pal".
+  'new_pal.index': '/pal/new',
+  'new_pal': '/pal/new',
+  'lms/new-pal': '/pal/new',
+  'new_pal.content_model': '/pal/new/content-model',
+  'lms/new-pal/content-model': '/pal/new/content-model',
+  // Administration — the second New PAL level-3 sub-module, registered by
+  // 2026_08_14_160100_add_administration_submodule_menu. Follows the same
+  // `new_pal.<sub_module>` link convention as Content Model above rather than
+  // a separate `*.index` root, so the level-3 family stays consistent.
+  'new_pal.administration': '/pal/new/administration',
+  'lms/new-pal/administration': '/pal/new/administration',
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',

@@ -19,6 +19,7 @@ export type GeneralData = {
   standards: GeneralOption[];
   subjects: GeneralOption[];
 };
+export type TemplateTag = { key: string; label: string };
 
 type UnknownRecord = Record<string, unknown>;
 function isRecord(value: unknown): value is UnknownRecord {
@@ -89,6 +90,11 @@ async function request(module: GeneralModule, session: SessionContext, suffix = 
 
 export async function loadGeneral(module: GeneralModule, session: SessionContext): Promise<GeneralData> {
   return normalize(await request(module, session));
+}
+export async function loadTemplateTags(session: SessionContext): Promise<TemplateTag[]> {
+  const payload = unwrap(await request("templates", session, "/tags"));
+  const tags = isRecord(payload.tags) ? payload.tags : {};
+  return Object.entries(tags).filter(([, label]) => typeof label === "string").map(([key, label]) => ({ key, label: String(label) }));
 }
 export async function saveGeneral(module: GeneralModule, session: SessionContext, values: Record<string, unknown>, id?: number): Promise<string> {
   const payload = await request(module, session, id ? `/${id}` : "", {
