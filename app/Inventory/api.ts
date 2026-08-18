@@ -41,8 +41,9 @@ function normalize(value: unknown): InventoryData {
       const key = `${String(id)}:${parentId}:${groupKey}`;
       if (id && label && !unique.has(key)) unique.set(key, { id, label, ...(parentId ? { parentId } : {}), ...(groupKey ? { groupKey } : {}), ...(Number.isFinite(price) ? { price } : {}) });
     });
-    return { records, options };
-  }
+  });
+  return { records, options };
+}
 
 export function getInventorySession(): SessionContext {
   const session = buildSessionContext();
