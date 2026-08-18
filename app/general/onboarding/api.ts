@@ -196,7 +196,7 @@ type MenuContextPayload = {
   client_id: number;
 };
 
-type MenuRightsResponse = {
+export type MenuRightsResponse = {
   status?: number | string;
   message?: string;
   data?: {
@@ -209,7 +209,7 @@ type MenuRightsResponse = {
   "level 3"?: unknown;
 };
 
-type MenuItemRecord = {
+export type MenuItemRecord = {
   id: number;
   name: string;
   menu_title: string;
@@ -448,4 +448,44 @@ export async function loadOnboarding(): Promise<OnboardingData> {
   } catch {
     return loadFallbackOnboarding();
   }
+}
+
+/**
+ * Reads the live menu tree (tblmenumaster) through the ERP `menu-rights`
+ * endpoint and returns the flattened level-2 / level-3 items. The caller is
+ * responsible for filtering by menu type (e.g. dropping REPORT) and by name.
+ */
+export async function loadMenuMasterItems(): Promise<MenuItemRecord[]> {
+  const session = buildSessionContext();
+  const context = getStoredMenuContext();
+  if (!context) {
+    throw new Error("Menu session data is missing.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/menu-rights`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "API",
+      sub_institute_id: context.sub_institute_id,
+      user_id: context.user_id,
+      user_profile_name: context.user_profile_name,
+      user_profile_id: context.user_profile_id,
+      client_id: context.client_id,
+    }),
+    cache: "no-store",
+  });
+
+  const payload = (await response.json()) as MenuRightsResponse;
+  if (!response.ok) {
+    throw new Error(payload.message || "Menu rights could not be loaded.");
+  }
+
+  const rawLevel2 = payload.data?.["level 2"] ?? payload["level 2"];
+  const rawLevel3 = payload.data?.["level 3"] ?? payload["level 3"];
+
+  const level2 = normalizeLevel(rawLevel2).map(toMenuItem).filter((item) => item.status === 1);
+  const level3 = normalizeLevel(rawLevel3).map(toMenuItem).filter((item) => item.status === 1);
+
+  return [...level2, ...level3];
 }

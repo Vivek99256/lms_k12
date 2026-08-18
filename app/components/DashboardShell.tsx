@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { createContext, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import Sidebar from '@/app/components/Sidebar';
@@ -8,7 +8,7 @@ import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 
@@ -59,9 +59,44 @@ function getFilteredMasterMenuItems(items: SubmenuItem[], selectedMenu: SubmenuI
     });
 }
 
+function augmentPalLevel3Items(items: Level3Item[], pathname: string): Level3Item[] {
+  const lowerPath = pathname.toLowerCase();
+  if (!lowerPath.startsWith('/pal')) return items;
+
+  return [
+    {
+      id: 'pal-framework',
+      label: 'Framework',
+      href: '/pal/frameworks',
+    },
+    {
+      id: 'pal-content-model',
+      label: 'Content Model',
+      href: '/pal/new/content-model',
+    },
+    {
+      id: 'pal-ulu',
+      label: 'Unified Learning Units',
+      href: '/pal/ulu',
+    },
+    {
+      id: 'pal-pedagogy-engine',
+      label: 'Pedagogy Engine',
+      href: '/pal/pedagogy-engine',
+    },
+    {
+      id: 'pal-administration',
+      label: 'Administration',
+      href: '/pal/new/administration',
+    },
+  ];
+}
+
+
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '';
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { menuItems, loading, error, refetch } = useMenuRights();
   const hasLoadedRef = useRef(false);
 
@@ -217,6 +252,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         return;
       }
 
+      const selectedLevel2Route = selectedLevel2.link ? mapApiLinkToRoute(selectedLevel2.link) : selectedLevel2.href;
+      const isPalRoot = normalizeMenuLabel(selectedLevel2.label) === 'new pal' || (selectedLevel2Route || '').toLowerCase() === '/pal';
+      if (isPalRoot) {
+        return;
+      }
+
       if (!isKnownMenuPath(pathname)) {
         return;
       }
@@ -276,6 +317,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
     await fetchMasterMenu(parent.id, submenu);
 
+    const submenuRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href;
+    const isPalRoot = normalizeMenuLabel(submenu.label) === 'new pal' || (submenuRoute || '').toLowerCase() === '/pal';
+    if (isPalRoot) {
+      const query = searchParams?.toString() ?? '';
+      router.push(query ? `/pal/frameworks?${query}` : '/pal/frameworks');
+      return;
+    }
+
     if (submenu.submenus && submenu.submenus.length > 0) {
       const firstLevel3 = submenu.submenus[0];
       // Use 'link' field from API (priority) or 'href' field
@@ -325,10 +374,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   };
 
   const level3Menu = (() => {
+    if (pathname.toLowerCase().startsWith('/pal')) {
+      return { parentLabel: 'New PAL', items: augmentPalLevel3Items([], pathname) };
+    }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
     }
     const found = searchLevel3FromMenu(menuItems, pathname);
+    if (!found) return null;
     return found;
   })();
 
@@ -348,9 +401,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <Header
           onToggleChatbot={toggleChatbot}
           isChatbotOpen={isChatbotOpen}
-          onToggleRightToolbar={toggleRightToolbar}
-          isRightToolbarOpen={isRightToolbarOpen}
-          rightToolbarToggleRef={rightToolbarToggleRef}
         />
         <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main
@@ -392,3 +442,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     </div>
   );
 }
+
+
+
+
+
+
+

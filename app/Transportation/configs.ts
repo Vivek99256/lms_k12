@@ -1,27 +1,9 @@
 import type { TransportConfig } from "./_components/TransportationPage";
 
-export const studentMappingConfig: TransportConfig = {
-  module: "student-mappings", title: "Student Transport Mapping",
-  description: "Assign pickup and drop transport details to students.", singular: "Student Mapping",
-  fields: [
-    { key: "student_id", label: "Student", kind: "select", source: "students", required: true },
-    { key: "from_shift_id", label: "Pickup Shift", kind: "select", source: "shifts", required: true },
-    { key: "from_bus_id", label: "Pickup Vehicle", kind: "select", source: "vehicles", dependsOn: "from_shift_id", required: true },
-    { key: "from_stop", label: "Pickup Stop", kind: "select", source: "stops", required: true },
-    { key: "to_shift_id", label: "Drop Shift", kind: "select", source: "shifts", required: true },
-    { key: "to_bus_id", label: "Drop Vehicle", kind: "select", source: "vehicles", dependsOn: "to_shift_id", required: true },
-    { key: "to_stop", label: "Drop Stop", kind: "select", source: "stops", required: true },
-    { key: "distance", label: "Distance", kind: "number" },
-    { key: "amount", label: "Amount", kind: "number" },
-  ],
-  columns: [
-    { key: "student_name", label: "Student" }, { key: "enrollment_no", label: "GR No." },
-    { key: "from_shift_name", label: "Pickup Shift" }, { key: "from_vehicle_name", label: "Pickup Vehicle" },
-    { key: "from_stop_name", label: "Pickup Stop" }, { key: "to_shift_name", label: "Drop Shift" },
-    { key: "to_vehicle_name", label: "Drop Vehicle" }, { key: "to_stop_name", label: "Drop Stop" },
-    { key: "distance", label: "Distance" }, { key: "amount", label: "Amount" },
-  ],
-};
+// Student transport mapping and transport rate are not generic CRUD screens —
+// they have their own pages under `student_transport_mapping/` and
+// `add_transport_rate/`, matching the search-and-bulk-grid and slab-validation
+// flows the ERP requires.
 
 export const driverConfig: TransportConfig = {
   module: "drivers", title: "Add Driver/Conductor", description: "Maintain transport drivers and conductors.", singular: "Driver/Conductor",
@@ -72,22 +54,6 @@ export const stopConfig: TransportConfig = {
   module: "stops", title: "Add Stop", description: "Maintain academic-year transport stops.", singular: "Stop",
   fields: [{ key: "stop_name", label: "Stop Name", kind: "text", required: true }],
   columns: [{ key: "stop_name", label: "Stop Name" }],
-};
-
-export const rateConfig: TransportConfig = {
-  module: "rates", title: "Add Transport Rate", description: "Maintain distance-based rickshaw and van rates.", singular: "Transport Rate",
-  fields: [
-    { key: "distance_from_school", label: "Distance From School", kind: "text", required: true },
-    { key: "from_distance", label: "From Distance", kind: "number", required: true },
-    { key: "to_distance", label: "To Distance", kind: "number", required: true },
-    { key: "rick_old", label: "Rickshaw Old Rate", kind: "number" }, { key: "rick_new", label: "Rickshaw New Rate", kind: "number" },
-    { key: "van_old", label: "Van Old Rate", kind: "number" }, { key: "van_new", label: "Van New Rate", kind: "number" },
-  ],
-  columns: [
-    { key: "distance_from_school", label: "Distance" }, { key: "from_distance", label: "From" }, { key: "to_distance", label: "To" },
-    { key: "rick_old", label: "Rickshaw Old" }, { key: "rick_new", label: "Rickshaw New" },
-    { key: "van_old", label: "Van Old" }, { key: "van_new", label: "Van New" },
-  ],
 };
 
 export const routeBusConfig: TransportConfig = {

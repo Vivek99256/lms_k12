@@ -283,13 +283,13 @@ export function ImplementationManagementPage() {
   }, [load]);
 
   const currentView = useMemo<ImplementationView>(() => {
-    const value = searchParams.get("view");
+    const value = searchParams?.get("view");
     if (value === "welcome" || value === "overview" || value === "details") return value;
     return "welcome";
   }, [searchParams]);
 
   const selectedStageId = useMemo(() => {
-    const value = Number(searchParams.get("moduleId") || "1");
+    const value = Number(searchParams?.get("moduleId") || "1");
     return Number.isFinite(value) && value >= 1 && value <= 5 ? value : 1;
   }, [searchParams]);
 
@@ -307,7 +307,7 @@ export function ImplementationManagementPage() {
   const session = useMemo(() => buildSessionContext(), []);
 
   function setView(view: ImplementationView, moduleId = selectedStageId) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString());
     params.set("view", view);
     params.set("moduleId", String(moduleId));
     router.replace(`/general/implementation_management?${params.toString()}`);
@@ -648,141 +648,6 @@ export function ImplementationManagementPage() {
         )}
       </ErpSection>
 
-      <ErpSection
-        title="Institute Strength"
-        description="These totals are stored once and applied across every standard row, matching the legacy implementation screen."
-        icon={<School2 className="size-5" />}
-      >
-        {loading ? (
-          <ErpLoading label="Loading implementation totals..." />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <div className="space-y-2">
-              <Label htmlFor="total_boys">Total Boys *</Label>
-              <Input
-                id="total_boys"
-                value={data.totalBoys}
-                onChange={(event) => updateTotals("totalBoys", event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="total_girls">Total Girls *</Label>
-              <Input
-                id="total_girls"
-                value={data.totalGirls}
-                onChange={(event) => updateTotals("totalGirls", event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="total_strenght">Total Strength</Label>
-              <Input id="total_strenght" value={data.totalStrength} readOnly />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="total_male">Total Male Staff *</Label>
-              <Input
-                id="total_male"
-                value={data.totalMale}
-                onChange={(event) => updateTotals("totalMale", event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="total_female">Total Female Staff *</Label>
-              <Input
-                id="total_female"
-                value={data.totalFemale}
-                onChange={(event) => updateTotals("totalFemale", event.target.value)}
-              />
-            </div>
-          </div>
-        )}
-      </ErpSection>
-
-      <ErpSection
-        title="Standard Wise Strength"
-        description="Only standards returned by the institute setup are listed, and each row keeps the same boys, girls, and total behavior as the old ERP."
-        icon={<Users className="size-5" />}
-        footer={
-          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-            <span>Standard Boys: {standardSummary.totalBoys}</span>
-            <span>Standard Girls: {standardSummary.totalGirls}</span>
-            <span>Standard Total: {standardSummary.total}</span>
-          </div>
-        }
-      >
-        {loading ? (
-          <ErpLoading label="Loading institute standards..." />
-        ) : data.rows.length === 0 ? (
-          <ErpEmpty
-            title="No standards are available for this institute."
-            hint="The old ERP only renders rows for standards already configured under institute setup."
-          />
-        ) : (
-          <div className="space-y-4">
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[220px]">Standard</TableHead>
-                    <TableHead className="w-[180px]">Total Boys</TableHead>
-                    <TableHead className="w-[180px]">Total Girls</TableHead>
-                    <TableHead className="w-[180px]">Total Strength</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.rows.map((row, index) => (
-                    <TableRow key={row.standardId}>
-                      <TableCell className="font-medium text-slate-900">{row.standardName}</TableCell>
-                      <TableCell>
-                        <Input
-                          value={row.boys}
-                          onChange={(event) => updateRow(index, "boys", event.target.value)}
-                          aria-label={`${row.standardName} boys`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={row.girls}
-                          onChange={(event) => updateRow(index, "girls", event.target.value)}
-                          aria-label={`${row.standardName} girls`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input value={row.total} readOnly aria-label={`${row.standardName} total strength`} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card className="border-slate-200 shadow-sm">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <div className="rounded-xl bg-blue-50 p-2 text-blue-600">
-                    <BarChart3 className="size-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Standards Listed</p>
-                    <p className="text-xl font-semibold text-slate-900">{data.rows.length}</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 shadow-sm">
-                <CardContent className="p-4">
-                  <p className="text-sm text-slate-500">Institute Total Strength</p>
-                  <p className="text-xl font-semibold text-slate-900">{count(data.totalStrength)}</p>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 shadow-sm">
-                <CardContent className="p-4">
-                  <p className="text-sm text-slate-500">Standard-wise Total Strength</p>
-                  <p className="text-xl font-semibold text-slate-900">{standardSummary.total}</p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-      </ErpSection>
     </main>
   );
 }
