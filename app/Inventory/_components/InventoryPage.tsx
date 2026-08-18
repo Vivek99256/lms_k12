@@ -12,7 +12,7 @@ import { deleteInventory, loadInventory, saveInventory, type InventoryData, type
 
 export type InventoryField = {
   key: string; label: string; kind?: "text" | "number" | "date" | "textarea" | "select" | "file";
-  required?: boolean; source?: string; options?: string[]; filter?: boolean;
+  required?: boolean; source?: string; options?: string[]; filter?: boolean; dependsOn?: string;
 };
 export type InventoryConfig = {
   module: string; title: string; description: string; singular: string;
@@ -35,7 +35,8 @@ export function InventoryPage({ config }: { config: InventoryConfig }) {
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const filters = useMemo(() => Object.fromEntries(config.fields.filter((field) => field.filter && form[field.key]).map((field) => [field.key, form[field.key]])), [config.fields, form]);
+  const dependentKeys = useMemo(() => new Set(config.fields.filter((field) => field.dependsOn).map((field) => field.dependsOn)), [config.fields]);
+  const filters = useMemo(() => Object.fromEntries(config.fields.filter((field) => (field.filter || field.source || dependentKeys.has(field.key)) && form[field.key]).map((field) => [field.key, form[field.key]])), [config.fields, form, dependentKeys]);
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { setData(await loadInventory(config.module, filters)); }
@@ -90,7 +91,7 @@ export function InventoryPage({ config }: { config: InventoryConfig }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{config.fields.map((field) => <div key={field.key} className={field.kind === "textarea" ? "sm:col-span-2 lg:col-span-3" : ""}><Label htmlFor={field.key}>{field.label}{field.required ? " *" : ""}</Label>
         {field.kind === "textarea" ? <Textarea id={field.key} className="mt-1" value={form[field.key] || ""} onChange={(event) => setForm((value) => ({ ...value, [field.key]: event.target.value }))} />
           : field.kind === "file" ? <Input id={field.key} type="file" className="mt-1" onChange={(event) => { const file = event.target.files?.[0]; setFiles((value) => { const next = { ...value }; if (file) next[field.key] = file; else delete next[field.key]; return next; }); }} />
-          : field.kind === "select" ? <select id={field.key} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={form[field.key] || ""} onChange={(event) => setForm((value) => ({ ...value, [field.key]: event.target.value, ...(field.key === "category_id" ? { sub_category_id: "" } : {}) }))}><option value="">All / Select {field.label}</option>{field.options?.map((item) => <option key={item} value={item}>{item}</option>)}{(data.options[field.source || ""] || []).filter((item) => field.source !== "sub_categories" || !form.category_id || item.parentId === Number(form.category_id)).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+          : field.kind === "select" ? <select id={field.key} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={form[field.key] || ""} onChange={(event) => setForm((value) => ({ ...value, [field.key]: event.target.value, ...(field.key === "category_id" ? { sub_category_id: "" } : {}), ...(config.fields.some((other) => other.dependsOn === field.key) ? Object.fromEntries(config.fields.filter((other) => other.dependsOn === field.key).map((other) => [other.key, ""])) : {}) }))}><option value="">All / Select {field.label}</option>{field.options?.map((item) => <option key={item} value={item}>{item}</option>)}{(data.options[field.source || ""] || []).filter((item) => field.source !== "sub_categories" || !form.category_id || item.parentId === Number(form.category_id)).filter((item) => !field.dependsOn || !form[field.dependsOn] || item.groupKey === form[field.dependsOn] || item.parentId === Number(form[field.dependsOn])).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
           : <Input id={field.key} type={field.kind || "text"} min={field.kind === "number" ? 0 : undefined} className="mt-1" value={form[field.key] || ""} onChange={(event) => setForm((value) => ({ ...value, [field.key]: event.target.value }))} />}</div>)}</div>
       <div className="mt-5"><Button onClick={() => config.mode === "report" ? void load() : void save()} disabled={busy}>{busy && <LoaderCircle className="size-4 animate-spin" />}{config.mode === "report" ? "Generate Report" : "Save"}</Button></div>
     </CardContent></Card>}
