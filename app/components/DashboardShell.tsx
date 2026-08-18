@@ -59,37 +59,72 @@ function getFilteredMasterMenuItems(items: SubmenuItem[], selectedMenu: SubmenuI
     });
 }
 
-function augmentPalLevel3Items(items: Level3Item[], pathname: string): Level3Item[] {
-  const lowerPath = pathname.toLowerCase();
-  if (!lowerPath.startsWith('/pal')) return items;
+/**
+ * New PAL's sub-modules — the level-3 bar shown under LMS + PAL → New PAL.
+ *
+ * Three of these live at `/pal/*` paths rather than under `/pal/new/*` for
+ * historical reasons; they are New PAL sub-modules all the same, which is why
+ * the route family below is derived from these hrefs rather than assumed from
+ * a `/pal` prefix.
+ */
+const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
+  {
+    id: 'pal-framework',
+    label: 'Framework',
+    href: '/pal/frameworks',
+  },
+  {
+    id: 'pal-content-model',
+    label: 'Content Model',
+    href: '/pal/new/content-model',
+  },
+  {
+    id: 'pal-ulu',
+    label: 'Unified Learning Units',
+    href: '/pal/ulu',
+  },
+  {
+    id: 'pal-pedagogy-engine',
+    label: 'Pedagogy Engine',
+    href: '/pal/pedagogy-engine',
+  },
+  {
+    id: 'pal-administration',
+    label: 'Administration',
+    href: '/pal/new/administration',
+  },
+  {
+    id: 'pal-gamification',
+    label: 'Gamification',
+    href: '/pal/new/gamification',
+  },
+];
 
-  return [
-    {
-      id: 'pal-framework',
-      label: 'Framework',
-      href: '/pal/frameworks',
-    },
-    {
-      id: 'pal-content-model',
-      label: 'Content Model',
-      href: '/pal/new/content-model',
-    },
-    {
-      id: 'pal-ulu',
-      label: 'Unified Learning Units',
-      href: '/pal/ulu',
-    },
-    {
-      id: 'pal-pedagogy-engine',
-      label: 'Pedagogy Engine',
-      href: '/pal/pedagogy-engine',
-    },
-    {
-      id: 'pal-administration',
-      label: 'Administration',
-      href: '/pal/new/administration',
-    },
-  ];
+/** `href` itself, or a page nested under it — never a sibling that merely shares a prefix. */
+function isUnderRoute(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/**
+ * The New PAL sub-nav, or null when this route is not part of New PAL.
+ *
+ * Scoped to the New PAL workspace and the sub-modules it links to. A `/pal`
+ * prefix is NOT enough: LMS + PAL → Test → PAL is the legacy PAL workspace at
+ * `/pal`, and Content/Exam/Report/Result/Intelligence hang off it. Those are a
+ * different module and must not wear New PAL's navigation.
+ *
+ * The boundary check matters here — `/pal/framework` (legacy) and
+ * `/pal/frameworks` (New PAL) differ by one character, so a plain
+ * `startsWith` would drag the legacy page back in.
+ */
+function newPalLevel3Items(pathname: string): Level3Item[] | null {
+  const lowerPath = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+
+  const inNewPal =
+    isUnderRoute(lowerPath, '/pal/new') ||
+    NEW_PAL_LEVEL3_ITEMS.some((item) => isUnderRoute(lowerPath, item.href));
+
+  return inNewPal ? NEW_PAL_LEVEL3_ITEMS : null;
 }
 
 
@@ -374,8 +409,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   };
 
   const level3Menu = (() => {
-    if (pathname.toLowerCase().startsWith('/pal')) {
-      return { parentLabel: 'New PAL', items: augmentPalLevel3Items([], pathname) };
+    // New PAL brings its own sub-nav. Every other route — including the legacy
+    // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
+    // menu-driven resolution below and gets whatever its own menu defines.
+    const newPalItems = newPalLevel3Items(pathname);
+    if (newPalItems) {
+      return { parentLabel: 'New PAL', items: newPalItems };
     }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
