@@ -189,13 +189,25 @@ export const MODULE_WORKFLOW_CONFIGS: Record<string, ModuleWorkflowConfig> = {
   attendance: {
     module: "attendance",
     workflowId: "attendance_report",
-    listTools: ["getTeacherDailyReport"],
-    selectTool: "getTeacherDailyReport",
-    navigationRoute: "/attendance",
-    navigationLabel: "View Attendance",
+    // Student attendance has its own workflow; the teacher daily report stays
+    // available for teacher-attendance questions.
+    listTools: ["getAttendanceOverview", "getTeacherDailyReport"],
+    selectTool: "getAttendanceOverview",
+    navigationRoute: "/student/daywise_student_attendance",
+    navigationLabel: "Open Daywise Attendance Report",
     entityIdParam: "id",
     extractEntityId: () => null,
-    buildNavigationQuery: () => ({}),
+    buildNavigationQuery: (entity) => {
+      const query: Record<string, string | number> = {};
+      if (typeof entity.date === "string" && entity.date) query.date = entity.date;
+      if (typeof entity.standardId === "string" && entity.standardId) {
+        query.standard_id = entity.standardId;
+      }
+      if (typeof entity.divisionId === "string" && entity.divisionId) {
+        query.division_id = entity.divisionId;
+      }
+      return query;
+    },
     readyMessagePrefix: "Attendance report is ready",
   },
   homework: {
@@ -313,14 +325,62 @@ export const MODULE_WORKFLOW_CONFIGS: Record<string, ModuleWorkflowConfig> = {
   teachers: {
     module: "teachers",
     workflowId: "teacher_lookup",
-    listTools: ["getTeacherDailyReport"],
-    selectTool: "getTeacherDailyReport",
+    listTools: ["getTeacherDirectory", "getClassTeachers", "getTeacherDailyReport"],
+    selectTool: "getTeacherDirectory",
     navigationRoute: "/classteacher",
     navigationLabel: "View Teacher Details",
     entityIdParam: "id",
     extractEntityId: () => null,
     buildNavigationQuery: () => ({}),
     readyMessagePrefix: "Teacher details found for",
+  },
+  subjects: {
+    module: "subjects",
+    workflowId: "subject_catalog",
+    listTools: ["getSubjectCatalog"],
+    selectTool: "getSubjectCatalog",
+    navigationRoute: "/subjects",
+    navigationLabel: "Open Subjects",
+    entityIdParam: "id",
+    extractEntityId: () => null,
+    buildNavigationQuery: () => ({}),
+    readyMessagePrefix: "Subject details found for",
+  },
+  courses: {
+    module: "courses",
+    workflowId: "course_catalog",
+    listTools: ["getCourseCatalog"],
+    selectTool: "getCourseCatalog",
+    navigationRoute: "/course-master",
+    navigationLabel: "Open Course Master",
+    entityIdParam: "id",
+    extractEntityId: () => null,
+    buildNavigationQuery: () => ({}),
+    readyMessagePrefix: "Course details found for",
+  },
+  departments: {
+    module: "departments",
+    workflowId: "department_lookup",
+    listTools: ["getDepartmentDirectory"],
+    selectTool: "getDepartmentDirectory",
+    navigationRoute: "/Institute_Detail/Department",
+    navigationLabel: "Open Departments",
+    entityIdParam: "id",
+    extractEntityId: () => null,
+    buildNavigationQuery: () => ({}),
+    readyMessagePrefix: "Department details found for",
+  },
+  classes: {
+    module: "classes",
+    workflowId: "class_structure",
+    listTools: ["getClassStructure"],
+    selectTool: "getClassStructure",
+    navigationRoute: "/academic_setup",
+    navigationLabel: "Open Academic Setup",
+    entityIdParam: "id",
+    extractEntityId: () => null,
+    buildNavigationQuery: () => ({}),
+    readyMessagePrefix: "Class details found for",
   },
 };
 
@@ -377,6 +437,10 @@ export function looksLikeDifferentModuleRequest(
     hostel: ["hostel", "room", "mess"],
     notifications: ["notification", "notice", "message"],
     accounts: ["account", "ledger", "invoice", "expense"],
+    subjects: ["subject", "syllabus"],
+    courses: ["course", "curriculum", "chapter"],
+    departments: ["department", "sub-department", "sub department"],
+    classes: ["class list", "classes", "section list", "divisions", "standards"],
   };
 
   const currentKeywords = moduleKeywords[currentModule.toLowerCase()] || [];
@@ -409,12 +473,12 @@ export function isIntentForModule(
 
   const moduleToolMap: Record<string, string[]> = {
     admissions: ["admission", "confirmAdmission", "findAdmission", "hydrateAdmission", "updateAdmission", "listAdmissionEnquiries"],
-    fees: ["fee", "findStudentFee", "getStudentFee", "listFeesDefaulters"],
-    students: ["student", "searchStudent"],
-    teachers: ["teacher", "getTeacherDaily"],
+    fees: ["fee", "findStudentFee", "getStudentFee", "listFeesDefaulters", "getFeesSummary"],
+    students: ["student", "searchStudent", "getStudentDirectory"],
+    teachers: ["teacher", "getTeacherDaily", "getTeacherDirectory", "getClassTeachers"],
     homework: ["homework", "listHomework"],
     results: ["result", "getResultReport"],
-    attendance: ["attendance", "getTeacherDaily"],
+    attendance: ["attendance", "getAttendanceOverview", "getStudentAttendanceDetail"],
     exams: ["exam", "result"],
     timetable: ["timetable"],
     library: ["library"],
@@ -422,6 +486,10 @@ export function isIntentForModule(
     hostel: ["hostel"],
     notifications: ["notification"],
     accounts: ["account"],
+    subjects: ["subject", "getSubjectCatalog"],
+    courses: ["course", "getCourseCatalog"],
+    departments: ["department", "getDepartmentDirectory"],
+    classes: ["class_structure", "getClassStructure"],
   };
 
   const expectedTools = moduleToolMap[normalizedModule] || [];

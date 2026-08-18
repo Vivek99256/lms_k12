@@ -64,6 +64,30 @@ const MODULE_HANDOFF_COPY: Record<string, { title: string; description: string }
     title: 'Student record is ready',
     description: 'Open the student module with this record.',
   },
+  attendance: {
+    title: 'Attendance report is ready',
+    description: 'Open the daywise attendance report with these filters applied.',
+  },
+  teachers: {
+    title: 'Teacher record is ready',
+    description: 'Open the teacher module with this record.',
+  },
+  departments: {
+    title: 'Department details are ready',
+    description: 'Open the department module with this record.',
+  },
+  subjects: {
+    title: 'Subject details are ready',
+    description: 'Open the subject module with this record.',
+  },
+  courses: {
+    title: 'Course details are ready',
+    description: 'Open the course master with this record.',
+  },
+  classes: {
+    title: 'Class details are ready',
+    description: 'Open academic setup with this class selected.',
+  },
 };
 
 function getHandoffCopy(module?: string) {
@@ -426,29 +450,13 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                           : 'border border-gray-200/80 bg-white text-gray-800 shadow-[0_8px_30px_rgba(15,23,42,0.06)]'
                     )}
                   >
-                    {message.role === 'assistant' &&
-                    (message.conversationType || message.status || message.tools?.length) ? (
-                      <div className="mb-2 flex flex-wrap gap-2">
-                        {message.conversationType ? (
-                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[#0D6EFD]">
-                            {message.conversationType}
-                          </span>
-                        ) : null}
-                        {message.status ? (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-emerald-700">
-                            {message.status.replaceAll('_', ' ')}
-                          </span>
-                        ) : null}
-                        {message.tools?.map((tool) => (
-                          <span
-                            key={`${message.id}-${tool}`}
-                            className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-500"
-                          >
-                            {tool}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
+                    {/*
+                      Conversation type, pipeline status and tool names are
+                      internal routing details. They used to render as chips
+                      above every answer, which put strings like the analysis
+                      tool's own name in front of the user. The assistant should
+                      read as an assistant, so only the answer is shown.
+                    */}
                     {message.content}
                     {message.role === 'assistant' && message.navigation ? (
                       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-slate-800">
