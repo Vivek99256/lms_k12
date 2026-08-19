@@ -25,6 +25,7 @@ import {
   submitAnnotation,
   type ReviewContext,
 } from "@/app/lms/lmsAnnotate_assignment/api";
+import RequireStaff from "@/app/lms/_shared/RequireStaff";
 
 export default function ReviewAssignmentPage() {
   const params = useParams<{ id: string }>();
@@ -122,6 +123,7 @@ export default function ReviewAssignmentPage() {
   }
 
   return (
+    <RequireStaff>
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -315,5 +317,6 @@ export default function ReviewAssignmentPage() {
         </div>
       ) : null}
     </main>
+    </RequireStaff>
   );
 }

@@ -14,6 +14,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 type ResourceKind = 'pdf' | 'link' | 'doc';
 
@@ -938,6 +939,7 @@ export default function LessonPlanPage() {
   }, [selectedLessonId]);
 
   return (
+    <RequireStaff>
     <div className="min-h-full  px-4 py-4 text-[#24211d] sm:px-6 lg:px-7">
       {isFilterDialogOpen && <FilterLessonDialog onClose={() => setIsFilterDialogOpen(false)} />}
       {isAddLessonDialogOpen && <AddLessonDialog onClose={() => setIsAddLessonDialogOpen(false)} />}
@@ -1007,5 +1009,6 @@ export default function LessonPlanPage() {
         <LessonDetail lesson={selectedLesson} onEdit={() => setIsEditLessonDialogOpen(true)} />
       </div>
     </div>
+    </RequireStaff>
   );
 }

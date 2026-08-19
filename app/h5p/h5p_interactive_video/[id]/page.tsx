@@ -9,6 +9,7 @@ import {
   hasH5pContext,
   h5pContextQuery,
   parseInteractionOptions,
+  postH5pXapiStatement,
   readH5pContext,
   type H5pInteractiveVideo,
   type H5pVideoInteraction,
@@ -185,6 +186,13 @@ function InteractiveVideoPlayerContent() {
     const correct = String(popup.selected) === String(interaction.correct_answer);
     markAnswered(popup.index);
     setPopup({ ...popup, result: correct ? 'correct' : 'wrong' });
+    void postH5pXapiStatement({
+      objectId: `interactive_video:${videoId}`,
+      verb: 'answered',
+      ctx,
+      success: correct,
+      response: popup.selected ?? undefined,
+    });
     if (correct) {
       const answeredIndex = popup.index;
       schedule(() => {
@@ -236,6 +244,7 @@ function InteractiveVideoPlayerContent() {
                     src={video.video_path}
                     onTimeUpdate={handleTimeUpdate}
                     onLoadedMetadata={() => setDuration(videoRef.current?.duration ?? 0)}
+                    onEnded={() => void postH5pXapiStatement({ objectId: `interactive_video:${videoId}`, verb: 'completed', ctx })}
                   />
                 ) : (
                   <p className="rounded-xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">

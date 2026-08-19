@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { fetchStudentList, type StudentListRow } from '@/app/lms/data/studentAnalysis';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
@@ -66,6 +67,7 @@ export default function StudentAnalysisPage() {
   };
 
   return (
+    <RequireStaff>
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1400px] space-y-5">
         {/* Header */}
@@ -187,5 +189,6 @@ export default function StudentAnalysisPage() {
         ) : null}
       </div>
     </div>
+    </RequireStaff>
   );
 }
