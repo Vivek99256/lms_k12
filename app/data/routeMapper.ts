@@ -490,6 +490,11 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return studentReportRoute;
   }
 
+  // Teacher Transfer Utility: legacy Laravel route name → the Next.js page.
+  if (cleanLink.toLowerCase() === 'teachertransfer.index') {
+    return '/teachertransfer';
+  }
+
   const migrationRoute = MIGRATION_MODULE_ROUTES[cleanLink.toLowerCase()];
   if (migrationRoute) return migrationRoute;
 
