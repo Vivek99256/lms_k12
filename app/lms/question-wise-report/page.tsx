@@ -37,6 +37,7 @@ import {
   type QuestionWiseReport,
   type ReportExam,
 } from '@/app/lms/data/questionWiseReport';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
@@ -188,6 +189,7 @@ export default function QuestionWiseReportPage() {
   };
 
   return (
+    <RequireStaff>
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1800px] space-y-5">
         {/* Header */}
@@ -423,5 +425,6 @@ export default function QuestionWiseReportPage() {
         ) : null}
       </div>
     </div>
+    </RequireStaff>
   );
 }

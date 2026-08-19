@@ -2,6 +2,7 @@
 
 import { type ReactNode, useMemo, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, Download, Filter, MapPin, Plus, X } from 'lucide-react';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 type EventStyleKey = 'math' | 'science' | 'english' | 'history' | 'geography' | 'art' | 'revision' | 'neutral';
 
@@ -731,6 +732,7 @@ export default function MonthlyPlanPage() {
   const selectedLessons = selectedDay.lessons ?? buildLessonsFromEvents(selectedDay);
 
   return (
+    <RequireStaff>
     <div className="min-h-full  px-4 py-4 text-[#27231f] sm:px-6 lg:px-7">
       {isFilterDialogOpen && <FilterSyllabusDialog onClose={() => setIsFilterDialogOpen(false)} />}
       {isAddLessonDialogOpen && <AddLessonDialog onClose={() => setIsAddLessonDialogOpen(false)} />}
@@ -883,5 +885,6 @@ export default function MonthlyPlanPage() {
         </div>
       </section>
     </div>
+    </RequireStaff>
   );
 }

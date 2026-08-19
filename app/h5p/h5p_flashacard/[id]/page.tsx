@@ -17,6 +17,7 @@ import {
   h5pContextQuery,
   hasH5pContext,
   isStudentProfile,
+  postH5pXapiStatement,
   readH5pContext,
   type H5pFlashcard,
 } from '@/app/h5p/data/h5p';
@@ -155,7 +156,17 @@ function FlashcardPlayerContent() {
     clearTimers();
 
     const expected = (card.correct_answer ?? '').trim().toLowerCase();
-    if (guess === expected) {
+    const isCorrect = guess === expected;
+
+    void postH5pXapiStatement({
+      objectId: `flash_cards:${card.id}`,
+      verb: 'answered',
+      ctx,
+      success: isCorrect,
+      response: answer.trim(),
+    });
+
+    if (isCorrect) {
       const index = current;
       setSolved((prev) => prev.map((value, i) => (i === index ? true : value)));
       setFeedback('correct');
@@ -166,6 +177,7 @@ function FlashcardPlayerContent() {
           goToCard(index + 1);
         } else {
           setShowResult(true);
+          void postH5pXapiStatement({ objectId: `flash_cards:${card.id}`, verb: 'completed', ctx });
         }
       }, 2000);
     } else {

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Download } from 'lucide-react';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 type StatCard = {
   label: string;
@@ -336,6 +337,7 @@ function ScheduleStatusPanel() {
 
 export default function ReportsPage() {
   return (
+    <RequireStaff>
     <div className="min-h-full px-4 py-4 text-[#27231f] sm:px-6 lg:px-7">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -366,5 +368,6 @@ export default function ReportsPage() {
         <ScheduleStatusPanel />
       </div>
     </div>
+    </RequireStaff>
   );
 }

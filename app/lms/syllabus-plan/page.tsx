@@ -23,6 +23,7 @@ import {
   type CurriculumOption,
   type SyllabusRow,
 } from '@/app/lms/syllabus-plan/api';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
@@ -224,6 +225,7 @@ export default function SyllabusPlanPage() {
   );
 
   return (
+    <RequireStaff>
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1600px] space-y-5">
         <header className="flex flex-wrap items-start justify-between gap-3">
@@ -391,5 +393,6 @@ export default function SyllabusPlanPage() {
         )}
       </div>
     </div>
+    </RequireStaff>
   );
 }

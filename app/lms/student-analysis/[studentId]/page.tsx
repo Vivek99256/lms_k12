@@ -28,6 +28,7 @@ import {
   fetchStudentAnalysis,
   type StudentAnalysis,
 } from '@/app/lms/data/studentAnalysis';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ChartTitle, Tooltip, Legend);
 
@@ -126,6 +127,7 @@ export default function StudentAnalysisDetailPage() {
   };
 
   return (
+    <RequireStaff>
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1200px] space-y-5">
         <Link
@@ -255,5 +257,6 @@ export default function StudentAnalysisDetailPage() {
         ) : null}
       </div>
     </div>
+    </RequireStaff>
   );
 }
