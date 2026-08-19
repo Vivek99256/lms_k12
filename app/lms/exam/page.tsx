@@ -943,6 +943,75 @@ function PrintableQuestionPaper({
 }
 
 function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  const handleAnswerChange = (questionId: number, value: string) => {
+    setAnswers((current) => ({ ...current, [questionId]: value }));
+  };
+
+  const handleSubmitExam = async () => {
+    const session = getCreateExamSession();
+
+    if (!session.subInstituteId || !session.userId) {
+      setSubmitError('Your session has expired. Please sign in again and retry.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setSubmitError('');
+
+      const formData = new FormData();
+      formData.append('questionpaper_id', String(paper.id));
+      formData.append('sub_institute_id', session.subInstituteId);
+      formData.append('user_id', session.userId);
+      formData.append('type', 'JSON');
+
+      (paper.question_arr || []).forEach((question) => {
+        formData.append(`answer_narrative[${question.id}]`, answers[question.id] ?? '');
+      });
+
+      const response = await fetch(`${API_BASE_URL}/lms/online_exam`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || Number(result?.status_code) !== 1) {
+        throw new Error(result?.message || 'Unable to submit the exam. Please try again.');
+      }
+
+      setSubmitSuccess(true);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : 'Unable to submit the exam. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (submitSuccess) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <CheckCircle2 className="mx-auto mb-3 text-emerald-500" size={40} />
+        <p className="text-lg font-semibold text-slate-900">Exam submitted</p>
+        <p className="mt-1 text-sm text-slate-500">Your answers have been recorded.</p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="mt-5 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
+        >
+          Back to exams
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1041,6 +1110,8 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
                 <textarea
                   name={`answer_${question.id}`}
                   rows={4}
+                  value={answers[question.id] ?? ''}
+                  onChange={(event) => handleAnswerChange(question.id, event.target.value)}
                   placeholder="Write your answer here..."
                   className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                 />
@@ -1060,12 +1131,17 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
       </div>
 
       {paper.question_arr?.length > 0 ? (
-        <div className="sticky bottom-4 flex justify-end rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+        <div className="sticky bottom-4 flex flex-col items-end gap-2 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+          {submitError ? (
+            <p className="text-sm font-medium text-red-600">{submitError}</p>
+          ) : null}
           <button
             type="button"
-            className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
+            onClick={handleSubmitExam}
+            disabled={isSubmitting}
+            className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Submit Exam
+            {isSubmitting ? 'Submitting…' : 'Submit Exam'}
           </button>
         </div>
       ) : null}
@@ -1078,6 +1154,8 @@ export default function StudentHomeworkIndexPage() {
   const { isChatbotOpen } = useContext(ChatbotLayoutContext);
   const [audienceMode, setAudienceMode] = useState<AudienceMode>(() => {
     if (typeof window === 'undefined') return 'Teacher';
+    const session = getCreateExamSession();
+    if (session.userProfileName.trim().toUpperCase() === 'STUDENT') return 'Student';
     const stored = localStorage.getItem('learningManagementAudienceMode');
     return stored === 'Student' ? 'Student' : 'Teacher';
   });
@@ -2450,6 +2528,12 @@ export default function StudentHomeworkIndexPage() {
   }, [isCreateExamOpen, mappingLevels.bloom.length, mappingLevels.dok.length]);
 
   useEffect(() => {
+    if (isStudentProfile && audienceMode !== 'Student') {
+      setAudienceMode('Student');
+    }
+  }, [isStudentProfile, audienceMode]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     localStorage.setItem('learningManagementAudienceMode', audienceMode);
   }, [audienceMode]);
@@ -2519,6 +2603,7 @@ export default function StudentHomeworkIndexPage() {
                 </p>
               </div>
 
+              {!isStudentProfile && (
               <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
                 <span className="text-[13px] font-medium text-[#6B7B91]">Viewing as</span>
                 <div className="inline-flex rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
@@ -2548,9 +2633,10 @@ export default function StudentHomeworkIndexPage() {
                   </button>
                 </div>
               </div>
+              )}
             </div>
 
-            {audienceMode === 'Teacher' ? (
+            {audienceMode === 'Teacher' && !isStudentProfile ? (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="flex flex-col gap-4">

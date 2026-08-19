@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Info, X } from 'lucide-react';
 import {
   fetchScenario,
   h5pContextQuery,
   hasH5pContext,
+  postH5pXapiStatement,
   readH5pContext,
   type H5pScenario,
   type H5pScenarioPoint,
@@ -58,6 +59,8 @@ function ScenarioShowContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activePoint, setActivePoint] = useState<H5pScenarioPoint | null>(null);
+  const viewedPointIds = useRef<Set<number>>(new Set());
+  const completedSent = useRef(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
@@ -147,7 +150,15 @@ function ScenarioShowContent() {
                 <button
                   key={point.id}
                   type="button"
-                  onClick={() => setActivePoint(point)}
+                  onClick={() => {
+                    setActivePoint(point);
+                    void postH5pXapiStatement({ objectId: `image_hotspot:${id}`, verb: 'attempted', ctx });
+                    viewedPointIds.current.add(point.id);
+                    if (!completedSent.current && viewedPointIds.current.size >= points.length && points.length > 0) {
+                      completedSent.current = true;
+                      void postH5pXapiStatement({ objectId: `image_hotspot:${id}`, verb: 'completed', ctx });
+                    }
+                  }}
                   style={{ left: point.position_x, top: point.position_y }}
                   className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow"
                   title={point.title}

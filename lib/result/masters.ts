@@ -34,10 +34,10 @@ export const hpcActivity: MasterScreenDef = {
   icon: Activity,
   entityName: 'activity',
   api: {
-    index: 'result/result_activity_master',
-    store: 'result/result_activity_master',
-    update: 'result/result_activity_master',
-    destroy: 'result/result_activity_master',
+    index: 'api/result/hpc-activity-master',
+    store: 'api/result/hpc-activity-master',
+    update: 'api/result/hpc-activity-master',
+    destroy: 'api/result/hpc-activity-master',
   },
   columns: [
     { key: 'id', header: 'Sr no.', width: '70px', mono: true },
@@ -51,11 +51,12 @@ export const hpcActivity: MasterScreenDef = {
   fields: [
     {
       name: 'standard', label: 'Standard', type: 'select', required: true, section: 'Activity details',
-      placeholder: 'Select standard', options: { kind: 'chain', chain: 'standard' },
+      placeholder: 'Select standard',
+      options: { kind: 'api', path: 'api/result/hpc-activity-master/create', dataKey: 'standardLists' },
     },
     {
       name: 'skill_id', label: 'Skill name', type: 'select', required: true, section: 'Activity details',
-      options: { kind: 'api', path: 'result/getActivityLists', params: { standard: '{standard}', level: '2' } },
+      options: { kind: 'api', path: 'api/result/hpc-activity-master/activity-lists', params: { standard: '{standard}', level: '2' } },
       helper: 'Skillsets configured for the selected standard.',
     },
     {
@@ -66,7 +67,7 @@ export const hpcActivity: MasterScreenDef = {
     {
       name: 'sub_skill_id', label: 'Sub skill name', type: 'select', section: 'Activity details',
       showIf: { field: 'levels', equals: ['4'] },
-      options: { kind: 'api', path: 'result/getActivityLists', params: { standard: '{standard}', skill_id: '{skill_id}', levels: '3', level: '4' } },
+      options: { kind: 'api', path: 'api/result/hpc-activity-master/activity-lists', params: { standard: '{standard}', skill_id: '{skill_id}', levels: '3', level: '4' } },
     },
     { name: 'title', label: 'Title', type: 'text', required: true, section: 'Activity details' },
     {
@@ -101,10 +102,10 @@ export const hpcSkillset: MasterScreenDef = {
   icon: Layers3,
   entityName: 'skillset',
   api: {
-    index: 'result/result_skillset',
-    store: 'result/result_skillset',
-    update: 'result/result_skillset',
-    destroy: 'result/result_skillset',
+    index: 'api/result/hpc-skillset',
+    store: 'api/result/hpc-skillset',
+    update: 'api/result/hpc-skillset',
+    destroy: 'api/result/hpc-skillset',
   },
   columns: [
     { key: 'id', header: 'Sr no.', width: '70px', mono: true },
@@ -116,10 +117,11 @@ export const hpcSkillset: MasterScreenDef = {
   fields: [
     {
       name: 'standard', label: 'Standard', type: 'select', required: true, section: 'Skillset details',
-      placeholder: 'Select standard', options: { kind: 'chain', chain: 'standard' },
+      placeholder: 'Select standard',
+      options: { kind: 'api', path: 'api/result/hpc-activity-master/create', dataKey: 'standardLists' },
     },
     { name: 'main_title', label: 'Main title', type: 'text', required: true, section: 'Skillset details' },
-    { name: 'title', label: 'Title', type: 'text', section: 'Skillset details' },
+    { name: 'title', label: 'Title', type: 'text', required: true, section: 'Skillset details' },
     {
       name: 'group', label: 'Group', type: 'select', required: true, section: 'Skillset details',
       options: {
@@ -527,10 +529,10 @@ export const resultBookMaster: MasterScreenDef = {
   entityName: 'result book',
   multipart: true,
   api: {
-    index: 'result/result_book_master',
-    store: 'result/result_book_master',
-    update: 'result/result_book_master',
-    destroy: 'result/result_book_master',
+    index: 'api/result/result-book-master',
+    store: 'api/result/result-book-master',
+    update: 'api/result/result-book-master',
+    destroy: 'api/result/result-book-master',
   },
   columns: [
     { key: 'line1', header: 'Line 1', sortable: true, searchable: true },
@@ -543,7 +545,7 @@ export const resultBookMaster: MasterScreenDef = {
   ],
   fields: [
     { name: 'grade', apiName: 'grade[]', label: 'Search section', type: 'multiselect', section: 'Scope', options: { kind: 'chain', chain: 'section' } },
-    { name: 'standard', apiName: 'standard[]', label: 'Search standard', type: 'multiselect', section: 'Scope', options: { kind: 'chain', chain: 'standard' } },
+    { name: 'standard', apiName: 'standard[]', label: 'Search standard', type: 'multiselect', required: true, section: 'Scope', options: { kind: 'chain', chain: 'standard' } },
     { name: 'line1', label: 'CCE line 1', type: 'editor', section: 'Letterhead lines' },
     { name: 'line2', label: 'CCE line 2', type: 'editor', section: 'Letterhead lines' },
     { name: 'line3', label: 'CCE line 3', type: 'editor', section: 'Letterhead lines' },
@@ -569,10 +571,10 @@ export const resultRemarkMaster: MasterScreenDef = {
   icon: MessageSquareText,
   entityName: 'remark',
   api: {
-    index: 'result/result_remark_master',
-    store: 'result/result_remark_master',
-    update: 'result/result_remark_master',
-    destroy: 'result/result_remark_master',
+    index: 'api/result/result-remark-master',
+    store: 'api/result/result-remark-master',
+    update: 'api/result/result-remark-master',
+    destroy: 'api/result/result-remark-master',
   },
   columns: [
     { key: 'title', header: 'Title', sortable: true, searchable: true },
@@ -601,10 +603,10 @@ export const coScholasticMaster: MasterScreenDef = {
   icon: Award,
   entityName: 'co-scholastic area',
   api: {
-    index: 'result/co_scholastic_master',
-    store: 'result/co_scholastic_master',
-    update: 'result/co_scholastic_master',
-    destroy: 'result/co_scholastic_master',
+    index: 'api/result/co-scholastic-master',
+    store: 'api/result/co-scholastic-master',
+    update: 'api/result/co-scholastic-master',
+    destroy: 'api/result/co-scholastic-master',
   },
   columns: [
     { key: 'title', header: 'Title', sortable: true, searchable: true },
@@ -627,10 +629,10 @@ export const coScholasticSetup: MasterScreenDef = {
   icon: Award,
   entityName: 'co-scholastic item',
   api: {
-    index: 'result/co_scholastic',
-    store: 'result/co_scholastic',
-    update: 'result/co_scholastic',
-    destroy: 'result/co_scholastic',
+    index: 'api/result/co-scholastic',
+    store: 'api/result/co-scholastic',
+    update: 'api/result/co-scholastic',
+    destroy: 'api/result/co-scholastic',
   },
   columns: [
     { key: 'term_name', header: 'Term name', sortable: true, searchable: true },
@@ -641,12 +643,20 @@ export const coScholasticSetup: MasterScreenDef = {
   ],
   fields: [
     {
+      name: 'term', label: 'Select term', type: 'select', required: true,
+      section: 'Item details', placeholder: 'Select term', options: { kind: 'chain', chain: 'term' },
+    },
+    {
+      name: 'grade', label: 'Grade', type: 'multiselect', required: true,
+      section: 'Item details', placeholder: '--Select grade--', options: { kind: 'chain', chain: 'section' },
+    },
+    {
       name: 'standard', apiName: 'standard[]', label: 'Standard', type: 'multiselect', required: true,
       section: 'Item details', placeholder: '--Select standard--', options: { kind: 'chain', chain: 'standard' },
     },
     {
       name: 'parent_id', label: 'Parent co-scholastic', type: 'select', required: true, section: 'Item details',
-      placeholder: '--Select parent--', options: { kind: 'api', path: 'result/co_scholastic_master', params: {} },
+      placeholder: '--Select parent--', options: { kind: 'api', path: 'api/result/co-scholastic-master', params: {} },
     },
     { name: 'title', label: 'Co-scholastic title', type: 'text', required: true, section: 'Item details' },
     { name: 'max_mark', label: 'Total mark', type: 'text', section: 'Item details' },
@@ -671,6 +681,11 @@ export const coScholasticSetup: MasterScreenDef = {
     },
   ],
   sectionOrder: ['Item details', 'Grade table'],
+  serialize: (fields, values) => {
+    const { data, hasFile } = serializeForm(fields, values);
+    delete data.grade;
+    return { data, hasFile };
+  },
 };
 
 /* ------------------------------------------------------------------------ */
@@ -684,10 +699,10 @@ export const workingDayMaster: MasterScreenDef = {
   icon: CalendarCheck2,
   entityName: 'working day record',
   api: {
-    index: 'result/working_day_master',
-    store: 'result/working_day_master',
-    update: 'result/working_day_master',
-    destroy: 'result/working_day_master',
+    index: 'api/result/working-day-master',
+    store: 'api/result/working-day-master',
+    update: 'api/result/working-day-master',
+    destroy: 'api/result/working-day-master',
   },
   columns: [
     { key: 'term_name', header: 'Term name', sortable: true, searchable: true },

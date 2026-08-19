@@ -98,12 +98,18 @@ function useFieldOptions(fields: FieldDef[], values: FormValues) {
 
   const termOptions = useMemo(() => {
     const selectedAcademicYear = typeof window === 'undefined' ? '' : localStorage.getItem('selectedAcademicYear') || '';
-    return toOptions(
-      academicTerms.filter((item) => {
+    return academicTerms
+      .filter((item) => {
         const year = readString((item as Record<string, unknown>).syear);
         return !selectedAcademicYear || !year || year === selectedAcademicYear;
-      }),
-    );
+      })
+      .map((item) => {
+        const row = item as Record<string, unknown>;
+        // Laravel filters by the generic `term_id` (1, 2, ...), not the
+        // academic_year row's own `id` — matches FilterBar's termOptions.
+        return { id: readString(row.term_id ?? row.id), label: readString(row.title ?? row.name) };
+      })
+      .filter((option) => option.id && option.label);
   }, [academicTerms]);
 
   const selectFields = useMemo(
@@ -179,7 +185,16 @@ function useFieldOptions(fields: FieldDef[], values: FormValues) {
         continue;
       }
       void resultGet(source.path, resolved)
-        .then((payload) => { if (!cancelled) setOptionsMap((current) => ({ ...current, [field.name]: toOptions(payload.data ?? payload) })); })
+        .then((payload) => {
+          if (cancelled) return;
+          const responseData = payload.data ?? payload;
+          const optionData = source.dataKey
+            ? (responseData && typeof responseData === 'object'
+              ? (responseData as Record<string, unknown>)[source.dataKey]
+              : [])
+            : responseData;
+          setOptionsMap((current) => ({ ...current, [field.name]: toOptions(optionData) }));
+        })
         .catch(() => { if (!cancelled) setOptionsMap((current) => (current[field.name]?.length ? current : { ...current, [field.name]: [] })); });
     }
     return () => { cancelled = true; };
