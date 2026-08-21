@@ -706,7 +706,7 @@ export function MobilityCenter() {
   const isJobsTab = activeTab === 'Overview' || activeTab === 'Internal Jobs'
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-background">
+    <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-1 overflow-y-auto pb-8 pr-2 custom-scrollbar">
 
         {/* Header Area */}

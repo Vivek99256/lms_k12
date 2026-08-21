@@ -486,7 +486,7 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
   }, [shared])
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
+    <div className="flex h-full flex-col overflow-hidden ">
       <div className="flex-1 overflow-y-auto pb-8 pr-2 custom-scrollbar">
         {comingSoon && (
           <div className="mb-6">

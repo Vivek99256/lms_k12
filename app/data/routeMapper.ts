@@ -389,6 +389,13 @@ const TALENT_ROUTE_NAME_MAP: Record<string, string> = {
   'talent.mobility_succession': '/talent-management/mobility-and-succession',
   'talent.offboarding': '/talent-management/offboarding',
   'talent.administration': '/talent-management/administration',
+  // Competency screens (Employee Profiles, Certifications, Development &
+  // Career Paths), ported as-is from G2G's `components/domain/competency/**`.
+  // Backend menu-seed migration adds matching route_name rows using these
+  // exact keys.
+  'talent.employee_profiles': '/talent-management/employee-profiles',
+  'talent.certifications': '/talent-management/certifications',
+  'talent.development_career_paths': '/talent-management/development-and-career-paths',
 };
 
 /**

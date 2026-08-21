@@ -337,6 +337,11 @@ export function JourneySheet({
       return
     }
 
+    if (form.candidate_phone.trim() && !/^\d{10}$/.test(form.candidate_phone.trim())) {
+      setError('Phone number must be 10 digits.')
+      return
+    }
+
     if (form.probation_start && form.probation_end && form.probation_end < form.probation_start) {
       setError('Probation end must be on or after the start date.')
       return
@@ -387,8 +392,14 @@ export function JourneySheet({
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold text-muted-foreground">Phone</Label>
               <Input
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="10-digit mobile number"
                 value={form.candidate_phone}
-                onChange={(event) => setForm((state) => ({ ...state, candidate_phone: event.target.value }))}
+                onChange={(event) =>
+                  setForm((state) => ({ ...state, candidate_phone: event.target.value.replace(/\D/g, '').slice(0, 10) }))
+                }
               />
             </div>
           </div>
