@@ -169,7 +169,7 @@ export function AdminCenter() {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
+    <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex flex-col gap-4 p-6 border-b border-border/40 bg-surface">
         <div className="flex items-start justify-between">
