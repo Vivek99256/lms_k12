@@ -236,6 +236,17 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   return 'Revision notes';
 }
 
+function getViewableContentUrl(rawUrl: string, filename?: string | null): string {
+  const isOfficeDoc = /\.(docx?|pptx?|xlsx?)(?:$|\?)/i.test(filename ?? rawUrl);
+  const isAbsoluteUrl = /^https?:\/\//i.test(rawUrl);
+
+  if (isOfficeDoc && isAbsoluteUrl) {
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(rawUrl)}&embedded=true`;
+  }
+
+  return rawUrl;
+}
+
 function buildApiChapterContentItems(
   chapter: Chapter,
   categories: Record<string, ChapterContentAsset[]>
@@ -243,7 +254,8 @@ function buildApiChapterContentItems(
   return Object.entries(categories).flatMap(([category, assets]) =>
     (assets ?? []).map((asset) => {
       const type = getApiContentType(category, asset);
-      const contentUrl = asset.url || asset.filename || undefined;
+      const rawContentUrl = asset.url || asset.filename || undefined;
+      const contentUrl = rawContentUrl ? getViewableContentUrl(rawContentUrl, asset.filename) : undefined;
       const updatedDate = asset.created_at?.split(' ')[0] ?? '—';
       const rawConceptId =
         asset.concept_id === null || asset.concept_id === undefined
