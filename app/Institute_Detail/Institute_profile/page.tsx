@@ -1,6 +1,6 @@
 "use client"
 
-import { FormEvent, ReactNode, useState } from "react"
+import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react"
 import {
   Building2,
   ChevronLeft,
@@ -37,6 +37,14 @@ import {
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import {
+  buildSessionContext,
+  getOrganizationProfile,
+  saveOrganizationProfile,
+  type OrgApiRecord,
+  type OrgProfileApiRecord,
+  type SessionContext,
+} from "../_lib/institute-profile-api"
 
 type OrganizationProfile = {
   status: "Active" | "Inactive" | "Pending Review"
@@ -281,6 +289,193 @@ const PAGE_SIZE = 5
 const cardSurfaceClass =
   "gap-0 rounded-xl bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.16)]"
 
+// Real starting point once the page talks to the backend: every field starts
+// empty (disabled fields already render "Pending" for falsy values) and gets
+// filled in from `getOrganizationProfile()` on mount. `initialProfile` above
+// stays put purely as demo scaffolding for a brand-new sister company draft.
+const blankProfile: OrganizationProfile = {
+  status: "Active",
+  organizationName: "",
+  organizationCode: "",
+  organizationType: "",
+  businessType: "",
+  industryType: "",
+  establishedDate: "",
+  registrationNo: "",
+  gstNo: "",
+  panNo: "",
+  website: "",
+  companyDescription: "",
+  email: "",
+  phone: "",
+  alternatePhone: "",
+  addressLine1: "",
+  addressLine2: "",
+  country: "",
+  state: "",
+  city: "",
+  postalCode: "",
+  brandName: "",
+  tagline: "",
+  brandDescription: "",
+  timeZone: "",
+  currency: "",
+  financialYear: "",
+  dateFormat: "",
+  language: "",
+  numberFormat: "",
+  totalEmployees: "",
+  workingDays: [],
+  sisterCompanies: [],
+}
+
+// `org_details.registered_address` is a single opaque, comma-joined string
+// (see buildRegisteredAddress below, mirroring G2G's concatenation). It is
+// not reliably invertible, so this is a best-effort positional split back
+// into the five UI address fields.
+function splitRegisteredAddress(address: string): {
+  addressLine1: string
+  addressLine2: string
+  city: string
+  state: string
+  postalCode: string
+  country: string
+} {
+  const parts = address.split(",").map((part) => part.trim())
+  return {
+    addressLine1: parts[0] ?? "",
+    addressLine2: parts[1] ?? "",
+    city: parts[2] ?? "",
+    state: parts[3] ?? "",
+    postalCode: parts[4] ?? "",
+    country: parts[5] ?? "",
+  }
+}
+
+function buildRegisteredAddress(profile: OrganizationProfile): string {
+  return [
+    profile.addressLine1,
+    profile.addressLine2,
+    profile.city,
+    profile.state,
+    profile.postalCode,
+    profile.country,
+  ]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ")
+}
+
+// Maps the fields the backend actually persists (see institute-profile-api.ts)
+// onto an OrganizationProfile. Fields G2G itself never persists (organizationType,
+// businessType, companyDescription, alternatePhone, brandName, tagline,
+// brandDescription, timeZone, currency, financialYear, dateFormat, language,
+// numberFormat, status) are left as whatever `base` already has.
+function applyOrgRecordToProfile(
+  base: OrganizationProfile,
+  record: OrgApiRecord
+): OrganizationProfile {
+  const cin = record.cin || base.registrationNo || base.organizationCode
+  const address = splitRegisteredAddress(record.registeredAddress)
+  const workingDays = record.workWeek
+    ? record.workWeek
+        .split(",")
+        .map((day) => day.trim())
+        .filter((day) => allDays.includes(day))
+    : base.workingDays
+
+  return {
+    ...base,
+    ...address,
+    organizationName: record.legalName || base.organizationName,
+    organizationCode: cin || base.organizationCode,
+    registrationNo: cin || base.registrationNo,
+    gstNo: record.gstin || base.gstNo,
+    panNo: record.pan || base.panNo,
+    industryType: record.industry || base.industryType,
+    totalEmployees: record.employeeCount || base.totalEmployees,
+    workingDays,
+    website: record.website || base.website,
+    email: record.email || base.email,
+    phone: record.mobileNo || base.phone,
+  }
+}
+
+function mapSisterRecordToCompany(record: OrgApiRecord, index: number): SisterCompany {
+  const profile = applyOrgRecordToProfile(blankProfile, record)
+  return {
+    id: record.id || `sister-${index}`,
+    name: record.legalName,
+    // relationship / status are UI-only in G2G too (not persisted columns).
+    relationship: "Sister Company",
+    status: "Active",
+    profile: { ...profile, organizationName: record.legalName },
+  }
+}
+
+function mapOrgProfileRecord(record: OrgProfileApiRecord | null): OrganizationProfile {
+  if (!record) return blankProfile
+
+  const mainProfile = applyOrgRecordToProfile(blankProfile, record)
+  return {
+    ...mainProfile,
+    sisterCompanies: record.sisterCompanies.map(mapSisterRecordToCompany),
+  }
+}
+
+// Builds the persisted-field slice of the multipart payload for one profile
+// (main org or a sister company). `nameOverride` lets the sister-company row's
+// inline-edited `name` win over its nested profile's organizationName.
+function appendPersistedFields(
+  formData: FormData,
+  profile: OrganizationProfile,
+  prefix = "",
+  nameOverride?: string
+) {
+  const cin = profile.registrationNo.trim() || profile.organizationCode.trim()
+  const fields: Record<string, string> = {
+    legal_name: nameOverride ?? profile.organizationName,
+    cin,
+    gstin: profile.gstNo,
+    pan: profile.panNo,
+    registered_address: buildRegisteredAddress(profile),
+    industry: profile.industryType,
+    employee_count: profile.totalEmployees,
+    work_week: profile.workingDays.join(","),
+    mobile_no: profile.phone,
+    country_code: "+91",
+    email: profile.email,
+    website: profile.website,
+  }
+
+  Object.entries(fields).forEach(([key, value]) => {
+    formData.set(prefix ? `${prefix}[${key}]` : key, value)
+  })
+}
+
+// Sister companies are always sent as a full replace, matching G2G/next_lms_erp's
+// organizationDetailsController@store (it deletes all existing sister rows for
+// the org, then re-inserts every entry in `sister_companies`).
+function buildOrganizationFormData(
+  session: SessionContext,
+  source: OrganizationProfile
+): FormData {
+  const formData = new FormData()
+  formData.set("type", "API")
+  formData.set("formType", "organization_details")
+  if (session.subInstituteId) formData.set("sub_institute_id", session.subInstituteId)
+  if (session.userId) formData.set("user_id", session.userId)
+  if (session.token) formData.set("token", session.token)
+
+  appendPersistedFields(formData, source)
+
+  source.sisterCompanies.forEach((company, index) => {
+    appendPersistedFields(formData, company.profile, `sister_companies[${index}]`, company.name)
+  })
+
+  return formData
+}
+
 function createSisterCompanyProfile(company?: SisterCompany): OrganizationProfile {
   if (company?.profile) {
     return {
@@ -325,13 +520,43 @@ function createSisterCompanyProfile(company?: SisterCompany): OrganizationProfil
 }
 
 export default function OrganizationProfilePage() {
-  const [profile, setProfile] = useState<OrganizationProfile>(initialProfile)
-  const [draft, setDraft] = useState<OrganizationProfile>(initialProfile)
+  const [profile, setProfile] = useState<OrganizationProfile>(blankProfile)
+  const [draft, setDraft] = useState<OrganizationProfile>(blankProfile)
   const [isEditing, setIsEditing] = useState(false)
   const [, setMessage] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [page, setPage] = useState(1)
   const [sisterForm, setSisterForm] = useState<SisterCompanyFormState | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
+
+  const loadProfile = useCallback(async () => {
+    setIsLoading(true)
+    setLoadError("")
+    try {
+      const session = buildSessionContext()
+      // eslint-disable-next-line no-console
+      console.log("[InstituteProfile] session", session)
+      const record = await getOrganizationProfile(session)
+      // eslint-disable-next-line no-console
+      console.log("[InstituteProfile] record", record)
+      const nextProfile = mapOrgProfileRecord(record)
+      setProfile(nextProfile)
+      setDraft(nextProfile)
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("[InstituteProfile] load failed", error)
+      setLoadError(
+        error instanceof Error ? error.message : "Unable to load institute profile."
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadProfile()
+  }, [loadProfile])
 
   const currentProfile = isEditing ? draft : profile
   const visibleCompanies = currentProfile.sisterCompanies.filter((company) =>
@@ -362,11 +587,11 @@ export default function OrganizationProfilePage() {
     setPage(1)
   }
 
-  function handleSave(event: FormEvent<HTMLFormElement>) {
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (sisterForm) {
-      handleSaveSisterCompany()
+      await handleSaveSisterCompany()
       return
     }
 
@@ -380,12 +605,30 @@ export default function OrganizationProfilePage() {
       return
     }
 
-    setProfile({
+    const nextDraft = {
       ...draft,
       sisterCompanies: draft.sisterCompanies.filter((company) => company.name.trim()),
-    })
-    setIsEditing(false)
-    setMessage("Institute profile updated.")
+    }
+
+    try {
+      const session = buildSessionContext()
+      const formData = buildOrganizationFormData(session, nextDraft)
+      const result = await saveOrganizationProfile(session, formData)
+
+      if (!result.success) {
+        setMessage(result.message || "Unable to save institute profile.")
+        return
+      }
+
+      setProfile(nextDraft)
+      setIsEditing(false)
+      setMessage(result.message || "Institute profile updated.")
+      await loadProfile()
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Unable to save institute profile."
+      )
+    }
   }
 
   function updateField(field: OrganizationField, value: string) {
@@ -471,7 +714,7 @@ export default function OrganizationProfilePage() {
     )
   }
 
-  function handleSaveSisterCompany() {
+  async function handleSaveSisterCompany() {
     if (!sisterForm) return
 
     const companyName = sisterForm.draft.organizationName.trim()
@@ -495,31 +738,64 @@ export default function OrganizationProfilePage() {
       },
     }
 
-    setProfile((current) => ({
-      ...current,
-      sisterCompanies:
-        sisterForm.mode === "edit"
-          ? current.sisterCompanies.map((company) =>
-              company.id === nextCompany.id ? nextCompany : company
-            )
-          : [...current.sisterCompanies, nextCompany],
-    }))
-    setDraft((current) => ({
-      ...current,
-      sisterCompanies:
-        sisterForm.mode === "edit"
-          ? current.sisterCompanies.map((company) =>
-              company.id === nextCompany.id ? nextCompany : company
-            )
-          : [...current.sisterCompanies, nextCompany],
-    }))
-    setSisterForm(null)
-    setMessage("Sister company saved.")
+    const nextSisterCompanies =
+      sisterForm.mode === "edit"
+        ? profile.sisterCompanies.map((company) =>
+            company.id === nextCompany.id ? nextCompany : company
+          )
+        : [...profile.sisterCompanies, nextCompany]
+
+    try {
+      const session = buildSessionContext()
+      // Sister companies are a full replace: always send them alongside the
+      // (unmodified) main profile fields, since the sister form itself only
+      // opens while the main profile is not being edited.
+      const formData = buildOrganizationFormData(session, {
+        ...profile,
+        sisterCompanies: nextSisterCompanies,
+      })
+      const result = await saveOrganizationProfile(session, formData)
+
+      if (!result.success) {
+        setMessage(result.message || "Unable to save sister company.")
+        return
+      }
+
+      setProfile((current) => ({ ...current, sisterCompanies: nextSisterCompanies }))
+      setDraft((current) => ({ ...current, sisterCompanies: nextSisterCompanies }))
+      setSisterForm(null)
+      setMessage(result.message || "Sister company saved.")
+      await loadProfile()
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Unable to save sister company."
+      )
+    }
   }
 
   function closeSisterForm() {
     setSisterForm(null)
     setMessage("")
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f6f8fb] px-4 text-[12px] text-slate-950">
+        <Card className={cn(cardSurfaceClass, "items-center px-8 py-6 text-center")}>
+          <p className="text-sm font-semibold text-slate-950">Loading institute profile…</p>
+        </Card>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f6f8fb] px-4 text-[12px] text-slate-950">
+        <Card className={cn(cardSurfaceClass, "items-center px-8 py-6 text-center")}>
+          <p className="text-sm font-semibold text-red-600">{loadError}</p>
+        </Card>
+      </div>
+    )
   }
 
   if (sisterForm) {

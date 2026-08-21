@@ -335,6 +335,102 @@ const MIGRATION_MODULE_ROUTES: Record<string, string> = {
   'nomenclature.index': '/reports/nomenclature',
 };
 
+/**
+ * HRIT Management: legacy Laravel route names (Attendance + Payroll, both
+ * already registered in next_lms_erp's routes/hrms.php) plus invented
+ * slug-style keys for Leave (a modern JSON-API sub-module with no legacy
+ * Laravel route name, keyed the same `hrit.leave.<page>` way other
+ * non-legacy modules in this file key their routes — see `new_pal.*` /
+ * `pal_content.*` above) → the Next.js pages under /hrit.
+ */
+const HRIT_ROUTE_NAME_MAP: Record<string, string> = {
+  // Attendance Management
+  // 'hrms_attendance.index' / 'hrms_attendance_report.index' are NOT used as
+  // keys here even though they're the legacy Laravel route names: those exact
+  // strings are already claimed by unrelated, actively-visible legacy menu
+  // rows (People & Competency > User Attendance, Reports > HRMS Report) — see
+  // 2026_08_17_120000_fix_hrit_menu_link_collisions.php in next_lms_erp for
+  // the full story. The new HRIT Management submenus use fresh `hrit.*` keys
+  // instead so they can't collide with or silently redirect those.
+  'hrit.attendance.tracking': '/hrit/attendance-management/attendance-tracking',
+  'hrms/hrms-attendance': '/hrit/attendance-management/attendance-tracking',
+  'hrit.attendance.reports': '/hrit/attendance-management/attendance-reports',
+  'hrms/hrms-attendance-report': '/hrit/attendance-management/attendance-reports',
+  // Leave management (modern JSON API, no legacy Laravel route name — see
+  // header comment above for the `hrit.leave.*` key convention)
+  'hrit.leave.dashboard': '/hrit/leave-management/leave-dashboard',
+  'hrit.leave.requests': '/hrit/leave-management/leave-requests',
+  'hrit.leave.reports': '/hrit/leave-management/leave-reports',
+  'hrit.leave.configuration': '/hrit/leave-management/leave-configuration',
+  // Payroll Management — same link-collision reasoning as Attendance above
+  // for payroll_type.index / employee_salary_structure.index /
+  // payroll_deduction.index / form16.index / hrms_salary_certificate.index
+  // (all already claimed by People & Competency > Payroll's unrelated rows).
+  // 'monthly_payroll_report.index' was NOT claimed by an existing row, so
+  // that one HRIT submenu keeps its legacy-route-name key.
+  'hrit.payroll.type': '/hrit/payroll-management/payroll-type',
+  'hrit.payroll.salary-structure': '/hrit/payroll-management/salary-structure',
+  'hrit.payroll.deduction': '/hrit/payroll-management/payroll-deduction',
+  'hrit.payroll.form16': '/hrit/payroll-management/form-16',
+  'hrit.payroll.salary-certificate': '/hrit/payroll-management/salary-certificate',
+  'monthly_payroll_report.index': '/hrit/payroll-management/monthly-payroll-report',
+  'monthly-payroll-report.index': '/hrit/payroll-management/monthly-payroll-report',
+};
+
+/**
+ * Talent Management → Talent Dashboard, Recruitment, Onboarding, Performance
+ * Reviews & Appraisals, Compensation, Mobility & Succession, Offboarding,
+ * Administration under /talent-management. Migrated as-is from G2G
+ * (g2gv0) — see app/talent-management/** and next_lms_erp's
+ * database/migrations/2026_08_18_120000_add_talent_management_menu.php for
+ * the matching backend menu-master rows, same pattern as HRIT_ROUTE_NAME_MAP.
+ */
+const TALENT_ROUTE_NAME_MAP: Record<string, string> = {
+  'talent.dashboard': '/talent-management/talent-dashboard',
+  'talent.recruitment': '/talent-management/recruitment',
+  'talent.onboarding': '/talent-management/onboarding',
+  'talent.performance_reviews': '/talent-management/performance-reviews-and-appraisals',
+  'talent.compensation': '/talent-management/compensation',
+  'talent.mobility_succession': '/talent-management/mobility-and-succession',
+  'talent.offboarding': '/talent-management/offboarding',
+  'talent.administration': '/talent-management/administration',
+};
+
+/**
+ * Organization Management → Employee Directory, Role and Permissions under
+ * /organization-management. Migrated as-is from G2G (g2gv0) — see
+ * app/organization-management/** — same pattern as TALENT_ROUTE_NAME_MAP.
+ * Backend menu-master rows (module/menu labels, icons, sort order, parent_id)
+ * for these two route_name keys still need to be inserted by the backend
+ * team; this map is ready to resolve them once those rows exist.
+ */
+const ORGANIZATION_MANAGEMENT_ROUTE_NAME_MAP: Record<string, string> = {
+  'org_mgmt.employee_directory': '/organization-management/employee-directory',
+  'org_mgmt.role_permissions': '/organization-management/role-and-permissions',
+};
+
+/**
+ * Task Management → Dashboard, My Tasks, Projects & Workstreams,
+ * Dependencies & Workstreams, Calendar, Reports & Analysis, Administration
+ * (Status Management, Permissions Matrix, Integration, Audit Logs) under
+ * /task-management. Migrated as-is from G2G (g2gv0) — see
+ * app/task-management/** — same pattern as TALENT_ROUTE_NAME_MAP.
+ */
+const TASK_MANAGEMENT_ROUTE_NAME_MAP: Record<string, string> = {
+  'task_management.dashboard': '/task-management/dashboard',
+  'task_management.my_tasks': '/task-management/my-tasks',
+  'task_management.projects_workstreams': '/task-management/projects-workstreams',
+  'task_management.dependencies_workstreams': '/task-management/dependencies-workstreams',
+  'task_management.calendar': '/task-management/calendar',
+  'task_management.reports_analysis': '/task-management/reports-analysis',
+  'task_management.admin.status_management': '/task-management/administration/status-management',
+  'task_management.admin.permissions_matrix': '/task-management/administration/permissions-matrix',
+  'task_management.admin.integration': '/task-management/administration/integration',
+  'task_management.admin.audit_logs': '/task-management/administration/audit-logs',
+  'org_mgmt.compliance_library': '/organization-management/compliance-library',
+  'org_mgmt.disciplinary_library': '/organization-management/disciplinary-library',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -497,6 +593,32 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
 
   const migrationRoute = MIGRATION_MODULE_ROUTES[cleanLink.toLowerCase()];
   if (migrationRoute) return migrationRoute;
+
+  // HRIT Management → Attendance, Leave, Payroll under /hrit.
+  const hritRoute = HRIT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (hritRoute) {
+    return hritRoute;
+  }
+
+  // Talent Management → Dashboard, Recruitment, Onboarding, Performance,
+  // Compensation, Mobility & Succession, Offboarding, Administration.
+  const talentRoute = TALENT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (talentRoute) {
+    return talentRoute;
+  }
+
+  // Organization Management → Employee Directory, Role and Permissions.
+  const organizationManagementRoute = ORGANIZATION_MANAGEMENT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (organizationManagementRoute) {
+    return organizationManagementRoute;
+  }
+
+  // Task Management → Dashboard, My Tasks, Projects & Workstreams,
+  // Dependencies & Workstreams, Calendar, Reports & Analysis, Administration.
+  const taskManagementRoute = TASK_MANAGEMENT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (taskManagementRoute) {
+    return taskManagementRoute;
+  }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
     return '/fees/master/fees-config-master';
