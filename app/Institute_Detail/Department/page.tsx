@@ -14,11 +14,14 @@ import {
   Eye,
   Filter,
   Folder,
+  Loader2,
   MoreVertical,
+  Pencil,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
+  Trash2,
   UserRound,
   Users,
   X,
@@ -26,6 +29,27 @@ import {
 import PoliciesModule from "./Component/polices";
 import RulesModule from "./Component/rules";
 import SopsModule from "./Component/sops";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buildSessionContext } from "@/lib/erp-client";
+import {
+  createDepartment,
+  deleteDepartment,
+  updateDepartment,
+} from "../_lib/department-management-api";
 
 type DepartmentStatus = "Active" | "Inactive" | "Pending";
 
@@ -358,7 +382,6 @@ function DepartmentDetailsHeader({
           e.preventDefault();
           e.stopPropagation();
 
-          console.log("Close Click");
           onClose();
         }}
         className=" px-3 py-2 text-black"
@@ -596,79 +619,97 @@ export default function DepartmentPage() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [showDetails, setShowDetails] = useState(false);
 
-  useEffect(() => {
-    const controller = new AbortController();
+  // Add/Edit/Delete dialog + inline notice state for the department CRUD
+  // actions (hierarchy() GET above stays untouched).
+  const [actionNotice, setActionNotice] = useState<
+    { type: "success" | "error"; message: string } | null
+  >(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addSubmitting, setAddSubmitting] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<ListRow | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ListRow | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
-    async function loadDepartments() {
-      try {
-        setLoading(true);
-        setError(null);
+  async function fetchDepartments(signal?: AbortSignal, showLoader = true) {
+    try {
+      if (showLoader) setLoading(true);
+      setError(null);
 
-        const session = getDepartmentSession();
-        const url = buildDepartmentsUrl(session);
+      const session = getDepartmentSession();
+      const url = buildDepartmentsUrl(session);
 
-        if (!session.subInstituteId) {
-          throw new Error("Current session is missing sub institute id.");
-        }
+      if (!session.subInstituteId) {
+        throw new Error("Current session is missing sub institute id.");
+      }
 
-        const response = await fetch(url, {
-          signal: controller.signal,
-          cache: "no-store",
-          headers: {
-            ...(session.token
-              ? { Authorization: `Bearer ${session.token}` }
-              : {}),
-          },
-        });
+      const response = await fetch(url, {
+        signal,
+        cache: "no-store",
+        headers: {
+          ...(session.token
+            ? { Authorization: `Bearer ${session.token}` }
+            : {}),
+        },
+      });
 
-        if (!response.ok) {
-          throw new Error(`Failed to load departments (status ${response.status})`);
-        }
+      if (!response.ok) {
+        throw new Error(`Failed to load departments (status ${response.status})`);
+      }
 
-        const data: HierarchyResponse = await response.json();
-        const source = resolveDepartments(data);
+      const data: HierarchyResponse = await response.json();
+      const source = resolveDepartments(data);
 
-        const views: DepartmentView[] = source.map((department) => {
-          const employees = department.employees ?? [];
-          const headInfo = getHeadInfo(employees);
-          return {
-            id: String(department.id),
-            apiId: department.id,
-            name: department.name,
-            shortName:
-              department.name.length > 16
-                ? `${department.name.slice(0, 14)}...`
-                : department.name,
-            code: `D-${department.id}`,
-            parent: "-",
-            head: headInfo.head,
-            title: headInfo.title,
-            employees: department.total_employees ?? employees.length,
-            status: "Active",
-            description: `${department.name} manages its operations, staff, and day-to-day activities.`,
-            createdOn: "—",
-            updatedOn: "—",
-            employees_list: employees,
-            sub_departments: department.sub_departments ?? [],
-          };
-        });
+      const views: DepartmentView[] = source.map((department) => {
+        const employees = department.employees ?? [];
+        const headInfo = getHeadInfo(employees);
+        return {
+          id: String(department.id),
+          apiId: department.id,
+          name: department.name,
+          shortName:
+            department.name.length > 16
+              ? `${department.name.slice(0, 14)}...`
+              : department.name,
+          code: `D-${department.id}`,
+          parent: "-",
+          head: headInfo.head,
+          title: headInfo.title,
+          employees: department.total_employees ?? employees.length,
+          status: "Active",
+          description: `${department.name} manages its operations, staff, and day-to-day activities.`,
+          createdOn: "—",
+          updatedOn: "—",
+          employees_list: employees,
+          sub_departments: department.sub_departments ?? [],
+        };
+      });
 
-        setDepartments(views);
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        setError(
-          err instanceof Error ? err.message : "An unexpected error occurred."
-        );
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+      setDepartments(views);
+    } catch (err) {
+      if (signal?.aborted) return;
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred."
+      );
+    } finally {
+      if (!signal?.aborted && showLoader) {
+        setLoading(false);
       }
     }
+  }
 
-    loadDepartments();
-
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchDepartments(controller.signal, true);
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const hierarchy = useMemo(() => buildHierarchy(departments), [departments]);
@@ -724,10 +765,124 @@ export default function DepartmentPage() {
   }
 
   function handleCloseDetails() {
-    console.log("Close button clicked");
     setShowDetails(false);
     setSelectedId(null);
     setSelectedNodeId(null);
+  }
+
+  function openAddDialog() {
+    setAddName("");
+    setAddError(null);
+    setAddDialogOpen(true);
+  }
+
+  async function submitAdd() {
+    const name = addName.trim();
+    if (!name) {
+      setAddError("Department name is required.");
+      return;
+    }
+
+    setAddSubmitting(true);
+    setAddError(null);
+
+    try {
+      const session = buildSessionContext();
+      if (!session.subInstituteId) {
+        throw new Error("Current session is missing sub institute id.");
+      }
+
+      await createDepartment(session, { department: name, parentId: 0 });
+
+      setAddDialogOpen(false);
+      setActionNotice({ type: "success", message: `Department "${name}" added successfully.` });
+      await fetchDepartments(undefined, false);
+    } catch (err) {
+      setAddError(
+        err instanceof Error ? err.message : "Could not add department."
+      );
+    } finally {
+      setAddSubmitting(false);
+    }
+  }
+
+  function openEditDialog(row: ListRow) {
+    setEditTarget(row);
+    setEditName(row.name);
+    setEditError(null);
+    setEditDialogOpen(true);
+  }
+
+  async function submitEdit() {
+    if (!editTarget) return;
+    const name = editName.trim();
+    if (!name) {
+      setEditError("Department name is required.");
+      return;
+    }
+
+    setEditSubmitting(true);
+    setEditError(null);
+
+    try {
+      const session = buildSessionContext();
+      if (!session.subInstituteId) {
+        throw new Error("Current session is missing sub institute id.");
+      }
+
+      await updateDepartment(session, editTarget.apiId, { department: name });
+
+      setEditDialogOpen(false);
+      setActionNotice({ type: "success", message: `Department "${name}" updated successfully.` });
+      await fetchDepartments(undefined, false);
+    } catch (err) {
+      setEditError(
+        err instanceof Error ? err.message : "Could not update department."
+      );
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
+
+  function openDeleteDialog(row: ListRow) {
+    setDeleteTarget(row);
+    setDeleteError(null);
+    setDeleteDialogOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+
+    setDeleteSubmitting(true);
+    setDeleteError(null);
+
+    try {
+      const session = buildSessionContext();
+      if (!session.subInstituteId) {
+        throw new Error("Current session is missing sub institute id.");
+      }
+
+      await deleteDepartment(session, deleteTarget.apiId);
+
+      setDeleteDialogOpen(false);
+      setActionNotice({
+        type: "success",
+        message: `Department "${deleteTarget.name}" and its sub-departments were removed.`,
+      });
+      if (selectedId === deleteTarget.id) {
+        setShowDetails(false);
+        setSelectedId(null);
+        setSelectedNodeId(null);
+      }
+      setDeleteTarget(null);
+      await fetchDepartments(undefined, false);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Could not delete department."
+      );
+    } finally {
+      setDeleteSubmitting(false);
+    }
   }
 
   if (loading) {
@@ -766,6 +921,7 @@ export default function DepartmentPage() {
   }
 
   return (
+    <>
     <main className="h-[calc(100vh-12px)] min-h-[570px] overflow-hidden bg-[#f3f7fc] p-1.5 text-[#061632]">
       <div
         className={`grid h-full min-w-[1180px] gap-2 ${
@@ -802,7 +958,7 @@ export default function DepartmentPage() {
             )}
           </div>
           <div className="grid grid-cols-4 border-t border-[#e4ebf3] p-3">
-            <ToolbarButton className="rounded-l-md">
+            <ToolbarButton className="rounded-l-md" onClick={openAddDialog}>
               <Plus className="h-3.5 w-3.5" />
             </ToolbarButton>
             <ToolbarButton>
@@ -822,6 +978,25 @@ export default function DepartmentPage() {
             <h1 className="mb-3.5 text-[13px] font-semibold text-[#061632]">
               Department List ({filteredDepartments.length})
             </h1>
+            {actionNotice ? (
+              <div
+                className={`mb-3 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-[11px] font-medium ${
+                  actionNotice.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-red-200 bg-red-50 text-red-700"
+                }`}
+              >
+                <span>{actionNotice.message}</span>
+                <button
+                  type="button"
+                  onClick={() => setActionNotice(null)}
+                  aria-label="Dismiss"
+                  className="shrink-0"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : null}
             <SearchField value={query} onChange={setQuery} />
             <div className="mt-2 grid grid-cols-[1fr_auto_auto_auto] gap-2">
               <label className="relative">
@@ -935,13 +1110,37 @@ export default function DepartmentPage() {
                         <StatusBadge status={department.status} />
                       </td>
                       <td className="px-2 text-center">
-                        <button
-                          type="button"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#061632] hover:bg-white"
-                          aria-label={`View ${department.name}`}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center gap-0.5">
+                          <button
+                            type="button"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#061632] hover:bg-white"
+                            aria-label={`View ${department.name}`}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openEditDialog(department);
+                            }}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#061632] hover:bg-white"
+                            aria-label={`Edit ${department.name}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openDeleteDialog(department);
+                            }}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#dc2626] hover:bg-white"
+                            aria-label={`Delete ${department.name}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1142,5 +1341,120 @@ export default function DepartmentPage() {
         ) : null}
       </div>
     </main>
+
+    <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add department</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="add-department-name" className="text-[11px] font-medium text-[#405275]">
+            Department name
+          </label>
+          <input
+            id="add-department-name"
+            value={addName}
+            onChange={(event) => setAddName(event.target.value)}
+            placeholder="e.g. Human Resources"
+            className="h-9 w-full rounded-md border border-[#d7e0eb] bg-white px-3 text-[12px] text-[#061632] outline-none focus:border-[#8ab3f5]"
+          />
+          {addError ? (
+            <p className="text-[11px] font-medium text-red-600">{addError}</p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => setAddDialogOpen(false)}
+            className="inline-flex h-8 items-center rounded-md border border-[#d7e0eb] bg-white px-3 text-[11px] font-medium text-[#061632] hover:bg-[#f8fbff]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={addSubmitting}
+            onClick={submitAdd}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#2f6df6] px-3 text-[11px] font-medium text-white hover:bg-[#2f6df6]/90 disabled:opacity-60"
+          >
+            {addSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Add department
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rename department</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="edit-department-name" className="text-[11px] font-medium text-[#405275]">
+            Department name
+          </label>
+          <input
+            id="edit-department-name"
+            value={editName}
+            onChange={(event) => setEditName(event.target.value)}
+            className="h-9 w-full rounded-md border border-[#d7e0eb] bg-white px-3 text-[12px] text-[#061632] outline-none focus:border-[#8ab3f5]"
+          />
+          {editError ? (
+            <p className="text-[11px] font-medium text-red-600">{editError}</p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => setEditDialogOpen(false)}
+            className="inline-flex h-8 items-center rounded-md border border-[#d7e0eb] bg-white px-3 text-[11px] font-medium text-[#061632] hover:bg-[#f8fbff]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={editSubmitting}
+            onClick={submitEdit}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#2f6df6] px-3 text-[11px] font-medium text-white hover:bg-[#2f6df6]/90 disabled:opacity-60"
+          >
+            {editSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Save changes
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove department</AlertDialogTitle>
+          <AlertDialogDescription>
+            Remove {deleteTarget?.name ?? "this department"} and its sub-departments? This
+            action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {deleteError ? (
+          <p className="text-[11px] font-medium text-red-600">{deleteError}</p>
+        ) : null}
+        <AlertDialogFooter>
+          <button
+            type="button"
+            onClick={() => setDeleteDialogOpen(false)}
+            className="inline-flex h-8 items-center rounded-md border border-[#d7e0eb] bg-white px-3 text-[11px] font-medium text-[#061632] hover:bg-[#f8fbff]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={deleteSubmitting}
+            onClick={confirmDelete}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-red-600 px-3 text-[11px] font-medium text-white hover:bg-red-600/90 disabled:opacity-60"
+          >
+            {deleteSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Remove
+          </button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

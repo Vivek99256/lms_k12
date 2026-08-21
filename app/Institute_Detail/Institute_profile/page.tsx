@@ -535,11 +535,17 @@ export default function OrganizationProfilePage() {
     setLoadError("")
     try {
       const session = buildSessionContext()
+      // eslint-disable-next-line no-console
+      console.log("[InstituteProfile] session", session)
       const record = await getOrganizationProfile(session)
+      // eslint-disable-next-line no-console
+      console.log("[InstituteProfile] record", record)
       const nextProfile = mapOrgProfileRecord(record)
       setProfile(nextProfile)
       setDraft(nextProfile)
     } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("[InstituteProfile] load failed", error)
       setLoadError(
         error instanceof Error ? error.message : "Unable to load institute profile."
       )
