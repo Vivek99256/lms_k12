@@ -261,6 +261,7 @@ export function AdminCenter() {
                   <div className="w-[150px]">
                     <Select
                       value={module}
+                      // @ts-expect-error — inert prop kept as-is, see docblock above
                       onValueChange={(val) => { setModule(val); setPage(1); }}
                       options={[
                         {label: 'All Modules', value: 'all'},
