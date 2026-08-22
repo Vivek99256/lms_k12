@@ -155,8 +155,10 @@ const LMS_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'questionreport': '/lms/question-wise-report',
   'lmsdashboard.index': '/lms/dashboard',
   'lms/lmsdashboard': '/lms/dashboard',
-  'lmsdashboard_teacher': '/lms/dashboard',
-  'teacherindex': '/lms/dashboard',
+  'lmsdashboard_teacher': '/lms/teacher-dashboard',
+  'teacherindex': '/lms/teacher-dashboard',
+  'lms.teacher-dashboard': '/lms/teacher-dashboard',
+  'lms/teacher-dashboard': '/lms/teacher-dashboard',
   // Message is a legacy placeholder (no backend data) — the page honestly
   // reflects that, but the menu link still needs to resolve rather than 404.
   'lmscommunication.index': '/lms/message',
