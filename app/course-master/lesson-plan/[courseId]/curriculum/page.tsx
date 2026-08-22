@@ -11,77 +11,22 @@ import {
   GraduationCap,
   List,
 } from 'lucide-react';
-import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { getRequestContext, getSyear } from '../../../page';
 import { getSubjectAndChapters, type SubjectWithChapters } from '../../../data/chapters';
 import type { Course } from '../../../data/courses';
 import { fetchLmsCourses, type LmsSubject } from '../../../data/lmsCourses';
-
-type CurriculumSession = {
-  token: string;
-  hostName: string;
-  subInstituteId: string;
-  academicYearId: string;
-};
-
-type CurriculumData = {
-  curriculum_id: number;
-  extraction_id: number;
-  sub_institute_id: number;
-  grade_id: number | null;
-  standard_id: number;
-  subject_id: number;
-  board_id: number | null;
-  curriculum_name: string;
-  curriculum_alignment: string | null;
-  holistic_curriculum: string | null;
-  model_integration: string | null;
-  syear: number;
-  board: string | null;
-  framework: string | null;
-  internal_marks: number | null;
-  status: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type UnitData = {
-  unit_number: number;
-  name: string;
-  unit_chapters: string | string[] | null;
-  total_marks: number | null;
-  planned_periods: number | string | null;
-  chapter_id: number;
-};
-
-type OutcomeNode = {
-  id: number;
-  code: string | null;
-  type: string | null;
-  parent_id: number | null;
-  description: string | null;
-  objective: string | null;
-  chapter: string | null;
-  outcome: string | null;
-  assessment_tool: string | null;
-  children: OutcomeNode[];
-};
-
-type CurriculumApiResult = {
-  curriculum_data: CurriculumData | null;
-  unit_data: UnitData[];
-  outcomes: OutcomeNode[];
-};
+import {
+  fetchCurriculumData,
+  getCurriculumSession,
+  type CurriculumApiResult,
+  type OutcomeNode,
+} from '../../../data/curriculum';
 
 type ResolvedCurriculumTarget = {
   subjectId: string;
   standardId?: string;
   subjectData: SubjectWithChapters | null;
 };
-
-function readString(value: unknown): string {
-  return value != null && value !== '' ? String(value) : '';
-}
 
 function getCourseGradeLabel(standardName?: string | null) {
   if (!standardName) return 'Grade';
@@ -110,92 +55,6 @@ function parseUnitChapters(value: string | string[] | null): string[] {
   }
 }
 
-function getCurriculumSession(): CurriculumSession | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
-    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
-
-    const token = readString(userData.user_token ?? userData.token);
-    const hostName = readString(userData.host_name) || API_BASE_URL;
-    const subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
-    const academicYearId =
-      readString(localStorage.getItem('selectedAcademicYear')) ||
-      readString(userData.academic_year_id ?? userData.academicYearId);
-
-    if (!token || !hostName || !subInstituteId || !academicYearId) {
-      return null;
-    }
-
-    return {
-      token,
-      hostName,
-      subInstituteId,
-      academicYearId,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchCurriculumData(
-  session: CurriculumSession,
-  subjectId: string,
-  standardId?: string
-): Promise<CurriculumApiResult> {
-  const query = new URLSearchParams({
-    subject_id: subjectId,
-    sub_institute_id: session.subInstituteId,
-    syear: session.academicYearId,
-    ...(standardId ? { standard_id: standardId } : {}),
-  });
-
-  const response = await fetch(
-    `${session.hostName.replace(/\/$/, '')}/lms/new_curriculum?${query.toString()}`,
-    {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${session.token}`,
-      },
-    }
-  );
-
-  const responseData = (await response.json()) as unknown;
-  if (!response.ok) {
-    throw new Error('Curriculum request failed');
-  }
-
-  const result = Array.isArray(responseData)
-    ? responseData[0]
-    : responseData;
-
-  const curriculumData =
-    result && typeof result === 'object' && 'curriculum_data' in result
-      ? ((result as Record<string, unknown>).curriculum_data as CurriculumData | null) ?? null
-      : null;
-  const unitData =
-    result && typeof result === 'object' && Array.isArray((result as Record<string, unknown>).unit_data)
-      ? ((result as Record<string, unknown>).unit_data as UnitData[])
-      : [];
-  const outcomes =
-    result && typeof result === 'object' && Array.isArray((result as Record<string, unknown>).outcomes)
-      ? ((result as Record<string, unknown>).outcomes as OutcomeNode[])
-      : [];
-
-  console.log('Curriculum API response:', responseData);
-  console.log('Mapped result:', result);
-  console.log('Curriculum:', curriculumData);
-  console.log('Units:', unitData);
-  console.log('Outcomes:', outcomes);
-
-  return {
-    curriculum_data: curriculumData,
-    unit_data: unitData,
-    outcomes,
-  };
-}
 
 async function resolveCurriculumTarget(
   rawCourseId: string,

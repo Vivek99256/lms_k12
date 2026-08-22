@@ -1,6 +1,6 @@
  'use client';
 
-import { useMemo, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
   Brain,
   Target,
@@ -22,6 +22,12 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { ConceptIntelEntry } from '../../data/chapters';
+import {
+  DEFAULT_TAB_LABELS,
+  MAX_TAB_LABEL_LENGTH,
+  fetchConceptIntelligenceTabLabels,
+  saveConceptIntelligenceTabLabel,
+} from '../../data/conceptIntelligenceTabLabels';
 
 function flattenText(value: unknown): string[] {
   if (value === null || value === undefined) return [];
@@ -175,6 +181,87 @@ export function ConceptIntelligenceTabs({
 
   const [active, setActive] = useState('overview');
   const activeTab = tabs.some((tab) => tab.id === active) ? active : 'overview';
+
+  // --- tenant-wise tab names ----------------------------------------------
+  // Nothing in the strip is named locally: the signed-in institute's labels
+  // arrive from the API and are merged over the shipped defaults. Until they
+  // land (or if the request fails) the defaults keep the strip readable.
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [labelError, setLabelError] = useState('');
+  // Enter unmounts the input, which can fire a trailing blur. This tracks which
+  // tab is genuinely still being edited so the second call is dropped instead of
+  // committing an already-cleared draft over the name that was just saved.
+  const editingKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchConceptIntelligenceTabLabels(controller.signal)
+      .then((result) => setLabels(result.byKey))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        // A failed lookup is not worth blocking the panel over — the strip
+        // falls back to the shipped names.
+        console.warn('Falling back to default intelligence tab names:', error);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const labelFor = useCallback(
+    (tabId: string, fallback: string) =>
+      labels[tabId] ?? DEFAULT_TAB_LABELS[tabId] ?? fallback,
+    [labels]
+  );
+
+  const beginEdit = useCallback((tabId: string, current: string) => {
+    setLabelError('');
+    editingKeyRef.current = tabId;
+    setEditingKey(tabId);
+    setDraft(current);
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    editingKeyRef.current = null;
+    setEditingKey(null);
+    setDraft('');
+  }, []);
+
+  const commitEdit = useCallback(
+    async (tabId: string, next: string, previous: string) => {
+      if (editingKeyRef.current !== tabId) return;
+      editingKeyRef.current = null;
+
+      const trimmed = next.trim();
+      setEditingKey(null);
+      setDraft('');
+
+      // Blank restores the shipped name, which is a real change; only an
+      // unchanged value is a no-op.
+      if (trimmed === previous) return;
+
+      setSavingKey(tabId);
+      setLabelError('');
+
+      // Show the new name straight away and roll it back if the save fails, so
+      // renaming does not feel like it lags a round trip behind.
+      setLabels((current) => ({ ...current, [tabId]: trimmed || (DEFAULT_TAB_LABELS[tabId] ?? previous) }));
+
+      try {
+        const result = await saveConceptIntelligenceTabLabel(tabId, trimmed);
+        setLabels(result.byKey);
+      } catch (error: unknown) {
+        setLabels((current) => ({ ...current, [tabId]: previous }));
+        setLabelError(error instanceof Error ? error.message : 'Could not save the tab name.');
+      } finally {
+        setSavingKey(null);
+      }
+    },
+    []
+  );
 
   const renderActive = () => {
     switch (activeTab) {
@@ -700,36 +787,80 @@ export function ConceptIntelligenceTabs({
     // active tab's content scrolls. Each region carries its own padding and
     // border so the component sits flush inside an unpadded card.
     <div className="flex h-full min-h-0 flex-col">
-      {/* Tab band — pinned card header */}
-      <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200/80 bg-white px-4 py-3 sm:px-5">
-        {tabs.map((tab) => {
-          const TabIcon = tab.Icon;
-          const isActive = tab.id === activeTab;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActive(tab.id)}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${
-                isActive
-                  ? 'bg-[#4f46e5] text-white shadow-[0_6px_14px_rgba(79,70,229,0.25)]'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <TabIcon size={14} className={isActive ? 'text-white' : 'text-slate-400'} />
-              {tab.label}
-              {tab.id !== 'overview' && (
+      {/* Tab band — pinned card header. Double-click a name to rename it for
+          this institute; Enter saves, Escape restores it. */}
+      <div className="shrink-0 border-b border-slate-200/80 bg-white px-4 py-3 sm:px-5">
+        <div className="flex gap-1 overflow-x-auto">
+          {tabs.map((tab) => {
+            const TabIcon = tab.Icon;
+            const isActive = tab.id === activeTab;
+            const label = labelFor(tab.id, tab.label);
+
+            if (editingKey === tab.id) {
+              return (
                 <span
-                  className={`rounded-full px-1.5 text-[10px] ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                  }`}
+                  key={tab.id}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#4f46e5] bg-white px-3 py-1.5 text-xs font-medium ring-2 ring-[#4f46e5]/20"
                 >
-                  {tab.count}
+                  <TabIcon size={14} className="text-[#4f46e5]" />
+                  <input
+                    autoFocus
+                    value={draft}
+                    maxLength={MAX_TAB_LABEL_LENGTH}
+                    aria-label={`Rename the ${label} tab`}
+                    size={Math.max(draft.length, 8)}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onFocus={(event) => event.currentTarget.select()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void commitEdit(tab.id, draft, label);
+                      } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        cancelEdit();
+                      }
+                    }}
+                    // Clicking away commits the same way Enter does, so a
+                    // rename is never silently thrown out.
+                    onBlur={() => void commitEdit(tab.id, draft, label)}
+                    className="min-w-[6ch] bg-transparent text-xs font-medium text-slate-900 outline-none"
+                  />
                 </span>
-              )}
-            </button>
-          );
-        })}
+              );
+            }
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActive(tab.id)}
+                onDoubleClick={() => beginEdit(tab.id, label)}
+                title={`${label} — double-click to rename`}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-[#4f46e5] text-white shadow-[0_6px_14px_rgba(79,70,229,0.25)]'
+                    : 'text-slate-600 hover:bg-slate-100'
+                } ${savingKey === tab.id ? 'opacity-60' : ''}`}
+              >
+                <TabIcon size={14} className={isActive ? 'text-white' : 'text-slate-400'} />
+                {label}
+                {tab.id !== 'overview' && (
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {labelError && (
+          <p className="mt-2 text-[11px] font-medium text-red-600">{labelError}</p>
+        )}
       </div>
 
       {/* Active tab content — the only scrolling region */}

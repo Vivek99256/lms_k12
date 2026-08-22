@@ -193,7 +193,8 @@ function buildChapterSemantic(source: ApiChapterSource): ChapterSemantic | undef
     abilities: source.abilities ?? nested.abilities,
     knowledge: source.knowledge ?? nested.knowledge,
     competency: source.competency ?? nested.competency,
-    dok: (source.dok ?? nested.dok)?.map((entry) => ({
+    // Normalised because the payload does not guarantee an array here.
+    dok: asArray<NonNullable<ChapterSemantic['dok']>[number]>(source.dok ?? nested.dok).map((entry) => ({
       level: stringifyLevel(entry?.level),
       description: entry?.description,
       concept_name: entry?.concept_name,
@@ -353,6 +354,40 @@ function asText(value: unknown): string {
   return String(value).trim();
 }
 
+/**
+ * The semantic-intelligence payload is generated per chapter and its list fields
+ * are not guaranteed to arrive as arrays — a single entry can come through as a
+ * bare object, and a list can arrive as a JSON string. Everything downstream maps
+ * and filters these, so they are normalised to arrays at the boundary.
+ */
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value === null || value === undefined || value === '') return [];
+
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed as T[];
+      return parsed === null || parsed === undefined ? [] : [parsed as T];
+    } catch {
+      return [value as T];
+    }
+  }
+
+  return [value as T];
+}
+
+/**
+ * Text out of a list whose entries may be objects keyed by `key`, or plain strings.
+ */
+function asTextList(value: unknown, key: string): string[] {
+  return asArray<unknown>(value)
+    .map((item) =>
+      item && typeof item === 'object' ? asText((item as Record<string, unknown>)[key]) : asText(item)
+    )
+    .filter(Boolean);
+}
+
 export function getConceptIntelligenceData(
   chapter: Chapter,
   conceptTitle: string
@@ -363,41 +398,45 @@ export function getConceptIntelligenceData(
   // new_chapter_master now returns the concept list beside the chapter semantic
   // payload. Prefer a legacy concept-level payload when present, then fall back
   // to the chapter-level intelligence returned by the new response shape.
-  const entries =
-    (concept?.semantic?.full_intelegance_json?.concepts as ConceptIntelEntry[] | undefined) ??
-    (semantic.full_intelegance_json?.concepts as ConceptIntelEntry[] | undefined) ??
-    [];
+  const entries = asArray<ConceptIntelEntry>(
+    concept?.semantic?.full_intelegance_json?.concepts ?? semantic.full_intelegance_json?.concepts
+  );
   const entry =
     entries.find((item) => item?.concept?.concept_name === conceptTitle) ?? entries[0] ?? {};
 
-  const knowledgeItems = entry.knowledge_items ?? [];
-  const knowledgeFromItems = knowledgeItems.map((item) => asText(item?.knowledge)).filter(Boolean);
+  const knowledgeFromItems = asTextList(entry.knowledge_items, 'knowledge');
   const knowledge =
-    knowledgeFromItems.length > 0
-      ? knowledgeFromItems
-      : (semantic.knowledge ?? []).map((item) => asText(item?.knowledge)).filter(Boolean);
+    knowledgeFromItems.length > 0 ? knowledgeFromItems : asTextList(semantic.knowledge, 'knowledge');
 
-  const rawPrerequisites = entry.prerequisites ?? [];
-  const prerequisites = rawPrerequisites.length
-    ? rawPrerequisites.map((item) => asText(item?.concept_name)).filter(Boolean)
-    : (semantic.prerequisites ?? []).map((item) => asText(item)).filter(Boolean);
+  const prerequisitesFromEntry = asTextList(entry.prerequisites, 'concept_name');
+  const prerequisites =
+    prerequisitesFromEntry.length > 0
+      ? prerequisitesFromEntry
+      : asTextList(semantic.prerequisites, 'concept_name');
+
+  // Each list prefers the concept-level entry and falls back to the chapter-level
+  // payload, so an entry that is present but empty must not mask the fallback.
+  const pick = <T,>(entryValue: unknown, semanticValue: unknown): T[] => {
+    const fromEntry = asArray<T>(entryValue);
+    return fromEntry.length > 0 ? fromEntry : asArray<T>(semanticValue);
+  };
 
   return {
     learningObjective: asText(semantic.learning_objective) || asText(semantic.full_intelegance_json?.chapter_summary),
     totalConcepts: Number(semantic.total_concepts) || (chapter.concepts ?? []).length || 0,
     knowledge,
-    abilities: entry.abilities ?? semantic.abilities ?? [],
-    skills: entry.skills ?? semantic.skill ?? [],
-    competencies: entry.competencies ?? semantic.competency ?? [],
-    learningObjectives: entry.learning_objectives ?? semantic.learning_objectives ?? [],
-    learningOutcomes: entry.learning_outcomes ?? semantic.learning_outcomes ?? [],
-    blooms: entry.blooms ?? semantic.blooms_level ?? [],
-    dok: entry.dok ?? semantic.dok ?? [],
+    abilities: pick(entry.abilities, semantic.abilities),
+    skills: pick(entry.skills, semantic.skill),
+    competencies: pick(entry.competencies, semantic.competency),
+    learningObjectives: pick(entry.learning_objectives, semantic.learning_objectives),
+    learningOutcomes: pick(entry.learning_outcomes, semantic.learning_outcomes),
+    blooms: pick(entry.blooms, semantic.blooms_level),
+    dok: pick(entry.dok, semantic.dok),
     prerequisites,
-    misconceptions: entry.misconceptions ?? semantic.misconceptions ?? [],
-    realWorld: entry.real_world_applications ?? semantic.real_world_applications ?? [],
-    pedagogy: entry.pedagogy_recommendations ?? semantic.pedagogy ?? [],
-    assessmentBlueprint: entry.assessment_blueprint ?? semantic.assessment_blueprint ?? [],
+    misconceptions: pick(entry.misconceptions, semantic.misconceptions),
+    realWorld: pick(entry.real_world_applications, semantic.real_world_applications),
+    pedagogy: pick(entry.pedagogy_recommendations, semantic.pedagogy),
+    assessmentBlueprint: pick(entry.assessment_blueprint, semantic.assessment_blueprint),
   };
 }
 
@@ -892,6 +931,12 @@ export async function getSubjectAndChapters(
           content_category: matchedCourse?.content_category ?? '',
           sub_institute_id: requestContext.sub_institute_id,
           chapters: response.data as ApiChapter[],
+          // Subject-level concept totals from the catalog, so screens can fall back
+          // to the API's own count when chapter rows don't carry their concepts.
+          key_concepts_count: matchedCourse?.key_concepts_count,
+          key_concept_count: matchedCourse?.key_concept_count,
+          concepts_count: matchedCourse?.concepts_count,
+          total_concepts: matchedCourse?.total_concepts,
         }
       : null;
 
