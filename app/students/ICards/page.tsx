@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   CreditCard,
   UserCheck,
@@ -9,52 +9,72 @@ import {
   Printer,
   Camera,
   Settings,
+  Loader2,
 } from "lucide-react";
 import { Info } from "lucide-react";
-
-interface StudentPreview {
-  schoolName: string;
-  cardTitle: string;
-  name: string;
-  admissionNo: string;
-  gradeClass: string;
-  house: string;
-  bloodGroup: string;
-  emergencyContact: string;
-  validTill: string;
-  initials: string;
-  photoUrl?: string;
-}
+import { getStudentIdCardPreview, type StudentPreview } from "./api";
 
 interface IdCardsContentProps {
-  student?: StudentPreview;
   onGenerateStudentCards?: () => void;
   onGenerateStaffCards?: () => void;
   onBulkPrintCards?: () => void;
 }
 
-const DEFAULT_STUDENT: StudentPreview = {
-  schoolName: "Hills High School",
+const EMPTY_STUDENT: StudentPreview = {
+  schoolName: "",
   cardTitle: "STUDENT IDENTITY CARD",
-  name: "Kiara Kapoor",
-  admissionNo: "ADM-2026-0424",
-  gradeClass: "Grade 9 - A",
-  house: "Vindhya",
-  bloodGroup: "AB+",
-  emergencyContact: "+91 9800112519",
-  validTill: "31 Mar 2027",
-  initials: "KK",
+  name: "",
+  admissionNo: "",
+  gradeClass: "",
+  house: "",
+  bloodGroup: "",
+  emergencyContact: "",
+  validTill: "",
+  initials: "",
 };
 
 export const IdCardsContent: React.FC<IdCardsContentProps> = ({
-  student = DEFAULT_STUDENT,
   onGenerateStudentCards,
   onGenerateStaffCards,
   onBulkPrintCards,
 }) => {
+  const [student, setStudent] = useState<StudentPreview>(EMPTY_STUDENT);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getStudentIdCardPreview(controller.signal)
+      .then((result) => {
+        if (result) setStudent(result);
+      })
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return;
+        setError(reason instanceof Error ? reason.message : 'Unable to load student profile.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-gray-500">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Loading student profile…
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
         {/* Main Grid Layout - 50/50 split */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column: ID Card Preview (50%) */}

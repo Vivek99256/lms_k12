@@ -13,6 +13,7 @@ import {
   Info,
   Lightbulb,
   Loader2,
+  Lock,
   Monitor,
   Play,
   RefreshCw,
@@ -43,6 +44,9 @@ import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import { getViewAsStudent, setViewAsStudent } from '@/app/pal/data/pal-view-as';
 import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
+import { DiagnosticButton } from '@/app/pal/_components/DiagnosticPanel';
+import { PracticePanel } from '@/app/pal/_components/PracticePanel';
+import { fetchChapterGate, type ChapterGateData } from '@/app/pal/data/pal';
 
 type ModalKind = 'pedagogy' | 'misconception';
 
@@ -349,6 +353,8 @@ export default function PalEntryPage() {
                     attemptsByChapter={data.attemptsByChapter}
                     onStartQuiz={(chapter) => startQuiz(chapter, subject)}
                     onOpenModal={(kind, chapter) => openModal(kind, chapter, subject)}
+                    studentId={data.student.studentId}
+                    getContext={(chapter) => chapterContext(chapter, subject)}
                   />
                 ))}
               </div>
@@ -377,6 +383,8 @@ function SubjectCard({
   attemptsByChapter,
   onStartQuiz,
   onOpenModal,
+  studentId,
+  getContext,
 }: {
   subject: PalSubject;
   expanded: boolean;
@@ -384,6 +392,8 @@ function SubjectCard({
   attemptsByChapter: PalLandingData['attemptsByChapter'];
   onStartQuiz: (chapter: PalChapter) => void;
   onOpenModal: (kind: ModalKind, chapter: PalChapter) => void;
+  studentId: string;
+  getContext: (chapter: PalChapter) => PalChapterContext;
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -423,6 +433,8 @@ function SubjectCard({
                 attempts={attemptsByChapter[chapter.id] ?? []}
                 onStartQuiz={() => onStartQuiz(chapter)}
                 onOpenModal={(kind) => onOpenModal(kind, chapter)}
+                studentId={studentId}
+                context={getContext(chapter)}
               />
             ))
           )}
@@ -437,13 +449,45 @@ function ChapterRow({
   attempts,
   onStartQuiz,
   onOpenModal,
+  studentId,
+  context,
 }: {
   chapter: PalChapter;
   attempts: PalLandingData['attemptsByChapter'][string];
   onStartQuiz: () => void;
   onOpenModal: (kind: ModalKind) => void;
+  studentId: string;
+  context: PalChapterContext;
 }) {
   const hasAttempts = chapter.quizCount > 0;
+  const [gate, setGate] = useState<ChapterGateData | null>(null);
+
+  // Prerequisite gate check — Step 5 of the learning journey. A chapter with
+  // no mapped concepts (most legacy chapters) comes back with an empty
+  // concept list and anyLocked=false, so this defaults to unlocked rather
+  // than blocking chapters that predate the concept model.
+  useEffect(() => {
+    if (!studentId || !context.chapterId) return;
+    const controller = new AbortController();
+    fetchChapterGate({ studentId, chapterId: context.chapterId }, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setGate(result);
+      })
+      .catch(() => {
+        // Gate check failing shouldn't block the chapter — treat as unlocked.
+      });
+    return () => controller.abort();
+  }, [studentId, context.chapterId]);
+
+  const locked = gate?.anyLocked ?? false;
+  const unmasteredNames = Array.from(
+    new Set(
+      (gate?.concepts ?? [])
+        .flatMap((c) => c.unmasteredPrerequisites)
+        .map((p) => p.conceptName)
+        .filter(Boolean)
+    )
+  );
 
   return (
     <div className="px-5 py-4">
@@ -457,6 +501,16 @@ function ChapterRow({
               </span>
             )}
           </div>
+
+          {locked && unmasteredNames.length > 0 && (
+            <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Master {unmasteredNames.join(', ')} first — take the diagnostic to check where
+                you stand, then come back here.
+              </span>
+            </div>
+          )}
 
           {attempts.length > 0 && (
             <div className="mt-3 space-y-2">
@@ -481,6 +535,10 @@ function ChapterRow({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          {/* Diagnostic is the onboarding step of the learning journey — it
+              establishes a baseline before instruction, so it's offered
+              whether or not the student has quiz attempts yet. */}
+          <DiagnosticButton studentId={studentId} context={context} />
           {hasAttempts && (
             <>
               <Button
@@ -501,11 +559,17 @@ function ChapterRow({
                 <AlertTriangle className="h-3.5 w-3.5" />
                 Misconception
               </Button>
+              <PracticePanel studentId={studentId} context={context} />
             </>
           )}
-          <Button size="sm" onClick={onStartQuiz}>
-            <Play className="h-3.5 w-3.5" />
-            {hasAttempts ? 'Next quiz' : 'Start quiz'}
+          <Button
+            size="sm"
+            onClick={onStartQuiz}
+            disabled={locked}
+            title={locked ? 'Master the prerequisite concept(s) above first' : undefined}
+          >
+            {locked ? <Lock className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            {locked ? 'Locked' : hasAttempts ? 'Next quiz' : 'Start quiz'}
           </Button>
         </div>
       </div>

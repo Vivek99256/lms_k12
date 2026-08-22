@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import { UserCheck, UserX, Clock, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
+import { UserCheck, UserX, AlertCircle } from 'lucide-react';
 import type { AttendanceStudent } from '../page';
 
 interface DailyRegisterProps {
@@ -29,23 +29,11 @@ export function DailyRegister({
         icon: <UserCheck className="w-4 h-4" />, 
         color: student.status === 'present' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-600 hover:bg-emerald-50 border-slate-200' 
       },
-      { 
-        key: 'absent', 
-        label: 'Absent', 
-        icon: <UserX className="w-4 h-4" />, 
-        color: student.status === 'absent' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-slate-600 hover:bg-red-50 border-slate-200' 
-      },
-      { 
-        key: 'late', 
-        label: 'Late', 
-        icon: <Clock className="w-4 h-4" />, 
-        color: student.status === 'late' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 hover:bg-amber-50 border-slate-200' 
-      },
-      { 
-        key: 'leave', 
-        label: 'Leave', 
-        icon: <CalendarIcon className="w-4 h-4" />, 
-        color: student.status === 'leave' ? 'bg-purple-500 text-white border-purple-500' : 'bg-white text-slate-600 hover:bg-purple-50 border-slate-200' 
+      {
+        key: 'absent',
+        label: 'Absent',
+        icon: <UserX className="w-4 h-4" />,
+        color: student.status === 'absent' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-slate-600 hover:bg-red-50 border-slate-200'
       },
     ];
 

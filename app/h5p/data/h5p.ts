@@ -482,6 +482,86 @@ export interface AiScenarioRequest {
   subject: string;
 }
 
+// ---------------------------------------------------------------------------
+// xAPI telemetry — feeds PAL's real BKT mastery / misconception pipeline
+// ---------------------------------------------------------------------------
+
+/**
+ * The H5P xAPI ingest pipeline (App\Services\PAL\H5P\H5PXapiPipeline, POST
+ * /api/pal/h5p/xapi) is real, working backend infrastructure that genuinely
+ * updates BKT mastery and runs misconception detection on the 'answered'
+ * verb (config/pal_h5p.php `xapi_verbs.answered.jobs`) -- but until now no
+ * H5P player in this frontend ever called it, so it received zero traffic.
+ * This is the wiring, not a new pipeline.
+ *
+ * Best-effort: never throws, never blocks the player. A telemetry failure
+ * must not be able to break a student's practice session.
+ */
+export type H5pXapiVerb = 'answered' | 'completed' | 'attempted' | 'progressed';
+
+export interface H5pXapiStatementInput {
+  /** "<h5p_type>:<content_id>", e.g. "flash_cards:123" -- see config/pal_h5p.php h5p_types. */
+  objectId: string;
+  verb: H5pXapiVerb;
+  ctx: H5pContext;
+  success?: boolean;
+  response?: string;
+  durationSeconds?: number;
+}
+
+const XAPI_VERB_IRI: Record<H5pXapiVerb, string> = {
+  answered: 'http://adlnet.gov/expapi/verbs/answered',
+  completed: 'http://adlnet.gov/expapi/verbs/completed',
+  attempted: 'http://adlnet.gov/expapi/verbs/attempted',
+  progressed: 'http://adlnet.gov/expapi/verbs/progressed',
+};
+
+export async function postH5pXapiStatement(input: H5pXapiStatementInput): Promise<void> {
+  let session: SessionParams;
+  try {
+    session = requireSession();
+  } catch {
+    return;
+  }
+
+  const statement: Record<string, unknown> = {
+    verb: { id: XAPI_VERB_IRI[input.verb] },
+    object: { id: input.objectId },
+    timestamp: new Date().toISOString(),
+    context: {
+      extensions: {
+        chapter_id: input.ctx.chapter_id || undefined,
+        subject_id: input.ctx.subject_id || undefined,
+        standard_id: input.ctx.standard_id || undefined,
+      },
+    },
+  };
+
+  if (input.success !== undefined || input.response !== undefined || input.durationSeconds !== undefined) {
+    statement.result = {
+      ...(input.success !== undefined ? { success: input.success } : {}),
+      ...(input.response !== undefined ? { response: input.response } : {}),
+      ...(input.durationSeconds !== undefined
+        ? { duration: `PT${Math.max(0, Math.round(input.durationSeconds))}S` }
+        : {}),
+    };
+  }
+
+  try {
+    await fetch(`${API_BASE_URL}/api/pal/h5p/xapi`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        learner_id: session.user_id,
+        statement,
+      }),
+    });
+  } catch {
+    // Best-effort telemetry -- a network failure here must never surface to
+    // the student or interrupt the activity they're doing.
+  }
+}
+
 export async function generateScenarioAI(request: AiScenarioRequest): Promise<AiScenarioResult> {
   const res = await fetch(`${API_BASE_URL}/get-h5p-ai-scenario`, {
     method: 'POST',

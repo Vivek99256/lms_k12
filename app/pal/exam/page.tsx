@@ -262,7 +262,7 @@ function PalExamContent() {
 
   return (
     <div className="min-h-screen p-6">
-      <div className="mx-auto max-w-5xl space-y-4">
+      <div className="mx-auto  space-y-4">
         {/* Sticky header with timer */}
         <div className="sticky top-0 z-10 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 px-5 py-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
           <div>
