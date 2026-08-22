@@ -536,18 +536,18 @@ export default function OrganizationProfilePage() {
     try {
       const session = buildSessionContext()
       // eslint-disable-next-line no-console
-      console.log("[InstituteProfile] session", session)
+      console.log("[OrganizationProfile] session", session)
       const record = await getOrganizationProfile(session)
       // eslint-disable-next-line no-console
-      console.log("[InstituteProfile] record", record)
+      console.log("[OrganizationProfile] record", record)
       const nextProfile = mapOrgProfileRecord(record)
       setProfile(nextProfile)
       setDraft(nextProfile)
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.error("[InstituteProfile] load failed", error)
+      console.error("[OrganizationProfile] load failed", error)
       setLoadError(
-        error instanceof Error ? error.message : "Unable to load institute profile."
+        error instanceof Error ? error.message : "Unable to load organization profile."
       )
     } finally {
       setIsLoading(false)
@@ -616,17 +616,17 @@ export default function OrganizationProfilePage() {
       const result = await saveOrganizationProfile(session, formData)
 
       if (!result.success) {
-        setMessage(result.message || "Unable to save institute profile.")
+        setMessage(result.message || "Unable to save organization profile.")
         return
       }
 
       setProfile(nextDraft)
       setIsEditing(false)
-      setMessage(result.message || "Institute profile updated.")
+      setMessage(result.message || "Organization profile updated.")
       await loadProfile()
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Unable to save institute profile."
+        error instanceof Error ? error.message : "Unable to save organization profile."
       )
     }
   }
@@ -1116,7 +1116,7 @@ export default function OrganizationProfilePage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold text-slate-950">
-                Institute Profile
+                Organization Profile
               </h1>
               <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">
                 Manage your institute&apos;s core information
