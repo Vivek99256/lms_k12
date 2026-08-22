@@ -1,15 +1,27 @@
 'use client'
 
 /**
- * Ported as-is from G2G's
- * `components/domain/talent/profile/talent-profile-view.tsx`. Markup and
- * behavior unchanged — still renders `mockProfileData` regardless of
- * `profileId` (G2G's own comment: "In a real app we would fetch the profile
- * by ID. For now, use mock."). Only import paths changed:
- * `@/components/ui/*` -> the shared `@/components/ui/g2g/*` (Button, Card,
- * Badge, Input, DropdownMenu) for the primitives that diverge from target's
- * native versions; StatusBadge is an unchanged, identical target primitive.
- * This file itself lives in `_components/`, one level up from the
+ * Adapted from G2G's `components/domain/talent/profile/talent-profile-view.tsx`.
+ * G2G's own comment said "In a real app we would fetch the profile by ID. For
+ * now, use mock." — this port does that fetch: `profileId` now resolves
+ * through `useCompetencyEmployeeProfile` (`../_lib/use-employee-profile`),
+ * which backs `GET /api/competency/employee-profiles/{id}` — the same
+ * endpoint the Employee Profiles center already uses for its own summary
+ * card. Markup/layout is otherwise unchanged.
+ *
+ * That endpoint's `EmployeeProfileData` shape is narrower than the mock's:
+ * it has no business unit, grade, work email, personal details, lifecycle
+ * timeline, team roster, tags or attachments source. Fields with no backing
+ * data render `—` (matching `EmployeeProfilesCenter`'s own fallback
+ * convention) rather than fabricating a value; list sections with no data
+ * source render the same "nothing yet" empty state used elsewhere in this
+ * module instead of mock rows. The competency ratings (`data.competencies`)
+ * back the Skills card.
+ *
+ * Import paths: `@/components/ui/*` -> the shared `@/components/ui/g2g/*`
+ * (Button, Card, Badge, Input, DropdownMenu) for the primitives that diverge
+ * from target's native versions; StatusBadge is an unchanged, identical
+ * target primitive. This file lives in `_components/`, one level up from the
  * recruitment feature folder, so it can be shared by every talent-management
  * feature area — recruitment today, onboarding/performance/mobility/
  * offboarding later.
@@ -48,17 +60,75 @@ import {
   DropdownMenuSeparator
 } from '@/components/ui/g2g/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { mockProfileData } from './talent-profile-data'
+import { useCompetencyEmployeeProfile } from '../_lib/use-employee-profile'
 
 interface TalentProfileViewProps {
   profileId?: string
   onBack?: () => void
 }
 
+const NA = '—'
+
 export function TalentProfileView({ profileId, onBack }: TalentProfileViewProps) {
   const [activeTab, setActiveTab] = useState('overview')
-  // In a real app we would fetch the profile by ID. For now, use mock.
-  const profile = mockProfileData
+  const { data, loading, error } = useCompetencyEmployeeProfile(profileId ?? null)
+
+  if (!profileId) {
+    return <div className="p-12 text-center text-sm text-muted-foreground">No profile selected.</div>
+  }
+  if (loading) {
+    return <div className="p-12 text-center text-sm text-muted-foreground">Loading profile…</div>
+  }
+  if (error || !data) {
+    return <div className="p-12 text-center text-sm text-destructive">{error || 'Failed to load this profile.'}</div>
+  }
+
+  const { employee, metrics } = data
+  const skills = data.competencies
+    .flatMap((category) => category.items.map((item) => ({ id: String(item.skill_id), name: item.name })))
+    .slice(0, 6)
+
+  const profile = {
+    name: employee.name,
+    avatarInitials: employee.initials,
+    status: 'Active Employee' as const,
+    role: employee.role,
+    department: employee.department,
+    employeeId: employee.emp_id,
+    joinedDate: employee.joined,
+    location: employee.location,
+
+    businessUnit: NA,
+    grade: NA,
+    reportsTo: employee.reports_to,
+    employeeType: employee.type,
+    workEmail: NA,
+
+    dateOfBirth: NA,
+    gender: NA,
+    phone: NA,
+    personalEmail: NA,
+
+    employmentStatus: NA,
+    probationStatus: NA,
+    nextReview: metrics.latest_assessment || NA,
+
+    aadhaarNo: NA,
+    pan: NA,
+    pfNumber: NA,
+    bloodGroup: NA,
+    nationality: NA,
+    maritalStatus: NA,
+
+    dateInCurrentRole: NA,
+    totalExperience: employee.experience,
+
+    skills,
+    timeline: [] as Array<{ id: string; title: string; description: string; date: string; icon: string }>,
+    teamMembers: [] as Array<{ id: string; name: string; role: string; status: string; avatar: string }>,
+    tags: [] as string[],
+    attachments: [] as Array<{ id: string; name: string; size: string }>,
+  }
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -322,28 +392,34 @@ export function TalentProfileView({ profileId, onBack }: TalentProfileViewProps)
                 <CardTitle className="text-base">Lifecycle Timeline</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="flex flex-col">
-                  {profile.timeline.map((event, i) => (
-                    <div key={event.id} className="flex items-center justify-between p-4 border-b border-border/40 hover:bg-muted/30 transition-colors group cursor-pointer">
-                      <div className="flex items-center gap-4">
-                        <div className="size-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                          {getTimelineIcon(event.icon)}
+                {profile.timeline.length === 0 ? (
+                  <p className="p-6 text-sm text-muted-foreground text-center">No lifecycle events recorded for this profile yet.</p>
+                ) : (
+                  <div className="flex flex-col">
+                    {profile.timeline.map((event) => (
+                      <div key={event.id} className="flex items-center justify-between p-4 border-b border-border/40 hover:bg-muted/30 transition-colors group cursor-pointer">
+                        <div className="flex items-center gap-4">
+                          <div className="size-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                            {getTimelineIcon(event.icon)}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-foreground">{event.title}</span>
+                            <span className="text-xs text-muted-foreground">{event.description}</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-foreground">{event.title}</span>
-                          <span className="text-xs text-muted-foreground">{event.description}</span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm font-medium text-foreground">{event.date}</span>
+                          <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm font-medium text-foreground">{event.date}</span>
-                        <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-4 bg-muted/10">
-                  <button className="text-xs font-semibold text-primary hover:underline">View Full Timeline</button>
-                </div>
+                    ))}
+                  </div>
+                )}
+                {profile.timeline.length > 0 && (
+                  <div className="p-4 bg-muted/10">
+                    <button className="text-xs font-semibold text-primary hover:underline">View Full Timeline</button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -391,25 +467,31 @@ export function TalentProfileView({ profileId, onBack }: TalentProfileViewProps)
                   <CardTitle className="text-base">Team Members ({profile.teamMembers.length})</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="flex flex-col">
-                    {profile.teamMembers.map(member => (
-                      <div key={member.id} className="flex items-center justify-between p-4 border-b border-border/40 hover:bg-muted/30 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
-                            {member.avatar}
+                  {profile.teamMembers.length === 0 ? (
+                    <p className="p-6 text-sm text-muted-foreground text-center">No direct reports found for this profile.</p>
+                  ) : (
+                    <div className="flex flex-col">
+                      {profile.teamMembers.map(member => (
+                        <div key={member.id} className="flex items-center justify-between p-4 border-b border-border/40 hover:bg-muted/30 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+                              {member.avatar}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-foreground">{member.name}</span>
+                              <span className="text-xs text-muted-foreground">{member.role}</span>
+                            </div>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold text-foreground">{member.name}</span>
-                            <span className="text-xs text-muted-foreground">{member.role}</span>
-                          </div>
+                          <StatusBadge variant="success" className="px-2 py-0.5 text-[10px]">{member.status}</StatusBadge>
                         </div>
-                        <StatusBadge variant="success" className="px-2 py-0.5 text-[10px]">{member.status}</StatusBadge>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-4 bg-muted/10">
-                    <button className="text-xs font-semibold text-primary hover:underline">View All Team Members</button>
-                  </div>
+                      ))}
+                    </div>
+                  )}
+                  {profile.teamMembers.length > 0 && (
+                    <div className="p-4 bg-muted/10">
+                      <button className="text-xs font-semibold text-primary hover:underline">View All Team Members</button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -491,13 +573,17 @@ export function TalentProfileView({ profileId, onBack }: TalentProfileViewProps)
                 </button>
               </CardHeader>
               <CardContent className="p-5 pt-0">
-                <div className="flex flex-wrap gap-2">
-                  {profile.tags.map(tag => (
-                    <Badge key={tag} variant="outline" className="font-medium text-muted-foreground bg-muted/30 hover:bg-muted">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
+                {profile.tags.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No tags on this profile.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {profile.tags.map(tag => (
+                      <Badge key={tag} variant="outline" className="font-medium text-muted-foreground bg-muted/30 hover:bg-muted">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -510,20 +596,26 @@ export function TalentProfileView({ profileId, onBack }: TalentProfileViewProps)
                 </button>
               </CardHeader>
               <CardContent className="p-5 pt-0 flex flex-col gap-3">
-                {profile.attachments.map(file => (
-                  <div key={file.id} className="flex items-center justify-between group">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="p-1.5 rounded bg-destructive/10 text-destructive shrink-0">
-                        <FileText className="size-3.5" />
+                {profile.attachments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No attachments uploaded for this profile.</p>
+                ) : (
+                  <>
+                    {profile.attachments.map(file => (
+                      <div key={file.id} className="flex items-center justify-between group">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="p-1.5 rounded bg-destructive/10 text-destructive shrink-0">
+                            <FileText className="size-3.5" />
+                          </div>
+                          <span className="text-sm font-medium text-foreground truncate cursor-pointer hover:underline group-hover:text-primary transition-colors">
+                            {file.name}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">{file.size}</span>
                       </div>
-                      <span className="text-sm font-medium text-foreground truncate cursor-pointer hover:underline group-hover:text-primary transition-colors">
-                        {file.name}
-                      </span>
-                    </div>
-                    <span className="text-xs text-muted-foreground shrink-0">{file.size}</span>
-                  </div>
-                ))}
-                <button className="text-xs font-semibold text-primary mt-2 hover:underline w-fit">View All Attachments</button>
+                    ))}
+                    <button className="text-xs font-semibold text-primary mt-2 hover:underline w-fit">View All Attachments</button>
+                  </>
+                )}
               </CardContent>
             </Card>
 

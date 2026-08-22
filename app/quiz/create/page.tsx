@@ -1,34 +1,62 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BookOpen, Plus, Trash2, CheckCircle2, Settings, Layers, Save, AlertCircle, PlayCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-// Mock Data
-const subjectsData = [
-  { id: 1, name: 'Science', chapters: [{ id: 101, name: 'Matter Around Us' }, { id: 102, name: 'Force and Motion' }, { id: 103, name: 'Light' }] },
-  { id: 2, name: 'Mathematics', chapters: [{ id: 201, name: 'Algebra' }, { id: 202, name: 'Geometry' }] },
-];
+import { buildSessionContext, fetchQuizSubjects, type QuizChapter, type QuizSubject } from '../_lib/quiz-api';
 
 export default function CreateQuizPage() {
   const router = useRouter();
   const [isPublishing, setIsPublishing] = useState(false);
-  const [selectedSubject, setSelectedSubject] = useState(subjectsData[0]);
-  const [selectedChapter, setSelectedChapter] = useState(subjectsData[0].chapters[0]);
-  
+  const [subjectsData, setSubjectsData] = useState<QuizSubject[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState<QuizSubject | null>(null);
+  const [selectedChapter, setSelectedChapter] = useState<QuizChapter | null>(null);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSubjects() {
+      try {
+        const session = buildSessionContext();
+        const subjects = await fetchQuizSubjects(session);
+        if (cancelled) return;
+        setSubjectsData(subjects);
+        setSelectedSubject(subjects[0] ?? null);
+        setSelectedChapter(subjects[0]?.chapters[0] ?? null);
+      } catch (err) {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load subjects.');
+      } finally {
+        if (!cancelled) setLoadingSubjects(false);
+      }
+    }
+
+    loadSubjects();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [quizDetails, setQuizDetails] = useState({
-    title: 'Chapter 1: Assessment',
+    title: '',
     timeLimit: 30,
     passingScore: 60,
   });
 
-  const [questions, setQuestions] = useState([
+  useEffect(() => {
+    if (selectedChapter && !quizDetails.title) {
+      setQuizDetails((prev) => ({ ...prev, title: `${selectedChapter.name}: Assessment` }));
+    }
+  }, [selectedChapter, quizDetails.title]);
+
+  const [questions, setQuestions] = useState<{ id: number; text: string; options: string[]; correctOptionIndex: number }[]>([
     {
       id: 1,
-      text: 'Which state of matter has a definite volume but no definite shape?',
-      options: ['Solid', 'Liquid', 'Gas', 'Plasma'],
-      correctOptionIndex: 1,
+      text: '',
+      options: ['', '', '', ''],
+      correctOptionIndex: 0,
     }
   ]);
 
@@ -112,17 +140,28 @@ export default function CreateQuizPage() {
                 </div>
               </div>
 
+              {loadingSubjects ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
+                  <Loader2 size={16} className="animate-spin" /> Loading subjects...
+                </div>
+              ) : loadError ? (
+                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">
+                  <AlertCircle size={16} /> {loadError}
+                </div>
+              ) : subjectsData.length === 0 ? (
+                <p className="text-sm text-gray-500">No subjects found for this account.</p>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Subject</label>
-                  <select 
+                  <select
                     className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-2xl focus:ring-blue-500 focus:border-blue-500 block p-4 outline-none transition-all"
-                    value={selectedSubject.id}
+                    value={selectedSubject?.id ?? ''}
                     onChange={(e) => {
                       const sub = subjectsData.find(s => s.id === parseInt(e.target.value));
                       if (sub) {
                         setSelectedSubject(sub);
-                        setSelectedChapter(sub.chapters[0]);
+                        setSelectedChapter(sub.chapters[0] ?? null);
                       }
                     }}
                   >
@@ -133,20 +172,21 @@ export default function CreateQuizPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Chapter</label>
-                  <select 
+                  <select
                     className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-2xl focus:ring-blue-500 focus:border-blue-500 block p-4 outline-none transition-all"
-                    value={selectedChapter?.id}
+                    value={selectedChapter?.id ?? ''}
                     onChange={(e) => {
-                      const ch = selectedSubject.chapters.find(c => c.id === parseInt(e.target.value));
+                      const ch = selectedSubject?.chapters.find(c => c.id === parseInt(e.target.value));
                       if (ch) setSelectedChapter(ch);
                     }}
                   >
-                    {selectedSubject.chapters.map(ch => (
+                    {(selectedSubject?.chapters ?? []).map(ch => (
                       <option key={ch.id} value={ch.id}>{ch.name}</option>
                     ))}
                   </select>
                 </div>
               </div>
+              )}
             </div>
 
             {/* Section 2: Quiz Settings */}

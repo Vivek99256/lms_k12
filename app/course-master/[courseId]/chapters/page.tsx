@@ -50,7 +50,7 @@ import {
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { courses, type Course } from '../../data/courses';
+import { type Course } from '../../data/courses';
 import {
   fetchChapterContent,
   fetchQuestionBank,
@@ -793,32 +793,28 @@ export default function ChapterListPage() {
   }, [subjectId, standardId]);
 
   const course: Course | undefined = useMemo(() => {
-    const staticCourse = courses.find((c) => c.id === courseId);
     const apiSubject = subjectData?.subject ?? null;
 
-    return (
-      staticCourse ??
-      (apiSubject
-        ? {
-            id: courseId,
-            title: apiSubject.subject_name,
-            code: '',
-            subject: apiSubject.subject_name,
-            category: apiSubject.content_category,
-            classGrade: `Class ${apiSubject.standard_name}`,
-            status: 'Active',
-            chapters: subjectData?.chapters.length ?? 0,
-            enrollments: 0,
-            progress: 0,
-            instructor: '',
-            createdAt: '',
-            accentColor: '#5648E8',
-            icon: 'book-open',
-          }
-        : undefined)
-    );
+    return apiSubject
+      ? {
+          id: courseId,
+          title: apiSubject.subject_name,
+          code: '',
+          subject: apiSubject.subject_name,
+          category: apiSubject.content_category,
+          classGrade: `Class ${apiSubject.standard_name}`,
+          status: 'Active',
+          chapters: subjectData?.chapters.length ?? 0,
+          enrollments: 0,
+          progress: 0,
+          instructor: '',
+          createdAt: '',
+          accentColor: '#5648E8',
+          icon: 'book-open',
+        }
+      : undefined;
   }, [courseId, subjectData?.chapters, subjectData?.subject]);
-  const allChapters = subjectData?.chapters ?? getChaptersByCourseid(courseId);
+  const allChapters = subjectData?.chapters ?? [];
 
   const [searchTerm] = useState('');
   const [isAddChapterOpen, setIsAddChapterOpen] = useState(false);

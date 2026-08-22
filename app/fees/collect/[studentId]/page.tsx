@@ -522,7 +522,7 @@ export default function FeesCollectionStudentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#f8fafc_38%,#f1f5f9_100%)]">
+    <div className="min-h-screen ">
       <div data-print-exclude="true" className="mx-auto max-w-[1500px] space-y-6 p-3 sm:p-4 md:p-6 lg:p-8">
         <section className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/95 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur">
           <div className="grid gap-6 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-6 lg:py-6">
@@ -778,10 +778,10 @@ export default function FeesCollectionStudentPage() {
           </div>
           <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-row">
             <Button type="button" variant="outline" className="h-10 rounded-lg bg-white" onClick={() => router.push('/fees/collect')} disabled={saving}>Cancel</Button>
-            <Button type="button" className="h-10 rounded-lg bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90" onClick={() => saveCollection(false)} disabled={saving || selectedMonthIds.length === 0}>
+            {/* <Button type="button" className="h-10 rounded-lg bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90" onClick={() => saveCollection(false)} disabled={saving || selectedMonthIds.length === 0}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save
-            </Button>
+            </Button> */}
             <Button type="button" className="h-10 rounded-lg bg-slate-900 text-white hover:bg-slate-800" onClick={() => saveCollection(true)} disabled={saving || selectedMonthIds.length === 0}>
               <Printer className="mr-2 h-4 w-4" />
               Save & Print Receipt

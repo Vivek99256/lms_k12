@@ -1,140 +1,33 @@
 /**
- * Ported as-is from G2G's
- * `components/domain/talent/administration/admin-data.ts`.
+ * Talent Management "Administration & Governance" — KPI card config.
  *
- * `mockAdminKPIs` still backs the 5 KPI cards at the top of the
- * Administration & Governance center — G2G never wired those cards to a real
- * endpoint (there is no `/talent/admin/kpis` route), so they stay static
- * exactly as in source. `mockWorkflows` itself is unused by `AdminCenter`
- * (the live table is driven by `AdminService.getWorkflows`) but is ported
- * too, unchanged, since it's still exported from the source file.
+ * G2G's `mockAdminKPIs`/`mockWorkflows` (ported here unchanged, then found to
+ * have no real backing) have been removed. `mockWorkflows` had zero
+ * consumers — `AdminCenter`'s workflow table is driven entirely by
+ * `AdminService.getWorkflows` — and G2G never wired the KPI cards to a real
+ * endpoint either: there is no `/talent/admin/kpis` route, and the target
+ * backend's `AdminWorkflowController` only exposes `index`/`show` for the
+ * workflow list (see that controller's own docblock).
+ *
+ * Of the five KPIs, only "Active Workflows" is backed by real data — it's
+ * the same `pagination.total` `AdminCenter` already receives from
+ * `AdminService.getWorkflows`, computed in `admin-center.tsx`. The other
+ * four (Templates, User Roles, Integrations, Audit Events) have no table or
+ * endpoint anywhere in this module, so their cards render "—" rather than a
+ * fabricated count. Only the label/icon/link text below is static — that's
+ * UI configuration, not data.
  */
 
-import type { AdminKPI, Workflow } from '../../_lib/talent-types'
+import type { AdminKPI } from '../../_lib/talent-types'
 
 export type { AdminKPI, Workflow, WorkflowApprover, WorkflowStage } from '../../_lib/talent-types'
 
-export const mockAdminKPIs: AdminKPI[] = [
-  { id: 'kpi-1', title: 'Active Workflows', value: '28', linkText: 'View all workflows', icon: 'git-merge' },
-  { id: 'kpi-2', title: 'Templates', value: '56', linkText: 'View all templates', icon: 'file-text' },
-  { id: 'kpi-3', title: 'User Roles', value: '18', linkText: 'View all roles', icon: 'users' },
-  { id: 'kpi-4', title: 'Integrations', value: '12', linkText: 'View all integrations', icon: 'plug' },
-  { id: 'kpi-5', title: 'Audit Events (30 Days)', value: '1,248', linkText: 'View audit logs', icon: 'shield-check' },
-]
+export type AdminKpiConfig = Omit<AdminKPI, 'value'>
 
-export const mockWorkflows: Workflow[] = [
-  {
-    id: 'wf-1',
-    name: 'Job Requisition Approval',
-    module: 'Recruitment',
-    status: 'Active',
-    version: '1.3',
-    description: 'Workflow for raising, routing and approving job requisitions.',
-    createdBy: 'Admin',
-    lastUpdated: 'May 12, 2025',
-    updatedBy: 'Admin',
-    stages: [
-      { step: 1, label: 'Requisition\nRaised' },
-      { step: 2, label: 'Manager\nApproval' },
-      { step: 3, label: 'HR\nReview' },
-      { step: 4, label: 'Finance\nApproval' },
-      { step: 5, label: 'Approved' }
-    ],
-    approvers: [
-      { id: 'a1', role: 'Manager', title: 'Immediate Manager', initials: 'M', approvalType: 'Mandatory', escalation: 'After 2 Days' },
-      { id: 'a2', role: 'HR', title: 'HR Manager', initials: 'H', approvalType: 'Mandatory', escalation: 'After 1 Day' },
-      { id: 'a3', role: 'Finance', title: 'Finance Controller', initials: 'F', approvalType: 'Mandatory', escalation: 'After 1 Day' }
-    ]
-  },
-  {
-    id: 'wf-2',
-    name: 'Interview Scheduling',
-    module: 'Recruitment',
-    status: 'Active',
-    version: '2.1',
-    description: 'Interview scheduling and coordination',
-    createdBy: 'Admin',
-    lastUpdated: 'May 08, 2025',
-    updatedBy: 'HR Admin',
-    stages: [],
-    approvers: []
-  },
-  {
-    id: 'wf-3',
-    name: 'Offer Approval',
-    module: 'Recruitment',
-    status: 'Active',
-    version: '1.2',
-    description: 'Offer letter approval workflow',
-    createdBy: 'Admin',
-    lastUpdated: 'May 02, 2025',
-    updatedBy: 'Admin',
-    stages: [],
-    approvers: []
-  },
-  {
-    id: 'wf-4',
-    name: 'Onboarding Checklist',
-    module: 'Onboarding',
-    status: 'Active',
-    version: '1.5',
-    description: 'New hire onboarding workflow',
-    createdBy: 'Admin',
-    lastUpdated: 'Apr 30, 2025',
-    updatedBy: 'HR Admin',
-    stages: [],
-    approvers: []
-  },
-  {
-    id: 'wf-5',
-    name: 'Probation Confirmation',
-    module: 'Onboarding',
-    status: 'Active',
-    version: '1.1',
-    description: 'Probation tracking and confirmation',
-    createdBy: 'Admin',
-    lastUpdated: 'Apr 25, 2025',
-    updatedBy: 'Admin',
-    stages: [],
-    approvers: []
-  },
-  {
-    id: 'wf-6',
-    name: 'Performance Review Cycle',
-    module: 'Performance',
-    status: 'Draft',
-    version: '1.0',
-    description: 'Performance review process workflow',
-    createdBy: 'Admin',
-    lastUpdated: 'May 15, 2025',
-    updatedBy: 'Admin',
-    stages: [],
-    approvers: []
-  },
-  {
-    id: 'wf-7',
-    name: 'Exit Clearance',
-    module: 'Offboarding',
-    status: 'Active',
-    version: '1.4',
-    description: 'Employee exit clearance workflow',
-    createdBy: 'Admin',
-    lastUpdated: 'May 10, 2025',
-    updatedBy: 'HR Admin',
-    stages: [],
-    approvers: []
-  },
-  {
-    id: 'wf-8',
-    name: 'Promotion Approval',
-    module: 'Mobility',
-    status: 'Active',
-    version: '1.0',
-    description: 'Promotion approval workflow',
-    createdBy: 'Admin',
-    lastUpdated: 'Apr 28, 2025',
-    updatedBy: 'Admin',
-    stages: [],
-    approvers: []
-  }
+export const adminKpiConfig: AdminKpiConfig[] = [
+  { id: 'kpi-1', title: 'Active Workflows', linkText: 'View all workflows', icon: 'git-merge' },
+  { id: 'kpi-2', title: 'Templates', linkText: 'View all templates', icon: 'file-text' },
+  { id: 'kpi-3', title: 'User Roles', linkText: 'View all roles', icon: 'users' },
+  { id: 'kpi-4', title: 'Integrations', linkText: 'View all integrations', icon: 'plug' },
+  { id: 'kpi-5', title: 'Audit Events (30 Days)', linkText: 'View audit logs', icon: 'shield-check' },
 ]
