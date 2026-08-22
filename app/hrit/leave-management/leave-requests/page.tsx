@@ -69,12 +69,27 @@ export default function LeaveRequestsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? '')
   const [leaveTypeFilter, setLeaveTypeFilter] = useState('')
+  const wfhTypeQuery = searchParams.get('type') === 'wfh' ? 'wfh' : undefined
   const [departmentFilter, setDepartmentFilter] = useState('')
   const [page, setPage] = useState(1)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [applyLeaveOpen, setApplyLeaveOpen] = useState(() => searchParams.get('apply') === '1')
+  const prefillLeaveTypeQuery = searchParams.get('type') ?? undefined
+
+  const { options } = useLeaveOptions()
+
+  // Reused by the "WFH Requests" quick action/My Requests entry — WFH is a
+  // configured leave type here rather than a separate request list. Derived,
+  // not synced via an effect: falls back to a fuzzy label match only until
+  // the user picks a leave type filter explicitly.
+  const wfhMatchedTypeId = useMemo(() => {
+    if (!wfhTypeQuery || !options?.leave_types) return undefined
+    return options.leave_types.find((type) => type.label.toLowerCase().includes(wfhTypeQuery))?.value
+  }, [wfhTypeQuery, options])
+
+  const effectiveLeaveTypeFilter = leaveTypeFilter || wfhMatchedTypeId || ''
 
   // Filtering, sorting and pagination all run server side - Laravel returns one page.
   const filters = useMemo(
@@ -82,14 +97,14 @@ export default function LeaveRequestsPage() {
       search: searchQuery.trim() || undefined,
       status: statusFilter ? [statusFilter] : undefined,
       departmentId: departmentFilter || undefined,
-      leaveTypeId: leaveTypeFilter || undefined,
+      leaveTypeId: effectiveLeaveTypeFilter || undefined,
       employeeId: showMine && menuContext?.user_id ? String(menuContext.user_id) : undefined,
       page,
       perPage: PAGE_SIZE,
       sortBy: 'submittedDate',
       sortDir: 'desc' as const,
     }),
-    [searchQuery, statusFilter, departmentFilter, leaveTypeFilter, page, showMine, menuContext?.user_id],
+    [searchQuery, statusFilter, departmentFilter, effectiveLeaveTypeFilter, page, showMine, menuContext?.user_id],
   )
 
   const {
@@ -106,7 +121,6 @@ export default function LeaveRequestsPage() {
     clearMessages,
   } = useLeaveRequests(filters)
 
-  const { options } = useLeaveOptions()
   const { detail, loading: detailLoading } = useLeaveRequestDetail(drawerOpen ? selectedRequestId : null)
 
   const rows = useMemo(() => requests.map(mapLeaveRequest), [requests])
@@ -380,7 +394,7 @@ export default function LeaveRequestsPage() {
 
             <Select
               className="min-w-[170px]"
-              value={leaveTypeFilter}
+              value={effectiveLeaveTypeFilter}
               onChange={(value) => {
                 setLeaveTypeFilter(value)
                 resetToFirstPage()
@@ -470,6 +484,7 @@ export default function LeaveRequestsPage() {
           onOpenChange={setApplyLeaveOpen}
           processing={processing}
           onSubmit={handleApplySubmit}
+          prefillLeaveTypeQuery={prefillLeaveTypeQuery}
         />
       </Suspense>
 

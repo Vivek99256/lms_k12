@@ -5,6 +5,7 @@ import { EnhancedAttendanceFilters } from '@/app/hrit/attendance-management/_sha
 import { AttendanceReportTable } from './components/AttendanceReportTable'
 import { savedReports, type EarlyGoingRecord } from './services/report-data'
 import { useAuth } from '@/contexts/AuthContext'
+import { useLeaveOptions } from '@/app/hrit/_lib/use-leave'
 import {
   hrmsService,
   buildSessionContext,
@@ -19,6 +20,13 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { Eye } from 'lucide-react'
 import type { Column } from '@/components/ui/data-table'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { AttendanceTabs } from '@/app/hrit/attendance-management/_shared/attendance-tabs'
 import {
   AttendanceKPICards,
@@ -70,13 +78,6 @@ type AttendanceHighlightsData = {
   highestEarlyGoingDept: string
 }
 
-function parsePercentage(value?: string | number | null) {
-  if (typeof value === 'number') return value
-  if (!value) return 0
-  const parsed = Number(value.replace('%', ''))
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
 function getApiDepartmentId(department: string) {
   return /^\d+$/.test(department) ? department : undefined
 }
@@ -86,21 +87,98 @@ function getApiEmployeeId(employee: string) {
   return /^\d+$/.test(employee) ? employee : undefined
 }
 
-function mapWeeklyTrend(response: AttendanceWeeklyResponse | null): AttendanceTrendData[] {
-  if (!response) return []
+type TrendMode = 'today' | 'week' | 'month' | 'custom'
 
-  return response.labels.map((label, index) => ({
-    label,
-    present: response.present[index] ?? 0,
-    late: response.late[index] ?? 0,
-    earlyGoing: 0,
-    absent: response.absent[index] ?? 0,
-  }))
+/**
+ * Relabels a weekly-summary day entry for the active quick filter - "Mon" for
+ * This Week, "Aug 1" for This Month/Custom - falling back to the raw label
+ * unchanged if it isn't a parseable date (e.g. the backend already sends a
+ * short weekday name).
+ */
+function formatTrendLabel(rawLabel: string, mode: TrendMode) {
+  const parsed = new Date(rawLabel.length <= 10 ? `${rawLabel}T00:00:00` : rawLabel)
+  if (Number.isNaN(parsed.getTime())) return rawLabel
+  if (mode === 'week') return parsed.toLocaleDateString('en-US', { weekday: 'short' })
+  return parsed.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
 }
 
-function average(values: number[]) {
-  if (values.length === 0) return 0
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+/**
+ * Maps the weekly-summary endpoint's per-day arrays to trend points for This
+ * Week / This Month / Custom, scoped to the applied department/employee/
+ * date-range filters (`getAttendanceWeeklySummary` is already called with
+ * those same filter params). Each day's Attendance %/Late %/Absent % is
+ * computed against that SAME day's own present+late+absent total, not an
+ * externally-sourced headcount - an earlier version of this code divided by
+ * a headcount from a different endpoint and produced nonsensical numbers
+ * (percentages over 1000%) when the two endpoints' populations didn't
+ * match. `earlyGoing` stays 0: `/attendance/weekly-summary` does not return
+ * a per-day early-going count.
+ */
+function computeDayTrend(response: AttendanceWeeklyResponse | null, mode: TrendMode): AttendanceTrendData[] {
+  if (!response) return []
+
+  return response.labels.map((label, index) => {
+    const present = response.present[index] ?? 0
+    const late = response.late[index] ?? 0
+    const absent = response.absent[index] ?? 0
+    const dayTotal = present + late + absent
+
+    return {
+      label: formatTrendLabel(label, mode),
+      present: dayTotal > 0 ? Math.round((present / dayTotal) * 100) : 0,
+      late: dayTotal > 0 ? Math.round((late / dayTotal) * 100) : 0,
+      earlyGoing: 0,
+      absent: dayTotal > 0 ? Math.round((absent / dayTotal) * 100) : 0,
+    }
+  })
+}
+
+/** Extracts the 24h hour from a display time like "09:15 AM"; null if unparsable/blank. */
+function parsePunchHour(display?: string): number | null {
+  if (!display || display === '--') return null
+  const match = display.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
+  if (!match) return null
+
+  let hour = Number(match[1])
+  const period = match[3].toUpperCase()
+  if (period === 'PM' && hour !== 12) hour += 12
+  if (period === 'AM' && hour === 12) hour = 0
+  return hour
+}
+
+/**
+ * For Today: builds an hourly cumulative "% of employees punched in by this
+ * hour" curve from the early-going report's per-employee punch-in times
+ * (already fetched for the selected date/department/employee filters).
+ * Late/Absent/Early Going have no well-defined per-hour value from this data
+ * so they stay flat at 0 - only the Present line is meaningful hour-by-hour.
+ */
+function computeHourlyTrend(records: EarlyGoingRecord[], totalEmployees: number): AttendanceTrendData[] {
+  if (totalEmployees <= 0) return []
+
+  const punchHours = records
+    .map((record) => parsePunchHour(record.punchIn))
+    .filter((hour): hour is number => hour !== null)
+    .sort((a, b) => a - b)
+
+  if (punchHours.length === 0) return []
+
+  const startHour = Math.min(...punchHours)
+  const endHour = Math.max(...punchHours)
+
+  return Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i).map((hour) => {
+    const cumulativePresent = punchHours.filter((h) => h <= hour).length
+    const period = hour < 12 ? 'AM' : 'PM'
+    const displayHour = hour % 12 === 0 ? 12 : hour % 12
+
+    return {
+      label: `${displayHour} ${period}`,
+      present: Math.round((cumulativePresent / totalEmployees) * 100),
+      late: 0,
+      earlyGoing: 0,
+      absent: 0,
+    }
+  })
 }
 
 function toNumber(value: number | string | null | undefined) {
@@ -190,7 +268,7 @@ const viewTabs: ViewTab[] = [
   { id: 'daily-details', label: 'Daily Details' },
 ]
 
-function getEarlyGoingColumns(): Column<EarlyGoingRecord>[] {
+function getEarlyGoingColumns(onView: (record: EarlyGoingRecord) => void): Column<EarlyGoingRecord>[] {
   return [
     { id: 'id', header: '#' },
     { id: 'employee', header: 'Employee' },
@@ -217,8 +295,14 @@ function getEarlyGoingColumns(): Column<EarlyGoingRecord>[] {
     {
       id: 'actions' as keyof EarlyGoingRecord,
       header: 'Actions',
-      render: () => (
-        <Button variant="ghost" size="icon" className="size-8 rounded-full">
+      render: (_, row) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 rounded-full"
+          aria-label={`View details for ${row.employee}`}
+          onClick={() => onView(row)}
+        >
           <Eye className="size-4" />
         </Button>
       ),
@@ -243,11 +327,29 @@ function AttendanceReportsPage() {
   const [quickFilter, setQuickFilter] = React.useState('custom')
   const [search, setSearch] = React.useState('')
   const [page, setPage] = React.useState(1)
+  const [viewRecord, setViewRecord] = React.useState<EarlyGoingRecord | null>(null)
   const [apiLoading, setApiLoading] = React.useState(false)
   const [apiError, setApiError] = React.useState<string | null>(null)
-  const [weeklySummary, setWeeklySummary] = React.useState<AttendanceWeeklyResponse | null>(null)
   const [attendanceKpis, setAttendanceKpis] = React.useState<AttendanceKpiResponse | null>(null)
-  const [departmentOptions, setDepartmentOptions] = React.useState<AttendanceOption[]>([])
+  const [weeklySummary, setWeeklySummary] = React.useState<AttendanceWeeklyResponse | null>(null)
+  // /attendance/report-filters (the attendance-specific endpoint) currently
+  // 500s server-side ("Class App\Models\HRMS\hrmsDepartmentModel not found")
+  // so it never returns a department list - see reportFilterDepartments
+  // below for the working fallback this page uses instead.
+  const [reportFilterDepartments, setReportFilterDepartments] = React.useState<AttendanceOption[]>([])
+  const { options: leaveOptions } = useLeaveOptions()
+  // Departments are shared institute-wide master data, not Leave-specific -
+  // reusing the Leave module's already-working /leave/options department
+  // list is a safe substitute while the attendance endpoint stays broken,
+  // and this also self-heals: once the backend model is fixed,
+  // reportFilterDepartments stops being empty and takes priority again.
+  const departmentOptions = React.useMemo<AttendanceOption[]>(() => {
+    if (reportFilterDepartments.length > 0) return reportFilterDepartments
+    return (leaveOptions?.departments ?? []).map((department) => ({
+      value: department.value,
+      label: department.label,
+    }))
+  }, [reportFilterDepartments, leaveOptions])
   const [employeeOptions, setEmployeeOptions] = React.useState<AttendanceOption[]>([])
   const [employeesLoading, setEmployeesLoading] = React.useState(false)
   const [departmentReport, setDepartmentReport] = React.useState<DepartmentAttendanceEmployee[]>([])
@@ -370,10 +472,23 @@ function AttendanceReportsPage() {
         const response = await hrmsService.getAttendanceReportIndex(context)
         if (cancelled) return
 
-        setDepartmentOptions(optionsFromDepartments(response.departments))
-      } catch {
+        const options = optionsFromDepartments(response.departments)
+        if (options.length === 0) {
+          // Request succeeded but returned no department list - was previously
+          // swallowed silently, leaving the dropdown empty with no clue why.
+          console.warn('[attendance-reports] /attendance/report-filters returned no departments:', response)
+        }
+        setReportFilterDepartments(options)
+      } catch (error) {
+        // console.warn, not console.error: this endpoint is known-broken
+        // server-side (Class "App\Models\HRMS\hrmsDepartmentModel" not
+        // found) and is already handled - departmentOptions falls back to
+        // the Leave module's department list above, so this isn't a
+        // functional failure. console.error would trip Next's dev-mode
+        // error overlay for an already-handled, expected failure.
+        console.warn('[attendance-reports] /attendance/report-filters failed (falling back to Leave module departments):', error)
         if (!cancelled) {
-          setDepartmentOptions([])
+          setReportFilterDepartments([])
         }
       }
     }
@@ -605,48 +720,82 @@ function AttendanceReportsPage() {
     }
   }, [appliedFilters, departmentReport, earlyGoingData, groupBy])
 
-  const trendData = React.useMemo((): AttendanceTrendData[] => {
-    const apiTrendData = mapWeeklyTrend(weeklySummary)
-    if (apiTrendData.length > 0) return apiTrendData
+  /**
+   * Single source of truth for Total Employees, Present, Absent, Late and
+   * Early Going, shared by the KPI cards, the distribution donut and the
+   * trend line, so the three can never disagree with each other OR with the
+   * Table Focus summary table below - all four are now built from the exact
+   * same `departmentReport` rows Table Focus's own grouped table sums, using
+   * the exact same formula it already uses per row
+   * (`attendancePercentage: present / workingDays * 100`, see
+   * `groupedTableData` above). `total_att_day` / `total_ab_day` / `late` are
+   * DAY counts summed across every employee in the filtered range (e.g.
+   * "179 absent-days across 7 employees this month"), not a single day's
+   * headcount - `totalSlots` (the working-day-slot sum) is their correct
+   * percentage denominator, not `totalEmployees`. Trying to normalise them
+   * back down to a headcount (an earlier version of this code divided by an
+   * average working-day count) produced nonsense whenever absent-days
+   * happened to be close to a small department's working-day count - that
+   * bug is what this rewrite replaces.
+   *
+   * `attendanceKpis.active_employees` (org-wide, ignores filters) is only
+   * used as a last-resort fallback before the department report has loaded.
+   *
+   * `/attendance/weekly-summary` is deliberately NOT used here (KPI cards /
+   * donut) - its response scale didn't match this filtered population
+   * (dividing it by this population's headcount produced percentages over
+   * 1000%) and there is no way to verify its intended meaning without
+   * backend access. It's still used for the Attendance Trend line chart
+   * below (`trendData`), plotted as-is with no extra scaling, since that's
+   * the only endpoint offering real day-by-day granularity and this page's
+   * trend chart is expected to keep that shape.
+   */
+  const attendanceAggregates = React.useMemo(() => {
+    const earlyGoingCount = new Set(
+      earlyGoingData.filter((record) => record.earlyByMin > 0).map((record) => record.employeeId),
+    ).size
 
-    const dataSource = earlyGoingData
-    const dateMap = new Map<string, { present: number; late: number; early: number; absent: number }>()
-    dataSource.forEach((r) => {
-      const date = r.date
-      if (!dateMap.has(date)) dateMap.set(date, { present: 0, late: 0, early: 0, absent: 0 })
-      const entry = dateMap.get(date)!
-      if (r.status === 'present') entry.present += 1
-      else if (r.status === 'late') entry.late += 1
-      else if (r.status === 'absent') entry.absent += 1
-      if (r.earlyByMin > 0) entry.early += 1
-    })
-    return Array.from(dateMap.entries()).map(([label, vals]) => ({
-      label,
-      present: vals.present,
-      late: vals.late,
-      earlyGoing: vals.early,
-      absent: vals.absent,
-    }))
-  }, [earlyGoingData, weeklySummary])
+    if (departmentReport.length > 0) {
+      const totalEmployees = departmentReport.length
+      const presentCount = departmentReport.reduce((sum, record) => sum + toNumber(record.total_att_day), 0)
+      const absentCount = departmentReport.reduce((sum, record) => sum + toNumber(record.total_ab_day), 0)
+      const lateCount = departmentReport.reduce((sum, record) => sum + toNumber(record.late), 0)
+      const totalSlots =
+        departmentReport.reduce((sum, record) => sum + toNumber(record.workingDays), 0) ||
+        presentCount + absentCount ||
+        1
 
-  const distributionData = React.useMemo((): AttendanceDistributionData => {
-    if (weeklySummary) {
-      return {
-        present: average(weeklySummary.present),
-        late: average(weeklySummary.late),
-        earlyGoing: 0,
-        absent: average(weeklySummary.absent),
-      }
+      return { totalEmployees, presentCount, absentCount, lateCount, earlyGoingCount, totalSlots }
     }
 
-    const dataSource = earlyGoingData
-    const present = dataSource.filter((r) => r.status === 'present').length
-    const late = dataSource.filter((r) => r.status === 'late').length
-    const absent = dataSource.filter((r) => r.status === 'absent').length
-    const earlyGoing = dataSource.filter((r) => r.earlyByMin > 0).length
+    // Fallback before the department report has loaded: derive from the
+    // single-day early-going report, which carries a real per-record status.
+    // This IS a single-day snapshot, so totalSlots === totalEmployees here.
+    const presentCount = earlyGoingData.filter((record) => record.status === 'present').length
+    const totalEmployees = attendanceKpis?.active_employees ?? earlyGoingData.length
+    const absentCount = Math.max(0, totalEmployees - presentCount)
+    const lateCount = earlyGoingData.filter((record) => record.status === 'late').length
 
-    return { present, late, earlyGoing, absent }
-  }, [earlyGoingData, weeklySummary])
+    return { totalEmployees, presentCount, absentCount, lateCount, earlyGoingCount, totalSlots: totalEmployees || 1 }
+  }, [departmentReport, earlyGoingData, attendanceKpis])
+
+  const distributionData = React.useMemo(
+    (): AttendanceDistributionData => ({
+      present: attendanceAggregates.presentCount,
+      late: attendanceAggregates.lateCount,
+      earlyGoing: attendanceAggregates.earlyGoingCount,
+      absent: attendanceAggregates.absentCount,
+    }),
+    [attendanceAggregates],
+  )
+
+  const trendData = React.useMemo((): AttendanceTrendData[] => {
+    if (quickFilter === 'today') {
+      return computeHourlyTrend(earlyGoingData, attendanceAggregates.totalEmployees)
+    }
+    const mode: TrendMode = quickFilter === 'week' || quickFilter === 'month' ? quickFilter : 'custom'
+    return computeDayTrend(weeklySummary, mode)
+  }, [quickFilter, earlyGoingData, attendanceAggregates.totalEmployees, weeklySummary])
 
   const highlightsData = React.useMemo((): AttendanceHighlightsData => {
     const dataSource = earlyGoingData
@@ -678,38 +827,28 @@ function AttendanceReportsPage() {
   }, [earlyGoingData])
 
   const enhancedCards = React.useMemo<AttendanceKPICard[]>(() => {
-    const dist = distributionData
-    const total = dist.present + dist.late + dist.earlyGoing + dist.absent
-    if (attendanceKpis) {
-      return getEnhancedSummaryCards({
-        totalEmployees: attendanceKpis.active_employees,
-        attendancePercentage: Math.round(parsePercentage(attendanceKpis.present_today)),
-        latePercentage: dist.late,
-        earlyGoingPercentage: dist.earlyGoing,
-        absentPercentage: dist.absent,
-      })
-    }
+    const { totalEmployees, presentCount, absentCount, lateCount, earlyGoingCount, totalSlots } = attendanceAggregates
+    if (totalEmployees === 0) return []
 
-    if (total === 0) return []
-
-    const attendancePct = Math.round((dist.present / total) * 100)
-    const latePct = Math.round((dist.late / total) * 100)
-    const earlyPct = Math.round((dist.earlyGoing / total) * 100)
-    const absentPct = Math.round((dist.absent / total) * 100)
-
+    // All four percentages divide by totalSlots (the same working-day-slot
+    // total Table Focus's own per-row `attendancePercentage` uses), not
+    // totalEmployees - see the attendanceAggregates comment above for why.
+    // Late % and Early Going % are independent subsets of Present, not a
+    // competing partition, so they are not expected to sum to 100 with the
+    // other two.
     return getEnhancedSummaryCards({
-      totalEmployees: total,
-      attendancePercentage: attendancePct,
-      latePercentage: latePct,
-      earlyGoingPercentage: earlyPct,
-      absentPercentage: absentPct,
+      totalEmployees,
+      attendancePercentage: Math.round((presentCount / totalSlots) * 100),
+      latePercentage: Math.round((lateCount / totalSlots) * 100),
+      earlyGoingPercentage: Math.round((earlyGoingCount / totalSlots) * 100),
+      absentPercentage: Math.round((absentCount / totalSlots) * 100),
     })
-  }, [attendanceKpis, distributionData])
+  }, [attendanceAggregates])
 
   const renderDailyDetails = () => {
     const data = earlyGoingData.slice((page - 1) * pageSize, page * pageSize)
     const total = earlyGoingData.length
-    const columns = getEarlyGoingColumns()
+    const columns = getEarlyGoingColumns(setViewRecord)
 
     return (
       <div className="flex flex-col gap-6">
@@ -735,6 +874,10 @@ function AttendanceReportsPage() {
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <AttendanceTrendChart data={trendData} />
         <div className="flex flex-col gap-6">
+          {/* No totalOverride: present/late/earlyGoing/absent are all
+              day-counts here (see attendanceAggregates), so the chart's own
+              segment sum - not Total Employees, a different unit (headcount)
+              - is the correct "Total" to show at the centre. */}
           <AttendanceDonutChart data={distributionData} />
           <AttendanceHighlights data={highlightsData} />
         </div>
@@ -820,6 +963,51 @@ function AttendanceReportsPage() {
       )}
 
       {renderContent()}
+
+      <Dialog open={!!viewRecord} onOpenChange={(open) => !open && setViewRecord(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{viewRecord?.employee}</DialogTitle>
+            <DialogDescription>{viewRecord?.employeeId} • {viewRecord?.department}</DialogDescription>
+          </DialogHeader>
+          {viewRecord && (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Date</p>
+                <p className="font-medium text-foreground">{viewRecord.date}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Status</p>
+                <StatusBadge
+                  variant={viewRecord.status === 'present' ? 'active' : viewRecord.status === 'late' ? 'pending' : 'error'}
+                  className="mt-0.5 h-6 px-2.5 text-xs font-semibold"
+                >
+                  {viewRecord.status === 'present' ? 'Present' : viewRecord.status === 'late' ? 'Late' : 'Absent'}
+                </StatusBadge>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Punch In</p>
+                <p className="font-medium text-foreground">{viewRecord.punchIn}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Punch Out</p>
+                <p className="font-medium text-foreground">{viewRecord.punchOut}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Expected Out</p>
+                <p className="font-medium text-foreground">{viewRecord.expectedOut}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Early By</p>
+                <p className="font-medium text-foreground">
+                  {viewRecord.earlyBy}
+                  {viewRecord.earlyByMin > 0 ? ` (${viewRecord.earlyByMin} min)` : ''}
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

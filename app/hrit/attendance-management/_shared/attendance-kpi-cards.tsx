@@ -43,6 +43,9 @@ export function getEnhancedSummaryCards(data: {
   earlyGoingPercentage: number
   absentPercentage: number
 }): AttendanceKPICard[] {
+  // No "vs last period" delta is available from the API yet, so trend/
+  // trendValue are omitted rather than showing a fabricated +2.5%-style
+  // number that has no real data behind it.
   return [
     {
       id: 'total-employees',
@@ -56,8 +59,6 @@ export function getEnhancedSummaryCards(data: {
       value: data.attendancePercentage,
       unit: '%',
       icon: <TrendingUp className="size-4 text-success" />,
-      trend: 'up',
-      trendValue: '+2.5%',
     },
     {
       id: 'late',
@@ -65,8 +66,6 @@ export function getEnhancedSummaryCards(data: {
       value: data.latePercentage,
       unit: '%',
       icon: <Clock className="size-4 text-warning" />,
-      trend: 'down',
-      trendValue: '-1.2%',
     },
     {
       id: 'early-going',
@@ -74,8 +73,6 @@ export function getEnhancedSummaryCards(data: {
       value: data.earlyGoingPercentage,
       unit: '%',
       icon: <TrendingDown className="size-4 text-destructive" />,
-      trend: 'up',
-      trendValue: '+0.8%',
     },
     {
       id: 'absent',
@@ -83,8 +80,6 @@ export function getEnhancedSummaryCards(data: {
       value: data.absentPercentage,
       unit: '%',
       icon: <XCircle className="size-4 text-destructive" />,
-      trend: 'neutral',
-      trendValue: '0.0%',
     },
   ]
 }

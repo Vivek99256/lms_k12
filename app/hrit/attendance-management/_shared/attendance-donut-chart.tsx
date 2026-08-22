@@ -13,13 +13,23 @@ export interface AttendanceDistributionData {
 
 interface AttendanceDonutChartProps {
   data: AttendanceDistributionData
+  /**
+   * Overrides the centre "Total" label with a caller-supplied figure (e.g.
+   * Total Employees from the KPI cards) instead of summing the four segment
+   * values. Late and Early Going are subsets of Present, not a fourth
+   * exclusive slice, so summing all four never equals a true employee
+   * headcount - passing the real total here is what keeps this chart's
+   * number in sync with the KPI cards instead of silently drifting apart.
+   */
+  totalOverride?: number
   className?: string
 }
 
-export function AttendanceDonutChart({ data, className }: AttendanceDonutChartProps) {
-  const total = data.present + data.late + data.earlyGoing + data.absent
+export function AttendanceDonutChart({ data, className, totalOverride }: AttendanceDonutChartProps) {
+  const segmentSum = data.present + data.late + data.earlyGoing + data.absent
+  const total = totalOverride ?? segmentSum
 
-  if (total === 0) {
+  if (segmentSum === 0) {
     return (
       <Card className={className}>
         <CardHeader className="pb-4">
@@ -47,7 +57,11 @@ export function AttendanceDonutChart({ data, className }: AttendanceDonutChartPr
   let currentAngle = -Math.PI / 2
 
   const paths = segments.map((seg) => {
-    const percentage = seg.value / total
+    // Arc proportions are always drawn against segmentSum (the four values
+    // actually passed in), not totalOverride - otherwise Late/Early Going
+    // sitting on top of Present would either overfill or under-fill the
+    // circle relative to a headcount that already double-counts subsets.
+    const percentage = seg.value / segmentSum
     const angle = percentage * 2 * Math.PI
     const startAngle = currentAngle
     const endAngle = currentAngle + angle

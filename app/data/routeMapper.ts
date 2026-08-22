@@ -351,6 +351,11 @@ const HRIT_ROUTE_NAME_MAP: Record<string, string> = {
   'hrms/hrms-attendance': '/hrit/attendance-management/attendance-tracking',
   'hrit.attendance.reports': '/hrit/attendance-management/attendance-reports',
   'hrms/hrms-attendance-report': '/hrit/attendance-management/attendance-reports',
+  // No legacy Laravel route name exists for these three (no backend menu rows
+  // registered yet) - invented `hrit.attendance.*` keys, same convention as above.
+  'hrit.attendance.regularization': '/hrit/attendance-management/attendance-regularization',
+  'hrit.attendance.policy': '/hrit/attendance-management/attendance-policy',
+  'hrit.attendance.request-center': '/hrit/attendance-management/request-center',
   // Leave management (modern JSON API, no legacy Laravel route name — see
   // header comment above for the `hrit.leave.*` key convention)
   'hrit.leave.dashboard': '/hrit/leave-management/leave-dashboard',
