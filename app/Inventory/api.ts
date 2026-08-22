@@ -4,7 +4,7 @@ import {
 } from "@/lib/erp-client";
 
 export type InventoryRecord = { id: number; values: Record<string, string | number | boolean | null> };
-export type InventoryOption = { id: number | string; label: string; parentId?: number; price?: number };
+export type InventoryOption = { id: number | string; label: string; parentId?: number; groupKey?: string; price?: number };
 export type InventoryData = { records: InventoryRecord[]; options: Record<string, InventoryOption[]> };
 type UnknownRecord = Record<string, unknown>;
 
@@ -15,34 +15,35 @@ function rows(value: unknown): UnknownRecord[] { return Array.isArray(value) ? v
 function message(value: unknown, fallback: string): string {
   return isRecord(value) ? readString(value.message) || fallback : fallback;
 }
-  function normalize(value: unknown): InventoryData {
-    const data = isRecord(value) && isRecord(value.data) ? value.data : isRecord(value) ? value : {};
-    const sourceRows = rows(data.records ?? data.data ?? data.items);
-    const records = sourceRows.map((row) => {
-      const values: InventoryRecord["values"] = {};
-      Object.entries(row).forEach(([key, item]) => {
-        if (typeof item === "string" || typeof item === "number" || typeof item === "boolean" || item === null) values[key.toLowerCase()] = item;
-      });
-      return { id: readNumber(row.id ?? row.ID), values };
+function normalize(value: unknown): InventoryData {
+  const data = isRecord(value) && isRecord(value.data) ? value.data : isRecord(value) ? value : {};
+  const recordsKey = data.records !== undefined ? "records" : data.data !== undefined ? "data" : data.items !== undefined ? "items" : null;
+  const sourceRows = rows(recordsKey ? data[recordsKey] : undefined);
+  const records = sourceRows.map((row) => {
+    const values: InventoryRecord["values"] = {};
+    Object.entries(row).forEach(([key, item]) => {
+      if (typeof item === "string" || typeof item === "number" || typeof item === "boolean" || item === null) values[key] = item;
     });
-    const options: InventoryData["options"] = {};
-    Object.entries(data).forEach(([key, value]) => {
-      if (!Array.isArray(value) || ["records", "data", "items"].includes(key)) return;
-      const unique = new Map<string, InventoryOption>();
-      rows(value).forEach((row) => {
-        const rawId = row.id ?? row.ID ?? row.item_id ?? row.user_id;
-        const numericId = readNumber(rawId);
-        const id = numericId || readString(rawId);
-        const label = readString(row.label ?? row.title ?? row.name ?? row.item_name ?? row.display_name);
-        const parentId = readNumber(row.parent_id ?? row.category_id ?? row.sub_category_id ?? row.vendor_id);
-        const price = Number(row.price);
-        const optionKey = `${String(id)}:${parentId}`;
-        if (id && label && !unique.has(optionKey)) unique.set(optionKey, { id, label, ...(parentId ? { parentId } : {}), ...(Number.isFinite(price) ? { price } : {}) });
-      });
-      options[key] = [...unique.values()];
+    return { id: readNumber(row.id ?? row.ID), values };
+  });
+  const options: InventoryData["options"] = {};
+  Object.entries(data).forEach(([key, value]) => {
+    if (!Array.isArray(value) || key === recordsKey || key === "data") return;
+    const unique = new Map<string, InventoryOption>();
+    rows(value).forEach((row) => {
+      const rawId = row.id ?? row.ID ?? row.item_id ?? row.user_id;
+      const numericId = readNumber(rawId);
+      const id = numericId || readString(rawId);
+      const label = readString(row.label ?? row.title ?? row.name ?? row.item_name ?? row.display_name);
+      const parentId = readNumber(row.parent_id ?? row.category_id ?? row.sub_category_id ?? row.vendor_id);
+      const groupKey = readString(row.group_key);
+      const price = Number(row.price);
+      const key = `${String(id)}:${parentId}:${groupKey}`;
+      if (id && label && !unique.has(key)) unique.set(key, { id, label, ...(parentId ? { parentId } : {}), ...(groupKey ? { groupKey } : {}), ...(Number.isFinite(price) ? { price } : {}) });
     });
-    return { records, options };
-  }
+  });
+  return { records, options };
+}
 
 export function getInventorySession(): SessionContext {
   const session = buildSessionContext();

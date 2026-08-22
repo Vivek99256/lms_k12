@@ -31,6 +31,7 @@ import {
   listStudents,
   type StudentRow,
 } from "@/app/lms/homework/api";
+import RequireStaff from "@/app/lms/_shared/RequireStaff";
 
 const academicFields: DropdownField[] = [
   "section",
@@ -189,6 +190,7 @@ export default function StudentHomeworkPage() {
   }
 
   return (
+    <RequireStaff>
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900">Student Homework</h1>
@@ -384,5 +386,6 @@ export default function StudentHomeworkPage() {
         </section>
       )}
     </main>
+    </RequireStaff>
   );
 }

@@ -214,6 +214,11 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   // a separate `*.index` root, so the level-3 family stays consistent.
   'new_pal.administration': '/pal/new/administration',
   'lms/new-pal/administration': '/pal/new/administration',
+  // Gamification — the third New PAL level-3 sub-module, registered by
+  // 2026_08_17_110000_add_new_pal_gamification_submodule_menu. Same
+  // `new_pal.<sub_module>` convention as its two siblings above.
+  'new_pal.gamification': '/pal/new/gamification',
+  'lms/new-pal/gamification': '/pal/new/gamification',
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',
@@ -591,6 +596,11 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const studentReportRoute = STUDENT_REPORT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (studentReportRoute) {
     return studentReportRoute;
+  }
+
+  // Teacher Transfer Utility: legacy Laravel route name → the Next.js page.
+  if (cleanLink.toLowerCase() === 'teachertransfer.index') {
+    return '/teachertransfer';
   }
 
   const migrationRoute = MIGRATION_MODULE_ROUTES[cleanLink.toLowerCase()];

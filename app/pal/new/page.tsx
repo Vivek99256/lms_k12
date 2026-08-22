@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import NewPalNav, { SUB_MODULES } from '@/app/pal/new/_components/NewPalNav';
+import { SUB_MODULES } from '@/app/pal/new/_components/NewPalNav';
 import {
   fetchEstateCoverage,
   scoreTone,
@@ -79,7 +79,12 @@ export default function NewPalPage() {
           </Button>
         </div>
 
-        <NewPalNav />
+        {/*
+          No sub-module bar here. DashboardShell already renders the New PAL
+          sub-nav above every /pal route, so a second one on this page was the
+          same navigation twice on one screen. The sub-module CARDS below still
+          read SUB_MODULES, so the roadmap stays visible.
+        */}
 
         {error ? (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">

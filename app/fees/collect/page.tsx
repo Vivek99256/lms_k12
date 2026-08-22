@@ -583,7 +583,7 @@ export default function FeesCollectPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#f8fafc_38%,#f1f5f9_100%)]">
+    <div className="min-h-screen ">
       <div className="mx-auto max-w-[1500px] space-y-5 p-4 md:p-5 lg:p-6">
         <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-sm ring-1 ring-slate-200/70">
           <CardHeader className="border-b border-slate-100 pb-4">
@@ -636,7 +636,7 @@ export default function FeesCollectPage() {
                     standard: 'All standards',
                     division: 'All divisions',
                   }}
-                  className="min-w-0 grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-3 [&>div]:min-w-0 [&_label]:text-xs [&_label]:font-semibold [&_label]:text-slate-600 [&_select]:h-11 [&_select]:min-w-0 [&_select]:w-full [&_select]:rounded-xl [&_select]:border-slate-200 [&_select]:bg-slate-50/70 [&_select]:pr-10 [&_select]:text-sm"
+                  className="w-130 grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-3 [&>div]:min-w-0 [&_label]:text-xs [&_label]:font-semibold [&_label]:text-slate-600 [&_select]:h-11 [&_select]:min-w-0 [&_select]:w-full [&_select]:rounded-xl [&_select]:border-slate-200 [&_select]:bg-slate-50/70 [&_select]:pr-10 [&_select]:text-sm"
                   onChange={handleAcademicDropdownChange}
                   onStandardChange={handleStandardChange}
                   onDivisionChange={handleDivisionChange}

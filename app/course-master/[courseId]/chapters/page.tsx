@@ -50,7 +50,7 @@ import {
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { courses, type Course } from '../../data/courses';
+import { type Course } from '../../data/courses';
 import {
   fetchChapterContent,
   fetchQuestionBank,
@@ -236,6 +236,17 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   return 'Revision notes';
 }
 
+function getViewableContentUrl(rawUrl: string, filename?: string | null): string {
+  const isOfficeDoc = /\.(docx?|pptx?|xlsx?)(?:$|\?)/i.test(filename ?? rawUrl);
+  const isAbsoluteUrl = /^https?:\/\//i.test(rawUrl);
+
+  if (isOfficeDoc && isAbsoluteUrl) {
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(rawUrl)}&embedded=true`;
+  }
+
+  return rawUrl;
+}
+
 function buildApiChapterContentItems(
   chapter: Chapter,
   categories: Record<string, ChapterContentAsset[]>
@@ -243,7 +254,8 @@ function buildApiChapterContentItems(
   return Object.entries(categories).flatMap(([category, assets]) =>
     (assets ?? []).map((asset) => {
       const type = getApiContentType(category, asset);
-      const contentUrl = asset.url || asset.filename || undefined;
+      const rawContentUrl = asset.url || asset.filename || undefined;
+      const contentUrl = rawContentUrl ? getViewableContentUrl(rawContentUrl, asset.filename) : undefined;
       const updatedDate = asset.created_at?.split(' ')[0] ?? '—';
       const rawConceptId =
         asset.concept_id === null || asset.concept_id === undefined
@@ -781,32 +793,28 @@ export default function ChapterListPage() {
   }, [subjectId, standardId]);
 
   const course: Course | undefined = useMemo(() => {
-    const staticCourse = courses.find((c) => c.id === courseId);
     const apiSubject = subjectData?.subject ?? null;
 
-    return (
-      staticCourse ??
-      (apiSubject
-        ? {
-            id: courseId,
-            title: apiSubject.subject_name,
-            code: '',
-            subject: apiSubject.subject_name,
-            category: apiSubject.content_category,
-            classGrade: `Class ${apiSubject.standard_name}`,
-            status: 'Active',
-            chapters: subjectData?.chapters.length ?? 0,
-            enrollments: 0,
-            progress: 0,
-            instructor: '',
-            createdAt: '',
-            accentColor: '#5648E8',
-            icon: 'book-open',
-          }
-        : undefined)
-    );
+    return apiSubject
+      ? {
+          id: courseId,
+          title: apiSubject.subject_name,
+          code: '',
+          subject: apiSubject.subject_name,
+          category: apiSubject.content_category,
+          classGrade: `Class ${apiSubject.standard_name}`,
+          status: 'Active',
+          chapters: subjectData?.chapters.length ?? 0,
+          enrollments: 0,
+          progress: 0,
+          instructor: '',
+          createdAt: '',
+          accentColor: '#5648E8',
+          icon: 'book-open',
+        }
+      : undefined;
   }, [courseId, subjectData?.chapters, subjectData?.subject]);
-  const allChapters = subjectData?.chapters ?? getChaptersByCourseid(courseId);
+  const allChapters = subjectData?.chapters ?? [];
 
   const [searchTerm] = useState('');
   const [isAddChapterOpen, setIsAddChapterOpen] = useState(false);

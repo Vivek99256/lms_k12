@@ -21,6 +21,7 @@ import {
   renameMapping,
   type MappingTypeRow,
 } from '@/app/lms/global-mapping/api';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
@@ -198,6 +199,7 @@ export default function GlobalMappingPage() {
     );
 
   return (
+    <RequireStaff>
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1100px] space-y-5">
         <header className="flex flex-wrap items-start justify-between gap-3">
@@ -335,5 +337,6 @@ export default function GlobalMappingPage() {
         )}
       </div>
     </div>
+    </RequireStaff>
   );
 }

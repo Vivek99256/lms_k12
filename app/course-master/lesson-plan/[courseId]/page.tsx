@@ -48,9 +48,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { cn } from '@/lib/utils';
 import { getRequestContext } from '../../page';
-import { courses } from '../../data/courses';
 import {
-  getChaptersByCourseid,
   getSubjectAndChapters,
   type Chapter,
   type SubjectWithChapters,
@@ -760,7 +758,6 @@ export default function LessonPlanPage() {
   const chapterId = searchParams?.get('chapterId') ?? '';
   const conceptTitleParam = searchParams?.get('concept') ?? '';
 
-  const staticCourse = courses.find((c) => c.id === courseId);
   const courseIdParts = courseId.includes('-') ? courseId.split('-', 2) : [];
   const subjectId = courseIdParts[0];
   const standardId = courseIdParts[1];
@@ -772,8 +769,7 @@ export default function LessonPlanPage() {
   const apiSubject = subjectData?.subject ?? null;
   const course: Course | undefined = useMemo(
     () =>
-      staticCourse ??
-      (apiSubject
+      apiSubject
         ? {
             id: courseId,
             title: apiSubject.subject_name,
@@ -790,14 +786,10 @@ export default function LessonPlanPage() {
             accentColor: '#4F46E5',
             icon: 'book-open',
           }
-        : undefined),
-    [staticCourse, apiSubject, subjectData, courseId]
+        : undefined,
+    [apiSubject, subjectData, courseId]
   );
-  const courseChapters = useMemo<Chapter[]>(() => {
-    if (subjectData?.chapters?.length) return subjectData.chapters;
-    if (staticCourse) return getChaptersByCourseid(courseId);
-    return [];
-  }, [subjectData, staticCourse, courseId]);
+  const courseChapters = useMemo<Chapter[]>(() => subjectData?.chapters ?? [], [subjectData]);
   const selectedChapter =
     courseChapters.find((chapter) => chapter.id === chapterId) || courseChapters[0] || null;
   const handleSubjectClick = (nextSubjectId: number | null, nextChapterId: number | null) => {

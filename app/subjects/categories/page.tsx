@@ -1,19 +1,64 @@
 'use client';
 
-import React from 'react';
-import { BookOpen, FolderOpen, ChevronRight } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BookOpen, FolderOpen, ChevronRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { fetchSubjects, subjectChapterCount, type LmsSubject } from '../_lib/subjects-api';
 
-const categories = [
-  { name: 'Arts', count: 24, emoji: '🎨', color: '#6366F1' },
-  { name: 'Science', count: 32, emoji: '🔬', color: '#10B981' },
-  { name: 'Mathematics', count: 28, emoji: '📐', color: '#F59E0B' },
-  { name: 'English', count: 18, emoji: '📖', color: '#8B5CF6' },
-  { name: 'History', count: 16, emoji: '🏛️', color: '#EF4444' },
-  { name: 'Geography', count: 20, emoji: '🗺️', color: '#0891B2' },
-];
+const PALETTE = ['#6366F1', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#0891B2', '#EC4899', '#14B8A6'];
+const EMOJI = ['🎨', '🔬', '📐', '📖', '🏛️', '🗺️', '💻', '📊'];
+
+type CategoryTile = {
+  name: string;
+  count: number;
+  emoji: string;
+  color: string;
+};
+
+function groupByCategory(subjects: LmsSubject[]): CategoryTile[] {
+  const counts = new Map<string, number>();
+  for (const subject of subjects) {
+    const name = subject.content_category || subject.category_name || 'Uncategorized';
+    counts.set(name, (counts.get(name) ?? 0) + subjectChapterCount(subject));
+  }
+  return Array.from(counts.entries()).map(([name, count], index) => ({
+    name,
+    count,
+    emoji: EMOJI[index % EMOJI.length],
+    color: PALETTE[index % PALETTE.length],
+  }));
+}
 
 export default function SubjectCategoriesPage() {
+  const [rawSubjects, setRawSubjects] = useState<LmsSubject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const rows = await fetchSubjects();
+        if (!cancelled) setRawSubjects(rows);
+      } catch (fetchError) {
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : 'Unable to load subject categories.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const categories = useMemo(() => groupByCategory(rawSubjects), [rawSubjects]);
+
   return (
     <div className="flex-1 overflow-auto p-8">
       <div className="mb-8">
@@ -21,6 +66,24 @@ export default function SubjectCategoriesPage() {
         <p className="text-gray-600 mt-1 text-lg">Manage and organize your subject categories</p>
       </div>
 
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading categories…
+        </div>
+      )}
+
+      {!loading && error && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && categories.length === 0 && (
+        <div className="text-center py-16 text-gray-400 text-sm">No subject categories available yet.</div>
+      )}
+
+      {!loading && !error && categories.length > 0 && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {categories.map((cat, idx) => (
           <Link
@@ -45,6 +108,7 @@ export default function SubjectCategoriesPage() {
           </Link>
         ))}
       </div>
+      )}
     </div>
   );
 }

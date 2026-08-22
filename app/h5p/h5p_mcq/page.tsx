@@ -25,6 +25,7 @@ import {
   getUserIdentity,
   h5pContextQuery,
   hasH5pContext,
+  postH5pXapiStatement,
   readH5pContext,
   type H5pContext,
   type McqAnswer,
@@ -690,9 +691,20 @@ function McqContent() {
     [ctx]
   );
 
-  const selectAnswer = useCallback((questionId: number, answerId: number) => {
-    setUserAnswers((prev) => ({ ...prev, [questionId]: answerId }));
-  }, []);
+  const selectAnswer = useCallback(
+    (questionId: number, answerId: number) => {
+      setUserAnswers((prev) => ({ ...prev, [questionId]: answerId }));
+
+      const correct = findCorrectAnswer(answersByQuestion[String(questionId)]);
+      void postH5pXapiStatement({
+        objectId: `multiple_choice:${questionId}`,
+        verb: 'answered',
+        ctx,
+        success: correct !== undefined && correct.id === answerId,
+      });
+    },
+    [answersByQuestion, ctx]
+  );
 
   const navigateTo = useCallback(
     (index: number) => {
@@ -704,8 +716,11 @@ function McqContent() {
 
   const endQuiz = useCallback(() => {
     setView('results');
+    for (const questionId of Object.keys(userAnswers)) {
+      void postH5pXapiStatement({ objectId: `multiple_choice:${questionId}`, verb: 'completed', ctx });
+    }
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  }, [userAnswers, ctx]);
 
   const retakeQuiz = useCallback(() => {
     setUserAnswers({});

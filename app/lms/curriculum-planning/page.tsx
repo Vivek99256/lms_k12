@@ -3,6 +3,7 @@
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ChevronDown, ChevronLeft, Download, Filter, Pencil, Plus, Search, X } from 'lucide-react';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 type Stat = {
   label: string;
@@ -1265,30 +1266,31 @@ export default function CurriculumPlanningPage() {
 
   if (isUpcomingLessonsViewOpen) {
     return (
-      <>
+      <RequireStaff>
         {dialogs}
         <AllUpcomingLessonsView
           onBack={() => setIsUpcomingLessonsViewOpen(false)}
           onFilter={() => setIsFilterDialogOpen(true)}
           onAddLesson={() => setIsAddTopicDialogOpen(true)}
         />
-      </>
+      </RequireStaff>
     );
   }
 
   if (isSubjectProgressViewOpen) {
     return (
-      <>
+      <RequireStaff>
         {dialogs}
         <SubjectProgressDetailsView
           onBack={() => setIsSubjectProgressViewOpen(false)}
           onFilter={() => setIsFilterDialogOpen(true)}
         />
-      </>
+      </RequireStaff>
     );
   }
 
   return (
+    <RequireStaff>
     <div className="min-h-full  px-4 py-4 text-[#26231f] sm:px-6 lg:px-7">
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -1476,5 +1478,6 @@ export default function CurriculumPlanningPage() {
         </div>
       </section>
     </div>
+    </RequireStaff>
   );
 }
