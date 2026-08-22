@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { fetchFeesDashboardSummary } from '@/app/fees/_lib/fees-dashboard-api';
+import { getFeesSession } from '@/app/fees/_lib/fees-api';
 import {
   SearchDropdown,
   type Division,
@@ -76,8 +78,12 @@ type PaymentMix = {
 type DashboardSnapshot = {
   collectedThisTerm?: number;
   outstandingTotal?: number;
+  demandAmount?: number;
   collectionRate?: number;
   defaulters?: number;
+  paidStudents?: number;
+  pendingStudents?: number;
+  studentsConsidered?: number;
   chartTrend?: ChartPoint[];
   headBreakdown?: HeadBreakdown[];
   paymentMix?: PaymentMix[];
@@ -202,7 +208,7 @@ export default function FeesCollectPage() {
       form.append('sub_institute_id', String(subInstituteId));
       form.append('syear', String(academicYearId));
       appendStudentSearchFilters(form, filters);
-      if (includeInactive) form.append('include_inactive', '1');
+      if (includeInactive) form.append('including_inactive', 'Yes');
       form.append('type', 'API');
 
       const response = await fetch(`${hostName.replace(/\/$/, '')}/fees/fees_collect/show_student`, {
@@ -221,7 +227,23 @@ export default function FeesCollectPage() {
       }
 
       const result = await readStudentsResponseProgressively(response, { onRows: () => {} });
-      const snapshot = toDashboardSnapshot(result.payload, result.source);
+      let snapshot = toDashboardSnapshot(result.payload, result.source);
+      try {
+        const dashboardSession = getFeesSession();
+        const dashboardPayload = await fetchFeesDashboardSummary(dashboardSession, {
+          sub_institute_id: dashboardSession.subInstituteId,
+          syear: dashboardSession.academicYearId,
+          user_id: dashboardSession.userId,
+          from_date: filters.fromDate || null,
+          to_date: filters.toDate || null,
+          grade_id: filters.selectedSection || null,
+          standard_id: filters.selectedStandard || null,
+          section_id: filters.selectedDivision || null,
+        });
+        snapshot = toDashboardSnapshot(dashboardPayload, dashboardPayload);
+      } catch {
+        // Keep the table-derived fallback when the aggregate endpoint is unavailable.
+      }
       setDashboardRows(result.rows);
       setDashboardSnapshot(snapshot);
       if (result.totalCount != null && totalStudentCount == null) {
@@ -299,7 +321,7 @@ export default function FeesCollectPage() {
       form.append('syear', String(academicYearId));
       appendStudentSearchFilters(form, filters);
       appendStudentPaginationFilters(form, pageNumber);
-      if (includeInactive) form.append('include_inactive', '1');
+      if (includeInactive) form.append('including_inactive', 'Yes');
       form.append('type', 'API');
 
       const res = await fetch(`${hostName.replace(/\/$/, '')}/fees/fees_collect/show_student`, {
@@ -490,7 +512,6 @@ export default function FeesCollectPage() {
     [dashboardSourceRows]
   );
   const totalPayableFees = dashboardData.totalPaidFees + dashboardData.totalPendingFees;
-  const hasDailyTrend = dashboardData.dailyTrend.length > 0;
   const hasDashboardData = dashboardData.todayCollection > 0
     || dashboardData.totalPaidFees > 0
     || dashboardData.totalPendingFees > 0
@@ -725,24 +746,6 @@ export default function FeesCollectPage() {
                   ))}
                 </section>
 
-                <section className={`grid gap-4 ${hasDailyTrend ? 'xl:grid-cols-[1.15fr_1fr]' : 'grid-cols-1'}`}>
-                  <ChartCard title="Collected vs Pending Fees" subtitle="Calculated directly from the current API response.">
-                    <PaidPendingComparisonChart
-                      paid={dashboardData.totalPaidFees}
-                      pending={dashboardData.totalPendingFees}
-                      totalPayable={totalPayableFees}
-                      paidStudents={dashboardData.paidStudents}
-                      pendingStudents={dashboardData.pendingStudents}
-                      trendData={dashboardData.dailyTrend}
-                    />
-                  </ChartCard>
-
-                  {hasDailyTrend ? (
-                    <ChartCard title="Daily Fee Collection Trend" subtitle="Shown only when date-wise collection transactions exist.">
-                      <DailyCollectionTrendChart data={dashboardData.dailyTrend} />
-                    </ChartCard>
-                  ) : null}
-                </section>
               </div>
             ) : (
               <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center">
@@ -1395,6 +1398,10 @@ function getCollectionTrendIndicator(data: ChartPoint[]) {
   };
 }
 
+void ChartCard;
+void DailyCollectionTrendChart;
+void PaidPendingComparisonChart;
+
 function SortableHeader({ label, align = 'left' }: { label: string; align?: 'left' | 'right' }) {
   return (
     <th className={`px-5 py-3 font-semibold ${align === 'right' ? 'text-right' : ''}`}>
@@ -1817,14 +1824,15 @@ function appendUniqueStudents(current: StudentFeeRow[], next: StudentFeeRow[]): 
 }
 
 function buildDashboardData(students: StudentFeeRow[], snapshot: DashboardSnapshot): DashboardData {
-  void snapshot;
-  const totalPaidFees = getCollectedTotal(students);
-  const totalPendingFees = students.reduce((total, student) => total + student.pendingFees, 0);
+  const totalPaidFees = snapshot.collectedThisTerm ?? getCollectedTotal(students);
+  const totalPendingFees = snapshot.outstandingTotal ?? students.reduce((total, student) => total + student.pendingFees, 0);
   const calculatedTotal = students.reduce((total, student) => total + getStudentTotalFees(student), 0);
-  const collectionBase = Math.max(calculatedTotal, totalPaidFees + totalPendingFees);
-  const collectionRate = collectionBase > 0 ? Math.round((totalPaidFees / collectionBase) * 100) : 0;
-  const pendingStudents = students.filter((student) => student.pendingFees > 0 && student.status !== 'paid').length;
-  const paidStudents = Math.max(students.filter((student) => student.status === 'paid' || student.pendingFees <= 0).length, 0);
+  const collectionBase = snapshot.demandAmount ?? Math.max(calculatedTotal, totalPaidFees + totalPendingFees);
+  const collectionRate = snapshot.collectionRate ?? (collectionBase > 0 ? Math.round((totalPaidFees / collectionBase) * 100) : 0);
+  const pendingStudents = snapshot.pendingStudents ?? snapshot.defaulters ?? students.filter((student) => student.pendingFees > 0 && student.status !== 'paid').length;
+  const paidStudents = snapshot.paidStudents
+    ?? (snapshot.studentsConsidered !== undefined ? Math.max(snapshot.studentsConsidered - pendingStudents, 0) : undefined)
+    ?? Math.max(students.filter((student) => student.status === 'paid' || student.pendingFees <= 0).length, 0);
 
   return {
     todayCollection: getTodayCollection(students),
@@ -1842,6 +1850,7 @@ function buildDashboardData(students: StudentFeeRow[], snapshot: DashboardSnapsh
 function hasDashboardSnapshotData(snapshot: DashboardSnapshot): boolean {
   return snapshot.collectedThisTerm !== undefined
     || snapshot.outstandingTotal !== undefined
+    || snapshot.demandAmount !== undefined
     || snapshot.collectionRate !== undefined
     || snapshot.defaulters !== undefined
     || Boolean(snapshot.chartTrend?.length)
@@ -1866,6 +1875,7 @@ function toDashboardSnapshot(payload: unknown, source: unknown): DashboardSnapsh
       'receivedAmount',
       'collection_amount',
       'collectionAmount',
+      'collected_amount',
     ]),
     outstandingTotal: readFirstNumber(records, [
       'outstanding',
@@ -1878,6 +1888,13 @@ function toDashboardSnapshot(payload: unknown, source: unknown): DashboardSnapsh
       'balance',
       'balance_amount',
       'due_amount',
+      'outstanding_amount',
+    ]),
+    demandAmount: readFirstNumber(records, [
+      'demand_amount',
+      'demandAmount',
+      'total_payable',
+      'totalPayable',
     ]),
     collectionRate: normalizeOptionalPercentage(readFirstNumber(records, [
       'collection_rate',
@@ -1896,6 +1913,19 @@ function toDashboardSnapshot(payload: unknown, source: unknown): DashboardSnapsh
       'overdueCount',
       'pending_students',
       'pendingStudents',
+    ]),
+    paidStudents: readFirstNumber(records, [
+      'paid_students',
+      'paidStudents',
+    ]),
+    studentsConsidered: readFirstNumber(records, [
+      'students_considered',
+      'studentsConsidered',
+    ]),
+    pendingStudents: readFirstNumber(records, [
+      'pending_students',
+      'pendingStudents',
+      'defaulters_count',
     ]),
     chartTrend: toChartPoints(readFirstArray(records, [
       'collection_trend',

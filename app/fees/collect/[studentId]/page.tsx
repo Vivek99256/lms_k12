@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Banknote, CalendarDays, ChevronDown, History, Loader2, Printer, Save } from 'lucide-react';
+import { ArrowLeft, Banknote, CalendarDays, ChevronDown, History, Loader2, Printer } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -109,12 +109,6 @@ type ReceiptResponse = {
   message?: string;
 };
 
-const defaultPaymentModes = [
-  { id: 'Cash', label: 'Cash' },
-  { id: 'Cheque', label: 'Cheque' },
-  { id: 'Online', label: 'Online' },
-];
-
 const currencyFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
@@ -132,13 +126,13 @@ export default function FeesCollectionStudentPage() {
   const [summaryRows, setSummaryRows] = useState<SummaryRow[]>([]);
   const [months, setMonths] = useState<FeeMonth[]>([]);
   const [banks, setBanks] = useState<SelectOption[]>([]);
-  const [paymentModes, setPaymentModes] = useState<SelectOption[]>(defaultPaymentModes);
+  const [paymentModes, setPaymentModes] = useState<SelectOption[]>([]);
   const [selectedMonthIds, setSelectedMonthIds] = useState<string[]>([]);
   const [expandedMonthId, setExpandedMonthId] = useState<string | null>(null);
   const [remarks, setRemarks] = useState('');
   const [discount, setDiscount] = useState(0);
   const [fine, setFine] = useState(0);
-  const [paymentMode, setPaymentMode] = useState('Cash');
+  const [paymentMode, setPaymentMode] = useState('');
   const [receiptDate, setReceiptDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [chequeDate, setChequeDate] = useState('');
   const [transactionNo, setTransactionNo] = useState('');
@@ -158,7 +152,7 @@ export default function FeesCollectionStudentPage() {
     setSummaryRows([]);
     setMonths([]);
     setBanks([]);
-    setPaymentModes(defaultPaymentModes);
+    setPaymentModes([]);
     setCollectionData(null);
     setReceiptHtml('');
     setPrintReceiptOnLoad(false);
@@ -207,7 +201,7 @@ export default function FeesCollectionStudentPage() {
     setPaymentModes(toPaymentModes(source.payment_modes));
     setSelectedMonthIds(loadedMonths.map((month) => month.id));
     setExpandedMonthId(loadedMonths[0]?.id ?? null);
-    setPaymentMode(savedPaymentMode || 'Cash');
+    setPaymentMode(savedPaymentMode || toPaymentModes(source.payment_modes)[0]?.id || '');
     setSelectedBankId(savedBankId);
     setBankBranch(savedBankBranch);
     setTransactionNo(savedTransactionNo);
@@ -285,9 +279,10 @@ export default function FeesCollectionStudentPage() {
 
   const totalAmount = selectedParticulars.reduce((total, item) => total + item.collectionAmount, 0);
   const grandTotal = Math.max(totalAmount - discount + fine, 0);
-  const showBankFields = paymentMode === 'Cheque' || paymentMode === 'Online';
-  const showChequeDate = paymentMode === 'Cheque';
-  const showBranch = paymentMode === 'Cheque';
+  const isCashPayment = paymentMode.trim().toLowerCase() === 'cash';
+  const showBankFields = Boolean(paymentMode) && !isCashPayment;
+  const showChequeDate = showBankFields;
+  const showBranch = showBankFields;
   const totalSummaryFees = summaryRows.reduce((total, row) => total + row.fees, 0);
   const totalSummaryPaid = summaryRows.reduce((total, row) => total + row.paid, 0);
   const totalSummaryDiscount = summaryRows.reduce((total, row) => total + row.discount, 0);
@@ -360,7 +355,9 @@ export default function FeesCollectionStudentPage() {
         return {
           ...month,
           particulars: month.particulars.map((particular) =>
-            particular.id === particularId ? { ...particular, collectionAmount: amount } : particular
+            particular.id === particularId
+              ? { ...particular, collectionAmount: Math.min(Math.max(amount, 0), particular.amount) }
+              : particular
           ),
         };
       })
@@ -377,8 +374,30 @@ export default function FeesCollectionStudentPage() {
       return;
     }
 
-    setSaving(true);
     setError(null);
+
+    if (selectedMonthIds.length === 0 || selectedParticulars.length === 0 || totalAmount <= 0) {
+      setError('Select at least one fee month with an amount to collect.');
+      return;
+    }
+    if (selectedParticulars.some((particular) => particular.collectionAmount > particular.amount)) {
+      setError('A collection amount cannot be greater than its original fee amount.');
+      return;
+    }
+    if (!paymentMode) {
+      setError('Select a payment mode.');
+      return;
+    }
+    if (!receiptDate) {
+      setError('Select a receipt date.');
+      return;
+    }
+    if (!isCashPayment && (!chequeDate || !transactionNo.trim() || !selectedBankId || !bankBranch.trim())) {
+      setError('Cheque/DD date, reference number, bank name, and bank branch are required for non-cash payments.');
+      return;
+    }
+
+    setSaving(true);
 
     try {
       const apiBaseUrl = (session.hostName || API_BASE_URL || '').replace(/\/$/, '');
@@ -421,6 +440,8 @@ export default function FeesCollectionStudentPage() {
 
       const particularTotals = new Map<string, { collectionAmount: number; amount: number }>();
       selectedParticulars.forEach((particular) => {
+        if (particular.collectionAmount <= 0) return;
+
         const current = particularTotals.get(particular.id) ?? { collectionAmount: 0, amount: 0 };
         particularTotals.set(particular.id, {
           collectionAmount: current.collectionAmount + particular.collectionAmount,
@@ -430,16 +451,9 @@ export default function FeesCollectionStudentPage() {
 
       particularTotals.forEach((particular, particularId) => {
         form.append(`fees_data[${particularId}]`, String(particular.collectionAmount));
-        form.append(`fine_data[${particularId}]`, '0');
         form.append(`hid_fees_data[${particularId}]`, String(particular.amount));
-        form.append(`discount_data[${particularId}]`, '0');
       });
 
-      const previousFees = readNumber(studentRecord.previous_fees);
-      form.append('fees_data[previous_fees]', '0');
-      form.append('fine_data[previous_fees]', '0');
-      form.append('hid_fees_data[previous_fees]', String(previousFees));
-      form.append('discount_data[previous_fees]', '0');
       form.append('total', String(totalAmount));
       form.append('totalFin', String(fine));
       form.append('remarks', remarks);
@@ -448,10 +462,11 @@ export default function FeesCollectionStudentPage() {
       form.append('PAYMENT_MODE', paymentMode);
       form.append('receiptdate', receiptDate);
       form.append('cheque_date', chequeDate || receiptDate);
-      form.append('cheque_no', paymentMode !== 'Cash' ? transactionNo : '');
+      form.append('cheque_no', showBankFields ? transactionNo : '');
       form.append('bank_id', showBankFields ? selectedBankId : '');
       form.append('bank_name', showBankFields ? selectedBankName : '');
       form.append('bank_branch', showBranch ? bankBranch : 'N/A');
+      if (sendSms) form.append('send_sms', 'on');
       form.append('submit', 'Save');
       form.append('sub_institute_id', session.subInstituteId);
       form.append('syear', session.academicYearId);
@@ -713,7 +728,7 @@ export default function FeesCollectionStudentPage() {
               </CardHeader>
               <CardContent className="space-y-4 p-4 sm:p-5">
                 <Field label="Payment Mode">
-                  <Select value={paymentMode} onValueChange={(value) => setPaymentMode(value ?? 'Cash')}>
+                  <Select value={paymentMode} onValueChange={(value) => setPaymentMode(value ?? '')}>
                     <SelectTrigger className="h-10 w-full rounded-lg border-slate-200 bg-slate-50/70 text-sm">
                       <SelectValue placeholder="Select payment mode" />
                     </SelectTrigger>
@@ -732,7 +747,7 @@ export default function FeesCollectionStudentPage() {
                     <Input type="date" value={chequeDate} onChange={(event) => setChequeDate(event.target.value)} className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
                   </Field>
                 )}
-                {paymentMode !== 'Cash' && (
+                {showBankFields && (
                   <Field label="Cheque/DD/Transaction No.">
                     <Input value={transactionNo} onChange={(event) => setTransactionNo(event.target.value)} placeholder="Enter reference number" className="h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
                   </Field>
@@ -857,6 +872,7 @@ function FeeParticularsTable({ month, onAmountChange }: { month: FeeMonth; onAmo
             <Input
               type="number"
               min="0"
+              max={particular.amount}
               value={particular.collectionAmount}
               onChange={(event) => onAmountChange(month.id, particular.id, readNumber(event.target.value))}
               className="mt-2 h-9 rounded-lg border-slate-200 bg-white text-sm"
@@ -890,7 +906,7 @@ function FeeParticularsTable({ month, onAmountChange }: { month: FeeMonth; onAmo
               <td className="px-3 py-3 font-medium text-slate-800">{particular.particular}</td>
               <td className="px-3 py-3 text-slate-600">{currencyFormatter.format(particular.amount)}</td>
               <td className="px-3 py-3">
-                <Input type="number" min="0" value={particular.collectionAmount} onChange={(event) => onAmountChange(month.id, particular.id, readNumber(event.target.value))} className="h-9 max-w-[160px] rounded-lg border-slate-200 bg-white text-sm" />
+                <Input type="number" min="0" max={particular.amount} value={particular.collectionAmount} onChange={(event) => onAmountChange(month.id, particular.id, readNumber(event.target.value))} className="h-9 max-w-[160px] rounded-lg border-slate-200 bg-white text-sm" />
               </td>
             </tr>
           ))}
@@ -1112,7 +1128,10 @@ function toParticulars(value: unknown, finalFee?: unknown, finalFeeName?: unknow
       id: readString(record.id ?? record.particular_id ?? record.fee_head_id ?? record.particular),
       particular: readString(record.particular ?? record.name ?? record.fee_head ?? record.title),
       amount,
-      collectionAmount: readNumber(record.collection_amount ?? record.collectionAmount ?? record.remaining ?? amount),
+      collectionAmount: Math.min(
+        Math.max(readNumber(record.collection_amount ?? record.collectionAmount ?? record.remaining ?? amount), 0),
+        amount
+      ),
     };
   }).filter((particular) => particular.id);
 }
@@ -1125,7 +1144,7 @@ function toPaymentModes(value: unknown): SelectOption[] {
     label: readString(label) || id,
   })).filter((mode) => mode.id && mode.label);
 
-  return modes.length > 0 ? modes : defaultPaymentModes;
+  return modes;
 }
 
 function toOptions(items: unknown): SelectOption[] {
