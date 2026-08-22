@@ -22,6 +22,13 @@ interface ApplyLeaveDrawerProps {
   onOpenChange: (open: boolean) => void
   processing?: boolean
   onSubmit?: (payload: LeaveApplyPayload) => Promise<{ ok: boolean; message: string }>
+  /**
+   * Pre-selects a leave type by fuzzy-matching its label (e.g. 'wfh' matches
+   * a 'Work From Home' leave type configured in hrms_leave_types), so quick
+   * actions like "Mark WFH" can reuse this drawer instead of a bespoke page.
+   * No-ops if the institute has no matching leave type configured.
+   */
+  prefillLeaveTypeQuery?: string
 }
 
 interface FormErrors {
@@ -79,7 +86,13 @@ function calculateDuration(fromDate: Date | undefined, toDate: Date | undefined,
   return `${diffDays} day${diffDays > 1 ? 's' : ''}`
 }
 
-export function ApplyLeaveDrawer({ open, onOpenChange, processing = false, onSubmit }: ApplyLeaveDrawerProps) {
+export function ApplyLeaveDrawer({
+  open,
+  onOpenChange,
+  processing = false,
+  onSubmit,
+  prefillLeaveTypeQuery,
+}: ApplyLeaveDrawerProps) {
   const { options, loading: optionsLoading, error: optionsError } = useLeaveOptions()
 
   const [formData, setFormData] = React.useState<FormData>(emptyForm)
@@ -103,6 +116,16 @@ export function ApplyLeaveDrawer({ open, onOpenChange, processing = false, onSub
     [options, formData.employee],
   )
 
+  // Derived, not synced via an effect: falls back to a fuzzy label match
+  // (e.g. 'wfh' -> 'Work From Home') only until the user picks explicitly.
+  const autoMatchedLeaveType = React.useMemo(() => {
+    if (!prefillLeaveTypeQuery) return undefined
+    const query = prefillLeaveTypeQuery.toLowerCase()
+    return (options?.leave_types ?? []).find((type) => type.label.toLowerCase().includes(query))?.value
+  }, [prefillLeaveTypeQuery, options])
+
+  const effectiveLeaveType = formData.leaveType || autoMatchedLeaveType || ''
+
   const duration = React.useMemo(
     () => calculateDuration(formData.fromDate, formData.toDate, formData.isHalfDay),
     [formData.fromDate, formData.toDate, formData.isHalfDay],
@@ -117,7 +140,7 @@ export function ApplyLeaveDrawer({ open, onOpenChange, processing = false, onSub
   const validateField = (field: keyof FormData, data: FormData = formData): string | undefined => {
     switch (field) {
       case 'leaveType':
-        return data.leaveType ? undefined : 'Leave type is required'
+        return data.leaveType || autoMatchedLeaveType ? undefined : 'Leave type is required'
       case 'fromDate':
         return data.fromDate ? undefined : 'Start date is required'
       case 'toDate': {
@@ -175,7 +198,7 @@ export function ApplyLeaveDrawer({ open, onOpenChange, processing = false, onSub
 
     try {
       const result = await onSubmit({
-        leaveTypeId: formData.leaveType,
+        leaveTypeId: effectiveLeaveType,
         dayType: formData.isHalfDay ? 'half' : 'full',
         fromDate: toDateInput(formData.fromDate as Date),
         toDate: formData.toDate ? toDateInput(formData.toDate) : undefined,
@@ -236,7 +259,7 @@ export function ApplyLeaveDrawer({ open, onOpenChange, processing = false, onSub
               <div className="space-y-2">
                 <Label required>Leave Type</Label>
                 <Select
-                  value={formData.leaveType}
+                  value={effectiveLeaveType}
                   onChange={(value) => updateField('leaveType', value)}
                   options={leaveTypeOptions}
                   placeholder={optionsLoading ? 'Loading leave types...' : 'Select leave type'}

@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { lazy, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   AlarmClock,
   BarChart3,
@@ -119,11 +120,11 @@ const widgetFallback = (
 )
 
 function AttendanceDashboard() {
-  // G2G's useSidebarNavigation()/getRoutePath (ActiveNav -> menu route) has no
-  // equivalent in target yet, so quick-action/alert/request click targets have
-  // nowhere to navigate to until that infra lands. Kept as a documented no-op
-  // so every button/handler keeps its exact shape and can be wired up later.
-  const navigate = React.useCallback((_next: { moduleId: string; menuId: string; submenuId: string }) => {}, [])
+  const router = useRouter()
+  const navigate = React.useCallback((path: string | null) => {
+    if (!path) return
+    router.push(path)
+  }, [router])
   const {
     loading,
     processing,
@@ -149,11 +150,11 @@ function AttendanceDashboard() {
   }, [monthlySummary])
 
   const QUICK_ACTIONS = [
-    { id: 'apply-leave', label: 'Apply Leave', icon: CalendarPlus, onClick: () => navigate({ moduleId: '5', menuId: '94', submenuId: '103' }) },
-    { id: 'regularize', label: 'Regularize Attendance', icon: Clock, onClick: () => navigate({ moduleId: '5', menuId: '93', submenuId: '100' }) },
-    { id: 'mark-wfh', label: 'Mark WFH', icon: Home, onClick: () => navigate({ moduleId: '5', menuId: '93', submenuId: '100' }) },
-    { id: 'download-timesheet', label: 'Download Timesheet', icon: Download, onClick: () => navigate({ moduleId: '5', menuId: '93', submenuId: '101' }) },
-    { id: 'monthly-report', label: 'View Monthly Report', icon: BarChart3, onClick: () => navigate({ moduleId: '5', menuId: '93', submenuId: '101' }) },
+    { id: 'apply-leave', label: 'Apply Leave', icon: CalendarPlus, onClick: () => navigate('/hrit/leave-management/leave-requests?apply=1') },
+    { id: 'regularize', label: 'Regularize Attendance', icon: Clock, onClick: () => navigate('/hrit/attendance-management/attendance-regularization?apply=1') },
+    { id: 'mark-wfh', label: 'Mark WFH', icon: Home, onClick: () => navigate('/hrit/leave-management/leave-requests?apply=1&type=wfh') },
+    { id: 'download-timesheet', label: 'Download Timesheet', icon: Download, onClick: () => navigate('/hrit/attendance-management/attendance-reports') },
+    { id: 'monthly-report', label: 'View Monthly Report', icon: BarChart3, onClick: () => navigate('/hrit/attendance-management/attendance-reports') },
   ]
 
   const ATTENDANCE_ALERTS = [
@@ -171,19 +172,43 @@ function AttendanceDashboard() {
   ]
 
   const handleAlertNavigate = React.useCallback((id: string) => {
-    navigate({ moduleId: '5', menuId: '93', submenuId: '100' })
+    switch (id) {
+      case 'a1': // Missing Punch-Out — jump to the regularization request that covers it.
+        navigate('/hrit/attendance-management/attendance-regularization?alert=missing-punch-out&highlight=reg-seed-1')
+        break
+      case 'a2': // Regularization Pending — the pending queue itself.
+        navigate('/hrit/attendance-management/attendance-regularization?status=pending')
+        break
+      case 'a3': // Attendance Locked in X Days — policy/lock info.
+        navigate('/hrit/attendance-management/attendance-policy')
+        break
+      case 'a4': // Early Exit — jump to that regularization record.
+        navigate('/hrit/attendance-management/attendance-regularization?alert=early-exit&highlight=reg-seed-2')
+        break
+      default:
+        navigate(null)
+    }
   }, [navigate])
 
   const handleRequestClick = React.useCallback((id: string) => {
-    if (id === 'r2') {
-      navigate({ moduleId: '5', menuId: '94', submenuId: '103' })
-    } else {
-      navigate({ moduleId: '5', menuId: '93', submenuId: '100' })
+    switch (id) {
+      case 'r1': // Regularization
+      case 'r4': // Attendance Corrections — same underlying regularization workflow, not a duplicate page.
+        navigate('/hrit/attendance-management/attendance-regularization')
+        break
+      case 'r2': // Leave Requests
+        navigate('/hrit/leave-management/leave-requests?mine=1')
+        break
+      case 'r3': // WFH Requests — WFH is a leave type, so it lives in the leave list too.
+        navigate('/hrit/leave-management/leave-requests?mine=1&type=wfh')
+        break
+      default:
+        navigate(null)
     }
   }, [navigate])
 
   const handleViewAllRequests = React.useCallback(() => {
-    navigate({ moduleId: '5', menuId: '94', submenuId: '103' })
+    navigate('/hrit/attendance-management/request-center')
   }, [navigate])
 
   return (

@@ -117,12 +117,22 @@ export function AttendanceTrendChart({ data, className }: AttendanceTrendChartPr
             </g>
 
             {data.map((d, i) => {
+              // Drawing every label (e.g. all 31 days of a month) packs them
+              // too tight to read - thin them to roughly 10 evenly-spaced
+              // labels for larger ranges, same as any axis with more points
+              // than pixels to label them clearly. Always keeps the first
+              // and last so the range's start/end stay visible. Short
+              // ranges (a week or less) are unaffected - every label shows.
+              const labelStep = Math.max(1, Math.ceil(data.length / 10))
+              const isLastPoint = i === data.length - 1
+              if (i % labelStep !== 0 && !isLastPoint) return null
+
               const x = data.length === 1
                 ? margin.left + chartWidth / 2
                 : margin.left + (i / (data.length - 1)) * chartWidth
               return (
                 <text
-                  key={d.label}
+                  key={`${d.label}-${i}`}
                   x={x}
                   y={height - 8}
                   textAnchor="middle"
@@ -133,7 +143,7 @@ export function AttendanceTrendChart({ data, className }: AttendanceTrendChartPr
               )
             })}
 
-            {legendItems.map((item) => {
+            {legendItems.map((item, itemIndex) => {
               const pathD = buildPath(item.key)
               const areaD = `${pathD} L ${points[points.length - 1].x} ${margin.top + chartHeight} L ${points[0].x} ${margin.top + chartHeight} Z`
               return (
@@ -152,12 +162,32 @@ export function AttendanceTrendChart({ data, className }: AttendanceTrendChartPr
                       key={pi}
                       cx={p.x}
                       cy={p[item.key]}
-                      r="3"
+                      r={data.length === 1 ? 4 : 3}
                       fill={item.color}
                       stroke="hsl(var(--background))"
                       strokeWidth="1.5"
                     />
                   ))}
+                  {/* A single point reads as a bare dot with nothing to
+                      compare it against - labelling its value directly is a
+                      readability fix for that one case, not a chart
+                      redesign. Multi-point ranges are unchanged: labelling
+                      every point there would clutter the chart. The four
+                      series' values often cluster near 0 (present/late/
+                      early going) with only absent up near 100, so each
+                      series' label is staggered by index to avoid stacking
+                      directly on top of one another. */}
+                  {data.length === 1 && (
+                    <text
+                      x={points[0].x}
+                      y={points[0][item.key] - 8 - itemIndex * 11}
+                      textAnchor="middle"
+                      className="text-[10px] font-semibold"
+                      fill={item.color}
+                    >
+                      {data[0][item.key]}%
+                    </text>
+                  )}
                 </g>
               )
             })}
