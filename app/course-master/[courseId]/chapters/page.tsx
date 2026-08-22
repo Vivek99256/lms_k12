@@ -56,7 +56,6 @@ import {
   fetchQuestionBank,
   fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
-  getChaptersByCourseid,
   getConceptIntelligenceData,
   getSubjectAndChapters,
   resolveSubjectDisplayName,
@@ -244,8 +243,7 @@ const DOWNLOAD_ONLY_FILE_PATTERN = /\.(pptx?|docx?|xlsx?|csv|zip|rtf)(?:$|[?#])/
 const GAMMA_DECK_PATTERN = /(?:\/\/|\.)gamma\.app\//i;
 
 function isHttpUrl(value?: string | null): value is string {
-  return typeof value 
-  'string' && /^https?:\/\//i.test(value.trim());
+  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
 }
 
 // Export links are often signed URLs with no file extension in the path, so
@@ -259,10 +257,19 @@ function isDownloadOnlyUrl(value: string): boolean {
   );
 }
 
+// Word/PowerPoint/Excel files render as a forced download in-browser with no
+// native preview, so they're routed through the Google Docs Viewer embed
+// instead of opened directly.
+function isOfficeDocumentUrl(value: string, filename?: string | null): boolean {
+  return /\.(docx?|pptx?|xlsx?)(?:$|[?#])/i.test(filename ?? value);
+}
+
 // Gamma stores two links per generated asset: `url` holds the export file
 // (a .pptx download) while `filename` keeps the gamma.app deck link. Pick the
-// link a browser can render in a tab, and route Office files that have no
-// viewable twin through the Office Online viewer so "Open" never downloads.
+// link a browser can render in a tab: a Gamma deck link renders natively,
+// an Office document goes through the Google Docs Viewer, other inline-
+// viewable links (PDFs, images) render directly, and anything else falls
+// back to the Office Online viewer so "Open" never downloads.
 function resolveViewableContentUrl(asset: ChapterContentAsset): string | undefined {
   const candidates = [asset.url, asset.filename]
     .filter(isHttpUrl)
@@ -275,19 +282,15 @@ function resolveViewableContentUrl(asset: ChapterContentAsset): string | undefin
   const deckLink = candidates.find((value) => GAMMA_DECK_PATTERN.test(value));
   if (deckLink) return deckLink;
 
+  const officeDocLink = candidates.find((value) => isOfficeDocumentUrl(value, asset.filename));
+  if (officeDocLink) {
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(officeDocLink)}&embedded=true`;
+  }
+
   const inlineViewable = candidates.find((value) => !isDownloadOnlyUrl(value));
   if (inlineViewable) return inlineViewable;
 
   return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(candidates[0])}`;
-function getViewableContentUrl(rawUrl: string, filename?: string | null): string {
-  const isOfficeDoc = /\.(docx?|pptx?|xlsx?)(?:$|\?)/i.test(filename ?? rawUrl);
-  const isAbsoluteUrl = /^https?:\/\//i.test(rawUrl);
-
-  if (isOfficeDoc && isAbsoluteUrl) {
-    return `https://docs.google.com/viewer?url=${encodeURIComponent(rawUrl)}&embedded=true`;
-  }
-
-  return rawUrl;
 }
 
 function buildApiChapterContentItems(
@@ -298,8 +301,6 @@ function buildApiChapterContentItems(
     (assets ?? []).map((asset) => {
       const type = getApiContentType(category, asset);
       const contentUrl = resolveViewableContentUrl(asset);
-      const rawContentUrl = asset.url || asset.filename || undefined;
-      const contentUrl = rawContentUrl ? getViewableContentUrl(rawContentUrl, asset.filename) : undefined;
       const updatedDate = asset.created_at?.split(' ')[0] ?? '—';
       const rawConceptId =
         asset.concept_id === null || asset.concept_id === undefined
@@ -852,14 +853,13 @@ export default function ChapterListPage() {
         }
       : undefined;
   }, [courseId, subjectData?.chapters, subjectData?.subject]);
-  const allChapters = subjectData?.chapters ?? getChaptersByCourseid(courseId);
+  const allChapters = subjectData?.chapters ?? [];
   // Both header stats come from live data: concept rows stored against the chapters,
   // and the board on the tenant's curriculum record.
   const totalConceptCount = useMemo(
     () => getTotalConceptCount(allChapters, subjectData?.subject),
     [allChapters, subjectData?.subject]
   );
-  const allChapters = subjectData?.chapters ?? [];
 
   const [searchTerm] = useState('');
   const [isAddChapterOpen, setIsAddChapterOpen] = useState(false);
@@ -4402,7 +4402,7 @@ export default function ChapterListPage() {
           </div>
         </div>
 
-        {subjectLoading && getChaptersByCourseid(courseId).length === 0 ? (
+        {subjectLoading && allChapters.length === 0 ? (
           <div className="space-y-4">
             {[1, 2, 3].map((skeleton) => (
               <div
