@@ -2039,7 +2039,7 @@ export default function LessonPlanPage() {
           <span>Subjects</span>
           <ChevronRight size={14} className="text-[#94A3B8]" />
           <span className="font-medium text-[#0F172A]">
-            {course.subject} - {gradeLabel.replace('Grade ', 'Grade ')} {sectionLabel.replace('Section ', '')}
+            {course.subject} - {gradeLabel.replace('Grade ', 'Grade ')} 
           </span>
         </div>
 
@@ -2051,7 +2051,7 @@ export default function LessonPlanPage() {
               </div>
               <div>
                 <h1 className="text-[34px] font-semibold tracking-tight text-[#0F172A]">
-                  {course.subject} - {gradeLabel} - {sectionLabel}
+                  {course.subject} - {gradeLabel} 
                 </h1>
                 <p className="mt-1 text-[16px] text-[#475569]">
                   {chapterCount} chapters · {totalKeyConcepts} key concepts
