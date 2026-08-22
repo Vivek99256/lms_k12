@@ -14,7 +14,7 @@ import {
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { getRequestContext, getSyear } from '../../../page';
 import { getSubjectAndChapters, type SubjectWithChapters } from '../../../data/chapters';
-import { courses, type Course } from '../../../data/courses';
+import type { Course } from '../../../data/courses';
 import { fetchLmsCourses, type LmsSubject } from '../../../data/lmsCourses';
 
 type CurriculumSession = {
@@ -340,8 +340,6 @@ export default function CurriculumPage() {
   const [openUnitId, setOpenUnitId] = useState<number | null>(null);
   const [openOutcomeId, setOpenOutcomeId] = useState<number | null>(null);
 
-  const fallbackCourse = courses.find((item) => item.id === courseId);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -360,7 +358,7 @@ export default function CurriculumPage() {
       setError(null);
 
       try {
-        const target = await resolveCurriculumTarget(courseId, fallbackCourse);
+        const target = await resolveCurriculumTarget(courseId);
         if (!target) {
           throw new Error('Curriculum target not resolved');
         }
@@ -393,9 +391,9 @@ export default function CurriculumPage() {
     return () => {
       cancelled = true;
     };
-  }, [courseId, fallbackCourse]);
+  }, [courseId]);
 
-  const course = buildLiveCourse(courseId, subjectData, fallbackCourse);
+  const course = buildLiveCourse(courseId, subjectData);
   const curriculumData = curriculumResponse?.curriculum_data ?? null;
   const unitData = curriculumResponse?.unit_data ?? [];
   const outcomes = curriculumResponse?.outcomes ?? [];

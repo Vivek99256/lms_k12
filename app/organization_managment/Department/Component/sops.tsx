@@ -12,7 +12,6 @@ import {
   MoreVertical,
   Pencil,
   Plus,
-  ShieldCheck,
   Sparkles,
   Trash2,
   Upload,
@@ -58,6 +57,8 @@ export interface Sop {
   uploadedBy: string;
   uploadedOn: string;
   pdfUrl?: string;
+  /** Raw `created_at`/`updated_at` timestamp from the API, kept only to sort the recent-activity feed. */
+  sortTimestamp?: string;
 }
 
 type ActivityEvent = {
@@ -169,29 +170,28 @@ function getApiErrorMessage(
   return payload?.message || fallback;
 }
 
-const recentActivity: ActivityEvent[] = [
-  {
-    id: "act-1",
-    icon: <Upload className="h-3.5 w-3.5" />,
-    user: "Priya Nair",
-    text: "uploaded SOP Employee Onboarding Workflow",
-    date: "12 Jun 2025",
-  },
-  {
-    id: "act-2",
-    icon: <Pencil className="h-3.5 w-3.5" />,
-    user: "Sanjay Kapoor",
-    text: "updated policy Code of Conduct",
-    date: "09 Jun 2025",
-  },
-  {
-    id: "act-3",
-    icon: <ShieldCheck className="h-3.5 w-3.5" />,
-    user: "Meera Iyer",
-    text: "modified decision rule Leave Approval Threshold",
-    date: "03 Jun 2025",
-  },
-];
+/**
+ * Recent activity is derived from the live `/api/ai-sop` list itself
+ * (no separate activity-log endpoint exists for this department view) —
+ * the 3 most recently uploaded SOPs, newest first.
+ */
+function buildRecentActivity(sops: Sop[]): ActivityEvent[] {
+  return [...sops]
+    .sort((a, b) => {
+      const aTime = Date.parse(a.sortTimestamp?.replace(" ", "T") || "");
+      const bTime = Date.parse(b.sortTimestamp?.replace(" ", "T") || "");
+      if (Number.isNaN(aTime) || Number.isNaN(bTime)) return 0;
+      return bTime - aTime;
+    })
+    .slice(0, 3)
+    .map((sop) => ({
+      id: `act-${sop.id}`,
+      icon: <Upload className="h-3.5 w-3.5" />,
+      user: sop.uploadedBy,
+      text: `uploaded SOP ${sop.title}`,
+      date: sop.uploadedOn,
+    }));
+}
 
 function formatToday() {
   return new Date().toLocaleDateString("en-GB", {
@@ -264,6 +264,7 @@ function mapApiSop(record: ApiSopRecord): Sop {
     uploadedBy,
     uploadedOn: formatApiDate(record.created_at ?? record.updated_at),
     pdfUrl,
+    sortTimestamp: readString(record.created_at ?? record.updated_at),
   };
 }
 
@@ -312,7 +313,9 @@ function IconButton({
 }
 
 
-function RecentActivity() {
+function RecentActivity({ activity }: { activity: ActivityEvent[] }) {
+  if (activity.length === 0) return null;
+
   return (
     <div className="space-y-3">
       <h4 className="flex items-center gap-2 text-[13px] font-semibold text-[#061632]">
@@ -320,7 +323,7 @@ function RecentActivity() {
         Recent Activity
       </h4>
       <ul className="space-y-3">
-        {recentActivity.map((event) => (
+        {activity.map((event) => (
           <li key={event.id} className="flex items-start gap-3">
             <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#eef3ff] text-[#2563eb]">
               {event.icon}
@@ -1109,7 +1112,7 @@ export default function SopsModule({
           View All SOPs
         </button>
 
-        <RecentActivity />
+        <RecentActivity activity={buildRecentActivity(sops)} />
       </div>
 
       {viewAllOpen ? (

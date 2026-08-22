@@ -1,39 +1,72 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Search, BookOpen, TrendingUp, Award, Clock } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Search, BookOpen, TrendingUp, Award, Clock, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { fetchSubjects, subjectChapterCount, subjectProgress, type LmsSubject } from './_lib/subjects-api';
 
-const subjects = [
-  { name: "Mathematics", chapters: 12, progress: 80, emoji: "📐", color: "#6366F1" },
-  { name: "Science", chapters: 15, progress: 65, emoji: "🔬", color: "#10B981" },
-  { name: "English", chapters: 10, progress: 90, emoji: "📖", color: "#8B5CF6" },
-  { name: "Social Science", chapters: 8, progress: 45, emoji: "🌍", color: "#F59E0B" },
-  { name: "Computer", chapters: 5, progress: 75, emoji: "💻", color: "#06B6D4" },
-  { name: "Gujarati", chapters: 6, progress: 55, emoji: "✍️", color: "#EC4899" },
-  { name: "Hindi", chapters: 8, progress: 30, emoji: "🗣️", color: "#EF4444" },
-  { name: "Sanskrit", chapters: 4, progress: 20, emoji: "📜", color: "#D97706" },
-  { name: "Physical Ed", chapters: 2, progress: 100, emoji: "⚽", color: "#84CC16" },
-  { name: "Art & Craft", chapters: 3, progress: 60, emoji: "🎨", color: "#6366F1" },
-  { name: "Music", chapters: 5, progress: 40, emoji: "🎵", color: "#F43F5E" },
-  { name: "Gen Knowledge", chapters: 10, progress: 85, emoji: "🧠", color: "#14B8A6" },
-  { name: "Accountancy", chapters: 8, progress: 10, emoji: "📊", color: "#3B82F6" },
-  { name: "Business", chapters: 5, progress: 5, emoji: "💼", color: "#10B981" },
-  { name: "Economics", chapters: 9, progress: 50, emoji: "📈", color: "#7C3AED" },
-  { name: "Statistics", chapters: 11, progress: 70, emoji: "📉", color: "#EA580C" },
-  { name: "Geography", chapters: 14, progress: 35, emoji: "🗺️", color: "#0891B2" },
-  { name: "History", chapters: 12, progress: 60, emoji: "🏛️", color: "#DB2777" },
-  { name: "Biology", chapters: 9, progress: 80, emoji: "🧬", color: "#16A34A" },
-  { name: "Chemistry", chapters: 11, progress: 45, emoji: "⚗️", color: "#9333EA" },
-  { name: "Physics", chapters: 13, progress: 55, emoji: "⚡", color: "#CA8A04" },
-];
+const PALETTE = ['#6366F1', '#10B981', '#8B5CF6', '#F59E0B', '#06B6D4', '#EC4899', '#EF4444', '#D97706', '#84CC16', '#14B8A6', '#3B82F6', '#7C3AED', '#EA580C', '#0891B2', '#DB2777', '#16A34A', '#9333EA', '#CA8A04'];
+const EMOJI = ['📘', '📐', '🔬', '📖', '🌍', '💻', '🧠', '📊', '📈', '🗺️', '🏛️', '🧬', '⚗️', '⚡', '🎨', '🎵'];
+
+type SubjectTile = {
+  key: string;
+  name: string;
+  chapters: number;
+  progress: number;
+  emoji: string;
+  color: string;
+  subjectId: number;
+  standardId: number;
+};
 
 export default function SubjectsPage() {
   const [search, setSearch] = useState('');
+  const [rawSubjects, setRawSubjects] = useState<LmsSubject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const rows = await fetchSubjects();
+        if (!cancelled) setRawSubjects(rows);
+      } catch (fetchError) {
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : 'Unable to load subjects.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const subjects = useMemo<SubjectTile[]>(
+    () =>
+      rawSubjects.map((subject, index) => ({
+        key: `${subject.subject_id}_${subject.standard_id}`,
+        name: subject.subject_name,
+        chapters: subjectChapterCount(subject),
+        progress: subjectProgress(subject),
+        emoji: EMOJI[index % EMOJI.length],
+        color: PALETTE[index % PALETTE.length],
+        subjectId: subject.subject_id,
+        standardId: subject.standard_id,
+      })),
+    [rawSubjects]
+  );
+
   const filtered = subjects.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
 
-  const topSubject = [...subjects].sort((a, b) => b.progress - a.progress)[0];
-  const avgProgress = Math.round(subjects.reduce((acc, s) => acc + s.progress, 0) / subjects.length);
+  const topSubject = subjects.length > 0 ? [...subjects].sort((a, b) => b.progress - a.progress)[0] : null;
+  const avgProgress = subjects.length > 0 ? Math.round(subjects.reduce((acc, s) => acc + s.progress, 0) / subjects.length) : 0;
   const completed = subjects.filter(s => s.progress === 100).length;
 
   return (
@@ -43,7 +76,7 @@ export default function SubjectsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My Subjects</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{subjects.length} subjects · Class 10</p>
+          <p className="text-sm text-gray-500 mt-0.5">{subjects.length} subjects</p>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
@@ -77,20 +110,34 @@ export default function SubjectsPage() {
           <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center"><Clock size={18} className="text-amber-600" /></div>
           <div>
             <div className="text-xs text-gray-500 font-medium">Top Subject</div>
-            <div className="text-sm font-bold text-gray-900 truncate">{topSubject.name}</div>
+            <div className="text-sm font-bold text-gray-900 truncate">{topSubject ? topSubject.name : '—'}</div>
           </div>
         </div>
       </div>
 
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading subjects…
+        </div>
+      )}
+
+      {!loading && error && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {error}
+        </div>
+      )}
+
       {/* Subject Tiles Grid */}
+      {!loading && !error && (
       <div
         className="grid gap-2.5"
         style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}
       >
-        {filtered.map((sub, i) => (
+        {filtered.map((sub) => (
               <Link
-                href="/chapters"
-                key={i}
+                href={`/chapters?subjectId=${sub.subjectId}&standardId=${sub.standardId}`}
+                key={sub.key}
                 className="group bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col gap-2 cursor-pointer relative overflow-hidden"
               >
             {/* Subtle colored glow blob on hover */}
@@ -133,9 +180,12 @@ export default function SubjectsPage() {
           </Link>
         ))}
       </div>
+      )}
 
-      {filtered.length === 0 && (
-        <div className="text-center py-16 text-gray-400 text-sm">No subjects match your search.</div>
+      {!loading && !error && filtered.length === 0 && (
+        <div className="text-center py-16 text-gray-400 text-sm">
+          {subjects.length === 0 ? 'No subjects available yet.' : 'No subjects match your search.'}
+        </div>
       )}
 
     </div>

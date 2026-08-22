@@ -25,7 +25,7 @@
  * inert in source too; kept as-is per this migration's as-is rule.
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Search,
   Plus,
@@ -67,7 +67,7 @@ import {
 } from '../../_lib/administration-api'
 
 import {
-  mockAdminKPIs,
+  adminKpiConfig,
   type Workflow
 } from './admin-data'
 
@@ -147,6 +147,18 @@ export function AdminCenter() {
     }
   }
 
+  // "Active Workflows" is the one KPI with a real backing figure — the same
+  // workflow-list pagination total already fetched above. The rest have no
+  // endpoint in this module (see admin-data.ts), so they render "—" instead
+  // of a fabricated count.
+  const kpis = useMemo(
+    () => adminKpiConfig.map((kpi) => ({
+      ...kpi,
+      value: kpi.id === 'kpi-1' ? (isLoading ? '—' : String(totalItems)) : '—',
+    })),
+    [isLoading, totalItems]
+  )
+
   const getStatusVariant = (status: Workflow['status']) => {
     switch (status) {
       case 'Active': return 'success'
@@ -196,7 +208,7 @@ export function AdminCenter() {
 
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mt-2">
-          {mockAdminKPIs.map((kpi) => (
+          {kpis.map((kpi) => (
             <Card key={kpi.id} className="p-4 flex flex-col justify-between border-border/60 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-semibold text-muted-foreground">{kpi.title}</span>

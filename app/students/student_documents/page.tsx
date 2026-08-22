@@ -1,7 +1,7 @@
 // app/students/student_documents/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Search,
   Filter,
@@ -23,6 +23,7 @@ import {
   Edit,
   Trash2,
   ChevronRight,
+  Loader2,
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -35,11 +36,12 @@ import {
   ChartOptions,
 } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
+import { getStudentDocuments } from './api';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 // Types
-interface StudentDocument {
+export interface StudentDocument {
   id: string;
   name: string;
   class: string;
@@ -53,21 +55,28 @@ interface StudentDocument {
   lastUpdated: string;
 }
 
-// Sample Data matching the image
-const sampleStudents: StudentDocument[] = [
-  { id: 'STU001', name: 'Aarav Sharma', class: '6', section: 'A', admissionNo: 'ADM-2026-0421', verifiedDocs: 4, totalDocs: 6, pendingDocs: 2, missingDocs: 0, status: 'pending', lastUpdated: '2024-01-15' },
-  { id: 'STU002', name: 'Ishaan Iyer', class: '7', section: 'A', admissionNo: 'ADM-2026-0422', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-14' },
-  { id: 'STU003', name: 'Ananya Gupta', class: '8', section: 'A', admissionNo: 'ADM-2026-0423', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-13' },
-  { id: 'STU004', name: 'Kiara Kapoor', class: '9', section: 'A', admissionNo: 'ADM-2026-0424', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-12' },
-  { id: 'STU005', name: 'Pari Menon', class: '10', section: 'A', admissionNo: 'ADM-2026-0425', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-11' },
-  { id: 'STU006', name: 'Sai Malhotra', class: '6', section: 'A', admissionNo: 'ADM-2026-0426', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-10' },
-];
-
 // Main Page Component
 export default function StudentDocumentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [sampleStudents, setSampleStudents] = useState<StudentDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getStudentDocuments(controller.signal)
+      .then(setSampleStudents)
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return;
+        setError(reason instanceof Error ? reason.message : 'Unable to load student documents.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   // Filter students
   const filteredStudents = sampleStudents.filter(student => {
@@ -86,7 +95,7 @@ export default function StudentDocumentsPage() {
     total: sampleStudents.length,
   };
 
-  const complianceRate = Math.round((metrics.verified / metrics.total) * 100);
+  const complianceRate = metrics.total ? Math.round((metrics.verified / metrics.total) * 100) : 0;
 
   // Doughnut chart data
   const doughnutData = {
@@ -219,8 +228,22 @@ export default function StudentDocumentsPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Loading student documents…
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
