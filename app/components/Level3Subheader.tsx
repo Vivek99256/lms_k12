@@ -2,7 +2,11 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+<<<<<<< HEAD
 import { usePathname, useRouter } from 'next/navigation';
+=======
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { SubmenuItem } from '@/app/data/menuItems';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
@@ -59,6 +63,10 @@ function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null 
 export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
+<<<<<<< HEAD
+=======
+  const searchParams = useSearchParams();
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const [showMasterDropdown, setShowMasterDropdown] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -155,6 +163,15 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
     router.push(route);
   };
 
+<<<<<<< HEAD
+=======
+  const buildRouteWithQuery = (route: string) => {
+    const query = searchParams?.toString() ?? '';
+    if (!query || !route.startsWith('/pal')) return route;
+    return `${route}?${query}`;
+  };
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const handleMasterClick = (item: SubmenuItem) => {
     const navigateRoute = getNavigationRoute(item);
     if (navigateRoute) {
@@ -228,7 +245,11 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                 
                 const handleClick = () => {
                   if (navigateRoute) {
+<<<<<<< HEAD
                     router.push(navigateRoute);
+=======
+                    router.push(buildRouteWithQuery(navigateRoute));
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   }
                 };
                 

@@ -34,6 +34,77 @@ export type TransportationData = {
   stops: TransportOption[];
   shifts: TransportOption[];
   students: TransportOption[];
+<<<<<<< HEAD
+=======
+  grades: TransportOption[];
+  standards: TransportOption[];
+  divisions: TransportOption[];
+};
+
+/** Shift fare settings — amount = shift_rate + distance × km_amount. */
+export type ShiftRate = {
+  id: number;
+  shiftRate: number;
+  kmAmount: number;
+};
+
+/** Vehicle seating, and how many seats the academic year has already taken. */
+export type VehicleSeats = {
+  vehicleId: number;
+  shiftId: number;
+  capacity: number;
+  reserved: number;
+};
+
+/** A stop a vehicle can serve, derived from its route mappings. */
+export type VehicleStop = {
+  vehicleId: number;
+  shiftId: number;
+  stopId: number;
+  stopName: string;
+};
+
+/** One row of the student mapping grid. */
+export type StudentMappingRow = {
+  studentId: number;
+  studentName: string;
+  enrollmentNo: string;
+  mobile: string;
+  address: string;
+  standardDivision: string;
+  mapped: boolean;
+  fromShiftId: string;
+  fromBusId: string;
+  fromStop: string;
+  toShiftId: string;
+  toBusId: string;
+  toStop: string;
+  distance: string;
+  amount: string;
+};
+
+export type StudentMappingFilters = {
+  grade?: string;
+  standard?: string;
+  division?: string;
+  name?: string;
+  grno?: string;
+  area?: string;
+};
+
+export type StudentMappingData = {
+  rows: StudentMappingRow[];
+  mapped: TransportRecord[];
+  shifts: TransportOption[];
+  shiftRates: ShiftRate[];
+  vehicles: TransportOption[];
+  vehicleStops: VehicleStop[];
+  seats: VehicleSeats[];
+  stops: TransportOption[];
+  grades: TransportOption[];
+  standards: TransportOption[];
+  divisions: TransportOption[];
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -91,6 +162,12 @@ function normalize(value: unknown): TransportationData {
     stops: options(data.stops),
     shifts: options(data.shifts),
     students: options(data.students),
+<<<<<<< HEAD
+=======
+    grades: options(data.grades),
+    standards: options(data.standards),
+    divisions: options(data.divisions),
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   };
 }
 
@@ -165,3 +242,131 @@ export async function deleteTransportation(
 ): Promise<string> {
   return messageFrom(await request(module, session, `/${id}`, { method: "DELETE" }), "Record deleted successfully.");
 }
+<<<<<<< HEAD
+=======
+
+/* ---------------------------------------------------------------- mapping */
+
+function numberText(value: unknown): string {
+  const text = readString(value).trim();
+  return text && text !== "0" ? text : "";
+}
+
+function mappingRow(record: UnknownRecord): StudentMappingRow {
+  return {
+    studentId: readNumber(record.student_id),
+    studentName: readString(record.student_name).replace(/\s+/g, " ").trim(),
+    enrollmentNo: readString(record.enrollment_no),
+    mobile: readString(record.mobile),
+    address: readString(record.address),
+    standardDivision: readString(record.standard_division),
+    mapped: readNumber(record.mapping_id) > 0,
+    fromShiftId: numberText(record.from_shift_id),
+    fromBusId: numberText(record.from_bus_id),
+    fromStop: numberText(record.from_stop),
+    toShiftId: numberText(record.to_shift_id),
+    toBusId: numberText(record.to_bus_id),
+    toStop: numberText(record.to_stop),
+    distance: readString(record.distance ?? ""),
+    amount: readString(record.amount ?? ""),
+  };
+}
+
+/**
+ * The mapping screen in one call: the searched students (with the mapping they
+ * already have), plus every lookup the grid needs to cascade shift → vehicle →
+ * stop and to price a row without further round trips.
+ */
+export async function loadStudentMappings(
+  session: SessionContext,
+  filters?: StudentMappingFilters
+): Promise<StudentMappingData> {
+  const payload = await request("student-mappings", session, "", undefined, filters as Record<string, string>);
+  const data = unwrap(payload);
+  const base = normalize(payload);
+
+  return {
+    rows: recordArray(data.students).map(mappingRow),
+    mapped: base.records,
+    shifts: base.shifts,
+    shiftRates: recordArray(data.shifts).map((shift) => ({
+      id: readNumber(shift.id),
+      shiftRate: readNumber(shift.shift_rate),
+      kmAmount: readNumber(shift.km_amount),
+    })),
+    vehicles: base.vehicles,
+    vehicleStops: recordArray(data.vehicle_stops).map((stop) => ({
+      vehicleId: readNumber(stop.vehicle_id),
+      shiftId: readNumber(stop.shift_id),
+      stopId: readNumber(stop.stop_id),
+      stopName: readString(stop.stop_name),
+    })),
+    seats: recordArray(data.vehicles).map((vehicle) => {
+      const vehicleId = readNumber(vehicle.id);
+      const shiftId = readNumber(vehicle.parent_id);
+      const reserved = recordArray(data.reserved_seats).find(
+        (seat) => readNumber(seat.vehicle_id) === vehicleId && readNumber(seat.shift_id) === shiftId
+      );
+      return {
+        vehicleId,
+        shiftId,
+        capacity: readNumber(vehicle.sitting_capacity),
+        reserved: reserved ? readNumber(reserved.reserved) : 0,
+      };
+    }),
+    stops: base.stops,
+    grades: base.grades,
+    standards: base.standards,
+    divisions: base.divisions,
+  };
+}
+
+export type StudentMappingPayload = {
+  student_id: number;
+  student_name: string;
+  from_shift_id: number;
+  from_bus_id: number;
+  from_stop: number;
+  to_shift_id: number;
+  to_bus_id: number;
+  to_stop: number;
+  distance: number;
+  amount: number;
+};
+
+/** Bulk upsert — each row replaces that student's mapping for the year. */
+export async function saveStudentMappings(
+  session: SessionContext,
+  mappings: StudentMappingPayload[]
+): Promise<string> {
+  const payload = await request("student-mappings", session, "/bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      mappings,
+      type: "API",
+      sub_institute_id: session.subInstituteId,
+      syear: session.syear,
+      user_id: session.userId,
+    }),
+  });
+  return messageFrom(payload, "Student mappings saved successfully.");
+}
+
+/** Bulk unmap for the current academic year. */
+export async function deleteStudentMappings(
+  session: SessionContext,
+  studentIds: number[]
+): Promise<string> {
+  const payload = await request("student-mappings", session, "/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({
+      student_ids: studentIds,
+      type: "API",
+      sub_institute_id: session.subInstituteId,
+      syear: session.syear,
+      user_id: session.userId,
+    }),
+  });
+  return messageFrom(payload, "Student mappings removed successfully.");
+}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d

@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import React, { useState } from 'react';
 import { 
   Plus, 
@@ -68,15 +69,170 @@ export default function AdmissionFormsContent() {
 
   // State Management
   const [selectedFormId, setSelectedFormId] = useState<string>('AF');
+=======
+import React, { useEffect, useState } from 'react';
+import { ChevronRight, Loader2, X } from 'lucide-react';
+import { addCustomField, fetchAdmissionFormTemplates, type AdmissionFormTemplate } from './_lib/admission-form-api';
+
+function AddCustomFieldModal({
+  formTitle,
+  onClose,
+  onSubmit,
+}: {
+  formTitle: string;
+  onClose: () => void;
+  onSubmit: (fieldLabel: string) => Promise<void>;
+}) {
+  const [fieldLabel, setFieldLabel] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!fieldLabel.trim()) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await onSubmit(fieldLabel.trim());
+      onClose();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to add the field.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-[2px]"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-custom-field-title"
+        className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <h2 id="add-custom-field-title" className="text-base font-bold tracking-tight text-slate-900">
+            Add custom field
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3 px-5 py-4">
+          <p className="text-xs text-slate-500">Adding to {formTitle}</p>
+          <div>
+            <label htmlFor="custom-field-label" className="mb-1.5 block text-xs font-semibold text-slate-600">
+              Field label
+            </label>
+            <input
+              id="custom-field-label"
+              type="text"
+              value={fieldLabel}
+              onChange={(event) => setFieldLabel(event.target.value)}
+              required
+              autoFocus
+              placeholder="e.g. Sibling admission number"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+          {submitError && <p className="text-xs text-red-600">{submitError}</p>}
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || !fieldLabel.trim()}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+            >
+              {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Add field
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default function AdmissionFormsContent() {
+  const [formsData, setFormsData] = useState<AdmissionFormTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedFormId, setSelectedFormId] = useState<string>('');
+  const [isAddFieldModalOpen, setIsAddFieldModalOpen] = useState(false);
+
+  const loadForms = () => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetchAdmissionFormTemplates()
+      .then((forms) => {
+        if (cancelled) return;
+        setFormsData(forms);
+        setSelectedFormId((current) => current || forms[0]?.id || '');
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load admission forms.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  };
+
+  useEffect(() => loadForms(), []);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   // Find currently selected form details
   const selectedForm = formsData.find(f => f.id === selectedFormId) || formsData[0];
 
   // Click Handlers
+<<<<<<< HEAD
   const handleNewForm = () => alert('Creating a new form layout...');
   const handleAddCustomField = () => alert('Adding a custom field to ' + selectedForm.title);
   const handlePreview = () => alert('Opening preview for ' + selectedForm.title);
   const handlePublish = () => alert('Publishing updates for ' + selectedForm.title);
+=======
+  const handleAddCustomField = () => setIsAddFieldModalOpen(true);
+
+  if (loading) {
+    return (
+      <div className="p-6 bg-[#f8fafc] min-h-screen font-sans text-[#1e293b] flex items-center justify-center">
+        <p className="text-sm text-slate-500">Loading admission forms...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 bg-[#f8fafc] min-h-screen font-sans text-[#1e293b] flex items-center justify-center">
+        <p className="text-sm text-red-600">{error}</p>
+      </div>
+    );
+  }
+
+  if (!selectedForm) {
+    return (
+      <div className="p-6 bg-[#f8fafc] min-h-screen font-sans text-[#1e293b] flex items-center justify-center">
+        <p className="text-sm text-slate-500">No admission forms found.</p>
+      </div>
+    );
+  }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   return (
     <div className="p-6 bg-[#f8fafc] min-h-screen font-sans text-[#1e293b]">
@@ -89,12 +245,15 @@ export default function AdmissionFormsContent() {
               <h2 className="text-base font-bold text-slate-900">Admission forms</h2>
               <p className="text-xs text-slate-500">Configure form fields per admission cycle</p>
             </div>
+<<<<<<< HEAD
             <button 
               onClick={handleNewForm}
               className="px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" /> New form
             </button>
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           </div>
 
           {/* List Array mapping */}
@@ -198,12 +357,17 @@ export default function AdmissionFormsContent() {
 
           {/* Configured Section Control Buttons */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+<<<<<<< HEAD
             <button 
+=======
+            <button
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               onClick={handleAddCustomField}
               className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
             >
               + Add custom field
             </button>
+<<<<<<< HEAD
             <div className="flex gap-2">
               <button 
                 onClick={handlePreview}
@@ -218,10 +382,23 @@ export default function AdmissionFormsContent() {
                 <CheckCircle className="w-3.5 h-3.5" /> Publish
               </button>
             </div>
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           </div>
         </section>
 
       </div>
+<<<<<<< HEAD
+=======
+
+      {isAddFieldModalOpen && selectedForm && (
+        <AddCustomFieldModal
+          formTitle={selectedForm.title}
+          onClose={() => setIsAddFieldModalOpen(false)}
+          onSubmit={(fieldLabel) => addCustomField(selectedForm.id, fieldLabel).then(() => { loadForms(); })}
+        />
+      )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     </div>
   );
 }

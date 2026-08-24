@@ -1,6 +1,10 @@
 "use client";
 
+<<<<<<< HEAD
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+=======
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import { LoaderCircle, Plus, RefreshCw, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +47,11 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
 
+<<<<<<< HEAD
+=======
+  const optionsRef = useRef<VisitorFormOptions>(EMPTY_OPTIONS);
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const load = useCallback(async (nextFilters = filters) => {
     setLoading(true);
     setError("");
@@ -50,19 +59,37 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
       const session = getHostelSession();
       const [loadedRecords, loadedOptions] = await Promise.all([
         loadVisitorList(session, nextFilters),
+<<<<<<< HEAD
         mode === "details" ? loadVisitorFormOptions(session) : Promise.resolve(options),
       ]);
       setRecords(loadedRecords);
       if (mode === "details") setOptions(loadedOptions);
+=======
+        mode === "details" ? loadVisitorFormOptions(session) : Promise.resolve(optionsRef.current),
+      ]);
+      setRecords(loadedRecords);
+      if (mode === "details") {
+        optionsRef.current = loadedOptions;
+        setOptions(loadedOptions);
+      }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     } catch (loadError: unknown) {
       setError(loadError instanceof Error ? loadError.message : "Visitor data could not be loaded.");
     } finally {
       setLoading(false);
     }
+<<<<<<< HEAD
   }, [filters, mode, options]);
 
   useEffect(() => {
     // The visitor data depends on browser session storage and token auth.
+=======
+  }, [filters, mode]);
+
+  useEffect(() => {
+    // Refresh only when the date filters change (not on every state update),
+    // so the list behaves like the legacy ERP screen instead of auto-polling.
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(filters);
   }, [filters, load]);

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿'use client';
+=======
+'use client';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 import React, { createContext, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import Sidebar from '@/app/components/Sidebar';
@@ -8,8 +12,14 @@ import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
+<<<<<<< HEAD
 import { usePathname, useRouter } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
+=======
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { mapApiLinkToRoute } from '@/app/data/routeMapper';
+import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 interface SelectedBranch {
@@ -59,9 +69,85 @@ function getFilteredMasterMenuItems(items: SubmenuItem[], selectedMenu: SubmenuI
     });
 }
 
+<<<<<<< HEAD
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '';
   const router = useRouter();
+=======
+/**
+ * New PAL's sub-modules — the level-3 bar shown under LMS + PAL → New PAL.
+ *
+ * Three of these live at `/pal/*` paths rather than under `/pal/new/*` for
+ * historical reasons; they are New PAL sub-modules all the same, which is why
+ * the route family below is derived from these hrefs rather than assumed from
+ * a `/pal` prefix.
+ */
+const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
+  {
+    id: 'pal-framework',
+    label: 'Framework',
+    href: '/pal/frameworks',
+  },
+  {
+    id: 'pal-content-model',
+    label: 'Content Model',
+    href: '/pal/new/content-model',
+  },
+  {
+    id: 'pal-ulu',
+    label: 'Unified Learning Units',
+    href: '/pal/ulu',
+  },
+  {
+    id: 'pal-pedagogy-engine',
+    label: 'Pedagogy Engine',
+    href: '/pal/pedagogy-engine',
+  },
+  {
+    id: 'pal-administration',
+    label: 'Administration',
+    href: '/pal/new/administration',
+  },
+  {
+    id: 'pal-gamification',
+    label: 'Gamification',
+    href: '/pal/new/gamification',
+  },
+];
+
+/** `href` itself, or a page nested under it — never a sibling that merely shares a prefix. */
+function isUnderRoute(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/**
+ * The New PAL sub-nav, or null when this route is not part of New PAL.
+ *
+ * Scoped to the New PAL workspace and the sub-modules it links to. A `/pal`
+ * prefix is NOT enough: LMS + PAL → Test → PAL is the legacy PAL workspace at
+ * `/pal`, and Content/Exam/Report/Result/Intelligence hang off it. Those are a
+ * different module and must not wear New PAL's navigation.
+ *
+ * The boundary check matters here — `/pal/framework` (legacy) and
+ * `/pal/frameworks` (New PAL) differ by one character, so a plain
+ * `startsWith` would drag the legacy page back in.
+ */
+function newPalLevel3Items(pathname: string): Level3Item[] | null {
+  const lowerPath = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+
+  const inNewPal =
+    isUnderRoute(lowerPath, '/pal/new') ||
+    NEW_PAL_LEVEL3_ITEMS.some((item) => isUnderRoute(lowerPath, item.href));
+
+  return inNewPal ? NEW_PAL_LEVEL3_ITEMS : null;
+}
+
+
+export default function DashboardShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname() || '';
+  const router = useRouter();
+  const searchParams = useSearchParams();
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const { menuItems, loading, error, refetch } = useMenuRights();
   const hasLoadedRef = useRef(false);
 
@@ -121,8 +207,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           return route !== '#' && currentPath === route.toLowerCase();
         });
         const level2Match = level2Route !== '#' && currentPath.startsWith(level2Route.toLowerCase());
+<<<<<<< HEAD
 
         if (level2Match || level3Match) {
+=======
+        const dashboardRoute = resolveModuleDashboardRoute(level2.label);
+        const dashboardMatch = Boolean(dashboardRoute && currentPath.startsWith(dashboardRoute.toLowerCase()));
+
+        if (level2Match || level3Match || dashboardMatch) {
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           // Restore the active menu branch on refresh/direct navigation so its
           // permission-filtered Master menu can be fetched for the sub-header.
           // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -217,6 +310,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         return;
       }
 
+<<<<<<< HEAD
+=======
+      const selectedLevel2Route = selectedLevel2.link ? mapApiLinkToRoute(selectedLevel2.link) : selectedLevel2.href;
+      const isPalRoot = normalizeMenuLabel(selectedLevel2.label) === 'new pal' || (selectedLevel2Route || '').toLowerCase() === '/pal';
+      if (isPalRoot) {
+        return;
+      }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       if (!isKnownMenuPath(pathname)) {
         return;
       }
@@ -276,6 +378,28 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
     await fetchMasterMenu(parent.id, submenu);
 
+<<<<<<< HEAD
+=======
+    const submenuRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href;
+    const isPalRoot = normalizeMenuLabel(submenu.label) === 'new pal' || (submenuRoute || '').toLowerCase() === '/pal';
+    if (isPalRoot) {
+      const query = searchParams?.toString() ?? '';
+      router.push(query ? `/pal/frameworks?${query}` : '/pal/frameworks');
+      return;
+    }
+
+    // Modules with their own dashboard (Fees, Admissions, Students, Library,
+    // Hostel, Transportation) land there — Level 2 → module dashboard →
+    // Level 3 screen — instead of jumping straight into the first Level 3
+    // screen. selectedBranch is already set above, so the Level 3 subheader
+    // still shows this module's screens for the next click.
+    const dashboardRoute = resolveModuleDashboardRoute(submenu.label);
+    if (dashboardRoute) {
+      router.push(dashboardRoute);
+      return;
+    }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     if (submenu.submenus && submenu.submenus.length > 0) {
       const firstLevel3 = submenu.submenus[0];
       // Use 'link' field from API (priority) or 'href' field
@@ -325,10 +449,24 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   };
 
   const level3Menu = (() => {
+<<<<<<< HEAD
+=======
+    // New PAL brings its own sub-nav. Every other route — including the legacy
+    // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
+    // menu-driven resolution below and gets whatever its own menu defines.
+    const newPalItems = newPalLevel3Items(pathname);
+    if (newPalItems) {
+      return { parentLabel: 'New PAL', items: newPalItems };
+    }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
     }
     const found = searchLevel3FromMenu(menuItems, pathname);
+<<<<<<< HEAD
+=======
+    if (!found) return null;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     return found;
   })();
 
@@ -348,9 +486,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <Header
           onToggleChatbot={toggleChatbot}
           isChatbotOpen={isChatbotOpen}
+<<<<<<< HEAD
           onToggleRightToolbar={toggleRightToolbar}
           isRightToolbarOpen={isRightToolbarOpen}
           rightToolbarToggleRef={rightToolbarToggleRef}
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         />
         <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main
@@ -392,3 +533,13 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     </div>
   );
 }
+<<<<<<< HEAD
+=======
+
+
+
+
+
+
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d

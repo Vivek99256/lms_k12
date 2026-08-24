@@ -13,6 +13,7 @@ import {
   Info,
   Lightbulb,
   Loader2,
+<<<<<<< HEAD
   Monitor,
   Play,
   RefreshCw,
@@ -22,6 +23,14 @@ import {
   Users,
   X,
   Zap,
+=======
+  Lock,
+  Monitor,
+  Play,
+  RefreshCw,
+  Sparkles,
+  X,
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -45,9 +54,17 @@ import {
 } from '@/app/pal/data/pal';
 import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import { getViewAsStudent, setViewAsStudent } from '@/app/pal/data/pal-view-as';
+<<<<<<< HEAD
 import { buildSessionContext, createAuthHeaders } from '@/lib/erp-client';
 import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
+=======
+import StudentPicker from '@/app/pal/_components/StudentPicker';
+import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
+import { DiagnosticButton } from '@/app/pal/_components/DiagnosticPanel';
+import { PracticePanel } from '@/app/pal/_components/PracticePanel';
+import { fetchChapterGate, type ChapterGateData } from '@/app/pal/data/pal';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 type ModalKind = 'pedagogy' | 'misconception';
 
@@ -201,6 +218,7 @@ export default function PalEntryPage() {
       subjectName: subject.name,
       learnerId: data?.student.studentId ?? '',
     });
+<<<<<<< HEAD
 
     if (kind === 'pedagogy') {
       const session = buildSessionContext();
@@ -219,6 +237,8 @@ export default function PalEntryPage() {
         }).catch(() => {});
       }
     }
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   };
 
   const totalChapters = useMemo(
@@ -279,6 +299,7 @@ export default function PalEntryPage() {
               variant="outline"
               size="sm"
               className="shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+<<<<<<< HEAD
               onClick={() => router.push('/pal/team-challenges')}
             >
               <Users className="h-3.5 w-3.5" />
@@ -297,11 +318,14 @@ export default function PalEntryPage() {
               variant="outline"
               size="sm"
               className="shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               onClick={() => router.push('/pal/intelligence')}
             >
               <Sparkles className="h-3.5 w-3.5" />
               Intelligence
             </Button>
+<<<<<<< HEAD
             <Button
               variant="outline"
               size="sm"
@@ -329,6 +353,8 @@ export default function PalEntryPage() {
               <Shield className="h-3.5 w-3.5" />
               Visibility & Access
             </Button>
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           </div>
         </div>
 
@@ -342,6 +368,7 @@ export default function PalEntryPage() {
             audience={audienceMode}
             onExit={exitStudentView}
             actions={
+<<<<<<< HEAD
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
@@ -371,6 +398,17 @@ export default function PalEntryPage() {
                   Career Quest
                 </Button>
               </div>
+=======
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push('/pal/intelligence')}
+                className="border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-100"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Intelligence
+              </Button>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
             }
           />
         )}
@@ -437,6 +475,11 @@ export default function PalEntryPage() {
                     attemptsByChapter={data.attemptsByChapter}
                     onStartQuiz={(chapter) => startQuiz(chapter, subject)}
                     onOpenModal={(kind, chapter) => openModal(kind, chapter, subject)}
+<<<<<<< HEAD
+=======
+                    studentId={data.student.studentId}
+                    getContext={(chapter) => chapterContext(chapter, subject)}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   />
                 ))}
               </div>
@@ -465,6 +508,11 @@ function SubjectCard({
   attemptsByChapter,
   onStartQuiz,
   onOpenModal,
+<<<<<<< HEAD
+=======
+  studentId,
+  getContext,
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }: {
   subject: PalSubject;
   expanded: boolean;
@@ -472,6 +520,11 @@ function SubjectCard({
   attemptsByChapter: PalLandingData['attemptsByChapter'];
   onStartQuiz: (chapter: PalChapter) => void;
   onOpenModal: (kind: ModalKind, chapter: PalChapter) => void;
+<<<<<<< HEAD
+=======
+  studentId: string;
+  getContext: (chapter: PalChapter) => PalChapterContext;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -511,6 +564,11 @@ function SubjectCard({
                 attempts={attemptsByChapter[chapter.id] ?? []}
                 onStartQuiz={() => onStartQuiz(chapter)}
                 onOpenModal={(kind) => onOpenModal(kind, chapter)}
+<<<<<<< HEAD
+=======
+                studentId={studentId}
+                context={getContext(chapter)}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               />
             ))
           )}
@@ -525,13 +583,53 @@ function ChapterRow({
   attempts,
   onStartQuiz,
   onOpenModal,
+<<<<<<< HEAD
+=======
+  studentId,
+  context,
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }: {
   chapter: PalChapter;
   attempts: PalLandingData['attemptsByChapter'][string];
   onStartQuiz: () => void;
   onOpenModal: (kind: ModalKind) => void;
+<<<<<<< HEAD
 }) {
   const hasAttempts = chapter.quizCount > 0;
+=======
+  studentId: string;
+  context: PalChapterContext;
+}) {
+  const hasAttempts = chapter.quizCount > 0;
+  const [gate, setGate] = useState<ChapterGateData | null>(null);
+
+  // Prerequisite gate check — Step 5 of the learning journey. A chapter with
+  // no mapped concepts (most legacy chapters) comes back with an empty
+  // concept list and anyLocked=false, so this defaults to unlocked rather
+  // than blocking chapters that predate the concept model.
+  useEffect(() => {
+    if (!studentId || !context.chapterId) return;
+    const controller = new AbortController();
+    fetchChapterGate({ studentId, chapterId: context.chapterId }, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setGate(result);
+      })
+      .catch(() => {
+        // Gate check failing shouldn't block the chapter — treat as unlocked.
+      });
+    return () => controller.abort();
+  }, [studentId, context.chapterId]);
+
+  const locked = gate?.anyLocked ?? false;
+  const unmasteredNames = Array.from(
+    new Set(
+      (gate?.concepts ?? [])
+        .flatMap((c) => c.unmasteredPrerequisites)
+        .map((p) => p.conceptName)
+        .filter(Boolean)
+    )
+  );
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   return (
     <div className="px-5 py-4">
@@ -546,6 +644,19 @@ function ChapterRow({
             )}
           </div>
 
+<<<<<<< HEAD
+=======
+          {locked && unmasteredNames.length > 0 && (
+            <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Master {unmasteredNames.join(', ')} first — take the diagnostic to check where
+                you stand, then come back here.
+              </span>
+            </div>
+          )}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           {attempts.length > 0 && (
             <div className="mt-3 space-y-2">
               {attempts.map((attempt, index) => (
@@ -569,6 +680,13 @@ function ChapterRow({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+<<<<<<< HEAD
+=======
+          {/* Diagnostic is the onboarding step of the learning journey — it
+              establishes a baseline before instruction, so it's offered
+              whether or not the student has quiz attempts yet. */}
+          <DiagnosticButton studentId={studentId} context={context} />
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           {hasAttempts && (
             <>
               <Button
@@ -589,11 +707,25 @@ function ChapterRow({
                 <AlertTriangle className="h-3.5 w-3.5" />
                 Misconception
               </Button>
+<<<<<<< HEAD
             </>
           )}
           <Button size="sm" onClick={onStartQuiz}>
             <Play className="h-3.5 w-3.5" />
             {hasAttempts ? 'Next quiz' : 'Start quiz'}
+=======
+              <PracticePanel studentId={studentId} context={context} />
+            </>
+          )}
+          <Button
+            size="sm"
+            onClick={onStartQuiz}
+            disabled={locked}
+            title={locked ? 'Master the prerequisite concept(s) above first' : undefined}
+          >
+            {locked ? <Lock className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            {locked ? 'Locked' : hasAttempts ? 'Next quiz' : 'Start quiz'}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           </Button>
         </div>
       </div>
@@ -695,7 +827,11 @@ function PedagogyModal({ modal, onClose }: { modal: ActiveModal; onClose: () => 
     };
     void load();
     return () => controller.abort();
+<<<<<<< HEAD
   }, [modal.context]); // eslint-disable-line react-hooks/exhaustive-deps
+=======
+  }, [modal.context]);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const handleContentClick = (item: PedagogyContentItem) => {
     void incrementContentVisit({
@@ -1082,4 +1218,8 @@ function MisconceptionModal({ modal, onClose }: { modal: ActiveModal; onClose: (
       )}
     </ModalShell>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d

@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+<<<<<<< HEAD
 import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot, LayoutGrid } from 'lucide-react';
+=======
+import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot } from 'lucide-react';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -68,6 +72,7 @@ const getStoredSelection = (key: string) => {
 export default function Header({
   onToggleChatbot,
   isChatbotOpen,
+<<<<<<< HEAD
   onToggleRightToolbar,
   isRightToolbarOpen,
   rightToolbarToggleRef,
@@ -77,6 +82,11 @@ export default function Header({
   onToggleRightToolbar: () => void;
   isRightToolbarOpen: boolean;
   rightToolbarToggleRef: React.RefObject<HTMLButtonElement | null>;
+=======
+}: {
+  onToggleChatbot: () => void;
+  isChatbotOpen: boolean;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }) {
   const { user, logout, refreshAcademicTerms } = useAuth();
   const router = useRouter();
@@ -318,6 +328,7 @@ export default function Header({
             </span>
           </div>
           
+<<<<<<< HEAD
           <button
             ref={rightToolbarToggleRef}
             type="button"
@@ -332,6 +343,9 @@ export default function Header({
             <LayoutGrid size={18} />
           </button>
         </div>
+=======
+          </div>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         
         {showUserDropdown && userPosition && typeof document !== 'undefined' && createPortal(
           <div

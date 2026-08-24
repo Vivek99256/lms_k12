@@ -1,6 +1,10 @@
 "use client";
 
+<<<<<<< HEAD
 import React from "react";
+=======
+import React, { useEffect, useState } from "react";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import {
   CreditCard,
   UserCheck,
@@ -9,6 +13,7 @@ import {
   Printer,
   Camera,
   Settings,
+<<<<<<< HEAD
 } from "lucide-react";
 import { Info } from "lucide-react";
 
@@ -28,11 +33,20 @@ interface StudentPreview {
 
 interface IdCardsContentProps {
   student?: StudentPreview;
+=======
+  Loader2,
+} from "lucide-react";
+import { Info } from "lucide-react";
+import { getStudentIdCardPreview, type StudentPreview } from "./api";
+
+interface IdCardsContentProps {
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   onGenerateStudentCards?: () => void;
   onGenerateStaffCards?: () => void;
   onBulkPrintCards?: () => void;
 }
 
+<<<<<<< HEAD
 const DEFAULT_STUDENT: StudentPreview = {
   schoolName: "Hills High School",
   cardTitle: "STUDENT IDENTITY CARD",
@@ -48,13 +62,69 @@ const DEFAULT_STUDENT: StudentPreview = {
 
 export const IdCardsContent: React.FC<IdCardsContentProps> = ({
   student = DEFAULT_STUDENT,
+=======
+const EMPTY_STUDENT: StudentPreview = {
+  schoolName: "",
+  cardTitle: "STUDENT IDENTITY CARD",
+  name: "",
+  admissionNo: "",
+  gradeClass: "",
+  house: "",
+  bloodGroup: "",
+  emergencyContact: "",
+  validTill: "",
+  initials: "",
+};
+
+export const IdCardsContent: React.FC<IdCardsContentProps> = ({
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   onGenerateStudentCards,
   onGenerateStaffCards,
   onBulkPrintCards,
 }) => {
+<<<<<<< HEAD
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+=======
+  const [student, setStudent] = useState<StudentPreview>(EMPTY_STUDENT);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getStudentIdCardPreview(controller.signal)
+      .then((result) => {
+        if (result) setStudent(result);
+      })
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return;
+        setError(reason instanceof Error ? reason.message : 'Unable to load student profile.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-gray-500">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Loading student profile…
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         {/* Main Grid Layout - 50/50 split */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column: ID Card Preview (50%) */}

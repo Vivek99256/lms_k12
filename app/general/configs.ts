@@ -5,7 +5,11 @@ export const templateConfig: GeneralConfig = {
   fields: [
     { key: "module_name", label: "Module Name", kind: "text", required: true },
     { key: "title", label: "Template Title", kind: "text", required: true },
+<<<<<<< HEAD
     { key: "html_content", label: "HTML Content", kind: "textarea", rows: 14, required: true },
+=======
+    { key: "html_content", label: "HTML Content", kind: "editor", required: true },
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   ],
   columns: [
     { key: "module_name", label: "Module" }, { key: "title", label: "Title" },

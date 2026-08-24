@@ -60,7 +60,11 @@ function DocumentTemplatesGallery() {
 
   // The sidebar links deep-link into a category (…?category=certificate), so
   // the filter is seeded from the URL rather than always starting at "all".
+<<<<<<< HEAD
   const initialCategory = searchParams.get('category') ?? 'all';
+=======
+  const initialCategory = searchParams?.get('category') ?? 'all';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +81,11 @@ function DocumentTemplatesGallery() {
   // trapping the user: adjusting during render keeps the list and the URL in
   // step, while a manual change to the dropdown still wins until the URL moves
   // again.
+<<<<<<< HEAD
   const urlCategory = searchParams.get('category') ?? 'all';
+=======
+  const urlCategory = searchParams?.get('category') ?? 'all';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const [lastUrlCategory, setLastUrlCategory] = useState(urlCategory);
   if (urlCategory !== lastUrlCategory) {
     setLastUrlCategory(urlCategory);

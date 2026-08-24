@@ -7,22 +7,41 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+<<<<<<< HEAD
     "typecheck": "tsc --noEmit",
     "test": "npx tsx --test",
     "test:pb": "npx tsx --test app/pal/data/pal-pb.test.ts"
+=======
+    "typecheck": "tsc --noEmit"
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.28",
     "@base-ui/react": "^1.6.0",
     "@craftjs/core": "^0.2.12",
     "@craftjs/layers": "^0.2.7",
+<<<<<<< HEAD
     "@hookform/resolvers": "^5.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+=======
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@hookform/resolvers": "^5.4.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@radix-ui/react-alert-dialog": "^1.1.23",
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-dropdown-menu": "^2.1.24",
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     "@radix-ui/react-radio-group": "^1.4.1",
     "@tiptap/core": "^3.29.2",
     "@tiptap/extension-color": "^3.30.0",
     "@tiptap/extension-font-family": "^3.30.0",
     "@tiptap/extension-highlight": "^3.30.0",
+<<<<<<< HEAD
+=======
+    "@tiptap/extension-image": "^3.30.0",
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     "@tiptap/extension-strike": "^3.30.0",
     "@tiptap/extension-table": "^3.30.0",
     "@tiptap/extension-table-cell": "^3.30.0",
@@ -34,6 +53,10 @@
     "@tiptap/pm": "^3.29.2",
     "@tiptap/react": "^3.30.0",
     "@tiptap/starter-kit": "^3.30.0",
+<<<<<<< HEAD
+=======
+    "@xyflow/react": "^12.11.3",
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     "ai": "^7.0.42",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
@@ -43,7 +66,10 @@
     "html2canvas-pro": "^2.3.2",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.16.0",
+<<<<<<< HEAD
     "mysql2": "^3.23.3",
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     "next": "16.2.6",
     "react": "19.2.4",
     "react-chartjs-2": "^5.3.1",

@@ -402,3 +402,297 @@ export async function fetchRemediation(
     recommendedSequence: toArray(data.recommended_sequence).map((id) => readNumber(id)),
   };
 }
+<<<<<<< HEAD
+=======
+export interface V4UluListItem {
+  id: number;
+  uluId: string;
+  title: string;
+  grade: number;
+  subject: string;
+  academicConcept: string;
+  subConcept: string;
+  status: string;
+  difficulty: number;
+  durationMinutes: number;
+  pedagogyTag: string;
+  h5pType: string;
+  caselDomain: string;
+  ngssPractice: string;
+  riasecSignal: string;
+  careerCluster: string;
+  realSkillName: string;
+  culturalContext: string;
+  socialMode: string;
+  updatedAt: string;
+  analytics: Record<string, unknown>;
+}
+
+export interface V4UluListResponse {
+  items: V4UluListItem[];
+  total: number;
+  currentPage: number;
+  lastPage: number;
+  perPage: number;
+}
+
+export interface V4UluFilters {
+  search?: string;
+  status?: string;
+  subject?: string;
+  grade?: string;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+  perPage?: number;
+  page?: number;
+}
+
+export interface V4UluDetail extends V4UluListItem {
+  language: string;
+  masteryGate: number;
+  ncdgGoal: string;
+  academicCore: Record<string, unknown>;
+  selLayer: Record<string, unknown>;
+  stemLayer: Record<string, unknown>;
+  careerLayer: Record<string, unknown>;
+  realSkill: Record<string, unknown>;
+  scenario: Record<string, unknown>;
+  branches: Array<Record<string, unknown>>;
+  reflections: Record<string, unknown>;
+  delivery: Record<string, unknown>;
+  qaChecks: Record<string, unknown>;
+  optimizationFlags: Record<string, unknown>;
+  crossDomainLinks: Array<Record<string, unknown>>;
+}
+
+export interface V4UluPreview {
+  uluId: string;
+  title: string;
+  studentJourney: {
+    context: string;
+    academicHook: string;
+    decisionPoint: string;
+    paths: Array<Record<string, unknown>>;
+    reflection: Record<string, unknown>;
+    careerSignal: Record<string, unknown>;
+    completion: Record<string, unknown>;
+  };
+}
+
+export interface V4UluAnalytics {
+  uluId: string;
+  analytics: Record<string, unknown>;
+  optimizationFlags: Record<string, unknown>;
+  recommendations: string[];
+}
+
+export interface V4UluMutationInput {
+  title: string;
+  grade: number;
+  subject: string;
+  academic_concept: string;
+  sub_concept: string;
+  status: string;
+  difficulty: number;
+  duration_minutes: number;
+  pedagogy_tag: string;
+  h5p_type: string;
+  casel_domain: string;
+  ngss_practice: string;
+  ncdg_goal: string;
+  riasec_signal: string;
+  career_cluster: string;
+  real_skill_name: string;
+  cultural_context: string;
+  social_mode: string;
+  language: string;
+  mastery_gate: number;
+  scenario: {
+    context: string;
+    academic_hook: string;
+    decision_point: string;
+    reflection: string;
+  };
+  reflections: {
+    stream: string;
+    mountain: string;
+    sky: string;
+  };
+}
+
+function mapUluItem(entry: unknown): V4UluListItem {
+  const record = toRecord(entry);
+  return {
+    id: readNumber(record.id),
+    uluId: readString(record.ulu_id),
+    title: readString(record.title),
+    grade: readNumber(record.grade),
+    subject: readString(record.subject),
+    academicConcept: readString(record.academic_concept),
+    subConcept: readString(record.sub_concept),
+    status: readString(record.status),
+    difficulty: readNumber(record.difficulty),
+    durationMinutes: readNumber(record.duration_minutes),
+    pedagogyTag: readString(record.pedagogy_tag),
+    h5pType: readString(record.h5p_type),
+    caselDomain: readString(record.casel_domain),
+    ngssPractice: readString(record.ngss_practice),
+    riasecSignal: readString(record.riasec_signal),
+    careerCluster: readString(record.career_cluster),
+    realSkillName: readString(record.real_skill_name),
+    culturalContext: readString(record.cultural_context),
+    socialMode: readString(record.social_mode),
+    updatedAt: readString(record.updated_at),
+    analytics: toRecord(record.analytics),
+  };
+}
+
+async function fetchV4Mutation(
+  path: string,
+  method: 'POST' | 'PUT' | 'DELETE',
+  body?: unknown,
+  signal?: AbortSignal
+): Promise<unknown> {
+  const session = buildSessionContext();
+  if (!session.baseUrl) throw new Error('Session data is missing. Please sign in again.');
+  if (!session.token) throw new Error('Your session has expired. Please sign in again to continue.');
+
+  const response = await fetch(`${session.baseUrl}/${path.replace(/^\//, '')}`, {
+    method,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      Authorization: `Bearer ${session.token}`,
+    },
+    body: body == null ? undefined : JSON.stringify(body),
+    signal,
+  });
+
+  const text = await response.text();
+  let payload: unknown = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const record = toRecord(payload);
+    throw new Error(readString(record.message) || `HTTP ${response.status}: the PAL V4 API request failed.`);
+  }
+
+  const record = toRecord(payload);
+  if (record.success === false) {
+    throw new Error(readString(record.message) || 'PAL V4 mutation failed.');
+  }
+
+  return 'data' in record ? record.data : payload;
+}
+
+export async function fetchULUList(
+  filters: V4UluFilters = {},
+  signal?: AbortSignal
+): Promise<V4UluListResponse> {
+  const params = new URLSearchParams();
+  if (filters.search) params.set('search', filters.search);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.subject) params.set('subject', filters.subject);
+  if (filters.grade) params.set('grade', filters.grade);
+  if (filters.sortBy) params.set('sort_by', filters.sortBy);
+  if (filters.sortDirection) params.set('sort_direction', filters.sortDirection);
+  if (filters.perPage) params.set('per_page', String(filters.perPage));
+  if (filters.page) params.set('page', String(filters.page));
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  const data = toRecord(await fetchV4Data(`api/pal/ulu${suffix}`, signal));
+
+  return {
+    items: toArray(data.data).map(mapUluItem),
+    total: readNumber(data.total),
+    currentPage: readNumber(data.current_page),
+    lastPage: readNumber(data.last_page),
+    perPage: readNumber(data.per_page),
+  };
+}
+
+export async function fetchULUDetail(id: number, signal?: AbortSignal): Promise<V4UluDetail> {
+  const record = toRecord(await fetchV4Data(`api/pal/ulu/${id}`, signal));
+  const item = mapUluItem(record);
+  return {
+    ...item,
+    language: readString(record.language),
+    masteryGate: readNumber(record.mastery_gate),
+    ncdgGoal: readString(record.ncdg_goal),
+    academicCore: toRecord(record.academic_core),
+    selLayer: toRecord(record.sel_layer),
+    stemLayer: toRecord(record.stem_layer),
+    careerLayer: toRecord(record.career_layer),
+    realSkill: toRecord(record.real_skill),
+    scenario: toRecord(record.scenario),
+    branches: toArray(record.branches).map((entry) => toRecord(entry)),
+    reflections: toRecord(record.reflections),
+    delivery: toRecord(record.delivery),
+    qaChecks: toRecord(record.qa_checks),
+    optimizationFlags: toRecord(record.optimization_flags),
+    crossDomainLinks: toArray(record.cross_domain_links).map((entry) => toRecord(entry)),
+  };
+}
+
+export async function createULU(input: V4UluMutationInput, signal?: AbortSignal): Promise<V4UluDetail> {
+  const data = await fetchV4Mutation('api/pal/ulu', 'POST', input, signal);
+  return fetchULUDetail(readNumber(toRecord(data).id), signal);
+}
+
+export async function updateULU(id: number, input: V4UluMutationInput, signal?: AbortSignal): Promise<V4UluDetail> {
+  const data = await fetchV4Mutation(`api/pal/ulu/${id}`, 'PUT', input, signal);
+  return fetchULUDetail(readNumber(toRecord(data).id), signal);
+}
+
+export async function duplicateULU(id: number, signal?: AbortSignal): Promise<V4UluDetail> {
+  const data = await fetchV4Mutation(`api/pal/ulu/${id}/duplicate`, 'POST', undefined, signal);
+  return fetchULUDetail(readNumber(toRecord(data).id), signal);
+}
+
+export async function approveULU(id: number, signal?: AbortSignal): Promise<V4UluDetail> {
+  const data = await fetchV4Mutation(`api/pal/ulu/${id}/approve`, 'POST', undefined, signal);
+  return fetchULUDetail(readNumber(toRecord(data).id), signal);
+}
+
+export async function archiveULU(id: number, signal?: AbortSignal): Promise<V4UluDetail> {
+  const data = await fetchV4Mutation(`api/pal/ulu/${id}/archive`, 'POST', undefined, signal);
+  return fetchULUDetail(readNumber(toRecord(data).id), signal);
+}
+
+export async function deleteULU(id: number, signal?: AbortSignal): Promise<void> {
+  await fetchV4Mutation(`api/pal/ulu/${id}`, 'DELETE', undefined, signal);
+}
+
+export async function fetchULUPreview(id: number, signal?: AbortSignal): Promise<V4UluPreview> {
+  const data = toRecord(await fetchV4Data(`api/pal/ulu/${id}/preview`, signal));
+  const studentJourney = toRecord(data.student_journey);
+  return {
+    uluId: readString(data.ulu_id),
+    title: readString(data.title),
+    studentJourney: {
+      context: readString(studentJourney.context),
+      academicHook: readString(studentJourney.academic_hook),
+      decisionPoint: readString(studentJourney.decision_point),
+      paths: toArray(studentJourney.paths).map((entry) => toRecord(entry)),
+      reflection: toRecord(studentJourney.reflection),
+      careerSignal: toRecord(studentJourney.career_signal),
+      completion: toRecord(studentJourney.completion),
+    },
+  };
+}
+
+export async function fetchULUAnalytics(id: number, signal?: AbortSignal): Promise<V4UluAnalytics> {
+  const data = toRecord(await fetchV4Data(`api/pal/ulu/${id}/analytics`, signal));
+  return {
+    uluId: readString(data.ulu_id),
+    analytics: toRecord(data.analytics),
+    optimizationFlags: toRecord(data.optimization_flags),
+    recommendations: toStringArray(data.recommendations),
+  };
+}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d

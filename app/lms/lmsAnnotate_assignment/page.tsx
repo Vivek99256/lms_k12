@@ -23,6 +23,10 @@ import {
   listAnnotateAssignments,
   type AnnotateRow,
 } from "@/app/lms/lmsAnnotate_assignment/api";
+<<<<<<< HEAD
+=======
+import RequireStaff from "@/app/lms/_shared/RequireStaff";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 export default function AnnotateAssignmentPage() {
   const [rows, setRows] = useState<AnnotateRow[]>([]);
@@ -51,6 +55,10 @@ export default function AnnotateAssignmentPage() {
   }, [load]);
 
   return (
+<<<<<<< HEAD
+=======
+    <RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -178,5 +186,9 @@ export default function AnnotateAssignmentPage() {
         </div>
       </section>
     </main>
+<<<<<<< HEAD
+=======
+    </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
 }

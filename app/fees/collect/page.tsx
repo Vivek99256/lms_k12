@@ -18,6 +18,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+<<<<<<< HEAD
+=======
+import { fetchFeesDashboardSummary } from '@/app/fees/_lib/fees-dashboard-api';
+import { getFeesSession } from '@/app/fees/_lib/fees-api';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import {
   SearchDropdown,
   type Division,
@@ -76,8 +81,17 @@ type PaymentMix = {
 type DashboardSnapshot = {
   collectedThisTerm?: number;
   outstandingTotal?: number;
+<<<<<<< HEAD
   collectionRate?: number;
   defaulters?: number;
+=======
+  demandAmount?: number;
+  collectionRate?: number;
+  defaulters?: number;
+  paidStudents?: number;
+  pendingStudents?: number;
+  studentsConsidered?: number;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   chartTrend?: ChartPoint[];
   headBreakdown?: HeadBreakdown[];
   paymentMix?: PaymentMix[];
@@ -202,7 +216,11 @@ export default function FeesCollectPage() {
       form.append('sub_institute_id', String(subInstituteId));
       form.append('syear', String(academicYearId));
       appendStudentSearchFilters(form, filters);
+<<<<<<< HEAD
       if (includeInactive) form.append('include_inactive', '1');
+=======
+      if (includeInactive) form.append('including_inactive', 'Yes');
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       form.append('type', 'API');
 
       const response = await fetch(`${hostName.replace(/\/$/, '')}/fees/fees_collect/show_student`, {
@@ -221,7 +239,27 @@ export default function FeesCollectPage() {
       }
 
       const result = await readStudentsResponseProgressively(response, { onRows: () => {} });
+<<<<<<< HEAD
       const snapshot = toDashboardSnapshot(result.payload, result.source);
+=======
+      let snapshot = toDashboardSnapshot(result.payload, result.source);
+      try {
+        const dashboardSession = getFeesSession();
+        const dashboardPayload = await fetchFeesDashboardSummary(dashboardSession, {
+          sub_institute_id: dashboardSession.subInstituteId,
+          syear: dashboardSession.academicYearId,
+          user_id: dashboardSession.userId,
+          from_date: filters.fromDate || null,
+          to_date: filters.toDate || null,
+          grade_id: filters.selectedSection || null,
+          standard_id: filters.selectedStandard || null,
+          section_id: filters.selectedDivision || null,
+        });
+        snapshot = toDashboardSnapshot(dashboardPayload, dashboardPayload);
+      } catch {
+        // Keep the table-derived fallback when the aggregate endpoint is unavailable.
+      }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       setDashboardRows(result.rows);
       setDashboardSnapshot(snapshot);
       if (result.totalCount != null && totalStudentCount == null) {
@@ -299,7 +337,11 @@ export default function FeesCollectPage() {
       form.append('syear', String(academicYearId));
       appendStudentSearchFilters(form, filters);
       appendStudentPaginationFilters(form, pageNumber);
+<<<<<<< HEAD
       if (includeInactive) form.append('include_inactive', '1');
+=======
+      if (includeInactive) form.append('including_inactive', 'Yes');
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       form.append('type', 'API');
 
       const res = await fetch(`${hostName.replace(/\/$/, '')}/fees/fees_collect/show_student`, {
@@ -490,7 +532,10 @@ export default function FeesCollectPage() {
     [dashboardSourceRows]
   );
   const totalPayableFees = dashboardData.totalPaidFees + dashboardData.totalPendingFees;
+<<<<<<< HEAD
   const hasDailyTrend = dashboardData.dailyTrend.length > 0;
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const hasDashboardData = dashboardData.todayCollection > 0
     || dashboardData.totalPaidFees > 0
     || dashboardData.totalPendingFees > 0
@@ -583,7 +628,11 @@ export default function FeesCollectPage() {
   };
 
   return (
+<<<<<<< HEAD
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#f8fafc_38%,#f1f5f9_100%)]">
+=======
+    <div className="min-h-screen ">
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       <div className="mx-auto max-w-[1500px] space-y-5 p-4 md:p-5 lg:p-6">
         <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-sm ring-1 ring-slate-200/70">
           <CardHeader className="border-b border-slate-100 pb-4">
@@ -636,7 +685,11 @@ export default function FeesCollectPage() {
                     standard: 'All standards',
                     division: 'All divisions',
                   }}
+<<<<<<< HEAD
                   className="min-w-0 grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-3 [&>div]:min-w-0 [&_label]:text-xs [&_label]:font-semibold [&_label]:text-slate-600 [&_select]:h-11 [&_select]:min-w-0 [&_select]:w-full [&_select]:rounded-xl [&_select]:border-slate-200 [&_select]:bg-slate-50/70 [&_select]:pr-10 [&_select]:text-sm"
+=======
+                  className="w-130 grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-3 [&>div]:min-w-0 [&_label]:text-xs [&_label]:font-semibold [&_label]:text-slate-600 [&_select]:h-11 [&_select]:min-w-0 [&_select]:w-full [&_select]:rounded-xl [&_select]:border-slate-200 [&_select]:bg-slate-50/70 [&_select]:pr-10 [&_select]:text-sm"
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   onChange={handleAcademicDropdownChange}
                   onStandardChange={handleStandardChange}
                   onDivisionChange={handleDivisionChange}
@@ -725,6 +778,7 @@ export default function FeesCollectPage() {
                   ))}
                 </section>
 
+<<<<<<< HEAD
                 <section className={`grid gap-4 ${hasDailyTrend ? 'xl:grid-cols-[1.15fr_1fr]' : 'grid-cols-1'}`}>
                   <ChartCard title="Collected vs Pending Fees" subtitle="Calculated directly from the current API response.">
                     <PaidPendingComparisonChart
@@ -743,6 +797,8 @@ export default function FeesCollectPage() {
                     </ChartCard>
                   ) : null}
                 </section>
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               </div>
             ) : (
               <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center">
@@ -1395,6 +1451,13 @@ function getCollectionTrendIndicator(data: ChartPoint[]) {
   };
 }
 
+<<<<<<< HEAD
+=======
+void ChartCard;
+void DailyCollectionTrendChart;
+void PaidPendingComparisonChart;
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 function SortableHeader({ label, align = 'left' }: { label: string; align?: 'left' | 'right' }) {
   return (
     <th className={`px-5 py-3 font-semibold ${align === 'right' ? 'text-right' : ''}`}>
@@ -1817,6 +1880,7 @@ function appendUniqueStudents(current: StudentFeeRow[], next: StudentFeeRow[]): 
 }
 
 function buildDashboardData(students: StudentFeeRow[], snapshot: DashboardSnapshot): DashboardData {
+<<<<<<< HEAD
   void snapshot;
   const totalPaidFees = getCollectedTotal(students);
   const totalPendingFees = students.reduce((total, student) => total + student.pendingFees, 0);
@@ -1825,6 +1889,17 @@ function buildDashboardData(students: StudentFeeRow[], snapshot: DashboardSnapsh
   const collectionRate = collectionBase > 0 ? Math.round((totalPaidFees / collectionBase) * 100) : 0;
   const pendingStudents = students.filter((student) => student.pendingFees > 0 && student.status !== 'paid').length;
   const paidStudents = Math.max(students.filter((student) => student.status === 'paid' || student.pendingFees <= 0).length, 0);
+=======
+  const totalPaidFees = snapshot.collectedThisTerm ?? getCollectedTotal(students);
+  const totalPendingFees = snapshot.outstandingTotal ?? students.reduce((total, student) => total + student.pendingFees, 0);
+  const calculatedTotal = students.reduce((total, student) => total + getStudentTotalFees(student), 0);
+  const collectionBase = snapshot.demandAmount ?? Math.max(calculatedTotal, totalPaidFees + totalPendingFees);
+  const collectionRate = snapshot.collectionRate ?? (collectionBase > 0 ? Math.round((totalPaidFees / collectionBase) * 100) : 0);
+  const pendingStudents = snapshot.pendingStudents ?? snapshot.defaulters ?? students.filter((student) => student.pendingFees > 0 && student.status !== 'paid').length;
+  const paidStudents = snapshot.paidStudents
+    ?? (snapshot.studentsConsidered !== undefined ? Math.max(snapshot.studentsConsidered - pendingStudents, 0) : undefined)
+    ?? Math.max(students.filter((student) => student.status === 'paid' || student.pendingFees <= 0).length, 0);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   return {
     todayCollection: getTodayCollection(students),
@@ -1842,6 +1917,10 @@ function buildDashboardData(students: StudentFeeRow[], snapshot: DashboardSnapsh
 function hasDashboardSnapshotData(snapshot: DashboardSnapshot): boolean {
   return snapshot.collectedThisTerm !== undefined
     || snapshot.outstandingTotal !== undefined
+<<<<<<< HEAD
+=======
+    || snapshot.demandAmount !== undefined
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     || snapshot.collectionRate !== undefined
     || snapshot.defaulters !== undefined
     || Boolean(snapshot.chartTrend?.length)
@@ -1866,6 +1945,10 @@ function toDashboardSnapshot(payload: unknown, source: unknown): DashboardSnapsh
       'receivedAmount',
       'collection_amount',
       'collectionAmount',
+<<<<<<< HEAD
+=======
+      'collected_amount',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     ]),
     outstandingTotal: readFirstNumber(records, [
       'outstanding',
@@ -1878,6 +1961,16 @@ function toDashboardSnapshot(payload: unknown, source: unknown): DashboardSnapsh
       'balance',
       'balance_amount',
       'due_amount',
+<<<<<<< HEAD
+=======
+      'outstanding_amount',
+    ]),
+    demandAmount: readFirstNumber(records, [
+      'demand_amount',
+      'demandAmount',
+      'total_payable',
+      'totalPayable',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     ]),
     collectionRate: normalizeOptionalPercentage(readFirstNumber(records, [
       'collection_rate',
@@ -1897,6 +1990,22 @@ function toDashboardSnapshot(payload: unknown, source: unknown): DashboardSnapsh
       'pending_students',
       'pendingStudents',
     ]),
+<<<<<<< HEAD
+=======
+    paidStudents: readFirstNumber(records, [
+      'paid_students',
+      'paidStudents',
+    ]),
+    studentsConsidered: readFirstNumber(records, [
+      'students_considered',
+      'studentsConsidered',
+    ]),
+    pendingStudents: readFirstNumber(records, [
+      'pending_students',
+      'pendingStudents',
+      'defaulters_count',
+    ]),
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     chartTrend: toChartPoints(readFirstArray(records, [
       'collection_trend',
       'collectionTrend',

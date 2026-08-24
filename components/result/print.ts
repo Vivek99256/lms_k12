@@ -46,6 +46,13 @@ export function printElement(element: HTMLElement | null, title = 'Print') {
   h1, h2, h3 { margin: 0 0 8px; }
   img { max-width: 100%; }
   @media print { body { margin: 0; } }
+<<<<<<< HEAD
+=======
+  /* Each generated report card is a sibling <div id="{student_id}"> block
+     (one per selected student) — force each onto its own printed page. */
+  body > * > div[id] { page-break-after: always; break-after: page; page-break-inside: avoid; }
+  body > * > div[id]:last-child { page-break-after: auto; break-after: auto; }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 </style>
 </head>
 <body>${element.outerHTML}</body>

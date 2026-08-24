@@ -40,10 +40,17 @@ type Criteria = {
 };
 
 const FILTER_FIELDS: FilterFieldDef[] = [
+<<<<<<< HEAD
   { kind: 'section' },
   { kind: 'standard', required: true },
   { kind: 'division', required: true },
   { kind: 'term', required: true },
+=======
+  { kind: 'term', required: true },
+  { kind: 'section' },
+  { kind: 'standard', required: true },
+  { kind: 'division', required: true },
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 ];
 
 function isValidRow(student: StudentRow): boolean {

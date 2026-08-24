@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+//
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -50,13 +54,20 @@ import {
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+<<<<<<< HEAD
 import { courses, type Course } from '../../data/courses';
+=======
+import { type Course } from '../../data/courses';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import {
   fetchChapterContent,
   fetchQuestionBank,
   fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
+<<<<<<< HEAD
   getChaptersByCourseid,
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   getConceptIntelligenceData,
   getSubjectAndChapters,
   resolveSubjectDisplayName,
@@ -72,8 +83,16 @@ import { ConceptIntelligenceTabs } from './ConceptIntelligenceTabs';
 import { getRequestContext } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
+<<<<<<< HEAD
 import type { Chapter } from '../../data/chapters';
 import { GeneratePresentationDrawer } from './sideDrawer';
+=======
+import { useCurriculumMeta } from '../../data/curriculum';
+import type { Chapter } from '../../data/chapters';
+import type { LmsSubject } from '../../data/lmsCourses';
+import { GeneratePresentationDrawer } from './sideDrawer';
+import { persistPalConceptContext } from '@/app/pal/_components/PalContextBootstrap';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 const EMPTY_CHAPTER_FORM = {
   chapterName: '',
@@ -235,6 +254,65 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   return 'Revision notes';
 }
 
+<<<<<<< HEAD
+=======
+// Files the browser can only download (no native renderer). PDFs, images and
+// videos are deliberately absent - those render inline in a tab.
+const DOWNLOAD_ONLY_FILE_PATTERN = /\.(pptx?|docx?|xlsx?|csv|zip|rtf)(?:$|[?#])/i;
+const GAMMA_DECK_PATTERN = /(?:\/\/|\.)gamma\.app\//i;
+
+function isHttpUrl(value?: string | null): value is string {
+  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+}
+
+// Export links are often signed URLs with no file extension in the path, so
+// also treat an explicit attachment disposition or an office format hint in the
+// query string as "this will download".
+function isDownloadOnlyUrl(value: string): boolean {
+  return (
+    DOWNLOAD_ONLY_FILE_PATTERN.test(value) ||
+    /response-content-disposition=[^&]*attachment/i.test(value) ||
+    /[?&][^=]*=(?:pptx|docx|xlsx)(?:$|[&#])/i.test(value)
+  );
+}
+
+// Word/PowerPoint/Excel files render as a forced download in-browser with no
+// native preview, so they're routed through the Google Docs Viewer embed
+// instead of opened directly.
+function isOfficeDocumentUrl(value: string, filename?: string | null): boolean {
+  return /\.(docx?|pptx?|xlsx?)(?:$|[?#])/i.test(filename ?? value);
+}
+
+// Gamma stores two links per generated asset: `url` holds the export file
+// (a .pptx download) while `filename` keeps the gamma.app deck link. Pick the
+// link a browser can render in a tab: a Gamma deck link renders natively,
+// an Office document goes through the Google Docs Viewer, other inline-
+// viewable links (PDFs, images) render directly, and anything else falls
+// back to the Office Online viewer so "Open" never downloads.
+function resolveViewableContentUrl(asset: ChapterContentAsset): string | undefined {
+  const candidates = [asset.url, asset.filename]
+    .filter(isHttpUrl)
+    .map((value) => value.trim());
+
+  if (!candidates.length) {
+    return asset.url || asset.filename || undefined;
+  }
+
+  const deckLink = candidates.find((value) => GAMMA_DECK_PATTERN.test(value));
+  if (deckLink) return deckLink;
+
+  const officeDocLink = candidates.find((value) => isOfficeDocumentUrl(value, asset.filename));
+  if (officeDocLink) {
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(officeDocLink)}&embedded=true`;
+  }
+
+  const inlineViewable = candidates.find((value) => !isDownloadOnlyUrl(value));
+  if (inlineViewable) return inlineViewable;
+
+  return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(candidates[0])}`;
+}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 function buildApiChapterContentItems(
   chapter: Chapter,
   categories: Record<string, ChapterContentAsset[]>
@@ -242,7 +320,11 @@ function buildApiChapterContentItems(
   return Object.entries(categories).flatMap(([category, assets]) =>
     (assets ?? []).map((asset) => {
       const type = getApiContentType(category, asset);
+<<<<<<< HEAD
       const contentUrl = asset.url || asset.filename || undefined;
+=======
+      const contentUrl = resolveViewableContentUrl(asset);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       const updatedDate = asset.created_at?.split(' ')[0] ?? '—';
       const rawConceptId =
         asset.concept_id === null || asset.concept_id === undefined
@@ -353,8 +435,68 @@ function getCourseGradeLabel(classGrade: string) {
   return `Grade ${classGrade.replace('Class', '').trim()}`;
 }
 
+<<<<<<< HEAD
 function getCurriculumLabel() {
   return 'CBSE curriculum';
+=======
+/**
+ * Concepts actually stored for a chapter. Prefers the concept rows the API
+ * returned, and falls back to the semantic record's own total when the rows
+ * weren't expanded in the response.
+ */
+function getChapterConceptCount(chapter: Chapter): number {
+  const conceptRows = chapter.concepts?.length ?? 0;
+  if (conceptRows > 0) return conceptRows;
+
+  const semanticTotal = Number(chapter.semantic?.total_concepts);
+  return Number.isFinite(semanticTotal) && semanticTotal > 0 ? semanticTotal : 0;
+}
+
+/**
+ * Key concepts stored for the subject. Sums the concept rows on the chapters, and
+ * falls back to the catalog's own subject-level total when the chapter rows didn't
+ * carry their concepts. Never a fabricated or padded number.
+ */
+function getTotalConceptCount(chapters: Chapter[], subject?: LmsSubject | null): number {
+  const chapterTotal = chapters.reduce((total, chapter) => total + getChapterConceptCount(chapter), 0);
+  if (chapterTotal > 0) return chapterTotal;
+
+  const subjectTotal = Number(
+    subject?.key_concepts_count ??
+      subject?.key_concept_count ??
+      subject?.concepts_count ??
+      subject?.total_concepts ??
+      0
+  );
+
+  return Number.isFinite(subjectTotal) && subjectTotal > 0 ? subjectTotal : 0;
+}
+
+/**
+ * Key-concept group for a chapter, built from the concepts stored against it.
+ * Falls back to the bundled sample set only for the demo courses that have no
+ * API-backed concepts of their own.
+ */
+function resolveChapterKeyConcepts(
+  courseId: string,
+  chapter: Chapter
+): ChapterKeyConceptGroup | null {
+  const concepts = chapter.concepts ?? [];
+
+  if (concepts.length > 0) {
+    return {
+      count: getChapterConceptCount(chapter),
+      concepts: concepts.map((concept) => ({
+        title: concept.title,
+        description: concept.description ?? '',
+        mastery: '',
+        time: '',
+      })),
+    };
+  }
+
+  return getChapterKeyConcepts(courseId, chapter.id);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }
 
 function buildTeacherResources(chapterTitle: string) {
@@ -656,6 +798,7 @@ async function fetchMappedQuestionBank(
   });
 }
 
+<<<<<<< HEAD
 function buildQuestionBankItems(course: Course, chapters: Chapter[]): QuestionBankItem[] {
   let questionNumber = 101;
 
@@ -721,6 +864,8 @@ function buildQuestionBankItems(course: Course, chapters: Chapter[]): QuestionBa
   });
 }
 
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 export default function ChapterListPage() {
   const router = useRouter();
   const params = useParams();
@@ -735,6 +880,13 @@ export default function ChapterListPage() {
   const subjectId = courseIdParts[0];
   const standardId = courseIdParts[1] ?? undefined;
 
+<<<<<<< HEAD
+=======
+  // The board (CBSE / ICSE / GSEB / IB / state board) belongs to the tenant's
+  // curriculum record, so it is read per subject instead of being assumed by the UI.
+  const { board: curriculumBoard, label: curriculumLabel } = useCurriculumMeta(subjectId, standardId);
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
@@ -780,6 +932,7 @@ export default function ChapterListPage() {
   }, [subjectId, standardId]);
 
   const course: Course | undefined = useMemo(() => {
+<<<<<<< HEAD
     const staticCourse = courses.find((c) => c.id === courseId);
     const apiSubject = subjectData?.subject ?? null;
 
@@ -806,6 +959,36 @@ export default function ChapterListPage() {
     );
   }, [courseId, subjectData?.chapters, subjectData?.subject]);
   const allChapters = subjectData?.chapters ?? getChaptersByCourseid(courseId);
+=======
+    const apiSubject = subjectData?.subject ?? null;
+
+    return apiSubject
+      ? {
+          id: courseId,
+          title: apiSubject.subject_name,
+          code: '',
+          subject: apiSubject.subject_name,
+          category: apiSubject.content_category,
+          classGrade: `Class ${apiSubject.standard_name}`,
+          status: 'Active',
+          chapters: subjectData?.chapters.length ?? 0,
+          enrollments: 0,
+          progress: 0,
+          instructor: '',
+          createdAt: '',
+          accentColor: '#5648E8',
+          icon: 'book-open',
+        }
+      : undefined;
+  }, [courseId, subjectData?.chapters, subjectData?.subject]);
+  const allChapters = subjectData?.chapters ?? [];
+  // Both header stats come from live data: concept rows stored against the chapters,
+  // and the board on the tenant's curriculum record.
+  const totalConceptCount = useMemo(
+    () => getTotalConceptCount(allChapters, subjectData?.subject),
+    [allChapters, subjectData?.subject]
+  );
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const [searchTerm] = useState('');
   const [isAddChapterOpen, setIsAddChapterOpen] = useState(false);
@@ -909,7 +1092,11 @@ export default function ChapterListPage() {
     allChapters.find((chapter) => chapter.id === activeChapterId) || allChapters[0] || null;
   const contentChapter = resourceChapter;
   const contentChapterConcepts =
+<<<<<<< HEAD
     course && contentChapter ? getChapterKeyConcepts(course.id, contentChapter.id) : null;
+=======
+    course && contentChapter ? resolveChapterKeyConcepts(course.id, contentChapter) : null;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const activeLibraryChapter = useMemo(
     () => allChapters.find((chapter) => chapter.id === selectedLibraryChapterId) ?? contentChapter,
@@ -919,7 +1106,11 @@ export default function ChapterListPage() {
   const activeLibraryChapterConcepts = useMemo(
     () =>
       course && activeLibraryChapter
+<<<<<<< HEAD
         ? getChapterKeyConcepts(course.id, activeLibraryChapter.id)
+=======
+        ? resolveChapterKeyConcepts(course.id, activeLibraryChapter)
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         : null,
     [activeLibraryChapter, course]
   );
@@ -970,6 +1161,7 @@ export default function ChapterListPage() {
     [chapterContentItems]
   );
 
+<<<<<<< HEAD
   const generatedQuestionBankItems = useMemo(
     () => (course ? buildQuestionBankItems(course, allChapters) : []),
     [allChapters, course]
@@ -980,6 +1172,17 @@ export default function ChapterListPage() {
         (question) => questionBankItemEdits[question.id] ?? question
       ),
     [apiQuestionBankItems, generatedQuestionBankItems, manualQuestionBankItems, questionBankItemEdits]
+=======
+  // The bank shows only questions that actually exist: what the API returned for the
+  // current chapter scope, plus questions added in this session. No synthetic
+  // placeholder questions, so every count on this screen is the real count.
+  const questionBankItems = useMemo(
+    () =>
+      [...apiQuestionBankItems, ...manualQuestionBankItems].map(
+        (question) => questionBankItemEdits[question.id] ?? question
+      ),
+    [apiQuestionBankItems, manualQuestionBankItems, questionBankItemEdits]
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
   const questionBankChapterOptions = useMemo(
     () => allChapters.map((chapter) => ({ id: chapter.id, title: chapter.title })),
@@ -1434,6 +1637,17 @@ export default function ChapterListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, activeChapterId]);
 
+<<<<<<< HEAD
+=======
+  useEffect(() => {
+    if (view !== 'concept-intelligence' || !activeChapterId) return;
+    persistPalConceptContext({
+      chapterId: activeChapterId,
+      concept: searchParams?.get('concept') ?? '0',
+    });
+  }, [view, activeChapterId, searchParams]);
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const generateTeacherTrainingPresentation = () => {
     setIsPresentationMenuOpen(false);
     setIsPresentationReady(false);
@@ -3279,11 +3493,22 @@ export default function ChapterListPage() {
   }
 
   if (view === 'question-bank') {
+<<<<<<< HEAD
+=======
+    const totalQuestionBankCount = questionBankItems.length;
+    const visibleQuestionBankCount = filteredQuestionBankItems.length;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     const questionCountLabel = questionBankLoading
       ? 'Loading questions…'
       : questionBankError
         ? 'Error loading questions'
+<<<<<<< HEAD
         : `${filteredQuestionBankItems.length} of ${questionBankItems.length} questions`;
+=======
+        : visibleQuestionBankCount === totalQuestionBankCount
+          ? `${totalQuestionBankCount} question${totalQuestionBankCount === 1 ? '' : 's'}`
+          : `${visibleQuestionBankCount} of ${totalQuestionBankCount} questions`;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
     return (
       <div className="min-h-screen rounded-t-3xl bg-[#E9EEF7]">
@@ -3388,7 +3613,11 @@ export default function ChapterListPage() {
               <Button
                 type="button"
                 onClick={openQuestionBankAddQuestion}
+<<<<<<< HEAD
                 disabled={questionBankItems.length === 0 || questionBankLoading}
+=======
+                disabled={allChapters.length === 0 || questionBankLoading}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 className="h-10 rounded-xl bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
               >
                 <Plus size={18} className="mr-2" />
@@ -3494,6 +3723,7 @@ export default function ChapterListPage() {
       chapterForIntel && conceptTitle ? getConceptIntelligence(chapterForIntel, conceptTitle) : null;
     const detailSections = details
       ? [
+<<<<<<< HEAD
           { title: 'Knowledge', icon: BookOpen, items: details.knowledge, kind: 'list' as const },
           { title: 'Abilities', icon: Lightbulb, items: details.abilities, kind: 'list' as const },
           { title: 'Skills', icon: WandSparkles, items: details.skills, kind: 'tags' as const },
@@ -3504,6 +3734,18 @@ export default function ChapterListPage() {
           { title: 'Learning objectives', icon: CircleDot, items: details.learningObjectives, kind: 'list' as const },
           { title: 'Teaching pedagogies', icon: ClipboardList, items: details.teachingPedagogies, kind: 'tags' as const },
           { title: 'Real-world applications', icon: GraduationCap, items: details.realWorldApplications, kind: 'list' as const },
+=======
+          { title: 'Knowledge', icon: BookOpen, items: details.knowledge, kind: 'cards' as const },
+          { title: 'Abilities', icon: Lightbulb, items: details.abilities, kind: 'cards' as const },
+          { title: 'Skills', icon: WandSparkles, items: details.skills, kind: 'tags' as const },
+          { title: 'Misconceptions', icon: TriangleAlert, items: details.misconceptions, kind: 'cards' as const },
+          { title: 'Prerequisites', icon: Orbit, items: details.prerequisites, kind: 'tags' as const },
+          { title: 'Learning outcomes', icon: Target, items: details.learningOutcomes, kind: 'cards' as const },
+          { title: 'Competencies', icon: BriefcaseBusiness, items: details.competencies, kind: 'cards' as const },
+          { title: 'Learning objectives', icon: CircleDot, items: details.learningObjectives, kind: 'cards' as const },
+          { title: 'Teaching pedagogies', icon: ClipboardList, items: details.teachingPedagogies, kind: 'tags' as const },
+          { title: 'Real-world applications', icon: GraduationCap, items: details.realWorldApplications, kind: 'cards' as const },
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         ]
       : [];
 
@@ -3633,6 +3875,7 @@ export default function ChapterListPage() {
               </div>
             ) : (
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+<<<<<<< HEAD
                 <div className="grid gap-x-10 gap-y-6 md:grid-cols-2">
                 {detailSections.map((section) => {
                   const SectionIcon = section.icon;
@@ -3656,6 +3899,72 @@ export default function ChapterListPage() {
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {section.items.map((item) => (
+=======
+                <div className="mb-6 grid gap-4 lg:grid-cols-4">
+                  {[
+                    { label: 'Knowledge', value: details?.knowledge.length ?? 0 },
+                    { label: 'Objectives', value: details?.learningObjectives.length ?? 0 },
+                    { label: 'Outcomes', value: details?.learningOutcomes.length ?? 0 },
+                    { label: 'Skills', value: details?.skills.length ?? 0 },
+                  ].map((metric) => (
+                    <div
+                      key={metric.label}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4 shadow-sm"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {metric.label}
+                      </p>
+                      <p className="mt-2 text-2xl font-bold text-slate-900">{metric.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-x-10 gap-y-6 md:grid-cols-2">
+                {detailSections.map((section) => {
+                  const SectionIcon = section.icon;
+                  const visibleItems = section.kind === 'tags' ? section.items.slice(0, 10) : section.items.slice(0, 4);
+                  const hiddenCount = Math.max(section.items.length - visibleItems.length, 0);
+
+                  return (
+                    <section key={section.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        <SectionIcon size={14} className="text-slate-500" />
+                        {section.title}
+                        </div>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                          {section.items.length}
+                        </span>
+                      </div>
+
+                      {section.kind === 'cards' ? (
+                        <div className="space-y-3">
+                          {visibleItems.map((item, index) => (
+                            <article
+                              key={`${section.title}-${index}-${item}`}
+                              className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3"
+                            >
+                              <div className="mb-2 flex items-center gap-2">
+                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                                  {index + 1}
+                                </span>
+                                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                                  {section.title.slice(0, -1) || section.title}
+                                </span>
+                              </div>
+                              <p className="text-[15px] leading-6 text-slate-800">{item}</p>
+                            </article>
+                          ))}
+                          {hiddenCount > 0 && (
+                            <p className="text-xs font-medium text-slate-500">
+                              +{hiddenCount} more {section.title.toLowerCase()} available in the detailed concept intelligence tab view.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {visibleItems.map((item) => (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                             <Badge
                               key={item}
                               className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
@@ -3663,6 +3972,14 @@ export default function ChapterListPage() {
                               {item}
                             </Badge>
                           ))}
+<<<<<<< HEAD
+=======
+                          {hiddenCount > 0 ? (
+                            <Badge className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 ring-1 ring-slate-200 hover:bg-white">
+                              +{hiddenCount} more
+                            </Badge>
+                          ) : null}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                         </div>
                       )}
                     </section>
@@ -4198,6 +4515,10 @@ export default function ChapterListPage() {
             allChapters={allChapters}
             courseId={course.id}
             course={course}
+<<<<<<< HEAD
+=======
+            board={curriculumBoard}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
             initialChapterId={activeLibraryChapter?.id ?? contentChapter?.id ?? ''}
             initialConcept={activeLibraryChapterConcepts?.concepts[0]?.title ?? ''}
             onSuccess={handleGenerateSuccess}
@@ -4236,6 +4557,7 @@ export default function ChapterListPage() {
             <ChevronRight size={14} className="text-slate-400" />
             <span className="font-semibold text-slate-900">
               {course.subject} - {getCourseGradeLabel(course.classGrade).replace('Grade ', 'Grade ')}{' '}
+<<<<<<< HEAD
               {getCourseSectionLabel(course.id).replace('Section ', '')}
             </span>
           </div>
@@ -4244,6 +4566,15 @@ export default function ChapterListPage() {
             <BookOpen size={14} />
             248 questions in bank
           </div>
+=======
+            </span>
+          </div>
+
+          {/* <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-4 py-2 text-sm font-medium text-[#4f46e5] shadow-sm ring-1 ring-white/80">
+            <BookOpen size={14} />
+            5 questions in bank
+          </div> */}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         </div>
 
         <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -4256,12 +4587,17 @@ export default function ChapterListPage() {
                 {course.subject} - {getCourseGradeLabel(course.classGrade)} 
               </h1>
               <p className="mt-1 text-[15px] text-slate-600">
+<<<<<<< HEAD
                 {allChapters.length} chapters -{' '}
                 {allChapters.reduce((total, chapter) => {
                   const chapterConcepts = getChapterKeyConcepts(course.id, chapter.id);
                   return total + (chapterConcepts?.count ?? 0);
                 }, 0)}{' '}
                 key concepts - {getCurriculumLabel()}
+=======
+                {allChapters.length} chapters - {totalConceptCount} key concepts
+                {curriculumLabel ? ` - ${curriculumLabel}` : ''}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               </p>
             </div>
           </div>
@@ -4295,7 +4631,11 @@ export default function ChapterListPage() {
           </div>
         </div>
 
+<<<<<<< HEAD
         {subjectLoading && getChaptersByCourseid(courseId).length === 0 ? (
+=======
+        {subjectLoading && allChapters.length === 0 ? (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           <div className="space-y-4">
             {[1, 2, 3].map((skeleton) => (
               <div

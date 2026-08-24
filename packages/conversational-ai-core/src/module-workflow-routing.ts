@@ -189,6 +189,7 @@ export const MODULE_WORKFLOW_CONFIGS: Record<string, ModuleWorkflowConfig> = {
   attendance: {
     module: "attendance",
     workflowId: "attendance_report",
+<<<<<<< HEAD
     listTools: ["getTeacherDailyReport"],
     selectTool: "getTeacherDailyReport",
     navigationRoute: "/attendance",
@@ -196,6 +197,27 @@ export const MODULE_WORKFLOW_CONFIGS: Record<string, ModuleWorkflowConfig> = {
     entityIdParam: "id",
     extractEntityId: () => null,
     buildNavigationQuery: () => ({}),
+=======
+    // Student attendance has its own workflow; the teacher daily report stays
+    // available for teacher-attendance questions.
+    listTools: ["getAttendanceOverview", "getTeacherDailyReport"],
+    selectTool: "getAttendanceOverview",
+    navigationRoute: "/student/daywise_student_attendance",
+    navigationLabel: "Open Daywise Attendance Report",
+    entityIdParam: "id",
+    extractEntityId: () => null,
+    buildNavigationQuery: (entity) => {
+      const query: Record<string, string | number> = {};
+      if (typeof entity.date === "string" && entity.date) query.date = entity.date;
+      if (typeof entity.standardId === "string" && entity.standardId) {
+        query.standard_id = entity.standardId;
+      }
+      if (typeof entity.divisionId === "string" && entity.divisionId) {
+        query.division_id = entity.divisionId;
+      }
+      return query;
+    },
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     readyMessagePrefix: "Attendance report is ready",
   },
   homework: {
@@ -313,8 +335,13 @@ export const MODULE_WORKFLOW_CONFIGS: Record<string, ModuleWorkflowConfig> = {
   teachers: {
     module: "teachers",
     workflowId: "teacher_lookup",
+<<<<<<< HEAD
     listTools: ["getTeacherDailyReport"],
     selectTool: "getTeacherDailyReport",
+=======
+    listTools: ["getTeacherDirectory", "getClassTeachers", "getTeacherDailyReport"],
+    selectTool: "getTeacherDirectory",
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     navigationRoute: "/classteacher",
     navigationLabel: "View Teacher Details",
     entityIdParam: "id",
@@ -322,6 +349,57 @@ export const MODULE_WORKFLOW_CONFIGS: Record<string, ModuleWorkflowConfig> = {
     buildNavigationQuery: () => ({}),
     readyMessagePrefix: "Teacher details found for",
   },
+<<<<<<< HEAD
+=======
+  subjects: {
+    module: "subjects",
+    workflowId: "subject_catalog",
+    listTools: ["getSubjectCatalog"],
+    selectTool: "getSubjectCatalog",
+    navigationRoute: "/subjects",
+    navigationLabel: "Open Subjects",
+    entityIdParam: "id",
+    extractEntityId: () => null,
+    buildNavigationQuery: () => ({}),
+    readyMessagePrefix: "Subject details found for",
+  },
+  courses: {
+    module: "courses",
+    workflowId: "course_catalog",
+    listTools: ["getCourseCatalog"],
+    selectTool: "getCourseCatalog",
+    navigationRoute: "/course-master",
+    navigationLabel: "Open Course Master",
+    entityIdParam: "id",
+    extractEntityId: () => null,
+    buildNavigationQuery: () => ({}),
+    readyMessagePrefix: "Course details found for",
+  },
+  departments: {
+    module: "departments",
+    workflowId: "department_lookup",
+    listTools: ["getDepartmentDirectory"],
+    selectTool: "getDepartmentDirectory",
+    navigationRoute: "/Institute_Detail/Department",
+    navigationLabel: "Open Departments",
+    entityIdParam: "id",
+    extractEntityId: () => null,
+    buildNavigationQuery: () => ({}),
+    readyMessagePrefix: "Department details found for",
+  },
+  classes: {
+    module: "classes",
+    workflowId: "class_structure",
+    listTools: ["getClassStructure"],
+    selectTool: "getClassStructure",
+    navigationRoute: "/academic_setup",
+    navigationLabel: "Open Academic Setup",
+    entityIdParam: "id",
+    extractEntityId: () => null,
+    buildNavigationQuery: () => ({}),
+    readyMessagePrefix: "Class details found for",
+  },
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 };
 
 export function getModuleWorkflowConfig(
@@ -377,6 +455,13 @@ export function looksLikeDifferentModuleRequest(
     hostel: ["hostel", "room", "mess"],
     notifications: ["notification", "notice", "message"],
     accounts: ["account", "ledger", "invoice", "expense"],
+<<<<<<< HEAD
+=======
+    subjects: ["subject", "syllabus"],
+    courses: ["course", "curriculum", "chapter"],
+    departments: ["department", "sub-department", "sub department"],
+    classes: ["class list", "classes", "section list", "divisions", "standards"],
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   };
 
   const currentKeywords = moduleKeywords[currentModule.toLowerCase()] || [];
@@ -409,12 +494,21 @@ export function isIntentForModule(
 
   const moduleToolMap: Record<string, string[]> = {
     admissions: ["admission", "confirmAdmission", "findAdmission", "hydrateAdmission", "updateAdmission", "listAdmissionEnquiries"],
+<<<<<<< HEAD
     fees: ["fee", "findStudentFee", "getStudentFee", "listFeesDefaulters"],
     students: ["student", "searchStudent"],
     teachers: ["teacher", "getTeacherDaily"],
     homework: ["homework", "listHomework"],
     results: ["result", "getResultReport"],
     attendance: ["attendance", "getTeacherDaily"],
+=======
+    fees: ["fee", "findStudentFee", "getStudentFee", "listFeesDefaulters", "getFeesSummary"],
+    students: ["student", "searchStudent", "getStudentDirectory"],
+    teachers: ["teacher", "getTeacherDaily", "getTeacherDirectory", "getClassTeachers"],
+    homework: ["homework", "listHomework"],
+    results: ["result", "getResultReport"],
+    attendance: ["attendance", "getAttendanceOverview", "getStudentAttendanceDetail"],
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     exams: ["exam", "result"],
     timetable: ["timetable"],
     library: ["library"],
@@ -422,6 +516,13 @@ export function isIntentForModule(
     hostel: ["hostel"],
     notifications: ["notification"],
     accounts: ["account"],
+<<<<<<< HEAD
+=======
+    subjects: ["subject", "getSubjectCatalog"],
+    courses: ["course", "getCourseCatalog"],
+    departments: ["department", "getDepartmentDirectory"],
+    classes: ["class_structure", "getClassStructure"],
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   };
 
   const expectedTools = moduleToolMap[normalizedModule] || [];

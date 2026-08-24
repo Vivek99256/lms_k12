@@ -68,12 +68,25 @@ export async function resultGet(path: string, params: Record<string, string> = {
     ...(session.token ? { token: session.token } : {}),
   });
   const response = await fetch(`${getBaseUrl()}/${path.replace(/^\/+/, '')}?${query.toString()}`, {
+<<<<<<< HEAD
+=======
+    cache: 'no-store',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     headers: session.token ? { Authorization: `Bearer ${session.token}` } : undefined,
   });
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
     throw new Error(readString(payload.message) || `HTTP ${response.status}: Request failed`);
   }
+<<<<<<< HEAD
+=======
+  // The Result REST endpoints use a JSON success envelope even for some
+  // application-level failures. Do not render those responses as an empty
+  // data table.
+  if (Object.prototype.hasOwnProperty.call(payload, 'success') && payload.success !== true) {
+    throw new Error(readString(payload.message) || 'Request failed');
+  }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   return payload;
 }
 
@@ -131,7 +144,25 @@ export async function resultPost(
     headers['Content-Type'] = 'application/x-www-form-urlencoded';
   }
 
+<<<<<<< HEAD
   const response = await fetch(`${getBaseUrl()}/${path.replace(/^\/+/, '')}`, { method: 'POST', headers, body });
+=======
+  // Blade-era Result controllers read the institute/session context from the
+  // request query string on writes. Keep it in the body too for the newer
+  // controllers, but mirror the GET context here so legacy inserts receive
+  // `syear` and `sub_institute_id` rather than NULL.
+  const query = new URLSearchParams({
+    type: 'API',
+    ...(session.subInstituteId ? { sub_institute_id: session.subInstituteId } : {}),
+    ...(session.userId ? { user_id: session.userId } : {}),
+    ...(session.syear ? { syear: session.syear } : {}),
+    ...(session.token ? { token: session.token } : {}),
+  });
+  const response = await fetch(
+    `${getBaseUrl()}/${path.replace(/^\/+/, '')}?${query.toString()}`,
+    { method: 'POST', headers, body },
+  );
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
     throw new Error(readString(payload.message) || `HTTP ${response.status}: Request failed`);
@@ -143,7 +174,13 @@ export async function resultPost(
 export function assertOk(payload: Record<string, unknown>, fallbackMessage: string): string {
   const status = readString(payload.status ?? payload.status_code ?? '');
   const success = payload.success === true || payload.success === 'true' || payload.success === 1 || payload.success === '1';
+<<<<<<< HEAD
   if (!success && status && status !== '1' && status.toLowerCase() !== 'success' && status !== '200') {
+=======
+  const hasSuccess = Object.prototype.hasOwnProperty.call(payload, 'success');
+  const statusIsSuccessful = status === '1' || status.toLowerCase() === 'success' || status === '200';
+  if ((hasSuccess && !success) || (!hasSuccess && status && !statusIsSuccessful)) {
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     throw new Error(readString(payload.message) || fallbackMessage);
   }
   return readString(payload.message);

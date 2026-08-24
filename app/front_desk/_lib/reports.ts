@@ -85,7 +85,11 @@ export const reportModules = {
   facultyTimetable: {
     title: 'View facultywise timetable',
     description: 'View and print the timetable assigned to a faculty member.',
+<<<<<<< HEAD
     endpoint: 'school_setup/ajax_getFacultywiseTimetable',
+=======
+    endpoint: 'school_setup/ajax_getFacultywiseTimetableApi',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     method: 'POST',
     report: true,
     supportsPrint: true,

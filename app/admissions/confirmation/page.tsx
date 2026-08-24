@@ -113,8 +113,13 @@ function parseDate(value: string): string {
 export default function AdmissionConfirmationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+<<<<<<< HEAD
   const registrationId = searchParams.get('registrationId');
   const enquiryId = searchParams.get('enquiryId');
+=======
+  const registrationId = searchParams?.get('registrationId') ?? null;
+  const enquiryId = searchParams?.get('enquiryId') ?? null;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const [records, setRecords] = useState<ConfirmationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);

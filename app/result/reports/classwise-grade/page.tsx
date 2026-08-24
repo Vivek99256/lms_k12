@@ -20,7 +20,11 @@ const FILTER_FIELDS: FilterFieldDef[] = [
   { kind: 'standard' },
   { kind: 'division' },
   {
+<<<<<<< HEAD
     kind: 'api', name: 'exam_type', label: 'Exam type', path: 'getCreateExamName',
+=======
+    kind: 'api', name: 'exam_type', label: 'Exam type', path: 'api/result/classwise-grade-report/exam-create-names',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     params: { stdId: '{standard}', termID: '{term}' },
   },
 ];
@@ -34,8 +38,13 @@ const TRAILING: [string, string][] = [
   ['total', 'Total'],
   ['rank', 'Rank'],
   ['percentage', 'Perc.'],
+<<<<<<< HEAD
   ['attendance', 'Atted.'],
   ['applied', 'Appli.'],
+=======
+  ['attendance', 'Attendance'],
+  ['applied', 'Appreciation'],
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   ['conduct', 'Conduct'],
   ['remarks', 'Remarks'],
 ];
@@ -68,8 +77,13 @@ export default function ClasswiseGradeReportPage() {
     setLoading(true);
     setError(null);
     try {
+<<<<<<< HEAD
       const payload = await resultGet('result/classwise_grade_report/create', flat);
       setRows(extractRows(payload));
+=======
+      const payload = await resultGet('api/result/classwise-grade-report/create', flat);
+      setRows(extractRows(payload, 'studentMarks'));
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     } catch (err) {
       setRows([]);
       setError(err instanceof Error ? err.message : 'Failed to load the classwise grade report.');

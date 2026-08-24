@@ -1,12 +1,21 @@
 // app/students/attendance/page.tsx
 "use client";
 
+<<<<<<< HEAD
 import React, { useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   Clock,
   Download,
+=======
+import React, { useEffect, useState } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   Save,
   Users,
   UserCheck,
@@ -30,6 +39,18 @@ import {
   ChartOptions,
 } from "chart.js";
 import { Line, Doughnut } from "react-chartjs-2";
+<<<<<<< HEAD
+=======
+import {
+  buildSessionContext,
+  fetchAttendanceTrend,
+  fetchClassSections,
+  fetchDailyRegister,
+  saveAttendance,
+  type AttendanceTrend,
+  type ClassSection,
+} from "../_lib/attendance-api";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 ChartJS.register(
   CategoryScale,
@@ -49,11 +70,16 @@ export interface AttendanceStudent {
   rollNo: string;
   class: string;
   section: string;
+<<<<<<< HEAD
   status: "present" | "absent" | "late" | "leave";
+=======
+  status: "present" | "absent";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   admissionNo: string;
   avatar?: string;
 }
 
+<<<<<<< HEAD
 // Sample Data
 const sampleStudents: AttendanceStudent[] = [
   {
@@ -164,19 +190,105 @@ const attendanceTrendData = {
   late: [1, 0, 1, 0, 0, 1, 0, 0],
   leave: [1, 1, 1, 1, 1, 0, 1, 1],
 };
+=======
+const emptyTrend: AttendanceTrend = { labels: [], present: [], absent: [] };
+
+function sectionLabel(section: ClassSection): string {
+  return `${section.standardName} - ${section.divisionName}`;
+}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 export default function AttendancePage() {
   const [activeTab, setActiveTab] = useState<"daily" | "monthly">("daily");
   const [selectedDate, setSelectedDate] = useState(new Date());
+<<<<<<< HEAD
   const [selectedClass, setSelectedClass] = useState("9-A");
   const [students, setStudents] = useState<AttendanceStudent[]>(sampleStudents);
+=======
+  const [sections, setSections] = useState<ClassSection[]>([]);
+  const [selectedSection, setSelectedSection] = useState<ClassSection | null>(null);
+  const [students, setStudents] = useState<AttendanceStudent[]>([]);
+  const [attendanceTrendData, setAttendanceTrendData] = useState<AttendanceTrend>(emptyTrend);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const selectedClass = selectedSection ? sectionLabel(selectedSection) : "";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSections() {
+      try {
+        const session = buildSessionContext();
+        const fetchedSections = await fetchClassSections(session);
+        if (cancelled) return;
+        setSections(fetchedSections);
+        setSelectedSection((prev) => prev ?? fetchedSections[0] ?? null);
+        if (fetchedSections.length === 0) {
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load class sections.");
+          setLoading(false);
+        }
+      }
+    }
+
+    loadSections();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedSection) return;
+    let cancelled = false;
+
+    async function loadAttendance() {
+      setLoading(true);
+      setError(null);
+      setSaveMessage(null);
+      setSaveError(null);
+      try {
+        const session = buildSessionContext();
+        const dateStr = selectedDate.toISOString().slice(0, 10);
+        const [register, trend] = await Promise.all([
+          fetchDailyRegister(session, selectedSection as ClassSection, dateStr),
+          fetchAttendanceTrend(session, selectedSection as ClassSection, selectedDate),
+        ]);
+        if (cancelled) return;
+        setStudents(register);
+        setAttendanceTrendData(trend);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load attendance data.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadAttendance();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSection, selectedDate]);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const totalStudents = students.length;
   const presentCount = students.filter((s) => s.status === "present").length;
   const absentCount = students.filter((s) => s.status === "absent").length;
+<<<<<<< HEAD
   const lateCount = students.filter((s) => s.status === "late").length;
   const leaveCount = students.filter((s) => s.status === "leave").length;
   const attendancePercentage = Math.round((presentCount / totalStudents) * 100);
+=======
+  const attendancePercentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const handleStatusChange = (
     studentId: string,
@@ -195,8 +307,32 @@ export default function AttendancePage() {
     );
   };
 
+<<<<<<< HEAD
   const handleSaveAttendance = () => {
     console.log("Saving attendance...", students);
+=======
+  const handleSaveAttendance = async () => {
+    if (!selectedSection || students.length === 0 || saving) return;
+
+    setSaving(true);
+    setSaveMessage(null);
+    setSaveError(null);
+    try {
+      const session = buildSessionContext();
+      const dateStr = selectedDate.toISOString().slice(0, 10);
+      const message = await saveAttendance(
+        session,
+        selectedSection,
+        dateStr,
+        students.map((student) => ({ id: student.id, status: student.status })),
+      );
+      setSaveMessage(message);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save attendance.");
+    } finally {
+      setSaving(false);
+    }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   };
 
   // Attendance Trend Chart
@@ -227,6 +363,7 @@ export default function AttendancePage() {
         pointBorderColor: "#ffffff",
         pointBorderWidth: 2,
       },
+<<<<<<< HEAD
       {
         label: "Late",
         data: attendanceTrendData.late,
@@ -251,6 +388,8 @@ export default function AttendancePage() {
         pointBorderColor: "#ffffff",
         pointBorderWidth: 2,
       },
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     ],
   };
 
@@ -300,11 +439,19 @@ export default function AttendancePage() {
 
   // Doughnut Chart Data
   const doughnutData = {
+<<<<<<< HEAD
     labels: ["Present", "Absent", "Late", "Leave"],
     datasets: [
       {
         data: [presentCount, absentCount, lateCount, leaveCount],
         backgroundColor: ["#10b981", "#ef4444", "#f59e0b", "#8b5cf6"],
+=======
+    labels: ["Present", "Absent"],
+    datasets: [
+      {
+        data: [presentCount, absentCount],
+        backgroundColor: ["#10b981", "#ef4444"],
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         borderColor: "#ffffff",
         borderWidth: 3,
       },
@@ -370,8 +517,26 @@ export default function AttendancePage() {
         </button>
       </div>
 
+<<<<<<< HEAD
       {/* Attendance Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+=======
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {loading && students.length === 0 ? (
+        <div className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white py-12 text-sm text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading attendance...
+        </div>
+      ) : (
+        <>
+      {/* Attendance Stats Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         <MetricCard
           title="Present"
           value={String(presentCount)}
@@ -385,17 +550,23 @@ export default function AttendancePage() {
           variant="danger"
         />
         <MetricCard
+<<<<<<< HEAD
           title="Late"
           value={String(lateCount)}
           icon={<Clock className="h-4 w-4" />}
           variant="warning"
         />
         <MetricCard
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           title="Class attendance"
           value={`${attendancePercentage}%`}
           icon={<Users className="h-4 w-4" />}
           variant="default"
+<<<<<<< HEAD
           trend={{ direction: "up", value: "+1.4%", label: "vs last week" }}
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         />
       </div>
 
@@ -470,6 +641,7 @@ export default function AttendancePage() {
               <div className="hidden h-6 w-px bg-slate-200 lg:block" />
               <div className="flex items-center gap-2">
                 <select
+<<<<<<< HEAD
                   value={selectedClass}
                   onChange={(e) => setSelectedClass(e.target.value)}
                   className="h-9 rounded border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none transition focus:border-[#3f5bf6] focus:ring-2 focus:ring-[#3f5bf6]/15"
@@ -478,6 +650,26 @@ export default function AttendancePage() {
                   <option value="9-B">Grade 9 - B</option>
                   <option value="10-A">Grade 10 - A</option>
                   <option value="10-B">Grade 10 - B</option>
+=======
+                  value={selectedSection ? `${selectedSection.standardId}||${selectedSection.divisionId}` : ""}
+                  onChange={(e) => {
+                    const next = sections.find(
+                      (section) => `${section.standardId}||${section.divisionId}` === e.target.value,
+                    );
+                    if (next) setSelectedSection(next);
+                  }}
+                  className="h-9 rounded border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none transition focus:border-[#3f5bf6] focus:ring-2 focus:ring-[#3f5bf6]/15"
+                >
+                  {sections.length === 0 && <option value="">No classes assigned</option>}
+                  {sections.map((section) => (
+                    <option
+                      key={`${section.standardId}||${section.divisionId}`}
+                      value={`${section.standardId}||${section.divisionId}`}
+                    >
+                      Grade {sectionLabel(section)}
+                    </option>
+                  ))}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 </select>
               </div>
               <span className="hidden text-sm text-slate-500 lg:inline">
@@ -522,14 +714,34 @@ export default function AttendancePage() {
             </button>
             <button
               onClick={handleSaveAttendance}
+<<<<<<< HEAD
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#3f5bf6] px-4 py-2 text-sm font-medium text-white hover:bg-[#3552e0] sm:flex-none"
             >
               <Save className="w-4 h-4" />
+=======
+              disabled={saving || students.length === 0}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#3f5bf6] px-4 py-2 text-sm font-medium text-white hover:bg-[#3552e0] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               Save attendance
             </button>
           </div>
         </div>
 
+<<<<<<< HEAD
+=======
+        {(saveMessage || saveError) && (
+          <div
+            className={`mx-4 mt-2 rounded-lg px-3 py-2 text-sm ${
+              saveError ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            {saveError || saveMessage}
+          </div>
+        )}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         {activeTab === "daily" ? (
           <DailyRegister
             students={students}
@@ -539,12 +751,27 @@ export default function AttendancePage() {
             getInitials={getInitials}
           />
         ) : (
+<<<<<<< HEAD
           <MonthlyOverview
             selectedDate={selectedDate}
             selectedClass={selectedClass}
           />
         )}
       </div>
+=======
+          selectedSection && (
+            <MonthlyOverview
+              selectedDate={selectedDate}
+              selectedClass={selectedClass}
+              section={selectedSection}
+              totalStudents={totalStudents}
+            />
+          )
+        )}
+      </div>
+        </>
+      )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     </div>
   );
 }

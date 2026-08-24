@@ -64,6 +64,33 @@ const MODULE_HANDOFF_COPY: Record<string, { title: string; description: string }
     title: 'Student record is ready',
     description: 'Open the student module with this record.',
   },
+<<<<<<< HEAD
+=======
+  attendance: {
+    title: 'Attendance report is ready',
+    description: 'Open the daywise attendance report with these filters applied.',
+  },
+  teachers: {
+    title: 'Teacher record is ready',
+    description: 'Open the teacher module with this record.',
+  },
+  departments: {
+    title: 'Department details are ready',
+    description: 'Open the department module with this record.',
+  },
+  subjects: {
+    title: 'Subject details are ready',
+    description: 'Open the subject module with this record.',
+  },
+  courses: {
+    title: 'Course details are ready',
+    description: 'Open the course master with this record.',
+  },
+  classes: {
+    title: 'Class details are ready',
+    description: 'Open academic setup with this class selected.',
+  },
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 };
 
 function getHandoffCopy(module?: string) {
@@ -426,6 +453,7 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                           : 'border border-gray-200/80 bg-white text-gray-800 shadow-[0_8px_30px_rgba(15,23,42,0.06)]'
                     )}
                   >
+<<<<<<< HEAD
                     {message.role === 'assistant' &&
                     (message.conversationType || message.status || message.tools?.length) ? (
                       <div className="mb-2 flex flex-wrap gap-2">
@@ -449,6 +477,15 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                         ))}
                       </div>
                     ) : null}
+=======
+                    {/*
+                      Conversation type, pipeline status and tool names are
+                      internal routing details. They used to render as chips
+                      above every answer, which put strings like the analysis
+                      tool's own name in front of the user. The assistant should
+                      read as an assistant, so only the answer is shown.
+                    */}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                     {message.content}
                     {message.role === 'assistant' && message.navigation ? (
                       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-slate-800">

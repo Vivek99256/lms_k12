@@ -7,6 +7,10 @@ export type SessionContext = {
   syear: string;
   userId: string;
   termId: string;
+<<<<<<< HEAD
+=======
+  isAdmin: string;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 };
 
 export type ApiEnvelope = {
@@ -63,6 +67,10 @@ export function buildSessionContext(): SessionContext {
       syear: '',
       userId: '',
       termId: '',
+<<<<<<< HEAD
+=======
+      isAdmin: '',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     };
   }
 
@@ -159,6 +167,10 @@ export function buildSessionContext(): SessionContext {
             localStorage.getItem('term_id')
         )
       ),
+<<<<<<< HEAD
+=======
+      isAdmin: readString(firstValue('is_admin', 'isAdmin')),
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     };
   } catch {
     return {
@@ -168,6 +180,10 @@ export function buildSessionContext(): SessionContext {
       syear: '',
       userId: '',
       termId: '',
+<<<<<<< HEAD
+=======
+      isAdmin: '',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     };
   }
 }

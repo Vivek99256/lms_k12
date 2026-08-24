@@ -25,6 +25,10 @@ import {
   getUserIdentity,
   h5pContextQuery,
   hasH5pContext,
+<<<<<<< HEAD
+=======
+  postH5pXapiStatement,
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   readH5pContext,
   type H5pContext,
   type McqAnswer,
@@ -690,9 +694,26 @@ function McqContent() {
     [ctx]
   );
 
+<<<<<<< HEAD
   const selectAnswer = useCallback((questionId: number, answerId: number) => {
     setUserAnswers((prev) => ({ ...prev, [questionId]: answerId }));
   }, []);
+=======
+  const selectAnswer = useCallback(
+    (questionId: number, answerId: number) => {
+      setUserAnswers((prev) => ({ ...prev, [questionId]: answerId }));
+
+      const correct = findCorrectAnswer(answersByQuestion[String(questionId)]);
+      void postH5pXapiStatement({
+        objectId: `multiple_choice:${questionId}`,
+        verb: 'answered',
+        ctx,
+        success: correct !== undefined && correct.id === answerId,
+      });
+    },
+    [answersByQuestion, ctx]
+  );
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const navigateTo = useCallback(
     (index: number) => {
@@ -704,8 +725,16 @@ function McqContent() {
 
   const endQuiz = useCallback(() => {
     setView('results');
+<<<<<<< HEAD
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+=======
+    for (const questionId of Object.keys(userAnswers)) {
+      void postH5pXapiStatement({ objectId: `multiple_choice:${questionId}`, verb: 'completed', ctx });
+    }
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [userAnswers, ctx]);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const retakeQuiz = useCallback(() => {
     setUserAnswers({});

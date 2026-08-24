@@ -87,6 +87,12 @@ export const ROUTES = {
     transferStudent: '/Utility/transfer-student',
   },
 
+<<<<<<< HEAD
+=======
+  // Import Data
+  importData: '/import-data',
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   // Admin services routes (front-office desks)
   adminServices: {
     addVisitor: '/admin-services/add-visitor',

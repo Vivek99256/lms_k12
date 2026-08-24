@@ -14,7 +14,10 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+<<<<<<< HEAD
 import { buildSessionContext, createAuthHeaders } from '@/lib/erp-client';
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import { careerRequest, loadInterestResults, loadQuestions, loadRecords } from './_lib/api';
 import type {
   CareerRecord, CareerSection, InterestQuestion, InterestResult, RequestState,
@@ -228,6 +231,7 @@ function Assessment() {
     setLoading(true); setError('');
     try {
       const encoded = questions.map((_, index) => (answers[index] ?? 0) + 1).join('');
+<<<<<<< HEAD
       const results = await loadInterestResults(encoded);
       setResults(results);
       setPhase('results');
@@ -246,6 +250,10 @@ function Assessment() {
           body: JSON.stringify({ eventType: 'riasec_complete', sourceId: 'riasec-assessment' }),
         }).catch(() => {});
       }
+=======
+      setResults(await loadInterestResults(encoded));
+      setPhase('results');
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to calculate the result.'); }
     finally { setLoading(false); }
   }
@@ -254,6 +262,7 @@ function Assessment() {
     const invalid = Object.values(scores).some((value) => !Number.isFinite(value) || value < 0 || value > 40);
     if (invalid) { setError('Each RIASEC score must be between 0 and 40.'); return; }
     setLoading(true); setError('');
+<<<<<<< HEAD
     try {
       const results = await loadInterestResults(undefined, scores);
       setResults(results);
@@ -275,6 +284,10 @@ function Assessment() {
         }).catch(() => {});
       }
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to calculate the result.'); }
+=======
+    try { setResults(await loadInterestResults(undefined, scores)); setManual(false); setPhase('results'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Unable to calculate the result.'); }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     finally { setLoading(false); }
   }
 
@@ -370,6 +383,7 @@ export default function CareerCounselling() {
     setActive(nextSection);
   }, [requested]);
 
+<<<<<<< HEAD
   useEffect(() => {
     const session = buildSessionContext?.();
     if (!session?.userId || !session?.subInstituteId || !session?.syear) return;
@@ -388,6 +402,8 @@ export default function CareerCounselling() {
     }).catch(() => {});
   }, []);
 
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   function selectSection(section: CareerSection) {
     setActive(section);
     const next = new URLSearchParams(params?.toString());

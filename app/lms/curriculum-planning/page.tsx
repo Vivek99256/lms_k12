@@ -1,8 +1,16 @@
 'use client';
 
+<<<<<<< HEAD
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ChevronDown, ChevronLeft, Download, Filter, Pencil, Plus, Search, X } from 'lucide-react';
+=======
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { ArrowRight, ChevronDown, ChevronLeft, Download, Filter, Pencil, Plus, Search, X } from 'lucide-react';
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
+import { createAuthHeaders, useLmsSessionContext } from '@/app/lms/_shared/useLmsSession';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 type Stat = {
   label: string;
@@ -61,6 +69,7 @@ type SubjectProgressDetail = {
   topics: SubjectProgressTopic[];
 };
 
+<<<<<<< HEAD
 const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
 
 const stats: Stat[] = [
@@ -126,6 +135,106 @@ const subjectPlans: SubjectPlan[] = [
     progress: 50,
   },
 ];
+=======
+const subjectColorPalette = [
+  { dotColor: '#2f7dd9', fill: '#dcecff', text: '#114f8f' },
+  { dotColor: '#18a379', fill: '#d8f0e8', text: '#0d6c55' },
+  { dotColor: '#7468d9', fill: '#e8e4fb', text: '#473aa5' },
+  { dotColor: '#b87916', fill: '#fae8c7', text: '#6f470c' },
+  { dotColor: '#d45628', fill: '#fae0d4', text: '#8a331a' },
+  { dotColor: '#c64a74', fill: '#f7dce8', text: '#8b2549' },
+];
+
+function subjectColorAt(index: number) {
+  return subjectColorPalette[index % subjectColorPalette.length];
+}
+
+// --- Curriculum Planning API -------------------------------------------------
+
+type ApiStats = {
+  total_topics: number;
+  completed: number;
+  in_progress: number;
+  weeks_remaining: number;
+  completion_percent: number;
+};
+
+type ApiSubjectMonth = {
+  month: string;
+  month_key: string;
+  topics: string[];
+  completion_percent: number;
+};
+
+type ApiSubject = {
+  subject_id: number;
+  subject_name: string;
+  standard_id: number;
+  standard_name: string | null;
+  progress: number;
+  months: ApiSubjectMonth[];
+};
+
+type ApiUpcomingLesson = {
+  period_id: number;
+  subject_id: number | null;
+  subject_name: string | null;
+  standard_id: number | null;
+  standard_name: string | null;
+  topic: string | null;
+  scheduled_date: string;
+  period_slot: string;
+  status: string;
+  teacher_name: string;
+};
+
+type ApiSubjectProgressTopic = {
+  title: string;
+  start_date: string;
+  end_date: string;
+  status: SubjectProgressStatus;
+};
+
+type ApiSubjectProgress = {
+  subject_id: number;
+  subject_name: string;
+  standard_id: number;
+  standard_name: string | null;
+  progress: number;
+  topics: ApiSubjectProgressTopic[];
+};
+
+type CurriculumPlanningApiData = {
+  stats: ApiStats;
+  subjects: ApiSubject[];
+  upcoming_lessons: ApiUpcomingLesson[];
+  subject_progress: ApiSubjectProgress[];
+};
+
+type CurriculumPlanningApiResponse = {
+  status?: boolean;
+  message?: string;
+  data?: CurriculumPlanningApiData | [];
+};
+
+function formatShortDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function upcomingStatusLabel(status: string): UpcomingLessonStatus {
+  if (status === 'in_progress') return 'In progress';
+  if (status === 'completed') return 'Ready';
+  return 'Upcoming';
+}
+
+const upcomingBadgeClassName: Record<UpcomingLessonStatus, string> = {
+  'In progress': 'bg-[#dcecff] text-[#114f8f]',
+  Upcoming: 'bg-[#e9e7e3] text-[#68635d]',
+  Ready: 'bg-[#def4d2] text-[#3f7b2b]',
+};
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 const calendarDays = [
   5, 6, 7, 8, 9,
@@ -134,6 +243,7 @@ const calendarDays = [
   26, 27, 28, 29, 30,
 ];
 
+<<<<<<< HEAD
 const upcomingLessons: Lesson[] = [
   {
     subject: 'Maths',
@@ -376,6 +486,8 @@ const subjectProgressDetails: SubjectProgressDetail[] = [
   },
 ];
 
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const editMonths = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
 const editColourLabels = ['#2f7dd9', '#18a379', '#7468d9', '#b87916', '#d45628', '#c64a74'];
@@ -951,10 +1063,20 @@ function EditTopicDialog({ onClose }: { onClose: () => void }) {
 }
 
 function AllUpcomingLessonsView({
+<<<<<<< HEAD
+=======
+  lessons,
+  gradeLabel,
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   onBack,
   onFilter,
   onAddLesson,
 }: {
+<<<<<<< HEAD
+=======
+  lessons: UpcomingLessonRow[];
+  gradeLabel: string;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   onBack: () => void;
   onFilter: () => void;
   onAddLesson: () => void;
@@ -980,7 +1102,11 @@ function AllUpcomingLessonsView({
           <div>
             <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">All upcoming lessons</h1>
             <p className="mt-1 text-sm text-[#706b64]">
+<<<<<<< HEAD
               Grade 8 - From 21 May 2026 onwards - 134 lessons remaining
+=======
+              {gradeLabel} - {lessons.length} lessons remaining
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1056,14 +1182,22 @@ function AllUpcomingLessonsView({
                 <th className="px-4 py-4">Date &amp; time</th>
                 <th className="px-4 py-4">Subject</th>
                 <th className="px-4 py-4">Topic</th>
+<<<<<<< HEAD
                 <th className="px-4 py-4">Room</th>
+=======
+                <th className="px-4 py-4">Teacher</th>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 <th className="px-4 py-4">Period</th>
                 <th className="px-4 py-4">Status</th>
                 <th className="px-4 py-4">Actions</th>
               </tr>
             </thead>
             <tbody>
+<<<<<<< HEAD
               {allUpcomingLessons.map((lesson) => (
+=======
+              {lessons.map((lesson) => (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 <tr key={`${lesson.date}-${lesson.time}-${lesson.topic}`} className="border-t border-[#e7e3dd]">
                   <td
                     className={`whitespace-nowrap px-4 py-4 text-xs font-medium ${
@@ -1102,7 +1236,11 @@ function AllUpcomingLessonsView({
       </section>
 
       <div className="mt-5 flex flex-col gap-3 text-xs text-[#706b64] sm:flex-row sm:items-center sm:justify-between">
+<<<<<<< HEAD
         <div>Showing 10 of 134 upcoming lessons</div>
+=======
+        <div>Showing {lessons.length} of {lessons.length} upcoming lessons</div>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -1138,9 +1276,21 @@ function AllUpcomingLessonsView({
 }
 
 function SubjectProgressDetailsView({
+<<<<<<< HEAD
   onBack,
   onFilter,
 }: {
+=======
+  subjects,
+  stats,
+  gradeLabel,
+  onBack,
+  onFilter,
+}: {
+  subjects: SubjectProgressDetail[];
+  stats: Stat[];
+  gradeLabel: string;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   onBack: () => void;
   onFilter: () => void;
 }) {
@@ -1166,7 +1316,11 @@ function SubjectProgressDetailsView({
             <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">
               Subject progress - detailed breakdown
             </h1>
+<<<<<<< HEAD
             <p className="mt-1 text-sm text-[#706b64]">Grade 8 - All subjects - Academic Year 2025-26</p>
+=======
+            <p className="mt-1 text-sm text-[#706b64]">{gradeLabel} - All subjects</p>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -1189,6 +1343,7 @@ function SubjectProgressDetailsView({
       </div>
 
       <section className="mb-4 grid gap-3 md:grid-cols-3">
+<<<<<<< HEAD
         <div className="rounded-lg bg-white px-4 py-4 text-center">
           <div className="text-3xl font-bold leading-none tracking-[0] text-[#17160f]">48</div>
           <div className="mt-2 text-xs font-medium text-[#77716b]">Total topics</div>
@@ -1205,6 +1360,18 @@ function SubjectProgressDetailsView({
 
       <section className="grid gap-4 xl:grid-cols-2">
         {subjectProgressDetails.map((subject) => (
+=======
+        {stats.slice(0, 3).map((stat) => (
+          <div key={stat.label} className="rounded-lg bg-white px-4 py-4 text-center">
+            <div className="text-3xl font-bold leading-none tracking-[0] text-[#17160f]">{stat.value}</div>
+            <div className="mt-2 text-xs font-medium text-[#77716b]">{stat.label}</div>
+          </div>
+        ))}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        {subjects.map((subject) => (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           <article
             key={subject.subject}
             className="rounded-lg border border-[#d7d3cd] bg-white p-4 shadow-[0_10px_24px_rgba(23,22,15,0.10)]"
@@ -1255,6 +1422,166 @@ export default function CurriculumPlanningPage() {
   const [isUpcomingLessonsViewOpen, setIsUpcomingLessonsViewOpen] = useState(false);
   const [isSubjectProgressViewOpen, setIsSubjectProgressViewOpen] = useState(false);
 
+<<<<<<< HEAD
+=======
+  const session = useLmsSessionContext();
+
+  const [apiData, setApiData] = useState<CurriculumPlanningApiData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const run = async () => {
+      if (!session.subInstituteId || !session.syear) {
+        setApiData(null);
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        // No standard_id: combines every standard's curriculum into one summary.
+        const params = new URLSearchParams({
+          sub_institute_id: session.subInstituteId,
+          syear: session.syear,
+        });
+
+        const response = await fetch(`${session.baseUrl}/api/intelligence/curriculum-planning?${params}`, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: createAuthHeaders(session),
+        });
+
+        const payload = (await response.json().catch(() => ({}))) as CurriculumPlanningApiResponse;
+
+        if (response.status === 404) {
+          setApiData(null);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(payload.message || `Curriculum planning API failed with status ${response.status}`);
+        }
+
+        setApiData(Array.isArray(payload.data) ? null : payload.data ?? null);
+      } catch (error) {
+        if ((error as Error)?.name === 'AbortError') return;
+        setLoadError(error instanceof Error ? error.message : 'Unable to load curriculum plan.');
+        setApiData(null);
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false);
+      }
+    };
+
+    void run();
+    return () => controller.abort();
+  }, [session.baseUrl, session.subInstituteId, session.syear, session.token]);
+
+  const monthKeys = useMemo(() => {
+    if (!apiData) return [];
+    const keys = new Set<string>();
+    apiData.subjects.forEach((subject) => subject.months.forEach((month) => keys.add(month.month_key)));
+    return Array.from(keys).sort();
+  }, [apiData]);
+
+  const monthLabels = useMemo(
+    () => monthKeys.map((key) => new Date(`${key}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'short' })),
+    [monthKeys]
+  );
+
+  const subjectPlans: SubjectPlan[] = useMemo(() => {
+    if (!apiData) return [];
+    return apiData.subjects.map((subject, index) => {
+      const color = subjectColorAt(index);
+      const monthTopics = new Map(subject.months.map((month) => [month.month_key, month.topics[0] ?? '-']));
+      const label = subject.standard_name ? `${subject.subject_name} - Std ${subject.standard_name}` : subject.subject_name;
+      return {
+        name: label,
+        displayName: label,
+        dotColor: color.dotColor,
+        fill: color.fill,
+        text: color.text,
+        progress: subject.progress,
+        topics: monthKeys.length > 0 ? monthKeys.map((key) => monthTopics.get(key) ?? '-') : subject.months.map((month) => month.topics[0] ?? '-'),
+      };
+    });
+  }, [apiData, monthKeys]);
+
+  const stats: Stat[] = useMemo(() => {
+    if (!apiData) return [];
+    const s = apiData.stats;
+    return [
+      { label: 'Total topics', value: String(s.total_topics), helper: `across ${apiData.subjects.length} subjects`, progress: 100, color: '#d8d4ce' },
+      { label: 'Completed', value: String(s.completed), helper: `${s.completion_percent}% of periods done`, progress: s.completion_percent, color: '#1aa179' },
+      { label: 'In progress', value: String(s.in_progress), helper: 'currently being taught', progress: Math.min(100, s.in_progress > 0 ? Math.round((s.in_progress / Math.max(1, s.completed + s.in_progress)) * 100) : 0), color: '#2f7dd9' },
+      { label: 'Weeks remaining', value: String(s.weeks_remaining), helper: 'in this term', progress: Math.max(0, 100 - s.completion_percent), color: '#b87916' },
+    ];
+  }, [apiData]);
+
+  const upcomingLessons: Lesson[] = useMemo(() => {
+    if (!apiData) return [];
+    const subjectIndexById = new Map(apiData.subjects.map((subject, index) => [subject.subject_id, index]));
+    return apiData.upcoming_lessons.slice(0, 4).map((item) => {
+      const color = subjectColorAt(subjectIndexById.get(item.subject_id ?? -1) ?? 0);
+      const status = upcomingStatusLabel(item.status);
+      const subjectLabel = item.standard_name ? `${item.subject_name ?? ''} - Std ${item.standard_name}` : item.subject_name ?? '';
+      return {
+        subject: subjectLabel,
+        title: item.topic || 'Lesson',
+        meta: `${subjectLabel} - ${formatShortDate(item.scheduled_date)} - ${item.period_slot}`,
+        dotColor: color.dotColor,
+        status,
+        badgeClassName: upcomingBadgeClassName[status],
+      };
+    });
+  }, [apiData]);
+
+  const allUpcomingLessons: UpcomingLessonRow[] = useMemo(() => {
+    if (!apiData) return [];
+    const subjectIndexById = new Map(apiData.subjects.map((subject, index) => [subject.subject_id, index]));
+    return apiData.upcoming_lessons.map((item) => {
+      const color = subjectColorAt(subjectIndexById.get(item.subject_id ?? -1) ?? 0);
+      const subjectLabel = item.standard_name ? `${item.subject_name ?? ''} - Std ${item.standard_name}` : item.subject_name ?? '';
+      return {
+        date: formatShortDate(item.scheduled_date),
+        time: item.teacher_name,
+        subject: subjectLabel,
+        dotColor: color.dotColor,
+        fill: color.fill,
+        text: color.text,
+        topic: item.topic || 'Lesson',
+        room: item.teacher_name,
+        period: item.period_slot,
+        status: upcomingStatusLabel(item.status),
+      };
+    });
+  }, [apiData]);
+
+  const subjectProgressDetails: SubjectProgressDetail[] = useMemo(() => {
+    if (!apiData) return [];
+    return apiData.subject_progress.map((subject, index) => ({
+      subject: subject.standard_name ? `${subject.subject_name} - Std ${subject.standard_name}` : subject.subject_name,
+      color: subjectColorAt(index).dotColor,
+      progress: subject.progress,
+      topics: subject.topics.map((topic) => ({
+        title: topic.title,
+        range: `${formatShortDate(topic.start_date)} - ${formatShortDate(topic.end_date)}`,
+        status: topic.status,
+      })),
+    }));
+  }, [apiData]);
+
+  const gradeLabel = 'All standards';
+  const headerSubtitle = apiData
+    ? `${apiData.subjects.length} subjects - ${apiData.stats.total_topics} topics - ${apiData.stats.completion_percent}% complete`
+    : isLoading
+      ? 'Loading curriculum plan...'
+      : loadError || 'No curriculum plan data found yet.';
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const dialogs = (
     <>
       {isFilterDialogOpen && <FilterSyllabusDialog onClose={() => setIsFilterDialogOpen(false)} />}
@@ -1265,19 +1592,32 @@ export default function CurriculumPlanningPage() {
 
   if (isUpcomingLessonsViewOpen) {
     return (
+<<<<<<< HEAD
       <>
         {dialogs}
         <AllUpcomingLessonsView
+=======
+      <RequireStaff>
+        {dialogs}
+        <AllUpcomingLessonsView
+          lessons={allUpcomingLessons}
+          gradeLabel={gradeLabel}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           onBack={() => setIsUpcomingLessonsViewOpen(false)}
           onFilter={() => setIsFilterDialogOpen(true)}
           onAddLesson={() => setIsAddTopicDialogOpen(true)}
         />
+<<<<<<< HEAD
       </>
+=======
+      </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     );
   }
 
   if (isSubjectProgressViewOpen) {
     return (
+<<<<<<< HEAD
       <>
         {dialogs}
         <SubjectProgressDetailsView
@@ -1285,15 +1625,36 @@ export default function CurriculumPlanningPage() {
           onFilter={() => setIsFilterDialogOpen(true)}
         />
       </>
+=======
+      <RequireStaff>
+        {dialogs}
+        <SubjectProgressDetailsView
+          subjects={subjectProgressDetails}
+          stats={stats}
+          gradeLabel={gradeLabel}
+          onBack={() => setIsSubjectProgressViewOpen(false)}
+          onFilter={() => setIsFilterDialogOpen(true)}
+        />
+      </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     );
   }
 
   return (
+<<<<<<< HEAD
     <div className="min-h-full  px-4 py-4 text-[#26231f] sm:px-6 lg:px-7">
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">Grade 8 - Yearly syllabus overview</h1>
           <p className="mt-1 text-sm text-[#706b64]">Academic Year 2025-26 - 6 subjects - 48 topics - 40% complete</p>
+=======
+    <RequireStaff>
+    <div className="min-h-full  px-4 py-4 text-[#26231f] sm:px-6 lg:px-7">
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">{gradeLabel} - Yearly syllabus overview</h1>
+          <p className="mt-1 text-sm text-[#706b64]">{headerSubtitle}</p>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -1343,20 +1704,39 @@ export default function CurriculumPlanningPage() {
         <div className="overflow-x-auto">
           <div
             className="grid min-w-[1260px]"
+<<<<<<< HEAD
             style={{ gridTemplateColumns: `128px repeat(${months.length}, minmax(94px, 1fr))` }}
+=======
+            style={{ gridTemplateColumns: `128px repeat(${Math.max(monthLabels.length, 1)}, minmax(94px, 1fr))` }}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           >
             <div className="border-b border-r border-[#e3dfd8] px-4 py-3 text-xs font-semibold text-[#8a847d]">
               Subject
             </div>
+<<<<<<< HEAD
             {months.map((month) => (
               <div
                 key={month}
+=======
+            {monthLabels.map((month, index) => (
+              <div
+                key={`${month}-${index}`}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 className="border-b border-r border-[#e3dfd8] px-3 py-3 text-center text-xs font-semibold text-[#a09a93] last:border-r-0"
               >
                 {month}
               </div>
             ))}
 
+<<<<<<< HEAD
+=======
+            {subjectPlans.length === 0 && (
+              <div className="col-span-full px-4 py-6 text-center text-sm text-[#9a958e]">
+                {isLoading ? 'Loading curriculum plan...' : loadError || 'No curriculum plan data found for this class yet.'}
+              </div>
+            )}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
             {subjectPlans.map((plan) => (
               <Fragment key={plan.name}>
                 <div
@@ -1367,7 +1747,11 @@ export default function CurriculumPlanningPage() {
                 </div>
                 {plan.topics.map((topic, index) => (
                   <div
+<<<<<<< HEAD
                     key={`${plan.name}-${months[index]}`}
+=======
+                    key={`${plan.name}-${monthLabels[index]}-${index}`}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                     className="flex min-h-12 items-center border-b border-r border-[#e9e5de] px-2 last:border-r-0"
                   >
                     <span
@@ -1388,7 +1772,11 @@ export default function CurriculumPlanningPage() {
       <section className="grid gap-4 xl:grid-cols-3">
         <div className="rounded-lg border border-[#ddd9d2] bg-white p-4 shadow-[0_8px_18px_rgba(23,22,15,0.08)]">
           <div className="mb-4 flex items-center justify-between gap-3">
+<<<<<<< HEAD
             <h2 className="text-base font-semibold tracking-[0]">May 2026 - monthly detail</h2>
+=======
+            <h2 className="text-base font-semibold tracking-[0]">Monthly detail</h2>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
             <Link href="/lms/monthly-plan" className="inline-flex items-center gap-1 text-sm font-medium text-[#2f7dd9]">
               View full
               <ArrowRight size={14} />
@@ -1431,6 +1819,14 @@ export default function CurriculumPlanningPage() {
           </div>
 
           <div className="space-y-2">
+<<<<<<< HEAD
+=======
+            {upcomingLessons.length === 0 && (
+              <div className="rounded-lg bg-[#efeeec] px-3 py-4 text-center text-xs text-[#9a958e]">
+                {isLoading ? 'Loading...' : 'No upcoming lessons.'}
+              </div>
+            )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
             {upcomingLessons.map((lesson) => (
               <div key={`${lesson.subject}-${lesson.title}`} className="flex min-h-14 items-start gap-3 rounded-lg bg-[#efeeec] px-3 py-3">
                 <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: lesson.dotColor }} />
@@ -1476,5 +1872,9 @@ export default function CurriculumPlanningPage() {
         </div>
       </section>
     </div>
+<<<<<<< HEAD
+=======
+    </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
 }

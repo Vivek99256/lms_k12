@@ -111,6 +111,14 @@ const H5P_ROUTE_NAME_MAP: Record<string, string> = {
   'h5p_mcq.index': '/h5p/h5p_mcq',
   'h5p_interactive_video.index': '/h5p/h5p_interactive_video',
   'h5p_flashacard.index': '/h5p/h5p_flashacard',
+<<<<<<< HEAD
+=======
+  // PAL V4 H5P Model workspace — pedagogy and framework tagging, chapter
+  // coverage, measured engagement and the xAPI pipeline. Reached from the
+  // H5P content hub.
+  'h5p_model.index': '/h5p/model',
+  'h5p/model': '/h5p/model',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 };
 
 /**
@@ -150,8 +158,15 @@ const LMS_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'questionreport': '/lms/question-wise-report',
   'lmsdashboard.index': '/lms/dashboard',
   'lms/lmsdashboard': '/lms/dashboard',
+<<<<<<< HEAD
   'lmsdashboard_teacher': '/lms/dashboard',
   'teacherindex': '/lms/dashboard',
+=======
+  'lmsdashboard_teacher': '/lms/teacher-dashboard',
+  'teacherindex': '/lms/teacher-dashboard',
+  'lms.teacher-dashboard': '/lms/teacher-dashboard',
+  'lms/teacher-dashboard': '/lms/teacher-dashboard',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   // Message is a legacy placeholder (no backend data) — the page honestly
   // reflects that, but the menu link still needs to resolve rather than 404.
   'lmscommunication.index': '/lms/message',
@@ -182,8 +197,11 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'pal.index': '/pal',
   'pal': '/pal',
   'lms/pal': '/pal',
+<<<<<<< HEAD
   'pal_personal_best.index': '/pal/personal-best',
   'lms/pal-personal-best': '/pal/personal-best',
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   // PAL V4 Content Intelligence Layer (tblmenumaster group "PAL", below
   // Homework). Listed explicitly rather than relying on the generic PAL slug
   // fallback further down — that one normalises to the bare slug "pal" and
@@ -194,6 +212,7 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/pal-content/review': '/pal/content/review',
   'pal_content.misconceptions': '/pal/content/misconceptions',
   'lms/pal-content/misconceptions': '/pal/content/misconceptions',
+<<<<<<< HEAD
   'pal_gamification.badges.index': '/pal/badges',
   'pal_gamification.badges': '/pal/badges',
   'lms/pal-badges': '/pal/badges',
@@ -211,6 +230,30 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/pal-career-quest/skill-builder': '/pal/career-quest/skill-builder',
   'lms/pal-career-quest/pathway-seeker': '/pal/career-quest/pathway-seeker',
   'lms/pal-career-quest/career-builder': '/pal/career-quest/career-builder',
+=======
+  // New PAL — a level-2 entry directly under LMS + PAL, alongside Homework.
+  // It is a workspace rather than a menu group, so the menu row links straight
+  // here and its sub-modules (Content Model first) are navigated inside the
+  // workspace by NewPalNav.
+  // Listed explicitly: the generic PAL slug fallback further down normalises to
+  // the bare slug "pal" and would not match "new_pal".
+  'new_pal.index': '/pal/new',
+  'new_pal': '/pal/new',
+  'lms/new-pal': '/pal/new',
+  'new_pal.content_model': '/pal/new/content-model',
+  'lms/new-pal/content-model': '/pal/new/content-model',
+  // Administration — the second New PAL level-3 sub-module, registered by
+  // 2026_08_14_160100_add_administration_submodule_menu. Follows the same
+  // `new_pal.<sub_module>` link convention as Content Model above rather than
+  // a separate `*.index` root, so the level-3 family stays consistent.
+  'new_pal.administration': '/pal/new/administration',
+  'lms/new-pal/administration': '/pal/new/administration',
+  // Gamification — the third New PAL level-3 sub-module, registered by
+  // 2026_08_17_110000_add_new_pal_gamification_submodule_menu. Same
+  // `new_pal.<sub_module>` convention as its two siblings above.
+  'new_pal.gamification': '/pal/new/gamification',
+  'lms/new-pal/gamification': '/pal/new/gamification',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',
@@ -327,6 +370,117 @@ const MIGRATION_MODULE_ROUTES: Record<string, string> = {
   'nomenclature.index': '/reports/nomenclature',
 };
 
+<<<<<<< HEAD
+=======
+/**
+ * HRIT Management: legacy Laravel route names (Attendance + Payroll, both
+ * already registered in next_lms_erp's routes/hrms.php) plus invented
+ * slug-style keys for Leave (a modern JSON-API sub-module with no legacy
+ * Laravel route name, keyed the same `hrit.leave.<page>` way other
+ * non-legacy modules in this file key their routes — see `new_pal.*` /
+ * `pal_content.*` above) → the Next.js pages under /hrit.
+ */
+const HRIT_ROUTE_NAME_MAP: Record<string, string> = {
+  // Attendance Management
+  // 'hrms_attendance.index' / 'hrms_attendance_report.index' are NOT used as
+  // keys here even though they're the legacy Laravel route names: those exact
+  // strings are already claimed by unrelated, actively-visible legacy menu
+  // rows (People & Competency > User Attendance, Reports > HRMS Report) — see
+  // 2026_08_17_120000_fix_hrit_menu_link_collisions.php in next_lms_erp for
+  // the full story. The new HRIT Management submenus use fresh `hrit.*` keys
+  // instead so they can't collide with or silently redirect those.
+  'hrit.attendance.tracking': '/hrit/attendance-management/attendance-tracking',
+  'hrms/hrms-attendance': '/hrit/attendance-management/attendance-tracking',
+  'hrit.attendance.reports': '/hrit/attendance-management/attendance-reports',
+  'hrms/hrms-attendance-report': '/hrit/attendance-management/attendance-reports',
+  // No legacy Laravel route name exists for these three (no backend menu rows
+  // registered yet) - invented `hrit.attendance.*` keys, same convention as above.
+  'hrit.attendance.regularization': '/hrit/attendance-management/attendance-regularization',
+  'hrit.attendance.policy': '/hrit/attendance-management/attendance-policy',
+  'hrit.attendance.request-center': '/hrit/attendance-management/request-center',
+  // Leave management (modern JSON API, no legacy Laravel route name — see
+  // header comment above for the `hrit.leave.*` key convention)
+  'hrit.leave.dashboard': '/hrit/leave-management/leave-dashboard',
+  'hrit.leave.requests': '/hrit/leave-management/leave-requests',
+  'hrit.leave.reports': '/hrit/leave-management/leave-reports',
+  'hrit.leave.configuration': '/hrit/leave-management/leave-configuration',
+  // Payroll Management — same link-collision reasoning as Attendance above
+  // for payroll_type.index / employee_salary_structure.index /
+  // payroll_deduction.index / form16.index / hrms_salary_certificate.index
+  // (all already claimed by People & Competency > Payroll's unrelated rows).
+  // 'monthly_payroll_report.index' was NOT claimed by an existing row, so
+  // that one HRIT submenu keeps its legacy-route-name key.
+  'hrit.payroll.type': '/hrit/payroll-management/payroll-type',
+  'hrit.payroll.salary-structure': '/hrit/payroll-management/salary-structure',
+  'hrit.payroll.deduction': '/hrit/payroll-management/payroll-deduction',
+  'hrit.payroll.form16': '/hrit/payroll-management/form-16',
+  'hrit.payroll.salary-certificate': '/hrit/payroll-management/salary-certificate',
+  'monthly_payroll_report.index': '/hrit/payroll-management/monthly-payroll-report',
+  'monthly-payroll-report.index': '/hrit/payroll-management/monthly-payroll-report',
+};
+
+/**
+ * Talent Management → Talent Dashboard, Recruitment, Onboarding, Performance
+ * Reviews & Appraisals, Compensation, Mobility & Succession, Offboarding,
+ * Administration under /talent-management. Migrated as-is from G2G
+ * (g2gv0) — see app/talent-management/** and next_lms_erp's
+ * database/migrations/2026_08_18_120000_add_talent_management_menu.php for
+ * the matching backend menu-master rows, same pattern as HRIT_ROUTE_NAME_MAP.
+ */
+const TALENT_ROUTE_NAME_MAP: Record<string, string> = {
+  'talent.dashboard': '/talent-management/talent-dashboard',
+  'talent.recruitment': '/talent-management/recruitment',
+  'talent.onboarding': '/talent-management/onboarding',
+  'talent.performance_reviews': '/talent-management/performance-reviews-and-appraisals',
+  'talent.compensation': '/talent-management/compensation',
+  'talent.mobility_succession': '/talent-management/mobility-and-succession',
+  'talent.offboarding': '/talent-management/offboarding',
+  'talent.administration': '/talent-management/administration',
+  // Competency screens (Employee Profiles, Certifications, Development &
+  // Career Paths), ported as-is from G2G's `components/domain/competency/**`.
+  // Backend menu-seed migration adds matching route_name rows using these
+  // exact keys.
+  'talent.employee_profiles': '/talent-management/employee-profiles',
+  'talent.certifications': '/talent-management/certifications',
+  'talent.development_career_paths': '/talent-management/development-and-career-paths',
+};
+
+/**
+ * Organization Management → Employee Directory, Role and Permissions under
+ * /organization-management. Migrated as-is from G2G (g2gv0) — see
+ * app/organization-management/** — same pattern as TALENT_ROUTE_NAME_MAP.
+ * Backend menu-master rows (module/menu labels, icons, sort order, parent_id)
+ * for these two route_name keys still need to be inserted by the backend
+ * team; this map is ready to resolve them once those rows exist.
+ */
+const ORGANIZATION_MANAGEMENT_ROUTE_NAME_MAP: Record<string, string> = {
+  'org_mgmt.employee_directory': '/organization-management/employee-directory',
+  'org_mgmt.role_permissions': '/organization-management/role-and-permissions',
+};
+
+/**
+ * Task Management → Dashboard, My Tasks, Projects & Workstreams,
+ * Dependencies & Workstreams, Calendar, Reports & Analysis, Administration
+ * (Status Management, Permissions Matrix, Integration, Audit Logs) under
+ * /task-management. Migrated as-is from G2G (g2gv0) — see
+ * app/task-management/** — same pattern as TALENT_ROUTE_NAME_MAP.
+ */
+const TASK_MANAGEMENT_ROUTE_NAME_MAP: Record<string, string> = {
+  'task_management.dashboard': '/task-management/dashboard',
+  'task_management.my_tasks': '/task-management/my-tasks',
+  'task_management.projects_workstreams': '/task-management/projects-workstreams',
+  'task_management.dependencies_workstreams': '/task-management/dependencies-workstreams',
+  'task_management.calendar': '/task-management/calendar',
+  'task_management.reports_analysis': '/task-management/reports-analysis',
+  'task_management.admin.status_management': '/task-management/administration/status-management',
+  'task_management.admin.permissions_matrix': '/task-management/administration/permissions-matrix',
+  'task_management.admin.integration': '/task-management/administration/integration',
+  'task_management.admin.audit_logs': '/task-management/administration/audit-logs',
+  'org_mgmt.compliance_library': '/organization-management/compliance-library',
+  'org_mgmt.disciplinary_library': '/organization-management/disciplinary-library',
+};
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -482,9 +636,46 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return studentReportRoute;
   }
 
+<<<<<<< HEAD
   const migrationRoute = MIGRATION_MODULE_ROUTES[cleanLink.toLowerCase()];
   if (migrationRoute) return migrationRoute;
 
+=======
+  // Teacher Transfer Utility: legacy Laravel route name → the Next.js page.
+  if (cleanLink.toLowerCase() === 'teachertransfer.index') {
+    return '/teachertransfer';
+  }
+
+  const migrationRoute = MIGRATION_MODULE_ROUTES[cleanLink.toLowerCase()];
+  if (migrationRoute) return migrationRoute;
+
+  // HRIT Management → Attendance, Leave, Payroll under /hrit.
+  const hritRoute = HRIT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (hritRoute) {
+    return hritRoute;
+  }
+
+  // Talent Management → Dashboard, Recruitment, Onboarding, Performance,
+  // Compensation, Mobility & Succession, Offboarding, Administration.
+  const talentRoute = TALENT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (talentRoute) {
+    return talentRoute;
+  }
+
+  // Organization Management → Employee Directory, Role and Permissions.
+  const organizationManagementRoute = ORGANIZATION_MANAGEMENT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (organizationManagementRoute) {
+    return organizationManagementRoute;
+  }
+
+  // Task Management → Dashboard, My Tasks, Projects & Workstreams,
+  // Dependencies & Workstreams, Calendar, Reports & Analysis, Administration.
+  const taskManagementRoute = TASK_MANAGEMENT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (taskManagementRoute) {
+    return taskManagementRoute;
+  }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
     return '/fees/master/fees-config-master';
   }

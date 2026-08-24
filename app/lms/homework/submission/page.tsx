@@ -31,6 +31,10 @@ import {
   type SubmissionInput,
   type SubmissionRow,
 } from "@/app/lms/homework/api";
+<<<<<<< HEAD
+=======
+import RequireStaff from "@/app/lms/_shared/RequireStaff";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 const academicFields: DropdownField[] = [
   "section",
@@ -158,6 +162,10 @@ export default function HomeworkSubmissionPage() {
   }
 
   return (
+<<<<<<< HEAD
+=======
+    <RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900">
@@ -348,5 +356,9 @@ export default function HomeworkSubmissionPage() {
         </form>
       ) : null}
     </main>
+<<<<<<< HEAD
+=======
+    </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
 }

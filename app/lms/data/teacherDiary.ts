@@ -67,7 +67,11 @@ export interface DiaryEntry {
 export async function fetchTeacherDiary(signal?: AbortSignal): Promise<DiaryEntry[]> {
   const session = requireSession();
 
+<<<<<<< HEAD
   const url = new URL(`${session.baseUrl}/lessonplanningReport`);
+=======
+  const url = new URL(`${session.baseUrl}/school_setup/lessonplanningReport`);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   url.searchParams.set('type', 'API');
   url.searchParams.set('sub_institute_id', session.subInstituteId);
   url.searchParams.set('syear', session.syear);

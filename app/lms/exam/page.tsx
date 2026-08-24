@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 'use client';
+=======
+﻿'use client';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 import Link from 'next/link';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -75,6 +79,7 @@ type StudentChapterProgress = {
   concepts: StudentConceptProgress[];
 };
 
+<<<<<<< HEAD
 type StudentExamStatus = 'Available' | 'Upcoming' | 'Completed' | 'Closed';
 
 type StudentOnlineExamRecord = {
@@ -113,6 +118,8 @@ type StudentOnlineQuestionPaper = {
   questions: StudentOnlineQuestion[];
 };
 
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 type StudentPracticeQuestionOption = {
   id: string;
   label: string;
@@ -123,7 +130,10 @@ type StudentPracticeQuestion = {
   question: string;
   marks: number;
   options: StudentPracticeQuestionOption[];
+<<<<<<< HEAD
   correctOptionId: string;
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 };
 
 type StudentPracticeAssessment = {
@@ -392,6 +402,7 @@ const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon }> = 
   { label: 'Offline Exam', icon: BookOpen },
 ];
 
+<<<<<<< HEAD
 const studentChapterProgressData: StudentChapterProgress[] = [
   {
     chapterId: 1,
@@ -648,6 +659,12 @@ const studentOnlineQuestionPapers: StudentOnlineQuestionPaper[] = [
     ],
   },
 ];
+=======
+// Real student-facing PAL chapter/concept mastery is fetched from
+// /api/pal/mastery-map/{learnerId} (see fetchStudentChapterProgress below);
+// this only seeds the type-safe empty default before that fetch resolves.
+const studentChapterProgressData: StudentChapterProgress[] = [];
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 const createExamSteps = [
   {
@@ -735,6 +752,132 @@ function mapQuestionPaperToExam(row: ApiQuestionPaperRecord): ExamRecord {
   };
 }
 
+<<<<<<< HEAD
+=======
+// --- PAL mastery map (GET /api/pal/mastery-map/{learnerId}) ---------------
+
+type MasteryMapConcept = {
+  concept_id: number | string;
+  concept_name?: string | null;
+  mastery_score?: number | string | null;
+  status?: string | null;
+};
+
+type MasteryMapData = {
+  concepts?: MasteryMapConcept[];
+  overall_mastery?: number | string | null;
+  mastered_concepts?: number | string | null;
+};
+
+type MasteryMapApiResponse = {
+  success?: boolean;
+  message?: string;
+  data?: MasteryMapData;
+};
+
+const CONCEPT_MASTERY_THRESHOLD = 75;
+
+function mapMasteryMapToChapterProgress(payload: MasteryMapApiResponse): StudentChapterProgress[] {
+  const data = payload.data;
+  const concepts = data?.concepts ?? [];
+  if (concepts.length === 0) return [];
+
+  const mappedConcepts: StudentConceptProgress[] = concepts.map((concept) => {
+    const mastery = Math.round(toNumber(concept.mastery_score));
+    const isMastered = readString(concept.status).toLowerCase() === 'mastered' || mastery >= CONCEPT_MASTERY_THRESHOLD;
+    const status: StudentConceptStatus = isMastered ? 'Mastered' : 'In progress';
+
+    return {
+      id: String(concept.concept_id),
+      title: readString(concept.concept_name) || `Concept ${concept.concept_id}`,
+      subtitle: isMastered ? 'Mastered' : `In progress · ${mastery}% mastery`,
+      mastery,
+      attemptsLabel: `${mastery}%`,
+      attemptsCount: 0,
+      status,
+      canLearn: true,
+      canPractice: !isMastered,
+      learningContent: [],
+    };
+  });
+
+  const conceptsMasteredCount = mappedConcepts.filter((concept) => concept.status === 'Mastered').length;
+  const overallMastery = Math.round(toNumber(data?.overall_mastery));
+
+  return [
+    {
+      chapterId: 0,
+      chapterTitle: 'Concept mastery',
+      badgeLabel: 'Based on your practice history',
+      chapterMastery: overallMastery,
+      conceptsMastered: `${conceptsMasteredCount} of ${mappedConcepts.length}`,
+      averageMastery: `${overallMastery}%`,
+      practiceAttempts: '-',
+      masteryThreshold: `${CONCEPT_MASTERY_THRESHOLD}%`,
+      concepts: mappedConcepts,
+    },
+  ];
+}
+
+// --- Adaptive practice (GET /lms/adaptive-practice, POST /lms/submit-practice) ---
+
+type AdaptivePracticeOption = {
+  id: number | string;
+  answer?: string | null;
+};
+
+type AdaptivePracticeQuestion = {
+  id: number | string;
+  question_title?: string | null;
+  points?: number | string | null;
+  options?: AdaptivePracticeOption[] | null;
+};
+
+type AdaptivePracticeApiResponse = {
+  status_code?: number;
+  message?: string;
+  data?: {
+    questions?: AdaptivePracticeQuestion[];
+  };
+};
+
+type SubmitPracticeApiResponse = {
+  status_code?: number;
+  message?: string;
+  data?: {
+    summary?: {
+      percentage?: number | string;
+    };
+  };
+};
+
+function mapAdaptivePracticeToAssessment(
+  conceptId: string,
+  payload: AdaptivePracticeApiResponse
+): StudentPracticeAssessment {
+  const rawQuestions = payload.data?.questions ?? [];
+
+  const questions: StudentPracticeQuestion[] = rawQuestions
+    .filter((question) => Array.isArray(question.options) && question.options.length > 0)
+    .map((question) => ({
+      id: String(question.id),
+      question: readString(question.question_title) || 'Untitled question',
+      marks: toNumber(question.points) || 1,
+      options: (question.options ?? []).map((option) => ({
+        id: String(option.id),
+        label: readString(option.answer) || 'Option',
+      })),
+    }));
+
+  return {
+    conceptId,
+    durationMinutes: Math.max(2, Math.ceil(questions.length * 1.5)),
+    masteryTarget: CONCEPT_MASTERY_THRESHOLD,
+    questions,
+  };
+}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 function toDisplayText(value: string | number | null | undefined): string {
   return value == null ? '' : String(value).trim();
 }
@@ -943,6 +1086,78 @@ function PrintableQuestionPaper({
 }
 
 function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
+<<<<<<< HEAD
+=======
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  const handleAnswerChange = (questionId: number, value: string) => {
+    setAnswers((current) => ({ ...current, [questionId]: value }));
+  };
+
+  const handleSubmitExam = async () => {
+    const session = getCreateExamSession();
+
+    if (!session.subInstituteId || !session.userId) {
+      setSubmitError('Your session has expired. Please sign in again and retry.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setSubmitError('');
+
+      const formData = new FormData();
+      formData.append('questionpaper_id', String(paper.id));
+      formData.append('sub_institute_id', session.subInstituteId);
+      formData.append('user_id', session.userId);
+      formData.append('type', 'JSON');
+
+      (paper.question_arr || []).forEach((question) => {
+        formData.append(`answer_narrative[${question.id}]`, answers[question.id] ?? '');
+      });
+
+      const response = await fetch(`${API_BASE_URL}/lms/online_exam`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || Number(result?.status_code) !== 1) {
+        throw new Error(result?.message || 'Unable to submit the exam. Please try again.');
+      }
+
+      setSubmitSuccess(true);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : 'Unable to submit the exam. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (submitSuccess) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <CheckCircle2 className="mx-auto mb-3 text-emerald-500" size={40} />
+        <p className="text-lg font-semibold text-slate-900">Exam submitted</p>
+        <p className="mt-1 text-sm text-slate-500">Your answers have been recorded.</p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="mt-5 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
+        >
+          Back to exams
+        </button>
+      </div>
+    );
+  }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1041,6 +1256,11 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
                 <textarea
                   name={`answer_${question.id}`}
                   rows={4}
+<<<<<<< HEAD
+=======
+                  value={answers[question.id] ?? ''}
+                  onChange={(event) => handleAnswerChange(question.id, event.target.value)}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   placeholder="Write your answer here..."
                   className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                 />
@@ -1060,12 +1280,26 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
       </div>
 
       {paper.question_arr?.length > 0 ? (
+<<<<<<< HEAD
         <div className="sticky bottom-4 flex justify-end rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
           <button
             type="button"
             className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
           >
             Submit Exam
+=======
+        <div className="sticky bottom-4 flex flex-col items-end gap-2 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+          {submitError ? (
+            <p className="text-sm font-medium text-red-600">{submitError}</p>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleSubmitExam}
+            disabled={isSubmitting}
+            className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? 'Submitting…' : 'Submit Exam'}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           </button>
         </div>
       ) : null}
@@ -1078,6 +1312,11 @@ export default function StudentHomeworkIndexPage() {
   const { isChatbotOpen } = useContext(ChatbotLayoutContext);
   const [audienceMode, setAudienceMode] = useState<AudienceMode>(() => {
     if (typeof window === 'undefined') return 'Teacher';
+<<<<<<< HEAD
+=======
+    const session = getCreateExamSession();
+    if (session.userProfileName.trim().toUpperCase() === 'STUDENT') return 'Student';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     const stored = localStorage.getItem('learningManagementAudienceMode');
     return stored === 'Student' ? 'Student' : 'Teacher';
   });
@@ -1114,10 +1353,13 @@ export default function StudentHomeworkIndexPage() {
     standard: '',
     subject: '',
   });
+<<<<<<< HEAD
   const [activeOnlineExamId, setActiveOnlineExamId] = useState<string | null>(null);
   const [onlinePaperAnswers, setOnlinePaperAnswers] = useState<Record<string, string>>({});
   const [isSubmittingOnlinePaper, setIsSubmittingOnlinePaper] = useState(false);
   const [completedOnlineExamIds, setCompletedOnlineExamIds] = useState<string[]>([]);
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const [isCreateExamOpen, setIsCreateExamOpen] = useState(false);
   const [createExamStep, setCreateExamStep] = useState(1);
   const [createExamFilters, setCreateExamFilters] = useState<Partial<SearchDropdownValues>>({
@@ -1152,9 +1394,20 @@ export default function StudentHomeworkIndexPage() {
   const [studentSelectedChapterId, setStudentSelectedChapterId] = useState<number>(
     studentChapterProgressData[0]?.chapterId ?? 0
   );
+<<<<<<< HEAD
   const [selectedConcept, setSelectedConcept] = useState<StudentConceptProgress | null>(null);
   const [isLearnDrawerOpen, setIsLearnDrawerOpen] = useState(false);
   const [activePracticeConceptId, setActivePracticeConceptId] = useState<string | null>(null);
+=======
+  const [isStudentMasteryLoading, setIsStudentMasteryLoading] = useState(false);
+  const [studentMasteryError, setStudentMasteryError] = useState('');
+  const [selectedConcept, setSelectedConcept] = useState<StudentConceptProgress | null>(null);
+  const [isLearnDrawerOpen, setIsLearnDrawerOpen] = useState(false);
+  const [activePracticeConceptId, setActivePracticeConceptId] = useState<string | null>(null);
+  const [activePracticeAssessment, setActivePracticeAssessment] = useState<StudentPracticeAssessment | null>(null);
+  const [isPracticeLoading, setIsPracticeLoading] = useState(false);
+  const [practiceLoadError, setPracticeLoadError] = useState('');
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({});
   const [practiceTimeLeft, setPracticeTimeLeft] = useState(0);
 
@@ -1178,12 +1431,15 @@ export default function StudentHomeworkIndexPage() {
       studentChapterProgressList[0],
     [studentChapterProgressList, studentSelectedChapterId]
   );
+<<<<<<< HEAD
   const activePracticeAssessment = useMemo(
     () =>
       studentPracticeAssessments.find((assessment) => assessment.conceptId === activePracticeConceptId) ??
       null,
     [activePracticeConceptId]
   );
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const activePracticeConcept = useMemo(
     () =>
       activeStudentChapter?.concepts.find((concept) => concept.id === activePracticeConceptId) ?? null,
@@ -1195,6 +1451,7 @@ export default function StudentHomeworkIndexPage() {
   const hasAnsweredAllPracticeQuestions = activePracticeAssessment
     ? practiceAnsweredCount === activePracticeAssessment.questions.length
     : false;
+<<<<<<< HEAD
   const activeOnlineExam = useMemo(
     () => studentOnlineExams.find((exam) => exam.id === activeOnlineExamId) ?? null,
     [activeOnlineExamId]
@@ -1211,6 +1468,8 @@ export default function StudentHomeworkIndexPage() {
   const hasAnsweredAllOnlineQuestions = activeOnlineQuestionPaper
     ? onlineAnsweredCount === activeOnlineQuestionPaper.questions.length
     : false;
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const handleOnlineExamDropdownChange = (values: SearchDropdownValues) => {
     const gradeId = Array.isArray(values.section)
       ? values.section[0] || ''
@@ -1806,6 +2065,7 @@ export default function StudentHomeworkIndexPage() {
     }, 200);
   };
 
+<<<<<<< HEAD
   const openOnlineQuestionPaper = (examId: string) => {
     setActiveOnlineExamId(examId);
     setOnlinePaperAnswers({});
@@ -1817,10 +2077,13 @@ export default function StudentHomeworkIndexPage() {
     setIsSubmittingOnlinePaper(false);
   };
 
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const printOfflineQuestionPaper = () => {
     window.print();
   };
 
+<<<<<<< HEAD
   const openPracticeAssessmentModal = (conceptId: string) => {
     const assessment = studentPracticeAssessments.find((item) => item.conceptId === conceptId);
     if (!assessment) return;
@@ -1828,6 +2091,54 @@ export default function StudentHomeworkIndexPage() {
     setActivePracticeConceptId(conceptId);
     setPracticeAnswers({});
     setPracticeTimeLeft(assessment.durationMinutes * 60);
+=======
+  const openPracticeAssessmentModal = async (conceptId: string) => {
+    const session = getCreateExamSession();
+
+    setActivePracticeConceptId(conceptId);
+    setActivePracticeAssessment(null);
+    setPracticeAnswers({});
+    setPracticeLoadError('');
+
+    if (!session.userId) {
+      setPracticeLoadError('Your session has expired. Please sign in again and retry.');
+      return;
+    }
+
+    try {
+      setIsPracticeLoading(true);
+
+      const url = new URL(`${API_BASE_URL}/lms/adaptive-practice`);
+      url.searchParams.set('type', 'API');
+      url.searchParams.set('student_id', session.userId);
+      url.searchParams.set('concept_id', conceptId);
+      url.searchParams.set('question_count', '5');
+      if (session.subInstituteId) {
+        url.searchParams.set('sub_institute_id', session.subInstituteId);
+      }
+
+      const response = await fetch(url.toString(), { method: 'GET', cache: 'no-store' });
+      const payload = (await response.json().catch(() => null)) as AdaptivePracticeApiResponse | null;
+
+      if (!response.ok || Number(payload?.status_code) !== 1) {
+        throw new Error(payload?.message || 'Unable to load practice questions.');
+      }
+
+      const assessment = mapAdaptivePracticeToAssessment(conceptId, payload ?? {});
+      if (assessment.questions.length === 0) {
+        throw new Error('No practice questions are available for this concept right now.');
+      }
+
+      setActivePracticeAssessment(assessment);
+      setPracticeTimeLeft(assessment.durationMinutes * 60);
+    } catch (error) {
+      setPracticeLoadError(
+        error instanceof Error ? error.message : 'Unable to load practice questions.'
+      );
+    } finally {
+      setIsPracticeLoading(false);
+    }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   };
 
   const selectedQuestionMarks = useMemo(() => {
@@ -2061,6 +2372,7 @@ export default function StudentHomeworkIndexPage() {
     }
   };
 
+<<<<<<< HEAD
   const submitPracticeAssessment = () => {
     if (!activePracticeAssessment || !activePracticeConcept || !activeStudentChapter) return;
     if (!hasAnsweredAllPracticeQuestions) return;
@@ -2082,6 +2394,53 @@ export default function StudentHomeworkIndexPage() {
 
         const updatedConcepts: StudentConceptProgress[] = chapter.concepts.map((concept, index, concepts) => {
           if (concept.id === activePracticeConcept.id) {
+=======
+  const submitPracticeAssessment = async () => {
+    if (!activePracticeAssessment || !activePracticeConcept || !activeStudentChapter) return;
+    if (!hasAnsweredAllPracticeQuestions) return;
+
+    const session = getCreateExamSession();
+    if (!session.userId) {
+      setPracticeLoadError('Your session has expired. Please sign in again and retry.');
+      return;
+    }
+
+    try {
+      setIsPracticeLoading(true);
+      setPracticeLoadError('');
+
+      const body = new URLSearchParams();
+      body.set('type', 'API');
+      body.set('student_id', session.userId);
+      if (session.subInstituteId) body.set('sub_institute_id', session.subInstituteId);
+      activePracticeAssessment.questions.forEach((question) => {
+        const answer = practiceAnswers[question.id];
+        if (answer) body.set(`answers[${question.id}]`, answer);
+      });
+
+      const response = await fetch(`${API_BASE_URL}/lms/submit-practice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        body: body.toString(),
+      });
+      const payload = (await response.json().catch(() => null)) as SubmitPracticeApiResponse | null;
+
+      if (!response.ok || Number(payload?.status_code) !== 1) {
+        throw new Error(payload?.message || 'Unable to submit practice answers.');
+      }
+
+      const scorePercent = Math.round(Number(payload?.data?.summary?.percentage ?? 0));
+      const nextMastery = Math.max(activePracticeConcept.mastery, scorePercent);
+      const didMasterConcept = nextMastery >= activePracticeAssessment.masteryTarget;
+
+      setStudentChapterProgressList((current) =>
+        current.map((chapter) => {
+          if (chapter.chapterId !== activeStudentChapter.chapterId) return chapter;
+
+          const updatedConcepts: StudentConceptProgress[] = chapter.concepts.map((concept) => {
+            if (concept.id !== activePracticeConcept.id) return concept;
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
             const attemptsCount = concept.attemptsCount + 1;
             const nextStatus: StudentConceptStatus = didMasterConcept ? 'Mastered' : 'In progress';
 
@@ -2096,6 +2455,7 @@ export default function StudentHomeworkIndexPage() {
                 : formatPracticeAttemptSubtitle(attemptsCount, activePracticeAssessment.masteryTarget),
               canPractice: !didMasterConcept,
             };
+<<<<<<< HEAD
           }
 
           const previousConcept = concepts[index - 1];
@@ -2157,6 +2517,36 @@ export default function StudentHomeworkIndexPage() {
       closeOnlineQuestionPaper();
     } finally {
       setIsSubmittingOnlinePaper(false);
+=======
+          });
+
+          const averageMasteryValue = Math.round(
+            updatedConcepts.reduce((sum, concept) => sum + concept.mastery, 0) / updatedConcepts.length
+          );
+          const conceptsMasteredCount = updatedConcepts.filter(
+            (concept) => concept.status === 'Mastered'
+          ).length;
+          const totalAttempts = updatedConcepts.reduce((sum, concept) => sum + concept.attemptsCount, 0);
+
+          return {
+            ...chapter,
+            concepts: updatedConcepts,
+            chapterMastery: averageMasteryValue,
+            conceptsMastered: `${conceptsMasteredCount} of ${updatedConcepts.length}`,
+            averageMastery: `${averageMasteryValue}%`,
+            practiceAttempts: String(totalAttempts),
+          };
+        })
+      );
+
+      closePracticeAssessmentModal();
+    } catch (error) {
+      setPracticeLoadError(
+        error instanceof Error ? error.message : 'Unable to submit practice answers.'
+      );
+    } finally {
+      setIsPracticeLoading(false);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     }
   };
 
@@ -2177,6 +2567,61 @@ export default function StudentHomeworkIndexPage() {
   }, [refreshExamList]);
 
   useEffect(() => {
+<<<<<<< HEAD
+=======
+    if (!isStudentProfile) return;
+
+    const session = getCreateExamSession();
+    if (!session.userId || !session.token) {
+      setStudentMasteryError('Your session has expired. Please sign in again and retry.');
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadMasteryMap() {
+      setIsStudentMasteryLoading(true);
+      setStudentMasteryError('');
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/pal/mastery-map/${session.userId}`, {
+          method: 'GET',
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${session.token}`,
+          },
+        });
+        const payload = (await response.json().catch(() => null)) as MasteryMapApiResponse | null;
+
+        if (!response.ok || payload?.success === false) {
+          throw new Error(payload?.message || 'Unable to load concept mastery.');
+        }
+
+        const chapters = mapMasteryMapToChapterProgress(payload ?? {});
+        setStudentChapterProgressList(chapters);
+        setStudentSelectedChapterId(chapters[0]?.chapterId ?? 0);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setStudentChapterProgressList([]);
+        setStudentMasteryError(
+          error instanceof Error ? error.message : 'Unable to load concept mastery.'
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsStudentMasteryLoading(false);
+        }
+      }
+    }
+
+    void loadMasteryMap();
+
+    return () => controller.abort();
+  }, [isStudentProfile]);
+
+  useEffect(() => {
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     if (!isCreateExamOpen && !activePracticeConceptId) return;
 
     const previousOverflow = document.body.style.overflow;
@@ -2450,6 +2895,15 @@ export default function StudentHomeworkIndexPage() {
   }, [isCreateExamOpen, mappingLevels.bloom.length, mappingLevels.dok.length]);
 
   useEffect(() => {
+<<<<<<< HEAD
+=======
+    if (isStudentProfile && audienceMode !== 'Student') {
+      setAudienceMode('Student');
+    }
+  }, [isStudentProfile, audienceMode]);
+
+  useEffect(() => {
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     if (typeof window === 'undefined') return;
     localStorage.setItem('learningManagementAudienceMode', audienceMode);
   }, [audienceMode]);
@@ -2487,12 +2941,15 @@ export default function StudentHomeworkIndexPage() {
     Locked: 'bg-slate-100 text-slate-500',
   };
 
+<<<<<<< HEAD
   const studentExamStatusBadgeClasses: Record<StudentExamStatus, string> = {
     Available: 'bg-violet-50 text-violet-700',
     Upcoming: 'bg-amber-50 text-amber-700',
     Completed: 'bg-emerald-50 text-emerald-700',
     Closed: 'bg-slate-100 text-slate-500',
   };
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const studentProgressBarClasses: Record<StudentConceptStatus, string> = {
     Mastered: 'bg-emerald-500',
@@ -2519,6 +2976,10 @@ export default function StudentHomeworkIndexPage() {
                 </p>
               </div>
 
+<<<<<<< HEAD
+=======
+              {!isStudentProfile && (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
                 <span className="text-[13px] font-medium text-[#6B7B91]">Viewing as</span>
                 <div className="inline-flex rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
@@ -2548,9 +3009,16 @@ export default function StudentHomeworkIndexPage() {
                   </button>
                 </div>
               </div>
+<<<<<<< HEAD
             </div>
 
             {audienceMode === 'Teacher' ? (
+=======
+              )}
+            </div>
+
+            {audienceMode === 'Teacher' && !isStudentProfile ? (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="flex flex-col gap-4">
@@ -2750,6 +3218,24 @@ export default function StudentHomeworkIndexPage() {
 
                 {studentLearningTab === 'PAL' ? (
                   <>
+<<<<<<< HEAD
+=======
+                    {isStudentMasteryLoading ? (
+                      <div className="rounded-[18px] border border-[#D9E3F0] bg-white px-5 py-8 text-center text-[14px] text-[#5F7087]">
+                        Loading concept mastery...
+                      </div>
+                    ) : studentMasteryError ? (
+                      <div className="rounded-[18px] border border-red-200 bg-red-50 px-5 py-4">
+                        <p className="text-sm font-semibold text-red-700">Unable to load concept mastery</p>
+                        <p className="mt-1 text-sm text-red-600">{studentMasteryError}</p>
+                      </div>
+                    ) : studentChapterProgressList.length === 0 ? (
+                      <div className="rounded-[18px] border border-dashed border-[#D9E3F0] bg-white px-5 py-8 text-center text-[14px] text-[#5F7087]">
+                        No concept mastery data is available yet. Complete a practice or online exam to see progress here.
+                      </div>
+                    ) : (
+                    <>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                       <div className="w-full max-w-[460px]">
                         <label className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
@@ -3024,6 +3510,11 @@ export default function StudentHomeworkIndexPage() {
                         </div>
                       </div>
                     </div>
+<<<<<<< HEAD
+=======
+                    </>
+                    )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   </>
                 ) : studentLearningTab === 'Online Exam' ? (
                   selectedPaper && selectedPaperContext === 'online' ? (
@@ -3036,6 +3527,7 @@ export default function StudentHomeworkIndexPage() {
                       }}
                     />
                   ) : (
+<<<<<<< HEAD
                   activeOnlineExam && activeOnlineQuestionPaper ? (
                     <div className="flex flex-col gap-5">
                       <div className="flex flex-col gap-4 border-b border-[#D9E3F0] pb-4 lg:flex-row lg:items-start lg:justify-between">
@@ -3154,6 +3646,8 @@ export default function StudentHomeworkIndexPage() {
                       </Card>
                     </div>
                   ) : (
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                     <div className="flex flex-col gap-5">
                       {!isStudentProfile ? (
                         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -3320,7 +3814,10 @@ export default function StudentHomeworkIndexPage() {
                       </div>
                     </div>
                   )
+<<<<<<< HEAD
                   )
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 ) : (
                   <div className="flex flex-col gap-5">
                     <div className="no-print flex items-start gap-2 rounded-[14px] border border-[#D8E5FF] bg-[#F5F8FF] px-4 py-3 text-[13px] text-[#4C63A8]">
@@ -3421,7 +3918,32 @@ export default function StudentHomeworkIndexPage() {
         </div>
      
 
+<<<<<<< HEAD
       {activePracticeAssessment && activePracticeConcept ? (
+=======
+      {activePracticeConceptId && (!activePracticeAssessment || isPracticeLoading) ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#0F172A]/60 px-3 py-4 backdrop-blur-[2px] sm:px-6">
+          <div className="w-full max-w-sm rounded-[20px] border border-[#DCE4F0] bg-white p-6 text-center shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+            {isPracticeLoading ? (
+              <p className="text-sm font-medium text-[#5B6B82]">Loading practice questions...</p>
+            ) : practiceLoadError ? (
+              <>
+                <p className="text-sm font-semibold text-red-600">{practiceLoadError}</p>
+                <button
+                  type="button"
+                  onClick={closePracticeAssessmentModal}
+                  className="mt-4 rounded-[12px] border border-[#D0D8E6] px-4 py-2 text-sm font-medium text-[#334155]"
+                >
+                  Close
+                </button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {activePracticeAssessment && activePracticeConcept && !isPracticeLoading ? (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#0F172A]/60 px-3 py-4 backdrop-blur-[2px] sm:px-6">
           <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] border border-[#DCE4F0] bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
             <div className="shrink-0 border-b border-[#E4EAF2] px-5 py-5 sm:px-7 sm:py-6">
@@ -3543,7 +4065,15 @@ export default function StudentHomeworkIndexPage() {
             <div className="shrink-0 border-t border-[#E4EAF2] bg-white px-7 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[14px] font-medium text-[#5F7087]">
+<<<<<<< HEAD
                   {practiceAnsweredCount} of {activePracticeAssessment.questions.length} answered
+=======
+                  {practiceLoadError ? (
+                    <span className="text-red-600">{practiceLoadError}</span>
+                  ) : (
+                    <>{practiceAnsweredCount} of {activePracticeAssessment.questions.length} answered</>
+                  )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 </p>
 
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -3558,10 +4088,17 @@ export default function StudentHomeworkIndexPage() {
                   <Button
                     type="button"
                     className="h-10 rounded-[12px] bg-[#5846EA] px-4 text-white hover:bg-[#4C3DD3]"
+<<<<<<< HEAD
                     disabled={!hasAnsweredAllPracticeQuestions}
                     onClick={submitPracticeAssessment}
                   >
                     Submit Answers
+=======
+                    disabled={!hasAnsweredAllPracticeQuestions || isPracticeLoading}
+                    onClick={submitPracticeAssessment}
+                  >
+                    {isPracticeLoading ? 'Submitting...' : 'Submit Answers'}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   </Button>
                 </div>
               </div>

@@ -27,6 +27,10 @@ import {
   saveLbMaster,
   type LbMasterRow,
 } from '@/app/lms/leader-board-master/api';
+<<<<<<< HEAD
+=======
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
@@ -207,6 +211,10 @@ export default function LeaderBoardMasterPage() {
   );
 
   return (
+<<<<<<< HEAD
+=======
+    <RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1500px] space-y-5">
         <header className="flex flex-wrap items-start justify-between gap-3">
@@ -375,5 +383,9 @@ export default function LeaderBoardMasterPage() {
         )}
       </div>
     </div>
+<<<<<<< HEAD
+=======
+    </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
 }

@@ -21,10 +21,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+<<<<<<< HEAD
   buildSessionContext,
   createAuthHeaders,
 } from '@/lib/erp-client';
 import {
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   defaultLearnerId,
   fetchLearnerState,
   fetchMisconceptionCluster,
@@ -44,6 +47,10 @@ import {
   type V4Velocity,
 } from '@/app/pal/data/pal-v4';
 import { getViewAsStudent, setViewAsStudent, useViewAsStudent } from '@/app/pal/data/pal-view-as';
+<<<<<<< HEAD
+=======
+import { isStudentSession } from '@/app/pal/data/pal-lookups';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 
 interface LearnerBundle {
@@ -80,6 +87,10 @@ function riskTone(level: string): string {
 }
 
 export default function PalIntelligencePage() {
+<<<<<<< HEAD
+=======
+  const [isStudent, setIsStudent] = useState(false);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const [learnerId, setLearnerId] = useState('');
   const [period, setPeriod] = useState('week');
   const [bundle, setBundle] = useState<LearnerBundle | null>(null);
@@ -130,9 +141,18 @@ export default function PalIntelligencePage() {
   const viewingStudent = useViewAsStudent();
 
   useEffect(() => {
+<<<<<<< HEAD
     // Prefer the "view as student" learner (set from the PAL landing picker) so
     // staff see a real learner's intelligence rather than their own empty one.
     const id = getViewAsStudent()?.studentId || defaultLearnerId();
+=======
+    const student = isStudentSession();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate role on mount
+    setIsStudent(student);
+    // Students only ever see their own intelligence — "view as student" is a
+    // staff-only picker and must not apply to a real student session.
+    const id = student ? defaultLearnerId() : getViewAsStudent()?.studentId || defaultLearnerId();
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate learner id + initial load on mount
     setLearnerId(id);
@@ -157,7 +177,11 @@ export default function PalIntelligencePage() {
           </div>
         </div>
 
+<<<<<<< HEAD
         {viewingStudent && (
+=======
+        {!isStudent && viewingStudent && (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           <ViewAsBanner
             student={viewingStudent}
             onExit={() => {
@@ -172,6 +196,7 @@ export default function PalIntelligencePage() {
         {/* Controls */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-end gap-3">
+<<<<<<< HEAD
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-500">Learner id</span>
               <Input
@@ -181,6 +206,19 @@ export default function PalIntelligencePage() {
                 className="h-9 w-40"
               />
             </label>
+=======
+            {!isStudent && (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-500">Learner id</span>
+                <Input
+                  value={learnerId}
+                  onChange={(event) => setLearnerId(event.target.value)}
+                  placeholder="Learner id"
+                  className="h-9 w-40"
+                />
+              </label>
+            )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-500">Velocity period</span>
               <select
@@ -695,6 +733,7 @@ function RemediationModal({
       setLoading(true);
       setError(null);
       try {
+<<<<<<< HEAD
         const remediation = await fetchRemediation(learnerId || '0', String(cluster.id), controller.signal);
         setData(remediation);
         if (remediation.found) {
@@ -714,6 +753,11 @@ function RemediationModal({
             }).catch(() => {});
           }
         }
+=======
+        setData(
+          await fetchRemediation(learnerId || '0', String(cluster.id), controller.signal)
+        );
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       } catch (reason) {
         if (controller.signal.aborted) return;
         setError(reason instanceof Error ? reason.message : 'Unable to load remediation.');

@@ -16,6 +16,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { fetchStudentList, type StudentListRow } from '@/app/lms/data/studentAnalysis';
+<<<<<<< HEAD
+=======
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
@@ -66,6 +70,10 @@ export default function StudentAnalysisPage() {
   };
 
   return (
+<<<<<<< HEAD
+=======
+    <RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1400px] space-y-5">
         {/* Header */}
@@ -187,5 +195,9 @@ export default function StudentAnalysisPage() {
         ) : null}
       </div>
     </div>
+<<<<<<< HEAD
+=======
+    </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
 }

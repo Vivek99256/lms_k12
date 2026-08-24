@@ -1,5 +1,6 @@
 import type { TransportConfig } from "./_components/TransportationPage";
 
+<<<<<<< HEAD
 export const studentMappingConfig: TransportConfig = {
   module: "student-mappings", title: "Student Transport Mapping",
   description: "Assign pickup and drop transport details to students.", singular: "Student Mapping",
@@ -22,6 +23,12 @@ export const studentMappingConfig: TransportConfig = {
     { key: "distance", label: "Distance" }, { key: "amount", label: "Amount" },
   ],
 };
+=======
+// Student transport mapping and transport rate are not generic CRUD screens —
+// they have their own pages under `student_transport_mapping/` and
+// `add_transport_rate/`, matching the search-and-bulk-grid and slab-validation
+// flows the ERP requires.
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 export const driverConfig: TransportConfig = {
   module: "drivers", title: "Add Driver/Conductor", description: "Maintain transport drivers and conductors.", singular: "Driver/Conductor",
@@ -74,6 +81,7 @@ export const stopConfig: TransportConfig = {
   columns: [{ key: "stop_name", label: "Stop Name" }],
 };
 
+<<<<<<< HEAD
 export const rateConfig: TransportConfig = {
   module: "rates", title: "Add Transport Rate", description: "Maintain distance-based rickshaw and van rates.", singular: "Transport Rate",
   fields: [
@@ -90,6 +98,8 @@ export const rateConfig: TransportConfig = {
   ],
 };
 
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 export const routeBusConfig: TransportConfig = {
   module: "route-buses", title: "Map Route-Bus", description: "Map transport vehicles to routes.", singular: "Route-Bus Mapping",
   fields: [

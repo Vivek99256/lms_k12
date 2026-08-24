@@ -15,6 +15,7 @@ export interface Course {
   icon: 'book-open' | 'flask-conical' | 'calculator' | 'globe' | 'pen-tool' | 'music' | 'dumbbell' | 'briefcase' | 'palette' | 'library' | 'cpu' | 'compass';
 }
 
+<<<<<<< HEAD
 export const courses: Course[] = [
   { id: 'c1', title: 'Social Science Fundamentals', code: 'SS-101', subject: 'Social Sciences', category: 'My Course', classGrade: 'Class 8', status: 'Active', chapters: 12, enrollments: 340, progress: 78, instructor: 'Mrs. Sharma', createdAt: '2024-06-15', accentColor: '#F59E0B', icon: 'globe' },
   { id: 'c2', title: 'Advanced Science Concepts', code: 'SCI-201', subject: 'Science', category: 'STEM Resources', classGrade: 'Class 9', status: 'Active', chapters: 15, enrollments: 420, progress: 65, instructor: 'Mr. Verma', createdAt: '2024-05-20', accentColor: '#10B981', icon: 'flask-conical' },
@@ -47,6 +48,20 @@ export const categories = [
   'SEL',
   'STEM Resources',
 ];
+=======
+/**
+ * Live course data now comes from the course-master catalog API (see
+ * `fetchLmsCourses` in `./lmsCourses.ts`, backed by lms\courseController::index /
+ * POST /api/lms-courses). This file used to ship 24 hardcoded rows here; those were
+ * never real courses and have been removed.
+ *
+ * `courses`/`categories` are kept as empty arrays purely so any lingering/legacy
+ * import (e.g. an unrouted WIP screen) still type-checks — no live route reads
+ * from them anymore. New code should call `fetchLmsCourses` directly.
+ */
+export const courses: Course[] = [];
+export const categories: string[] = [];
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 export const subjects = [...new Set(courses.map(c => c.subject))];
 export const classGrades = [...new Set(courses.map(c => c.classGrade))].sort();

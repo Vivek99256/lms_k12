@@ -25,6 +25,10 @@ import {
   submitAnnotation,
   type ReviewContext,
 } from "@/app/lms/lmsAnnotate_assignment/api";
+<<<<<<< HEAD
+=======
+import RequireStaff from "@/app/lms/_shared/RequireStaff";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 export default function ReviewAssignmentPage() {
   const params = useParams<{ id: string }>();
@@ -122,6 +126,10 @@ export default function ReviewAssignmentPage() {
   }
 
   return (
+<<<<<<< HEAD
+=======
+    <RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -315,5 +323,9 @@ export default function ReviewAssignmentPage() {
         </div>
       ) : null}
     </main>
+<<<<<<< HEAD
+=======
+    </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
 }

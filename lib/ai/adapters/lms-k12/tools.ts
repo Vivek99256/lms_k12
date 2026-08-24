@@ -53,6 +53,23 @@ import { resolveStandard } from "./resolve-standard";
 import { resolveDivision } from "./resolve-division";
 import { resolveStudentQuota } from "./resolve-student-quota";
 import { callBackendMcpTool } from "./mcp-server";
+<<<<<<< HEAD
+=======
+import {
+  MODULE_DATA_TOOL_NAMES,
+  getAttendanceOverview,
+  getClassStructure,
+  getClassTeachers,
+  getCourseCatalog,
+  getDepartmentDirectory,
+  getFeesSummary,
+  getModuleDataToolDefinitions,
+  getStudentAttendanceDetail,
+  getStudentDirectory,
+  getSubjectCatalog,
+  getTeacherDirectory,
+} from "./module-data-tools";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 function normalizeAcademicLabel(value: string | null | undefined) {
   return (value || "")
@@ -128,6 +145,21 @@ function inferModuleName(input: { module?: string; searchText?: string }, contex
     return "attendance";
   }
 
+<<<<<<< HEAD
+=======
+  if (/subject|syllabus/.test(text)) {
+    return "subjects";
+  }
+
+  if (/course|curriculum|chapter|content/.test(text)) {
+    return "courses";
+  }
+
+  if (/department|division head|sub department/.test(text)) {
+    return "departments";
+  }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   if (/timetable|schedule|period/.test(text)) {
     return "timetable";
   }
@@ -164,6 +196,15 @@ function inferModuleName(input: { module?: string; searchText?: string }, contex
     return "students";
   }
 
+<<<<<<< HEAD
+=======
+  // Only reached when the message is about the class structure itself rather
+  // than the people or records inside a class.
+  if (/\b(class list|classes|section list|divisions|standards)\b/.test(text)) {
+    return "classes";
+  }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   if (/dashboard|progress/.test(text) || /\/lms|\/dashboard/.test(route)) {
     return "dashboard";
   }
@@ -176,6 +217,34 @@ function inferModuleName(input: { module?: string; searchText?: string }, contex
   return moduleToken || "general";
 }
 
+<<<<<<< HEAD
+=======
+/**
+ * Pulls a proper name out of free text ("attendance of Zeel Tank", "Computer
+ * Science department") so it can be resolved against real backend rows. Returns
+ * an empty string when the message carries no name, because a wrong guess would
+ * silently narrow the result set.
+ */
+function inferStudentNameFromText(text: string) {
+  const source = (text || "").trim();
+  if (!source) {
+    return "";
+  }
+
+  const labelled = source.match(
+    /\b(?:of|for|named|name(?:d)?\s*[:=-]?|about)\s+([A-Z][A-Za-z.'-]*(?:\s+[A-Z][A-Za-z.'-]*){0,3})/
+  );
+  if (labelled?.[1]) {
+    return labelled[1].trim();
+  }
+
+  const capitalized = source.match(
+    /\b([A-Z][a-z]{1,}(?:\s+[A-Z][A-Za-z.'-]*){1,3})\b/
+  );
+  return capitalized?.[1]?.trim() || "";
+}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 function inferModuleAction(input: { action?: string; searchText?: string }, context: ProjectContext) {
   const text = `${input.action || ""} ${input.searchText || ""} ${context.latestUserMessage.content || ""}`.toLowerCase();
 
@@ -2196,6 +2265,27 @@ async function executeModuleAction(
       );
     }
     case "fees": {
+<<<<<<< HEAD
+=======
+      // Institute-level money questions ("total collection", "how much is
+      // outstanding") are answered by the fee dashboard, not by a student row.
+      if (
+        /total|summary|collection rate|collected|outstanding|demand|how much/.test(searchText) &&
+        !/collect fee|collect fees/.test(searchText)
+      ) {
+        return getFeesSummary(
+          {
+            grade: normalized.grade,
+            standard: normalized.standard,
+            division: normalized.division,
+            fromDate: normalized.fromDate,
+            toDate: normalized.toDate,
+          },
+          context
+        );
+      }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       if (action === "collect") {
         return findStudentFeeRecord(
           {
@@ -2264,6 +2354,7 @@ async function executeModuleAction(
         context
       );
     }
+<<<<<<< HEAD
     case "attendance":
       return getTeacherDailyReport(
         {
@@ -2283,6 +2374,102 @@ async function executeModuleAction(
     case "students":
     case "parents":
     case "guardian":
+=======
+    case "attendance": {
+      // Teacher attendance stays on the teacher daily report; every other
+      // attendance question is student attendance, which has its own workflow.
+      if (/teacher|staff|faculty/.test(searchText)) {
+        return getTeacherDailyReport(
+          {
+            date: normalized.fromDate || normalized.toDate,
+            status: normalized.status as "Y" | "N" | undefined,
+          },
+          context
+        );
+      }
+
+      const namedStudent = inferStudentNameFromText(searchText);
+      if (namedStudent || normalized.enrollmentNo) {
+        return getStudentAttendanceDetail(
+          {
+            studentName: namedStudent,
+            enrollmentNo: normalized.enrollmentNo,
+            standard: normalized.standard,
+            division: normalized.division,
+            fromDate: normalized.fromDate,
+            toDate: normalized.toDate,
+          },
+          context
+        );
+      }
+
+      return getAttendanceOverview(
+        {
+          date: normalized.fromDate || normalized.toDate,
+          standard: normalized.standard,
+          division: normalized.division,
+        },
+        context
+      );
+    }
+    case "teachers":
+    case "staff": {
+      if (/absent|present|daily report|daily activity|leave/.test(searchText)) {
+        return getTeacherDailyReport(
+          {
+            date: normalized.fromDate || normalized.toDate,
+          },
+          context
+        );
+      }
+
+      if (normalized.standard || normalized.division) {
+        return getClassTeachers(
+          {
+            standard: normalized.standard,
+            division: normalized.division,
+          },
+          context
+        );
+      }
+
+      return getTeacherDirectory(
+        {
+          teacherName: inferStudentNameFromText(searchText),
+        },
+        context
+      );
+    }
+    case "students":
+    case "parents":
+    case "guardian": {
+      // Counts, class rosters and "students of Standard 7" come from the real
+      // enrolment directory; the homework-scoped search stays for the workflows
+      // that already depend on it.
+      if (
+        /how many|count|total|list|strength|all students|show students/.test(searchText) ||
+        !normalized.searchText
+      ) {
+        return getStudentDirectory(
+          {
+            grade: normalized.grade,
+            standard: normalized.standard,
+            division: normalized.division,
+            studentName: inferStudentNameFromText(searchText),
+            enrollmentNo: normalized.enrollmentNo,
+            rollNo: normalized.rollNo,
+            mobileNo: normalized.mobileNo,
+            groupBy: /how many|count|total|strength/.test(searchText)
+              ? normalized.standard
+                ? "division"
+                : "standard"
+              : "none",
+          },
+          context
+        );
+      }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       return searchStudents(
         {
           standard: normalized.standard,
@@ -2294,17 +2481,58 @@ async function executeModuleAction(
         },
         context
       );
+<<<<<<< HEAD
+=======
+    }
+    case "subjects":
+      return getSubjectCatalog(
+        {
+          grade: normalized.grade,
+          standard: normalized.standard,
+          division: normalized.division,
+        },
+        context
+      );
+    case "courses":
+      return getCourseCatalog(
+        {
+          grade: normalized.grade,
+          standard: normalized.standard,
+        },
+        context
+      );
+    case "classes":
+      return getClassStructure({}, context);
+    case "departments":
+      return getDepartmentDirectory(
+        {
+          departmentName: inferStudentNameFromText(searchText),
+          includeEmployees: /employee|staff|member|who/.test(searchText),
+        },
+        context
+      );
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     case "dashboard":
       return getLmsDashboard({}, context);
     case "activity":
       return getActivityStream({}, context);
     default: {
+<<<<<<< HEAD
+=======
+      // No LMS data source is wired to this module yet. Say so plainly rather
+      // than answering from anything other than backend data.
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       const guidance = await getContextualSuggestions({ module: moduleName, context: route }, context);
       return {
         module: moduleName,
         action,
         route,
+<<<<<<< HEAD
         summary: `I can help with the ${moduleName} module. Please share the specific record or action you want to perform.`,
+=======
+        available: false,
+        summary: `I don't currently have a connected LMS data source for the ${moduleName} module, so I can't answer that from real records. I can help with students, teachers, classes, subjects, courses, attendance, homework, results, fees, admissions, and departments.`,
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         suggestions: guidance.suggestions,
       };
     }
@@ -2489,6 +2717,12 @@ export function getLmsToolDefinitions(): ProjectToolDefinition[] {
       capabilities: ["module_action", "module_lookup", "erp_workflow"],
       execute: executeModuleAction,
     },
+<<<<<<< HEAD
+=======
+    // Directory, catalogue, attendance, department, fee-summary and analysis
+    // tools for the modules that had no conversational coverage before.
+    ...getModuleDataToolDefinitions(),
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   ];
 }
 
@@ -2499,8 +2733,32 @@ export function getAllowedToolNamesForProfile(profileName?: string) {
     toolNames.push("getLmsDashboard", "getActivityStream", "getResultReport", "searchStudents");
   }
 
+<<<<<<< HEAD
   if (isTeacherProfile(profileName) || isAdminProfile(profileName)) {
     toolNames.push("listHomework", "getTeacherDailyReport", "searchStudents");
+=======
+  // Students may ask about their own attendance and the catalogue they study
+  // from; the backend still scopes every row to their session.
+  if (isStudentProfile(profileName)) {
+    toolNames.push(
+      "getClassStructure",
+      "getSubjectCatalog",
+      "getCourseCatalog",
+      "getStudentAttendanceDetail"
+    );
+  }
+
+  if (isTeacherProfile(profileName) || isAdminProfile(profileName)) {
+    // Institute-wide analysis stays with the profiles that can already see the
+    // underlying rows, so a cross-module question cannot widen a user's scope.
+    toolNames.push(
+      "listHomework",
+      "getTeacherDailyReport",
+      "searchStudents",
+      ...MODULE_DATA_TOOL_NAMES.read,
+      ...MODULE_DATA_TOOL_NAMES.analysis
+    );
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   }
 
   if (isAdminProfile(profileName)) {
@@ -2512,11 +2770,20 @@ export function getAllowedToolNamesForProfile(profileName?: string) {
       "confirmAdmissionCandidate",
       "updateAdmissionCandidateDetails",
       "findStudentFeeRecord",
+<<<<<<< HEAD
       "getStudentFeeDetails"
     );
   }
 
   return toolNames;
+=======
+      "getStudentFeeDetails",
+      ...MODULE_DATA_TOOL_NAMES.admin
+    );
+  }
+
+  return [...new Set(toolNames)];
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }
 
 export { admissionApi, admissionStateService, getAdmissionStateKey };

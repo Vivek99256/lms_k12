@@ -1,7 +1,11 @@
 import {
   LayoutDashboard, User, Banknote, Calendar, FileText,
   BarChart3, MessageSquare, Settings, BookOpen, ClipboardList,
+<<<<<<< HEAD
   UserPlus, FileCheck, Menu, Award, Users, Rocket
+=======
+  UserPlus, FileCheck, Menu
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { MenuItem, SubmenuItem, Level3Item } from './menuItems';
@@ -194,7 +198,11 @@ export function buildMenuTree(
   level2: ApiMenuGroups | undefined,
   level3: ApiMenuGroups | undefined,
 ): MenuItem[] {
+<<<<<<< HEAD
   const tree = level1
+=======
+  return level1
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     .filter(item => item.status === 1)
     .filter(item => {
       const link = (item.link || '').toLowerCase().trim();
@@ -237,6 +245,7 @@ export function buildMenuTree(
             submenus: level3Items.length > 0 ? level3Items : undefined,
           };
         });
+<<<<<<< HEAD
 
       const normalizedLink = (item.link || '').toLowerCase().trim();
       const isPalParent =
@@ -310,6 +319,8 @@ export function buildMenuTree(
         });
       }
 
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       return {
         id: item.id,
         menuType: item.menu_type,
@@ -319,8 +330,11 @@ export function buildMenuTree(
         submenus: submenus.length > 0 ? submenus : undefined,
       };
     });
+<<<<<<< HEAD
 
   return tree;
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }
 
 export function mapApiIconToComponent(iconString: string | null, level: number = 1): MenuIcon {

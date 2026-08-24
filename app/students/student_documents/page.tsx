@@ -1,7 +1,11 @@
 // app/students/student_documents/page.tsx
 'use client';
 
+<<<<<<< HEAD
 import React, { useState } from 'react';
+=======
+import React, { useEffect, useState } from 'react';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import {
   Search,
   Filter,
@@ -23,6 +27,10 @@ import {
   Edit,
   Trash2,
   ChevronRight,
+<<<<<<< HEAD
+=======
+  Loader2,
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -35,11 +43,19 @@ import {
   ChartOptions,
 } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
+<<<<<<< HEAD
+=======
+import { getStudentDocuments } from './api';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 // Types
+<<<<<<< HEAD
 interface StudentDocument {
+=======
+export interface StudentDocument {
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   id: string;
   name: string;
   class: string;
@@ -53,6 +69,7 @@ interface StudentDocument {
   lastUpdated: string;
 }
 
+<<<<<<< HEAD
 // Sample Data matching the image
 const sampleStudents: StudentDocument[] = [
   { id: 'STU001', name: 'Aarav Sharma', class: '6', section: 'A', admissionNo: 'ADM-2026-0421', verifiedDocs: 4, totalDocs: 6, pendingDocs: 2, missingDocs: 0, status: 'pending', lastUpdated: '2024-01-15' },
@@ -63,11 +80,33 @@ const sampleStudents: StudentDocument[] = [
   { id: 'STU006', name: 'Sai Malhotra', class: '6', section: 'A', admissionNo: 'ADM-2026-0426', verifiedDocs: 6, totalDocs: 6, pendingDocs: 0, missingDocs: 0, status: 'complete', lastUpdated: '2024-01-10' },
 ];
 
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 // Main Page Component
 export default function StudentDocumentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+<<<<<<< HEAD
+=======
+  const [sampleStudents, setSampleStudents] = useState<StudentDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getStudentDocuments(controller.signal)
+      .then(setSampleStudents)
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return;
+        setError(reason instanceof Error ? reason.message : 'Unable to load student documents.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   // Filter students
   const filteredStudents = sampleStudents.filter(student => {
@@ -86,7 +125,11 @@ export default function StudentDocumentsPage() {
     total: sampleStudents.length,
   };
 
+<<<<<<< HEAD
   const complianceRate = Math.round((metrics.verified / metrics.total) * 100);
+=======
+  const complianceRate = metrics.total ? Math.round((metrics.verified / metrics.total) * 100) : 0;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   // Doughnut chart data
   const doughnutData = {
@@ -219,8 +262,27 @@ export default function StudentDocumentsPage() {
     }
   };
 
+<<<<<<< HEAD
   return (
     <div className="p-6 space-y-6">
+=======
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Loading student documents…
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -37,6 +37,10 @@ import {
   type QuestionWiseReport,
   type ReportExam,
 } from '@/app/lms/data/questionWiseReport';
+<<<<<<< HEAD
+=======
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
@@ -188,6 +192,10 @@ export default function QuestionWiseReportPage() {
   };
 
   return (
+<<<<<<< HEAD
+=======
+    <RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1800px] space-y-5">
         {/* Header */}
@@ -423,5 +431,9 @@ export default function QuestionWiseReportPage() {
         ) : null}
       </div>
     </div>
+<<<<<<< HEAD
+=======
+    </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
 }

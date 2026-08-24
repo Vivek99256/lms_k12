@@ -28,6 +28,10 @@ import {
   fetchStudentAnalysis,
   type StudentAnalysis,
 } from '@/app/lms/data/studentAnalysis';
+<<<<<<< HEAD
+=======
+import RequireStaff from '@/app/lms/_shared/RequireStaff';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ChartTitle, Tooltip, Legend);
 
@@ -126,6 +130,10 @@ export default function StudentAnalysisDetailPage() {
   };
 
   return (
+<<<<<<< HEAD
+=======
+    <RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1200px] space-y-5">
         <Link
@@ -255,5 +263,9 @@ export default function StudentAnalysisDetailPage() {
         ) : null}
       </div>
     </div>
+<<<<<<< HEAD
+=======
+    </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
 }

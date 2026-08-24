@@ -6,6 +6,10 @@ import { createPortal } from 'react-dom';
 import { ChevronRight, LayoutDashboard, Menu, RefreshCw } from 'lucide-react';
 import { MenuItem, SubmenuItem, Level3Item } from '@/app/data/menuItems';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
+<<<<<<< HEAD
+=======
+import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 interface SidebarProps {
   menuItems: MenuItem[];
@@ -43,6 +47,11 @@ function itemMatchesPath(item: MenuItem, pathname: string) {
 
   return Boolean(item.submenus?.some((submenu) => {
     if (submenu.href !== '#' && currentPath.startsWith(normalizeHref(submenu.href))) return true;
+<<<<<<< HEAD
+=======
+    const dashboardRoute = resolveModuleDashboardRoute(submenu.label);
+    if (dashboardRoute && currentPath.startsWith(dashboardRoute.toLowerCase())) return true;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     return submenu.submenus?.some((level3) => level3.href !== '#' && currentPath === normalizeHref(level3.href));
   }));
 }
@@ -183,8 +192,17 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
     onLevel2Select(submenu, level2Panel.item);
     setLevel2Panel(null);
 
+<<<<<<< HEAD
     // Use 'link' from API, fallback to 'href', map through routeMapper
     const navigateRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href;
+=======
+    // Modules with a dashboard (Fees, Admissions, Students, Library, Hostel,
+    // Transportation) land there first — Level 2 → module dashboard →
+    // Level 3 screen — rather than jumping straight into a Level 3 screen.
+    // Everything else keeps using the API 'link', falling back to 'href'.
+    const navigateRoute = resolveModuleDashboardRoute(submenu.label)
+      ?? (submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     if (navigateRoute && navigateRoute !== '#') {
       router.push(navigateRoute);
     }
@@ -403,7 +421,16 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
                 {column.map((submenu, itemIndex) => {
                   const SubIcon = submenu.icon;
                   const hasLevel3 = Boolean(submenu.submenus?.length);
+<<<<<<< HEAD
                   const isSubActive = submenu.href !== '#' && (pathname.startsWith(submenu.href) || pathname === submenu.href);
+=======
+                  const dashboardRoute = resolveModuleDashboardRoute(submenu.label);
+                  const lowerPathname = pathname.toLowerCase();
+                  const isSubActive =
+                    (dashboardRoute && lowerPathname.startsWith(dashboardRoute.toLowerCase())) ||
+                    (submenu.href !== '#' && (pathname.startsWith(submenu.href) || pathname === submenu.href)) ||
+                    Boolean(submenu.submenus?.some((level3) => level3.href !== '#' && lowerPathname.startsWith(level3.href.toLowerCase())));
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
                   return (
                     <button

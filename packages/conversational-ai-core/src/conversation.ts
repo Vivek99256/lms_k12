@@ -25,6 +25,11 @@ import {
   buildToolInputCandidates,
   extractModuleRecords,
 } from "./module-records";
+<<<<<<< HEAD
+=======
+import { extractConversationFocus } from "./conversation-focus";
+import { recordFollowUpQuery } from "./followup-state";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import {
   getModuleWorkflowConfig,
   getWorkflowConfigByWorkflowId,
@@ -239,6 +244,49 @@ function isAffirmativeMessage(message: string) {
   );
 }
 
+<<<<<<< HEAD
+=======
+/**
+ * Leaves behind what the next turn needs to resolve a pronoun: the record this
+ * answer was about, the records it could have been about, and the filters that
+ * produced them. Without this, "Why?" has no subject.
+ */
+function rememberConversationFocus(
+  prepared: PreparedConversation,
+  toolName: string,
+  toolInput: unknown,
+  result: unknown
+) {
+  const extraction = extractConversationFocus(toolName, result);
+  if (!extraction) {
+    return;
+  }
+
+  const ids = getWorkflowSessionIds(prepared);
+  const payload =
+    typeof result === "object" && result !== null
+      ? (result as Record<string, unknown>)
+      : {};
+
+  recordFollowUpQuery(
+    { userId: ids.userId, sessionId: ids.conversationId },
+    {
+      tool: toolName,
+      module: extraction.module,
+      filters:
+        typeof toolInput === "object" && toolInput !== null
+          ? (toolInput as Record<string, unknown>)
+          : {},
+      focus: extraction.focus,
+      candidates: extraction.candidates,
+      resolvedEntities: [],
+      rowCount: extraction.rowCount,
+      status: payload.available === false ? "unavailable" : "success",
+    }
+  );
+}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 function getWorkflowSessionIds(prepared: PreparedConversation) {
   const userId = prepared.context.userId || "anonymous";
   const conversationId =
@@ -381,8 +429,31 @@ const DISCOVERY_LIST_TOOLS = [
   "listAdmissionEnquiries",
   "listHomework",
   "searchStudents",
+<<<<<<< HEAD
 ];
 
+=======
+  // Directory and catalogue tools answer "how many / which ones" questions, so
+  // several rows is the answer itself rather than a selection prompt.
+  "getStudentDirectory",
+  "getTeacherDirectory",
+  "getClassTeachers",
+  "getClassStructure",
+  "getSubjectCatalog",
+  "getCourseCatalog",
+  "getAttendanceOverview",
+  "getDepartmentDirectory",
+];
+
+/**
+ * Tools whose value is the reasoning done over the rows they return, not the
+ * rows themselves. These are deliberately left to the model so it can compare,
+ * rank and explain the retrieved facts; the deterministic summariser still
+ * covers them for the provider-outage fallback path.
+ */
+const LLM_REASONING_TOOLS = ["analyzeLmsData", "getDepartmentInsight"];
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 function shouldBypassTools(intent: PreparedConversation["intent"]) {
   return (
     intent.domain === "shared" &&
@@ -546,12 +617,87 @@ function getLocalSharedAnswer(prepared: PreparedConversation) {
   return null;
 }
 
+<<<<<<< HEAD
 async function getFallbackToolInput(prepared: PreparedConversation, toolName: string) {
   const message = prepared.context.latestUserMessage.content;
   const dateRange = inferDateRangeFromMessage(message);
   const standard = inferStandard(message);
   const division = inferDivision(message);
   const studentName = inferPersonName(message);
+=======
+/**
+ * Reads a class scope the conversation already established. "Show attendance
+ * for Standard 7" followed by "which division has the lowest attendance?" must
+ * keep Standard 7, so when the latest message carries no class the earlier user
+ * turns are scanned newest-first for one.
+ */
+function inferStandardFromHistory(prepared: PreparedConversation) {
+  const history = [...prepared.context.messageHistory]
+    .filter((entry) => entry.role === "user")
+    .reverse();
+
+  for (const entry of history) {
+    const standard = inferStandard(entry.content);
+    if (standard) {
+      return standard;
+    }
+  }
+
+  return "";
+}
+
+function inferDivisionFromHistory(prepared: PreparedConversation) {
+  const history = [...prepared.context.messageHistory]
+    .filter((entry) => entry.role === "user")
+    .reverse();
+
+  for (const entry of history) {
+    const division = inferDivision(entry.content);
+    if (division) {
+      return division;
+    }
+  }
+
+  return "";
+}
+
+/** Datasets an analytical question needs, chosen from the words it uses. */
+function inferAnalysisDatasets(message: string) {
+  const text = message.toLowerCase();
+  const datasets: string[] = [];
+
+  if (/attendance|absent|present/.test(text)) datasets.push("attendance");
+  if (/fee|fees|defaulter|dues|outstanding|pending payment/.test(text)) {
+    datasets.push("fees_pending", "fees_summary");
+  }
+  if (/department|training|skill|employee|staff distribution/.test(text)) {
+    datasets.push("departments");
+  }
+  if (/teacher|faculty/.test(text)) datasets.push("teachers");
+  if (/homework|assignment|classwork/.test(text)) datasets.push("homework");
+  if (/admission|enquiry|application/.test(text)) datasets.push("admissions");
+  if (/class|standard|division|section|strength/.test(text)) datasets.push("classes");
+  if (/student|learner|pupil|enrol/.test(text)) datasets.push("students");
+
+  return datasets.length > 0 ? [...new Set(datasets)] : ["students", "classes"];
+}
+
+async function getFallbackToolInput(prepared: PreparedConversation, toolName: string) {
+  const message = prepared.context.latestUserMessage.content;
+  const dateRange = inferDateRangeFromMessage(message);
+
+  // The follow-up router resolves the subject of an elliptical message and
+  // carries it here as concrete filters. Anything the message states itself
+  // still wins — "and for Standard 8?" must move off the remembered class.
+  const readIntentEntity = (key: string) => {
+    const value = prepared.intent.entities?.[key];
+    return typeof value === "string" && value.trim() ? value.trim() : "";
+  };
+
+  const standard = inferStandard(message) || readIntentEntity("focusStandard");
+  const division = inferDivision(message) || readIntentEntity("focusDivision");
+  const studentName = inferPersonName(message) || readIntentEntity("focusStudentName");
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const enrollmentNo = inferEnrollmentNo(message);
   const enquiryNo = inferEnquiryNo(message);
   const rollNo = inferRollNo(message);
@@ -570,9 +716,21 @@ async function getFallbackToolInput(prepared: PreparedConversation, toolName: st
   switch (toolName) {
     case "getLmsDashboard":
     case "getActivityStream":
+<<<<<<< HEAD
     case "listFeesDefaulters":
     case "getContextualSuggestions":
       return {};
+=======
+    case "getContextualSuggestions":
+      return {};
+    case "listFeesDefaulters":
+      // Carries the class the conversation is already on, so "what about their
+      // fees?" after a class answer stays scoped to that class.
+      return {
+        standard: standard || undefined,
+        division: division || undefined,
+      };
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     case "listAdmissionEnquiries":
       return {
         onlyPending: /\bpending|open\b/i.test(message),
@@ -827,6 +985,102 @@ async function getFallbackToolInput(prepared: PreparedConversation, toolName: st
         ...(dateRange || {}),
       };
     }
+<<<<<<< HEAD
+=======
+    case "getStudentDirectory": {
+      const scopedStandard = standard || inferStandardFromHistory(prepared);
+      const scopedDivision = division || inferDivisionFromHistory(prepared);
+      const asksForCount = /how many|count|total|strength/i.test(message);
+
+      return {
+        standard: scopedStandard || undefined,
+        division: scopedDivision || undefined,
+        studentName: studentName || undefined,
+        enrollmentNo: enrollmentNo || undefined,
+        rollNo: rollNo || undefined,
+        mobileNo: mobileNo || undefined,
+        gender: /\bboys?\b|\bmale\b/i.test(message)
+          ? "male"
+          : /\bgirls?\b|\bfemale\b/i.test(message)
+            ? "female"
+            : undefined,
+        groupBy: asksForCount
+          ? scopedStandard
+            ? ("division" as const)
+            : ("standard" as const)
+          : ("none" as const),
+      };
+    }
+    case "getTeacherDirectory":
+      return {
+        teacherName: studentName || undefined,
+      };
+    case "getClassTeachers":
+      return {
+        standard: standard || inferStandardFromHistory(prepared) || undefined,
+        division: division || inferDivisionFromHistory(prepared) || undefined,
+      };
+    case "getClassStructure":
+      return {};
+    case "getSubjectCatalog":
+      return {
+        standard: standard || inferStandardFromHistory(prepared) || undefined,
+        division: division || undefined,
+      };
+    case "getCourseCatalog":
+      return {
+        standard: standard || inferStandardFromHistory(prepared) || undefined,
+      };
+    case "getAttendanceOverview":
+      return {
+        // A single explicit date wins; otherwise the tool defaults to today.
+        date: dateRange?.toDate,
+        standard: standard || inferStandardFromHistory(prepared) || undefined,
+        division: division || inferDivisionFromHistory(prepared) || undefined,
+        taken: /not taken|pending attendance|not submitted/i.test(message)
+          ? ("no" as const)
+          : undefined,
+      };
+    case "getStudentAttendanceDetail":
+      return {
+        studentName: studentName || undefined,
+        enrollmentNo: enrollmentNo || undefined,
+        standard: standard || inferStandardFromHistory(prepared) || undefined,
+        division: division || inferDivisionFromHistory(prepared) || undefined,
+        fromDate: dateRange?.fromDate,
+        toDate: dateRange?.toDate,
+      };
+    case "getDepartmentDirectory":
+      return {
+        departmentName: studentName || undefined,
+        includeEmployees: /employee|staff|member|who\b/i.test(message),
+      };
+    case "getDepartmentInsight":
+      return {
+        // The follow-up router already resolved which department the message is
+        // about, so that name wins over anything re-parsed from the text.
+        departmentName:
+          readIntentEntity("focusDepartmentName") ||
+          readIntentEntity("focusName") ||
+          studentName ||
+          undefined,
+      };
+    case "getFeesSummary":
+      return {
+        standard: standard || inferStandardFromHistory(prepared) || undefined,
+        division: division || inferDivisionFromHistory(prepared) || undefined,
+        fromDate: dateRange?.fromDate,
+        toDate: dateRange?.toDate,
+      };
+    case "analyzeLmsData":
+      return {
+        question: message,
+        datasets: inferAnalysisDatasets(message),
+        standard: standard || inferStandardFromHistory(prepared) || undefined,
+        division: division || inferDivisionFromHistory(prepared) || undefined,
+        date: dateRange?.toDate,
+      };
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     default:
       return null;
   }
@@ -1262,6 +1516,19 @@ function summarizeToolBackedResult(
       return summaryText;
     }
 
+<<<<<<< HEAD
+=======
+    // The module action delegates to a real module tool, so summarise whatever
+    // that tool returned instead of announcing a generic retrieval.
+    const delegatedTool = inferModuleDataToolFromPayload(resultRecord);
+    const delegatedSummary = delegatedTool
+      ? summarizeModuleDataResult(delegatedTool, resultRecord)
+      : null;
+    if (delegatedSummary) {
+      return delegatedSummary;
+    }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     return `Retrieved ${moduleName} data from the linked backend workflow.`;
   }
 
@@ -1453,9 +1720,700 @@ function summarizeToolBackedResult(
     return `I loaded the student's fee details from the LMS backend${pendingRows > 0 ? ` with ${pendingRows} payment record(s)` : ""}.`;
   }
 
+<<<<<<< HEAD
   return null;
 }
 
+=======
+  const moduleDataSummary = summarizeModuleDataResult(toolName, data);
+  if (moduleDataSummary) {
+    return moduleDataSummary;
+  }
+
+  return null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Directory, attendance, catalogue and analysis summaries                    */
+/* -------------------------------------------------------------------------- */
+
+function readText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatIndianAmount(value: unknown) {
+  const amount = readCount(value);
+  if (amount == null) {
+    return "";
+  }
+  return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(amount)}`;
+}
+
+function readRecord(value: unknown) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readObjectArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter(
+        (item): item is Record<string, unknown> =>
+          typeof item === "object" && item !== null && !Array.isArray(item)
+      )
+    : [];
+}
+
+/**
+ * Answers are read in a narrow chat column, so they are built as short blocks
+ * separated by blank lines rather than as one running paragraph. The panel
+ * renders with `whitespace-pre-wrap`, so the structure survives.
+ */
+function buildSections(sections: Array<string | null | undefined>) {
+  return sections
+    .map((section) => (section || "").trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function bulletBlock(heading: string, items: string[]) {
+  if (items.length === 0) {
+    return "";
+  }
+  return [`${heading}:`, ...items.map((item) => `• ${item}`)].join("\n");
+}
+
+function statLine(label: string, value: string) {
+  return `${label}: ${value}`;
+}
+
+function formatBreakdown(rows: Array<Record<string, unknown>>, limit = 6) {
+  return rows
+    .slice(0, limit)
+    .map((row) => `${readText(row.label) || "Unspecified"}: ${readCount(row.count) ?? 0}`)
+    .join(", ");
+}
+
+/** The tool said the backend has nothing for this request; say so plainly. */
+function readUnavailableReason(data: Record<string, unknown>) {
+  if (data.available === false && typeof data.reason === "string" && data.reason.trim()) {
+    return data.reason.trim();
+  }
+  return null;
+}
+
+/**
+ * Identifies which module data tool produced a payload. `executeModuleAction`
+ * forwards a delegated tool's result verbatim, so the shape is what tells the
+ * summariser how to describe it.
+ */
+function inferModuleDataToolFromPayload(data: Record<string, unknown>) {
+  const moduleName = readText(data.module);
+
+  if (moduleName === "students" && "instituteTotal" in data) {
+    return "getStudentDirectory";
+  }
+  if (moduleName === "teachers") {
+    return "teachers" in data && "standard" in data
+      ? "getClassTeachers"
+      : "getTeacherDirectory";
+  }
+  if (moduleName === "classes") {
+    return "getClassStructure";
+  }
+  if (moduleName === "subjects") {
+    return "getSubjectCatalog";
+  }
+  if (moduleName === "courses") {
+    return "getCourseCatalog";
+  }
+  if (moduleName === "attendance") {
+    return "student" in data ? "getStudentAttendanceDetail" : "getAttendanceOverview";
+  }
+  if (moduleName === "departments") {
+    return "department" in data ? "getDepartmentInsight" : "getDepartmentDirectory";
+  }
+  if (moduleName === "fees" && "summary" in data) {
+    return "getFeesSummary";
+  }
+  if (moduleName === "analysis") {
+    return "analyzeLmsData";
+  }
+
+  return null;
+}
+
+export function summarizeModuleDataResult(
+  toolName: string | undefined,
+  data: Record<string, unknown>
+) {
+  if (!toolName) {
+    return null;
+  }
+
+  const moduleDataTools = [
+    "getStudentDirectory",
+    "getTeacherDirectory",
+    "getClassTeachers",
+    "getClassStructure",
+    "getSubjectCatalog",
+    "getCourseCatalog",
+    "getAttendanceOverview",
+    "getStudentAttendanceDetail",
+    "getDepartmentDirectory",
+    "getDepartmentInsight",
+    "getFeesSummary",
+    "analyzeLmsData",
+  ];
+
+  if (!moduleDataTools.includes(toolName)) {
+    return null;
+  }
+
+  if (data.ambiguous === true) {
+    const candidates = readObjectArray(data.candidates);
+    const options = candidates
+      .slice(0, 5)
+      .map((candidate, index) => {
+        const name = readText(candidate.studentName) || "Unknown student";
+        const standard = readText(candidate.standard);
+        const division = readText(candidate.division);
+        const enrollment = readText(candidate.enrollmentNo);
+        const details = [standard && `Standard ${standard}`, division, enrollment && `GR ${enrollment}`]
+          .filter(Boolean)
+          .join(", ");
+        return `${index + 1}. ${name}${details ? ` (${details})` : ""}`;
+      })
+      .join("\n");
+    return `${readText(data.reason) || "Several students match that name."} Please choose one:\n${options}`;
+  }
+
+  const unavailable = readUnavailableReason(data);
+  if (unavailable) {
+    return unavailable;
+  }
+
+  if (toolName === "getStudentDirectory") {
+    const total = readCount(data.totalCount) ?? 0;
+    const filters =
+      typeof data.appliedFilters === "object" && data.appliedFilters !== null
+        ? (data.appliedFilters as Record<string, unknown>)
+        : {};
+    const scope = [
+      readText(filters.standard) && `Standard ${readText(filters.standard)}`,
+      readText(filters.division),
+      readText(filters.gender),
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    if (total === 0) {
+      return `No enrolled students match ${scope || "those filters"} in the current academic year.`;
+    }
+
+    const breakdown = readObjectArray(data.breakdown);
+    const students = readObjectArray(data.students);
+
+    return buildSections([
+      `${scope || "The institute"} has ${total} enrolled student${total === 1 ? "" : "s"}.`,
+      breakdown.length > 1
+        ? bulletBlock(
+            scope ? "By division" : "By standard",
+            breakdown
+              .slice(0, 12)
+              .map(
+                (row) =>
+                  `${readText(row.label) || "Unspecified"} — ${readCount(row.count) ?? 0}`
+              )
+          )
+        : "",
+      students.length > 0 && total <= 25
+        ? bulletBlock(
+            "Students",
+            students.slice(0, 25).map((student) => {
+              const name = readText(student.studentName) || "Unknown student";
+              const standard = readText(student.standard);
+              const division = readText(student.division);
+              const roll = readText(student.rollNo);
+              const where = [standard && `Standard ${standard}`, division]
+                .filter(Boolean)
+                .join(" ");
+              return `${name}${where ? ` — ${where}` : ""}${roll ? `, roll ${roll}` : ""}`;
+            })
+          )
+        : students.length > 0
+          ? bulletBlock(
+              "First few students",
+              students.slice(0, 8).map((student) => {
+                const name = readText(student.studentName) || "Unknown student";
+                const standard = readText(student.standard);
+                const division = readText(student.division);
+                const where = [standard && `Standard ${standard}`, division]
+                  .filter(Boolean)
+                  .join(" ");
+                return `${name}${where ? ` — ${where}` : ""}`;
+              })
+            )
+          : "",
+    ]);
+  }
+
+  if (toolName === "getTeacherDirectory") {
+    const total = readCount(data.totalCount) ?? 0;
+    if (total === 0) {
+      return "No teacher records match that request for the current institute.";
+    }
+
+    const breakdown = formatBreakdown(readObjectArray(data.breakdown));
+    const sample = readObjectArray(data.teachers)
+      .slice(0, 5)
+      .map((teacher) => readText(teacher.teacherName))
+      .filter(Boolean)
+      .join(", ");
+
+    return [
+      `There ${total === 1 ? "is" : "are"} ${total} teacher record${total === 1 ? "" : "s"} in the institute.`,
+      breakdown ? `By profile — ${breakdown}.` : "",
+      sample ? `For example: ${sample}.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (toolName === "getClassTeachers") {
+    const total = readCount(data.totalCount) ?? 0;
+    const standard = readText(data.standard);
+    const division = readText(data.division);
+    const label = `${standard ? `Standard ${standard}` : "that class"}${division ? ` ${division}` : ""}`;
+
+    if (total === 0) {
+      return `The LMS timetable has no teachers assigned to ${label}.`;
+    }
+
+    const lines = readObjectArray(data.teachers)
+      .slice(0, 12)
+      .map((teacher) => {
+        const name = readText(teacher.teacherName) || "Unknown teacher";
+        const subject = readText(teacher.subject);
+        return `${name}${subject ? ` — ${subject}` : ""}`;
+      })
+      .join("\n");
+
+    return `${total} teacher${total === 1 ? " is" : "s are"} assigned to ${label}:\n${lines}`;
+  }
+
+  if (toolName === "getClassStructure") {
+    const classes = readObjectArray(data.classes);
+    if (classes.length === 0) {
+      return "The LMS has no classes configured for the current academic year.";
+    }
+
+    const lines = classes
+      .slice(0, 15)
+      .map((option) => {
+        const standard = readText(option.standard);
+        const division = readText(option.division);
+        const count = readCount(option.studentCount) ?? 0;
+        return `${standard}${division ? ` ${division}` : ""}: ${count} student${count === 1 ? "" : "s"}`;
+      })
+      .join("\n");
+
+    return `The institute runs ${classes.length} class section${classes.length === 1 ? "" : "s"} this academic year:\n${lines}`;
+  }
+
+  if (toolName === "getSubjectCatalog") {
+    const subjects = Array.isArray(data.subjects)
+      ? data.subjects.filter((item): item is string => typeof item === "string")
+      : [];
+    if (subjects.length === 0) {
+      return "No subjects are mapped in the LMS for that scope.";
+    }
+
+    const standard = readText(data.standard);
+    return `${subjects.length} subject${subjects.length === 1 ? "" : "s"} ${subjects.length === 1 ? "is" : "are"} mapped${standard ? ` to Standard ${standard}` : " across the institute"}: ${subjects.slice(0, 20).join(", ")}.`;
+  }
+
+  if (toolName === "getCourseCatalog") {
+    const courses = readObjectArray(data.courses);
+    if (courses.length === 0) {
+      return "The LMS course catalogue has no published courses for that scope.";
+    }
+
+    const lines = courses
+      .slice(0, 12)
+      .map((course) => {
+        const name = readText(course.courseName) || "Untitled course";
+        const standard = readText(course.standard);
+        const chapters = readCount(course.chapterCount) ?? 0;
+        return `${name}${standard ? ` (${standard})` : ""}${chapters > 0 ? ` — ${chapters} chapter${chapters === 1 ? "" : "s"}` : ""}`;
+      })
+      .join("\n");
+
+    return `${readCount(data.totalCount) ?? courses.length} course${courses.length === 1 ? "" : "s"} are published in the LMS:\n${lines}`;
+  }
+
+  if (toolName === "getAttendanceOverview") {
+    const totals =
+      typeof data.totals === "object" && data.totals !== null
+        ? (data.totals as Record<string, unknown>)
+        : {};
+    const date = readText(data.date);
+    const totalStudents = readCount(totals.totalStudents) ?? 0;
+    const present = readCount(totals.present) ?? 0;
+    const absent = readCount(totals.absent) ?? 0;
+    const attendancePercent = readCount(totals.attendancePercent);
+    const pending = readCount(totals.classesPending) ?? 0;
+
+    const lowest =
+      typeof data.lowestAttendance === "object" && data.lowestAttendance !== null
+        ? (data.lowestAttendance as Record<string, unknown>)
+        : null;
+
+    const appliedFilters =
+      typeof data.appliedFilters === "object" && data.appliedFilters !== null
+        ? (data.appliedFilters as Record<string, unknown>)
+        : {};
+    const scope = [
+      readText(appliedFilters.standard) && `Standard ${readText(appliedFilters.standard)}`,
+      readText(appliedFilters.division),
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const classRows = readObjectArray(data.classes);
+    const classLines = classRows.slice(0, 15).map((row) => {
+      const standard = readText(row.standard);
+      const division = readText(row.division);
+      const label = `${standard}${division ? ` ${division}` : ""}`;
+      const rowPercent = readCount(row.attendancePercent);
+      const rowPresent = readCount(row.present) ?? 0;
+      const rowTotal = readCount(row.totalStudents) ?? 0;
+
+      if (!row.attendanceTaken) {
+        return `${label} — attendance not submitted (${rowTotal} enrolled)`;
+      }
+      return `${label} — ${rowPresent} of ${rowTotal} present${rowPercent != null ? ` (${rowPercent}%)` : ""}`;
+    });
+
+    return buildSections([
+      `Attendance for ${scope || "the whole institute"} on ${date}`,
+      [
+        statLine("Total students", String(totalStudents)),
+        statLine(
+          "Present",
+          `${present}${attendancePercent != null ? ` (${attendancePercent}%)` : ""}`
+        ),
+        statLine("Absent", String(absent)),
+        pending > 0
+          ? statLine(
+              "Not yet submitted",
+              `${pending} class section${pending === 1 ? "" : "s"}`
+            )
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      classRows.length > 1 ? bulletBlock("By class", classLines) : "",
+      lowest && classRows.length > 1
+        ? `Lowest: ${readText(lowest.standard)}${readText(lowest.division) ? ` ${readText(lowest.division)}` : ""} at ${readCount(lowest.attendancePercent) ?? 0}%.`
+        : "",
+    ]);
+  }
+
+  if (toolName === "getStudentAttendanceDetail") {
+    const student =
+      typeof data.student === "object" && data.student !== null
+        ? (data.student as Record<string, unknown>)
+        : {};
+    const totals =
+      typeof data.totals === "object" && data.totals !== null
+        ? (data.totals as Record<string, unknown>)
+        : {};
+    const name = readText(student.studentName) || "This student";
+    const standard = readText(student.standard);
+    const division = readText(student.division);
+    const recorded = readCount(totals.recordedDays) ?? 0;
+    const present = readCount(totals.present) ?? 0;
+    const absent = readCount(totals.absent) ?? 0;
+    const attendancePercent = readCount(totals.attendancePercent);
+    const absentDates = Array.isArray(data.absentDates)
+      ? data.absentDates.filter((item): item is string => typeof item === "string")
+      : [];
+
+    return [
+      `${name}${standard ? ` (Standard ${standard}${division ? ` ${division}` : ""})` : ""} was present on ${present} of ${recorded} recorded days${attendancePercent != null ? `, which is ${attendancePercent}%` : ""}.`,
+      absent > 0 ? `Absent on ${absent} day${absent === 1 ? "" : "s"}.` : "",
+      absentDates.length > 0 ? `Recent absences: ${absentDates.slice(0, 8).join(", ")}.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (toolName === "getDepartmentDirectory") {
+    const departments = readObjectArray(data.departments);
+    if (departments.length === 0) {
+      return "No departments are configured for this institute.";
+    }
+
+    const lines = departments
+      .slice(0, 15)
+      .map((department) => {
+        const name = readText(department.name) || "Unnamed department";
+        const parent = readText(department.parentName);
+        const employees = readCount(department.totalEmployees) ?? 0;
+        return `${name}${parent ? ` (under ${parent})` : ""}: ${employees} employee${employees === 1 ? "" : "s"}`;
+      })
+      .join("\n");
+
+    return `The institute has ${readCount(data.totalCount) ?? departments.length} department${departments.length === 1 ? "" : "s"} with ${readCount(data.totalEmployees) ?? 0} employees in total:\n${lines}`;
+  }
+
+  if (toolName === "getDepartmentInsight") {
+    const department = readRecord(data.department);
+    const comparison = readRecord(data.comparison);
+    if (!department) {
+      return null;
+    }
+
+    const name = readText(department.name) || "That department";
+    const headcount = readCount(department.totalEmployees) ?? 0;
+    const rank = comparison ? readCount(comparison.rankByHeadcount) : null;
+    const departmentCount = comparison ? readCount(comparison.departmentCount) : null;
+    const average = comparison ? readCount(comparison.averageEmployeesPerDepartment) : null;
+    const share = comparison ? readCount(comparison.shareOfWorkforcePercent) : null;
+    const subDepartments = readObjectArray(data.subDepartments)
+      .map((row) => readText(row.name))
+      .filter(Boolean);
+    const missing = Array.isArray(data.unavailableSignals)
+      ? data.unavailableSignals.filter((item): item is string => typeof item === "string")
+      : [];
+
+    const lines = [
+      `${name} has ${headcount} employee${headcount === 1 ? "" : "s"}${
+        rank && departmentCount
+          ? `, which ranks it ${rank} of ${departmentCount} departments by size`
+          : ""
+      }${share != null ? ` and accounts for ${share}% of the workforce` : ""}.`,
+    ];
+
+    if (average != null) {
+      lines.push(
+        `The average department has ${average} employees, so this one sits ${
+          headcount > average ? "above" : headcount < average ? "below" : "at"
+        } the norm.`
+      );
+    }
+
+    if (subDepartments.length > 0) {
+      lines.push(
+        `It covers ${subDepartments.length} sub-department${subDepartments.length === 1 ? "" : "s"}: ${subDepartments.slice(0, 6).join(", ")}.`
+      );
+    }
+
+    if (missing.length > 0) {
+      lines.push(
+        `Beyond size and structure, the LMS does not currently hold ${missing.slice(0, 3).join(", ")} for this institute, so the underlying reason cannot be confirmed from the available records.`
+      );
+    }
+
+    return lines.join(" ");
+  }
+
+  if (toolName === "getFeesSummary") {
+    const summary =
+      typeof data.summary === "object" && data.summary !== null
+        ? (data.summary as Record<string, unknown>)
+        : {};
+    const demand = formatIndianAmount(summary.demandAmount);
+    const collected = formatIndianAmount(summary.collectedAmount);
+    const outstanding = formatIndianAmount(summary.outstandingAmount);
+    const rate = readCount(summary.collectionRate);
+
+    const headwise = readObjectArray(data.headwise)
+      .filter((row) => (readCount(row.pendingAmount) ?? 0) > 0)
+      .slice(0, 6)
+      .map(
+        (row) =>
+          `${readText(row.feeTitle) || "Fee head"}: ${formatIndianAmount(row.pendingAmount)} pending`
+      )
+      .join("\n");
+
+    return [
+      `Fee demand is ${demand}, collection is ${collected}, and ${outstanding} is still outstanding${rate != null ? ` (collection rate ${rate}%)` : ""}.`,
+      headwise ? `Pending by fee head:\n${headwise}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (toolName === "analyzeLmsData") {
+    return composeAnalysisNarrative(data);
+  }
+
+  return null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Analysis narrative                                                         */
+/* -------------------------------------------------------------------------- */
+
+function topOf(rows: Array<Record<string, unknown>>) {
+  return rows[0] ? readText(rows[0].label) : "";
+}
+
+/**
+ * Renders the analysis factbase as plain sentences.
+ *
+ * This runs when no model interpretation is available — a provider outage, or a
+ * reply that skipped the tool. It must still read as an answer, so the figures
+ * are described rather than dumped: raw JSON, dataset ids and tool names never
+ * reach the user.
+ */
+export function composeAnalysisNarrative(data: Record<string, unknown>) {
+  const facts =
+    typeof data.facts === "object" && data.facts !== null
+      ? (data.facts as Record<string, unknown>)
+      : {};
+  const missing = readObjectArray(data.unavailableDatasets)
+    .map((entry) => readText(entry.dataset).replace(/_/g, " "))
+    .filter(Boolean);
+
+  const lines: string[] = [];
+
+  const students = readRecord(facts.students);
+  if (students) {
+    const total = readCount(students.totalStudents) ?? 0;
+    const byStandard = readObjectArray(students.byStandard);
+    const leader = byStandard[0];
+    lines.push(
+      `There are ${total} enrolled students across ${byStandard.length} standards${
+        leader
+          ? `, with ${readText(leader.label)} the largest at ${readCount(leader.count) ?? 0} students`
+          : ""
+      }.`
+    );
+  }
+
+  const classes = readRecord(facts.classes);
+  if (classes) {
+    const rows = readObjectArray(classes.classes);
+    const ranked = [...rows].sort(
+      (left, right) => (readCount(right.studentCount) ?? 0) - (readCount(left.studentCount) ?? 0)
+    );
+    const largest = ranked[0];
+    const smallest = ranked[ranked.length - 1];
+    lines.push(
+      `The institute runs ${rows.length} class sections${
+        largest && smallest
+          ? `, ranging from ${readText(smallest.standard)} ${readText(smallest.division)} at ${readCount(smallest.studentCount) ?? 0} students to ${readText(largest.standard)} ${readText(largest.division)} at ${readCount(largest.studentCount) ?? 0}`
+          : ""
+      }.`
+    );
+  }
+
+  const teachers = readRecord(facts.teachers);
+  if (teachers) {
+    lines.push(
+      `There are ${readCount(teachers.totalTeachers) ?? 0} teacher records on file.`
+    );
+  }
+
+  const attendance = readRecord(facts.attendance);
+  if (attendance) {
+    const totals = readRecord(attendance.totals);
+    const lowest = readRecord(attendance.lowestAttendance);
+    if (totals) {
+      lines.push(
+        `On ${readText(attendance.date) || "the date checked"}, ${readCount(totals.present) ?? 0} of ${readCount(totals.totalStudents) ?? 0} students were present${
+          readCount(totals.attendancePercent) != null
+            ? ` (${readCount(totals.attendancePercent)}%)`
+            : ""
+        }.`
+      );
+    }
+    if (lowest) {
+      lines.push(
+        `The lowest attendance was ${readText(lowest.standard)} ${readText(lowest.division)} at ${readCount(lowest.attendancePercent) ?? 0}%.`
+      );
+    }
+    if (readText(attendance.reason)) {
+      lines.push(readText(attendance.reason));
+    }
+  }
+
+  const feesPending = readRecord(facts.feesPending);
+  if (feesPending) {
+    const count = readCount(feesPending.studentsWithPendingFees) ?? 0;
+    const amount = formatIndianAmount(feesPending.totalPendingAmount);
+    const byClass = readObjectArray(feesPending.byClass);
+    lines.push(
+      `${count} students have pending fees totalling ${amount}${
+        byClass.length > 0 ? `, concentrated in ${topOf(byClass)}` : ""
+      }.`
+    );
+  }
+
+  const feesSummary = readRecord(facts.feesSummary);
+  const feeTotals = feesSummary ? readRecord(feesSummary.summary) : null;
+  if (feeTotals) {
+    lines.push(
+      `Fee demand stands at ${formatIndianAmount(feeTotals.demandAmount)} against ${formatIndianAmount(feeTotals.collectedAmount)} collected, leaving ${formatIndianAmount(feeTotals.outstandingAmount)} outstanding.`
+    );
+  }
+
+  const departments = readRecord(facts.departments);
+  if (departments) {
+    const rows = readObjectArray(departments.departments);
+    const largest = readRecord(departments.largestDepartment);
+    lines.push(
+      `There are ${readCount(departments.totalCount) ?? rows.length} departments covering ${readCount(departments.totalEmployees) ?? 0} employees${
+        largest
+          ? `, the largest being ${readText(largest.name)} with ${readCount(largest.totalEmployees) ?? 0}`
+          : ""
+      }.`
+    );
+  }
+
+  const homework = readRecord(facts.homework);
+  if (homework) {
+    const bySubject = readObjectArray(homework.bySubject);
+    lines.push(
+      `${readCount(homework.totalHomework) ?? 0} homework records are on file${
+        bySubject.length > 0 ? `, most of it in ${topOf(bySubject)}` : ""
+      }.`
+    );
+  }
+
+  const admissions = readRecord(facts.admissions);
+  if (admissions) {
+    const byStatus = readObjectArray(admissions.byStatus);
+    lines.push(
+      `${readCount(admissions.totalEnquiries) ?? 0} admission enquiries are recorded${
+        byStatus.length > 0 ? `, mostly at "${topOf(byStatus)}" status` : ""
+      }.`
+    );
+  }
+
+  if (lines.length === 0) {
+    return `I could not load the information needed to answer that${
+      missing.length > 0 ? `, because the ${missing.join(" and ")} data was unavailable` : ""
+    }.`;
+  }
+
+  if (missing.length > 0) {
+    lines.push(
+      `I could not read the ${missing.join(" and ")} data, so anything that depends on it is not covered here.`
+    );
+  }
+
+  return lines.join(" ");
+}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 async function executePreferredTool(
   prepared: PreparedConversation
 ): Promise<ConversationalResponse | null> {
@@ -1484,6 +2442,15 @@ async function executePreferredTool(
     return null;
   }
 
+<<<<<<< HEAD
+=======
+  if (LLM_REASONING_TOOLS.includes(toolName)) {
+    // Hand the turn to the model with this tool active so it retrieves the real
+    // rows and then explains them, instead of returning a canned summary.
+    return null;
+  }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   if (
     workflowState?.pendingAction &&
     typeof workflowState.pendingAction.tool === "string" &&
@@ -1981,6 +2948,11 @@ async function executePreferredTool(
     throw error;
   }
 
+<<<<<<< HEAD
+=======
+  rememberConversationFocus(prepared, toolName, parsedInput, directResult);
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const toolResult = normalizeDirectToolResult(directResult);
   const summary =
     summarizeToolBackedResult(prepared, [{ toolName, output: toolResult }]) ||
@@ -2113,7 +3085,22 @@ async function executePreferredTool(
     toolName === "getResultReport" ||
     toolName === "getTeacherDailyReport" ||
     toolName === "getLmsDashboard" ||
+<<<<<<< HEAD
     toolName === "getActivityStream"
+=======
+    toolName === "getActivityStream" ||
+    // Read-only summaries that produce no selectable record; clearing the state
+    // stops a finished workflow from capturing the next unrelated message.
+    toolName === "getTeacherDirectory" ||
+    toolName === "getClassTeachers" ||
+    toolName === "getClassStructure" ||
+    toolName === "getSubjectCatalog" ||
+    toolName === "getCourseCatalog" ||
+    toolName === "getAttendanceOverview" ||
+    toolName === "getStudentAttendanceDetail" ||
+    toolName === "getDepartmentDirectory" ||
+    toolName === "getFeesSummary"
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   ) {
     clearConversationWorkflowState(
       prepared.context.projectId,
@@ -2800,7 +3787,65 @@ export async function generateConversationResponse(
       },
     });
 
+<<<<<<< HEAD
     const fallbackMessage = summarizeToolBackedResult(prepared, result.toolResults);
+=======
+    // Tool calls the model made itself leave the same trail a deterministic run
+    // does, so the next turn can resolve "that department" either way.
+    for (const toolResult of result.toolResults) {
+      const output = toolResult.output as Record<string, unknown> | undefined;
+      const data = output && typeof output === "object" ? output.data : undefined;
+      rememberConversationFocus(
+        prepared,
+        toolResult.toolName || "",
+        (toolResult as { input?: unknown }).input,
+        data ?? output
+      );
+    }
+
+    const fallbackMessage = summarizeToolBackedResult(prepared, result.toolResults);
+
+    // An analytical answer must stand on retrieved rows. If the model replied
+    // without calling the data tool, discard that reply and answer from the
+    // backend figures instead of letting an ungrounded explanation through.
+    if (
+      LLM_REASONING_TOOLS.includes(prepared.intent.suggestedTool || "") &&
+      result.toolResults.length === 0
+    ) {
+      const groundedResponse = await executeQuotaFallback(prepared);
+      if (groundedResponse) {
+        appendConversationHistory({
+          sessionId,
+          userId,
+          messages: [
+            {
+              id: `assistant-${Date.now()}`,
+              role: "assistant",
+              content: groundedResponse.message,
+            },
+          ],
+        });
+
+        recordAuditEvent(
+          "conversation.response",
+          {
+            projectId: adapter.projectId,
+            capability: prepared.intent.capability,
+            conversationType: prepared.intent.type,
+            activeTools: prepared.activeTools,
+            status: groundedResponse.status,
+          },
+          {
+            userId: prepared.context.userId,
+            organizationId: prepared.context.orgId,
+          }
+        );
+
+        return groundedResponse;
+      }
+    }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     const generatedMessage = result.text?.trim();
     const safeMessage =
       generatedMessage && mentionsProviderRateLimit(generatedMessage) && fallbackMessage

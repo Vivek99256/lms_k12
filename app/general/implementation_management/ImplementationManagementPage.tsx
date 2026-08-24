@@ -283,13 +283,21 @@ export function ImplementationManagementPage() {
   }, [load]);
 
   const currentView = useMemo<ImplementationView>(() => {
+<<<<<<< HEAD
     const value = searchParams.get("view");
+=======
+    const value = searchParams?.get("view");
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     if (value === "welcome" || value === "overview" || value === "details") return value;
     return "welcome";
   }, [searchParams]);
 
   const selectedStageId = useMemo(() => {
+<<<<<<< HEAD
     const value = Number(searchParams.get("moduleId") || "1");
+=======
+    const value = Number(searchParams?.get("moduleId") || "1");
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     return Number.isFinite(value) && value >= 1 && value <= 5 ? value : 1;
   }, [searchParams]);
 
@@ -307,7 +315,11 @@ export function ImplementationManagementPage() {
   const session = useMemo(() => buildSessionContext(), []);
 
   function setView(view: ImplementationView, moduleId = selectedStageId) {
+<<<<<<< HEAD
     const params = new URLSearchParams(searchParams.toString());
+=======
+    const params = new URLSearchParams(searchParams?.toString());
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     params.set("view", view);
     params.set("moduleId", String(moduleId));
     router.replace(`/general/implementation_management?${params.toString()}`);
@@ -648,6 +660,7 @@ export function ImplementationManagementPage() {
         )}
       </ErpSection>
 
+<<<<<<< HEAD
       <ErpSection
         title="Institute Strength"
         description="These totals are stored once and applied across every standard row, matching the legacy implementation screen."
@@ -783,6 +796,8 @@ export function ImplementationManagementPage() {
           </div>
         )}
       </ErpSection>
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     </main>
   );
 }

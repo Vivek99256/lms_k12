@@ -58,7 +58,10 @@ function PalExamContent() {
   const [previewResult, setPreviewResult] = useState<{ correct: number; total: number } | null>(null);
 
   const startedAtRef = useRef<string>('');
+<<<<<<< HEAD
   const sessionEndRef = useRef<string>('');
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const attemptTimesRef = useRef<Record<string, number>>({});
   const activeQuestionRef = useRef<string>('');
   const submittedRef = useRef(false);
@@ -118,7 +121,10 @@ function PalExamContent() {
       setSubmitting(true);
       setSubmitError(null);
       try {
+<<<<<<< HEAD
         sessionEndRef.current = new Date().toISOString();
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         const result = await submitPalQuiz({
           context: quiz.context,
           paperName: quiz.paperName,
@@ -132,8 +138,11 @@ function PalExamContent() {
         const query = new URLSearchParams({
           id: result.questionPaperId,
           online_exam_id: result.onlineExamId,
+<<<<<<< HEAD
           session_start: startedAtRef.current,
           session_end: sessionEndRef.current,
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         });
         router.push(`/pal/result?${query.toString()}`);
       } catch (reason) {
@@ -266,7 +275,11 @@ function PalExamContent() {
 
   return (
     <div className="min-h-screen p-6">
+<<<<<<< HEAD
       <div className="mx-auto max-w-5xl space-y-4">
+=======
+      <div className="mx-auto  space-y-4">
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         {/* Sticky header with timer */}
         <div className="sticky top-0 z-10 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 px-5 py-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
           <div>

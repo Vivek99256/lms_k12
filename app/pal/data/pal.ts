@@ -563,7 +563,11 @@ export async function fetchMisconceptions(
   }
 
   const payload = toRecord(await response.json());
+<<<<<<< HEAD
   const questions = toArray(payload.data).map((entry) => {
+=======
+  return toArray(payload.data).map((entry) => {
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     const record = toRecord(entry);
     return {
       questionId: readString(record.question_id),
@@ -573,6 +577,7 @@ export async function fetchMisconceptions(
       mapping: readMapping(record.mapping),
     };
   });
+<<<<<<< HEAD
 
   // Record badge event for misconception view (fire-and-forget).
   try {
@@ -597,6 +602,8 @@ export async function fetchMisconceptions(
   }
 
   return questions;
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }
 
 export async function generateMisconceptionContent(
@@ -660,6 +667,7 @@ export async function incrementContentVisit(input: {
   } catch {
     /* ignore tracking failures */
   }
+<<<<<<< HEAD
 
   // Record badge event for content visit (fire-and-forget).
   try {
@@ -682,6 +690,8 @@ export async function incrementContentVisit(input: {
   } catch {
     /* ignore badge event failures */
   }
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }
 
 // ===========================================================================
@@ -1071,6 +1081,13 @@ export interface PracticeQuestion {
   questionTypeId: string;
   multipleAnswer: boolean;
   difficulty: string;
+<<<<<<< HEAD
+=======
+  /** Bloom's Taxonomy level tagged on the question (Remember/Understand/Apply/Analyze/Evaluate/Create), if tagged. */
+  bloomLevel: string;
+  /** Depth of Knowledge level (1-4) tagged on the question, if tagged. */
+  dokLevel: number;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   hintText: string;
   conceptId: string;
   conceptName: string;
@@ -1148,6 +1165,11 @@ export async function fetchAdaptivePractice(
       questionTypeId: readString(record.question_type_id),
       multipleAnswer: readString(record.multiple_answer) === '1',
       difficulty: readString(record.difficulty),
+<<<<<<< HEAD
+=======
+      bloomLevel: readString(record.bloom_level),
+      dokLevel: readNumber(record.dok_level),
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       hintText: readString(record.hint_text),
       conceptId: readString(record.concept_id),
       conceptName: readString(record.concept_name),
@@ -1233,6 +1255,253 @@ export async function submitAdaptivePractice(input: {
   };
 }
 
+<<<<<<< HEAD
+=======
+// ===========================================================================
+// Diagnostic assessment (onboarding)
+//
+//   GET  /lms/diagnostic-assessment          assessmentQuestionController@generateDiagnosticAssessment
+//   POST /lms/submit-diagnostic-assessment   assessmentQuestionController@submitDiagnosticAssessment
+//
+// Unlike adaptive practice, a diagnostic doesn't narrow toward a known
+// mastery level — there isn't one yet. It samples the target concept plus
+// its prerequisites across the DOK range, then classifies each concept as
+// mastered / partial / gap / prerequisite_gap once scored.
+// ===========================================================================
+
+export interface DiagnosticQuestion {
+  id: string;
+  title: string;
+  questionTypeId: string;
+  multipleAnswer: boolean;
+  difficulty: string;
+  bloomLevel: string;
+  dokLevel: number;
+  conceptId: string;
+  conceptName: string;
+  options: PracticeQuestionOption[];
+}
+
+export interface DiagnosticData {
+  status: string;
+  message: string;
+  questions: DiagnosticQuestion[];
+  conceptIds: string[];
+}
+
+export interface DiagnosticInput {
+  studentId: string;
+  standardId?: string;
+  subjectId?: string;
+  chapterId?: string;
+  conceptId?: string;
+}
+
+export async function fetchDiagnosticAssessment(
+  input: DiagnosticInput,
+  signal?: AbortSignal
+): Promise<DiagnosticData> {
+  const session = requireSession();
+  const params = practiceParams(session, input.studentId);
+  if (input.standardId) params.set('standard_id', input.standardId);
+  if (input.subjectId) params.set('subject_id', input.subjectId);
+  if (input.chapterId) params.set('chapter_id', input.chapterId);
+  if (input.conceptId) params.set('concept_id', input.conceptId);
+
+  const response = await fetch(
+    `${session.baseUrl}/lms/diagnostic-assessment?${params.toString()}`,
+    { headers: ajaxHeaders(session), signal }
+  );
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: Unable to load diagnostic assessment.`);
+  }
+
+  const payload = toRecord(await response.json());
+  const data = toRecord(payload.data);
+
+  const questions: DiagnosticQuestion[] = toArray(data.questions).map((entry) => {
+    const record = toRecord(entry);
+    const options = toArray(record.options).map((opt) => {
+      const option = toRecord(opt);
+      return {
+        id: readString(option.id),
+        answer: readString(option.answer),
+        correct: readString(option.correct_answer) === '1',
+      };
+    });
+    return {
+      id: readString(record.id),
+      title: readString(record.question_title),
+      questionTypeId: readString(record.question_type_id),
+      multipleAnswer: readString(record.multiple_answer) === '1',
+      difficulty: readString(record.difficulty),
+      bloomLevel: readString(record.bloom_level),
+      dokLevel: readNumber(record.dok_level),
+      conceptId: readString(record.concept_id),
+      conceptName: readString(record.concept_name),
+      options,
+    };
+  });
+
+  return {
+    status: normalizeApiStatus(payload),
+    message: readString(payload.message),
+    questions,
+    conceptIds: toArray(data.concept_ids).map((id) => readString(id)),
+  };
+}
+
+export interface DiagnosticConceptResult {
+  conceptId: string;
+  correct: number;
+  total: number;
+  /** Raw accuracy on the questions probed this sitting — a small sample. */
+  accuracy: number;
+  /**
+   * Bayesian Knowledge Tracing mastery estimate (0-100) over the student's
+   * full response history for the concept, not just this sitting. This is
+   * what actually drives `status` below, not `accuracy`.
+   */
+  bktMastery: number;
+  status: string;
+  prerequisiteGapDetected: boolean;
+}
+
+export interface DiagnosticSubmitResult {
+  status: string;
+  message: string;
+  concepts: DiagnosticConceptResult[];
+}
+
+export async function submitDiagnosticAssessment(input: {
+  studentId: string;
+  /** questionId -> selected answer_master id (single) or ids (multiple). */
+  answers: Record<string, string | string[]>;
+}): Promise<DiagnosticSubmitResult> {
+  const session = requireSession();
+  const body = practiceParams(session, input.studentId);
+  Object.entries(input.answers).forEach(([questionId, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((id) => body.append(`answers[${questionId}][]`, id));
+    } else if (value) {
+      body.set(`answers[${questionId}]`, value);
+    }
+  });
+
+  const response = await fetch(`${session.baseUrl}/lms/submit-diagnostic-assessment`, {
+    method: 'POST',
+    headers: ajaxHeaders(session, 'application/x-www-form-urlencoded'),
+    body: body.toString(),
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: Unable to submit diagnostic assessment.`);
+  }
+
+  const payload = toRecord(await response.json());
+  const data = toRecord(payload.data);
+  const conceptResults = toRecord(data.concept_results);
+  const classification = toRecord(data.classification);
+
+  const concepts: DiagnosticConceptResult[] = Object.keys(classification).map((conceptId) => {
+    const entry = toRecord(classification[conceptId]);
+    const resultEntry = toRecord(conceptResults[conceptId]);
+    return {
+      conceptId,
+      correct: readNumber(resultEntry.correct),
+      total: readNumber(resultEntry.total),
+      accuracy: readNumber(entry.accuracy),
+      bktMastery: readNumber(entry.bkt_mastery),
+      status: readString(entry.status),
+      prerequisiteGapDetected: Boolean(entry.prerequisite_gap_detected),
+    };
+  });
+
+  return {
+    status: normalizeApiStatus(payload),
+    message: readString(payload.message),
+    concepts,
+  };
+}
+
+// ===========================================================================
+// Prerequisite gate (Step 5 — mastery-based progression)
+//
+//   GET /lms/chapter-gate   assessmentQuestionController@getChapterGate
+//
+// The knowledge graph (lms_knowledge_graph) and per-concept mastery
+// (lms_concept_mastery) already existed; this is the check that was
+// missing — whether a concept's prerequisites are actually mastered before
+// the student is let in.
+// ===========================================================================
+
+export interface UnmasteredPrerequisite {
+  conceptId: string;
+  conceptName: string;
+  masteryLevel: number;
+  required: number;
+}
+
+export interface ChapterGateConcept {
+  conceptId: string;
+  locked: boolean;
+  unmasteredPrerequisites: UnmasteredPrerequisite[];
+}
+
+export interface ChapterGateData {
+  status: string;
+  message: string;
+  chapterId: string;
+  concepts: ChapterGateConcept[];
+  anyLocked: boolean;
+}
+
+export async function fetchChapterGate(
+  input: { studentId: string; chapterId: string },
+  signal?: AbortSignal
+): Promise<ChapterGateData> {
+  const session = requireSession();
+  const params = practiceParams(session, input.studentId);
+  params.set('chapter_id', input.chapterId);
+
+  const response = await fetch(`${session.baseUrl}/lms/chapter-gate?${params.toString()}`, {
+    headers: ajaxHeaders(session),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: Unable to load prerequisite status.`);
+  }
+
+  const payload = toRecord(await response.json());
+  const data = toRecord(payload.data);
+
+  const concepts: ChapterGateConcept[] = toArray(data.concepts).map((entry) => {
+    const record = toRecord(entry);
+    const unmasteredPrerequisites = toArray(record.unmastered_prerequisites).map((p) => {
+      const prereq = toRecord(p);
+      return {
+        conceptId: readString(prereq.concept_id),
+        conceptName: readString(prereq.concept_name),
+        masteryLevel: readNumber(prereq.mastery_level),
+        required: readNumber(prereq.required),
+      };
+    });
+    return {
+      conceptId: readString(record.concept_id),
+      locked: Boolean(record.locked),
+      unmasteredPrerequisites,
+    };
+  });
+
+  return {
+    status: normalizeApiStatus(payload),
+    message: readString(payload.message),
+    chapterId: readString(data.chapter_id),
+    concepts,
+    anyLocked: Boolean(data.any_locked),
+  };
+}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 export interface SpacedRepetitionItem {
   conceptId: string;
   conceptName: string;
@@ -1450,6 +1719,7 @@ export async function submitPersonalizeMarks(
     savedCount: toArray(payload.StudentData).length,
   };
 }
+<<<<<<< HEAD
 
 // ===========================================================================
 // Session Summary
@@ -1613,3 +1883,5 @@ export async function fetchSessionSummary(
         }),
     };
 }
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d

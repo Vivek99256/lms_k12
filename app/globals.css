@@ -160,6 +160,29 @@ html {
   height: 0 !important;
 }
 
+<<<<<<< HEAD
+=======
+/* Thin, always-visible scrollbar (used by the employee profile tab strip so
+   overflow is visually obvious, unlike .scrollbar-hide above). */
+.scrollbar-thin {
+  scrollbar-width: thin;                /* Firefox */
+}
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

@@ -98,12 +98,27 @@ function useFieldOptions(fields: FieldDef[], values: FormValues) {
 
   const termOptions = useMemo(() => {
     const selectedAcademicYear = typeof window === 'undefined' ? '' : localStorage.getItem('selectedAcademicYear') || '';
+<<<<<<< HEAD
     return toOptions(
       academicTerms.filter((item) => {
         const year = readString((item as Record<string, unknown>).syear);
         return !selectedAcademicYear || !year || year === selectedAcademicYear;
       }),
     );
+=======
+    return academicTerms
+      .filter((item) => {
+        const year = readString((item as Record<string, unknown>).syear);
+        return !selectedAcademicYear || !year || year === selectedAcademicYear;
+      })
+      .map((item) => {
+        const row = item as Record<string, unknown>;
+        // Laravel filters by the generic `term_id` (1, 2, ...), not the
+        // academic_year row's own `id` — matches FilterBar's termOptions.
+        return { id: readString(row.term_id ?? row.id), label: readString(row.title ?? row.name) };
+      })
+      .filter((option) => option.id && option.label);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   }, [academicTerms]);
 
   const selectFields = useMemo(
@@ -179,7 +194,20 @@ function useFieldOptions(fields: FieldDef[], values: FormValues) {
         continue;
       }
       void resultGet(source.path, resolved)
+<<<<<<< HEAD
         .then((payload) => { if (!cancelled) setOptionsMap((current) => ({ ...current, [field.name]: toOptions(payload.data ?? payload) })); })
+=======
+        .then((payload) => {
+          if (cancelled) return;
+          const responseData = payload.data ?? payload;
+          const optionData = source.dataKey
+            ? (responseData && typeof responseData === 'object'
+              ? (responseData as Record<string, unknown>)[source.dataKey]
+              : [])
+            : responseData;
+          setOptionsMap((current) => ({ ...current, [field.name]: toOptions(optionData) }));
+        })
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         .catch(() => { if (!cancelled) setOptionsMap((current) => (current[field.name]?.length ? current : { ...current, [field.name]: [] })); });
     }
     return () => { cancelled = true; };

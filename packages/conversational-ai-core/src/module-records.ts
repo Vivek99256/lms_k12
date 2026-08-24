@@ -225,7 +225,12 @@ export function extractModuleRecords(
           readNumber(payload.totalCount) ?? rows.length,
       };
     }
+<<<<<<< HEAD
     case "searchStudents": {
+=======
+    case "searchStudents":
+    case "getStudentDirectory": {
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       const rows = asRecordArray(payload.students);
       return {
         module: "students",
@@ -356,6 +361,25 @@ export function buildToolInputCandidates(
         { studentName, enrollmentNo },
         { studentName },
       ]);
+<<<<<<< HEAD
+=======
+    case "getStudentDirectory":
+      return dedupeCandidates([
+        { studentName, standard, division, enrollmentNo, rollNo, mobileNo },
+        { studentName, standard, division },
+        { studentName },
+      ]);
+    case "getStudentAttendanceDetail":
+      return dedupeCandidates([
+        { studentId },
+        { studentName, standard, division },
+        { enrollmentNo },
+      ]);
+    case "getAttendanceOverview":
+      return dedupeCandidates([{ standard, division }, { standard }]);
+    case "getClassTeachers":
+      return dedupeCandidates([{ standard, division }, { standard }]);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     case "findAdmissionCandidate":
       return dedupeCandidates([
         { studentName, enquiryNo, standard, onlyPending: true },

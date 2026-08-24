@@ -144,3 +144,65 @@ test("homework rows become selectable records and navigate to the report", () =>
 test("non record-producing tools are ignored", () => {
   assert.equal(extractModuleRecords("getLmsDashboard", { anything: true }), null);
 });
+<<<<<<< HEAD
+=======
+
+test("student directory rows become selectable student records", () => {
+  const extraction = extractModuleRecords("getStudentDirectory", {
+    totalCount: 2,
+    students: [
+      {
+        studentId: "41",
+        studentName: "Zeel J Tank",
+        standard: "7",
+        division: "A",
+        enrollmentNo: "GR-101",
+      },
+      {
+        studentId: "42",
+        studentName: "Aarohi Shah",
+        standard: "7",
+        division: "B",
+        enrollmentNo: "GR-102",
+      },
+    ],
+  });
+
+  assert.equal(extraction?.module, "students");
+  assert.equal(extraction?.totalCount, 2);
+  assert.deepEqual(
+    extraction?.entities.map((entity) => entity.label),
+    ["Zeel J Tank", "Aarohi Shah"]
+  );
+
+  const navigation = buildRecordNavigation(
+    "students",
+    extraction?.entities[0].metadata as Record<string, unknown>
+  );
+  assert.equal(navigation?.route, "/students/search_student");
+  assert.deepEqual(navigation?.query, { id: "41", enrollment_no: "GR-101" });
+});
+
+test("a resolved class scope is projected onto the attendance tool input", () => {
+  const candidates = buildToolInputCandidates("getAttendanceOverview", {
+    standard: "7",
+    division: "B",
+  });
+
+  assert.deepEqual(candidates[0], { standard: "7", division: "B" });
+  // The looser projection drops the division so a class-level retry is possible.
+  assert.deepEqual(candidates[1], { standard: "7" });
+});
+
+test("a resolved student is projected onto the individual attendance tool input", () => {
+  const candidates = buildToolInputCandidates("getStudentAttendanceDetail", {
+    studentId: "41",
+    studentName: "Zeel J Tank",
+    standard: "7",
+    division: "A",
+    enrollmentNo: "GR-101",
+  });
+
+  assert.deepEqual(candidates[0], { studentId: "41" });
+});
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d

@@ -75,7 +75,14 @@ export default function MasterCrud({ screen, embedded = false }: { screen: Maste
     setLoading(true);
     setError(null);
     try {
+<<<<<<< HEAD
       const payload = await resultGet(screen.api.index);
+=======
+      // DataTable already paginates client-side; ask Laravel for the full
+      // set (per_page=0) so rows past the backend's default page size (25)
+      // aren't silently dropped from the list.
+      const payload = await resultGet(screen.api.index, { per_page: '0' });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       setRows(extractRows(payload, screen.listKey));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load records.');

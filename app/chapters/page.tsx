@@ -1,5 +1,6 @@
 'use client';
 
+<<<<<<< HEAD
 import React, { useState } from 'react';
 import { FileText, Download, Play, CheckCircle2, Clock, BookOpen, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -54,6 +55,122 @@ export default function ChapterView() {
 
   const activeChapter = chapters[activeChapterIndex];
 
+=======
+import { Suspense, useEffect, useState } from 'react';
+import { FileText, Download, Play, CheckCircle2, Clock, BookOpen, ArrowLeft, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import type { ChapterContentAsset } from '@/app/course-master/data/chapters';
+import { fetchChapters, fetchChapterPdfAsset, chapterLessons, chapterContentText, type Chapter } from './_lib/chapters-api';
+
+function ChapterViewContent() {
+  const searchParams = useSearchParams();
+  const subjectId = searchParams.get('subjectId') ?? '';
+  const standardId = searchParams.get('standardId') ?? '';
+
+  const [activeTab, setActiveTab] = useState<'Overview' | 'Content' | 'Resources' | 'Quiz'>('Overview');
+  const [notes, setNotes] = useState('');
+  const [activeChapterIndex, setActiveChapterIndex] = useState(0);
+
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [subjectName, setSubjectName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [pdfAsset, setPdfAsset] = useState<ChapterContentAsset | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!subjectId) {
+        setLoading(false);
+        setError('No subject selected. Go back to Subjects and pick a subject.');
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+      try {
+        const { subject, chapters: fetchedChapters } = await fetchChapters(subjectId, standardId || undefined);
+        if (cancelled) return;
+        setChapters(fetchedChapters);
+        setSubjectName(subject?.subject_name || '');
+        setActiveChapterIndex(0);
+        if (fetchedChapters.length === 0) {
+          setError('No chapters are available for this subject yet.');
+        }
+      } catch (fetchError) {
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : 'Unable to load chapters.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId, standardId]);
+
+  const activeChapter = chapters[activeChapterIndex];
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!activeChapter) {
+        setPdfAsset(null);
+        return;
+      }
+      setPdfLoading(true);
+      try {
+        const asset = await fetchChapterPdfAsset(Number(activeChapter.id));
+        if (!cancelled) setPdfAsset(asset);
+      } finally {
+        if (!cancelled) setPdfLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeChapter]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 overflow-auto p-8">
+        <div className="flex items-center justify-center gap-2 py-24 text-sm text-gray-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading chapters…
+        </div>
+      </div>
+    );
+  }
+
+  if (error && chapters.length === 0) {
+    return (
+      <div className="flex-1 overflow-auto p-8">
+        <Link
+          href="/subjects"
+          className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-blue-600 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 px-4 py-2 rounded-xl transition-all mb-5 shadow-sm group"
+        >
+          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+          Back to Subjects
+        </Link>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error}</div>
+      </div>
+    );
+  }
+
+  if (!activeChapter) return null;
+
+  const lessons = chapterLessons(activeChapter);
+  const chapterProgress = 0; // The chapters API does not return a per-chapter completion percentage yet.
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   return (
     <div className="flex-1 overflow-auto p-8">
           {/* Back Button */}
@@ -66,8 +183,13 @@ export default function ChapterView() {
           </Link>
 
           {/* Breadcrumb */}
+<<<<<<< HEAD
           <div className="text-sm text-gray-500 mb-1">Science • Chapter {activeChapterIndex + 1}</div>
           <h1 className="text-3xl font-semibold tracking-tight">Chapter {activeChapterIndex + 1}: {chapters[activeChapterIndex].title}</h1>
+=======
+          <div className="text-sm text-gray-500 mb-1">{subjectName || 'Subject'} • Chapter {activeChapterIndex + 1}</div>
+          <h1 className="text-3xl font-semibold tracking-tight">Chapter {activeChapterIndex + 1}: {activeChapter.title}</h1>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           <p className="text-gray-600 mt-1 max-w-2xl">Learn about {activeChapter.title.toLowerCase()} and its key principles.</p>
 
           <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -78,19 +200,33 @@ export default function ChapterView() {
                 <div className="space-y-2 mb-8">
                   {chapters.map((ch, idx) => (
                     <div
+<<<<<<< HEAD
                       key={idx}
+=======
+                      key={ch.id}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                       onClick={() => setActiveChapterIndex(idx)}
                       className={`px-4 py-3.5 rounded-2xl text-sm flex justify-between items-center cursor-pointer transition-all duration-300 ${activeChapterIndex === idx ? 'bg-blue-600 text-white font-medium shadow-md shadow-blue-500/30 -translate-y-0.5' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'}`}
                     >
                       <span className="truncate pr-2">{ch.title}</span>
+<<<<<<< HEAD
                       <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${activeChapterIndex === idx ? 'bg-white/20' : 'bg-white text-gray-600 shadow-sm'}`}>{ch.progress}%</span>
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                     </div>
                   ))}
                 </div>
 
                 <h4 className="font-semibold text-gray-900 mb-4 text-sm flex items-center gap-2"><Clock size={16} className="text-emerald-500" /> Lessons in this Chapter</h4>
                 <ul className="space-y-3">
+<<<<<<< HEAD
                   {activeChapter.lessons.map((lesson, i) => (
+=======
+                  {lessons.length === 0 && (
+                    <li className="text-sm text-gray-400">No lessons added yet.</li>
+                  )}
+                  {lessons.map((lesson, i) => (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                     <li key={i} className="flex items-start gap-3 text-sm text-gray-600 group">
                       <div className="mt-0.5 w-5 h-5 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform"><CheckCircle2 size={12} /></div>
                       <span className="group-hover:text-gray-900 transition-colors">{lesson}</span>
@@ -119,6 +255,7 @@ export default function ChapterView() {
                 {activeTab === 'Overview' && (
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                     <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><FileText size={18} className="text-red-500" /> Study Material</h3>
+<<<<<<< HEAD
                     <div className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl mb-8 shadow-sm hover:shadow-md hover:border-blue-100 transition-all gap-4">
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="w-12 h-12 bg-red-50 text-red-500 rounded-xl flex items-center justify-center shrink-0">
@@ -155,12 +292,47 @@ export default function ChapterView() {
                         <p className="text-sm text-emerald-700 leading-relaxed">{activeChapter.takeaway}</p>
                       </div>
                     </div> */}
+=======
+                    {pdfLoading ? (
+                      <div className="flex items-center gap-2 p-4 text-sm text-gray-400 mb-8">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Checking for uploaded material…
+                      </div>
+                    ) : pdfAsset ? (
+                      <div className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl mb-8 shadow-sm hover:shadow-md hover:border-blue-100 transition-all gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-12 h-12 bg-red-50 text-red-500 rounded-xl flex items-center justify-center shrink-0">
+                            <FileText size={24} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">{pdfAsset.filename || pdfAsset.title}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{pdfAsset.file_type || 'Document'}</div>
+                          </div>
+                        </div>
+                        <a
+                          href={pdfAsset.url ?? '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold bg-gray-50 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors w-full sm:w-auto shrink-0"
+                        >
+                          <Download size={16} /> Download
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl mb-8 text-sm text-gray-500">
+                        No study material has been uploaded for this chapter yet.
+                      </div>
+                    )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   </div>
                 )}
 
                 {activeTab === 'Content' && (
                   <div className="prose max-w-none text-gray-700">
+<<<<<<< HEAD
                     <p>{activeChapter.content}</p>
+=======
+                    <p>{chapterContentText(activeChapter)}</p>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   </div>
                 )}
 
@@ -168,16 +340,24 @@ export default function ChapterView() {
                 {activeTab === 'Quiz' && (
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                     <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><FileText size={18} className="text-blue-500" /> Available Assessments</h3>
+<<<<<<< HEAD
                     
                     <div className="group flex flex-col md:flex-row md:items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl mb-8 shadow-sm hover:shadow-md hover:border-blue-200 transition-all gap-5 relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
                       
+=======
+
+                    <div className="group flex flex-col md:flex-row md:items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl mb-8 shadow-sm hover:shadow-md hover:border-blue-200 transition-all gap-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110"></div>
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                       <div className="flex items-center gap-4 relative z-10 flex-1 min-w-0">
                         <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-md shadow-blue-500/30">
                           <CheckCircle2 size={26} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-bold text-gray-900 text-lg group-hover:text-blue-600 transition-colors truncate">Chapter {activeChapterIndex + 1}: Assessment</div>
+<<<<<<< HEAD
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 mt-1.5 font-medium">
                             <span className="flex items-center gap-1 shrink-0"><Clock size={14} className="text-gray-400" /> 15 Minutes</span>
                             <span className="flex items-center gap-1 shrink-0"><FileText size={14} className="text-gray-400" /> 5 Questions</span>
@@ -186,6 +366,11 @@ export default function ChapterView() {
                         </div>
                       </div>
                       
+=======
+                        </div>
+                      </div>
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                       <div className="relative z-10 shrink-0 mt-2 md:mt-0">
                         <Link href="/quiz/take" className="flex items-center justify-center gap-2 px-8 py-3 text-sm font-bold bg-[#0D6EFD] text-white rounded-xl shadow-md shadow-blue-500/30 hover:-translate-y-0.5 hover:bg-blue-700 transition-all w-full md:w-auto">
                           Start Quiz <Play size={16} className="fill-white" />
@@ -210,10 +395,17 @@ export default function ChapterView() {
                 <div className="relative w-32 h-32 mx-auto mb-4">
                   <svg className="w-32 h-32 -rotate-90 transition-all duration-1000" viewBox="0 0 36 36">
                     <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
+<<<<<<< HEAD
                     <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeDasharray={`${chapters[activeChapterIndex].progress}, 100`} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-3xl font-bold text-gray-900">{chapters[activeChapterIndex].progress}%</span>
+=======
+                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeDasharray={`${chapterProgress}, 100`} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-bold text-gray-900">{chapterProgress}%</span>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                     <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mt-1">Completed</span>
                   </div>
                 </div>
@@ -221,6 +413,7 @@ export default function ChapterView() {
 
               <div className="bg-white rounded-[24px] p-6 border border-gray-100 shadow-sm">
                 <h4 className="font-semibold text-gray-900 mb-4">Upcoming Tasks</h4>
+<<<<<<< HEAD
                 <div className="space-y-3 text-sm">
                   <div className="p-3.5 bg-orange-50/50 border border-orange-100 text-orange-800 rounded-2xl flex items-start gap-3">
                     <Clock size={16} className="text-orange-500 mt-0.5 shrink-0" />
@@ -237,6 +430,9 @@ export default function ChapterView() {
                     </div>
                   </div>
                 </div>
+=======
+                <div className="space-y-3 text-sm text-gray-400">No upcoming tasks for this chapter.</div>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               </div>
 
               <div className="bg-white rounded-[24px] p-6 border border-gray-100 shadow-sm">
@@ -254,3 +450,23 @@ export default function ChapterView() {
       </div>
   );
 }
+<<<<<<< HEAD
+=======
+
+export default function ChapterView() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 overflow-auto p-8">
+          <div className="flex items-center justify-center gap-2 py-24 text-sm text-gray-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading chapters…
+          </div>
+        </div>
+      }
+    >
+      <ChapterViewContent />
+    </Suspense>
+  );
+}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d

@@ -21,6 +21,10 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+<<<<<<< HEAD
+=======
+  const [showSuccess, setShowSuccess] = useState(false);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +34,7 @@ export default function LoginPage() {
       const result = await login(email, password);
       if (!result.success) {
         setError(result.error || 'Invalid credentials. Please try again.');
+<<<<<<< HEAD
         return;
       }
       localStorage.removeItem('selectedMenuBranch');
@@ -37,6 +42,19 @@ export default function LoginPage() {
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
+=======
+        setIsLoading(false);
+        return;
+      }
+      localStorage.removeItem('selectedMenuBranch');
+      setIsLoading(false);
+      setShowSuccess(true);
+      window.setTimeout(() => {
+        router.replace('/dashboard');
+      }, 1100);
+    } catch {
+      setError('Something went wrong. Please try again.');
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       setIsLoading(false);
     }
   };
@@ -264,6 +282,75 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+<<<<<<< HEAD
+=======
+
+      {/* Post-submit success animation — checkmark draw-in, then redirect */}
+      {showSuccess && (
+        <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-[#1e3a8a] via-[#4169E1] to-[#3b82f6]">
+          <div className="flex flex-col items-center gap-5">
+            <div className="relative flex h-24 w-24 items-center justify-center">
+              <svg className="h-24 w-24 -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray="276.5"
+                  className="animate-successRing"
+                />
+              </svg>
+              <svg className="absolute h-10 w-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 12l5 5L20 6"
+                  strokeDasharray="24"
+                  className="animate-successCheck"
+                />
+              </svg>
+            </div>
+            <p className="animate-successText text-lg font-semibold text-white opacity-0">Signed in — taking you in</p>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .success-overlay {
+          animation: fadeIn 0.25s ease-out;
+        }
+        @keyframes successRing {
+          from { stroke-dashoffset: 276.5; }
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes successCheck {
+          0%, 40% { stroke-dashoffset: 24; opacity: 0; }
+          55% { opacity: 1; }
+          100% { stroke-dashoffset: 0; opacity: 1; }
+        }
+        @keyframes successText {
+          0%, 45% { opacity: 0; transform: translateY(4px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-successRing {
+          animation: successRing 0.6s ease-out forwards;
+        }
+        .animate-successCheck {
+          animation: successCheck 0.7s ease-out forwards;
+        }
+        .animate-successText {
+          animation: successText 0.6s ease-out forwards;
+        }
+      `}</style>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     </div>
   );
 }

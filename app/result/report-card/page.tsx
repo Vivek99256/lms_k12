@@ -21,6 +21,10 @@ import { asRecord, extractRows, readString, resultGet, resultPost, toCollection,
 
 type StudentRow = {
   id: string;
+<<<<<<< HEAD
+=======
+  rollNo: string;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   enrollmentNo: string;
   studentName: string;
   standard: string;
@@ -47,24 +51,49 @@ export default function NewReportCardPage() {
   const [generating, setGenerating] = useState(false);
   const [savingMobile, setSavingMobile] = useState(false);
   const [reportHtml, setReportHtml] = useState('');
+<<<<<<< HEAD
+=======
+  const [studentHtml, setStudentHtml] = useState<Record<string, string>>({});
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const printRef = useRef<HTMLDivElement>(null);
 
   /* ------------------------------------------ mount: templates + types */
   useEffect(() => {
     let cancelled = false;
+<<<<<<< HEAD
     void resultGet('result/student-result')
       .then((payload) => {
         if (cancelled) return;
         const data = asRecord(payload.data ?? payload);
         const templates = toCollection(data.result_template_master ?? asRecord(payload).result_template_master)
+=======
+    void resultGet('api/result/student-result')
+      .then((payload) => {
+        if (cancelled) return;
+        const data = asRecord(payload.data ?? payload);
+        // Laravel's studentResultController::index() returns the template
+        // list under the plain `data` key (result_template_master rows),
+        // not a `result_template_master` key.
+        const templates = toCollection(data.data)
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           .map(asRecord)
           .map((row) => ({
             value: readString(row.id),
             label: readString(row.module_name) || readString(row.title),
           }))
           .filter((option) => option.value && option.label);
+<<<<<<< HEAD
         const types = toOptions(data.result_types ?? asRecord(payload).result_types)
           .map((option) => ({ value: option.id, label: option.label }));
+=======
+        // result_types is a flat array of plain strings (e.g. ['Regular',
+        // 'HPC']), not row objects — toOptions() expects id/label-shaped
+        // rows and drops plain strings, so map it directly instead.
+        const types = toCollection(data.result_types)
+          .map(readString)
+          .filter(Boolean)
+          .map((label) => ({ value: label, label }));
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         setTemplateOptions(templates);
         setResultTypeOptions(types);
         setBootError(null);
@@ -100,10 +129,19 @@ export default function NewReportCardPage() {
     setLoading(true);
     setError(null);
     setReportHtml('');
+<<<<<<< HEAD
     try {
       const payload = await resultGet('result/student-result/create', flat);
       const rows = extractRows(payload).map((row): StudentRow => ({
         id: readString(row.id ?? row.student_id),
+=======
+    setStudentHtml({});
+    try {
+      const payload = await resultGet('api/result/student-result/create', flat);
+      const rows = extractRows(payload, 'student_data').map((row): StudentRow => ({
+        id: readString(row.id ?? row.student_id),
+        rollNo: readString(row.roll_no),
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         enrollmentNo: readString(row.enrollment_no ?? row.gr_number ?? row.gr_no),
         studentName: readString(row.student_name ?? row.name ?? row.full_name),
         standard: readString(row.standard_name ?? row.standard),
@@ -154,14 +192,26 @@ export default function NewReportCardPage() {
         result_type: readString(lastFilters.result_type),
       };
       Array.from(selected).forEach((id, index) => { body[`students[${index}]`] = id; });
+<<<<<<< HEAD
       const payload = await resultPost('result/student-result', body);
       const html = readString(asRecord(payload.data).html ?? payload.html);
+=======
+      const payload = await resultPost('api/result/student-result', body);
+      const data = asRecord(payload.data ?? payload);
+      const html = readString(data.html);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       if (!html) {
         toast.error('No report card returned', 'The server did not return report-card HTML for the selection.');
         setReportHtml('');
         return;
       }
       setReportHtml(html);
+<<<<<<< HEAD
+=======
+      setStudentHtml(Object.fromEntries(
+        Object.entries(asRecord(data.all_stud_html)).map(([studentId, value]) => [studentId, readString(value)]),
+      ));
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       toast.success('Report cards generated', `${selected.size} report card(s) ready below.`);
     } catch (err) {
       toast.error('Failed to generate report cards', err instanceof Error ? err.message : undefined);
@@ -173,6 +223,7 @@ export default function NewReportCardPage() {
   const handlePrintMobile = async () => {
     setSavingMobile(true);
     try {
+<<<<<<< HEAD
       await resultPost('result/save_result_html_new', {
         term_id: readString(lastFilters.format),
         student_arr: Array.from(selected).join(','),
@@ -180,6 +231,23 @@ export default function NewReportCardPage() {
         present_working_day: '0',
         student_percentage: '0',
       });
+=======
+      const body: Record<string, string> = {
+        term_id: readString(lastFilters.format),
+        student_arr: Array.from(selected).join(','),
+        grade_id: readString(lastFilters.grade),
+        standard_id: readString(lastFilters.standard),
+        division_id: readString(lastFilters.division),
+        result_type: readString(lastFilters.result_type),
+        total_working_day: '0',
+        present_working_day: '0',
+        student_percentage: '0',
+      };
+      Array.from(selected).forEach((studentId) => {
+        body[`html_${studentId}`] = studentHtml[studentId] || reportHtml;
+      });
+      await resultPost('api/result/student-result/save-html', body);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       toast.success('Result HTML saved for mobile app');
     } catch (err) {
       toast.error('Failed to save result HTML', err instanceof Error ? err.message : undefined);
@@ -198,7 +266,11 @@ export default function NewReportCardPage() {
           breadcrumbs={[{ label: 'Result', href: '/result' }, { label: 'Reports' }, { label: 'New report card' }]}
           actions={
             <a
+<<<<<<< HEAD
               href={`/api/proxy?path=${encodeURIComponent('result/all_results/create')}`}
+=======
+              href={`/api/proxy?path=${encodeURIComponent('api/result/all-results')}`}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
@@ -246,6 +318,10 @@ export default function NewReportCardPage() {
                           <th className="w-10 px-4 py-3">
                             <Checkbox checked={allSelected} indeterminate={!allSelected && someSelected} onChange={toggleAll} />
                           </th>
+<<<<<<< HEAD
+=======
+                          <th className="px-4 py-3 font-semibold">Roll no</th>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                           <th className="px-4 py-3 font-semibold">Gr no</th>
                           <th className="px-4 py-3 font-semibold">Student name</th>
                           <th className="px-4 py-3 font-semibold">Standard</th>
@@ -258,6 +334,10 @@ export default function NewReportCardPage() {
                             <td className="px-4 py-3">
                               <Checkbox checked={selected.has(student.id)} onChange={(checked) => toggleOne(student.id, checked)} />
                             </td>
+<<<<<<< HEAD
+=======
+                            <td className="px-4 py-3 text-slate-600">{student.rollNo || '—'}</td>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                             <td className="px-4 py-3 font-mono text-xs text-slate-600">{student.enrollmentNo || '—'}</td>
                             <td className="px-4 py-3 font-medium text-slate-900">{student.studentName || '—'}</td>
                             <td className="px-4 py-3 text-slate-600">{student.standard || '—'}</td>

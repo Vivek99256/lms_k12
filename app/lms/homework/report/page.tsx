@@ -39,6 +39,10 @@ import {
   listHomework,
   type HomeworkRecord,
 } from "@/app/lms/homework/api";
+<<<<<<< HEAD
+=======
+import RequireStaff from "@/app/lms/_shared/RequireStaff";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 const academicFields: DropdownField[] = [
   "section",
@@ -65,9 +69,17 @@ function readValue(
 
 export default function StudentHomeworkReportPage() {
   return (
+<<<<<<< HEAD
     <Suspense fallback={null}>
       <StudentHomeworkReport />
     </Suspense>
+=======
+    <RequireStaff>
+      <Suspense fallback={null}>
+        <StudentHomeworkReport />
+      </Suspense>
+    </RequireStaff>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   );
 }
 

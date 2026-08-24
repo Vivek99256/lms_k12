@@ -8,6 +8,7 @@ import {
   shouldContinueModuleWorkflow,
   resolveWorkflowSelection,
 } from "./module-workflow-routing";
+<<<<<<< HEAD
 
 test("shouldContinueModuleWorkflow returns false for idle stage", () => {
   const state = {
@@ -16,6 +17,30 @@ test("shouldContinueModuleWorkflow returns false for idle stage", () => {
     collectedSlots: {},
     missingSlots: [],
   };
+=======
+import type { ConversationWorkflowState } from "./workflow-state";
+
+/**
+ * Routing only reads the stage/module fields, so tests describe just those and
+ * let this helper supply the identifiers every stored state carries.
+ */
+function workflowState(
+  overrides: Partial<ConversationWorkflowState> &
+    Pick<ConversationWorkflowState, "currentStage">
+): ConversationWorkflowState {
+  return {
+    conversationId: "conversation-1",
+    projectId: "project-1",
+    matchedEntities: [],
+    collectedSlots: {},
+    missingSlots: [],
+    ...overrides,
+  };
+}
+
+test("shouldContinueModuleWorkflow returns false for idle stage", () => {
+  const state = workflowState({ currentStage: "idle" });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const result = shouldContinueModuleWorkflow(state, "How many students have pending fees?", {
     capability: "module_action",
@@ -26,12 +51,16 @@ test("shouldContinueModuleWorkflow returns false for idle stage", () => {
 });
 
 test("shouldContinueModuleWorkflow returns true for selecting_entity stage", () => {
+<<<<<<< HEAD
   const state = {
     currentStage: "selecting_entity",
     matchedEntities: [],
     collectedSlots: {},
     missingSlots: [],
   };
+=======
+  const state = workflowState({ currentStage: "selecting_entity" });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const result = shouldContinueModuleWorkflow(state, "Rajesh", {
     capability: "fee_collection",
@@ -42,6 +71,7 @@ test("shouldContinueModuleWorkflow returns true for selecting_entity stage", () 
 });
 
 test("shouldContinueModuleWorkflow returns false when switching modules", () => {
+<<<<<<< HEAD
   const state = {
     currentStage: "selecting_entity",
     module: "fees",
@@ -49,6 +79,9 @@ test("shouldContinueModuleWorkflow returns false when switching modules", () => 
     collectedSlots: {},
     missingSlots: [],
   };
+=======
+  const state = workflowState({ currentStage: "selecting_entity", module: "fees" });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const result = shouldContinueModuleWorkflow(state, "Show pending admissions", {
     capability: "admission_enquiries",
@@ -59,6 +92,7 @@ test("shouldContinueModuleWorkflow returns false when switching modules", () => 
 });
 
 test("shouldContinueModuleWorkflow returns true for affirmative in awaiting_confirmation", () => {
+<<<<<<< HEAD
   const state = {
     currentStage: "awaiting_confirmation",
     module: "fees",
@@ -66,6 +100,9 @@ test("shouldContinueModuleWorkflow returns true for affirmative in awaiting_conf
     collectedSlots: {},
     missingSlots: [],
   };
+=======
+  const state = workflowState({ currentStage: "awaiting_confirmation", module: "fees" });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const result = shouldContinueModuleWorkflow(state, "yes", {
     capability: "fee_collection",
@@ -76,6 +113,7 @@ test("shouldContinueModuleWorkflow returns true for affirmative in awaiting_conf
 });
 
 test("shouldContinueModuleWorkflow returns true for cancel in awaiting_confirmation", () => {
+<<<<<<< HEAD
   const state = {
     currentStage: "awaiting_confirmation",
     module: "fees",
@@ -83,6 +121,9 @@ test("shouldContinueModuleWorkflow returns true for cancel in awaiting_confirmat
     collectedSlots: {},
     missingSlots: [],
   };
+=======
+  const state = workflowState({ currentStage: "awaiting_confirmation", module: "fees" });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const result = shouldContinueModuleWorkflow(state, "no", {
     capability: "fee_collection",
@@ -93,12 +134,16 @@ test("shouldContinueModuleWorkflow returns true for cancel in awaiting_confirmat
 });
 
 test("routeModuleWorkflow returns select_entity for selecting_entity stage", () => {
+<<<<<<< HEAD
   const state = {
     currentStage: "selecting_entity",
     matchedEntities: [],
     collectedSlots: {},
     missingSlots: [],
   };
+=======
+  const state = workflowState({ currentStage: "selecting_entity" });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const result = routeModuleWorkflow("1", state);
 
@@ -106,12 +151,16 @@ test("routeModuleWorkflow returns select_entity for selecting_entity stage", () 
 });
 
 test("routeModuleWorkflow returns execute_action for yes in awaiting_confirmation", () => {
+<<<<<<< HEAD
   const state = {
     currentStage: "awaiting_confirmation",
     matchedEntities: [],
     collectedSlots: {},
     missingSlots: [],
   };
+=======
+  const state = workflowState({ currentStage: "awaiting_confirmation" });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const result = routeModuleWorkflow("yes", state);
 
@@ -119,12 +168,16 @@ test("routeModuleWorkflow returns execute_action for yes in awaiting_confirmatio
 });
 
 test("routeModuleWorkflow returns cancel_workflow for no in awaiting_confirmation", () => {
+<<<<<<< HEAD
   const state = {
     currentStage: "awaiting_confirmation",
     matchedEntities: [],
     collectedSlots: {},
     missingSlots: [],
   };
+=======
+  const state = workflowState({ currentStage: "awaiting_confirmation" });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const result = routeModuleWorkflow("no", state);
 
@@ -132,12 +185,16 @@ test("routeModuleWorkflow returns cancel_workflow for no in awaiting_confirmatio
 });
 
 test("routeModuleWorkflow returns hydrate_entity for hydrating_context stage", () => {
+<<<<<<< HEAD
   const state = {
     currentStage: "hydrating_context",
     matchedEntities: [],
     collectedSlots: {},
     missingSlots: [],
   };
+=======
+  const state = workflowState({ currentStage: "hydrating_context" });
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const result = routeModuleWorkflow("continue", state);
 

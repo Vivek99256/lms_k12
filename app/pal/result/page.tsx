@@ -1,6 +1,10 @@
 'use client';
 
+<<<<<<< HEAD
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+=======
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -8,7 +12,10 @@ import {
   CheckCircle2,
   Loader2,
   RefreshCw,
+<<<<<<< HEAD
   Sparkles,
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   TrendingUp,
   XCircle,
 } from 'lucide-react';
@@ -22,8 +29,11 @@ import {
   type PalResultData,
   type PalResultQuestion,
 } from '@/app/pal/data/pal';
+<<<<<<< HEAD
 import { computeFluency } from '@/app/pal/data/pal-pb';
 import { buildSessionContext } from '@/lib/erp-client';
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 export default function PalResultPage() {
   return (
@@ -56,6 +66,7 @@ function PalResultContent() {
   const [result, setResult] = useState<PalResultData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+<<<<<<< HEAD
   const [pbNotifications, setPbNotifications] = useState<Array<{ title: string; message: string }>>([]);
 
   const processPersonalBest = useCallback(async (data: PalResultData, signal: AbortSignal) => {
@@ -148,6 +159,8 @@ function PalResultContent() {
       /* ignore tracking failures */
     }
   }, [questionPaperId]);
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   useEffect(() => {
     if (!questionPaperId) return;
@@ -156,10 +169,14 @@ function PalResultContent() {
       setLoading(true);
       setError(null);
       try {
+<<<<<<< HEAD
         const data = await fetchPalResult(questionPaperId, onlineExamId, controller.signal);
         setResult(data);
         await processPersonalBest(data, controller.signal);
         await processBadges(data, controller.signal);
+=======
+        setResult(await fetchPalResult(questionPaperId, onlineExamId, controller.signal));
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       } catch (reason) {
         if (controller.signal.aborted) return;
         setError(reason instanceof Error ? reason.message : 'Unable to load the quiz result.');
@@ -169,7 +186,11 @@ function PalResultContent() {
     };
     void load();
     return () => controller.abort();
+<<<<<<< HEAD
   }, [questionPaperId, onlineExamId, processPersonalBest, processBadges]);
+=======
+  }, [questionPaperId, onlineExamId]);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   const mastery = useMemo(
     () => (result ? computeConceptMastery(result.questions) : []),
@@ -234,10 +255,13 @@ function PalResultContent() {
               <ArrowLeft className="h-4 w-4" />
               Back to PAL
             </Button>
+<<<<<<< HEAD
             <Button variant="outline" onClick={() => router.push(`/pal/session-summary?id=${questionPaperId}`)}>
               <Sparkles className="h-4 w-4" />
               Session Summary
             </Button>
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
             <Button onClick={retake}>
               <RefreshCw className="h-4 w-4" />
               Next quiz
@@ -245,6 +269,7 @@ function PalResultContent() {
           </div>
         </div>
 
+<<<<<<< HEAD
         {/* PB notifications */}
         {pbNotifications.length > 0 && (
           <div className="space-y-2">
@@ -260,6 +285,8 @@ function PalResultContent() {
           </div>
         )}
 
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         {/* Practice engine: adaptive practice, review schedule, history */}
         <PracticePanel studentId={result.studentId} context={result.context} />
 

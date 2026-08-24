@@ -1,6 +1,10 @@
  'use client';
 
+<<<<<<< HEAD
 import { useMemo, useState, type ComponentType } from 'react';
+=======
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import {
   Brain,
   Target,
@@ -22,15 +26,69 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { ConceptIntelEntry } from '../../data/chapters';
+<<<<<<< HEAD
 
 /** Coerce any JSON value to a trimmed display string. */
 const s = (v: unknown): string => (v === null || v === undefined ? '' : String(v).trim());
+=======
+import {
+  DEFAULT_TAB_LABELS,
+  MAX_TAB_LABEL_LENGTH,
+  fetchConceptIntelligenceTabLabels,
+  saveConceptIntelligenceTabLabel,
+} from '../../data/conceptIntelligenceTabLabels';
+
+function flattenText(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    const text = String(value).trim();
+    return text ? [text] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => flattenText(item));
+  }
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).flatMap((item) => flattenText(item));
+  }
+  return [];
+}
+
+function uniq(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+/** Coerce any JSON value to a trimmed display string without leaking raw objects. */
+const s = (v: unknown): string => uniq(flattenText(v)).join(' · ');
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 /** Coerce any JSON value to an array of records. */
 const toArr = (v: unknown): Record<string, unknown>[] =>
   Array.isArray(v) ? (v as Record<string, unknown>[]) : [];
 /** Coerce a list of primitives to trimmed strings. */
+<<<<<<< HEAD
 const toStrList = (v: unknown): string[] =>
   Array.isArray(v) ? v.map((item) => s(item)).filter(Boolean) : [];
+=======
+const toStrList = (v: unknown): string[] => uniq(flattenText(v));
+
+const hasTruthy = (v: unknown) => s(v).length > 0;
+const boolish = (v: unknown) => v === true || s(v).toLowerCase() === 'true';
+
+function getDisplayTitle(
+  record: Record<string, unknown>,
+  keys: string[],
+  fallback = 'Untitled'
+) {
+  const match = keys.map((key) => s(record[key])).find(Boolean);
+  return match || fallback;
+}
+
+function getDisplayBody(
+  record: Record<string, unknown>,
+  keys: string[]
+) {
+  return keys.map((key) => s(record[key])).find(Boolean) || '';
+}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 type IconType = ComponentType<{ size?: number; className?: string }>;
 
@@ -139,6 +197,90 @@ export function ConceptIntelligenceTabs({
   const [active, setActive] = useState('overview');
   const activeTab = tabs.some((tab) => tab.id === active) ? active : 'overview';
 
+<<<<<<< HEAD
+=======
+  // --- tenant-wise tab names ----------------------------------------------
+  // Nothing in the strip is named locally: the signed-in institute's labels
+  // arrive from the API and are merged over the shipped defaults. Until they
+  // land (or if the request fails) the defaults keep the strip readable.
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [labelError, setLabelError] = useState('');
+  // Enter unmounts the input, which can fire a trailing blur. This tracks which
+  // tab is genuinely still being edited so the second call is dropped instead of
+  // committing an already-cleared draft over the name that was just saved.
+  const editingKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchConceptIntelligenceTabLabels(controller.signal)
+      .then((result) => setLabels(result.byKey))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        // A failed lookup is not worth blocking the panel over — the strip
+        // falls back to the shipped names.
+        console.warn('Falling back to default intelligence tab names:', error);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const labelFor = useCallback(
+    (tabId: string, fallback: string) =>
+      labels[tabId] ?? DEFAULT_TAB_LABELS[tabId] ?? fallback,
+    [labels]
+  );
+
+  const beginEdit = useCallback((tabId: string, current: string) => {
+    setLabelError('');
+    editingKeyRef.current = tabId;
+    setEditingKey(tabId);
+    setDraft(current);
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    editingKeyRef.current = null;
+    setEditingKey(null);
+    setDraft('');
+  }, []);
+
+  const commitEdit = useCallback(
+    async (tabId: string, next: string, previous: string) => {
+      if (editingKeyRef.current !== tabId) return;
+      editingKeyRef.current = null;
+
+      const trimmed = next.trim();
+      setEditingKey(null);
+      setDraft('');
+
+      // Blank restores the shipped name, which is a real change; only an
+      // unchanged value is a no-op.
+      if (trimmed === previous) return;
+
+      setSavingKey(tabId);
+      setLabelError('');
+
+      // Show the new name straight away and roll it back if the save fails, so
+      // renaming does not feel like it lags a round trip behind.
+      setLabels((current) => ({ ...current, [tabId]: trimmed || (DEFAULT_TAB_LABELS[tabId] ?? previous) }));
+
+      try {
+        const result = await saveConceptIntelligenceTabLabel(tabId, trimmed);
+        setLabels(result.byKey);
+      } catch (error: unknown) {
+        setLabels((current) => ({ ...current, [tabId]: previous }));
+        setLabelError(error instanceof Error ? error.message : 'Could not save the tab name.');
+      } finally {
+        setSavingKey(null);
+      }
+    },
+    []
+  );
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const renderActive = () => {
     switch (activeTab) {
       case 'overview':
@@ -175,6 +317,7 @@ export function ConceptIntelligenceTabs({
             {knowledge.map((k, i) => (
               <div key={i} className={`${CARD} border-slate-200 bg-white`}>
                 <div className="flex items-start justify-between gap-3">
+<<<<<<< HEAD
                   <p className="text-[15px] font-semibold text-slate-900">{s(k.knowledge)}</p>
                   {s(k.knowledge_type) && (
                     <Chip className="shrink-0 bg-slate-100 text-slate-600">{s(k.knowledge_type)}</Chip>
@@ -182,6 +325,21 @@ export function ConceptIntelligenceTabs({
                 </div>
                 {s(k.statement) && <p className="mt-2 text-sm leading-6 text-slate-600">{s(k.statement)}</p>}
                 {s(k.confidence) && (
+=======
+                  <p className="text-[15px] font-semibold text-slate-900">
+                    {getDisplayTitle(k, ['knowledge', 'statement', 'definition', 'concept_name'])}
+                  </p>
+                  {hasTruthy(k.knowledge_type) && (
+                    <Chip className="shrink-0 bg-slate-100 text-slate-600">{s(k.knowledge_type)}</Chip>
+                  )}
+                </div>
+                {getDisplayBody(k, ['statement', 'definition', 'description']) && (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {getDisplayBody(k, ['statement', 'definition', 'description'])}
+                  </p>
+                )}
+                {hasTruthy(k.confidence) && (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   <div className="mt-3">
                     <Chip className="bg-slate-100 text-slate-500">Confidence: {s(k.confidence)}</Chip>
                   </div>
@@ -216,7 +374,13 @@ export function ConceptIntelligenceTabs({
           <div className="grid grid-cols-1 gap-3">
             {skills.map((sk, i) => (
               <div key={i} className={`${CARD} border-teal-100 bg-teal-50/40`}>
+<<<<<<< HEAD
                 <p className="text-[15px] font-semibold text-teal-800">{s(sk.skill)}</p>
+=======
+                <p className="text-[15px] font-semibold text-teal-800">
+                  {getDisplayTitle(sk, ['skill', 'title', 'concept_name'])}
+                </p>
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 {toStrList(sk.ability_refs).length > 0 && (
                   <p className="mt-2 text-xs text-teal-700/80">
                     <span className="font-semibold">Ability refs:</span> {toStrList(sk.ability_refs).join(', ')}
@@ -232,8 +396,17 @@ export function ConceptIntelligenceTabs({
           <div className="grid grid-cols-1 gap-3">
             {competencies.map((c, i) => (
               <div key={i} className={`${CARD} border-indigo-100 bg-indigo-50/40`}>
+<<<<<<< HEAD
                 <p className="text-[15px] font-semibold text-indigo-800">{s(c.competency)}</p>
                 {s(c.statement) && <p className="mt-2 text-sm italic leading-6 text-slate-700">“{s(c.statement)}”</p>}
+=======
+                <p className="text-[15px] font-semibold text-indigo-800">
+                  {getDisplayTitle(c, ['competency', 'statement', 'concept_name'])}
+                </p>
+                {getDisplayBody(c, ['statement', 'description']) && (
+                  <p className="mt-2 text-sm italic leading-6 text-slate-700">“{getDisplayBody(c, ['statement', 'description'])}”</p>
+                )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {toStrList(c.knowledge_refs).length > 0 && (
                     <Chip className="bg-indigo-100 text-indigo-700">Knowledge: {toStrList(c.knowledge_refs).join(', ')}</Chip>
@@ -371,10 +544,20 @@ export function ConceptIntelligenceTabs({
               <div key={i} className={`${CARD} flex items-start gap-3 border-slate-200 bg-white`}>
                 <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
                 <div>
+<<<<<<< HEAD
                   <p className="text-sm font-medium text-slate-800">{s(o.objective)}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {s(o.objective_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.objective_type)}</Chip>}
                     {s(o.priority) && <Chip className="bg-blue-100 text-blue-700">{s(o.priority)} priority</Chip>}
+=======
+                  <p className="text-sm font-medium text-slate-800">
+                    {getDisplayTitle(o, ['objective', 'statement', 'description'])}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {hasTruthy(o.objective_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.objective_type)}</Chip>}
+                    {hasTruthy(o.priority) && <Chip className="bg-blue-100 text-blue-700">{s(o.priority)} priority</Chip>}
+                    {hasTruthy(o.concept_name) && <Chip className="bg-slate-100 text-slate-500">Concept: {s(o.concept_name)}</Chip>}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   </div>
                 </div>
               </div>
@@ -391,6 +574,7 @@ export function ConceptIntelligenceTabs({
                   ✓
                 </span>
                 <div>
+<<<<<<< HEAD
                   <p className="text-sm font-medium text-slate-800">{s(o.outcome)}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {s(o.outcome_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.outcome_type)}</Chip>}
@@ -400,6 +584,20 @@ export function ConceptIntelligenceTabs({
                     {(o.assessment_ready === true || s(o.assessment_ready) === 'true') && (
                       <Chip className="bg-emerald-100 text-emerald-700">Assessment ready</Chip>
                     )}
+=======
+                  <p className="text-sm font-medium text-slate-800">
+                    {getDisplayTitle(o, ['outcome', 'statement', 'description'])}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {hasTruthy(o.outcome_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.outcome_type)}</Chip>}
+                    {boolish(o.measurable) && (
+                      <Chip className="bg-emerald-100 text-emerald-700">Measurable</Chip>
+                    )}
+                    {boolish(o.assessment_ready) && (
+                      <Chip className="bg-emerald-100 text-emerald-700">Assessment ready</Chip>
+                    )}
+                    {hasTruthy(o.concept_name) && <Chip className="bg-white text-slate-500 ring-1 ring-slate-200">Concept: {s(o.concept_name)}</Chip>}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   </div>
                 </div>
               </div>
@@ -591,10 +789,26 @@ export function ConceptIntelligenceTabs({
             {relationships.map((r, i) => (
               <div key={i} className={`${CARD} border-cyan-100 bg-cyan-50/40`}>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
+<<<<<<< HEAD
                   <span className="font-semibold text-cyan-800">{s(r.source_concept)}</span>
                   <Chip className="bg-cyan-100 text-cyan-700">{s(r.relation_type)}</Chip>
                   <span className="font-semibold text-cyan-800">{s(r.target_concept)}</span>
                 </div>
+=======
+                  <span className="font-semibold text-cyan-800">
+                    {getDisplayTitle(r, ['source_concept', 'concept_name', 'title'])}
+                  </span>
+                  {hasTruthy(r.relation_type) && (
+                    <Chip className="bg-cyan-100 text-cyan-700">{s(r.relation_type)}</Chip>
+                  )}
+                  <span className="font-semibold text-cyan-800">
+                    {getDisplayTitle(r, ['target_concept', 'related_concept', 'concept_name'])}
+                  </span>
+                </div>
+                {getDisplayBody(r, ['description', 'statement']) && (
+                  <p className="mt-2 text-sm text-cyan-900/80">{getDisplayBody(r, ['description', 'statement'])}</p>
+                )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               </div>
             ))}
           </div>
@@ -636,6 +850,7 @@ export function ConceptIntelligenceTabs({
     // active tab's content scrolls. Each region carries its own padding and
     // border so the component sits flush inside an unpadded card.
     <div className="flex h-full min-h-0 flex-col">
+<<<<<<< HEAD
       {/* Tab band — pinned card header */}
       <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200/80 bg-white px-4 py-3 sm:px-5">
         {tabs.map((tab) => {
@@ -666,6 +881,82 @@ export function ConceptIntelligenceTabs({
             </button>
           );
         })}
+=======
+      {/* Tab band — pinned card header. Double-click a name to rename it for
+          this institute; Enter saves, Escape restores it. */}
+      <div className="shrink-0 border-b border-slate-200/80 bg-white px-4 py-3 sm:px-5">
+        <div className="flex gap-1 overflow-x-auto">
+          {tabs.map((tab) => {
+            const TabIcon = tab.Icon;
+            const isActive = tab.id === activeTab;
+            const label = labelFor(tab.id, tab.label);
+
+            if (editingKey === tab.id) {
+              return (
+                <span
+                  key={tab.id}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#4f46e5] bg-white px-3 py-1.5 text-xs font-medium ring-2 ring-[#4f46e5]/20"
+                >
+                  <TabIcon size={14} className="text-[#4f46e5]" />
+                  <input
+                    autoFocus
+                    value={draft}
+                    maxLength={MAX_TAB_LABEL_LENGTH}
+                    aria-label={`Rename the ${label} tab`}
+                    size={Math.max(draft.length, 8)}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onFocus={(event) => event.currentTarget.select()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void commitEdit(tab.id, draft, label);
+                      } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        cancelEdit();
+                      }
+                    }}
+                    // Clicking away commits the same way Enter does, so a
+                    // rename is never silently thrown out.
+                    onBlur={() => void commitEdit(tab.id, draft, label)}
+                    className="min-w-[6ch] bg-transparent text-xs font-medium text-slate-900 outline-none"
+                  />
+                </span>
+              );
+            }
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActive(tab.id)}
+                onDoubleClick={() => beginEdit(tab.id, label)}
+                title={`${label} — double-click to rename`}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-[#4f46e5] text-white shadow-[0_6px_14px_rgba(79,70,229,0.25)]'
+                    : 'text-slate-600 hover:bg-slate-100'
+                } ${savingKey === tab.id ? 'opacity-60' : ''}`}
+              >
+                <TabIcon size={14} className={isActive ? 'text-white' : 'text-slate-400'} />
+                {label}
+                {tab.id !== 'overview' && (
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {labelError && (
+          <p className="mt-2 text-[11px] font-medium text-red-600">{labelError}</p>
+        )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       </div>
 
       {/* Active tab content — the only scrolling region */}

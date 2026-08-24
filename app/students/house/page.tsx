@@ -1,6 +1,10 @@
 "use client";
 
+<<<<<<< HEAD
 import React from 'react';
+=======
+import React, { useEffect, useState } from "react";
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -13,7 +17,12 @@ import {
   ChartOptions
 } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
+<<<<<<< HEAD
 import { Settings, Users } from 'lucide-react';
+=======
+import { Settings, Users, Loader2 } from 'lucide-react';
+import { getHouses, type HouseData } from './api';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 // Register Chart.js modules
 ChartJS.register(
@@ -25,6 +34,7 @@ ChartJS.register(
   Legend
 );
 
+<<<<<<< HEAD
 // Types & Interfaces
 interface HouseMember {
   id: string;
@@ -150,6 +160,50 @@ export const HousesContent: React.FC<HousesContentProps> = ({
       pointHoverBackgroundColor: '#fff',
       pointHoverBorderColor: house.borderColor,
     }))
+=======
+interface HousesContentProps {
+  onMasterSetupClick?: () => void;
+}
+
+export const HousesContent: React.FC<HousesContentProps> = ({
+  onMasterSetupClick
+}) => {
+  const [houses, setHouses] = useState<HouseData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getHouses(controller.signal)
+      .then(setHouses)
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return;
+        setError(reason instanceof Error ? reason.message : 'Unable to load houses.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  // Chart Configuration
+  const chartData: ChartData<'radar'> = {
+    labels: ['Sports', 'Academics', 'Cultural', 'Discipline', 'Attendance'],
+    datasets: houses.map(house => {
+      const score = Math.min(100, house.memberCount * 4);
+      return {
+        label: house.name,
+        data: [score, score, score, score, score],
+        backgroundColor: house.color,
+        borderColor: house.borderColor,
+        borderWidth: 2,
+        pointBackgroundColor: house.borderColor,
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: house.borderColor,
+      };
+    })
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   };
 
   const chartOptions: ChartOptions<'radar'> = {
@@ -179,12 +233,28 @@ export const HousesContent: React.FC<HousesContentProps> = ({
           color: '#475569'
         },
         ticks: { display: false },
+<<<<<<< HEAD
         suggestedMin: 50,
+=======
+        suggestedMin: 0,
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         suggestedMax: 100
       }
     }
   };
 
+<<<<<<< HEAD
+=======
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Loading houses…
+      </div>
+    );
+  }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   return (
     <div className="space-y-6 p-6 max-w-7xl mx-auto">
       {/* Header Info Section */}
@@ -204,6 +274,15 @@ export const HousesContent: React.FC<HousesContentProps> = ({
         </button>
       </div>
 
+<<<<<<< HEAD
+=======
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       {/* Radar Chart Card */}
       <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
         <div className="mb-4">
@@ -238,7 +317,11 @@ export const HousesContent: React.FC<HousesContentProps> = ({
             <div className="my-5 pt-4 border-t border-slate-50">
               <div className="text-xs text-slate-400 mb-2">House captain</div>
               <div className="flex items-center gap-3">
+<<<<<<< HEAD
                 <div 
+=======
+                <div
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm"
                   style={{ backgroundColor: house.borderColor }}
                 >
@@ -251,7 +334,11 @@ export const HousesContent: React.FC<HousesContentProps> = ({
             {/* Avatars Pile & Footer */}
             <div className="flex items-center justify-between pt-3 border-t border-slate-50 mt-auto">
               <div className="flex -space-x-2 overflow-hidden">
+<<<<<<< HEAD
                 {house.members.map((member) => (
+=======
+                {house.members.slice(0, 8).map((member) => (
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                   <div
                     key={member.id}
                     className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-slate-100 flex items-center justify-center text-[9px] font-semibold text-slate-500"
@@ -259,6 +346,14 @@ export const HousesContent: React.FC<HousesContentProps> = ({
                     {member.initials}
                   </div>
                 ))}
+<<<<<<< HEAD
+=======
+                {house.members.length > 8 && (
+                  <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-slate-200 flex items-center justify-center text-[8px] font-semibold text-slate-600">
+                    +{house.members.length - 8}
+                  </div>
+                )}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
               </div>
               <span className="text-xs text-slate-400 inline-flex items-center gap-1">
                 <Users className="w-3 h-3" />
@@ -272,4 +367,8 @@ export const HousesContent: React.FC<HousesContentProps> = ({
   );
 };
 
+<<<<<<< HEAD
 export default HousesContent;
+=======
+export default HousesContent;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d

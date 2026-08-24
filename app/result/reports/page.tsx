@@ -42,12 +42,20 @@ const FILTER_FIELDS: FilterFieldDef[] = [
   { kind: 'standard', required: true },
   { kind: 'division', required: true },
   {
+<<<<<<< HEAD
     kind: 'api', name: 'additional_subjects', label: 'Select subject', path: 'ajax_StandardwiseSubject',
+=======
+    kind: 'api', name: 'additional_subjects', label: 'Select subject', path: 'api/result/result-report/standardwise-subjects',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     params: { std_id: '{standard}' }, multi: true,
     showIf: { field: 'report_of', equals: ['marks_report'] },
   },
   {
+<<<<<<< HEAD
     kind: 'api', name: 'subject', label: 'Select subject', path: 'ajax_StandardwiseSubject',
+=======
+    kind: 'api', name: 'subject', label: 'Select subject', path: 'api/result/result-report/standardwise-subjects',
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     params: { std_id: '{standard}' },
     showIf: { field: 'report_of', equals: ['subject_progress_report', 'weightage_conversion_report'] },
   },
@@ -56,6 +64,7 @@ const FILTER_FIELDS: FilterFieldDef[] = [
   { kind: 'date', name: 'from_date', label: 'From date', showIf: { field: 'report_of', equals: DATE_RANGE_REPORTS } },
   { kind: 'date', name: 'to_date', label: 'To date', showIf: { field: 'report_of', equals: DATE_RANGE_REPORTS } },
   {
+<<<<<<< HEAD
     kind: 'api', name: 'exam_type', label: 'Exam type', path: 'api/get-exam-master-list',
     params: { standard_id: '{standard}', term_id: '{term}' },
     showIf: { field: 'report_of', equals: ['classwise_report', 'classwise_grade_report', 'overall_report'] },
@@ -63,6 +72,15 @@ const FILTER_FIELDS: FilterFieldDef[] = [
   {
     kind: 'api', name: 'exam_create', label: 'Select exam', path: 'api/get-exam-list',
     params: { standard_id: '{standard}', exam_id: '{exam_type}' },
+=======
+    kind: 'api', name: 'exam_type', label: 'Exam type', path: 'api/result/classwise-grade-report/exam-create-names',
+    params: { stdId: '{standard}', termID: '{term}' },
+    showIf: { field: 'report_of', equals: ['created_exam_report'] },
+  },
+  {
+    kind: 'api', name: 'exam_create', label: 'Select exam', path: 'api/result/classwise-grade-report/exam-create-names',
+    params: { stdId: '{standard}', termID: '{term}' },
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
     showIf: { field: 'report_of', equals: ['classwise_report', 'classwise_grade_report'] },
   },
   {
@@ -76,7 +94,17 @@ const FILTER_FIELDS: FilterFieldDef[] = [
 function flatten(values: FilterValues): Record<string, string> {
   const flat: Record<string, string> = {};
   for (const [key, value] of Object.entries(values)) {
+<<<<<<< HEAD
     flat[key] = Array.isArray(value) ? value.join(',') : value;
+=======
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        flat[`${key}[${index}]`] = item;
+      });
+    } else {
+      flat[key] = value;
+    }
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   }
   return flat;
 }
@@ -176,7 +204,11 @@ export default function ResultReportPage() {
     setLoading(true);
     setError(null);
     try {
+<<<<<<< HEAD
       const payload = await resultPost('result/show_result_report', flat);
+=======
+      const payload = await resultPost('api/result/result-report/show', flat);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       setRows(extractRows(payload));
     } catch (err) {
       setRows([]);
@@ -196,7 +228,11 @@ export default function ResultReportPage() {
 
   const handleServerExcel = async () => {
     try {
+<<<<<<< HEAD
       await resultGet('result/cbse_1t5_result/download_overall_report', lastFilters);
+=======
+      await resultGet('api/result/result-report/download-overall-excel', lastFilters);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
       toast.info('Server export requested', 'The overall report Excel export was requested from the server.');
     } catch (err) {
       toast.error('Server export failed', err instanceof Error ? err.message : undefined);

@@ -48,14 +48,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { cn } from '@/lib/utils';
 import { getRequestContext } from '../../page';
+<<<<<<< HEAD
 import { courses } from '../../data/courses';
 import {
   getChaptersByCourseid,
+=======
+import {
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   getSubjectAndChapters,
   type Chapter,
   type SubjectWithChapters,
 } from '../../data/chapters';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
+<<<<<<< HEAD
+=======
+import { useCurriculumMeta } from '../../data/curriculum';
+import type { LmsSubject } from '../../data/lmsCourses';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 import { getSemanticIntelligenceForSelection } from '../../data/semanticIntelligence';
 import type { Course } from '../../data/courses';
 
@@ -490,6 +499,7 @@ function getCourseGradeLabel(classGrade: string) {
   return `Grade ${classGrade.replace('Class', '').trim()}`;
 }
 
+<<<<<<< HEAD
 function getCurriculumLabel(course: Course) {
   return course.category === 'STEM Resources' ? 'STEM curriculum' : 'NCF-SE 2023 curriculum';
 }
@@ -501,6 +511,40 @@ function getTotalKeyConceptCount(course: Course, chapters: Chapter[]) {
 
   if (conceptCount > 0) return conceptCount;
   return Math.max(course.chapters * 4, 12);
+=======
+/**
+ * Concepts actually stored for a chapter. Prefers the concept rows the API
+ * returned, and falls back to the semantic record's own total when the rows
+ * weren't expanded in the response.
+ */
+function getChapterConceptCount(chapter: Chapter): number {
+  const conceptRows = chapter.concepts?.length ?? 0;
+  if (conceptRows > 0) return conceptRows;
+
+  const semanticTotal = Number(chapter.semantic?.total_concepts);
+  return Number.isFinite(semanticTotal) && semanticTotal > 0 ? semanticTotal : 0;
+}
+
+function getTotalKeyConceptCount(course: Course, chapters: Chapter[], subject?: LmsSubject | null) {
+  const liveCount = chapters.reduce((total, chapter) => total + getChapterConceptCount(chapter), 0);
+  if (liveCount > 0) return liveCount;
+
+  // The catalog's own subject-level total, for when chapter rows omit their concepts.
+  const subjectTotal = Number(
+    subject?.key_concepts_count ??
+      subject?.key_concept_count ??
+      subject?.concepts_count ??
+      subject?.total_concepts ??
+      0
+  );
+  if (Number.isFinite(subjectTotal) && subjectTotal > 0) return subjectTotal;
+
+  // Demo courses carry no API concepts; their sample set is the only source.
+  return chapters.reduce(
+    (total, chapter) => total + (getChapterKeyConcepts(course.id, chapter.id)?.count ?? 0),
+    0
+  );
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }
 
 const PERIOD_SLOT_TIME_MAP: Record<string, { startHour: number; startMinute: number; fallbackLabel: string }> = {
@@ -760,11 +804,20 @@ export default function LessonPlanPage() {
   const chapterId = searchParams?.get('chapterId') ?? '';
   const conceptTitleParam = searchParams?.get('concept') ?? '';
 
+<<<<<<< HEAD
   const staticCourse = courses.find((c) => c.id === courseId);
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const courseIdParts = courseId.includes('-') ? courseId.split('-', 2) : [];
   const subjectId = courseIdParts[0];
   const standardId = courseIdParts[1];
 
+<<<<<<< HEAD
+=======
+  // The board shown in the header belongs to the tenant's curriculum record.
+  const { label: curriculumLabel } = useCurriculumMeta(subjectId, standardId);
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const isLmsRoute = Boolean(subjectId && standardId);
   const [subjectData, setSubjectData] = useState<SubjectWithChapters | null>(null);
   const [subjectLoading, setSubjectLoading] = useState(isLmsRoute);
@@ -772,8 +825,12 @@ export default function LessonPlanPage() {
   const apiSubject = subjectData?.subject ?? null;
   const course: Course | undefined = useMemo(
     () =>
+<<<<<<< HEAD
       staticCourse ??
       (apiSubject
+=======
+      apiSubject
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         ? {
             id: courseId,
             title: apiSubject.subject_name,
@@ -790,6 +847,7 @@ export default function LessonPlanPage() {
             accentColor: '#4F46E5',
             icon: 'book-open',
           }
+<<<<<<< HEAD
         : undefined),
     [staticCourse, apiSubject, subjectData, courseId]
   );
@@ -798,6 +856,12 @@ export default function LessonPlanPage() {
     if (staticCourse) return getChaptersByCourseid(courseId);
     return [];
   }, [subjectData, staticCourse, courseId]);
+=======
+        : undefined,
+    [apiSubject, subjectData, courseId]
+  );
+  const courseChapters = useMemo<Chapter[]>(() => subjectData?.chapters ?? [], [subjectData]);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const selectedChapter =
     courseChapters.find((chapter) => chapter.id === chapterId) || courseChapters[0] || null;
   const handleSubjectClick = (nextSubjectId: number | null, nextChapterId: number | null) => {
@@ -1147,8 +1211,12 @@ export default function LessonPlanPage() {
   const chapterCount = Math.max(course?.chapters ?? 0, courseChapters.length);
   const gradeLabel = course ? getCourseGradeLabel(course.classGrade) : '';
   const sectionLabel = course ? getCourseSectionLabel(course.id) : '';
+<<<<<<< HEAD
   const curriculumLabel = course ? getCurriculumLabel(course) : '';
   const totalKeyConcepts = course ? getTotalKeyConceptCount(course, courseChapters) : 0;
+=======
+  const totalKeyConcepts = course ? getTotalKeyConceptCount(course, courseChapters, apiSubject) : 0;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
   const selectedDivision = useMemo(
     () =>
       divisions.find(
@@ -1657,7 +1725,12 @@ export default function LessonPlanPage() {
                   {course.subject} - {gradeLabel} - {sectionLabel}
                 </h1>
                 <p className="mt-1 text-[16px] text-[#475569]">
+<<<<<<< HEAD
                   {chapterCount} chapters Ã‚Â· {totalKeyConcepts} key concepts Ã‚Â· {curriculumLabel}
+=======
+                  {chapterCount} chapters · {totalKeyConcepts} key concepts
+                  {curriculumLabel ? ` · ${curriculumLabel}` : ''}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 </p>
               </div>
             </div>
@@ -2021,7 +2094,11 @@ export default function LessonPlanPage() {
           <span>Subjects</span>
           <ChevronRight size={14} className="text-[#94A3B8]" />
           <span className="font-medium text-[#0F172A]">
+<<<<<<< HEAD
             {course.subject} - {gradeLabel.replace('Grade ', 'Grade ')} {sectionLabel.replace('Section ', '')}
+=======
+            {course.subject} - {gradeLabel.replace('Grade ', 'Grade ')} 
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           </span>
         </div>
 
@@ -2033,10 +2110,18 @@ export default function LessonPlanPage() {
               </div>
               <div>
                 <h1 className="text-[34px] font-semibold tracking-tight text-[#0F172A]">
+<<<<<<< HEAD
                   {course.subject} - {gradeLabel} - {sectionLabel}
                 </h1>
                 <p className="mt-1 text-[16px] text-[#475569]">
                   {chapterCount} chapters · {totalKeyConcepts} key concepts · {curriculumLabel}
+=======
+                  {course.subject} - {gradeLabel} 
+                </h1>
+                <p className="mt-1 text-[16px] text-[#475569]">
+                  {chapterCount} chapters · {totalKeyConcepts} key concepts
+                  {curriculumLabel ? ` · ${curriculumLabel}` : ''}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 </p>
               </div>
             </div>

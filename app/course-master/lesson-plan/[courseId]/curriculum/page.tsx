@@ -11,6 +11,7 @@ import {
   GraduationCap,
   List,
 } from 'lucide-react';
+<<<<<<< HEAD
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { getRequestContext, getSyear } from '../../../page';
 import { getSubjectAndChapters, type SubjectWithChapters } from '../../../data/chapters';
@@ -72,6 +73,19 @@ type CurriculumApiResult = {
   unit_data: UnitData[];
   outcomes: OutcomeNode[];
 };
+=======
+import { getRequestContext, getSyear } from '../../../page';
+import { getSubjectAndChapters, type Chapter, type SubjectWithChapters } from '../../../data/chapters';
+import type { Course } from '../../../data/courses';
+import { fetchLmsCourses, type LmsSubject } from '../../../data/lmsCourses';
+import {
+  CURRICULUM_NOT_CONFIGURED,
+  fetchCurriculumData,
+  getCurriculumSession,
+  type CurriculumApiResult,
+  type OutcomeNode,
+} from '../../../data/curriculum';
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 type ResolvedCurriculumTarget = {
   subjectId: string;
@@ -79,6 +93,7 @@ type ResolvedCurriculumTarget = {
   subjectData: SubjectWithChapters | null;
 };
 
+<<<<<<< HEAD
 function readString(value: unknown): string {
   return value != null && value !== '' ? String(value) : '';
 }
@@ -91,6 +106,25 @@ function getCourseGradeLabel(standardName?: string | null) {
 function getCourseSectionLabel(courseId: string) {
   const numeric = Number(courseId.replace(/\D/g, '')) || 0;
   return numeric % 2 === 0 ? 'Section A' : 'Section B';
+=======
+function getCourseGradeLabel(standardName?: string | null) {
+  // Matches the Lesson plans and Chapters tabs: with no grade to show, render
+  // nothing rather than a bare "Grade" with no number after it.
+  const grade = String(standardName ?? '').replace('Class', '').trim();
+  return grade ? `Grade ${grade}` : '';
+}
+
+/**
+ * Concepts stored for a chapter, counted the same way the Lesson plans tab
+ * counts them: prefer the expanded concept rows, else the semantic total.
+ */
+function getChapterConceptCount(chapter: Chapter): number {
+  const conceptRows = chapter.concepts?.length ?? 0;
+  if (conceptRows > 0) return conceptRows;
+
+  const semanticTotal = Number(chapter.semantic?.total_concepts);
+  return Number.isFinite(semanticTotal) && semanticTotal > 0 ? semanticTotal : 0;
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 }
 
 function normalizeNumericString(value?: string | null): string | undefined {
@@ -110,6 +144,7 @@ function parseUnitChapters(value: string | string[] | null): string[] {
   }
 }
 
+<<<<<<< HEAD
 function getCurriculumSession(): CurriculumSession | null {
   if (typeof window === 'undefined') return null;
 
@@ -196,6 +231,8 @@ async function fetchCurriculumData(
     outcomes,
   };
 }
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
 async function resolveCurriculumTarget(
   rawCourseId: string,
@@ -340,7 +377,35 @@ export default function CurriculumPage() {
   const [openUnitId, setOpenUnitId] = useState<number | null>(null);
   const [openOutcomeId, setOpenOutcomeId] = useState<number | null>(null);
 
+<<<<<<< HEAD
   const fallbackCourse = courses.find((item) => item.id === courseId);
+=======
+  // Same courseId parsing the Lesson plans tab uses: "<subjectId>-<standardId>",
+  // passed through verbatim rather than through normalizeNumericString, which
+  // drops any part that is not purely digits.
+  const courseIdParts = courseId.includes('-') ? courseId.split('-', 2) : [];
+  const subjectId = courseIdParts[0] ?? '';
+  const standardId = courseIdParts[1];
+  const isLmsRoute = Boolean(subjectId && standardId);
+
+  // The heading names the subject and grade exactly like Lesson plans and
+  // Chapters, so it loads on its own. Previously the only path to the subject
+  // ran inside the curriculum effect below, behind a getCurriculumSession()
+  // guard that returns early — with no session, or with a curriculum record
+  // that fails to load, the header was left with no subject and no grade.
+  useEffect(() => {
+    if (!isLmsRoute) return;
+    let cancelled = false;
+
+    getSubjectAndChapters(subjectId, standardId).then((data) => {
+      if (!cancelled && data.subject) setSubjectData(data);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLmsRoute, subjectId, standardId]);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   useEffect(() => {
     let cancelled = false;
@@ -360,11 +425,29 @@ export default function CurriculumPage() {
       setError(null);
 
       try {
+<<<<<<< HEAD
         const target = await resolveCurriculumTarget(courseId, fallbackCourse);
+=======
+        const target = await resolveCurriculumTarget(courseId);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         if (!target) {
           throw new Error('Curriculum target not resolved');
         }
 
+<<<<<<< HEAD
+=======
+        if (cancelled) return;
+
+        // Publish the subject as soon as it resolves. The heading reads the
+        // subject and grade from here, so holding it back until the curriculum
+        // call returns leaves the header blank whenever that call fails or
+        // returns nothing — Lesson plans and Chapters name the subject
+        // regardless of their own content loading.
+        if (target.subjectData?.subject) {
+          setSubjectData(target.subjectData);
+        }
+
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         const curriculumResult = await fetchCurriculumData(
           session,
           target.subjectId,
@@ -373,7 +456,10 @@ export default function CurriculumPage() {
 
         if (cancelled) return;
 
+<<<<<<< HEAD
         setSubjectData(target.subjectData);
+=======
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
         setCurriculumResponse(curriculumResult);
         setOpenUnitId(curriculumResult.unit_data[0]?.unit_number ?? null);
         setOpenOutcomeId(curriculumResult.outcomes[0]?.id ?? null);
@@ -393,6 +479,7 @@ export default function CurriculumPage() {
     return () => {
       cancelled = true;
     };
+<<<<<<< HEAD
   }, [courseId, fallbackCourse]);
 
   const course = buildLiveCourse(courseId, subjectData, fallbackCourse);
@@ -411,6 +498,44 @@ export default function CurriculumPage() {
 
     return parts.join(' - ');
   }, [curriculumData?.board, curriculumData?.framework, curriculumData?.syear]);
+=======
+  }, [courseId]);
+
+  const course = buildLiveCourse(courseId, subjectData);
+  const curriculumData = curriculumResponse?.curriculum_data ?? null;
+  const unitData = curriculumResponse?.unit_data ?? [];
+  const outcomes = curriculumResponse?.outcomes ?? [];
+  const gradeLabel = getCourseGradeLabel(subjectData?.subject?.standard_name ?? course?.classGrade);
+
+  // "Mathematics - Grade 7", identical to the Lesson plans and Chapters tabs.
+  // Only when the subject has not resolved do we fall back to naming the
+  // curriculum, so the header is never left as a bare "Grade".
+  const headerTitle =
+    [course?.subject, gradeLabel].filter(Boolean).join(' - ') ||
+    curriculumData?.curriculum_name ||
+    'Curriculum';
+
+  // "16 chapters - 406 key concepts - Curriculum not configured", the same
+  // three parts the other two tabs show beneath the heading.
+  const headerMeta = useMemo(() => {
+    const chapters = subjectData?.chapters ?? [];
+    const conceptCount = chapters.reduce(
+      (total, chapter) => total + getChapterConceptCount(chapter),
+      0
+    );
+    const curriculumLabel = curriculumResponse
+      ? curriculumData?.curriculum_name || CURRICULUM_NOT_CONFIGURED
+      : '';
+
+    return [
+      `${chapters.length} chapters`,
+      `${conceptCount} key concepts`,
+      curriculumLabel,
+    ]
+      .filter(Boolean)
+      .join(' - ');
+  }, [subjectData?.chapters, curriculumResponse, curriculumData?.curriculum_name]);
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
 
   if (!courseId) {
     return (
@@ -435,7 +560,11 @@ export default function CurriculumPage() {
           <span>Subjects</span>
           <ChevronRight size={14} className="text-[#94A3B8]" />
           <span className="font-medium text-[#0F172A]">
+<<<<<<< HEAD
             {(course?.subject || curriculumData?.curriculum_name || 'Curriculum')} - {gradeLabel} {sectionLabel}
+=======
+            {headerTitle}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
           </span>
         </div>
 
@@ -447,7 +576,11 @@ export default function CurriculumPage() {
               </div>
               <div>
                 <h1 className="text-[30px] font-semibold tracking-tight text-[#0F172A] sm:text-[34px]">
+<<<<<<< HEAD
                   {curriculumData?.curriculum_name || 'Curriculum'}
+=======
+                  {headerTitle}
+>>>>>>> 8e0f73003448bc4d974b01993286b34ecb08d45d
                 </h1>
                 {headerMeta ? (
                   <p className="mt-1 text-[15px] text-[#475569] sm:text-[16px]">{headerMeta}</p>
