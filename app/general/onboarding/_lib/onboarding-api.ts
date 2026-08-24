@@ -466,6 +466,7 @@ export type OnboardingStep = {
     menuId: number | null;
     youtubeLink: string;
     pdfLink: string;
+    quickMenu: string;
   };
   state: {
     manualStatus: StepStatus | '';
@@ -678,6 +679,7 @@ function normalizeStep(value: unknown): OnboardingStep {
       menuId: action.menu_id == null ? null : readNumber(action.menu_id),
       youtubeLink: readString(action.youtube_link),
       pdfLink: readString(action.pdf_link),
+      quickMenu: readString(action.quick_menu),
     },
     state: {
       manualStatus: (readString(state.manual_status) || '') as StepStatus | '',
