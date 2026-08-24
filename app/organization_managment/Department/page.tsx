@@ -1188,7 +1188,7 @@ export default function DepartmentPage() {
 
   return (
     <>
-      <main className="flex h-[calc(100vh-12px)] min-h-[640px] flex-col gap-4 overflow-hidden bg-background p-4 text-foreground">
+      <main className="flex h-[calc(100vh-12px)] min-h-[640px] flex-col gap-4 overflow-hidden p-4 text-foreground">
         <Breadcrumb />
 
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

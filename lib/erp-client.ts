@@ -7,6 +7,7 @@ export type SessionContext = {
   syear: string;
   userId: string;
   termId: string;
+  isAdmin: string;
 };
 
 export type ApiEnvelope = {
@@ -63,6 +64,7 @@ export function buildSessionContext(): SessionContext {
       syear: '',
       userId: '',
       termId: '',
+      isAdmin: '',
     };
   }
 
@@ -159,6 +161,7 @@ export function buildSessionContext(): SessionContext {
             localStorage.getItem('term_id')
         )
       ),
+      isAdmin: readString(firstValue('is_admin', 'isAdmin')),
     };
   } catch {
     return {
@@ -168,6 +171,7 @@ export function buildSessionContext(): SessionContext {
       syear: '',
       userId: '',
       termId: '',
+      isAdmin: '',
     };
   }
 }

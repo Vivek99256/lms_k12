@@ -122,7 +122,7 @@ export function StepDrawer({
             </p>
             <div className="flex flex-col gap-3">
               <OwnerMarker
-                label={currentUserName}
+                owner={step.owner}
                 role={step.owner === "TRIZ" ? step.trizRole : step.schoolRole}
                 lead
               />
