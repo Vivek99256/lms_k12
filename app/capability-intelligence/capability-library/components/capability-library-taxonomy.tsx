@@ -1,0 +1,98 @@
+'use client'
+
+import { useState } from 'react'
+
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+import { useLibraryMeta } from '../../_lib/use-libraries-taxonomy'
+import type { LibraryTabId } from '../../_lib/libraries-taxonomy-api'
+
+import { LIBRARY_TABS, tabConfig } from './library-config'
+import { LibraryTab } from './library-tab'
+
+/**
+ * Capability Library — Libraries & Taxonomy.
+ *
+ * Ported from G2G's `components/domain/competency/cm-libraries-taxonomy.tsx`
+ * (the `Cm` prefix dropped per this migration's naming convention).
+ *
+ * The source libraries the competency model is built from - Job Role, Job Role
+ * Task, Knowledge, Ability, Attitude, Behaviour and Invisible - behind one tab
+ * strip, each with its own taxonomy editor.
+ *
+ * Skills/competencies are deliberately NOT a tab here. They live on
+ * s_users_skills, which the (separate, out-of-scope) Competency Library screen
+ * owns end to end.
+ */
+export function CapabilityLibraryTaxonomy() {
+  const [activeTab, setActiveTab] = useState<LibraryTabId>('jobrole')
+  const { meta, loading: metaLoading } = useLibraryMeta()
+
+  const config = tabConfig(activeTab)
+
+  return (
+    <div className="g2g-scrollbar flex h-full flex-col gap-6 overflow-y-auto p-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Capability</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The building blocks every competency is assembled from: job roles, tasks, and the knowledge, ability, behaviour and attitude items behind them.
+        </p>
+      </div>
+
+      {/* Tab strip. shrink-0 is a required fix, not a G2G deviation: without
+          it, this flex item's automatic min-height is treated as 0 (CSS spec
+          rule for a flex item with overflow other than visible), so it gets
+          crushed to ~1px whenever the active tab's content below is tall
+          enough to fill the h-full flex column - the tab strip silently
+          disappears even though every button is still in the DOM. */}
+      <div
+        className="g2g-scrollbar -mx-1 flex shrink-0 gap-1 overflow-x-auto border-b border-border px-1"
+        role="tablist"
+        aria-label="Library"
+      >
+        {LIBRARY_TABS.map((tab) => {
+          const isActive = tab.id === activeTab
+          const count = meta.counts?.[tab.id]
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                '-mb-px flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition-colors',
+                isActive
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+              {metaLoading ? (
+                <Skeleton className="h-4 w-8 rounded-full" />
+              ) : count !== undefined ? (
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums',
+                    isActive ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {count.toLocaleString()}
+                </span>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+
+      <p className="-mt-3 text-sm text-muted-foreground">{config.description}</p>
+
+      {/* Only the active tab is mounted, so switching tabs never leaves eight
+          list requests in flight. */}
+      <LibraryTab key={activeTab} config={config} meta={meta} active />
+    </div>
+  )
+}

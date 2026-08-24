@@ -443,6 +443,23 @@ const TASK_MANAGEMENT_ROUTE_NAME_MAP: Record<string, string> = {
   'org_mgmt.disciplinary_library': '/organization-management/disciplinary-library',
 };
 
+/**
+ * Capability Intelligence → Dashboard, Competency Library, Capability
+ * Library, Competency Framework, Capability Explorer under
+ * /capability-intelligence. Migrated as-is from G2G (g2gv0) — see
+ * app/capability-intelligence/** and next_lms_erp's
+ * database/migrations/2026_08_24_120000_add_capability_intelligence_menu.php
+ * for the matching backend menu-master rows, same pattern as
+ * TALENT_ROUTE_NAME_MAP / TASK_MANAGEMENT_ROUTE_NAME_MAP.
+ */
+const CAPABILITY_INTELLIGENCE_ROUTE_NAME_MAP: Record<string, string> = {
+  'capability_intelligence.dashboard': '/capability-intelligence/dashboard',
+  'capability_intelligence.competency_library': '/capability-intelligence/competency-library',
+  'capability_intelligence.capability_library': '/capability-intelligence/capability-library',
+  'capability_intelligence.competency_framework': '/capability-intelligence/competency-framework',
+  'capability_intelligence.capability_explorer': '/capability-intelligence/capability-explorer',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -630,6 +647,13 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const taskManagementRoute = TASK_MANAGEMENT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (taskManagementRoute) {
     return taskManagementRoute;
+  }
+
+  // Capability Intelligence → Dashboard, Competency Library, Capability
+  // Library, Competency Framework, Capability Explorer.
+  const capabilityIntelligenceRoute = CAPABILITY_INTELLIGENCE_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (capabilityIntelligenceRoute) {
+    return capabilityIntelligenceRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
