@@ -1,0 +1,140 @@
+/**
+ * Route Name Registry
+ * Maps route names to paths for type-safe navigation
+ */
+
+export const ROUTES = {
+  // Dashboard
+  dashboard: '/dashboard',
+  
+  // Exam routes
+  exam: {
+    marksEntry: '/exam/marks-entry',
+    examMaster: '/exam/exam-master',
+  },
+  
+  // Student routes
+  students: {
+    searchStudent: '/students/search_student',
+  },
+
+  careerCounselling: {
+    home: '/career-counselling',
+    explore: '/career-counselling?section=explore',
+    assessment: '/career-counselling?section=assessment',
+    colleges: '/career-counselling?section=colleges',
+    courses: '/career-counselling?section=courses',
+    employers: '/career-counselling?section=employers',
+    experts: '/career-counselling?section=experts',
+    sectors: '/career-counselling?section=sectors',
+    match: '/career-counselling?section=match',
+  },
+  
+  // Result routes (paths mirror the legacy Laravel result route group)
+  result: {
+    markEntry: '/result/marks_entry',
+    coScholasticMark: '/result/co_scholastic_marks_entry',
+    resultTemplate: '/result/result-template',
+    newReportCard: '/result/student-result',
+    hpcActivityEntry: '/result/result_activity_marks',
+    hpcEntryV1: '/result/result_activity_marks_V1',
+    approveMobileResult: '/result/approve_mobile_result',
+    uploadResult: '/result/upload_result',
+    examMaster: '/result/exam_master',
+    examCreation: '/result/exam_creation',
+    gradeMaster: '/result/grade_master',
+    standardGradeMapping: '/result/std_grd_maping',
+    resultMaster: '/result/result_master',
+    resultBookMaster: '/result/result_book_master',
+    studentResultRemarkMaster: '/result/result_remark_master',
+    coScholasticMaster: '/result/co_scholastic_master',
+    workingDayMaster: '/result/working_day_master',
+    studentAttendanceMaster: '/result/student_attendance_master',
+    hpcSkillset: '/result/result_skillset',
+    hpcActivity: '/result/result_activity_master',
+    resultReport: '/result/result_report',
+    marksApprovalReport: '/result/marks_approval_report',
+    classwiseGradeReport: '/result/classwise_grade_report',
+    studentResultRemarks: '/result/student_result_remarks',
+    consolidateReport: '/result/consolidate_report',
+    wrtReport: '/result/WRT_report',
+    wrtProgressReport: '/result/WRT_progress_report',
+    cbseResult1to5: '/result/cbse_result',
+    cbseResultT2: '/result/cbse_result_t2',
+    cbse11Result: '/result/cbse_11_result',
+    cnse11Result: '/result/cnse_11_result',
+  },
+
+  // Fees routes
+  fees: {
+    collect: '/fees/collect',
+    nachS1ExcelExport: '/fees/NACH_s1excel_export',
+    nachS2ExcelImport: '/fees/NACH_s2excel_import',
+    nachS3ExcelExport: '/fees/NACH_s3excel_export',
+    nachS4ExcelImport: '/fees/NACH_s4excel_import',
+    otherFeesCollect: '/fees/other_fees_collect',
+    otherFeesCancel: '/fees/other_fees_cancel',
+    onlineFeesCollect: '/fees/online_fees_collect',
+  },
+
+  // Utility routes (year-end and low-code maintenance tools)
+  utility: {
+    studentTransfer: '/Utility/student-transfer',
+    rollover: '/Utility/rollover',
+    breakoffRollover: '/Utility/breakoff-rollover',
+    updateAllData: '/Utility/update-all-data',
+    customModule: '/Utility/custom-module',
+    transferStudent: '/Utility/transfer-student',
+  },
+
+  // Admin services routes (front-office desks)
+  adminServices: {
+    addVisitor: '/admin-services/add-visitor',
+    visitorReport: '/admin-services/visitor-report',
+    complaintManagement: '/admin-services/complaint-management',
+    complaintReport: '/admin-services/complaint-report',
+    consentMaster: '/admin-services/consent-master',
+    deleteConsentMaster: '/admin-services/delete-consent-master',
+    consentReport: '/admin-services/consent-report',
+    frontDesk: '/admin-services/front-desk',
+    frontDeskReport: '/admin-services/front-desk-report',
+    pettyCash: '/admin-services/petty-cash',
+    pettyCashMaster: '/admin-services/petty-cash-master',
+    pettyCashReport: '/admin-services/petty-cash-report',
+    ptmAttendedStatus: '/admin-services/ptm-attended-status',
+    ptmTimeSlotMaster: '/admin-services/ptm-time-slot-master',
+    ptmReport: '/admin-services/ptm-report',
+  },
+} as const;
+
+export type RouteName = string;
+
+/**
+ * Get route path by name
+ * @param routeName - Route path string
+ * @returns The route path for useRouter().push()
+ */
+export function getRoute(routeName: string): string {
+  if (!routeName) return '/';
+  return routeName.startsWith('/') ? routeName : `/${routeName}`;
+}
+
+/**
+ * Compose route with parameters
+ * @param route - Base route name
+ * @param params - URL parameters
+ * @returns Route with query params
+ */
+export function composeRoute(route: string, params?: Record<string, string | number | undefined>): string {
+  const basePath = getRoute(route);
+  if (!params || Object.keys(params).length === 0) return basePath;
+  
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.set(key, String(value));
+    }
+  });
+  
+  return `${basePath}?${searchParams.toString()}`;
+}

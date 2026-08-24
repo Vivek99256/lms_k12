@@ -1,0 +1,65 @@
+{
+  "conversationId": "82864aac-ae45-4cb0-9673-671f34ac3d60",
+  "projectId": "lms_k12",
+  "currentStage": "completed",
+  "matchedEntities": [
+    {
+      "id": "unknown",
+      "label": "Unknown student",
+      "reference": "233",
+      "secondary": "7",
+      "metadata": {
+        "module": "fees",
+        "studentId": "unknown",
+        "studentName": "Unknown student",
+        "standard": "7",
+        "division": "C",
+        "enrollmentNo": "233",
+        "mobileNo": "9909906514",
+        "pendingFees": 0
+      }
+    }
+  ],
+  "collectedSlots": {},
+  "missingSlots": [],
+  "module": "fees",
+  "intent": "fee_collection",
+  "workflowId": "fee_collection",
+  "lastTool": "findStudentFeeRecord",
+  "selectedEntity": {
+    "id": "unknown",
+    "label": "Unknown student",
+    "reference": "233",
+    "secondary": "7",
+    "metadata": {
+      "module": "fees",
+      "studentId": "unknown",
+      "studentName": "Unknown student",
+      "standard": "7",
+      "division": "C",
+      "enrollmentNo": "233",
+      "mobileNo": "9909906514",
+      "pendingFees": 0
+    }
+  },
+  "selectedRecord": {
+    "module": "fees",
+    "studentId": "unknown",
+    "studentName": "Unknown student",
+    "standard": "7",
+    "division": "C",
+    "enrollmentNo": "233",
+    "mobileNo": "9909906514",
+    "pendingFees": 0
+  },
+  "hydratedEntity": {
+    "module": "fees",
+    "studentId": "unknown",
+    "studentName": "Unknown student",
+    "standard": "7",
+    "division": "C",
+    "enrollmentNo": "233",
+    "mobileNo": "9909906514",
+    "pendingFees": 0
+  }
+}

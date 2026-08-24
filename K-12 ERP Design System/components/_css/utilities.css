@@ -1,0 +1,26 @@
+/* =============================================================================
+   COMPONENT CSS — Utilities group (Divider, Accordion). Icon has no CSS;
+   DensityToggle/ThemeToggle reuse the segmented control styles.
+   ============================================================================= */
+
+/* ---- Divider ---- */
+.ds-divider { border: 0; }
+.ds-divider--horizontal { height: 1px; width: 100%; background: var(--border-subtle); }
+.ds-divider--vertical { width: 1px; align-self: stretch; min-height: 1em; background: var(--border-subtle); }
+.ds-divider--labeled { display: flex; align-items: center; gap: var(--space-3); color: var(--content-tertiary); }
+.ds-divider--labeled::before, .ds-divider--labeled::after { content: ""; flex: 1; height: 1px; background: var(--border-subtle); }
+.ds-divider__label { font-size: var(--text-caption-size); text-transform: uppercase; letter-spacing: var(--letter-spacing-wide); }
+
+/* ---- Accordion ---- */
+.ds-accordion { border: var(--border-width-thin) solid var(--border-subtle); border-radius: var(--radius-surface); overflow: hidden; background: var(--surface-default); }
+.ds-accordion__item + .ds-accordion__item { border-top: var(--border-width-thin) solid var(--border-subtle); }
+.ds-accordion__header {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  width: 100%; padding: var(--space-3) var(--inset-md);
+  background: transparent; border: 0; cursor: pointer; text-align: start;
+  font-family: var(--font-sans); font-size: var(--text-body-size); font-weight: var(--font-weight-medium);
+  color: var(--content-primary);
+}
+.ds-accordion__header:hover { background: var(--surface-hover); }
+.ds-accordion__caret { color: var(--content-tertiary); flex-shrink: 0; }
+.ds-accordion__body { padding: 0 var(--inset-md) var(--inset-md); font-size: var(--text-body-sm-size); color: var(--content-secondary); }

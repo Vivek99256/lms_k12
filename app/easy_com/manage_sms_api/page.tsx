@@ -1,0 +1,4 @@
+'use client';
+import { RadioTower } from 'lucide-react';
+import MasterPage from '../_components/MasterPage';
+export default function Page() { return <MasterPage config={{ kind: 'sms-api', title: 'SMS API Master', description: 'Configure the institute SMS gateway URL and parameters.', icon: RadioTower, path: 'easy_com/manage_sms_api', fields: [{ key: 'url', label: 'URL', required: true }, { key: 'pram', label: 'Parameter', required: true }, { key: 'mobile_var', label: 'Mobile Variable', required: true }, { key: 'text_var', label: 'Text Variable', required: true }, { key: 'last_var', label: 'Last Variable', required: true }], columns: [{ key: 'url', label: 'URL' }, { key: 'pram', label: 'Parameter' }, { key: 'mobile_var', label: 'Mobile Variable' }, { key: 'text_var', label: 'Text Variable' }, { key: 'last_var', label: 'Last Variable' }] }} />; }

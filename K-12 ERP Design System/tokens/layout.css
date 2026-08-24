@@ -1,0 +1,47 @@
+/* =============================================================================
+   LAYOUT PRIMITIVES — breakpoints, container widths, z-index layers.
+   Breakpoints are documented here as tokens (CSS can't use vars in media
+   queries, so consumers hardcode these exact values in @media).
+   Source: 02_design_tokens.yaml + 03_layout_system.yaml
+   ============================================================================= */
+
+:root {
+  /* ---- Breakpoints (min-width, px) — mobile-first ----
+     xs 0 · sm 480 · md 768 · lg 1024 · xl 1280 · 2xl 1536 */
+  --bp-sm: 480px; /* @kind spacing */
+  --bp-md: 768px; /* @kind spacing */
+  --bp-lg: 1024px; /* @kind spacing */
+  --bp-xl: 1280px; /* @kind spacing */
+  --bp-2xl: 1536px; /* @kind spacing */
+
+  /* ---- Container max-widths ---- */
+  --container-sm: 480px; /* @kind spacing */
+  --container-md: 768px; /* @kind spacing */
+  --container-lg: 1024px; /* @kind spacing */
+  --container-xl: 1280px; /* @kind spacing */
+  --container-2xl: 1440px; /* @kind spacing */  /* cap dense layouts for readability */
+  --container-full: 100%; /* @kind spacing */
+  --container-prose: 72ch; /* @kind spacing */    /* optimal reading measure */
+
+  /* ---- Application frame dimensions ---- */
+  --sidebar-width-expanded: 256px; /* @kind spacing */
+  --sidebar-width-collapsed: 64px; /* @kind spacing */
+  --topnav-height: 64px; /* @kind spacing */
+  --toolbar-height: 56px; /* @kind spacing */
+  --breadcrumb-height: 40px; /* @kind spacing */
+
+  /* ---- Z-index layers ---- */
+  --z-hide: -1; /* @kind other */
+  --z-base: 0; /* @kind other */
+  --z-raised: 10; /* @kind other */
+  --z-docked: 100; /* @kind other */   /* sticky headers, toolbars */
+  --z-dropdown: 1000; /* @kind other */  /* menus, selects */
+  --z-sticky: 1100; /* @kind other */
+  --z-banner: 1200; /* @kind other */  /* system/announcement banners */
+  --z-overlay: 1300; /* @kind other */  /* scrims / backdrops */
+  --z-drawer: 1400; /* @kind other */  /* side sheets, panels */
+  --z-modal: 1500; /* @kind other */  /* centered dialogs */
+  --z-popover: 1600; /* @kind other */  /* popovers above modals */
+  --z-toast: 1700; /* @kind other */  /* transient notifications */
+  --z-tooltip: 1800; /* @kind other */
+}

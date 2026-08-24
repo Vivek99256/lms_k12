@@ -1,0 +1,69 @@
+{
+  "workflow": "confirm_admission",
+  "stage": "hydrating_candidate",
+  "candidates": [
+    {
+      "enquiryId": 14,
+      "enquiryNo": "2022010",
+      "fullName": "Rajesh",
+      "mobile": "7655467890",
+      "status": "new"
+    },
+    {
+      "enquiryId": 13,
+      "enquiryNo": "2022009",
+      "fullName": "Gajera Vivek Babubhai",
+      "mobile": "09925642448",
+      "status": "new"
+    },
+    {
+      "enquiryId": 10,
+      "enquiryNo": "2022008",
+      "fullName": "John Michael Smith",
+      "mobile": "9876543210",
+      "status": "new"
+    },
+    {
+      "enquiryId": 9,
+      "enquiryNo": "2022008",
+      "fullName": "John Michael Smith",
+      "mobile": "9876543210",
+      "status": "new"
+    },
+    {
+      "enquiryId": 8,
+      "enquiryNo": "2022008",
+      "fullName": "John Michael Smith",
+      "mobile": "9876543210",
+      "status": "new"
+    },
+    {
+      "enquiryId": 7,
+      "enquiryNo": "2022002",
+      "fullName": "Raj R R",
+      "mobile": "9909906511",
+      "standardName": "4",
+      "status": "approve"
+    },
+    {
+      "enquiryId": 1,
+      "enquiryNo": "2022001",
+      "fullName": "John Updated",
+      "mobile": "9876543211",
+      "standardName": "1",
+      "status": "approve"
+    }
+  ],
+  "hydratedData": {},
+  "collectedFields": {},
+  "missingFields": [],
+  "lastTool": "findAdmissionCandidate",
+  "selectedCandidate": {
+    "enquiryId": 13,
+    "enquiryNo": "2022009",
+    "fullName": "Gajera Vivek Babubhai",
+    "mobile": "09925642448",
+    "status": "new"
+  },
+  "enquiryId": 13
+}

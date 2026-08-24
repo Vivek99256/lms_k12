@@ -1,0 +1,46 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Workflow" subtitle="ApprovalCard, TimelineItem, ActivityFeed, AuditEntry" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .lbl { width: 100%; font: 600 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--content-tertiary); margin-bottom: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div id="root"></div>
+<script type="text/babel">
+const { ApprovalCard, TimelineItem, ActivityFeed, AuditEntry } = window.EduERPDesignSystem_d63b75;
+
+function Demo(){
+  return (<div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <ApprovalCard title="Admission application #0421" requester="Meera Sharma" submittedAt="2h ago" meta={[{term:"Class",value:"Grade 9"},{term:"Reg. fee",value:"₹2,500"}]} onApprove={()=>{}} onReject={()=>{}} onReview={()=>{}} />
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+      <ol className="ds-timeline">
+        <TimelineItem tone="success" title="Fee paid" actor="by Meera Sharma" timestamp="10:24" />
+        <TimelineItem tone="info" title="Application submitted" timestamp="Mon" />
+        <TimelineItem title="Enquiry created" timestamp="Last week" last />
+      </ol>
+      <ActivityFeed items={[{id:"1",actor:"Rahul K.",action:"approved admission for",target:"Aarav Sharma",timestamp:"5m"},{id:"2",actor:"System",action:"generated 42 fee receipts",timestamp:"1h"}]} />
+    </div>
+    <div style={{border:"1px solid var(--border-subtle)",borderRadius:8,padding:"4px 12px"}}>
+      <AuditEntry actor="admin@school.edu" action="Updated" actionType="update" target="Fee structure — Grade 9" timestamp="01 Jul, 10:24" expandable ip="10.0.2.14" detail={{Field:"Tuition",From:"₹40,000",To:"₹42,000"}} />
+      <AuditEntry actor="rahul@school.edu" action="Approved" actionType="create" target="Admission #0421" timestamp="01 Jul, 09:10" />
+    </div>
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

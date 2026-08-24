@@ -1,0 +1,53 @@
+<!-- @dsCard group="Components" viewport="700x320" name="Selection" subtitle="Checkbox, RadioGroup, Toggle, Select, Combobox, SegmentedControl" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .lbl { width: 100%; font: 600 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--content-tertiary); margin-bottom: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  
+</style>
+</head>
+<body data-theme="light" style="color-scheme:light">
+<div id="root"></div>
+<script type="text/babel">
+const { Checkbox, RadioGroup, Toggle, Select, Combobox, SegmentedControl } = window.EduERPDesignSystem_d63b75;
+
+function Demo(){
+  const [sel,setSel]=React.useState("9a");
+  const [multi,setMulti]=React.useState(["math"]);
+  const [seg,setSeg]=React.useState("month");
+  return (<div className="grid2">
+    <div>
+      <div className="lbl">Checkbox</div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        <Checkbox label="Send SMS to parents" defaultChecked />
+        <Checkbox label="Partial selection" indeterminate />
+        <Checkbox label="Disabled" disabled />
+      </div>
+    </div>
+    <div><div className="lbl">Radio</div>
+      <RadioGroup label="Gender" orientation="horizontal" defaultValue="m" options={[{value:"m",label:"Male"},{value:"f",label:"Female"},{value:"o",label:"Other"}]} />
+      <div style={{marginTop:12}}><Toggle label="Email notifications" defaultChecked /></div>
+    </div>
+    <Select label="Class" value={sel} onChange={setSel} options={[{value:"9a",label:"Grade 9 - A"},{value:"9b",label:"Grade 9 - B"},{value:"10a",label:"Grade 10 - A"}]} />
+    <Combobox label="Assign subjects" multi value={multi} onChange={setMulti} options={[{value:"math",label:"Mathematics"},{value:"sci",label:"Science"},{value:"eng",label:"English"}]} />
+    <div style={{gridColumn:"1 / -1"}}><div className="lbl">Segmented control</div>
+      <SegmentedControl value={seg} onChange={setSeg} options={[{value:"month",label:"Month"},{value:"week",label:"Week"},{value:"day",label:"Day"}]} />
+    </div>
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+</script>
+</body>
+</html>

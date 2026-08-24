@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html data-theme="light" style="color-scheme:light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="ERP list page" description="Enterprise list-page scaffold: page header, filter toolbar, sortable/selectable data table, pagination — built from EduERP components." -->
+<helmet>
+<script src="./ds-base.js"></script>
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+</helmet>
+<div style="max-width:1280px;margin:0 auto;padding:24px 32px 48px;display:flex;flex-direction:column;gap:20px;font-family:var(--font-sans);color:var(--content-primary);background:var(--surface-canvas);min-height:100vh;box-sizing:border-box">
+
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <h1 style="margin:0;font-size:var(--text-h1-size);font-weight:var(--text-h1-wt);letter-spacing:var(--text-h1-ls);color:var(--content-primary)">{{ title }}</h1>
+      <p style="margin:4px 0 0;font-size:var(--text-body-sm-size);color:var(--content-secondary)">{{ subtitle }}</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <x-import component-from-global-scope="EduERPDesignSystem_d63b75.Button" variant="secondary" icon-start="upload" hint-size="110px,36px">Import</x-import>
+      <x-import component-from-global-scope="EduERPDesignSystem_d63b75.Button" variant="primary" icon-start="plus" hint-size="140px,36px">Add student</x-import>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <div style="width:260px">
+      <x-import component-from-global-scope="EduERPDesignSystem_d63b75.SearchInput" placeholder="Search students…" size="sm" hint-size="260px,32px"></x-import>
+    </div>
+    <x-import component-from-global-scope="EduERPDesignSystem_d63b75.Select" placeholder="Class" size="sm" options="{{ classOptions }}" hint-size="140px,32px"></x-import>
+    <span style="margin-inline-start:auto;font-size:var(--text-caption-size);color:var(--content-secondary)">{{ countLabel }}</span>
+  </div>
+
+  <div data-density="cozy">
+    <x-import
+      component-from-global-scope="EduERPDesignSystem_d63b75.DataTable"
+      columns="{{ columns }}"
+      data="{{ rows }}"
+      selectable="{{ true }}"
+      selected-keys="{{ selectedKeys }}"
+      on-selection-change="{{ setSelected }}"
+      sort-key="{{ sortKey }}"
+      sort-dir="{{ sortDir }}"
+      on-sort="{{ onSort }}"
+      hint-size="100%,360px">
+    </x-import>
+  </div>
+
+  <div>
+    <x-import
+      component-from-global-scope="EduERPDesignSystem_d63b75.Pagination"
+      page="{{ 1 }}"
+      page-count="{{ 4 }}"
+      page-size="{{ 25 }}"
+      total="{{ total }}"
+      hint-size="100%,44px">
+    </x-import>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:620}}">
+class Component extends DCLogic {
+  state = { selectedKeys: [2], sortKey: "name", sortDir: "asc" };
+
+  ns() { return window.EduERPDesignSystem_d63b75 || {}; }
+
+  renderVals() {
+    const NS = this.ns();
+    const Badge = NS.Badge;
+    const Avatar = NS.Avatar;
+    const inr = (n) => "₹" + Number(n).toLocaleString("en-IN");
+    const sv = { Active: "success", "Fees due": "warning", Inactive: "neutral" };
+
+    const rows = [
+      { id: 1, name: "Aarav Sharma", cls: "Grade 9 - A", roll: 21, status: "Active", due: 0 },
+      { id: 2, name: "Diya Patel", cls: "Grade 9 - A", roll: 22, status: "Fees due", due: 12500 },
+      { id: 3, name: "Kabir Singh", cls: "Grade 9 - B", roll: 7, status: "Active", due: 0 },
+      { id: 4, name: "Ananya Rao", cls: "Grade 10 - A", roll: 4, status: "Inactive", due: 2500 },
+      { id: 5, name: "Vivaan Mehta", cls: "Grade 10 - A", roll: 12, status: "Active", due: 0 },
+    ];
+
+    const columns = [
+      { key: "name", header: "Student", sortable: true, render: (r) =>
+        React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 10 } },
+          Avatar ? React.createElement(Avatar, { name: r.name, size: "sm" }) : null,
+          React.createElement("span", { style: { fontWeight: 500 } }, r.name)) },
+      { key: "cls", header: "Class", sortable: true },
+      { key: "roll", header: "Roll", align: "end", sortable: true },
+      { key: "status", header: "Status", render: (r) =>
+        Badge ? React.createElement(Badge, { variant: sv[r.status], dot: true }, r.status) : r.status },
+      { key: "due", header: "Balance", align: "end", sortable: true, render: (r) => inr(r.due) },
+    ];
+
+    return {
+      title: "Students",
+      subtitle: "5 shown · Academic year 2026–27",
+      countLabel: "5 of 1,284",
+      total: 1284,
+      classOptions: [
+        { value: "9", label: "Grade 9" },
+        { value: "10", label: "Grade 10" },
+      ],
+      columns,
+      rows,
+      selectedKeys: this.state.selectedKeys,
+      sortKey: this.state.sortKey,
+      sortDir: this.state.sortDir,
+      setSelected: (keys) => this.setState({ selectedKeys: keys }),
+      onSort: (key, dir) => this.setState({ sortKey: key, sortDir: dir }),
+    };
+  }
+}
+</script>
+</body>
+</html>

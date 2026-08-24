@@ -1,0 +1,75 @@
+/* =============================================================================
+   BASE — minimal, token-driven resets and root element defaults.
+   Establishes body typography, box-sizing, focus-visible baseline, and the
+   accessible focus ring used platform-wide (WCAG 2.2 focus-appearance).
+   ============================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-lh);
+  font-weight: var(--font-weight-regular);
+  color: var(--content-primary);
+  background: var(--surface-canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Headings inherit; role classes below apply the scale. */
+h1, h2, h3, h4, h5, h6, p, figure {
+  margin: 0;
+}
+
+a {
+  color: var(--content-link);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--content-link-hover);
+  text-decoration: underline;
+}
+
+/* Consistent, visible focus ring — keyboard only. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-off);
+  border-radius: var(--radius-focus);
+}
+
+::selection {
+  background: var(--action-subtle-active);
+  color: var(--content-primary);
+}
+
+/* Numeric alignment helper for tables. */
+.ds-num {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+/* =============================================================================
+   TYPE ROLE UTILITY CLASSES — apply a semantic type role in one class.
+   ============================================================================= */
+.ds-display  { font-family: var(--font-display); font-size: var(--text-display-size); line-height: var(--text-display-lh); font-weight: var(--text-display-wt); letter-spacing: var(--text-display-ls); }
+.ds-h1       { font-size: var(--text-h1-size); line-height: var(--text-h1-lh); font-weight: var(--text-h1-wt); letter-spacing: var(--text-h1-ls); }
+.ds-h2       { font-size: var(--text-h2-size); line-height: var(--text-h2-lh); font-weight: var(--text-h2-wt); }
+.ds-h3       { font-size: var(--text-h3-size); line-height: var(--text-h3-lh); font-weight: var(--text-h3-wt); }
+.ds-body-lg  { font-size: var(--text-body-lg-size); line-height: var(--text-body-lg-lh); }
+.ds-body     { font-size: var(--text-body-size); line-height: var(--text-body-lh); }
+.ds-body-sm  { font-size: var(--text-body-sm-size); line-height: var(--text-body-sm-lh); }
+.ds-label    { font-size: var(--text-label-size); line-height: var(--text-label-lh); font-weight: var(--text-label-wt); }
+.ds-caption  { font-size: var(--text-caption-size); line-height: var(--text-caption-lh); color: var(--content-secondary); }
+.ds-overline { font-size: var(--text-overline-size); line-height: var(--text-overline-lh); font-weight: var(--text-overline-wt); letter-spacing: var(--text-overline-ls); text-transform: uppercase; color: var(--content-tertiary); }
+.ds-code     { font-family: var(--font-mono); font-size: var(--font-size-sm); }

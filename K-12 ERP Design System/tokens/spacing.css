@@ -1,0 +1,110 @@
+/* =============================================================================
+   SPACING — 4px base rhythm. Numeric primitive scale, semantic intents,
+   and density modes (comfortable / cozy / compact).
+   Source: 02_design_tokens.yaml
+   ============================================================================= */
+
+:root {
+  /* ---- Primitive scale (px) ---- */
+  --space-0:    0;
+  --space-px:   1px;
+  --space-0-5:  2px;
+  --space-1:    4px;
+  --space-1-5:  6px;
+  --space-2:    8px;
+  --space-2-5:  10px;
+  --space-3:    12px;
+  --space-3-5:  14px;
+  --space-4:    16px;
+  --space-5:    20px;
+  --space-6:    24px;
+  --space-7:    28px;
+  --space-8:    32px;
+  --space-9:    36px;
+  --space-10:   40px;
+  --space-11:   44px;
+  --space-12:   48px;
+  --space-14:   56px;
+  --space-16:   64px;
+  --space-20:   80px;
+  --space-24:   96px;
+  --space-28:   112px;
+  --space-32:   128px;
+  --space-40:   160px;
+  --space-48:   192px;
+  --space-56:   224px;
+  --space-64:   256px;
+
+  /* ---- Semantic: inset (inner padding) ---- */
+  --inset-xs: var(--space-2);
+  --inset-sm: var(--space-3);
+  --inset-md: var(--space-4);
+  --inset-lg: var(--space-6);
+  --inset-xl: var(--space-8);
+
+  /* ---- Semantic: stack (vertical gap) ---- */
+  --stack-xs: var(--space-1);
+  --stack-sm: var(--space-2);
+  --stack-md: var(--space-4);
+  --stack-lg: var(--space-6);
+  --stack-xl: var(--space-8);
+
+  /* ---- Semantic: inline (horizontal gap) ---- */
+  --inline-xs: var(--space-1);
+  --inline-sm: var(--space-2);
+  --inline-md: var(--space-3);
+  --inline-lg: var(--space-4);
+
+  /* ---- Semantic: gutter (layout/grid) ---- */
+  --gutter-sm: var(--space-4);
+  --gutter-md: var(--space-6);
+  --gutter-lg: var(--space-8);
+
+  /* ---- Semantic: section (major page regions) ---- */
+  --section-sm: var(--space-8);
+  --section-md: var(--space-12);
+  --section-lg: var(--space-16);
+
+  /* ---- Density: comfortable (parent / mobile-friendly) ---- */
+  --density-comfortable-control-height: var(--space-11); /* 44px */
+  --density-comfortable-row-height:     var(--space-12); /* 48px */
+  --density-comfortable-inset-x:        var(--space-4);
+  --density-comfortable-inset-y:        var(--space-3);
+
+  /* ---- Density: cozy (default admin/staff) ---- */
+  --density-cozy-control-height: var(--space-9);  /* 36px */
+  --density-cozy-row-height:     var(--space-10); /* 40px */
+  --density-cozy-inset-x:        var(--space-3);
+  --density-cozy-inset-y:        var(--space-2);
+
+  /* ---- Density: compact (power-user dense grids) ---- */
+  --density-compact-control-height: var(--space-8); /* 32px */
+  --density-compact-row-height:     var(--space-8); /* 32px */
+  --density-compact-inset-x:        var(--space-2);
+  --density-compact-inset-y:        var(--space-1);
+
+  /* ---- Active density (overridable via [data-density]) ---- */
+  --control-height: var(--density-cozy-control-height);
+  --row-height:     var(--density-cozy-row-height);
+  --row-inset-x:    var(--density-cozy-inset-x);
+  --row-inset-y:    var(--density-cozy-inset-y);
+}
+
+[data-density="comfortable"] {
+  --control-height: var(--density-comfortable-control-height);
+  --row-height:     var(--density-comfortable-row-height);
+  --row-inset-x:    var(--density-comfortable-inset-x);
+  --row-inset-y:    var(--density-comfortable-inset-y);
+}
+[data-density="cozy"] {
+  --control-height: var(--density-cozy-control-height);
+  --row-height:     var(--density-cozy-row-height);
+  --row-inset-x:    var(--density-cozy-inset-x);
+  --row-inset-y:    var(--density-cozy-inset-y);
+}
+[data-density="compact"] {
+  --control-height: var(--density-compact-control-height);
+  --row-height:     var(--density-compact-row-height);
+  --row-inset-x:    var(--density-compact-inset-x);
+  --row-inset-y:    var(--density-compact-inset-y);
+}
