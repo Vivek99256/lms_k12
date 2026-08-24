@@ -54,7 +54,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(payload, { status: upstream.status });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Proxy request failed';
-    return NextResponse.json({ message }, { status: 502 });
+    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : undefined;
+    return NextResponse.json({ message, cause, target: url }, { status: 502 });
   }
 }
 
@@ -115,6 +116,7 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
     return NextResponse.json(payload, { status: upstream.status });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Proxy request failed';
-    return NextResponse.json({ message }, { status: 502 });
+    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : undefined;
+    return NextResponse.json({ message, cause, target: url }, { status: 502 });
   }
 }
