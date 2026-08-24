@@ -46,6 +46,49 @@ async function postDashboardProxy<T extends ApiStatusPayload>(path: string, sess
   return payload;
 }
 
+/**
+ * Same as `postDashboardProxy`, but calls Laravel directly from the browser
+ * instead of routing through the Next.js server (`/api/dashboard/*`). Used
+ * where the Vercel serverless function can't reach the Laravel host but the
+ * browser can, since the backend already answers CORS preflights for this origin.
+ */
+async function postDashboardDirect<T extends ApiStatusPayload>(laravelPath: string, session: DashboardSession, signal?: AbortSignal): Promise<T> {
+  const headers = new Headers();
+  headers.set('Accept', 'application/json');
+  headers.set('Content-Type', 'application/json');
+  headers.set('X-Requested-With', 'XMLHttpRequest');
+  if (session.token) headers.set('Authorization', `Bearer ${session.token}`);
+
+  const response = await fetch(`${getApiBaseUrl(session)}${laravelPath}`, {
+    method: 'POST',
+    signal,
+    headers,
+    cache: 'no-store',
+    body: JSON.stringify({
+      type: 'JSON',
+      sub_institute_id: session.subInstituteId,
+      syear: session.academicYearId,
+      user_id: session.userId,
+      term_id: session.termId,
+    }),
+  });
+
+  const text = await response.text();
+  let payload: T;
+  try {
+    payload = JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Admin dashboard request returned a non-JSON response (${response.headers.get('content-type') || 'unknown content type'}).`);
+  }
+
+  if (!response.ok) {
+    throw new Error(readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to load the dashboard.`);
+  }
+
+  assertApiSuccess(payload, 'Unable to load the dashboard.');
+  return payload;
+}
+
 export type AdminDashboardSummary = ApiStatusPayload & {
   summary: {
     total_students: number;
@@ -94,7 +137,7 @@ export type StudentDashboardSummary = ApiStatusPayload & {
 };
 
 export function fetchAdminDashboard(session: DashboardSession, signal?: AbortSignal) {
-  return postDashboardProxy<AdminDashboardSummary>('/api/dashboard/admin', session, signal);
+  return postDashboardDirect<AdminDashboardSummary>('/api/admin-dashboard/summary', session, signal);
 }
 
 export function fetchTeacherDashboard(session: DashboardSession, signal?: AbortSignal) {
