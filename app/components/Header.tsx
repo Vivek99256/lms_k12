@@ -11,8 +11,8 @@ const profileMenuItems = [
   'Onboarding',
   'Add Process',
   'Fields Configuration',
-  'Group-wise Rights',
-  'Individual Rights',
+  // 'Group-wise Rights',
+  // 'Individual Rights',
   'Mobile App Rights',
 ] as const;
 
