@@ -122,7 +122,7 @@ export function StepDrawer({
             </p>
             <div className="flex flex-col gap-3">
               <OwnerMarker
-                label={currentUserName}
+                owner={step.owner}
                 role={step.owner === "TRIZ" ? step.trizRole : step.schoolRole}
                 lead
               />
@@ -162,6 +162,17 @@ export function StepDrawer({
               </div>
             </div>
           )}
+
+          {step.action.quickMenu ? (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Quick menu
+              </p>
+              <p className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-700">
+                {step.action.quickMenu}
+              </p>
+            </div>
+          ) : null}
 
 
 

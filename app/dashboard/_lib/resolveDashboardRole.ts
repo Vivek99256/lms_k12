@@ -1,7 +1,7 @@
 export type DashboardRole = 'admin' | 'teacher' | 'student';
 
 const ADMIN_PROFILES = new Set(['super admin', 'admin', 'school admin']);
-const TEACHER_PROFILES = new Set(['teacher']);
+const TEACHER_PROFILES = new Set(['teacher', 'lms teacher']);
 const STUDENT_PROFILES = new Set(['student']);
 
 /**

@@ -1,9 +1,10 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ChevronDown, ChevronLeft, Download, Filter, Pencil, Plus, Search, X } from 'lucide-react';
 import RequireStaff from '@/app/lms/_shared/RequireStaff';
+import { createAuthHeaders, useLmsSessionContext } from '@/app/lms/_shared/useLmsSession';
 
 type Stat = {
   label: string;
@@ -62,319 +63,110 @@ type SubjectProgressDetail = {
   topics: SubjectProgressTopic[];
 };
 
-const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-
-const stats: Stat[] = [
-  { label: 'Total topics', value: '48', helper: 'across 6 subjects', progress: 100, color: '#d8d4ce' },
-  { label: 'Completed', value: '19', helper: '40% of year done', progress: 40, color: '#1aa179' },
-  { label: 'In progress', value: '7', helper: 'current month', progress: 58, color: '#2f7dd9' },
-  { label: 'Weeks remaining', value: '22', helper: 'ends June 2026', progress: 46, color: '#b87916' },
+const subjectColorPalette = [
+  { dotColor: '#2f7dd9', fill: '#dcecff', text: '#114f8f' },
+  { dotColor: '#18a379', fill: '#d8f0e8', text: '#0d6c55' },
+  { dotColor: '#7468d9', fill: '#e8e4fb', text: '#473aa5' },
+  { dotColor: '#b87916', fill: '#fae8c7', text: '#6f470c' },
+  { dotColor: '#d45628', fill: '#fae0d4', text: '#8a331a' },
+  { dotColor: '#c64a74', fill: '#f7dce8', text: '#8b2549' },
 ];
 
-const subjectPlans: SubjectPlan[] = [
-  {
-    name: 'Maths',
-    displayName: 'Mathematics',
-    dotColor: '#2f7dd9',
-    fill: '#dcecff',
-    text: '#114f8f',
-    topics: ['Algebra', 'Algebra', 'Geometry', 'Geometry', 'Statistics', 'Break', 'Fractions', 'Fractions', 'Calculus', 'Calculus', 'Revision', 'Exams'],
-    progress: 62,
-  },
-  {
-    name: 'Science',
-    displayName: 'Science',
-    dotColor: '#18a379',
-    fill: '#d8f0e8',
-    text: '#0d6c55',
-    topics: ['Biology', 'Biology', 'Chemistry', 'Chemistry', 'Physics', 'Break', 'Ecology', 'Ecology', 'Physics', 'Lab work', 'Revision', 'Exams'],
-    progress: 55,
-  },
-  {
-    name: 'English',
-    displayName: 'English',
-    dotColor: '#7468d9',
-    fill: '#e8e4fb',
-    text: '#473aa5',
-    topics: ['Prose', 'Prose', 'Poetry', 'Drama', 'Drama', 'Break', 'Writing', 'Writing', 'Media', 'Media', 'Revision', 'Exams'],
-    progress: 48,
-  },
-  {
-    name: 'History',
-    displayName: 'History',
-    dotColor: '#b87916',
-    fill: '#fae8c7',
-    text: '#6f470c',
-    topics: ['WWI', 'WWI', 'WWII', 'WWII', 'Cold War', 'Break', 'Civil Rights', 'Cold War', 'Modern', 'Modern', 'Revision', 'Exams'],
-    progress: 40,
-  },
-  {
-    name: 'Geography',
-    displayName: 'Geography',
-    dotColor: '#d45628',
-    fill: '#fae0d4',
-    text: '#8a331a',
-    topics: ['Climate', 'Climate', 'Landforms', 'Landforms', 'Ecosystems', 'Break', 'Urban', 'Urban', 'Dev.', 'Dev.', 'Revision', 'Exams'],
-    progress: 35,
-  },
-  {
-    name: 'Art',
-    displayName: 'Art',
-    dotColor: '#c64a74',
-    fill: '#f7dce8',
-    text: '#8b2549',
-    topics: ['Drawing', 'Drawing', 'Colour', 'Colour', '3D Forms', 'Break', 'Digital', 'Digital', 'Portfolio', 'Portfolio', 'Exhibition', 'Exhibition'],
-    progress: 50,
-  },
-];
+function subjectColorAt(index: number) {
+  return subjectColorPalette[index % subjectColorPalette.length];
+}
+
+// --- Curriculum Planning API -------------------------------------------------
+
+type ApiStats = {
+  total_topics: number;
+  completed: number;
+  in_progress: number;
+  weeks_remaining: number;
+  completion_percent: number;
+};
+
+type ApiSubjectMonth = {
+  month: string;
+  month_key: string;
+  topics: string[];
+  completion_percent: number;
+};
+
+type ApiSubject = {
+  subject_id: number;
+  subject_name: string;
+  standard_id: number;
+  standard_name: string | null;
+  progress: number;
+  months: ApiSubjectMonth[];
+};
+
+type ApiUpcomingLesson = {
+  period_id: number;
+  subject_id: number | null;
+  subject_name: string | null;
+  standard_id: number | null;
+  standard_name: string | null;
+  topic: string | null;
+  scheduled_date: string;
+  period_slot: string;
+  status: string;
+  teacher_name: string;
+};
+
+type ApiSubjectProgressTopic = {
+  title: string;
+  start_date: string;
+  end_date: string;
+  status: SubjectProgressStatus;
+};
+
+type ApiSubjectProgress = {
+  subject_id: number;
+  subject_name: string;
+  standard_id: number;
+  standard_name: string | null;
+  progress: number;
+  topics: ApiSubjectProgressTopic[];
+};
+
+type CurriculumPlanningApiData = {
+  stats: ApiStats;
+  subjects: ApiSubject[];
+  upcoming_lessons: ApiUpcomingLesson[];
+  subject_progress: ApiSubjectProgress[];
+};
+
+type CurriculumPlanningApiResponse = {
+  status?: boolean;
+  message?: string;
+  data?: CurriculumPlanningApiData | [];
+};
+
+function formatShortDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function upcomingStatusLabel(status: string): UpcomingLessonStatus {
+  if (status === 'in_progress') return 'In progress';
+  if (status === 'completed') return 'Ready';
+  return 'Upcoming';
+}
+
+const upcomingBadgeClassName: Record<UpcomingLessonStatus, string> = {
+  'In progress': 'bg-[#dcecff] text-[#114f8f]',
+  Upcoming: 'bg-[#e9e7e3] text-[#68635d]',
+  Ready: 'bg-[#def4d2] text-[#3f7b2b]',
+};
 
 const calendarDays = [
   5, 6, 7, 8, 9,
   12, 13, 14, 15, 16,
   19, 20, 21, 22, 23,
   26, 27, 28, 29, 30,
-];
-
-const upcomingLessons: Lesson[] = [
-  {
-    subject: 'Maths',
-    title: 'Calculus - Introduction to derivatives',
-    meta: 'Maths - Today - Period 2 - Room 14',
-    dotColor: '#2f7dd9',
-    status: 'In progress',
-    badgeClassName: 'bg-[#dcecff] text-[#114f8f]',
-  },
-  {
-    subject: 'Science',
-    title: 'Revision - Ecosystems & biomes',
-    meta: 'Science - Tomorrow - Period 4 - Lab B',
-    dotColor: '#18a379',
-    status: 'Upcoming',
-    badgeClassName: 'bg-[#e9e7e3] text-[#68635d]',
-  },
-  {
-    subject: 'English',
-    title: 'Media literacy - Analysing news sources',
-    meta: 'English - 23 May - Period 1 - Room 7',
-    dotColor: '#7468d9',
-    status: 'Upcoming',
-    badgeClassName: 'bg-[#e9e7e3] text-[#68635d]',
-  },
-  {
-    subject: 'History',
-    title: 'Revision - Cold War and detente',
-    meta: 'History - 26 May - Period 3 - Room 9',
-    dotColor: '#b87916',
-    status: 'Ready',
-    badgeClassName: 'bg-[#def4d2] text-[#3f7b2b]',
-  },
-];
-
-const allUpcomingLessons: UpcomingLessonRow[] = [
-  {
-    date: '21 May',
-    time: '9:30 AM',
-    subject: 'Maths',
-    dotColor: '#2f7dd9',
-    fill: '#dcecff',
-    text: '#0f4c8a',
-    topic: 'Calculus - Intro to derivatives',
-    room: 'Room 14',
-    period: 'P2',
-    status: 'In progress',
-    highlight: true,
-  },
-  {
-    date: '21 May',
-    time: '11:30 AM',
-    subject: 'English',
-    dotColor: '#7468d9',
-    fill: '#e8e4fb',
-    text: '#473aa5',
-    topic: 'Media literacy - Analysing news',
-    room: 'Room 7',
-    period: 'P4',
-    status: 'Upcoming',
-  },
-  {
-    date: '21 May',
-    time: '1:30 PM',
-    subject: 'Geography',
-    dotColor: '#d45628',
-    fill: '#fae0d4',
-    text: '#8a331a',
-    topic: 'Development - Human development index',
-    room: 'Room 3',
-    period: 'P6',
-    status: 'Ready',
-  },
-  {
-    date: '22 May',
-    time: '9:30 AM',
-    subject: 'Science',
-    dotColor: '#18a379',
-    fill: '#d8f0e8',
-    text: '#0d6c55',
-    topic: 'Revision - Ecosystems and biomes',
-    room: 'Lab B',
-    period: 'P2',
-    status: 'Upcoming',
-  },
-  {
-    date: '22 May',
-    time: '11:30 AM',
-    subject: 'History',
-    dotColor: '#b87916',
-    fill: '#fae8c7',
-    text: '#6f470c',
-    topic: 'Cold War - Detente and arms race',
-    room: 'Room 9',
-    period: 'P4',
-    status: 'Ready',
-  },
-  {
-    date: '23 May',
-    time: '9:30 AM',
-    subject: 'Art',
-    dotColor: '#c64a74',
-    fill: '#f7dce8',
-    text: '#8b2549',
-    topic: 'Exhibition prep - Final portfolio review',
-    room: 'Studio',
-    period: 'P1',
-    status: 'Upcoming',
-  },
-  {
-    date: '26 May',
-    time: '9:30 AM',
-    subject: 'Maths',
-    dotColor: '#2f7dd9',
-    fill: '#dcecff',
-    text: '#0f4c8a',
-    topic: 'Calculus - Differentiation rules',
-    room: 'Room 14',
-    period: 'P2',
-    status: 'Upcoming',
-  },
-  {
-    date: '26 May',
-    time: '1:30 PM',
-    subject: 'Science',
-    dotColor: '#18a379',
-    fill: '#d8f0e8',
-    text: '#0d6c55',
-    topic: 'Physics - Forces and motion',
-    room: 'Lab A',
-    period: 'P6',
-    status: 'Upcoming',
-  },
-  {
-    date: '27 May',
-    time: '11:30 AM',
-    subject: 'English',
-    dotColor: '#7468d9',
-    fill: '#e8e4fb',
-    text: '#473aa5',
-    topic: 'Writing - Argumentative essays',
-    room: 'Room 7',
-    period: 'P4',
-    status: 'Upcoming',
-  },
-  {
-    date: '28 May',
-    time: '9:30 AM',
-    subject: 'History',
-    dotColor: '#b87916',
-    fill: '#fae8c7',
-    text: '#6f470c',
-    topic: 'Modern history - Globalisation',
-    room: 'Room 9',
-    period: 'P2',
-    status: 'Upcoming',
-  },
-];
-
-const subjectProgressDetails: SubjectProgressDetail[] = [
-  {
-    subject: 'Mathematics',
-    color: '#2f7dd9',
-    progress: 62,
-    topics: [
-      { title: 'Algebra', range: 'Jul-Aug - 2 months', status: 'Done' },
-      { title: 'Geometry', range: 'Sep-Oct - 2 months', status: 'Done' },
-      { title: 'Statistics', range: 'Nov - 1 month', status: 'Done' },
-      { title: 'Fractions', range: 'Jan-Feb - 2 months', status: 'Done' },
-      { title: 'Calculus', range: 'Mar-Apr - 2 months', status: 'In progress' },
-      { title: 'Revision', range: 'May - 1 month', status: 'Upcoming' },
-      { title: 'Exams', range: 'Jun - 1 month', status: 'Upcoming' },
-    ],
-  },
-  {
-    subject: 'Science',
-    color: '#18a379',
-    progress: 55,
-    topics: [
-      { title: 'Biology', range: 'Jul-Aug', status: 'Done' },
-      { title: 'Chemistry', range: 'Sep-Oct', status: 'Done' },
-      { title: 'Physics (term 1)', range: 'Nov', status: 'Done' },
-      { title: 'Ecology', range: 'Jan-Feb', status: 'In progress' },
-      { title: 'Physics (term 2)', range: 'Mar', status: 'Upcoming' },
-      { title: 'Lab work', range: 'Apr', status: 'Upcoming' },
-      { title: 'Revision & Exams', range: 'May-Jun', status: 'Upcoming' },
-    ],
-  },
-  {
-    subject: 'English',
-    color: '#7468d9',
-    progress: 48,
-    topics: [
-      { title: 'Prose reading', range: 'Jul-Aug', status: 'Done' },
-      { title: 'Poetry', range: 'Sep', status: 'Done' },
-      { title: 'Drama', range: 'Oct-Nov', status: 'Done' },
-      { title: 'Writing skills', range: 'Jan-Feb', status: 'In progress' },
-      { title: 'Media literacy', range: 'Mar-Apr', status: 'In progress' },
-      { title: 'Revision & Exams', range: 'May-Jun', status: 'Upcoming' },
-    ],
-  },
-  {
-    subject: 'History',
-    color: '#b87916',
-    progress: 40,
-    topics: [
-      { title: 'World War I', range: 'Jul-Aug', status: 'Done' },
-      { title: 'World War II', range: 'Sep-Oct', status: 'Done' },
-      { title: 'Cold War', range: 'Nov - Feb', status: 'In progress' },
-      { title: 'Civil Rights', range: 'Jan', status: 'Upcoming' },
-      { title: 'Modern history', range: 'Mar-Apr', status: 'Upcoming' },
-      { title: 'Revision & Exams', range: 'May-Jun', status: 'Upcoming' },
-    ],
-  },
-  {
-    subject: 'Geography',
-    color: '#d45628',
-    progress: 35,
-    topics: [
-      { title: 'Climate systems', range: 'Jul-Aug', status: 'Done' },
-      { title: 'Landforms', range: 'Sep-Oct', status: 'Done' },
-      { title: 'Ecosystems', range: 'Nov', status: 'In progress' },
-      { title: 'Urban geography', range: 'Jan-Feb', status: 'Upcoming' },
-      { title: 'Development', range: 'Mar-Apr', status: 'Upcoming' },
-      { title: 'Revision & Exams', range: 'May-Jun', status: 'Upcoming' },
-    ],
-  },
-  {
-    subject: 'Art',
-    color: '#c64a74',
-    progress: 50,
-    topics: [
-      { title: 'Drawing fundamentals', range: 'Jul-Aug', status: 'Done' },
-      { title: 'Colour theory', range: 'Sep-Oct', status: 'Done' },
-      { title: '3D forms & sculpture', range: 'Nov', status: 'Done' },
-      { title: 'Digital art', range: 'Jan-Feb', status: 'In progress' },
-      { title: 'Portfolio development', range: 'Mar-Apr', status: 'In progress' },
-      { title: 'Exhibition prep', range: 'May-Jun', status: 'Upcoming' },
-    ],
-  },
 ];
 
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -952,10 +744,14 @@ function EditTopicDialog({ onClose }: { onClose: () => void }) {
 }
 
 function AllUpcomingLessonsView({
+  lessons,
+  gradeLabel,
   onBack,
   onFilter,
   onAddLesson,
 }: {
+  lessons: UpcomingLessonRow[];
+  gradeLabel: string;
   onBack: () => void;
   onFilter: () => void;
   onAddLesson: () => void;
@@ -981,7 +777,7 @@ function AllUpcomingLessonsView({
           <div>
             <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">All upcoming lessons</h1>
             <p className="mt-1 text-sm text-[#706b64]">
-              Grade 8 - From 21 May 2026 onwards - 134 lessons remaining
+              {gradeLabel} - {lessons.length} lessons remaining
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1057,14 +853,14 @@ function AllUpcomingLessonsView({
                 <th className="px-4 py-4">Date &amp; time</th>
                 <th className="px-4 py-4">Subject</th>
                 <th className="px-4 py-4">Topic</th>
-                <th className="px-4 py-4">Room</th>
+                <th className="px-4 py-4">Teacher</th>
                 <th className="px-4 py-4">Period</th>
                 <th className="px-4 py-4">Status</th>
                 <th className="px-4 py-4">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {allUpcomingLessons.map((lesson) => (
+              {lessons.map((lesson) => (
                 <tr key={`${lesson.date}-${lesson.time}-${lesson.topic}`} className="border-t border-[#e7e3dd]">
                   <td
                     className={`whitespace-nowrap px-4 py-4 text-xs font-medium ${
@@ -1103,7 +899,7 @@ function AllUpcomingLessonsView({
       </section>
 
       <div className="mt-5 flex flex-col gap-3 text-xs text-[#706b64] sm:flex-row sm:items-center sm:justify-between">
-        <div>Showing 10 of 134 upcoming lessons</div>
+        <div>Showing {lessons.length} of {lessons.length} upcoming lessons</div>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -1139,9 +935,15 @@ function AllUpcomingLessonsView({
 }
 
 function SubjectProgressDetailsView({
+  subjects,
+  stats,
+  gradeLabel,
   onBack,
   onFilter,
 }: {
+  subjects: SubjectProgressDetail[];
+  stats: Stat[];
+  gradeLabel: string;
   onBack: () => void;
   onFilter: () => void;
 }) {
@@ -1167,7 +969,7 @@ function SubjectProgressDetailsView({
             <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">
               Subject progress - detailed breakdown
             </h1>
-            <p className="mt-1 text-sm text-[#706b64]">Grade 8 - All subjects - Academic Year 2025-26</p>
+            <p className="mt-1 text-sm text-[#706b64]">{gradeLabel} - All subjects</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -1190,22 +992,16 @@ function SubjectProgressDetailsView({
       </div>
 
       <section className="mb-4 grid gap-3 md:grid-cols-3">
-        <div className="rounded-lg bg-white px-4 py-4 text-center">
-          <div className="text-3xl font-bold leading-none tracking-[0] text-[#17160f]">48</div>
-          <div className="mt-2 text-xs font-medium text-[#77716b]">Total topics</div>
-        </div>
-        <div className="rounded-lg bg-white px-4 py-4 text-center">
-          <div className="text-3xl font-bold leading-none tracking-[0] text-[#0d6c55]">19</div>
-          <div className="mt-2 text-xs font-medium text-[#77716b]">Completed</div>
-        </div>
-        <div className="rounded-lg bg-white px-4 py-4 text-center">
-          <div className="text-3xl font-bold leading-none tracking-[0] text-[#0f4c8a]">7</div>
-          <div className="mt-2 text-xs font-medium text-[#77716b]">In progress</div>
-        </div>
+        {stats.slice(0, 3).map((stat) => (
+          <div key={stat.label} className="rounded-lg bg-white px-4 py-4 text-center">
+            <div className="text-3xl font-bold leading-none tracking-[0] text-[#17160f]">{stat.value}</div>
+            <div className="mt-2 text-xs font-medium text-[#77716b]">{stat.label}</div>
+          </div>
+        ))}
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        {subjectProgressDetails.map((subject) => (
+        {subjects.map((subject) => (
           <article
             key={subject.subject}
             className="rounded-lg border border-[#d7d3cd] bg-white p-4 shadow-[0_10px_24px_rgba(23,22,15,0.10)]"
@@ -1256,6 +1052,163 @@ export default function CurriculumPlanningPage() {
   const [isUpcomingLessonsViewOpen, setIsUpcomingLessonsViewOpen] = useState(false);
   const [isSubjectProgressViewOpen, setIsSubjectProgressViewOpen] = useState(false);
 
+  const session = useLmsSessionContext();
+
+  const [apiData, setApiData] = useState<CurriculumPlanningApiData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const run = async () => {
+      if (!session.subInstituteId || !session.syear) {
+        setApiData(null);
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        // No standard_id: combines every standard's curriculum into one summary.
+        const params = new URLSearchParams({
+          sub_institute_id: session.subInstituteId,
+          syear: session.syear,
+        });
+
+        const response = await fetch(`${session.baseUrl}/api/intelligence/curriculum-planning?${params}`, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: createAuthHeaders(session),
+        });
+
+        const payload = (await response.json().catch(() => ({}))) as CurriculumPlanningApiResponse;
+
+        if (response.status === 404) {
+          setApiData(null);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(payload.message || `Curriculum planning API failed with status ${response.status}`);
+        }
+
+        setApiData(Array.isArray(payload.data) ? null : payload.data ?? null);
+      } catch (error) {
+        if ((error as Error)?.name === 'AbortError') return;
+        setLoadError(error instanceof Error ? error.message : 'Unable to load curriculum plan.');
+        setApiData(null);
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false);
+      }
+    };
+
+    void run();
+    return () => controller.abort();
+  }, [session.baseUrl, session.subInstituteId, session.syear, session.token]);
+
+  const monthKeys = useMemo(() => {
+    if (!apiData) return [];
+    const keys = new Set<string>();
+    apiData.subjects.forEach((subject) => subject.months.forEach((month) => keys.add(month.month_key)));
+    return Array.from(keys).sort();
+  }, [apiData]);
+
+  const monthLabels = useMemo(
+    () => monthKeys.map((key) => new Date(`${key}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'short' })),
+    [monthKeys]
+  );
+
+  const subjectPlans: SubjectPlan[] = useMemo(() => {
+    if (!apiData) return [];
+    return apiData.subjects.map((subject, index) => {
+      const color = subjectColorAt(index);
+      const monthTopics = new Map(subject.months.map((month) => [month.month_key, month.topics[0] ?? '-']));
+      const label = subject.standard_name ? `${subject.subject_name} - Std ${subject.standard_name}` : subject.subject_name;
+      return {
+        name: label,
+        displayName: label,
+        dotColor: color.dotColor,
+        fill: color.fill,
+        text: color.text,
+        progress: subject.progress,
+        topics: monthKeys.length > 0 ? monthKeys.map((key) => monthTopics.get(key) ?? '-') : subject.months.map((month) => month.topics[0] ?? '-'),
+      };
+    });
+  }, [apiData, monthKeys]);
+
+  const stats: Stat[] = useMemo(() => {
+    if (!apiData) return [];
+    const s = apiData.stats;
+    return [
+      { label: 'Total topics', value: String(s.total_topics), helper: `across ${apiData.subjects.length} subjects`, progress: 100, color: '#d8d4ce' },
+      { label: 'Completed', value: String(s.completed), helper: `${s.completion_percent}% of periods done`, progress: s.completion_percent, color: '#1aa179' },
+      { label: 'In progress', value: String(s.in_progress), helper: 'currently being taught', progress: Math.min(100, s.in_progress > 0 ? Math.round((s.in_progress / Math.max(1, s.completed + s.in_progress)) * 100) : 0), color: '#2f7dd9' },
+      { label: 'Weeks remaining', value: String(s.weeks_remaining), helper: 'in this term', progress: Math.max(0, 100 - s.completion_percent), color: '#b87916' },
+    ];
+  }, [apiData]);
+
+  const upcomingLessons: Lesson[] = useMemo(() => {
+    if (!apiData) return [];
+    const subjectIndexById = new Map(apiData.subjects.map((subject, index) => [subject.subject_id, index]));
+    return apiData.upcoming_lessons.slice(0, 4).map((item) => {
+      const color = subjectColorAt(subjectIndexById.get(item.subject_id ?? -1) ?? 0);
+      const status = upcomingStatusLabel(item.status);
+      const subjectLabel = item.standard_name ? `${item.subject_name ?? ''} - Std ${item.standard_name}` : item.subject_name ?? '';
+      return {
+        subject: subjectLabel,
+        title: item.topic || 'Lesson',
+        meta: `${subjectLabel} - ${formatShortDate(item.scheduled_date)} - ${item.period_slot}`,
+        dotColor: color.dotColor,
+        status,
+        badgeClassName: upcomingBadgeClassName[status],
+      };
+    });
+  }, [apiData]);
+
+  const allUpcomingLessons: UpcomingLessonRow[] = useMemo(() => {
+    if (!apiData) return [];
+    const subjectIndexById = new Map(apiData.subjects.map((subject, index) => [subject.subject_id, index]));
+    return apiData.upcoming_lessons.map((item) => {
+      const color = subjectColorAt(subjectIndexById.get(item.subject_id ?? -1) ?? 0);
+      const subjectLabel = item.standard_name ? `${item.subject_name ?? ''} - Std ${item.standard_name}` : item.subject_name ?? '';
+      return {
+        date: formatShortDate(item.scheduled_date),
+        time: item.teacher_name,
+        subject: subjectLabel,
+        dotColor: color.dotColor,
+        fill: color.fill,
+        text: color.text,
+        topic: item.topic || 'Lesson',
+        room: item.teacher_name,
+        period: item.period_slot,
+        status: upcomingStatusLabel(item.status),
+      };
+    });
+  }, [apiData]);
+
+  const subjectProgressDetails: SubjectProgressDetail[] = useMemo(() => {
+    if (!apiData) return [];
+    return apiData.subject_progress.map((subject, index) => ({
+      subject: subject.standard_name ? `${subject.subject_name} - Std ${subject.standard_name}` : subject.subject_name,
+      color: subjectColorAt(index).dotColor,
+      progress: subject.progress,
+      topics: subject.topics.map((topic) => ({
+        title: topic.title,
+        range: `${formatShortDate(topic.start_date)} - ${formatShortDate(topic.end_date)}`,
+        status: topic.status,
+      })),
+    }));
+  }, [apiData]);
+
+  const gradeLabel = 'All standards';
+  const headerSubtitle = apiData
+    ? `${apiData.subjects.length} subjects - ${apiData.stats.total_topics} topics - ${apiData.stats.completion_percent}% complete`
+    : isLoading
+      ? 'Loading curriculum plan...'
+      : loadError || 'No curriculum plan data found yet.';
+
   const dialogs = (
     <>
       {isFilterDialogOpen && <FilterSyllabusDialog onClose={() => setIsFilterDialogOpen(false)} />}
@@ -1269,6 +1222,8 @@ export default function CurriculumPlanningPage() {
       <RequireStaff>
         {dialogs}
         <AllUpcomingLessonsView
+          lessons={allUpcomingLessons}
+          gradeLabel={gradeLabel}
           onBack={() => setIsUpcomingLessonsViewOpen(false)}
           onFilter={() => setIsFilterDialogOpen(true)}
           onAddLesson={() => setIsAddTopicDialogOpen(true)}
@@ -1282,6 +1237,9 @@ export default function CurriculumPlanningPage() {
       <RequireStaff>
         {dialogs}
         <SubjectProgressDetailsView
+          subjects={subjectProgressDetails}
+          stats={stats}
+          gradeLabel={gradeLabel}
           onBack={() => setIsSubjectProgressViewOpen(false)}
           onFilter={() => setIsFilterDialogOpen(true)}
         />
@@ -1294,8 +1252,8 @@ export default function CurriculumPlanningPage() {
     <div className="min-h-full  px-4 py-4 text-[#26231f] sm:px-6 lg:px-7">
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">Grade 8 - Yearly syllabus overview</h1>
-          <p className="mt-1 text-sm text-[#706b64]">Academic Year 2025-26 - 6 subjects - 48 topics - 40% complete</p>
+          <h1 className="text-xl font-semibold tracking-[0] text-[#24211d]">{gradeLabel} - Yearly syllabus overview</h1>
+          <p className="mt-1 text-sm text-[#706b64]">{headerSubtitle}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -1345,19 +1303,25 @@ export default function CurriculumPlanningPage() {
         <div className="overflow-x-auto">
           <div
             className="grid min-w-[1260px]"
-            style={{ gridTemplateColumns: `128px repeat(${months.length}, minmax(94px, 1fr))` }}
+            style={{ gridTemplateColumns: `128px repeat(${Math.max(monthLabels.length, 1)}, minmax(94px, 1fr))` }}
           >
             <div className="border-b border-r border-[#e3dfd8] px-4 py-3 text-xs font-semibold text-[#8a847d]">
               Subject
             </div>
-            {months.map((month) => (
+            {monthLabels.map((month, index) => (
               <div
-                key={month}
+                key={`${month}-${index}`}
                 className="border-b border-r border-[#e3dfd8] px-3 py-3 text-center text-xs font-semibold text-[#a09a93] last:border-r-0"
               >
                 {month}
               </div>
             ))}
+
+            {subjectPlans.length === 0 && (
+              <div className="col-span-full px-4 py-6 text-center text-sm text-[#9a958e]">
+                {isLoading ? 'Loading curriculum plan...' : loadError || 'No curriculum plan data found for this class yet.'}
+              </div>
+            )}
 
             {subjectPlans.map((plan) => (
               <Fragment key={plan.name}>
@@ -1369,7 +1333,7 @@ export default function CurriculumPlanningPage() {
                 </div>
                 {plan.topics.map((topic, index) => (
                   <div
-                    key={`${plan.name}-${months[index]}`}
+                    key={`${plan.name}-${monthLabels[index]}-${index}`}
                     className="flex min-h-12 items-center border-b border-r border-[#e9e5de] px-2 last:border-r-0"
                   >
                     <span
@@ -1390,7 +1354,7 @@ export default function CurriculumPlanningPage() {
       <section className="grid gap-4 xl:grid-cols-3">
         <div className="rounded-lg border border-[#ddd9d2] bg-white p-4 shadow-[0_8px_18px_rgba(23,22,15,0.08)]">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold tracking-[0]">May 2026 - monthly detail</h2>
+            <h2 className="text-base font-semibold tracking-[0]">Monthly detail</h2>
             <Link href="/lms/monthly-plan" className="inline-flex items-center gap-1 text-sm font-medium text-[#2f7dd9]">
               View full
               <ArrowRight size={14} />
@@ -1433,6 +1397,11 @@ export default function CurriculumPlanningPage() {
           </div>
 
           <div className="space-y-2">
+            {upcomingLessons.length === 0 && (
+              <div className="rounded-lg bg-[#efeeec] px-3 py-4 text-center text-xs text-[#9a958e]">
+                {isLoading ? 'Loading...' : 'No upcoming lessons.'}
+              </div>
+            )}
             {upcomingLessons.map((lesson) => (
               <div key={`${lesson.subject}-${lesson.title}`} className="flex min-h-14 items-start gap-3 rounded-lg bg-[#efeeec] px-3 py-3">
                 <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: lesson.dotColor }} />
