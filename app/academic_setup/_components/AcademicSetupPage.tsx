@@ -317,7 +317,26 @@ export function AcademicSetupPage({ config }: { config: AcademicSetupConfig }) {
                         <select
                           id={field.key}
                           value={valueText(form[field.key])}
-                          onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
+                          onChange={(event) => setForm((current) => {
+                            // OldERP SearchChain resets dependent dropdowns when a
+                            // parent changes; replicate that during Add and Update.
+                            const next: Record<string, string | boolean | number[]> = {
+                              ...current,
+                              [field.key]: event.target.value,
+                            };
+                            const dependents = new Set<string>();
+                            const collect = (parentKey: string) => {
+                              config.fields.forEach((item) => {
+                                if (item.dependsOn === parentKey) {
+                                  dependents.add(item.key);
+                                  collect(item.key);
+                                }
+                              });
+                            };
+                            collect(field.key);
+                            dependents.forEach((key) => { next[key] = ""; });
+                            return next;
+                          })}
                           className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                         >
                           <option value="">Select {field.label}</option>

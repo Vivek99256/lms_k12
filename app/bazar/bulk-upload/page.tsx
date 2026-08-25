@@ -1,5 +1,5 @@
-import { MigrationModulePage } from '@/app/migration-modules/MigrationModulePage';
+import { BazarUploadPage } from './BazarUploadPage';
 
 export default function BazarBulkUploadPage() {
-  return <MigrationModulePage module="bazar-upload" />;
+  return <BazarUploadPage />;
 }

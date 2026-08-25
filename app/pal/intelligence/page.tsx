@@ -40,6 +40,7 @@ import {
   type V4Velocity,
 } from '@/app/pal/data/pal-v4';
 import { getViewAsStudent, setViewAsStudent, useViewAsStudent } from '@/app/pal/data/pal-view-as';
+import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 
 interface LearnerBundle {
@@ -76,6 +77,7 @@ function riskTone(level: string): string {
 }
 
 export default function PalIntelligencePage() {
+  const [isStudent, setIsStudent] = useState(false);
   const [learnerId, setLearnerId] = useState('');
   const [period, setPeriod] = useState('week');
   const [bundle, setBundle] = useState<LearnerBundle | null>(null);
@@ -126,9 +128,12 @@ export default function PalIntelligencePage() {
   const viewingStudent = useViewAsStudent();
 
   useEffect(() => {
-    // Prefer the "view as student" learner (set from the PAL landing picker) so
-    // staff see a real learner's intelligence rather than their own empty one.
-    const id = getViewAsStudent()?.studentId || defaultLearnerId();
+    const student = isStudentSession();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate role on mount
+    setIsStudent(student);
+    // Students only ever see their own intelligence — "view as student" is a
+    // staff-only picker and must not apply to a real student session.
+    const id = student ? defaultLearnerId() : getViewAsStudent()?.studentId || defaultLearnerId();
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate learner id + initial load on mount
     setLearnerId(id);
@@ -153,7 +158,7 @@ export default function PalIntelligencePage() {
           </div>
         </div>
 
-        {viewingStudent && (
+        {!isStudent && viewingStudent && (
           <ViewAsBanner
             student={viewingStudent}
             onExit={() => {
@@ -168,15 +173,17 @@ export default function PalIntelligencePage() {
         {/* Controls */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-500">Learner id</span>
-              <Input
-                value={learnerId}
-                onChange={(event) => setLearnerId(event.target.value)}
-                placeholder="Learner id"
-                className="h-9 w-40"
-              />
-            </label>
+            {!isStudent && (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-500">Learner id</span>
+                <Input
+                  value={learnerId}
+                  onChange={(event) => setLearnerId(event.target.value)}
+                  placeholder="Learner id"
+                  className="h-9 w-40"
+                />
+              </label>
+            )}
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-500">Velocity period</span>
               <select

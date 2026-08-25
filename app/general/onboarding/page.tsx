@@ -1,20 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, Search } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CircleCheck, ListChecks, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ErpAlert, ErpEmpty, ErpLoading, ErpPageHeader } from "@/components/erp/erp-ui";
 import {
   OnboardingLegend,
   OnboardingPanel,
   ProgressMeter,
+  StatusBadge,
 } from "./_components/onboarding-ui";
 import {
   errorMessage,
   loadOnboardingOverview,
   type OnboardingOverview,
 } from "./_lib/onboarding-api";
-import { loadMenuMasterItems, type MenuItemRecord } from "./api";
 
 /**
  * Onboarding home — one card per module, each showing derived progress and the
@@ -30,8 +31,6 @@ export default function OnboardingPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [menuItems, setMenuItems] = useState<MenuItemRecord[]>([]);
-  const [menuLoading, setMenuLoading] = useState(true);
 
   const load = useCallback(async (isRefresh = false) => {
     isRefresh ? setRefreshing(true) : setLoading(true);
@@ -50,50 +49,25 @@ export default function OnboardingPage() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    let active = true;
+  const modules = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term || !overview) return overview?.modules ?? [];
 
-    (async () => {
-      setMenuLoading(true);
-      try {
-        const items = await loadMenuMasterItems();
-        if (active) setMenuItems(items);
-      } catch {
-        if (active) setMenuItems([]);
-      } finally {
-        if (active) setMenuLoading(false);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+    return overview.modules.filter(
+      (module) =>
+        module.moduleName.toLowerCase().includes(term) ||
+        module.description.toLowerCase().includes(term) ||
+        module.menuTitle.toLowerCase().includes(term)
+    );
+  }, [overview, query]);
 
   const summary = overview?.summary;
-
-  const visibleMenuItems = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    return menuItems.filter((item) => {
-      const menuType = item.menu_type.trim().toUpperCase();
-      // Exclude REPORT rows from tblmenumaster.
-      if (menuType === "REPORT") return false;
-      const name = item.name.trim().toLowerCase();
-      // Drop validation and integration items from the zigzag.
-      if (name.includes("validation") || name.includes("integration")) return false;
-      if (!term) return true;
-      return (
-        item.name.trim().toLowerCase().includes(term) ||
-        item.menu_title.trim().toLowerCase().includes(term)
-      );
-    });
-  }, [menuItems, query]);
 
   return (
     <div className="space-y-5 p-4 sm:p-6">
       <ErpPageHeader
         title="Onboarding"
-        description="Work through the setup menu plan for your institute, straight from tblmenumaster. REPORT, validation, and integration items are hidden by default."
+        description="Track how far each module has been set up for your institute. Progress is measured from the records in the system, not from a checklist."
         onRefresh={() => void load(true)}
         refreshing={refreshing}
       />
@@ -131,8 +105,8 @@ export default function OnboardingPage() {
                 </div>
               </dl>
             </div>
-            <div className="mt-5 border-t border-slate-100 pt-4">
-              <OnboardingLegend currentUserName={overview.context.currentUserName} />
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <OnboardingLegend currentUserOwner={overview.context.currentUserOwner} />
             </div>
           </OnboardingPanel>
 
@@ -144,91 +118,72 @@ export default function OnboardingPage() {
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search menu items"
-              aria-label="Search menu items"
+              placeholder="Search modules"
+              aria-label="Search modules"
               className="pl-9"
             />
           </div>
 
-          {menuLoading ? (
-            <ErpLoading label="Loading menu plan…" />
-          ) : visibleMenuItems.length === 0 ? (
+          {modules.length === 0 ? (
             <ErpEmpty
-              title={query ? "No menu items match that search" : "No menu items found"}
+              title={query ? "No modules match that search" : "No onboarding journeys are configured"}
               hint={
                 query
-                  ? "Try a different menu name."
-                  : "The menu plan returned no items to set up."
+                  ? "Try a different module name."
+                  : "Ask your administrator to install the onboarding journey template."
               }
             />
           ) : (
-            <div className="relative mx-auto max-w-3xl">
-              {/* Centre spine of the zigzag. */}
-              <span
-                className="pointer-events-none absolute left-1/2 top-0 hidden w-px -translate-x-1/2 bg-gradient-to-b from-violet-200 via-slate-200 to-violet-200 sm:block"
-                aria-hidden
-                style={{ height: "100%" }}
-              />
-              <ol className="space-y-6">
-                {visibleMenuItems.map((item, index) => {
-                  const side: "left" | "right" = index % 2 === 0 ? "left" : "right";
-                  const menuType = item.menu_type.trim().toUpperCase();
-                  const rawLink = item.link.trim();
-                  const isSafeLink =
-                    rawLink !== "" &&
-                    rawLink !== "#" &&
-                    !rawLink.startsWith("javascript:") &&
-                    !rawLink.startsWith("void(");
-                  const route = isSafeLink ? rawLink.replace(/^\/+/, "") : "#";
-
-                  return (
-                    <li
-                      key={item.id}
-                      className={`flex ${side === "left" ? "sm:justify-start" : "sm:justify-end"}`}
-                    >
-                      <div className="relative w-full sm:w-[calc(50%-1.25rem)]">
-                        {/* Node on the spine. */}
-                        <span
-                          className="absolute top-1/2 hidden size-3 -translate-y-1/2 rounded-full border-2 border-white bg-violet-500 sm:block"
-                          style={{
-                            [side === "left" ? "right" : "left"]: "-0.95rem",
-                          }}
-                          aria-hidden
-                        />
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-violet-300 hover:shadow-md">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <h3 className="font-semibold text-slate-900">{item.name}</h3>
-                              <p className="mt-0.5 text-sm text-slate-500">{item.menu_title}</p>
-                            </div>
-                            <span
-                              className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-medium ${
-                                menuType === "MASTER"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-emerald-100 text-emerald-700"
-                              }`}
-                            >
-                              {menuType}
-                            </span>
-                          </div>
-                          {isSafeLink && route !== "#" ? (
-                            <a
-                              href={`/${route}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-violet-700 hover:underline"
-                            >
-                              Open setup
-                              <ArrowRight className="size-3.5" aria-hidden />
-                            </a>
-                          ) : null}
-                        </div>
+            <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {modules.map((module) => (
+                <li key={module.moduleKey}>
+                  <Link
+                    href={`/general/onboarding/${module.moduleKey}`}
+                    className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-violet-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-slate-900">{module.moduleName}</h3>
+                        <p className="mt-0.5 line-clamp-2 text-sm text-slate-500">
+                          {module.description}
+                        </p>
                       </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
+                      {module.summary.isComplete ? (
+                        <CircleCheck className="size-5 shrink-0 text-emerald-500" aria-hidden />
+                      ) : (
+                        <ListChecks className="size-5 shrink-0 text-slate-300" aria-hidden />
+                      )}
+                    </div>
+
+                    <div className="mt-4">
+                      <ProgressMeter
+                        percent={module.summary.percentComplete}
+                        label={`${module.summary.requiredCompleted} of ${module.summary.requiredSteps} steps`}
+                      />
+                    </div>
+
+                    <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-100 pt-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          {module.nextStep ? "Next up" : "Status"}
+                        </p>
+                        {module.nextStep ? (
+                          <p className="truncate text-sm text-slate-700">
+                            {module.nextStep.title}
+                          </p>
+                        ) : (
+                          <StatusBadge status="completed" />
+                        )}
+                      </div>
+                      <ArrowRight
+                        className="size-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-violet-600"
+                        aria-hidden
+                      />
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
         </>
       )}

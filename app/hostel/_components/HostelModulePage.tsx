@@ -56,7 +56,7 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [showForm, setShowForm] = useState(config.kind === "allocation" || config.kind === "master");
+  const [showForm, setShowForm] = useState(config.kind === "master");
   const [editing, setEditing] = useState<HostelRecord | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -113,7 +113,7 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
   function resetForm() {
     setEditing(null);
     setForm({});
-    setShowForm(config.kind === "allocation" || config.kind === "master");
+    setShowForm(config.kind === "master");
   }
 
   function updateField(key: string, value: string) {
@@ -178,6 +178,13 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
     return text(record.values[field.field_name]);
   }
 
+  function allocationUserGroupId(record: HostelRecord): string {
+    if (text(record.values.profile_name).toLowerCase() === "student") return "8";
+    const profileName = text(record.values.profile_name).toLowerCase();
+    const matched = data.profiles.find((option) => option.label.toLowerCase() === profileName);
+    return matched ? String(matched.id) : text(record.values.user_group_id || "");
+  }
+
   function editRecord(record: HostelRecord) {
     const next: Record<string, string> = {};
     const fields = config.fields ?? [];
@@ -191,7 +198,7 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
     }
     if (module === "hostel-room-allocation") {
       next.user_id = text(record.values.id);
-      next.user_group_id = text(record.values.profile_name).toLowerCase() === "student" ? "8" : text(record.values.user_group_id || "");
+      next.user_group_id = allocationUserGroupId(record);
       next.admission_category_id = text(record.values.admission_category_id);
       next.hostel_id = text(record.values.hostel_id);
       next.room_id = text(record.values.room_id);
@@ -230,10 +237,17 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
       const session = getHostelSetupSession();
       const values: Record<string, string> = { ...form };
       if (module === "hostel-room-allocation") {
-        values.user_id = form.user_id || text(editing?.values.id);
-        values.user_group_id = form.user_group_id || (text(editing?.values.profile_name).toLowerCase() === "student" ? "8" : "");
+        // OldERP keys the allocation on (user_id, user_group_id, syear,
+        // sub_institute_id) and never rewrites those identity columns on update,
+        // so we send them from the edited row rather than an allocation id.
+        const editingRecord = editing;
+        values.user_id = form.user_id || (editingRecord ? text(editingRecord.values.id) : "");
+        values.user_group_id = form.user_group_id || (editingRecord ? allocationUserGroupId(editingRecord) : "");
       }
-      const message = await saveHostelModule(module, session, values, editing?.id ?? readNumber(editing?.values.allocation_id));
+      // Hostel room allocation is an upsert keyed by user identity, so it always
+      // goes through the store endpoint regardless of whether we are editing.
+      const saveId = module === "hostel-room-allocation" ? undefined : editing?.id;
+      const message = await saveHostelModule(module, session, values, saveId);
       setNotice(message);
       resetForm();
       await load(filters);

@@ -97,7 +97,18 @@ export const RIBBON_FILL: Record<StepStatus, string> = {
  */
 export const RIBBON_TURN_COLOR = "#7c3aed"; // violet-600
 
-// Static OWNER_META has been removed.
+export const OWNER_META: Record<StepOwner, { label: string; ring: string; text: string }> = {
+  TRIZ: {
+    label: "scholar admin",
+    ring: "border-sky-500 bg-sky-50 text-sky-700",
+    text: "text-sky-700",
+  },
+  SCHOOL: {
+    label: "School admin",
+    ring: "border-orange-400 bg-orange-50 text-orange-700",
+    text: "text-orange-700",
+  },
+};
 
 export function StatusBadge({ status }: { status: StepStatus }) {
   const meta = STATUS_META[status] ?? STATUS_META.pending;
@@ -111,31 +122,34 @@ export function StatusBadge({ status }: { status: StepStatus }) {
   );
 }
 
+/**
+ * The owner marker from the reference design — the small ringed avatar that
+ * sits above or below each chevron. `lead` renders the owner that drives the
+ * step; the other side is shown muted so both parties stay visible.
+ */
 export function OwnerMarker({
-  label,
+  owner,
   role,
   lead,
 }: {
-  label: string;
+  owner: StepOwner;
   role?: string;
   lead?: boolean;
 }) {
-  const initials = (label || "User").substring(0, 2).toUpperCase();
+  const meta = OWNER_META[owner];
+  const initials = owner === "TRIZ" || owner === "SCHOOL" ? "SA" : "SA";
 
   return (
     <span className="flex items-center gap-1.5">
       <span
-        className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-semibold ${
-          lead
-            ? "border-sky-500 bg-sky-50 text-sky-700"
-            : "border-slate-200 bg-slate-50 text-slate-500 opacity-60"
-        }`}
+        className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-semibold ${meta.ring} ${lead ? "" : "opacity-60"
+          }`}
         aria-hidden
       >
         {initials}
       </span>
-      <span className={`text-[11px] leading-tight ${lead ? "text-sky-700" : "text-slate-400"}`}>
-        <span className="font-medium">{label || "User"}</span>
+      <span className={`text-[11px] leading-tight ${lead ? meta.text : "text-slate-400"}`}>
+        <span className="font-medium">{meta.label}</span>
         {role ? <span className="block text-slate-400">{role}</span> : null}
       </span>
     </span>
@@ -180,10 +194,15 @@ export function ProgressMeter({
   );
 }
 
-export function OnboardingLegend({ currentUserName }: { currentUserName?: string }) {
+export function OnboardingLegend({ currentUserOwner }: { currentUserOwner?: StepOwner }) {
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500">
-      {currentUserName && <OwnerMarker label={currentUserName} lead />}
+      {(!currentUserOwner || currentUserOwner === 'TRIZ') ? (
+        <OwnerMarker owner="TRIZ" lead />
+      ) : null}
+      {(!currentUserOwner || currentUserOwner === 'SCHOOL') ? (
+        <OwnerMarker owner="SCHOOL" lead />
+      ) : null}
       <span className="h-4 w-px bg-slate-200" aria-hidden />
       {(["completed", "in_progress", "pending", "misconfigured"] as StepStatus[]).map((status) => (
         <span key={status} className="flex items-center gap-1.5">

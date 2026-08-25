@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { clearTeachAssistantStorage } from '@/lib/chatbot-storage';
+import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -143,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      const res = await fetch(`/api/proxy?path=api/api-login`, {
+      const res = await fetch(`${API_BASE_URL}/api/api-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, type: 'API' }),
@@ -223,12 +224,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!subInstituteId) return;
     try {
       const query = new URLSearchParams({
-        path: 'api/academic-terms',
         type: 'API',
         sub_institute_id: String(subInstituteId),
         syear,
       });
-      const res = await fetch(`/api/proxy?${query.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/api/academic-terms?${query.toString()}`);
       const data = await res.json();
       const terms = Array.isArray(data?.data) ? data.data : [];
       setAcademicTerms(terms);

@@ -27,6 +27,9 @@ const CONTENT_TYPE_OPTIONS = [
   { label: 'Classroom Activity', value: 'Classroom Activity', apiValue: 'Classroom Activity' },
   { label: 'Remedial Class', value: 'Remedial Class', apiValue: 'remedial_class' },
 ] as const;
+// Mirrors UPLOAD_PRESENTATION_TYPES in the chapters page: the library reads this
+// string out of content_category to decide the Teacher Resource lane.
+const TEACHER_TRAINING_CONTENT_CATEGORY = 'Teacher training presentation';
 const PDF_FORMATTING_INSTRUCTIONS = `PDF formatting instructions:
 - Generate the final answer as clean HTML suitable for direct PDF conversion.
 - Use semantic HTML tags such as <h2>, <h3>, <p>, <strong>, <ul>, <ol>, <li>, and <table> where appropriate.
@@ -61,14 +64,19 @@ function readErrorMessage(value: unknown): string {
   return '';
 }
 
-function getBoardStandardLabel(classGrade?: string) {
+/**
+ * "<board> Standard <grade>" for the generation prompt. The board comes from the
+ * tenant's curriculum record when known, otherwise from a board prefix on the
+ * grade itself; with neither available the board is left out rather than guessed.
+ */
+function getBoardStandardLabel(classGrade?: string, board?: string) {
   const rawGrade = (classGrade || '').replace(/^Class\s+/i, '').trim();
   const boardMatch = rawGrade.match(/^([A-Za-z]+)[-\s]+(.+)$/);
-  if (boardMatch) {
-    return `${boardMatch[1].toUpperCase()} Standard ${boardMatch[2].trim()}`;
-  }
 
-  return `CBSE Standard ${rawGrade || 'Standard'}`;
+  const resolvedBoard = (board || '').trim() || (boardMatch ? boardMatch[1].toUpperCase() : '');
+  const grade = (boardMatch ? boardMatch[2].trim() : rawGrade) || 'Standard';
+
+  return resolvedBoard ? `${resolvedBoard} Standard ${grade}` : `Standard ${grade}`;
 }
 
 interface GeneratePresentationDrawerProps {
@@ -79,6 +87,8 @@ interface GeneratePresentationDrawerProps {
   initialChapterId?: string;
   initialConcept?: string;
   course?: Pick<Course, 'subject' | 'classGrade'>;
+  /** Board of the tenant's curriculum (CBSE / ICSE / IB / …), used in the prompt. */
+  board?: string;
   onSuccess?: (data: Record<string, unknown>) => void;
 }
 
@@ -90,6 +100,7 @@ export function GeneratePresentationDrawer({
   initialChapterId = '',
   initialConcept = '',
   course,
+  board,
   onSuccess,
 }: GeneratePresentationDrawerProps) {
   const [presentationMode, setPresentationMode] = useState<'Classroom' | 'Teacher training'>('Classroom');
@@ -466,10 +477,14 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
     const semanticPayload = getSemanticPayload(chapter, semanticResult);
     const groundTruthContent = semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.');
 
-    if (selectedContentType.trim().toLowerCase() === 'remedial class') {
-      return `You are an AI-powered Remedial Education Specialist, Instructional Designer, and Inclusive Education Expert specializing in CBSE, NCERT, NEP 2020, NCF, Competency-Based Education (CBE), and Inquiry-Based Learning (IBL).
+    // The board comes from the tenant's curriculum; with none configured the prompt
+    // names the national frameworks only rather than assuming a board.
+    const boardExpertise = board?.trim() ? `${board.trim()}, NCERT` : 'NCERT';
 
-Analyze the attached chapter PDF and generate a comprehensive Chapter-wise Remedial Class for CBSE Standard ${standard}, Subject ${subject}, Chapter "${chapterName}".
+    if (selectedContentType.trim().toLowerCase() === 'remedial class') {
+      return `You are an AI-powered Remedial Education Specialist, Instructional Designer, and Inclusive Education Expert specializing in ${boardExpertise}, NEP 2020, NCF, Competency-Based Education (CBE), and Inquiry-Based Learning (IBL).
+
+Analyze the attached chapter PDF and generate a comprehensive Chapter-wise Remedial Class for ${getBoardStandardLabel(standard, board)}, Subject ${subject}, Chapter "${chapterName}".
 
 The remedial content should support slow learners, below-average performers, students with learning gaps, and students requiring additional reinforcement after the regular classroom teaching.
 
@@ -482,7 +497,7 @@ ${groundTruthContent}`;
     }
 
     if (selectedContentType.trim().toLowerCase() === 'classroom activity') {
-      return `Generate Presentation with an attached chapter PDF to a classroom activity using Inquiry-based learning on ${chapterName} for ${getBoardStandardLabel(course?.classGrade)} ${subject}. The Inquiry-based learning should include interactive elements such as role-playing, quizzes, puzzles, or simulations tailored to best practices. It must align with the chapter's learning objectives, focus on student engagement, and enhance knowledge retention & application of knowledge.
+      return `Generate Presentation with an attached chapter PDF to a classroom activity using Inquiry-based learning on ${chapterName} for ${getBoardStandardLabel(course?.classGrade, board)} ${subject}. The Inquiry-based learning should include interactive elements such as role-playing, quizzes, puzzles, or simulations tailored to best practices. It must align with the chapter's learning objectives, focus on student engagement, and enhance knowledge retention & application of knowledge.
 
 Incorporate the following elements:
 - Clear activity instructions for the teacher.
@@ -528,11 +543,19 @@ ${groundTruthContent}`;
       }
 
       const normalizedContentType = contentType.trim().toLowerCase();
-      const isPresentation = normalizedContentType === 'presentation';
+      // The Teacher Resource tab always produces a deck, whatever the Classroom
+      // tab's content type happens to be left on.
+      const isTeacherTraining = presentationMode === 'Teacher training';
+      const isPresentation = isTeacherTraining || normalizedContentType === 'presentation';
       const exportFormat = isPresentation ? 'pptx' : 'pdf';
-      const apiContentType = CONTENT_TYPE_OPTIONS.find((option) => option.value === contentType)?.apiValue ?? contentType;
+      // content_category is what splits the library into Classroom Resource vs
+      // Teacher Resource, so teacher-training decks must be filed under their own
+      // category instead of the generic 'presentation'.
+      const apiContentType = isTeacherTraining
+        ? TEACHER_TRAINING_CONTENT_CATEGORY
+        : CONTENT_TYPE_OPTIONS.find((option) => option.value === contentType)?.apiValue ?? contentType;
 
-      if (isPresentation && presentationMode === 'Teacher training' && !presentationConcept) {
+      if (isTeacherTraining && !presentationConcept) {
         setGenerationError('Please select a concept for teacher training.');
         setIsGenerating(false);
         return;
@@ -545,7 +568,7 @@ ${groundTruthContent}`;
         console.warn('[GeneratePresentation] Falling back to chapter semantic data:', error);
       }
       const prompt = isPresentation
-        ? presentationMode === 'Teacher training'
+        ? isTeacherTraining
           ? constructTeacherTrainingPrompt(chapter, presentationConcept, semanticResult)
           : constructPrompt(chapter, semanticResult)
         : constructDocumentPrompt(chapter, contentType, semanticResult);
@@ -591,6 +614,11 @@ ${groundTruthContent}`;
         user_id,
         user_profile_name,
         chapter_name: chapter.title,
+        // The deck is generated for one concept; sending it lets the stored row
+        // carry the concept mapping instead of only the chapter.
+        concept_id: presentationConcept || undefined,
+        concept_name:
+          presentationConceptOptions.find((c) => c.id === presentationConcept)?.title || undefined,
         prompt,
         content_type: apiContentType,
         format: isPresentation ? 'presentation' : 'document',

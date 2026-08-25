@@ -11,6 +11,7 @@ import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/men
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
+import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 interface SelectedBranch {
@@ -192,8 +193,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           return route !== '#' && currentPath === route.toLowerCase();
         });
         const level2Match = level2Route !== '#' && currentPath.startsWith(level2Route.toLowerCase());
+        const dashboardRoute = resolveModuleDashboardRoute(level2.label);
+        const dashboardMatch = Boolean(dashboardRoute && currentPath.startsWith(dashboardRoute.toLowerCase()));
 
-        if (level2Match || level3Match) {
+        if (level2Match || level3Match || dashboardMatch) {
           // Restore the active menu branch on refresh/direct navigation so its
           // permission-filtered Master menu can be fetched for the sub-header.
           // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -358,6 +361,17 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (isPalRoot) {
       const query = searchParams?.toString() ?? '';
       router.push(query ? `/pal/frameworks?${query}` : '/pal/frameworks');
+      return;
+    }
+
+    // Modules with their own dashboard (Fees, Admissions, Students, Library,
+    // Hostel, Transportation) land there — Level 2 → module dashboard →
+    // Level 3 screen — instead of jumping straight into the first Level 3
+    // screen. selectedBranch is already set above, so the Level 3 subheader
+    // still shows this module's screens for the next click.
+    const dashboardRoute = resolveModuleDashboardRoute(submenu.label);
+    if (dashboardRoute) {
+      router.push(dashboardRoute);
       return;
     }
 

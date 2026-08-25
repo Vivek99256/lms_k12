@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -13,7 +13,8 @@ import {
   ChartOptions
 } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
-import { Settings, Users } from 'lucide-react';
+import { Settings, Users, Loader2 } from 'lucide-react';
+import { getHouses, type HouseData } from './api';
 
 // Register Chart.js modules
 ChartJS.register(
@@ -25,131 +26,48 @@ ChartJS.register(
   Legend
 );
 
-// Types & Interfaces
-interface HouseMember {
-  id: string;
-  initials: string;
-  name?: string;
-}
-
-interface HouseData {
-  id: string;
-  name: string;
-  points: number;
-  captain: {
-    name: string;
-    initials: string;
-  };
-  memberCount: number;
-  members: HouseMember[];
-  color: string;
-  borderColor: string;
-}
-
 interface HousesContentProps {
-  houses?: HouseData[];
   onMasterSetupClick?: () => void;
 }
 
-// Default/Mock Data based on the UI
-const DEFAULT_HOUSES: HouseData[] = [
-  {
-    id: 'aravali',
-    name: 'Aravali',
-    points: 820,
-    captain: { name: 'Aarav Sharma', initials: 'AS' },
-    memberCount: 25,
-    color: 'rgba(239, 68, 68, 0.2)', // red-500
-    borderColor: 'rgb(239, 68, 68)',
-    members: [
-      { id: '1', initials: 'AS' },
-      { id: '2', initials: 'PM' },
-      { id: '3', initials: 'IR' },
-      { id: '4', initials: 'TB' },
-      { id: '5', initials: 'RS' },
-      { id: '6', initials: 'NS' },
-      { id: '7', initials: 'MM' },
-    ]
-  },
-  {
-    id: 'nilgiri',
-    name: 'Nilgiri',
-    points: 760,
-    captain: { name: 'Ishaan Iyer', initials: 'II' },
-    memberCount: 25,
-    color: 'rgba(59, 130, 246, 0.2)', // blue-500
-    borderColor: 'rgb(59, 130, 246)',
-    members: [
-      { id: '1', initials: 'II' },
-      { id: '2', initials: 'SM' },
-      { id: '3', initials: 'VM' },
-      { id: '4', initials: 'VC' },
-      { id: '5', initials: 'ND' },
-      { id: '6', initials: 'ZI' },
-      { id: '7', initials: 'SM' },
-    ]
-  },
-  {
-    id: 'shivalik',
-    name: 'Shivalik',
-    points: 910,
-    captain: { name: 'Ananya Gupta', initials: 'AG' },
-    memberCount: 25,
-    color: 'rgba(16, 185, 129, 0.2)', // emerald-500
-    borderColor: 'rgb(16, 185, 129)',
-    members: [
-      { id: '1', initials: 'AG' },
-      { id: '2', initials: 'NK' },
-      { id: '3', initials: 'DB' },
-      { id: '4', initials: 'RN' },
-      { id: '5', initials: 'RJ' },
-      { id: '6', initials: 'AG' },
-      { id: '7', initials: 'AK' },
-    ]
-  },
-  {
-    id: 'vindhya',
-    name: 'Vindhya',
-    points: 680,
-    captain: { name: 'Kiara Kapoor', initials: 'KK' },
-    memberCount: 25,
-    color: 'rgba(245, 158, 11, 0.2)', // amber-500
-    borderColor: 'rgb(245, 158, 11)',
-    members: [
-      { id: '1', initials: 'KK' },
-      { id: '2', initials: 'AV' },
-      { id: '3', initials: 'SP' },
-      { id: '4', initials: 'DR' },
-      { id: '5', initials: 'KS' },
-      { id: '6', initials: 'AK' },
-      { id: '7', initials: 'KV' },
-    ]
-  }
-];
-
 export const HousesContent: React.FC<HousesContentProps> = ({
-  houses = DEFAULT_HOUSES,
   onMasterSetupClick
 }) => {
-  
+  const [houses, setHouses] = useState<HouseData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getHouses(controller.signal)
+      .then(setHouses)
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return;
+        setError(reason instanceof Error ? reason.message : 'Unable to load houses.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
   // Chart Configuration
   const chartData: ChartData<'radar'> = {
     labels: ['Sports', 'Academics', 'Cultural', 'Discipline', 'Attendance'],
-    datasets: houses.map(house => ({
-      label: house.name,
-      // Mock performance breakdowns across categories matching total standings visual positions
-      data: house.id === 'shivalik' ? [85, 90, 78, 88, 92] :
-            house.id === 'aravali'  ? [90, 80, 85, 75, 82] :
-            house.id === 'nilgiri'  ? [75, 85, 70, 80, 78] : 
-                                      [68, 72, 80, 65, 70],
-      backgroundColor: house.color,
-      borderColor: house.borderColor,
-      borderWidth: 2,
-      pointBackgroundColor: house.borderColor,
-      pointBorderColor: '#fff',
-      pointHoverBackgroundColor: '#fff',
-      pointHoverBorderColor: house.borderColor,
-    }))
+    datasets: houses.map(house => {
+      const score = Math.min(100, house.memberCount * 4);
+      return {
+        label: house.name,
+        data: [score, score, score, score, score],
+        backgroundColor: house.color,
+        borderColor: house.borderColor,
+        borderWidth: 2,
+        pointBackgroundColor: house.borderColor,
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: house.borderColor,
+      };
+    })
   };
 
   const chartOptions: ChartOptions<'radar'> = {
@@ -179,11 +97,20 @@ export const HousesContent: React.FC<HousesContentProps> = ({
           color: '#475569'
         },
         ticks: { display: false },
-        suggestedMin: 50,
+        suggestedMin: 0,
         suggestedMax: 100
       }
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Loading houses…
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6 max-w-7xl mx-auto">
@@ -203,6 +130,12 @@ export const HousesContent: React.FC<HousesContentProps> = ({
           <span>House master setup</span>
         </button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* Radar Chart Card */}
       <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
@@ -238,7 +171,7 @@ export const HousesContent: React.FC<HousesContentProps> = ({
             <div className="my-5 pt-4 border-t border-slate-50">
               <div className="text-xs text-slate-400 mb-2">House captain</div>
               <div className="flex items-center gap-3">
-                <div 
+                <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm"
                   style={{ backgroundColor: house.borderColor }}
                 >
@@ -251,7 +184,7 @@ export const HousesContent: React.FC<HousesContentProps> = ({
             {/* Avatars Pile & Footer */}
             <div className="flex items-center justify-between pt-3 border-t border-slate-50 mt-auto">
               <div className="flex -space-x-2 overflow-hidden">
-                {house.members.map((member) => (
+                {house.members.slice(0, 8).map((member) => (
                   <div
                     key={member.id}
                     className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-slate-100 flex items-center justify-center text-[9px] font-semibold text-slate-500"
@@ -259,6 +192,11 @@ export const HousesContent: React.FC<HousesContentProps> = ({
                     {member.initials}
                   </div>
                 ))}
+                {house.members.length > 8 && (
+                  <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-slate-200 flex items-center justify-center text-[8px] font-semibold text-slate-600">
+                    +{house.members.length - 8}
+                  </div>
+                )}
               </div>
               <span className="text-xs text-slate-400 inline-flex items-center gap-1">
                 <Users className="w-3 h-3" />

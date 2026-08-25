@@ -11,67 +11,17 @@ import {
   GraduationCap,
   List,
 } from 'lucide-react';
-import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { getRequestContext, getSyear } from '../../../page';
-import { getSubjectAndChapters, type SubjectWithChapters } from '../../../data/chapters';
-import { courses, type Course } from '../../../data/courses';
+import { getSubjectAndChapters, type Chapter, type SubjectWithChapters } from '../../../data/chapters';
+import type { Course } from '../../../data/courses';
 import { fetchLmsCourses, type LmsSubject } from '../../../data/lmsCourses';
-
-type CurriculumSession = {
-  token: string;
-  hostName: string;
-  subInstituteId: string;
-  academicYearId: string;
-};
-
-type CurriculumData = {
-  curriculum_id: number;
-  extraction_id: number;
-  sub_institute_id: number;
-  grade_id: number | null;
-  standard_id: number;
-  subject_id: number;
-  board_id: number | null;
-  curriculum_name: string;
-  curriculum_alignment: string | null;
-  holistic_curriculum: string | null;
-  model_integration: string | null;
-  syear: number;
-  board: string | null;
-  framework: string | null;
-  internal_marks: number | null;
-  status: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type UnitData = {
-  unit_number: number;
-  name: string;
-  unit_chapters: string | string[] | null;
-  total_marks: number | null;
-  planned_periods: number | string | null;
-  chapter_id: number;
-};
-
-type OutcomeNode = {
-  id: number;
-  code: string | null;
-  type: string | null;
-  parent_id: number | null;
-  description: string | null;
-  objective: string | null;
-  chapter: string | null;
-  outcome: string | null;
-  assessment_tool: string | null;
-  children: OutcomeNode[];
-};
-
-type CurriculumApiResult = {
-  curriculum_data: CurriculumData | null;
-  unit_data: UnitData[];
-  outcomes: OutcomeNode[];
-};
+import {
+  CURRICULUM_NOT_CONFIGURED,
+  fetchCurriculumData,
+  getCurriculumSession,
+  type CurriculumApiResult,
+  type OutcomeNode,
+} from '../../../data/curriculum';
 
 type ResolvedCurriculumTarget = {
   subjectId: string;
@@ -79,18 +29,23 @@ type ResolvedCurriculumTarget = {
   subjectData: SubjectWithChapters | null;
 };
 
-function readString(value: unknown): string {
-  return value != null && value !== '' ? String(value) : '';
-}
-
 function getCourseGradeLabel(standardName?: string | null) {
-  if (!standardName) return 'Grade';
-  return `Grade ${String(standardName).replace('Class', '').trim()}`;
+  // Matches the Lesson plans and Chapters tabs: with no grade to show, render
+  // nothing rather than a bare "Grade" with no number after it.
+  const grade = String(standardName ?? '').replace('Class', '').trim();
+  return grade ? `Grade ${grade}` : '';
 }
 
-function getCourseSectionLabel(courseId: string) {
-  const numeric = Number(courseId.replace(/\D/g, '')) || 0;
-  return numeric % 2 === 0 ? 'Section A' : 'Section B';
+/**
+ * Concepts stored for a chapter, counted the same way the Lesson plans tab
+ * counts them: prefer the expanded concept rows, else the semantic total.
+ */
+function getChapterConceptCount(chapter: Chapter): number {
+  const conceptRows = chapter.concepts?.length ?? 0;
+  if (conceptRows > 0) return conceptRows;
+
+  const semanticTotal = Number(chapter.semantic?.total_concepts);
+  return Number.isFinite(semanticTotal) && semanticTotal > 0 ? semanticTotal : 0;
 }
 
 function normalizeNumericString(value?: string | null): string | undefined {
@@ -110,92 +65,6 @@ function parseUnitChapters(value: string | string[] | null): string[] {
   }
 }
 
-function getCurriculumSession(): CurriculumSession | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
-    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
-
-    const token = readString(userData.user_token ?? userData.token);
-    const hostName = readString(userData.host_name) || API_BASE_URL;
-    const subInstituteId = readString(userData.sub_institute_id ?? menuContext.sub_institute_id);
-    const academicYearId =
-      readString(localStorage.getItem('selectedAcademicYear')) ||
-      readString(userData.academic_year_id ?? userData.academicYearId);
-
-    if (!token || !hostName || !subInstituteId || !academicYearId) {
-      return null;
-    }
-
-    return {
-      token,
-      hostName,
-      subInstituteId,
-      academicYearId,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchCurriculumData(
-  session: CurriculumSession,
-  subjectId: string,
-  standardId?: string
-): Promise<CurriculumApiResult> {
-  const query = new URLSearchParams({
-    subject_id: subjectId,
-    sub_institute_id: session.subInstituteId,
-    syear: session.academicYearId,
-    ...(standardId ? { standard_id: standardId } : {}),
-  });
-
-  const response = await fetch(
-    `${session.hostName.replace(/\/$/, '')}/lms/new_curriculum?${query.toString()}`,
-    {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${session.token}`,
-      },
-    }
-  );
-
-  const responseData = (await response.json()) as unknown;
-  if (!response.ok) {
-    throw new Error('Curriculum request failed');
-  }
-
-  const result = Array.isArray(responseData)
-    ? responseData[0]
-    : responseData;
-
-  const curriculumData =
-    result && typeof result === 'object' && 'curriculum_data' in result
-      ? ((result as Record<string, unknown>).curriculum_data as CurriculumData | null) ?? null
-      : null;
-  const unitData =
-    result && typeof result === 'object' && Array.isArray((result as Record<string, unknown>).unit_data)
-      ? ((result as Record<string, unknown>).unit_data as UnitData[])
-      : [];
-  const outcomes =
-    result && typeof result === 'object' && Array.isArray((result as Record<string, unknown>).outcomes)
-      ? ((result as Record<string, unknown>).outcomes as OutcomeNode[])
-      : [];
-
-  console.log('Curriculum API response:', responseData);
-  console.log('Mapped result:', result);
-  console.log('Curriculum:', curriculumData);
-  console.log('Units:', unitData);
-  console.log('Outcomes:', outcomes);
-
-  return {
-    curriculum_data: curriculumData,
-    unit_data: unitData,
-    outcomes,
-  };
-}
 
 async function resolveCurriculumTarget(
   rawCourseId: string,
@@ -340,7 +209,31 @@ export default function CurriculumPage() {
   const [openUnitId, setOpenUnitId] = useState<number | null>(null);
   const [openOutcomeId, setOpenOutcomeId] = useState<number | null>(null);
 
-  const fallbackCourse = courses.find((item) => item.id === courseId);
+  // Same courseId parsing the Lesson plans tab uses: "<subjectId>-<standardId>",
+  // passed through verbatim rather than through normalizeNumericString, which
+  // drops any part that is not purely digits.
+  const courseIdParts = courseId.includes('-') ? courseId.split('-', 2) : [];
+  const subjectId = courseIdParts[0] ?? '';
+  const standardId = courseIdParts[1];
+  const isLmsRoute = Boolean(subjectId && standardId);
+
+  // The heading names the subject and grade exactly like Lesson plans and
+  // Chapters, so it loads on its own. Previously the only path to the subject
+  // ran inside the curriculum effect below, behind a getCurriculumSession()
+  // guard that returns early — with no session, or with a curriculum record
+  // that fails to load, the header was left with no subject and no grade.
+  useEffect(() => {
+    if (!isLmsRoute) return;
+    let cancelled = false;
+
+    getSubjectAndChapters(subjectId, standardId).then((data) => {
+      if (!cancelled && data.subject) setSubjectData(data);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLmsRoute, subjectId, standardId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -360,9 +253,20 @@ export default function CurriculumPage() {
       setError(null);
 
       try {
-        const target = await resolveCurriculumTarget(courseId, fallbackCourse);
+        const target = await resolveCurriculumTarget(courseId);
         if (!target) {
           throw new Error('Curriculum target not resolved');
+        }
+
+        if (cancelled) return;
+
+        // Publish the subject as soon as it resolves. The heading reads the
+        // subject and grade from here, so holding it back until the curriculum
+        // call returns leaves the header blank whenever that call fails or
+        // returns nothing — Lesson plans and Chapters name the subject
+        // regardless of their own content loading.
+        if (target.subjectData?.subject) {
+          setSubjectData(target.subjectData);
         }
 
         const curriculumResult = await fetchCurriculumData(
@@ -373,7 +277,6 @@ export default function CurriculumPage() {
 
         if (cancelled) return;
 
-        setSubjectData(target.subjectData);
         setCurriculumResponse(curriculumResult);
         setOpenUnitId(curriculumResult.unit_data[0]?.unit_number ?? null);
         setOpenOutcomeId(curriculumResult.outcomes[0]?.id ?? null);
@@ -393,24 +296,42 @@ export default function CurriculumPage() {
     return () => {
       cancelled = true;
     };
-  }, [courseId, fallbackCourse]);
+  }, [courseId]);
 
-  const course = buildLiveCourse(courseId, subjectData, fallbackCourse);
+  const course = buildLiveCourse(courseId, subjectData);
   const curriculumData = curriculumResponse?.curriculum_data ?? null;
   const unitData = curriculumResponse?.unit_data ?? [];
   const outcomes = curriculumResponse?.outcomes ?? [];
-  const sectionLabel = getCourseSectionLabel(courseId);
   const gradeLabel = getCourseGradeLabel(subjectData?.subject?.standard_name ?? course?.classGrade);
 
-  const headerMeta = useMemo(() => {
-    const parts = [
-      curriculumData?.board,
-      curriculumData?.framework,
-      curriculumData?.syear ? `Academic year ${curriculumData.syear}` : null,
-    ].filter(Boolean);
+  // "Mathematics - Grade 7", identical to the Lesson plans and Chapters tabs.
+  // Only when the subject has not resolved do we fall back to naming the
+  // curriculum, so the header is never left as a bare "Grade".
+  const headerTitle =
+    [course?.subject, gradeLabel].filter(Boolean).join(' - ') ||
+    curriculumData?.curriculum_name ||
+    'Curriculum';
 
-    return parts.join(' - ');
-  }, [curriculumData?.board, curriculumData?.framework, curriculumData?.syear]);
+  // "16 chapters - 406 key concepts - Curriculum not configured", the same
+  // three parts the other two tabs show beneath the heading.
+  const headerMeta = useMemo(() => {
+    const chapters = subjectData?.chapters ?? [];
+    const conceptCount = chapters.reduce(
+      (total, chapter) => total + getChapterConceptCount(chapter),
+      0
+    );
+    const curriculumLabel = curriculumResponse
+      ? curriculumData?.curriculum_name || CURRICULUM_NOT_CONFIGURED
+      : '';
+
+    return [
+      `${chapters.length} chapters`,
+      `${conceptCount} key concepts`,
+      curriculumLabel,
+    ]
+      .filter(Boolean)
+      .join(' - ');
+  }, [subjectData?.chapters, curriculumResponse, curriculumData?.curriculum_name]);
 
   if (!courseId) {
     return (
@@ -435,7 +356,7 @@ export default function CurriculumPage() {
           <span>Subjects</span>
           <ChevronRight size={14} className="text-[#94A3B8]" />
           <span className="font-medium text-[#0F172A]">
-            {(course?.subject || curriculumData?.curriculum_name || 'Curriculum')} - {gradeLabel} {sectionLabel}
+            {headerTitle}
           </span>
         </div>
 
@@ -447,7 +368,7 @@ export default function CurriculumPage() {
               </div>
               <div>
                 <h1 className="text-[30px] font-semibold tracking-tight text-[#0F172A] sm:text-[34px]">
-                  {curriculumData?.curriculum_name || 'Curriculum'}
+                  {headerTitle}
                 </h1>
                 {headerMeta ? (
                   <p className="mt-1 text-[15px] text-[#475569] sm:text-[16px]">{headerMeta}</p>

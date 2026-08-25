@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { LoaderCircle, Plus, RefreshCw, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,8 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
 
+  const optionsRef = useRef<VisitorFormOptions>(EMPTY_OPTIONS);
+
   const load = useCallback(async (nextFilters = filters) => {
     setLoading(true);
     setError("");
@@ -50,19 +52,23 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
       const session = getHostelSession();
       const [loadedRecords, loadedOptions] = await Promise.all([
         loadVisitorList(session, nextFilters),
-        mode === "details" ? loadVisitorFormOptions(session) : Promise.resolve(options),
+        mode === "details" ? loadVisitorFormOptions(session) : Promise.resolve(optionsRef.current),
       ]);
       setRecords(loadedRecords);
-      if (mode === "details") setOptions(loadedOptions);
+      if (mode === "details") {
+        optionsRef.current = loadedOptions;
+        setOptions(loadedOptions);
+      }
     } catch (loadError: unknown) {
       setError(loadError instanceof Error ? loadError.message : "Visitor data could not be loaded.");
     } finally {
       setLoading(false);
     }
-  }, [filters, mode, options]);
+  }, [filters, mode]);
 
   useEffect(() => {
-    // The visitor data depends on browser session storage and token auth.
+    // Refresh only when the date filters change (not on every state update),
+    // so the list behaves like the legacy ERP screen instead of auto-polling.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(filters);
   }, [filters, load]);

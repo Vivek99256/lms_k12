@@ -59,18 +59,20 @@ export const configs: Record<string, InventoryConfig> = {
     { key: "po_approval_remark", label: "Approval Remark", kind: "textarea" },
   ], [{ key: "po_number", label: "PO Number" }, { key: "vendor_name", label: "Vendor" }, { key: "item_name", label: "Item" }, { key: "price", label: "Price" }, { key: "qty", label: "Qty" }, { key: "status", label: "Status" }]),
   item_receivable: workflow("receivables", "Item Receivable", [
-    { key: "po_number", label: "Approved PO", kind: "select", source: "approved_purchase_orders", required: true }, item,
+    { key: "po_number", label: "Approved PO", kind: "select", source: "approved_purchase_orders", required: true },
+    { ...item, source: "po_items", dependsOn: "po_number" },
     { key: "actual_received_qty", label: "Received Quantity", kind: "number", required: true }, { key: "challan_no", label: "Challan No." },
     { key: "challan_date", label: "Challan Date", kind: "date" }, { key: "bill_no", label: "Bill No." }, { key: "bill_date", label: "Bill Date", kind: "date" },
     { key: "warranty_start_date", label: "Warranty Start", kind: "date" }, { key: "warranty_end_date", label: "Warranty End", kind: "date" }, { key: "remarks", label: "Remarks", kind: "textarea" },
   ], [{ key: "po_number", label: "PO Number" }, { key: "item_name", label: "Item" }, { key: "qty", label: "PO Qty" }, { key: "actual_received_qty", label: "Received" }, { key: "pending_qty", label: "Pending" }]),
   inventory_allocation: workflow("allocations", "Inventory Allocation", [
-    ...dates, item, { key: "requisition_by", label: "Requisition By", kind: "select", source: "users", required: true },
+    ...dates, { key: "requisition_by", label: "Requisition By", kind: "select", source: "allocation_users", required: true },
+    { ...item, source: "allocatable_items", dependsOn: "requisition_by" },
     { key: "location_of_material", label: "Material Location", required: true }, { key: "person_responsible", label: "Person Responsible", required: true },
   ], [{ key: "item_name", label: "Item" }, { key: "requisition_by_name", label: "Requested By" }, { key: "approved_qty", label: "Approved Qty" }, { key: "location_of_material", label: "Location" }, { key: "person_responsible", label: "Responsible Person" }]),
   inventory_return: workflow("returns", "Inventory Return", [
     { key: "requisition_by", label: "Issued To", kind: "select", source: "users", required: true },
-    { ...item, source: "return_items" },
+    { ...item, source: "returnable_items", dependsOn: "requisition_by" },
     { key: "return_qty", label: "Return Quantity", kind: "number", required: true }, { key: "remarks", label: "Remarks", kind: "textarea" },
   ], [{ key: "return_date", label: "Return Date" }, { key: "user_name", label: "Returned By" }, { key: "item_name", label: "Item" }, { key: "return_qty", label: "Quantity" }, { key: "remarks", label: "Remarks" }]),
   inventory_defective: workflow("defectives", "Inventory Defective", [

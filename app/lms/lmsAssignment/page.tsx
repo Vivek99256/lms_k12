@@ -34,6 +34,7 @@ import {
   type AssignmentStudentRow,
   type ExamPaperRow,
 } from "@/app/lms/lmsAssignment/api";
+import RequireStaff from "@/app/lms/_shared/RequireStaff";
 
 const academicFields: DropdownField[] = [
   "section",
@@ -193,6 +194,7 @@ export default function CreateAssignmentPage() {
   }
 
   return (
+    <RequireStaff>
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900">Create Assignment</h1>
@@ -410,5 +412,6 @@ export default function CreateAssignmentPage() {
         </section>
       )}
     </main>
+    </RequireStaff>
   );
 }

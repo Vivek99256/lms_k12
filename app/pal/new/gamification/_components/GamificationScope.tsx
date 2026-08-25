@@ -6,6 +6,7 @@ import { UserRound } from 'lucide-react';
 import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 import { getViewAsStudent, setViewAsStudent, useViewAsStudent } from '@/app/pal/data/pal-view-as';
+import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import type { PalStudentSelection } from '@/app/pal/data/pal';
 import type { LearnerScope } from '@/app/pal/new/data/gamification';
 
@@ -97,19 +98,28 @@ export function LearnerRequiredPanel({
   message?: string;
   onSelect: (student: PalStudentSelection) => void;
 }) {
+  // The class-roster picker is a staff-only tool. A student session must never
+  // render it, even if the API's "learner_id is required" hint fires for them
+  // unexpectedly — the client stays defense-in-depth here, not just the server.
+  const isStaff = !isStudentSession();
+
   return (
     <PageShell>
       <StatusPanel
         kind="empty"
         title="Pick a student"
         message={
-          message ||
-          'Gamification follows one learner\'s own journey, so it needs a student. Choose one below — you will keep viewing that learner across PAL.'
+          isStaff
+            ? message ||
+              'Gamification follows one learner\'s own journey, so it needs a student. Choose one below — you will keep viewing that learner across PAL.'
+            : 'Unable to load your gamification data right now.'
         }
       >
-        <div className="mx-auto max-w-3xl text-left">
-          <StudentPicker audience="Teacher" onSelect={onSelect} />
-        </div>
+        {isStaff && (
+          <div className="mx-auto max-w-3xl text-left">
+            <StudentPicker audience="Teacher" onSelect={onSelect} />
+          </div>
+        )}
       </StatusPanel>
     </PageShell>
   );
@@ -117,6 +127,8 @@ export function LearnerRequiredPanel({
 
 /** A compact inline prompt for sub-pages that already have a header. */
 export function InlineLearnerPrompt({ onSelect }: { onSelect: (student: PalStudentSelection) => void }) {
+  if (isStudentSession()) return null;
+
   return (
     <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-3">

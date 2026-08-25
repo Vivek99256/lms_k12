@@ -48,15 +48,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { cn } from '@/lib/utils';
-import { getRequestContext } from '../../page';
-import { courses } from '../../data/courses';
+import { getRequestContext, getSyear } from '../../page';
 import {
-  getChaptersByCourseid,
   getSubjectAndChapters,
   type Chapter,
   type SubjectWithChapters,
 } from '../../data/chapters';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
+import { useCurriculumMeta } from '../../data/curriculum';
+import type { LmsSubject } from '../../data/lmsCourses';
 import { getSemanticIntelligenceForSelection } from '../../data/semanticIntelligence';
 import type { Course } from '../../data/courses';
 
@@ -505,17 +505,38 @@ function getCourseGradeLabel(classGrade: string) {
   return `Grade ${classGrade.replace('Class', '').trim()}`;
 }
 
-function getCurriculumLabel(course: Course) {
-  return course.category === 'STEM Resources' ? 'STEM curriculum' : 'NCF-SE 2023 curriculum';
+/**
+ * Concepts actually stored for a chapter. Prefers the concept rows the API
+ * returned, and falls back to the semantic record's own total when the rows
+ * weren't expanded in the response.
+ */
+function getChapterConceptCount(chapter: Chapter): number {
+  const conceptRows = chapter.concepts?.length ?? 0;
+  if (conceptRows > 0) return conceptRows;
+
+  const semanticTotal = Number(chapter.semantic?.total_concepts);
+  return Number.isFinite(semanticTotal) && semanticTotal > 0 ? semanticTotal : 0;
 }
 
-function getTotalKeyConceptCount(course: Course, chapters: Chapter[]) {
-  const conceptCount = chapters.reduce((total, chapter) => {
-    return total + (getChapterKeyConcepts(course.id, chapter.id)?.count ?? 0);
-  }, 0);
+function getTotalKeyConceptCount(course: Course, chapters: Chapter[], subject?: LmsSubject | null) {
+  const liveCount = chapters.reduce((total, chapter) => total + getChapterConceptCount(chapter), 0);
+  if (liveCount > 0) return liveCount;
 
-  if (conceptCount > 0) return conceptCount;
-  return Math.max(course.chapters * 4, 12);
+  // The catalog's own subject-level total, for when chapter rows omit their concepts.
+  const subjectTotal = Number(
+    subject?.key_concepts_count ??
+      subject?.key_concept_count ??
+      subject?.concepts_count ??
+      subject?.total_concepts ??
+      0
+  );
+  if (Number.isFinite(subjectTotal) && subjectTotal > 0) return subjectTotal;
+
+  // Demo courses carry no API concepts; their sample set is the only source.
+  return chapters.reduce(
+    (total, chapter) => total + (getChapterKeyConcepts(course.id, chapter.id)?.count ?? 0),
+    0
+  );
 }
 
 const PERIOD_SLOT_TIME_MAP: Record<string, { startHour: number; startMinute: number; fallbackLabel: string }> = {
@@ -775,10 +796,12 @@ export default function LessonPlanPage() {
   const chapterId = searchParams?.get('chapterId') ?? '';
   const conceptTitleParam = searchParams?.get('concept') ?? '';
 
-  const staticCourse = courses.find((c) => c.id === courseId);
   const courseIdParts = courseId.includes('-') ? courseId.split('-', 2) : [];
   const subjectId = courseIdParts[0];
   const standardId = courseIdParts[1];
+
+  // The board shown in the header belongs to the tenant's curriculum record.
+  const { label: curriculumLabel } = useCurriculumMeta(subjectId, standardId);
 
   const isLmsRoute = Boolean(subjectId && standardId);
   const [subjectData, setSubjectData] = useState<SubjectWithChapters | null>(null);
@@ -787,8 +810,7 @@ export default function LessonPlanPage() {
   const apiSubject = subjectData?.subject ?? null;
   const course: Course | undefined = useMemo(
     () =>
-      staticCourse ??
-      (apiSubject
+      apiSubject
         ? {
             id: courseId,
             title: apiSubject.subject_name,
@@ -805,14 +827,10 @@ export default function LessonPlanPage() {
             accentColor: '#4F46E5',
             icon: 'book-open',
           }
-        : undefined),
-    [staticCourse, apiSubject, subjectData, courseId]
+        : undefined,
+    [apiSubject, subjectData, courseId]
   );
-  const courseChapters = useMemo<Chapter[]>(() => {
-    if (subjectData?.chapters?.length) return subjectData.chapters;
-    if (staticCourse) return getChaptersByCourseid(courseId);
-    return [];
-  }, [subjectData, staticCourse, courseId]);
+  const courseChapters = useMemo<Chapter[]>(() => subjectData?.chapters ?? [], [subjectData]);
   const selectedChapter =
     courseChapters.find((chapter) => chapter.id === chapterId) || courseChapters[0] || null;
   const handleSubjectClick = (nextSubjectId: number | null, nextChapterId: number | null) => {
@@ -823,7 +841,6 @@ export default function LessonPlanPage() {
       chapter_id: nextChapterId,
     });
     setSelectedSubjectId(nextSubjectId);
-    setSelectedChapterId(nextChapterId);
   };
   const chapterConcepts = useMemo(() => {
     if (!selectedChapter) return null;
@@ -868,11 +885,15 @@ export default function LessonPlanPage() {
     standardId: '',
     hostName: '',
   });
-  const currentStandardId = Number(sessionContext.standardId || routeStandardId || 0) || null;
+  // The standard the user selected by opening this subject card is the one in the
+  // route. It has to win over any standard left over in the session, otherwise the
+  // division list and the lesson plan calendar are built for a different standard
+  // than the one on screen. The session value only fills in for the non-LMS route,
+  // where the courseId carries no standard.
+  const currentStandardId = Number(routeStandardId || sessionContext.standardId || 0) || null;
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(
     /^\d+$/.test(subjectId) ? Number(subjectId) : null
   );
-  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null);
   const [hoveredPeriod, setHoveredPeriod] = useState<LessonPlanEvent | null>(null);
   const [hoverPosition, setHoverPosition] = useState<HoverPopupPosition>({ top: 0, left: 0 });
   const [lessonPlanDraft, setLessonPlanDraft] = useState<LessonPlanDraft>({
@@ -1065,12 +1086,37 @@ export default function LessonPlanPage() {
       return;
     }
 
-    if (!selectedSubjectId || !selectedChapterId) return;
+    // Lesson plans are keyed by institute + year + term + standard + subject +
+    // division. Chapter is not one of those, so it must not gate the calendar.
+    if (!selectedSubjectId) return;
+
+    const syear = getSyear();
+    const { subInstituteId, termId } = sessionContext;
 
     const controller = new AbortController();
     const runFetchLessonPlans = async () => {
-      const lessonPlanApiUrl =
-        'https://dev.triz.co.in/api/intelligence/lesson-plans?sub_institute_id=195&standard_id=2235&subject_id=4018&term_id=149&division_id=936&syear=2025';
+      // Every filter below identifies the tenant's own plan. If any of them is
+      // missing the calendar stays empty — it must never fall back to a default
+      // that would surface another institute's lesson plans.
+      if (!subInstituteId || !termId || !syear || !currentStandardId) {
+        setApiPeriods([]);
+        setLessonPlanError(
+          'Current session is missing the institute, academic term, or academic year, so no lesson plan calendar can be loaded.'
+        );
+        setLessonPlanLoading(false);
+        return;
+      }
+
+      const lessonPlanUrl = new URL(
+        `${(sessionContext.hostName || API_BASE_URL).replace(/\/$/, '')}/api/intelligence/lesson-plans`
+      );
+      lessonPlanUrl.searchParams.set('sub_institute_id', subInstituteId);
+      lessonPlanUrl.searchParams.set('standard_id', String(currentStandardId));
+      lessonPlanUrl.searchParams.set('subject_id', String(selectedSubjectId));
+      lessonPlanUrl.searchParams.set('term_id', termId);
+      lessonPlanUrl.searchParams.set('division_id', String(selectedDivisionId));
+      lessonPlanUrl.searchParams.set('syear', syear);
+      const lessonPlanApiUrl = lessonPlanUrl.toString();
       setLessonPlanLoading(true);
 
       try {
@@ -1101,6 +1147,15 @@ export default function LessonPlanPage() {
           } catch {
             payload = { message: responseText };
           }
+        }
+
+        // The API answers 404 when this institute has no plan for the selected
+        // term/standard/subject/division. That is an empty calendar, not a failure.
+        if (response.status === 404) {
+          setApiPeriods([]);
+          setLessonPlanError(null);
+          setLessonPlanLoading(false);
+          return;
         }
 
         if (!response.ok) {
@@ -1143,7 +1198,6 @@ export default function LessonPlanPage() {
   }, [
     selectedDivisionId,
     selectedSubjectId,
-    selectedChapterId,
     currentStandardId,
     standardId,
     subjectId,
@@ -1162,8 +1216,7 @@ export default function LessonPlanPage() {
   const chapterCount = Math.max(course?.chapters ?? 0, courseChapters.length);
   const gradeLabel = course ? getCourseGradeLabel(course.classGrade) : '';
   const sectionLabel = course ? getCourseSectionLabel(course.id) : '';
-  const curriculumLabel = course ? getCurriculumLabel(course) : '';
-  const totalKeyConcepts = course ? getTotalKeyConceptCount(course, courseChapters) : 0;
+  const totalKeyConcepts = course ? getTotalKeyConceptCount(course, courseChapters, apiSubject) : 0;
   const selectedDivision = useMemo(
     () =>
       divisions.find(
@@ -1672,7 +1725,8 @@ export default function LessonPlanPage() {
                   {course.subject} - {gradeLabel} - {sectionLabel}
                 </h1>
                 <p className="mt-1 text-[16px] text-[#475569]">
-                  {chapterCount} chapters Ã‚Â· {totalKeyConcepts} key concepts Ã‚Â· {curriculumLabel}
+                  {chapterCount} chapters · {totalKeyConcepts} key concepts
+                  {curriculumLabel ? ` · ${curriculumLabel}` : ''}
                 </p>
               </div>
             </div>
@@ -2036,7 +2090,7 @@ export default function LessonPlanPage() {
           <span>Subjects</span>
           <ChevronRight size={14} className="text-[#94A3B8]" />
           <span className="font-medium text-[#0F172A]">
-            {course.subject} - {gradeLabel.replace('Grade ', 'Grade ')} {sectionLabel.replace('Section ', '')}
+            {course.subject} - {gradeLabel.replace('Grade ', 'Grade ')} 
           </span>
         </div>
 
@@ -2048,10 +2102,11 @@ export default function LessonPlanPage() {
               </div>
               <div>
                 <h1 className="text-[34px] font-semibold tracking-tight text-[#0F172A]">
-                  {course.subject} - {gradeLabel} - {sectionLabel}
+                  {course.subject} - {gradeLabel} 
                 </h1>
                 <p className="mt-1 text-[16px] text-[#475569]">
-                  {chapterCount} chapters · {totalKeyConcepts} key concepts · {curriculumLabel}
+                  {chapterCount} chapters · {totalKeyConcepts} key concepts
+                  {curriculumLabel ? ` · ${curriculumLabel}` : ''}
                 </p>
               </div>
             </div>

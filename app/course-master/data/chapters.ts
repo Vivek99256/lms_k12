@@ -8,6 +8,8 @@ export interface Chapter {
   number: number;
   title: string;
   content_categories?: Record<string, unknown[]>;
+  /** The chapter's topic breakdown (topic_master), in curriculum order. */
+  topics?: ChapterTopic[];
   concepts?: ChapterConcept[];
   teachingMethodologies: string[];
   resources: {
@@ -91,10 +93,23 @@ export interface ChapterSemantic {
   md_content?: string;
 }
 
+/**
+ * A topic inside a chapter. Chapters are split into topics, and topics into
+ * concepts, so the chapter list drills chapter -> topic -> concept.
+ */
+export interface ChapterTopic {
+  id: string;
+  title: string;
+  description: string;
+  sortOrder: number;
+}
+
 export interface ChapterConcept {
   id: string;
   title: string;
   description: string;
+  /** topic_master.id this concept sits under, or null when it predates the topic split. */
+  topicId: string | null;
   learningObjective?: string;
   semantic?: {
     learning_objective?: string;
@@ -118,6 +133,7 @@ interface ApiChapterSource {
   total_triz_content?: number | string;
   total_OER_content?: number | string;
   content_categories?: Record<string, unknown[]>;
+  topics?: ApiChapterTopicSource[];
   subject_id?: number;
   standard_id?: number;
   semantic?: ChapterSemantic;
@@ -143,9 +159,17 @@ interface ApiChapterSource {
 
 interface ApiChapterConceptSource {
   concept_id?: number | string;
+  topic_id?: number | string | null;
   concept_name?: string;
   concept_description?: string;
   semantic?: ChapterConcept['semantic'];
+}
+
+interface ApiChapterTopicSource {
+  topic_id?: number | string;
+  topic_name?: string;
+  topic_description?: string | null;
+  topic_sort_order?: number | string | null;
 }
 
 export interface SubjectWithChapters {
@@ -161,10 +185,35 @@ function mapChapterConcepts(concepts: ApiChapterConceptSource[] | undefined): Ch
       id: String(concept.concept_id ?? index + 1),
       title: concept.concept_name ?? `Concept ${index + 1}`,
       description: concept.concept_description ?? '',
+      topicId: normaliseTopicId(concept.topic_id),
       learningObjective: concept.semantic?.learning_objective,
       semantic: concept.semantic,
     }))
     .filter((concept) => concept.title.trim());
+}
+
+/** 0 and '' are "no topic" in the payload, so they normalise to null alongside null itself. */
+function normaliseTopicId(value: number | string | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const id = String(value).trim();
+  return id && id !== '0' ? id : null;
+}
+
+/**
+ * Topics come back already sorted by topic_sort_order, but the sort column is
+ * nullable, so ties fall back to payload order rather than jumping around.
+ */
+function mapChapterTopics(topics: ApiChapterTopicSource[] | undefined): ChapterTopic[] {
+  if (!Array.isArray(topics)) return [];
+
+  return topics
+    .map((topic, index) => ({
+      id: String(topic.topic_id ?? index + 1),
+      title: topic.topic_name ?? `Topic ${index + 1}`,
+      description: topic.topic_description ?? '',
+      sortOrder: Number(topic.topic_sort_order) || index + 1,
+    }))
+    .filter((topic) => topic.title.trim());
 }
 
 function mapConceptCategories(concepts: ChapterConcept[], fallback?: Record<string, unknown[]>) {
@@ -193,7 +242,8 @@ function buildChapterSemantic(source: ApiChapterSource): ChapterSemantic | undef
     abilities: source.abilities ?? nested.abilities,
     knowledge: source.knowledge ?? nested.knowledge,
     competency: source.competency ?? nested.competency,
-    dok: (source.dok ?? nested.dok)?.map((entry) => ({
+    // Normalised because the payload does not guarantee an array here.
+    dok: asArray<NonNullable<ChapterSemantic['dok']>[number]>(source.dok ?? nested.dok).map((entry) => ({
       level: stringifyLevel(entry?.level),
       description: entry?.description,
       concept_name: entry?.concept_name,
@@ -353,6 +403,40 @@ function asText(value: unknown): string {
   return String(value).trim();
 }
 
+/**
+ * The semantic-intelligence payload is generated per chapter and its list fields
+ * are not guaranteed to arrive as arrays — a single entry can come through as a
+ * bare object, and a list can arrive as a JSON string. Everything downstream maps
+ * and filters these, so they are normalised to arrays at the boundary.
+ */
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value === null || value === undefined || value === '') return [];
+
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed as T[];
+      return parsed === null || parsed === undefined ? [] : [parsed as T];
+    } catch {
+      return [value as T];
+    }
+  }
+
+  return [value as T];
+}
+
+/**
+ * Text out of a list whose entries may be objects keyed by `key`, or plain strings.
+ */
+function asTextList(value: unknown, key: string): string[] {
+  return asArray<unknown>(value)
+    .map((item) =>
+      item && typeof item === 'object' ? asText((item as Record<string, unknown>)[key]) : asText(item)
+    )
+    .filter(Boolean);
+}
+
 export function getConceptIntelligenceData(
   chapter: Chapter,
   conceptTitle: string
@@ -363,41 +447,45 @@ export function getConceptIntelligenceData(
   // new_chapter_master now returns the concept list beside the chapter semantic
   // payload. Prefer a legacy concept-level payload when present, then fall back
   // to the chapter-level intelligence returned by the new response shape.
-  const entries =
-    (concept?.semantic?.full_intelegance_json?.concepts as ConceptIntelEntry[] | undefined) ??
-    (semantic.full_intelegance_json?.concepts as ConceptIntelEntry[] | undefined) ??
-    [];
+  const entries = asArray<ConceptIntelEntry>(
+    concept?.semantic?.full_intelegance_json?.concepts ?? semantic.full_intelegance_json?.concepts
+  );
   const entry =
     entries.find((item) => item?.concept?.concept_name === conceptTitle) ?? entries[0] ?? {};
 
-  const knowledgeItems = entry.knowledge_items ?? [];
-  const knowledgeFromItems = knowledgeItems.map((item) => asText(item?.knowledge)).filter(Boolean);
+  const knowledgeFromItems = asTextList(entry.knowledge_items, 'knowledge');
   const knowledge =
-    knowledgeFromItems.length > 0
-      ? knowledgeFromItems
-      : (semantic.knowledge ?? []).map((item) => asText(item?.knowledge)).filter(Boolean);
+    knowledgeFromItems.length > 0 ? knowledgeFromItems : asTextList(semantic.knowledge, 'knowledge');
 
-  const rawPrerequisites = entry.prerequisites ?? [];
-  const prerequisites = rawPrerequisites.length
-    ? rawPrerequisites.map((item) => asText(item?.concept_name)).filter(Boolean)
-    : (semantic.prerequisites ?? []).map((item) => asText(item)).filter(Boolean);
+  const prerequisitesFromEntry = asTextList(entry.prerequisites, 'concept_name');
+  const prerequisites =
+    prerequisitesFromEntry.length > 0
+      ? prerequisitesFromEntry
+      : asTextList(semantic.prerequisites, 'concept_name');
+
+  // Each list prefers the concept-level entry and falls back to the chapter-level
+  // payload, so an entry that is present but empty must not mask the fallback.
+  const pick = <T,>(entryValue: unknown, semanticValue: unknown): T[] => {
+    const fromEntry = asArray<T>(entryValue);
+    return fromEntry.length > 0 ? fromEntry : asArray<T>(semanticValue);
+  };
 
   return {
     learningObjective: asText(semantic.learning_objective) || asText(semantic.full_intelegance_json?.chapter_summary),
     totalConcepts: Number(semantic.total_concepts) || (chapter.concepts ?? []).length || 0,
     knowledge,
-    abilities: entry.abilities ?? semantic.abilities ?? [],
-    skills: entry.skills ?? semantic.skill ?? [],
-    competencies: entry.competencies ?? semantic.competency ?? [],
-    learningObjectives: entry.learning_objectives ?? semantic.learning_objectives ?? [],
-    learningOutcomes: entry.learning_outcomes ?? semantic.learning_outcomes ?? [],
-    blooms: entry.blooms ?? semantic.blooms_level ?? [],
-    dok: entry.dok ?? semantic.dok ?? [],
+    abilities: pick(entry.abilities, semantic.abilities),
+    skills: pick(entry.skills, semantic.skill),
+    competencies: pick(entry.competencies, semantic.competency),
+    learningObjectives: pick(entry.learning_objectives, semantic.learning_objectives),
+    learningOutcomes: pick(entry.learning_outcomes, semantic.learning_outcomes),
+    blooms: pick(entry.blooms, semantic.blooms_level),
+    dok: pick(entry.dok, semantic.dok),
     prerequisites,
-    misconceptions: entry.misconceptions ?? semantic.misconceptions ?? [],
-    realWorld: entry.real_world_applications ?? semantic.real_world_applications ?? [],
-    pedagogy: entry.pedagogy_recommendations ?? semantic.pedagogy ?? [],
-    assessmentBlueprint: entry.assessment_blueprint ?? semantic.assessment_blueprint ?? [],
+    misconceptions: pick(entry.misconceptions, semantic.misconceptions),
+    realWorld: pick(entry.real_world_applications, semantic.real_world_applications),
+    pedagogy: pick(entry.pedagogy_recommendations, semantic.pedagogy),
+    assessmentBlueprint: pick(entry.assessment_blueprint, semantic.assessment_blueprint),
   };
 }
 
@@ -431,6 +519,8 @@ export interface ChapterContentAsset {
   file_type: string | null;
   content_category: string | null;
   concept_id?: number | string | null;
+  /** lms_concept.name, resolved through content_master.concept_id. */
+  concept_name?: string | null;
   created_at: string | null;
   source?: string | null;
 }
@@ -582,6 +672,12 @@ export interface UploadChapterContentInput {
   chapter_id: number;
   sub_institute_id: number;
   user_id: number;
+  /**
+   * Role of the signed-in user. The store endpoint only accepts Admin / Teacher /
+   * LMS Teacher, and has no Laravel session to read it from on an API call, so it
+   * has to travel with the request or the upload is rejected as unauthorized.
+   */
+  user_profile_name: string;
   subject_id?: number;
   standard_id?: number;
   syear?: string;
@@ -619,6 +715,7 @@ export async function uploadChapterContent(
   form.append('chapter_id', String(input.chapter_id));
   form.append('sub_institute_id', String(input.sub_institute_id));
   form.append('user_id', String(input.user_id));
+  form.append('user_profile_name', input.user_profile_name);
   if (input.subject_id != null) form.append('subject_id', String(input.subject_id));
   if (input.standard_id != null) form.append('standard_id', String(input.standard_id));
   if (input.syear) form.append('syear', input.syear);
@@ -794,7 +891,12 @@ export async function fetchNewChapterMaster(
 export interface QuestionBankApiQuestion {
   id: number;
   chapter_id: number;
-  topic_id?: number;
+  /** topic_master.id — a different id space from concept_id. */
+  topic_id?: number | null;
+  /** lms_concept.id the question is filed under. */
+  concept_id?: number | null;
+  /** Concept name stored on the question itself, for rows whose ids don't resolve. */
+  concept?: string | null;
   question: string;
   question_type: string;
   options?: Array<{
@@ -829,6 +931,63 @@ export async function fetchQuestionBank(chapterId: number): Promise<QuestionBank
     message: (raw.message as string) || 'Questions fetched successfully.',
     data: (raw.data as QuestionBankApiQuestion[]) ?? [],
   };
+}
+
+export interface UpdateQuestionBankPayload {
+  id: number;
+  sub_institute_id: number;
+  question: string;
+  question_type: 'MCQ' | 'Narrative';
+  marks: number;
+  concept_id?: number | null;
+  concept?: string | null;
+  model_answer?: string | null;
+  options?: Array<{ label: string; text: string; is_correct: boolean }>;
+}
+
+/**
+ * Persist an edited Question Bank question. Writes to the same rows
+ * fetchQuestionBank reads, so the caller only has to re-fetch to show the
+ * stored result.
+ */
+export async function updateQuestionBankQuestion(
+  payload: UpdateQuestionBankPayload
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-question-bank/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await readApiJson(res, 'Failed to save the question');
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to save the question'));
+  }
+}
+
+export interface DeleteQuestionBankPayload {
+  id: number;
+  sub_institute_id: number;
+}
+
+/**
+ * Remove a Question Bank question. The API soft-deletes it — the row keeps its
+ * id and gets a deleted_at stamp — so papers and exam answers that reference the
+ * question still resolve, while fetchQuestionBank no longer returns it.
+ */
+export async function deleteQuestionBankQuestion(
+  payload: DeleteQuestionBankPayload
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-question-bank/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await readApiJson(res, 'Failed to delete the question');
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to delete the question'));
+  }
 }
 
 export async function getSubjectAndChapters(
@@ -892,6 +1051,12 @@ export async function getSubjectAndChapters(
           content_category: matchedCourse?.content_category ?? '',
           sub_institute_id: requestContext.sub_institute_id,
           chapters: response.data as ApiChapter[],
+          // Subject-level concept totals from the catalog, so screens can fall back
+          // to the API's own count when chapter rows don't carry their concepts.
+          key_concepts_count: matchedCourse?.key_concepts_count,
+          key_concept_count: matchedCourse?.key_concept_count,
+          concepts_count: matchedCourse?.concepts_count,
+          total_concepts: matchedCourse?.total_concepts,
         }
       : null;
 
@@ -911,6 +1076,7 @@ export async function getSubjectAndChapters(
         number: Number(chapter.sort_order) || index + 1,
         title: chapter.chapter_name || '',
         content_categories: mapConceptCategories(concepts, chapter.content_categories),
+        topics: mapChapterTopics(chapter.topics),
         concepts,
         teachingMethodologies: [],
         resources: {
@@ -991,128 +1157,4 @@ export async function fetchChapterSemantic(
   } catch {
     return null;
   }
-}
-
-export const chapterData: Record<string, Chapter[]> = {
-  'c2': [ // Advanced Science Concepts (Class 9, Science)
-    {
-      id: 'ch1',
-      courseId: 'c2',
-      number: 1,
-      title: 'Chemical Reactions and Equations',
-      teachingMethodologies: ['Inquiry Based Teaching', 'Experiential Based Teaching', 'Art Initiated Teaching', 'Game Based, Activity Based Teaching, Project Based Teaching', 'Flashcard Based Teaching/Flipped Classroom Teaching', 'Scenario Based Teaching', 'Spiritual Science Teaching'],
-      resources: {
-        teacherResource: 10,
-        lessonPlanning: 8,
-        chapterMapping: 5,
-        hspContent: 12,
-        questions: 15,
-      },
-    },
-    {
-      id: 'ch2',
-      courseId: 'c2',
-      number: 2,
-      title: 'Acids, Bases and Salts',
-      teachingMethodologies: ['Experiential Based Teaching', 'Inquiry Based Teaching', 'Project Based Teaching'],
-      resources: {
-        teacherResource: 9,
-        lessonPlanning: 7,
-        chapterMapping: 6,
-        hspContent: 10,
-        questions: 12,
-      },
-    },
-    {
-      id: 'ch3',
-      courseId: 'c2',
-      number: 3,
-      title: 'Metals and Non-metals',
-      teachingMethodologies: ['Game Based, Activity Based Teaching', 'Inquiry Based Teaching', 'Skill/Competency Based Teaching'],
-      resources: {
-        teacherResource: 8,
-        lessonPlanning: 6,
-        chapterMapping: 4,
-        hspContent: 9,
-        questions: 13,
-      },
-    },
-    {
-      id: 'ch4',
-      courseId: 'c2',
-      number: 4,
-      title: 'Carbon and its Compounds',
-      teachingMethodologies: ['Concept Based Teaching Sports', 'Experiential Based Teaching', 'Project Based Teaching'],
-      resources: {
-        teacherResource: 8,
-        lessonPlanning: 7,
-        chapterMapping: 5,
-        hspContent: 11,
-        questions: 14,
-      },
-    },
-    {
-      id: 'ch5',
-      courseId: 'c2',
-      number: 5,
-      title: 'Life Processes',
-      teachingMethodologies: ['Inquiry Based Teaching', 'Game Based, Activity Based Teaching', 'Experiential Based Teaching'],
-      resources: {
-        teacherResource: 9,
-        lessonPlanning: 8,
-        chapterMapping: 6,
-        hspContent: 10,
-        questions: 13,
-      },
-    },
-  ],
-  // Add more courses' chapter data as needed
-  'c1': [ // Social Science Fundamentals
-    {
-      id: 'ch1-ss',
-      courseId: 'c1',
-      number: 1,
-      title: 'Introduction to Social Science',
-      teachingMethodologies: ['Inquiry Based Teaching', 'Project Based Teaching'],
-      resources: {
-        teacherResource: 7,
-        lessonPlanning: 6,
-        chapterMapping: 4,
-        hspContent: 8,
-        questions: 10,
-      },
-    },
-    {
-      id: 'ch2-ss',
-      courseId: 'c1',
-      number: 2,
-      title: 'Geography and Maps',
-      teachingMethodologies: ['Visual Based Teaching', 'Experiential Based Teaching'],
-      resources: {
-        teacherResource: 8,
-        lessonPlanning: 7,
-        chapterMapping: 5,
-        hspContent: 9,
-        questions: 11,
-      },
-    },
-    {
-      id: 'ch3-ss',
-      courseId: 'c1',
-      number: 3,
-      title: 'History and Culture',
-      teachingMethodologies: ['Narrative Based Teaching', 'Project Based Teaching'],
-      resources: {
-        teacherResource: 9,
-        lessonPlanning: 8,
-        chapterMapping: 6,
-        hspContent: 10,
-        questions: 12,
-      },
-    },
-  ],
-};
-
-export function getChaptersByCourseid(courseId: string): Chapter[] {
-  return chapterData[courseId] || [];
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,54 +11,23 @@ const profileMenuItems = [
   'Onboarding',
   'Add Process',
   'Fields Configuration',
-  'Group-wise Rights',
-  'Individual Rights',
+  // 'Group-wise Rights',
+  // 'Individual Rights',
   'Mobile App Rights',
 ] as const;
 
-function readAcademicSession() {
-  if (typeof window === 'undefined') return null;
+/**
+ * Academic years and terms both live in one table, `academic_year`, one row per
+ * (institute, syear, term). The signed-in institute's rows arrive with the login
+ * payload and are refreshed per year from /api/academic-terms, so everything the
+ * switcher offers is that institute's own — there are no defaults to fall back on.
+ */
+type AcademicRow = Record<string, unknown>;
 
-  const storageKeys = ['userData', 'menuContext', 'auth', 'sessionData', 'sessiondata', 'user_data', 'session', 'academicSession', 'academicData'];
-  for (const key of storageKeys) {
-    const stored = localStorage.getItem(key);
-    if (!stored) continue;
-    try {
-      const data = JSON.parse(stored);
-      const terms: string[] = [];
-      const years: string[] = [];
-
-      if (Array.isArray(data.academicTerms)) {
-        for (const item of data.academicTerms) {
-          const syear = item.syear != null ? String(item.syear) : null;
-          const termName =  item.title || null;
-          if (syear && !years.includes(syear)) years.push(syear);
-          if (termName && !terms.includes(termName)) terms.push(termName);
-        }
-      }
-
-      if (Array.isArray(data.academicYears)) {
-        for (const item of data.academicYears) {
-          const syear = item.syear != null ? String(item.syear) : null;
-          if (syear && !years.includes(syear)) years.push(syear);
-        }
-      }
-
-      if (years.length > 0 || terms.length > 0) {
-        console.log('[Header] academic session from key:', key, { years, terms });
-        return {
-          years: years.length > 0 ? years : [],
-          terms: terms.length > 0 ? terms : [],
-          selectedYear: years.length > 0 ? years[0] : '',
-          selectedTerm: terms.length > 0 ? terms[0] : '',
-        };
-      }
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
+const readCell = (row: AcademicRow | undefined, key: string) => {
+  const value = row?.[key];
+  return value === null || value === undefined ? '' : String(value).trim();
+};
 
 const getStoredSelection = (key: string) => {
   if (typeof window === 'undefined') return null;
@@ -72,7 +41,7 @@ export default function Header({
   onToggleChatbot: () => void;
   isChatbotOpen: boolean;
 }) {
-  const { user, logout, refreshAcademicTerms } = useAuth();
+  const { user, logout, refreshAcademicTerms, academicTerms, academicYears } = useAuth();
   const router = useRouter();
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showTermDropdown, setShowTermDropdown] = useState(false);
@@ -89,49 +58,73 @@ export default function Header({
     'Mobile App Rights': '/general/mobile_app_rights',
   };
 
-  const [selectedYear, setSelectedYear] = useState<string>(() => {
-    const stored = getStoredSelection('selectedAcademicYear');
-    if (stored) return stored;
-    const academic = readAcademicSession();
-    return academic?.selectedYear || '';
-  });
+  // Seeded only from what this browser last chose. Anything else is adopted from
+  // the institute's own rows once they resolve, below.
+  const [selectedYear, setSelectedYear] = useState<string>(
+    () => getStoredSelection('selectedAcademicYear') || ''
+  );
+  const [selectedTerm, setSelectedTerm] = useState<string>(
+    () => getStoredSelection('selectedAcademicTerm') || ''
+  );
 
-  const [selectedTerm, setSelectedTerm] = useState<string>(() => {
-    const stored = getStoredSelection('selectedAcademicTerm');
-    if (stored) return stored;
-    const academic = readAcademicSession();
-    return academic?.selectedTerm || 'Term 1';
-  });
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && selectedYear) {
-      localStorage.setItem('selectedAcademicYear', selectedYear);
-      localStorage.setItem('selectedAcademicTerm', selectedTerm);
+  /** The institute's academic years, newest first. */
+  const years = useMemo(() => {
+    const seen = new Set<string>();
+    // academicTerms is scoped to one year but still carries its syear, so it
+    // keeps the list complete for sessions issued before the year rows existed.
+    for (const row of [...academicYears, ...academicTerms]) {
+      const syear = readCell(row, 'syear');
+      if (syear) seen.add(syear);
     }
-  }, [selectedYear, selectedTerm]);
+    return Array.from(seen).sort((a, b) => Number(b) - Number(a));
+  }, [academicTerms, academicYears]);
 
-  // `selectedYear` can still be empty on first render if login hasn't
-  // populated the academic session yet — adopt the real syear as soon as
-  // it shows up instead of staying blank (and leaving term dropdowns empty).
-  useEffect(() => {
-    if (selectedYear) return;
-    const academic = readAcademicSession();
-    if (academic?.selectedYear) setSelectedYear(academic.selectedYear);
-  }, [user, selectedYear]);
+  // What is actually shown: this browser's stored choice while it is still one of
+  // the institute's years, otherwise the institute's most recent year. Derived
+  // rather than pushed into state, so it is never briefly wrong on first paint.
+  const effectiveYear = selectedYear && years.includes(selectedYear) ? selectedYear : years[0] ?? '';
+
+  /**
+   * Terms for the year on screen, in the institute's own sort_order. Term names
+   * differ per year for some institutes, so rows for other years are excluded
+   * rather than pooled together.
+   */
+  const terms = useMemo(() => {
+    const scoped = effectiveYear
+      ? academicTerms.filter((row) => readCell(row, 'syear') === effectiveYear)
+      : academicTerms;
+    const seen = new Set<string>();
+    for (const row of scoped) {
+      const title = readCell(row, 'title');
+      if (title) seen.add(title);
+    }
+    return Array.from(seen);
+  }, [academicTerms, effectiveYear]);
+
+  // A term belongs to a year, so a choice left over from a different year falls
+  // back to the first term this institute defines for the current one.
+  const effectiveTerm = selectedTerm && terms.includes(selectedTerm) ? selectedTerm : terms[0] ?? '';
+
+
 
   // Term dropdowns app-wide read `academicTerms`, which only ever comes
   // from login (scoped to that syear) — refetch it whenever the switcher
   // changes years, otherwise every term select goes empty for any other year.
   useEffect(() => {
-    void refreshAcademicTerms(selectedYear);
+    if (typeof window === 'undefined') return;
+    if (effectiveYear) localStorage.setItem('selectedAcademicYear', effectiveYear);
+    if (effectiveTerm) localStorage.setItem('selectedAcademicTerm', effectiveTerm);
+  }, [effectiveYear, effectiveTerm]);
+
+  useEffect(() => {
+    void refreshAcademicTerms(effectiveYear);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYear]);
+  }, [effectiveYear]);
 
   const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
   const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);
   const [hasLogoError, setHasLogoError] = useState(false);
 
-  const academic = readAcademicSession();
   const logoUrl = (() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -152,11 +145,11 @@ export default function Header({
   useEffect(() => {
     setHasLogoError(false);
   }, [logoUrl]);
-  const years = academic?.years && academic.years.length > 0 ? academic.years : ['2025', '2024', '2023'];
-  const displayYears = !selectedYear || years.includes(selectedYear) ? years : [selectedYear, ...years];
-
-  const terms = academic?.terms && academic.terms.length > 0 ? academic.terms : ['Term 1', 'Term 2', 'Term 3', 'Term 4'];
-  const displayTerms = terms.includes(selectedTerm) ? terms : [selectedTerm, ...terms];
+  // Only the institute's own values are offered. A stored selection that is no
+  // longer in its data stays visible until the effects above replace it, so the
+  // switcher never goes blank mid-swap.
+  const displayYears = !effectiveYear || years.includes(effectiveYear) ? years : [effectiveYear, ...years];
+  const displayTerms = !effectiveTerm || terms.includes(effectiveTerm) ? terms : [effectiveTerm, ...terms];
 
   const yearButtonRef = useRef<HTMLButtonElement>(null);
   const termButtonRef = useRef<HTMLButtonElement>(null);
@@ -255,7 +248,7 @@ export default function Header({
           className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200/50 bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
         >
           <GraduationCap size={16} className="text-gray-500" />
-          <span className="max-w-[80px] truncate">{selectedYear}</span>
+          <span className="max-w-[80px] truncate">{effectiveYear || '—'}</span>
           <ChevronDown size={14} className={`text-gray-400 transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
         </button>
 
@@ -266,12 +259,12 @@ export default function Header({
         >
           <BookOpen size={16} className="text-gray-500" />
           
-          <span className="max-w-[60px] truncate">{selectedTerm}</span>
+          <span className="max-w-[60px] truncate">{effectiveTerm || '—'}</span>
           <ChevronDown size={14} className={`text-gray-400 transition-transform ${showTermDropdown ? 'rotate-180' : ''}`} />
         </button>
 
-        {renderDropdown(showYearDropdown, yearPosition, setSelectedYear, setShowYearDropdown, displayYears, selectedYear)}
-        {renderDropdown(showTermDropdown, termPosition, setSelectedTerm, setShowTermDropdown, displayTerms, selectedTerm)}
+        {renderDropdown(showYearDropdown, yearPosition, setSelectedYear, setShowYearDropdown, displayYears, effectiveYear)}
+        {renderDropdown(showTermDropdown, termPosition, setSelectedTerm, setShowTermDropdown, displayTerms, effectiveTerm)}
 
         <button
           onClick={onToggleChatbot}
