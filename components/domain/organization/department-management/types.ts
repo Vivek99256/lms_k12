@@ -97,6 +97,18 @@ export type DepartmentsManagementResponse = {
   }>
 }
 
+/**
+ * Shape of `getDepartmentsManagement`'s return value - same envelope as
+ * `DepartmentsManagementResponse`, but with every row mapped through
+ * `mapDepartment()` into the app-facing `Department` type instead of the
+ * raw backend row shape.
+ */
+export type DepartmentsManagementResult = {
+  main_departments: Department[]
+  sub_departments: Record<string, Department[]>
+  departments?: Department[]
+}
+
 export type DepartmentDetail = {
   id: number
   department: string

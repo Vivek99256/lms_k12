@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { Department, DepartmentEmployee } from './types'
 import { organizationService } from './organization-service'
+import type { SessionContext } from '@/lib/erp-client'
 
 function fullName(employee: DepartmentEmployee) {
   return (
@@ -32,7 +33,7 @@ export function HodPickerDialog({
   onSelect,
 }: {
   department: Department | null
-  context: { baseUrl: string; token: string; subInstituteId: string }
+  context: SessionContext
   isSaving: boolean
   onCancel: () => void
   onSelect: (employeeId: string | null) => void

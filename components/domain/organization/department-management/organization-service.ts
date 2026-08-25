@@ -8,6 +8,7 @@ import type {
   DepartmentImpact,
   DepartmentDetail,
   DepartmentsManagementResponse,
+  DepartmentsManagementResult,
   DepartmentEmployee,
   DepartmentJobRole,
 } from './types'
@@ -173,7 +174,7 @@ function mapDepartment(d: {
 }
 
 export const organizationService = {
-  async getDepartmentsManagement(session: SessionContext): Promise<DepartmentsManagementResponse> {
+  async getDepartmentsManagement(session: SessionContext): Promise<DepartmentsManagementResult> {
     const data = await apiGet<DepartmentsManagementResponse>(session, '/departments-management', {
       type: 'API',
       sub_institute_id: session.subInstituteId,
