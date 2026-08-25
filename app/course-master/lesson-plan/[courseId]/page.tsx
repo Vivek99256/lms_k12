@@ -47,7 +47,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { cn } from '@/lib/utils';
-import { getRequestContext } from '../../page';
+import { getRequestContext, getSyear } from '../../page';
 import {
   getSubjectAndChapters,
   type Chapter,
@@ -826,7 +826,6 @@ export default function LessonPlanPage() {
       chapter_id: nextChapterId,
     });
     setSelectedSubjectId(nextSubjectId);
-    setSelectedChapterId(nextChapterId);
   };
   const chapterConcepts = useMemo(() => {
     if (!selectedChapter) return null;
@@ -871,11 +870,15 @@ export default function LessonPlanPage() {
     standardId: '',
     hostName: '',
   });
-  const currentStandardId = Number(sessionContext.standardId || routeStandardId || 0) || null;
+  // The standard the user selected by opening this subject card is the one in the
+  // route. It has to win over any standard left over in the session, otherwise the
+  // division list and the lesson plan calendar are built for a different standard
+  // than the one on screen. The session value only fills in for the non-LMS route,
+  // where the courseId carries no standard.
+  const currentStandardId = Number(routeStandardId || sessionContext.standardId || 0) || null;
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(
     /^\d+$/.test(subjectId) ? Number(subjectId) : null
   );
-  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null);
   const [hoveredPeriod, setHoveredPeriod] = useState<LessonPlanEvent | null>(null);
   const [hoverPosition, setHoverPosition] = useState<HoverPopupPosition>({ top: 0, left: 0 });
   const [lessonPlanDraft, setLessonPlanDraft] = useState<LessonPlanDraft>({
@@ -1068,12 +1071,37 @@ export default function LessonPlanPage() {
       return;
     }
 
-    if (!selectedSubjectId || !selectedChapterId) return;
+    // Lesson plans are keyed by institute + year + term + standard + subject +
+    // division. Chapter is not one of those, so it must not gate the calendar.
+    if (!selectedSubjectId) return;
+
+    const syear = getSyear();
+    const { subInstituteId, termId } = sessionContext;
 
     const controller = new AbortController();
     const runFetchLessonPlans = async () => {
-      const lessonPlanApiUrl =
-        'https://dev.triz.co.in/api/intelligence/lesson-plans?sub_institute_id=195&standard_id=2235&subject_id=4018&term_id=149&division_id=936&syear=2025';
+      // Every filter below identifies the tenant's own plan. If any of them is
+      // missing the calendar stays empty — it must never fall back to a default
+      // that would surface another institute's lesson plans.
+      if (!subInstituteId || !termId || !syear || !currentStandardId) {
+        setApiPeriods([]);
+        setLessonPlanError(
+          'Current session is missing the institute, academic term, or academic year, so no lesson plan calendar can be loaded.'
+        );
+        setLessonPlanLoading(false);
+        return;
+      }
+
+      const lessonPlanUrl = new URL(
+        `${(sessionContext.hostName || API_BASE_URL).replace(/\/$/, '')}/api/intelligence/lesson-plans`
+      );
+      lessonPlanUrl.searchParams.set('sub_institute_id', subInstituteId);
+      lessonPlanUrl.searchParams.set('standard_id', String(currentStandardId));
+      lessonPlanUrl.searchParams.set('subject_id', String(selectedSubjectId));
+      lessonPlanUrl.searchParams.set('term_id', termId);
+      lessonPlanUrl.searchParams.set('division_id', String(selectedDivisionId));
+      lessonPlanUrl.searchParams.set('syear', syear);
+      const lessonPlanApiUrl = lessonPlanUrl.toString();
       setLessonPlanLoading(true);
 
       try {
@@ -1104,6 +1132,15 @@ export default function LessonPlanPage() {
           } catch {
             payload = { message: responseText };
           }
+        }
+
+        // The API answers 404 when this institute has no plan for the selected
+        // term/standard/subject/division. That is an empty calendar, not a failure.
+        if (response.status === 404) {
+          setApiPeriods([]);
+          setLessonPlanError(null);
+          setLessonPlanLoading(false);
+          return;
         }
 
         if (!response.ok) {
@@ -1146,7 +1183,6 @@ export default function LessonPlanPage() {
   }, [
     selectedDivisionId,
     selectedSubjectId,
-    selectedChapterId,
     currentStandardId,
     standardId,
     subjectId,

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Boxes, LayoutGrid, type LucideIcon } from 'lucide-react';
+import { Boxes, LayoutGrid, Share2, type LucideIcon } from 'lucide-react';
 
 /**
  * New PAL's sub-module bar.
@@ -34,6 +34,15 @@ export const SUB_MODULES: SubModule[] = [
     icon: Boxes,
     description:
       'The 4-type content model, Bloom ladder, metadata schema and misconception library, projected from extracted chapter intelligence.',
+    available: true,
+  },
+  {
+    key: 'coherence-map',
+    label: 'Coherence map',
+    href: '/pal/new/coherence-map',
+    icon: Share2,
+    description:
+      'The concept prerequisite graph read out of Neo4j — what each concept needs before it, what it unlocks after it, and what is attached to teach and assess it.',
     available: true,
   },
 ];

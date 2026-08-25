@@ -614,6 +614,11 @@ ${groundTruthContent}`;
         user_id,
         user_profile_name,
         chapter_name: chapter.title,
+        // The deck is generated for one concept; sending it lets the stored row
+        // carry the concept mapping instead of only the chapter.
+        concept_id: presentationConcept || undefined,
+        concept_name:
+          presentationConceptOptions.find((c) => c.id === presentationConcept)?.title || undefined,
         prompt,
         content_type: apiContentType,
         format: isPresentation ? 'presentation' : 'document',
