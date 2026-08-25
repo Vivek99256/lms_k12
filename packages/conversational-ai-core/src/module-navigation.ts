@@ -1,7 +1,64 @@
 import { describeRecord } from "./module-records";
 import type { ConversationalResponse } from "./response-schema";
 import type { PreparedConversation } from "./types";
-import type { ConversationWorkflowState, WorkflowEntitySummary } from "./workflow-state";
+import {
+  upsertConversationWorkflowState,
+  type ConversationWorkflowState,
+  type WorkflowEntitySummary,
+} from "./workflow-state";
+
+/**
+ * The same session identity the rest of the workflow uses.
+ *
+ * Written out here rather than imported so this module keeps its one-way
+ * dependency on `workflow-state`; the fields and their fallbacks must stay in
+ * step with `getWorkflowSessionIdsFromContext` in `conversation.ts`, because a
+ * different key would write state that nothing ever reads.
+ */
+function sessionIds(prepared: PreparedConversation) {
+  const userId = prepared.context.userId || "anonymous";
+  return {
+    userId,
+    conversationId:
+      prepared.context.conversationId ||
+      prepared.context.request.context?.conversationId ||
+      userId,
+  };
+}
+
+/**
+ * Normalises whatever a module handed us into the shape the selection resolver
+ * reads: a name to match, a reference to match, and the untouched backend record
+ * behind them.
+ */
+function toSelectableSummary(
+  entity: Record<string, unknown>,
+  index: number
+): WorkflowEntitySummary {
+  const read = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = entity[key];
+      if (typeof value === "string" && value.trim()) return value.trim();
+      if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    }
+    return "";
+  };
+
+  const existingMetadata =
+    entity.metadata && typeof entity.metadata === "object" && !Array.isArray(entity.metadata)
+      ? (entity.metadata as Record<string, unknown>)
+      : null;
+
+  return {
+    id: read("id", "enquiryId", "studentId", "recordId"),
+    label: read("label", "studentName", "fullName", "name") || `Record ${index + 1}`,
+    reference: read("reference", "enquiryNo", "enrollmentNo", "admissionId", "rollNo") || undefined,
+    secondary: read("secondary", "standard", "standardName", "class") || undefined,
+    // The whole backend row, so the next tool reads identifiers from the record
+    // rather than re-parsing the user's sentence.
+    metadata: existingMetadata || entity,
+  };
+}
 
 export function buildModuleNavigationResponse(
   prepared: PreparedConversation,
@@ -100,6 +157,44 @@ export function buildModuleSelectionResponse(
 
   const heading =
     leadMessage || `Which ${moduleLabel} record would you like to continue with?`;
+
+  /*
+   * Remember what was offered.
+   *
+   * This prompt used to be rendered and forgotten: the list went to the screen and
+   * nothing was written to the workflow state, so the next turn found no
+   * `matchedEntities`, `shouldContinueModuleWorkflow` refused on a null state, and
+   * the selection branch never ran. A reply naming a record from *this very list*
+   * had nothing to resolve against, and the flow restarted or collapsed into
+   * "no record was selected".
+   *
+   * It appeared to work only where the reply happened to restate enough for the
+   * text parsers to recover ("Diya Mehta, ENQ-2026-0042"). A bare number, a name
+   * the parser does not extract, or "yes, proceed with Riya" had nothing behind
+   * them at all.
+   *
+   * Storing the offered records here is what makes the numbered option, the name,
+   * the reference and a later "this student" all resolve to the same backend row.
+   */
+  const ids = sessionIds(prepared);
+  const offered = entities.map(toSelectableSummary);
+
+  if (offered.length > 0) {
+    upsertConversationWorkflowState(
+      prepared.context.projectId,
+      ids.userId,
+      ids.conversationId,
+      {
+        module,
+        currentStage: "selecting_entity",
+        matchedEntities: offered,
+        // `lastTool` is deliberately not written here. It records which tool
+        // produced the current record, and a prompt asking the user to choose has
+        // produced none. Setting it to the waiting tool made the fees flow believe
+        // the record was already hydrated and skip its lookup entirely.
+      }
+    );
+  }
 
   /*
    * The chips are the records themselves, not advice about how to pick one.
