@@ -31,6 +31,8 @@ import PoliciesModule from "./Component/polices";
 import RulesModule from "./Component/rules";
 import SopsModule from "./Component/sops";
 import { DepartmentCreateWizard } from "./Component/department-create-wizard";
+import { DepartmentEmployeesPanel } from "./Component/department-employees-panel";
+import { DepartmentJobRolesPanel } from "./Component/department-job-roles-panel";
 import { DepartmentEditDialog } from "./Component/department-edit-dialog";
 import { HeadOfDepartmentPicker } from "./Component/head-of-department-picker";
 import { Button } from "@/components/ui/button";
@@ -185,7 +187,7 @@ type ListRow = {
   sub_departments: SubDepartment[];
 };
 
-const tabs = ["Overview", "SOPs", "Policies", "Rules"];
+const tabs = ["Overview", "Employees", "Job Roles", "SOPs", "Policies", "Rules"];
 
 type DepartmentSession = {
   baseUrl: string;
@@ -1756,11 +1758,20 @@ export default function DepartmentPage() {
          * employee-directory-sheets.tsx). Content below is unchanged from
          * the previous inline <aside>.
          */}
-        <Sheet open={showDetails} onOpenChange={(open) => { if (!open) handleCloseDetails(); }}>
+        {/* modal={false}: this Sheet's Employees/Job Roles tabs nest base-ui
+            <Select>s whose popups portal outside Radix's modal focus-trap
+            boundary - same fix as department-create-wizard.tsx and
+            department-edit-dialog.tsx, for the same reason (the trap fights
+            the popup and it never stays open). */}
+        <Sheet
+          open={showDetails}
+          modal={false}
+          onOpenChange={(open) => { if (!open) handleCloseDetails(); }}
+        >
           {selectedRow ? (
             <SheetContent
               side="right"
-              className="flex h-full w-full flex-col gap-0 overflow-hidden border-l border-border bg-card p-0 sm:max-w-sm"
+              className="flex h-full w-full flex-col gap-0 overflow-hidden border-l border-border bg-card p-0 sm:max-w-xl"
             >
               {/* SheetContent already renders its own close button
                   (top-right) - a second one here duplicated it. */}
@@ -1821,7 +1832,7 @@ export default function DepartmentPage() {
                 </Button>
               </div>
 
-              <div className="grid h-9 grid-cols-4 border-y border-border">
+              <div className="grid h-9 grid-cols-6 border-y border-border">
                 {tabs.map((tab) => (
                   <button
                     key={tab}
@@ -1839,7 +1850,19 @@ export default function DepartmentPage() {
                 ))}
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-5">
-                {activeTab === "SOPs" ? (
+                {activeTab === "Employees" ? (
+                  <DepartmentEmployeesPanel
+                    department={{ id: selectedRow.apiId, name: selectedRow.name }}
+                    departments={listRows.map((row) => ({ id: row.apiId, name: row.name }))}
+                    canManage
+                    onChanged={() => void fetchDepartments(undefined, false)}
+                  />
+                ) : activeTab === "Job Roles" ? (
+                  <DepartmentJobRolesPanel
+                    department={{ id: selectedRow.apiId, name: selectedRow.name }}
+                    canManage
+                  />
+                ) : activeTab === "SOPs" ? (
                   <SopsModule departmentName={selectedRow.name} departmentId={selectedRow.apiId} />
                 ) : activeTab === "Policies" ? (
                   <PoliciesModule departmentName={selectedRow.name} />

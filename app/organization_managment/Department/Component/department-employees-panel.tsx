@@ -278,7 +278,12 @@ export function DepartmentEmployeesPanel({
               }}
             >
               <SelectTrigger className="h-9 w-full sm:w-56">
-                <SelectValue />
+                {/* This Select wrapper (base-ui, not Radix) does not
+                    auto-resolve a label from the matching SelectItem -
+                    SelectValue needs to be told what to display. */}
+                <SelectValue>
+                  {source === "transfer" ? "Transfer from a department" : "Employees with no department"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="transfer">Transfer from a department</SelectItem>
@@ -291,7 +296,12 @@ export function DepartmentEmployeesPanel({
                 onValueChange={(value) => setSourceDepartmentId(Number(value))}
               >
                 <SelectTrigger className="h-9 w-full sm:w-64">
-                  <SelectValue placeholder="Select a department..." />
+                  <SelectValue>
+                    {sourceDepartmentId === ""
+                      ? "Select a department..."
+                      : (transferSources.find((d) => d.id === sourceDepartmentId)?.name ??
+                        "Select a department...")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {transferSources.map((d) => (
@@ -376,7 +386,12 @@ export function DepartmentEmployeesPanel({
                 onValueChange={(value) => setJobRoleId(value === "none" ? "" : Number(value))}
               >
                 <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Keep or clear their current role" />
+                  <SelectValue>
+                    {jobRoleId === ""
+                      ? "Keep or clear their current role"
+                      : (jobRoles.find((role) => role.id === jobRoleId)?.jobrole ??
+                        "Keep or clear their current role")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Keep or clear their current role</SelectItem>

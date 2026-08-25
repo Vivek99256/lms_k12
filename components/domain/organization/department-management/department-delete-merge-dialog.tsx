@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { Department, DepartmentImpact } from './types'
 import { organizationService } from './organization-service'
+import type { SessionContext } from '@/lib/erp-client'
 
 type Mode = 'delete' | 'merge'
 type ImpactState = 'idle' | 'loading' | 'error'
@@ -30,7 +31,7 @@ export function DepartmentDeleteMergeDialog({
 }: {
   department: Department | null
   departments: Department[]
-  context: { baseUrl: string; token: string; subInstituteId: string }
+  context: SessionContext
   isSaving: boolean
   onCancel: () => void
   onDelete: () => void
