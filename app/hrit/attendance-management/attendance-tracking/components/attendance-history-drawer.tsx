@@ -48,11 +48,6 @@ export function AttendanceHistoryDrawer({
     return result
   }, [search, statusFilter, records])
 
-  const handleExport = () => {
-    // Placeholder for export functionality
-    console.log('Exporting attendance data...')
-  }
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger />
@@ -84,7 +79,7 @@ export function AttendanceHistoryDrawer({
                 { value: 'leave', label: 'Leave' },
               ]}
             />
-            <Button variant="outline" onClick={handleExport}>
+            <Button variant="outline" disabled title="Export is not available yet">
               Export
             </Button>
           </div>

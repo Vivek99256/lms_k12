@@ -341,6 +341,8 @@ export interface LibraryListParams {
   category?: string;
   sub_category?: string;
   department?: string;
+  /** Jobrole tab only - scopes the list to one department's roles by id. */
+  department_id?: string;
   jobrole?: string;
   proficiency_level?: string;
   approve_status?: string;

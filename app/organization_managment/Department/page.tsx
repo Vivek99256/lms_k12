@@ -30,6 +30,9 @@ import {
 import PoliciesModule from "./Component/polices";
 import RulesModule from "./Component/rules";
 import SopsModule from "./Component/sops";
+import { DepartmentCreateWizard } from "./Component/department-create-wizard";
+import { DepartmentEditDialog } from "./Component/department-edit-dialog";
+import { HeadOfDepartmentPicker } from "./Component/head-of-department-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +67,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -75,10 +79,15 @@ import {
 import { cn } from "@/lib/utils";
 import { buildSessionContext } from "@/lib/erp-client";
 import {
-  createDepartment,
   deleteDepartment,
-  updateDepartment,
+  getDepartmentEmployees,
+  getDepartmentImpact,
+  mergeDepartments,
+  reorderDepartments,
+  setDepartmentHead,
+  type DepartmentImpact,
 } from "../_lib/department-management-api";
+import type { PickerEmployee } from "./Component/head-of-department-picker";
 
 type DepartmentStatus = "Active" | "Inactive" | "Pending";
 type SortKey = "name" | "code" | "parent" | "head" | "employees" | "status";
@@ -112,6 +121,11 @@ type SubDepartment = {
 type Department = {
   id: number;
   name: string;
+  code?: string | null;
+  description?: string | null;
+  sort_order?: number;
+  parent_id?: number;
+  head_user_id?: number | null;
   total_employees: number;
   employees: Employee[];
   sub_departments: SubDepartment[];
@@ -130,6 +144,8 @@ type DepartmentView = {
   name: string;
   shortName: string;
   code: string;
+  parentId: number;
+  sortOrder: number;
   parent: string;
   head: string;
   title: string;
@@ -155,6 +171,8 @@ type ListRow = {
   apiId: number;
   name: string;
   code: string;
+  /** Immediate parent's backend id, or 0 for a top-level department. */
+  parentApiId: number;
   parent: string;
   head: string;
   title: string;
@@ -516,11 +534,13 @@ function RowMenu({
   isSubDepartment,
   onEdit,
   onAddSubDepartment,
+  onAssignHod,
   onDelete,
 }: {
   isSubDepartment: boolean;
   onEdit: () => void;
   onAddSubDepartment: () => void;
+  onAssignHod: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -545,7 +565,7 @@ function RowMenu({
           <Plus className="h-3.5 w-3.5" />
           Add sub-department
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={onAssignHod}>
           <UserPlus className="h-3.5 w-3.5" />
           Assign / change HOD
         </DropdownMenuItem>
@@ -624,11 +644,13 @@ function DetailLine({
   label,
   value,
   action,
+  onAction,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   action?: string;
+  onAction?: () => void;
 }) {
   return (
     <div className="grid grid-cols-[18px_minmax(0,1fr)_70px] items-start gap-3 py-2">
@@ -644,6 +666,7 @@ function DetailLine({
       {action ? (
         <button
           type="button"
+          onClick={onAction}
           className="mt-5 text-right text-[9px] font-medium text-blue-600"
         >
           {action}
@@ -740,6 +763,7 @@ function buildListRows(departments: DepartmentView[]): ListRow[] {
     deptId: string,
     subs: SubDepartment[],
     parentName: string,
+    parentApiId: number,
     parentPath = ""
   ) => {
     for (const sub of subs) {
@@ -751,6 +775,7 @@ function buildListRows(departments: DepartmentView[]): ListRow[] {
         apiId: sub.id,
         name: sub.name,
         code: `SD-${sub.id}`,
+        parentApiId,
         parent: parentName,
         head: headInfo.head,
         title: headInfo.title,
@@ -762,7 +787,7 @@ function buildListRows(departments: DepartmentView[]): ListRow[] {
         employees_list: employees,
         sub_departments: sub.sub_departments ?? [],
       });
-      addSub(deptId, sub.sub_departments ?? [], sub.name, id);
+      addSub(deptId, sub.sub_departments ?? [], sub.name, sub.id, id);
     }
   };
 
@@ -772,6 +797,7 @@ function buildListRows(departments: DepartmentView[]): ListRow[] {
       apiId: department.apiId,
       name: department.name,
       code: department.code,
+      parentApiId: department.parentId,
       parent: department.parent,
       head: department.head,
       title: department.title,
@@ -783,7 +809,7 @@ function buildListRows(departments: DepartmentView[]): ListRow[] {
       employees_list: department.employees_list,
       sub_departments: department.sub_departments,
     });
-    addSub(department.id, department.sub_departments ?? [], department.name);
+    addSub(department.id, department.sub_departments ?? [], department.name, department.apiId);
   }
 
   return rows;
@@ -847,20 +873,82 @@ export default function DepartmentPage() {
   const [actionNotice, setActionNotice] = useState<
     { type: "success" | "error"; message: string } | null
   >(null);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [addParent, setAddParent] = useState<ListRow | null>(null);
-  const [addName, setAddName] = useState("");
-  const [addError, setAddError] = useState<string | null>(null);
-  const [addSubmitting, setAddSubmitting] = useState(false);
+  // The create/add-sub-department flow is the multi-step
+  // DepartmentCreateWizard (Component/department-create-wizard.tsx) - it
+  // owns its own name/code/description/parent form state internally, this
+  // page only needs to know whether it's open and which parent (if any) it
+  // was launched with.
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardParent, setWizardParent] = useState<ListRow | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ListRow | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editError, setEditError] = useState<string | null>(null);
-  const [editSubmitting, setEditSubmitting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ListRow | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<DepartmentImpact | null>(null);
+  const [deleteImpactLoading, setDeleteImpactLoading] = useState(false);
+  const [reorderSubmitting, setReorderSubmitting] = useState(false);
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergeTargetId, setMergeTargetId] = useState<string>("");
+  const [mergeSubmitting, setMergeSubmitting] = useState(false);
+
+  // Assign / change HOD dialog. Originally scoped to the target
+  // department's own `employees_list`, but a department can have zero
+  // employees of its own (a brand-new one always does) and still needs a
+  // head assignable from anyone in the tenant - same reasoning as the
+  // creation wizard's Head step, and the same fetch shape (a small default
+  // batch immediately, refined by debounced search).
+  const [hodTarget, setHodTarget] = useState<ListRow | null>(null);
+  const [hodSearch, setHodSearch] = useState("");
+  const [hodError, setHodError] = useState<string | null>(null);
+  const [hodSubmitting, setHodSubmitting] = useState(false);
+  const [hodCandidates, setHodCandidates] = useState<PickerEmployee[]>([]);
+  const [hodCandidatesLoading, setHodCandidatesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!hodTarget) {
+      setHodCandidates([]);
+      return;
+    }
+
+    const query = hodSearch.trim();
+    let cancelled = false;
+    setHodCandidatesLoading(true);
+
+    const delay = query ? 300 : 0;
+    const timer = setTimeout(() => {
+      (async () => {
+        try {
+          const session = buildSessionContext();
+          const data = await getDepartmentEmployees(
+            session,
+            query ? { search: query, limit: 50 } : { limit: 30 }
+          );
+          if (cancelled) return;
+          setHodCandidates(
+            data.map((employee) => ({
+              id: employee.id,
+              name: employee.name?.trim() || `Employee #${employee.id}`,
+              employee_no: employee.employee_no ?? undefined,
+              department_name: employee.department_name ?? undefined,
+            }))
+          );
+        } catch (err) {
+          if (!cancelled) {
+            setHodError(err instanceof Error ? err.message : "Failed to load employees.");
+          }
+        } finally {
+          if (!cancelled) setHodCandidatesLoading(false);
+        }
+      })();
+    }, delay);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [hodTarget, hodSearch]);
 
   async function fetchDepartments(signal?: AbortSignal, showLoader = true) {
     try {
@@ -902,13 +990,17 @@ export default function DepartmentPage() {
             department.name.length > 16
               ? `${department.name.slice(0, 14)}...`
               : department.name,
-          code: `D-${department.id}`,
+          code: department.code || `D-${department.id}`,
+          parentId: department.parent_id ?? 0,
+          sortOrder: department.sort_order ?? 0,
           parent: "-",
           head: headInfo.head,
           title: headInfo.title,
           employees: department.total_employees ?? employees.length,
           status: "Active",
-          description: `${department.name} manages its operations, staff, and day-to-day activities.`,
+          description:
+            department.description ||
+            `${department.name} manages its operations, staff, and day-to-day activities.`,
           createdOn: "—",
           updatedOn: "—",
           employees_list: employees,
@@ -1063,99 +1155,72 @@ export default function DepartmentPage() {
     }
   }
 
-  function openAddDialog(parent: ListRow | null = null) {
-    setAddParent(parent);
-    setAddName("");
-    setAddError(null);
-    setAddDialogOpen(true);
+  function openCreateWizard(parent: ListRow | null = null) {
+    setWizardParent(parent);
+    setWizardOpen(true);
   }
 
-  async function submitAdd() {
-    const name = addName.trim();
-    if (!name) {
-      setAddError("Department name is required.");
-      return;
-    }
-
-    setAddSubmitting(true);
-    setAddError(null);
-
-    try {
-      const session = buildSessionContext();
-      if (!session.subInstituteId) {
-        throw new Error("Current session is missing sub institute id.");
-      }
-
-      await createDepartment(session, {
-        department: name,
-        parentId: addParent?.apiId ?? 0,
-      });
-
-      setAddDialogOpen(false);
-      setActionNotice({
-        type: "success",
-        message: addParent
-          ? "Sub-department added successfully."
-          : "Department added successfully.",
-      });
-      await fetchDepartments(undefined, false);
-    } catch (err) {
-      setAddError(
-        err instanceof Error ? err.message : "Could not add department."
-      );
-    } finally {
-      setAddSubmitting(false);
-    }
+  function closeCreateWizard() {
+    setWizardOpen(false);
+    setWizardParent(null);
   }
 
   function openEditDialog(row: ListRow) {
     setEditTarget(row);
-    setEditName(row.name);
-    setEditError(null);
     setEditDialogOpen(true);
   }
 
-  async function submitEdit() {
-    if (!editTarget) return;
-    const name = editName.trim();
-    if (!name) {
-      setEditError("Department name is required.");
-      return;
-    }
-
-    setEditSubmitting(true);
-    setEditError(null);
-
-    try {
-      const session = buildSessionContext();
-      if (!session.subInstituteId) {
-        throw new Error("Current session is missing sub institute id.");
-      }
-
-      await updateDepartment(session, editTarget.apiId, { department: name });
-
-      setEditDialogOpen(false);
-      setActionNotice({
-        type: "success",
-        message:
-          editTarget.parent !== "-"
-            ? "Sub-department updated successfully."
-            : "Department updated successfully.",
-      });
-      await fetchDepartments(undefined, false);
-    } catch (err) {
-      setEditError(
-        err instanceof Error ? err.message : "Could not update department."
-      );
-    } finally {
-      setEditSubmitting(false);
-    }
+  function closeEditDialog() {
+    setEditDialogOpen(false);
+    setEditTarget(null);
   }
+
+  async function handleEditSaved(message: string) {
+    setEditDialogOpen(false);
+    setEditTarget(null);
+    setActionNotice({ type: "success", message });
+    await fetchDepartments(undefined, false);
+  }
+
+  /**
+   * Valid new parents for the row being edited: every department/
+   * sub-department except itself and everything beneath it. The backend
+   * rejects those moves anyway ("beneath itself or one of its own
+   * sub-departments"), so offering them would only produce a guaranteed
+   * 422. Reuses the same `hierarchy`/`findNode`/`collectSubtreeIds` helpers
+   * already used for the hierarchy tree's own filtering, rather than
+   * re-walking `listRows` by hand.
+   */
+  const editParentOptions = useMemo(() => {
+    if (!editTarget) return [];
+    const node = findNode(hierarchy, editTarget.id);
+    const blocked = node ? collectSubtreeIds(node) : new Set([editTarget.id]);
+    return listRows
+      .filter((row) => !blocked.has(row.id))
+      .map((row) => ({ id: row.apiId, name: row.name, parent: row.parent }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [editTarget, hierarchy, listRows]);
 
   function openDeleteDialog(row: ListRow) {
     setDeleteTarget(row);
     setDeleteError(null);
+    setDeleteImpact(null);
+    setMergeMode(false);
+    setMergeTargetId("");
     setDeleteDialogOpen(true);
+
+    setDeleteImpactLoading(true);
+    (async () => {
+      try {
+        const session = buildSessionContext();
+        const impact = await getDepartmentImpact(session, row.apiId);
+        setDeleteImpact(impact);
+      } catch {
+        // Impact preview is best-effort - deletion can still proceed without it.
+      } finally {
+        setDeleteImpactLoading(false);
+      }
+    })();
   }
 
   async function confirmDelete() {
@@ -1191,6 +1256,128 @@ export default function DepartmentPage() {
       );
     } finally {
       setDeleteSubmitting(false);
+    }
+  }
+
+  async function confirmMerge() {
+    if (!deleteTarget || !mergeTargetId) return;
+
+    setMergeSubmitting(true);
+    setDeleteError(null);
+
+    try {
+      const session = buildSessionContext();
+      if (!session.subInstituteId) {
+        throw new Error("Current session is missing sub institute id.");
+      }
+
+      const target = listRows.find((row) => row.id === mergeTargetId);
+      if (!target) {
+        throw new Error("Select a department to merge into.");
+      }
+
+      await mergeDepartments(session, {
+        sourceId: deleteTarget.apiId,
+        targetId: target.apiId,
+      });
+
+      setDeleteDialogOpen(false);
+      setActionNotice({
+        type: "success",
+        message: `${deleteTarget.name} merged into ${target.name} successfully.`,
+      });
+      if (selectedId === deleteTarget.id) {
+        setSelectedId(null);
+      }
+      setDeleteTarget(null);
+      await fetchDepartments(undefined, false);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Could not merge department."
+      );
+    } finally {
+      setMergeSubmitting(false);
+    }
+  }
+
+  function openHodDialog(row: ListRow) {
+    setHodTarget(row);
+    setHodSearch("");
+    setHodError(null);
+  }
+
+  function closeHodDialog() {
+    if (hodSubmitting) return;
+    setHodTarget(null);
+  }
+
+  async function submitSetHead(headUserId: number | null) {
+    if (!hodTarget) return;
+
+    setHodSubmitting(true);
+    setHodError(null);
+
+    try {
+      const session = buildSessionContext();
+      if (!session.subInstituteId) {
+        throw new Error("Current session is missing sub institute id.");
+      }
+
+      await setDepartmentHead(session, hodTarget.apiId, headUserId);
+
+      setHodTarget(null);
+      setActionNotice({
+        type: "success",
+        message:
+          headUserId === null
+            ? "Department head cleared."
+            : "Department head updated successfully.",
+      });
+      await fetchDepartments(undefined, false);
+    } catch (err) {
+      setHodError(
+        err instanceof Error ? err.message : "Could not update department head."
+      );
+    } finally {
+      setHodSubmitting(false);
+    }
+  }
+
+  // Move the selected top-level department up/down among its siblings
+  // (same parentId), swapping sort_order with the adjacent one. Only
+  // top-level departments are reorderable here - sub-departments are a
+  // nested list on their parent, not part of `departments`.
+  async function moveDepartment(direction: "up" | "down") {
+    if (!selectedRow || reorderSubmitting) return;
+
+    const current = departments.find((d) => d.id === selectedRow.id);
+    if (!current) return;
+
+    const siblings = departments
+      .filter((d) => d.parentId === current.parentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.apiId - b.apiId);
+
+    const index = siblings.findIndex((d) => d.id === current.id);
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (index === -1 || swapIndex < 0 || swapIndex >= siblings.length) return;
+
+    const other = siblings[swapIndex];
+
+    setReorderSubmitting(true);
+    try {
+      const session = buildSessionContext();
+      await reorderDepartments(session, [
+        { id: current.apiId, sortOrder: other.sortOrder },
+        { id: other.apiId, sortOrder: current.sortOrder },
+      ]);
+      await fetchDepartments(undefined, false);
+    } catch (err) {
+      setActionNotice({
+        type: "error",
+        message: err instanceof Error ? err.message : "Could not reorder departments.",
+      });
+    } finally {
+      setReorderSubmitting(false);
     }
   }
 
@@ -1252,7 +1439,7 @@ export default function DepartmentPage() {
               type="button"
               size="lg"
               className="bg-blue-600 text-white hover:bg-blue-700"
-              onClick={() => openAddDialog()}
+              onClick={() => openCreateWizard()}
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
               Add Department
@@ -1285,14 +1472,7 @@ export default function DepartmentPage() {
           </div>
         ) : null}
 
-        <div
-          className={cn(
-            "grid min-h-0 flex-1 gap-3",
-            showDetails
-              ? "grid-cols-[280px_minmax(0,1fr)_320px]"
-              : "grid-cols-[280px_minmax(0,1fr)]"
-          )}
-        >
+        <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)] gap-3">
           <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
             <PanelHeader title="Department Hierarchy" />
             <div className="border-b border-border px-4 pb-4">
@@ -1322,13 +1502,18 @@ export default function DepartmentPage() {
               <FooterIcon
                 label={selectedRow ? "Add sub-department" : "Add department"}
                 icon={<Plus className="h-3.5 w-3.5" />}
-                onClick={() => openAddDialog(selectedRow)}
+                onClick={() => openCreateWizard(selectedRow)}
               />
               <FooterIcon
                 label="Move up"
                 icon={<ChevronDown className="h-3.5 w-3.5 rotate-180" />}
+                onClick={() => moveDepartment("up")}
               />
-              <FooterIcon label="Move down" icon={<ChevronDown className="h-3.5 w-3.5" />} />
+              <FooterIcon
+                label="Move down"
+                icon={<ChevronDown className="h-3.5 w-3.5" />}
+                onClick={() => moveDepartment("down")}
+              />
               <FooterIcon
                 label="Hierarchy settings"
                 icon={<ChevronsUpDown className="h-3.5 w-3.5" />}
@@ -1497,7 +1682,8 @@ export default function DepartmentPage() {
                                 <RowMenu
                                   isSubDepartment={isSubDepartment}
                                   onEdit={() => openEditDialog(department)}
-                                  onAddSubDepartment={() => openAddDialog(department)}
+                                  onAddSubDepartment={() => openCreateWizard(department)}
+                                  onAssignHod={() => openHodDialog(department)}
                                   onDelete={() => openDeleteDialog(department)}
                                 />
                               </div>
@@ -1560,21 +1746,28 @@ export default function DepartmentPage() {
               </div>
             </div>
           </section>
+        </div>
 
-          {showDetails && selectedRow ? (
-            <aside className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-              <div className="flex h-[50px] items-center justify-between border-b border-border px-3.5">
+        {/*
+         * Department Details is a right-side slide-over, not a third grid
+         * column - it overlays instead of squeezing the hierarchy/list
+         * panels, matching the Sheet convention already used for the
+         * Employee Directory's detail panel (see
+         * employee-directory-sheets.tsx). Content below is unchanged from
+         * the previous inline <aside>.
+         */}
+        <Sheet open={showDetails} onOpenChange={(open) => { if (!open) handleCloseDetails(); }}>
+          {selectedRow ? (
+            <SheetContent
+              side="right"
+              className="flex h-full w-full flex-col gap-0 overflow-hidden border-l border-border bg-card p-0 sm:max-w-sm"
+            >
+              {/* SheetContent already renders its own close button
+                  (top-right) - a second one here duplicated it. */}
+              <div className="flex h-[50px] items-center border-b border-border px-3.5">
                 <h2 className="text-[13px] font-semibold text-foreground">
                   Department Details
                 </h2>
-                <button
-                  type="button"
-                  onClick={handleCloseDetails}
-                  className="px-3 py-2 text-foreground"
-                  aria-label="Close details"
-                >
-                  <X className="h-4 w-4" />
-                </button>
               </div>
               <div className="flex items-center gap-3 px-3.5 py-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
@@ -1609,7 +1802,7 @@ export default function DepartmentPage() {
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => openAddDialog(selectedRow)}
+                  onClick={() => openCreateWizard(selectedRow)}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add sub department
@@ -1659,7 +1852,8 @@ export default function DepartmentPage() {
                         icon={<UserRound className="h-3.5 w-3.5" />}
                         label="Department Head"
                         value={selectedRow.head === "-" ? "Unassigned" : selectedRow.head}
-                        action="Change HOD"
+                        action={selectedRow.head === "-" ? "Assign HOD" : "Change HOD"}
+                        onAction={() => openHodDialog(selectedRow)}
                       />
                       <DetailLine
                         icon={<Folder className="h-3.5 w-3.5" />}
@@ -1734,7 +1928,7 @@ export default function DepartmentPage() {
                         </h4>
                         <button
                           type="button"
-                          onClick={() => openAddDialog(selectedRow)}
+                          onClick={() => openCreateWizard(selectedRow)}
                           className="text-[10px] font-medium text-blue-600"
                         >
                           Add sub-department
@@ -1773,92 +1967,64 @@ export default function DepartmentPage() {
                   </div>
                 )}
               </div>
-            </aside>
+            </SheetContent>
           ) : null}
-        </div>
+        </Sheet>
       </main>
 
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {addParent ? "Add sub-department" : "Add department"}
-            </DialogTitle>
-            {addParent ? (
-              <DialogDescription>Parent department: {addParent.name}</DialogDescription>
-            ) : null}
-          </DialogHeader>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="add-department-name" className="text-[11px] font-medium text-muted-foreground">
-              Department name
-            </label>
-            <Input
-              id="add-department-name"
-              value={addName}
-              onChange={(event) => setAddName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void submitAdd();
-              }}
-              placeholder="e.g. Human Resources"
-              className="h-9"
-            />
-            {addError ? (
-              <p className="text-[11px] font-medium text-destructive">{addError}</p>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="bg-blue-600 text-white hover:bg-blue-700"
-              disabled={addSubmitting}
-              onClick={submitAdd}
-            >
-              {addSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              {addParent ? "Add sub-department" : "Add department"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DepartmentCreateWizard
+        open={wizardOpen}
+        parentOptions={listRows.map((row) => ({ id: row.apiId, name: row.name }))}
+        initialParent={wizardParent ? { id: wizardParent.apiId, name: wizardParent.name } : null}
+        onCancel={closeCreateWizard}
+        onCreated={() => fetchDepartments(undefined, false)}
+        onFinished={() => {
+          closeCreateWizard();
+          setActionNotice({
+            type: "success",
+            message: wizardParent
+              ? "Sub-department added successfully."
+              : "Department added successfully.",
+          });
+          void fetchDepartments(undefined, false);
+        }}
+      />
 
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
+      <DepartmentEditDialog
+        open={editDialogOpen}
+        target={editTarget}
+        parentOptions={editParentOptions}
+        onCancel={closeEditDialog}
+        onSaved={(message) => void handleEditSaved(message)}
+      />
+
+      <Dialog open={Boolean(hodTarget)} onOpenChange={(open) => { if (!open) closeHodDialog(); }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Edit {editTarget && editTarget.parent !== "-" ? "sub-department" : "department"}
+              {hodTarget && hodTarget.head !== "-" ? "Change head of department" : "Assign head of department"}
             </DialogTitle>
+            <DialogDescription>
+              {hodTarget ? `Select the employee who leads "${hodTarget.name}".` : ""}
+            </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="edit-department-name" className="text-[11px] font-medium text-muted-foreground">
-              Department name
-            </label>
-            <Input
-              id="edit-department-name"
-              value={editName}
-              onChange={(event) => setEditName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void submitEdit();
-              }}
-              className="h-9"
-            />
-            {editError ? (
-              <p className="text-[11px] font-medium text-destructive">{editError}</p>
-            ) : null}
-          </div>
+
+          <HeadOfDepartmentPicker
+            currentHead={hodTarget?.head ?? "-"}
+            employees={hodCandidates}
+            loading={hodCandidatesLoading}
+            emptyHint={hodSearch.trim() ? "No employees match that search." : "No employees available to assign."}
+            search={hodSearch}
+            onSearchChange={setHodSearch}
+            isSubmitting={hodSubmitting}
+            onAssign={(employeeId) => submitSetHead(employeeId)}
+            onClear={() => submitSetHead(null)}
+            error={hodError}
+          />
+
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+            <Button type="button" variant="outline" onClick={closeHodDialog} disabled={hodSubmitting}>
               Cancel
-            </Button>
-            <Button
-              type="button"
-              className="bg-blue-600 text-white hover:bg-blue-700"
-              disabled={editSubmitting}
-              onClick={submitEdit}
-            >
-              {editSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Update
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1876,6 +2042,63 @@ export default function DepartmentPage() {
                 : `Remove ${deleteTarget?.name ?? "this department"} and its sub-departments? This action cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteImpactLoading ? (
+            <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Checking what this affects…
+            </p>
+          ) : deleteImpact && deleteImpact.total_records > 0 ? (
+            <div className="space-y-2">
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">
+                Deleting this affects {deleteImpact.total_records} record
+                {deleteImpact.total_records === 1 ? "" : "s"}
+                {deleteImpact.sub_departments > 0
+                  ? ` across ${deleteImpact.sub_departments} sub-department${deleteImpact.sub_departments === 1 ? "" : "s"} and related tables.`
+                  : " in related tables."}
+              </p>
+              {!mergeMode ? (
+                <button
+                  type="button"
+                  className="text-[11px] font-medium text-blue-600 underline-offset-2 hover:underline"
+                  onClick={() => setMergeMode(true)}
+                >
+                  Merge into another department instead, so those records stay attached
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {mergeMode && deleteTarget ? (
+            <div className="space-y-2">
+              <p className="text-[11px] font-medium text-foreground">Merge into</p>
+              <Select value={mergeTargetId} onValueChange={(value) => setMergeTargetId(value ?? "")}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select a department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {listRows
+                    .filter(
+                      (row) =>
+                        row.id !== deleteTarget.id &&
+                        !row.id.startsWith(`${deleteTarget.id}-s-`)
+                    )
+                    .map((row) => (
+                      <SelectItem key={row.id} value={row.id}>
+                        {row.parent !== "-" ? `${row.parent} / ${row.name}` : row.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <button
+                type="button"
+                className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+                onClick={() => {
+                  setMergeMode(false);
+                  setMergeTargetId("");
+                }}
+              >
+                Cancel merge, delete instead
+              </button>
+            </div>
+          ) : null}
           {deleteError ? (
             <p className="text-[11px] font-medium text-destructive">{deleteError}</p>
           ) : null}
@@ -1883,10 +2106,21 @@ export default function DepartmentPage() {
             <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button type="button" variant="destructive" disabled={deleteSubmitting} onClick={confirmDelete}>
-              {deleteSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Remove
-            </Button>
+            {mergeMode ? (
+              <Button
+                type="button"
+                disabled={mergeSubmitting || !mergeTargetId}
+                onClick={confirmMerge}
+              >
+                {mergeSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Merge
+              </Button>
+            ) : (
+              <Button type="button" variant="destructive" disabled={deleteSubmitting} onClick={confirmDelete}>
+                {deleteSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Remove
+              </Button>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
