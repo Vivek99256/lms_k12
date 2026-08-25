@@ -18,6 +18,7 @@ import {
 
 import { Button } from '@/components/ui/button';
 import NewPalNav from '@/app/pal/new/_components/NewPalNav';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import {
   enrichNode,
   fetchNode,
@@ -414,9 +415,20 @@ function AuthoringContent() {
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"
                 />
 
-                <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  Body
-                </label>
+                <div className="mt-4 flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    Body
+                  </label>
+                  <AiFieldAssistant
+                    value={body}
+                    onApply={setBody}
+                    fieldType="lesson_content"
+                    label="Content body"
+                    module="pal"
+                    page="Content authoring"
+                    entityType="pal_content"
+                  />
+                </div>
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}

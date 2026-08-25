@@ -18,6 +18,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { erpSelectClass } from "@/components/erp/erp-ui";
+import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import { mapApiLinkToRoute } from "@/app/data/routeMapper";
 import { OwnerMarker, StatusBadge } from "./onboarding-ui";
 import type {
@@ -177,9 +178,21 @@ export function StepDrawer({
 
 
           <div>
-            <Label htmlFor={`step-notes-${step.id}`} className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Notes
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor={`step-notes-${step.id}`} className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Notes
+              </Label>
+              <AiFieldAssistant
+                value={notes}
+                onApply={setNotes}
+                fieldType="notes"
+                label="Step notes"
+                module="general"
+                page="Onboarding"
+                entityType="onboarding_step"
+                maxLength={5000}
+              />
+            </div>
             <Textarea
               id={`step-notes-${step.id}`}
               value={notes}

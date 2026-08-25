@@ -29,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { resultGet, toOptions, readString, type SelectOption } from '@/lib/result/api';
 import type { FieldDef } from '@/lib/result/types';
 import { Checkbox, Switch } from './primitives';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { cn } from '@/lib/utils';
 
 export type FormValues = Record<string, unknown>;
@@ -457,14 +458,30 @@ export default function DynamicForm({
     switch (field.type) {
       case 'textarea':
         return (
-          <Textarea
-            id={`field-${field.name}`}
-            value={readString(value)}
-            onChange={(event) => onChange(event.target.value)}
-            placeholder={field.placeholder}
-            readOnly={field.readOnly}
-            rows={3}
-          />
+          <>
+            {/* A read-only field is being displayed, not authored — no assistant. */}
+            {field.readOnly ? null : (
+              <div className="mb-1 flex justify-end">
+                <AiFieldAssistant
+                  value={readString(value)}
+                  onApply={onChange}
+                  fieldType="description"
+                  label={field.label ?? field.name}
+                  module="result"
+                  page="Result entry"
+                  entityType={field.name}
+                />
+              </div>
+            )}
+            <Textarea
+              id={`field-${field.name}`}
+              value={readString(value)}
+              onChange={(event) => onChange(event.target.value)}
+              placeholder={field.placeholder}
+              readOnly={field.readOnly}
+              rows={3}
+            />
+          </>
         );
       case 'editor':
         return <HtmlEditor value={readString(value)} onChange={onChange} />;

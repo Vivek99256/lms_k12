@@ -101,6 +101,25 @@ export function buildModuleSelectionResponse(
   const heading =
     leadMessage || `Which ${moduleLabel} record would you like to continue with?`;
 
+  /*
+   * The chips are the records themselves, not advice about how to pick one.
+   *
+   * A chip's label is sent verbatim as the next user message, and `resolveEntitySelection`
+   * matches on the record name — so offering the names makes one click a working
+   * selection. Offering "Reply with the numbered option if shown." sent that sentence as
+   * the question instead, matched nothing, and looped the user back to this same prompt.
+   */
+  const selectionChips = entities
+    .slice(0, 4)
+    .map(
+      (entity, index) =>
+        (typeof entity.label === "string" && entity.label) ||
+        (typeof entity.studentName === "string" && entity.studentName) ||
+        (typeof entity.fullName === "string" && entity.fullName) ||
+        `${index + 1}`
+    )
+    .filter((chip) => chip.trim().length > 0);
+
   return {
     message: `${heading}\n${options.join("\n")}\nYou can reply with the name, reference number, or the numbered option.`,
     conversationType: prepared.intent.type,
@@ -112,10 +131,7 @@ export function buildModuleSelectionResponse(
         summary: `Waiting for the user to choose one of the ${moduleLabel} records.`,
       },
     ],
-    followUpSuggestions: [
-      "Reply with the record name or reference number.",
-      "Reply with the numbered option if shown.",
-    ],
+    followUpSuggestions: selectionChips,
     intent: prepared.intent,
     activeTools: prepared.activeTools,
   };

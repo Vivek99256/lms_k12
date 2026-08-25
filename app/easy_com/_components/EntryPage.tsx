@@ -22,6 +22,7 @@ import {
 } from '../_lib/api';
 import type { EntryConfig, JsonRecord, Recipient } from '../_lib/types';
 import { ErrorBanner, Field, PageFrame, Panel, SendSummary, Select } from './shared';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 
 const emptyAcademic: Partial<SearchDropdownValues> = { section: '', standard: '', division: '' };
 
@@ -412,6 +413,18 @@ export default function EntryPage({ config }: { config: EntryConfig }) {
                 : undefined
             }
           >
+            <div className="mb-1 flex justify-end">
+              <AiFieldAssistant
+                value={message}
+                onApply={setMessage}
+                fieldType="announcement"
+                label="Message"
+                module="easy_com"
+                page="Communication"
+                entityType="message"
+                maxLength={config.messageMaxLength ?? null}
+              />
+            </div>
             <Textarea
               value={message}
               maxLength={config.messageMaxLength}

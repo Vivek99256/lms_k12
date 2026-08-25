@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 
 import PolicyGenerationDialog from "./policy-generation-dialog";
 import type { AiGeneratedDocumentSave } from "./ai-generation-drawer";
@@ -352,9 +353,18 @@ function PolicyForm({
       <div className="space-y-1.5">
         <label
           htmlFor="policy-description"
-          className="text-[13px] font-semibold text-[#061632]"
+          className="flex items-center justify-between text-[13px] font-semibold text-[#061632]"
         >
           Description
+          <AiFieldAssistant
+            value={description}
+            onApply={setDescription}
+            fieldType="policy"
+            label="Policy description"
+            module="institute-detail"
+            page="Policies"
+            entityType="policy"
+          />
         </label>
         <Textarea
           id="policy-description"

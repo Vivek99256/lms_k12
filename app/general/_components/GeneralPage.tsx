@@ -14,6 +14,7 @@ import {
 } from "../api";
 import { TemplateHtmlEditor } from "./TemplateHtmlEditor";
 import FormBuilderEditor, { parseFormJson } from "../form_builder/FormBuilderEditor";
+import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import type { BuilderField } from "../form_builder/types";
 
 type Source = keyof Pick<GeneralData, "profiles" | "grades" | "standards" | "subjects">;
@@ -216,7 +217,22 @@ export function GeneralPage({ config }: { config: GeneralConfig }) {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{config.fields.map((field) => <div key={field.key} className={(field.kind === "textarea" || field.kind === "editor") ? "sm:col-span-2 lg:col-span-3" : ""}>
-            <Label htmlFor={field.key}>{field.label}{field.required ? " *" : ""}</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor={field.key}>{field.label}{field.required ? " *" : ""}</Label>
+              {/* Offered on the long-form kinds only. A code, a date or a number is not
+                  something an assistant should be rewriting. */}
+              {(field.kind === "textarea" || field.kind === "editor") ? (
+                <AiFieldAssistant
+                  value={text(form[field.key])}
+                  onApply={(next) => setForm((current) => ({ ...current, [field.key]: next }))}
+                  fieldType={field.kind === "editor" ? "announcement" : "description"}
+                  label={field.label}
+                  module="general"
+                  page={config.module}
+                  entityType={config.module}
+                />
+              ) : null}
+            </div>
             {field.kind === "select" ? <select id={field.key} value={text(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
               className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
               <option value="">Select {field.label}</option>{field.options?.map((option) => <option key={option} value={option}>{option}</option>)}{fieldOptions(field).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}

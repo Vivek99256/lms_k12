@@ -4,6 +4,7 @@ import React, { createContext, useMemo, useState, useEffect, useRef, useCallback
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
+import { PageAiContextProvider } from '@/contexts/PageAiContext';
 import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
@@ -441,6 +442,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const showSubheader = Boolean(level3Menu?.items.length || fetchedMasterMenuItems.length > 0 || masterMenuGroups.length > 0);
 
   return (
+    /*
+      Wraps both the page and the assistant, because the two have to share it: pages
+      register what they are showing, the panel reads it. Mounted at the shell rather
+      than the root layout so it covers exactly the surface the assistant appears on.
+    */
+    <PageAiContextProvider>
     <div className="app-shell-background flex h-screen overflow-hidden">
       <Sidebar
         menuItems={menuItems}
@@ -493,6 +500,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         />
       </div>
     </div>
+    </PageAiContextProvider>
   );
 }
 

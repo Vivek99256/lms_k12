@@ -9,6 +9,7 @@ import {
 } from "@shared/conversational-ai-core";
 import { createAiModel } from "@shared/conversational-ai-core/model";
 import {
+  ConversationPermissionError,
   describeFollowUpState,
   getFollowUpState,
   isContextualFollowUp,
@@ -382,6 +383,77 @@ function isLikelyLmsQuery(text: string) {
  * the message also looking LMS-related so ordinary "why/how" chit-chat is not
  * routed into a data-analysis tool call.
  */
+/**
+ * Academic-risk questions, which belong to the intelligence layer rather than to the
+ * generic analysis tool.
+ *
+ * This has to be consulted *before* `isAnalyticalLmsQuery`, because that matcher
+ * claims the word "risk" and routes it to `analyzeLmsData` — a cross-module dataset
+ * loader that can only ever return counts. That is why "analyse this student's
+ * academic risk" used to come back as an enrollment breakdown: the deterministic
+ * fast path answered before the classifier, and the eight intelligence tools were
+ * never candidates.
+ *
+ * Deliberately narrow. "Which students have the highest fee risk?" is a fee question
+ * and must stay with the analysis tool, so a fee/payment mention disqualifies the
+ * match outright.
+ */
+export function getIntelligenceCapability(text: string): string | null {
+  // Fees, transport and library carry their own notion of "risk" and are already
+  // served well. Only academic risk belongs to the agent.
+  if (/\b(fee|fees|payment|due|defaulter|transport|library|hostel)\b/.test(text)) {
+    return null;
+  }
+
+  // Acting on a specific item, checked before the "show me the queue" branches
+  // below. Without these, "approve recommendation 7" matches no intelligence
+  // capability at all and falls through to the admission slot-filling flow, which
+  // is where the word "approve" otherwise lives.
+  const actOnApproval = text.match(
+    /\b(approve|reject)\b[^0-9]{0,40}\b(approval|workflow step|step)\b[^0-9]{0,10}(\d+)/
+  );
+
+  if (actOnApproval) {
+    return "resolve_approval";
+  }
+
+  if (/\b(approve|reject)\b[^0-9]{0,40}\brecommendation\b[^0-9]{0,10}\d+/.test(text)) {
+    return "approve_recommendation";
+  }
+
+  // Checked before the recommendation branch: a workflow step waiting on a person
+  // is a different queue from a recommendation waiting on one, and the words
+  // overlap heavily.
+  if (/\b(workflow (approvals?|steps?)|stuck workflows?|waiting (workflow|steps?)|pending (workflow )?steps?)\b/.test(text)) {
+    return "workflow_approvals";
+  }
+
+  if (/\b(what needs my approval|pending recommendations?|awaiting approval|approval queue)\b/.test(text)) {
+    return "pending_recommendations";
+  }
+
+  if (/\b(open cases?|flagged (students?|by the system)|what has the system flagged)\b/.test(text)) {
+    return "ai_cases";
+  }
+
+  const mentionsRisk =
+    /\b(academic risk|at[\s-]?risk|risk level|struggling|failing|falling behind|needs? intervention|underperforming)\b/.test(
+      text
+    );
+
+  if (!mentionsRisk) {
+    return null;
+  }
+
+  // "Why ... at risk" and "what is the evidence" read an existing case rather than
+  // re-running detection, which is both cheaper and the honest answer.
+  if (/\b(why|reason|reasons|evidence|proof|how do you know|justify)\b/.test(text)) {
+    return "explain_risk";
+  }
+
+  return "academic_risk";
+}
+
 export function isAnalyticalLmsQuery(text: string) {
   if (!isLikelyLmsQuery(text)) {
     return false;
@@ -637,6 +709,12 @@ function getContextualContinuationIntent(context: ProjectContext): ConversationI
 
 function fallbackIntent(context: ProjectContext): ConversationIntent {
   const text = context.latestUserMessage.content.toLowerCase();
+
+  // Same precedence as the fast path: academic risk before generic analysis.
+  const intelligenceIntent = getIntelligenceIntent(text);
+  if (intelligenceIntent) {
+    return { ...intelligenceIntent, confidence: 0.72 };
+  }
 
   if (isAnalyticalLmsQuery(text)) {
     return {
@@ -1246,6 +1324,60 @@ export function getModuleDataIntent(text: string): ConversationIntent | null {
   return null;
 }
 
+/**
+ * Turns an academic-risk question into the intelligence tool that answers it.
+ *
+ * Shared by the deterministic fast path and the error fallback so both agree; the
+ * classifier prompt carries the same mapping in words.
+ */
+function getIntelligenceIntent(text: string): ConversationIntent | null {
+  const capability = getIntelligenceCapability(text);
+
+  if (!capability) {
+    return null;
+  }
+
+  const suggestedTool = {
+    academic_risk: "findStudentsAtRisk",
+    explain_risk: "explainStudentRisk",
+    ai_cases: "listIntelligenceCases",
+    pending_recommendations: "listRecommendationsAwaitingApproval",
+    workflow_approvals: "listWorkflowApprovals",
+    approve_recommendation: "approveRecommendationAction",
+    resolve_approval: "resolveWorkflowApproval",
+  }[capability];
+
+  if (!suggestedTool) {
+    return null;
+  }
+
+  // "Approve recommendation 7" names its target in the sentence. Carrying the id and
+  // the verb on the intent is what lets the deterministic path call the tool with
+  // real arguments instead of calling it empty and failing schema validation.
+  const entities: Record<string, unknown> = {};
+
+  if (capability === "approve_recommendation" || capability === "resolve_approval") {
+    const id = text.match(/\b(?:recommendation|approval|workflow step|step)\b[^0-9]{0,10}(\d+)/);
+
+    if (id) {
+      entities.targetId = Number(id[1]);
+    }
+
+    entities.decision = /\breject\b/.test(text) ? "rejected" : "approved";
+  }
+
+  return {
+    type: "analyse",
+    domain: "k12",
+    capability,
+    entities,
+    confidence: 0.88,
+    requiresConfirmation: false,
+    requiredPermission: "lms:student:read",
+    suggestedTool,
+  };
+}
+
 function getDeterministicIntent(context: ProjectContext): ConversationIntent | null {
   const text = context.latestUserMessage.content.trim().toLowerCase();
 
@@ -1293,6 +1425,14 @@ function getDeterministicIntent(context: ProjectContext): ConversationIntent | n
       confidence: 0.9,
       requiresConfirmation: false,
     };
+  }
+
+  // Academic risk belongs to the intelligence layer, and has to be claimed before
+  // the analytical branch below — that branch matches on "risk" and would send the
+  // question to a dataset loader that can only return counts.
+  const intelligenceIntent = getIntelligenceIntent(text);
+  if (intelligenceIntent) {
+    return intelligenceIntent;
   }
 
   // Analytical questions are routed to the cross-module analysis tool so the
@@ -1544,6 +1684,131 @@ function hasPermission(profileName: string | undefined, permission: string) {
   return permissions.includes("*") || permissions.includes(permission);
 }
 
+/**
+ * The CURRENT PAGE block: where the user is standing, and what is on the screen.
+ *
+ * This is what makes "summarise these", "why is this student at risk?" and "which of
+ * these need attention?" answerable without the user restating what they are looking
+ * at. Three rules keep it from doing harm:
+ *
+ *  - It describes; it never authorises. Tools re-derive scope from the session, so a
+ *    page claiming to show records the user may not read changes nothing.
+ *  - The listed rows are a *window*, not the dataset. The model is told so explicitly,
+ *    because a summary drawn from 25 of 300 rows and presented as the whole is worse
+ *    than no summary.
+ *  - Page context loses to an explicit reference. If the user names a different record,
+ *    that one wins — the page is a default subject, not a constraint.
+ *
+ * Returns "" when the page said nothing, in which case the prompt is unchanged from
+ * what it was before any of this existed.
+ */
+function describeCurrentPage(context: ProjectContext): string {
+  const page = context.page;
+  const lines: string[] = [];
+
+  const place = context.moduleLabel || context.module;
+  if (place) {
+    lines.push(
+      `The user is in the ${place} module${page?.title ? `, on "${page.title}"` : ""}.`
+    );
+  } else if (page?.title) {
+    lines.push(`The user is on "${page.title}".`);
+  }
+
+  // The record the page is about. Stated with its id so tools are called with it
+  // rather than the user being asked to name what they are already looking at.
+  if (context.entityType && context.entityId) {
+    lines.push(
+      `They are viewing ${context.entityType} ${context.entityId}${
+        context.entityLabel ? ` (${context.entityLabel})` : ""
+      }.`,
+      `Resolve "this ${context.entityType}", "this record", "them" and "here" to that record, and call tools with that identifier instead of asking again.`
+    );
+  }
+
+  if (page?.searchQuery) {
+    lines.push(`A search for "${page.searchQuery}" is active on this page.`);
+  }
+
+  if (page?.filters?.length) {
+    const described = page.filters
+      .map((filter) => `${filter.label || filter.key}: ${filter.value}`)
+      .join(", ");
+    lines.push(`The view is filtered by ${described}.`);
+    lines.push(
+      "Apply those same filters when retrieving data for this page, unless the user asks for something wider."
+    );
+  }
+
+  if (page?.metrics?.length) {
+    const described = page.metrics
+      .map((metric) => `${metric.label || metric.key} = ${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`)
+      .join("; ");
+    lines.push(`Figures currently displayed: ${described}.`);
+  }
+
+  if (typeof page?.selectedCount === "number" && page.selectedCount > 0) {
+    lines.push(
+      `The user has selected ${page.selectedCount} record${page.selectedCount === 1 ? "" : "s"}. "These", "the selected ones" and "them" refer to that selection.`
+    );
+  }
+
+  if (page?.records?.length) {
+    const total = page.recordCount ?? page.records.length;
+    const window = page.records.length;
+
+    lines.push(
+      total > window
+        ? `The page is showing ${window} of ${total} records. The rows below are only that window — if the user asks about the full set, retrieve it with a tool rather than generalising from these.`
+        : `The page is showing ${total} record${total === 1 ? "" : "s"}.`
+    );
+
+    // Compact and labelled, so the model can name real rows rather than describing
+    // "the records" generically — the same rule the grounding section imposes.
+    const sample = page.records.slice(0, 10).map((record) => {
+      const attributes = Object.entries(record)
+        .filter(([key]) => key !== "id" && key !== "label")
+        .slice(0, 4)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(", ");
+
+      return `- ${record.label ?? record.id ?? "(unnamed)"}${attributes ? ` — ${attributes}` : ""}`;
+    });
+
+    lines.push(`Rows on screen:\n${sample.join("\n")}`);
+  }
+
+  // What the page can be narrowed by. Lets the assistant answer "what grades are
+  // there?" from the screen, and resolve "Grade 5" to a real option rather than
+  // guessing whether one exists.
+  if (page?.facets?.length) {
+    const described = page.facets
+      .map((facet) => `${facet.label || facet.key}: ${facet.values.join(", ")}`)
+      .join("; ");
+    lines.push(`Options available on this page — ${described}.`);
+  }
+
+  if (page?.availableActions?.length) {
+    const described = page.availableActions
+      .map((action) => action.label || action.key)
+      .join(", ");
+    lines.push(
+      `Actions available on this page: ${described}. Use these when the user asks what they can do here; do not invent others.`
+    );
+  }
+
+  if (!lines.length) {
+    return "";
+  }
+
+  lines.push(
+    "This is context, not a limit. If the user asks about something outside this page, answer it from the right data source instead of telling them to navigate somewhere else.",
+    "If the user clearly names a different record, use the one they named."
+  );
+
+  return `CURRENT PAGE:\n${lines.join("\n")}`;
+}
+
 export const lmsK12Adapter: ProjectAIAdapter = {
   projectId: "lms_k12",
   projectName: "Teach Connect LMS_K12",
@@ -1567,6 +1832,12 @@ export const lmsK12Adapter: ProjectAIAdapter = {
       syear: trustedContext.syear,
       termId: trustedContext.termId,
       route: trustedContext.route,
+      entityType: trustedContext.entityType,
+      entityId: trustedContext.entityId,
+      entityLabel: trustedContext.entityLabel,
+      module: trustedContext.module,
+      moduleLabel: trustedContext.moduleLabel,
+      page: trustedContext.page,
       cookieHeader: trustedContext.cookieHeader,
       referer: trustedContext.referer,
       request,
@@ -1589,7 +1860,22 @@ export const lmsK12Adapter: ProjectAIAdapter = {
 
 User profile: ${context.profileName || "unknown"}
 Route context: ${context.route || "dashboard"}
+Current module: ${context.moduleLabel || context.module || "unknown"}${
+          context.entityType && context.entityId
+            ? `\nViewing: ${context.entityType} ${context.entityId}${context.entityLabel ? ` (${context.entityLabel})` : ""}`
+            : ""
+        }${
+          context.page?.filters?.length
+            ? `\nActive filters: ${context.page.filters
+                .map((filter) => `${filter.label || filter.key}=${filter.value}`)
+                .join(", ")}`
+            : ""
+        }
 User message: ${context.latestUserMessage.content}
+
+The module and filters above are where the user is standing. Use them to disambiguate a
+message that names no module — "who has not paid?" on the fees module is a fees lookup.
+They are not a restriction: a message that clearly names another module routes there.
 
 Prefer these mappings:
 - admission enquiries, pending admission applications, open admissions, admission inquiries for today -> listAdmissionEnquiries
@@ -1611,7 +1897,14 @@ Prefer these mappings:
 - one named student's attendance record or percentage -> getStudentAttendanceDetail
 - departments, sub-departments or employee distribution -> getDepartmentDirectory
 - total fee demand, collection, outstanding amount or collection rate -> getFeesSummary
-- comparisons, rankings, risk, trends, skill gaps, "which X needs the most", or any question needing more than one module -> analyzeLmsData
+- a named or current student's academic risk, "analyse this student", risk level, who is at risk, who is struggling, who needs intervention -> findStudentsAtRisk
+- why a student is at risk, or the evidence and reasoning behind a flag -> explainStudentRisk
+- what the system has flagged, open cases -> listIntelligenceCases
+- what needs my approval, pending recommendations -> listRecommendationsAwaitingApproval
+- workflow steps waiting on someone, stuck workflows, what is holding an intervention -> listWorkflowApprovals
+- approve or reject a named recommendation -> approveRecommendationAction
+- approve or reject a named workflow approval or step -> resolveWorkflowApproval
+- comparisons, rankings, trends, "which X needs the most", or any question needing more than one module -> analyzeLmsData
 - student, parent, teacher, staff, attendance, timetable, exam, library, transport, hostel, accounts, notification, marks, fees, homework, or other module lookups and actions -> executeModuleAction
 - greetings, simple chit-chat, and general knowledge questions -> shared capability with no tool call
 
@@ -1638,6 +1931,8 @@ Return only structured output.`,
       getFollowUpState(ids.userId, ids.sessionId)
     );
 
+    const pageContextRules = describeCurrentPage(context);
+
     const groundingRules = [
       "GROUNDING — non negotiable:",
       "Never state a number, name, date, status or total about this institute unless it came from a tool result in this conversation.",
@@ -1646,6 +1941,7 @@ Return only structured output.`,
       "When a tool result reports that the information is unavailable, say so plainly and give the reason in business language. Do not substitute an estimate.",
       "When a result lists signals or datasets that could not be read, say which ones were missing rather than filling the gap yourself.",
       "If the data supports a count but not a cause, give the count and say the data does not show the cause. Offer the specific extra information that would answer it.",
+      "When a tool result carries `unavailableSignals`, you may not answer any question that depends on those signals. Say plainly which data the system does not hold, give only what was actually measured, and state that it does not answer the question asked. A ranking question about a quality the institute does not record — training need, competency, workload — must be refused on those grounds, never answered from headcount or any other proxy.",
     ].join(" ");
 
     const followUpRules = [
@@ -1698,6 +1994,13 @@ Return only structured output.`,
       );
     }
 
+    // Added last so the record on screen is the freshest thing in the prompt, but
+    // still below the explicit follow-up focus above — if the previous turn pinned a
+    // different record, that one wins.
+    if (pageContextRules) {
+      sections.push(pageContextRules);
+    }
+
     return sections.filter(Boolean).join("\n\n");
   },
   async getToolDefinitions() {
@@ -1713,9 +2016,13 @@ Return only structured output.`,
 
     if (!hasPermission(context.profileName, intent.requiredPermission)) {
       // Phrased for the chat surface: the message is what the user sees when a
-      // request falls outside their profile's rights.
-      throw new Error(
-        `Your ${context.profileName || "current"} profile does not have access to this information in the LMS, so I can't answer that. (Required right: ${intent.requiredPermission}.)`
+      // request falls outside their profile's rights. Typed so the transport can
+      // answer 403 rather than 500 — being declined is the assistant working.
+      // The required right is deliberately not shown to the user; it means nothing
+      // to a teacher and reads as a fault. It stays on the error for the logs.
+      throw new ConversationPermissionError(
+        `Your ${context.profileName || "current"} profile does not have access to this information, so I can't answer that. Ask an administrator if you need it.`,
+        { requiredPermission: intent.requiredPermission, role: context.role }
       );
     }
   },

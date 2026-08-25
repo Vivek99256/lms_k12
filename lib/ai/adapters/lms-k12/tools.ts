@@ -53,6 +53,12 @@ import { resolveStandard } from "./resolve-standard";
 import { resolveDivision } from "./resolve-division";
 import { resolveStudentQuota } from "./resolve-student-quota";
 import { callBackendMcpTool } from "./mcp-server";
+// Shared intelligence layer: signals, cases, explanations, recommendations and the
+// human approval gate. Additive — nothing existing changes behaviour.
+import {
+  INTELLIGENCE_TOOL_NAMES,
+  getIntelligenceToolDefinitions,
+} from "./intelligence-tools";
 import {
   MODULE_DATA_TOOL_NAMES,
   getAttendanceOverview,
@@ -1371,10 +1377,28 @@ async function searchStudents(
 
   const filtered = filterStudentRows(rows, input);
 
+  // What was actually filtered on, so the summary can say why a search came back
+  // empty. Without this, "21 students returned, 0 matched" and "the institute has no
+  // students" produce the same sentence, and only one of them is true.
+  const criteria = Object.fromEntries(
+    Object.entries({
+      name: input.studentName,
+      enrollmentNo: input.enrollmentNo,
+      rollNo: input.rollNo,
+      mobileNo: input.mobileNo,
+      standard: input.standard,
+      division: input.division,
+    }).filter(([, value]) => typeof value === "string" && value.trim().length > 0)
+  );
+
   return {
     source: "lms_backend",
     students: filtered.slice(0, 25),
     totalCount: filtered.length,
+    criteria,
+    // How many were in scope before filtering — the difference between "none exist"
+    // and "none matched".
+    availableCount: rows.length,
     payload,
   };
 }
@@ -2634,6 +2658,10 @@ export function getLmsToolDefinitions(): ProjectToolDefinition[] {
       requiredPermissions: ["admission:enquiry:read"],
       riskLevel: "medium",
       requiresConfirmation: true,
+      // Names the enquiry so the person confirming can see which one they are
+      // admitting, rather than agreeing to an unidentified record.
+      confirmationMessage: (input: z.infer<typeof admissionConfirmInputSchema>) =>
+        `Confirm admission for enquiry ${input.enquiryId || input.id}? This admits the student and cannot be undone from here.`,
       capabilities: ["confirm_admission_action", "admission_confirmation"],
       execute: confirmAdmissionCandidate,
     },
@@ -2673,6 +2701,10 @@ export function getLmsToolDefinitions(): ProjectToolDefinition[] {
     // Directory, catalogue, attendance, department, fee-summary and analysis
     // tools for the modules that had no conversational coverage before.
     ...getModuleDataToolDefinitions(),
+    // Signals, cases, evidence-backed explanations, recommendations, the approval
+    // gate and knowledge-graph traversal. Their descriptions tell the model when NOT
+    // to reach for them, so simple lookups stay on the cheaper tools above.
+    ...getIntelligenceToolDefinitions(),
   ];
 }
 
@@ -2702,7 +2734,11 @@ export function getAllowedToolNamesForProfile(profileName?: string) {
       "getTeacherDailyReport",
       "searchStudents",
       ...MODULE_DATA_TOOL_NAMES.read,
-      ...MODULE_DATA_TOOL_NAMES.analysis
+      ...MODULE_DATA_TOOL_NAMES.analysis,
+      // Teachers may read cases and run risk analysis over students they can
+      // already see; the backend scopes every row regardless.
+      ...INTELLIGENCE_TOOL_NAMES.read,
+      ...INTELLIGENCE_TOOL_NAMES.analysis
     );
   }
 
@@ -2716,7 +2752,11 @@ export function getAllowedToolNamesForProfile(profileName?: string) {
       "updateAdmissionCandidateDetails",
       "findStudentFeeRecord",
       "getStudentFeeDetails",
-      ...MODULE_DATA_TOOL_NAMES.admin
+      ...MODULE_DATA_TOOL_NAMES.admin,
+      // Raw signal inspection and the approval action stay with administrators.
+      // Approving still writes a decision against the authenticated user and is
+      // re-checked by the backend before anything executes.
+      ...INTELLIGENCE_TOOL_NAMES.admin
     );
   }
 

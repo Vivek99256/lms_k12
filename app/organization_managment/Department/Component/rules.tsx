@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 
 import AiGenerationDrawer from "./ai-generation-drawer";
 import type { AiGeneratedDocumentSave } from "./ai-generation-drawer";
@@ -417,9 +418,18 @@ function RuleForm({
       <div className="space-y-1.5">
         <label
           htmlFor="rule-description"
-          className="text-[13px] font-semibold text-[#061632]"
+          className="flex items-center justify-between text-[13px] font-semibold text-[#061632]"
         >
           Rule Logic / Description
+          <AiFieldAssistant
+            value={description}
+            onApply={setDescription}
+            fieldType="policy"
+            label="Rule description"
+            module="institute-detail"
+            page="Rules"
+            entityType="rule"
+          />
         </label>
         <Textarea
           id="rule-description"

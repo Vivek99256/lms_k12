@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Textarea } from '@/components/ui/textarea';
 
 /**
@@ -417,10 +418,22 @@ function ScenarioCreateContent() {
                 {modalError ? <p className="mt-1 text-xs text-red-600">{modalError}</p> : null}
               </div>
               <div>
-                <Label htmlFor="point-description">
-                  Description
-                  <span className="text-xs font-normal text-slate-400">HTML supported</span>
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="point-description">
+                    Description
+                    <span className="text-xs font-normal text-slate-400">HTML supported</span>
+                  </Label>
+                  <AiFieldAssistant
+                    value={modal.description}
+                    onApply={(next) => setModal({ ...modal, description: next })}
+                    fieldType="lesson_content"
+                    label="Hotspot description"
+                    module="h5p"
+                    page="Scenario based"
+                    entityType="h5p_scenario_point"
+                    related={{ 'Hotspot title': modal.title ?? '' }}
+                  />
+                </div>
                 <Textarea
                   id="point-description"
                   rows={4}

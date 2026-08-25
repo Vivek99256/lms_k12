@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import {
   EmptyTableRow,
   Field,
@@ -916,6 +917,17 @@ export default function BookResourcesPage() {
                           if (field.field_type === 'textarea') {
                             return (
                               <Field key={field.field_name} label={field.field_label}>
+                                <div className="mb-1 flex justify-end">
+                                  <AiFieldAssistant
+                                    value={Array.isArray(value) ? value.join(', ') : String(value ?? '')}
+                                    onApply={(next) => updateCustomValue(field.field_name, next)}
+                                    fieldType="description"
+                                    label={field.field_label}
+                                    module="library"
+                                    page="Book resources"
+                                    entityType="book_resource"
+                                  />
+                                </div>
                                 <textarea
                                   value={Array.isArray(value) ? value.join(', ') : String(value ?? '')}
                                   onChange={(event) => updateCustomValue(field.field_name, event.target.value)}

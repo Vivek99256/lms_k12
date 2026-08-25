@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Banknote, CalendarDays, ChevronDown, History, Loader2, Printer } from 'lucide-react';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -146,6 +147,47 @@ export default function FeesCollectionStudentPage() {
   const [receiptHtml, setReceiptHtml] = useState('');
   const [printReceiptOnLoad, setPrintReceiptOnLoad] = useState(false);
   const [printViewOpen, setPrintViewOpen] = useState(false);
+
+  /*
+   * Tell the assistant which student this is and what their fee position looks like.
+   *
+   * The route already maps to the student entity, so the assistant knew *who* before
+   * this. What it did not know was the figures on screen, which is the difference
+   * between "I can look that up" and answering "why does this balance look wrong?"
+   * about the balance the user is pointing at.
+   *
+   * Only settled figures are registered — the summary rows and the pending total, all
+   * of which came from the backend. Nothing in the unsaved payment form is included:
+   * a discount the user is midway through typing is not a fact about the record.
+   */
+  useRegisterPageAiContext(
+    useMemo(
+      () =>
+        student
+          ? {
+              pageTitle: 'Fee collection',
+              pageType: 'detail' as const,
+              entityType: 'student',
+              entityId: studentId,
+              metrics: [
+                { key: 'pending_fees', label: 'Pending fees', value: student.pendingFees, unit: 'INR' },
+                ...summaryRows.map((row) => ({
+                  key: `remaining_${row.label.toLowerCase().replace(/\s+/g, '_')}`,
+                  label: `${row.label} remaining`,
+                  value: row.remaining,
+                  unit: 'INR',
+                })),
+              ],
+              availableActions: [
+                { key: 'collect_fees', label: 'Collect a fee payment' },
+                { key: 'apply_discount', label: 'Apply a discount or fine' },
+                { key: 'print_receipt', label: 'Print a receipt' },
+              ],
+            }
+          : null,
+      [student, studentId, summaryRows]
+    )
+  );
 
   const clearCollectionData = useCallback((message: string) => {
     setStudent(null);

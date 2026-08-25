@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   conversationRequestSchema,
   generateConversationResponse,
+  isConversationPermissionError,
   streamConversationResponse,
 } from "@shared/conversational-ai-core";
 import { resolveProjectAdapter } from "@/lib/ai/project-resolver";
@@ -265,6 +266,35 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    // A permission refusal is the assistant working, not failing. Log it quietly,
+    // answer 403, and hand the surface a normal assistant reply so the user reads a
+    // sentence rather than a red crash banner.
+    if (isConversationPermissionError(error)) {
+      console.info("[ai/chat] permission refused", {
+        requiredPermission: error.requiredPermission,
+        role: error.role,
+      });
+
+      return NextResponse.json(
+        {
+          message: {
+            id: `assistant-${Date.now()}`,
+            role: "assistant" as const,
+            content: error.message,
+          },
+          response: {
+            message: error.message,
+            conversationType: "ask",
+            status: "failed",
+            toolExecutions: [],
+            activeTools: [],
+          },
+          code: "AI_PERMISSION_DENIED",
+        },
+        { status: 403 }
+      );
+    }
+
     console.error("[ai/chat] route failure", error);
     const message = getErrorMessage(error);
 

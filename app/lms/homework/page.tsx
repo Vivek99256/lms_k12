@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import {
   Table,
   TableBody,
@@ -282,7 +283,21 @@ export default function StudentHomeworkPage() {
               />
             </div>
             <div className="space-y-2 md:col-span-2 xl:col-span-3">
-              <Label htmlFor="hw-desc">Description</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="hw-desc">Description</Label>
+                <AiFieldAssistant
+                  value={description}
+                  onApply={setDescription}
+                  fieldType="instructions"
+                  label="Homework description"
+                  module="lms"
+                  page="Homework"
+                  entityType="homework"
+                  grade={standardName}
+                  subject={subjectName}
+                  related={{ "Homework title": title }}
+                />
+              </div>
               <Textarea
                 id="hw-desc"
                 value={description}

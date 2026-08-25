@@ -33,15 +33,31 @@ import {
   routeModuleWorkflow,
   shouldContinueModuleWorkflow,
 } from "./module-workflow-routing";
+import {
+  buildCitations,
+  buildPlan,
+  describePlan,
+  findBlockingGap,
+  questionBlockedByGap,
+  stepBudgetFor,
+  toolsFromPlan,
+} from "./planner";
 import { getLatestUserMessage } from "./context";
 import { createAiModel } from "./model";
 import type { ConversationalResponse } from "./response-schema";
-import type { ConversationRequest } from "./schemas";
+import type { ConversationIntent, ConversationRequest } from "./schemas";
 import type {
   PreparedConversation,
   ProjectAIAdapter,
+  ProjectContext,
+  ProjectToolDefinition,
 } from "./types";
-import { createProjectTools } from "./tools";
+import {
+  createProjectTools,
+  describeConfirmation,
+  isPendingConfirmation,
+  type PendingConfirmation,
+} from "./tools";
 
 function mentionsProviderRateLimit(text: string) {
   return /rate.?limit|quota|temporarily rate-limited|provider .*limited/i.test(text);
@@ -155,6 +171,35 @@ function inferDivision(message: string) {
   return match ? match[1].trim() : null;
 }
 
+/**
+ * Words that describe *how to identify* a student rather than naming one.
+ *
+ * "Find a student by name." used to yield the name "by name.", because the
+ * `student\s+(...)$` pattern happily captured whatever followed the word "student".
+ * That string then matched nobody, so a search over 21 real students returned zero and
+ * the assistant reported "I could not find a matching student" — a false negative
+ * caused entirely by the criteria, not the data.
+ *
+ * No real person's name contains these, so rejecting a candidate that mentions one is
+ * safe and stops instruction text being mistaken for an identity.
+ */
+const NON_NAME_TOKENS =
+  /\b(name|names|named|enrol?lment|enrol?ment|number|roll|mobile|phone|email|profile|details?|record|records|information|info|id|gr\.?no|grno|standard|division|section|grade|class|students?|learners?|risk|attendance|performance|marks|results?|report|fees?|defaulters?|pending|homework|exam|list|everyone|all)\b/i;
+
+function isPlausiblePersonName(candidate: string) {
+  if (candidate.length < 2) {
+    return false;
+  }
+
+  // Must contain at least one letter run that is not a stop word.
+  if (NON_NAME_TOKENS.test(candidate)) {
+    return false;
+  }
+
+  // "a", "the", "me" and similar leftovers are not names.
+  return !/^(a|an|the|me|it|this|that|them|him|her|someone|anyone)$/i.test(candidate.trim());
+}
+
 function inferStudentName(message: string) {
   const normalizedMessage = message.replace(
     /\b(for|of|to)(?=[A-Z][a-z])/g,
@@ -162,8 +207,17 @@ function inferStudentName(message: string) {
   );
   const patterns = [
     /\b(?:collect fees?|pay fees?|fee collection)\s+(?:for\s+)?([a-z][a-z\s.'-]{1,60})$/i,
+    // "the student named X", "a learner called X"
+    /\b(?:named|called)\s+([a-z][a-z\s.'-]{1,60})[?.!]?$/i,
+    // "the profile of X", "details for X"
+    /\b(?:profile|details?|record|information)\s+(?:of|for)\s+([a-z][a-z\s.'-]{1,60})[?.!]?$/i,
+    // "X's details", "X's profile"
+    /\b([a-z][a-z\s.'-]{1,60}?)'s\s+(?:details?|profile|record|information)\b/i,
     /\b(?:student|learner)\s+([a-z][a-z\s.'-]{1,60})$/i,
     /\bfor\s+([a-z][a-z\s.'-]{1,60})$/i,
+    // Bare "Find Raj Patel" / "Open Sonika P Pansuriya". Last, and only safe because
+    // NON_NAME_TOKENS rejects "students at risk", "fees defaulters" and the like.
+    /\b(?:find|search|lookup|look\s+up|open|show)\s+([a-z][a-z\s.'-]{1,60})[?.!]?$/i,
   ];
 
   for (const pattern of patterns) {
@@ -171,9 +225,16 @@ function inferStudentName(message: string) {
     if (match?.[1]) {
       const candidate = match[1]
         .trim()
-        .replace(/^(?:for|of|to)\s+/i, "")
+        // The capture classes include spaces, so a possessive like "X's details"
+        // otherwise drags the whole lead-in ("I want to see Darshna…") into the name.
+        .replace(
+          /^(?:i\s+(?:want|need|would\s+like)\s+to\s+see|show\s+me|please\s+show|can\s+you\s+(?:show|find|get)|let\s+me\s+see|give\s+me|display|open|find|get|see)\s+/i,
+          ""
+        )
+        .replace(/^(?:for|of|to|a|an|the)\s+/i, "")
+        .replace(/[?.!]+$/, "")
         .trim();
-      if (!/\b(standard|division|section|grade|class)\b/i.test(candidate)) {
+      if (isPlausiblePersonName(candidate)) {
         return candidate;
       }
     }
@@ -281,16 +342,98 @@ function rememberConversationFocus(
   );
 }
 
-function getWorkflowSessionIds(prepared: PreparedConversation) {
-  const userId = prepared.context.userId || "anonymous";
+function getWorkflowSessionIdsFromContext(context: ProjectContext) {
+  const userId = context.userId || "anonymous";
   const conversationId =
-    prepared.context.conversationId ||
-    prepared.context.request.context?.conversationId ||
-    userId;
+    context.conversationId || context.request.context?.conversationId || userId;
   return {
     userId,
     conversationId,
   };
+}
+
+function getWorkflowSessionIds(prepared: PreparedConversation) {
+  return getWorkflowSessionIdsFromContext(prepared.context);
+}
+
+/**
+ * Which module a tool belongs to.
+ *
+ * Derived from the tool rather than the intent because the tool name is
+ * unambiguous, and an intent's capability is not: "data_analysis" spans every
+ * module. Anything not listed is deliberately absent — an unknown tool yields no
+ * module, and no module means the stale-state guard below leaves the flow alone.
+ */
+export function moduleForTool(toolName: string | undefined): string | null {
+  if (!toolName) {
+    return null;
+  }
+
+  if (/^(getFeesSummary|listFeesDefaulters|findStudentFeeRecord|getStudentFeeDetails)$/.test(toolName)) {
+    return "fees";
+  }
+  if (/Admission/i.test(toolName)) {
+    return "admissions";
+  }
+  if (/^getDepartment/.test(toolName)) {
+    return "hrms";
+  }
+  if (/^(getStudentDirectory|searchStudents|getStudentAttendanceDetail)$/.test(toolName)) {
+    return "student";
+  }
+  if (/^(findStudentsAtRisk|explainStudentRisk|listIntelligenceCases|listOpenSignals|listRecommendationsAwaitingApproval|approveRecommendationAction)$/.test(toolName)) {
+    return "intelligence";
+  }
+
+  return null;
+}
+
+/**
+ * Drops a half-finished flow that the new question has clearly moved away from.
+ *
+ * Without this, an abandoned fee-collection or admission flow keeps claiming every
+ * later message: "How many students are enrolled?" came back as "Fee collection is
+ * ready for Unknown student", because the open flow answered before the question
+ * was read.
+ *
+ * Deliberately conservative — it clears only when the new intent names a tool from
+ * a *different* module. A contextual follow-up ("why?", "and for Standard 8") and a
+ * bare slot answer ("GREEVA RAFALIYA, 7, 102") resolve to no tool, so no module can
+ * be derived and slot collection is never interrupted.
+ *
+ * The module mismatch is the whole test, deliberately. `isContextualFollowUp` looks
+ * like the natural guard here and is not usable for it: it treats any short question
+ * opening with why/what/which/who/how as a follow-up, so "How many students are
+ * enrolled?" reads as a continuation of whatever came before — which is the very
+ * confusion this function exists to undo.
+ */
+export function clearStaleWorkflowState(
+  context: ProjectContext,
+  intent: ConversationIntent
+) {
+  const ids = getWorkflowSessionIdsFromContext(context);
+  const state = getConversationWorkflowState(
+    context.projectId,
+    ids.userId,
+    ids.conversationId
+  );
+
+  if (!state || !state.module) {
+    return;
+  }
+
+  // A finished flow cannot hijack anything.
+  if (["idle", "completed", "failed"].includes(state.currentStage)) {
+    return;
+  }
+
+  const nextModule = moduleForTool(intent.suggestedTool);
+
+  if (!nextModule || nextModule === state.module) {
+    return;
+  }
+
+  clearConversationWorkflowState(context.projectId, ids.userId, ids.conversationId);
 }
 
 function resolveWorkflowSelection(
@@ -342,6 +485,64 @@ function getSelectedRecord(
  * inferred from the raw message. Backend values always win, so information the
  * conversation already resolved is never asked for again.
  */
+/**
+ * Confirmation for the deterministic path.
+ *
+ * `createProjectTools` gates tools the *model* calls. It cannot gate this path,
+ * which resolves a tool from the intent and calls `definition.execute()` straight
+ * out — so an "approve recommendation 7" that never reached the model executed with
+ * no confirmation at all. Both routes have to answer to the same rule, or the gate
+ * is only as strong as whichever route the question happens to take.
+ *
+ * Returns the response to send instead of executing, or null to proceed.
+ */
+function directConfirmationResponse(
+  prepared: PreparedConversation,
+  definition: ProjectToolDefinition,
+  input: unknown
+): ConversationalResponse | null {
+  if (!definition.requiresConfirmation) {
+    return null;
+  }
+
+  const confirmed = new Set(prepared.context.request.context?.confirmedTools || []);
+
+  if (confirmed.has(definition.name)) {
+    return null;
+  }
+
+  const message = describeConfirmation(definition, input);
+
+  recordAuditEvent(
+    "conversation.confirmation_required",
+    {
+      projectId: prepared.adapter.projectId,
+      capability: prepared.intent.capability,
+      tool: definition.name,
+      riskLevel: definition.riskLevel,
+      path: "deterministic",
+    },
+    { userId: prepared.context.userId, organizationId: prepared.context.orgId }
+  );
+
+  return {
+    message,
+    conversationType: prepared.intent.type,
+    status: "requires_confirmation",
+    confirmation: {
+      action: definition.name,
+      riskLevel: definition.riskLevel,
+      message,
+      parameters: (input ?? {}) as Record<string, unknown>,
+    },
+    toolExecutions: [
+      { tool: definition.name, status: "planned", summary: "Awaiting your confirmation." },
+    ],
+    intent: prepared.intent,
+    activeTools: prepared.activeTools,
+  };
+}
+
 function mergeToolInput(
   inferred: Record<string, unknown> | null,
   contextInput: Record<string, unknown> | undefined
@@ -693,11 +894,31 @@ async function getFallbackToolInput(prepared: PreparedConversation, toolName: st
     workflowIds.conversationId
   );
 
+  // The id the user named, carried on the intent by the classifier. Read here rather
+  // than re-parsed, so the sentence is interpreted once.
+  const targetId = prepared.intent.entities?.targetId;
+  const decision = prepared.intent.entities?.decision;
+
   switch (toolName) {
     case "getLmsDashboard":
     case "getActivityStream":
     case "getContextualSuggestions":
       return {};
+    case "listWorkflowApprovals":
+    case "listRecommendationsAwaitingApproval":
+      return {};
+    case "approveRecommendationAction":
+      // Returning undefined rather than a partial object matters: an incomplete
+      // input fails schema validation and surfaces as a raw zod error, whereas no
+      // input lets the model ask which recommendation is meant.
+      return typeof targetId === "number" ? { recommendationId: targetId } : null;
+    case "resolveWorkflowApproval":
+      return typeof targetId === "number"
+        ? {
+            approvalId: targetId,
+            decision: decision === "rejected" ? "rejected" : "approved",
+          }
+        : null;
     case "listFeesDefaulters":
       // Carries the class the conversation is already on, so "what about their
       // fees?" after a class answer stays scoped to that class.
@@ -1403,6 +1624,124 @@ function summarizeToolBackedResult(
 
   const toolName = latestToolResult?.toolName || prepared.activeTools.at(-1);
 
+  /*
+   * Intelligence narration.
+   *
+   * Without these the deterministic path had nothing to say about an agent run and
+   * fell back to "I completed the requested LMS action." — a sentence that discards
+   * the finding, the reasoning and the fact that a decision is now pending. The data
+   * was all present in the payload; only the wording was missing, which is the worst
+   * version of the problem because it reads as though nothing happened.
+   */
+  if (toolName === "findStudentsAtRisk") {
+    const findings = Array.isArray(data.findings) ? data.findings : [];
+
+    if (findings.length === 0) {
+      return "No students are showing academic risk signals in the current scope.";
+    }
+
+    const lines = findings.slice(0, 5).map((raw) => {
+      const finding = raw as Record<string, any>;
+      const parts = [
+        `${finding.student}${finding.class ? ` (${finding.class})` : ""} — ${finding.severity} risk.`,
+      ];
+
+      if (finding.why) {
+        parts.push(finding.why);
+      }
+
+      // The hypothesis is the agent's reading, so it is labelled as one rather than
+      // stated alongside the measurement as if it were equally certain.
+      if (finding.likely_cause?.statement) {
+        const confidence = finding.likely_cause.confidence;
+        parts.push(
+          `Likely cause: ${finding.likely_cause.statement}${
+            typeof confidence === "number"
+              ? ` (${Math.round(confidence * 100)}% confidence)`
+              : ""
+          }`
+        );
+      }
+
+      if (finding.recommendation?.title) {
+        parts.push(
+          `Recommendation #${finding.recommendation.id}: ${finding.recommendation.title} — awaiting approval.`
+        );
+      }
+
+      return parts.join(" ");
+    });
+
+    const header =
+      findings.length === 1
+        ? "1 student is showing academic risk."
+        : `${findings.length} students are showing academic risk.`;
+
+    return [header, ...lines, "Nothing has been created yet — each recommendation needs approval."].join(
+      "\n\n"
+    );
+  }
+
+  if (toolName === "explainStudentRisk") {
+    if (data.found === false) {
+      return typeof data.message === "string" ? data.message : null;
+    }
+
+    const parts: string[] = [];
+
+    if (typeof data.explanation === "string" && data.explanation) {
+      parts.push(data.explanation);
+    } else if (typeof data.explanation_withheld === "string") {
+      parts.push(data.explanation_withheld);
+    }
+
+    const hypotheses = Array.isArray(data.hypotheses) ? data.hypotheses : [];
+
+    for (const raw of hypotheses.slice(0, 2)) {
+      const hypothesis = raw as Record<string, any>;
+      parts.push(
+        `${hypothesis.status === "refuted" ? "Ruled out" : "Likely cause"}: ${hypothesis.statement}${
+          hypothesis.rationale ? ` ${hypothesis.rationale}` : ""
+        }`
+      );
+    }
+
+    return parts.length > 0 ? parts.join("\n\n") : null;
+  }
+
+  if (toolName === "approveRecommendationAction") {
+    const workflow = data.workflow as Record<string, any> | null;
+
+    return [
+      `Approved: ${data.recommendation}.`,
+      workflow?.awaiting
+        ? `The process has started and is waiting at its next step (${workflow.awaiting}). Nothing has been created yet.`
+        : "The process has started.",
+    ].join(" ");
+  }
+
+  if (toolName === "resolveWorkflowApproval") {
+    return typeof data.outcome === "string" ? data.outcome : null;
+  }
+
+  if (toolName === "listWorkflowApprovals") {
+    const approvals = Array.isArray(data.approvals) ? data.approvals : [];
+
+    if (approvals.length === 0) {
+      return "Nothing is waiting on you — no workflow step needs a decision.";
+    }
+
+    return [
+      approvals.length === 1
+        ? "1 step is waiting on you:"
+        : `${approvals.length} steps are waiting on you:`,
+      ...approvals.slice(0, 10).map((raw) => {
+        const approval = raw as Record<string, any>;
+        return `Approval #${approval.approval_id} — ${approval.step} on ${approval.workflow}.`;
+      }),
+    ].join("\n");
+  }
+
   if (toolName === "listHomework") {
     const count =
       typeof data.count === "number"
@@ -1631,8 +1970,36 @@ function summarizeToolBackedResult(
       return null;
     }
 
+    const criteria =
+      data.criteria && typeof data.criteria === "object"
+        ? (data.criteria as Record<string, unknown>)
+        : {};
+    const criteriaLabels: Record<string, string> = {
+      name: "name",
+      enrollmentNo: "enrollment number",
+      rollNo: "roll number",
+      mobileNo: "mobile number",
+      standard: "standard",
+      division: "division",
+    };
+    const describedCriteria = Object.entries(criteria)
+      .map(([key, value]) => `${criteriaLabels[key] || key} "${String(value)}"`)
+      .join(", ");
+    const available =
+      typeof data.availableCount === "number" ? data.availableCount : null;
+
     if (count === 0) {
-      return "I searched the student records, but I could not find a matching student.";
+      // Say which of the two happened. Reporting "no matching student" when 21 were in
+      // scope but none matched the criteria hides the fact that the criteria were wrong.
+      if (describedCriteria) {
+        return `I couldn't find a student matching ${describedCriteria}${
+          available ? ` among the ${available} students in scope` : ""
+        }. Try a different spelling, or give me an enrollment or roll number.`;
+      }
+
+      return available === 0
+        ? "There are no student records in scope for this academic year."
+        : "I searched the student records, but I could not find a matching student.";
     }
 
     const students = Array.isArray(data.students)
@@ -1647,7 +2014,15 @@ function summarizeToolBackedResult(
         return `${name}${standard ? `, Standard ${standard}` : ""}${division ? ` ${division}` : ""}`;
       });
 
-    return `I found ${count} matching student record(s). ${highlights.join("; ")}.`;
+    // With no criteria the caller asked to see the roll, so name the scope rather than
+    // implying these are search hits.
+    if (!describedCriteria) {
+      return `There are ${count} students in scope. ${highlights.join("; ")}${
+        count > highlights.length ? `, and ${count - highlights.length} more` : ""
+      }. Tell me a name, enrollment number or roll number to narrow it down.`;
+    }
+
+    return `I found ${count} student${count === 1 ? "" : "s"} matching ${describedCriteria}. ${highlights.join("; ")}.`;
   }
 
   if (toolName === "findStudentFeeRecord") {
@@ -2790,6 +3165,12 @@ async function executePreferredTool(
   }
 
   const parsedInput = definition.inputSchema.parse(inferredInput ?? {});
+
+  const needsConfirmation = directConfirmationResponse(prepared, definition, parsedInput);
+  if (needsConfirmation) {
+    return needsConfirmation;
+  }
+
   let directResult: unknown;
 
   try {
@@ -2910,6 +3291,41 @@ async function executePreferredTool(
   rememberConversationFocus(prepared, toolName, parsedInput, directResult);
 
   const toolResult = normalizeDirectToolResult(directResult);
+
+  // The tool answered, but not the question that was asked. Say so instead of
+  // narrating the figures it did return — a headcount presented in reply to a
+  // question about training reads as an answer about training.
+  const gap = questionBlockedByGap(
+    prepared.context.latestUserMessage.content,
+    directResult
+  );
+
+  if (gap) {
+    recordAuditEvent(
+      "conversation.refused_no_data",
+      {
+        projectId: prepared.adapter.projectId,
+        capability: prepared.intent.capability,
+        tool: toolName,
+        missing: gap.missing,
+      },
+      { userId: prepared.context.userId, organizationId: prepared.context.orgId }
+    );
+
+    return {
+      message: gap.reason,
+      conversationType: prepared.intent.type,
+      status: "completed",
+      toolExecutions: [
+        { tool: toolName, status: "completed", summary: "Checked; the required data is not recorded." },
+      ],
+      citations: buildCitations([{ toolName, output: toolResult }]),
+      data: { unavailableSignals: gap.missing },
+      intent: prepared.intent,
+      activeTools: prepared.activeTools,
+    };
+  }
+
   const summary =
     summarizeToolBackedResult(prepared, [{ toolName, output: toolResult }]) ||
     "I completed the requested LMS action.";
@@ -3526,6 +3942,12 @@ async function executeQuotaFallback(
   }
 
   const parsedInput = definition.inputSchema.parse(inferredInput);
+
+  const needsConfirmation = directConfirmationResponse(prepared, definition, parsedInput);
+  if (needsConfirmation) {
+    return needsConfirmation;
+  }
+
   let directResult: unknown;
 
   try {
@@ -3544,6 +3966,31 @@ async function executeQuotaFallback(
   }
 
   const toolResult = normalizeDirectToolResult(directResult);
+
+  // The same refusal as the other two execution paths. This one matters most: it
+  // runs when the model is unavailable, which is exactly when there is no prompt
+  // rule left to hold the line and the temptation to narrate whatever came back is
+  // strongest.
+  const quotaGap = questionBlockedByGap(
+    prepared.context.latestUserMessage.content,
+    directResult
+  );
+
+  if (quotaGap) {
+    return {
+      message: quotaGap.reason,
+      conversationType: prepared.intent.type,
+      status: "completed",
+      data: { unavailableSignals: quotaGap.missing },
+      toolExecutions: [
+        { tool: toolName, status: "completed", summary: "Checked; the required data is not recorded." },
+      ],
+      citations: buildCitations([{ toolName, output: toolResult }]),
+      intent: prepared.intent,
+      activeTools: prepared.activeTools,
+    };
+  }
+
   const fallbackMessage =
     summarizeToolBackedResult(prepared, [{ toolName, output: toolResult }]) ||
     buildLocalizedMessage(
@@ -3586,18 +4033,52 @@ export async function prepareConversation(
   const intent = await adapter.classifyIntent(context);
   await adapter.validatePermission(intent, context);
 
+  // Before any tool is built: drop a half-finished flow the question has moved on
+  // from, so an abandoned fee or admission workflow cannot answer in its place.
+  clearStaleWorkflowState(context, intent);
+
   const allowedTools = await adapter.getAllowedToolNames(context);
   const definitions = await adapter.getToolDefinitions(context);
-  const activeTools = shouldBypassTools(intent)
-    ? []
-    : intent.suggestedTool && allowedTools.includes(intent.suggestedTool)
-      ? [intent.suggestedTool]
-      : allowedTools;
+  const bypass = shouldBypassTools(intent);
+
+  // Plan before choosing tools.
+  //
+  // This replaces a narrowing that handed the model exactly one tool whenever the
+  // classifier named a `suggestedTool` — which made the answering step incapable of
+  // anything the classifier had not already decided, and left comparative questions
+  // answerable only from whichever single dataset it picked. `suggestedTool` is now
+  // a hint to the planner rather than a verdict.
+  //
+  // A null plan (planning skipped, refused or invalid) falls through to the full
+  // allowed set, so this can never offer less than the old behaviour.
+  // Plan only for turns that will actually reach the model.
+  //
+  // A deterministic single-tool lookup ("how many students are there?") resolves its
+  // tool from the intent and calls it directly, never consulting a plan — so
+  // planning those was a second LLM call per turn whose result was discarded. The
+  // turns that need a plan are the ones with no single obvious tool, and the
+  // analytical ones deliberately handed to the model to reason over.
+  const needsPlan =
+    !bypass &&
+    (!intent.suggestedTool || LLM_REASONING_TOOLS.includes(intent.suggestedTool));
+
+  const plan = needsPlan
+    ? await (adapter.buildPlan
+        ? adapter.buildPlan({ context, intent, allowedTools, toolDefinitions: definitions })
+        : buildPlan({ context, intent, allowedTools, toolDefinitions: definitions }))
+    : null;
+
+  const activeTools = bypass ? [] : toolsFromPlan(plan, allowedTools);
   const tools = createProjectTools(
     definitions.filter((definition) => activeTools.includes(definition.name)),
     context
   );
-  const systemPrompt = await adapter.buildSystemPrompt(context, intent);
+
+  const basePrompt = await adapter.buildSystemPrompt(context, intent);
+  const planInstructions = describePlan(plan);
+  const systemPrompt = planInstructions
+    ? `${basePrompt}\n\n${planInstructions}`
+    : basePrompt;
 
   recordAuditEvent(
     "conversation.request",
@@ -3606,6 +4087,7 @@ export async function prepareConversation(
       intentType: intent.type,
       capability: intent.capability,
       activeTools,
+      planSteps: plan ? plan.steps.map((step) => step.tool) : null,
       messageCount: messages.length,
     },
     {
@@ -3618,6 +4100,7 @@ export async function prepareConversation(
     adapter,
     context,
     intent,
+    plan,
     systemPrompt,
     activeTools,
     tools,
@@ -3725,7 +4208,7 @@ export async function generateConversationResponse(
       model: createAiModel(),
       system: prepared.systemPrompt,
       messages,
-      stopWhen: stepCountIs(6),
+      stopWhen: stepCountIs(stepBudgetFor(prepared.plan)),
       maxRetries: 0,
       tools: prepared.tools,
       activeTools: prepared.activeTools,
@@ -3750,6 +4233,109 @@ export async function generateConversationResponse(
         (toolResult as { input?: unknown }).input,
         data ?? output
       );
+    }
+
+    // A consequential tool was reached but not confirmed. Stop here and put the
+    // decision back to the user, rather than reporting an action that did not
+    // happen — or, worse, performing one they never agreed to.
+    const pending = result.toolResults
+      .map((toolResult) => {
+        const output = toolResult.output as Record<string, unknown> | undefined;
+        return isPendingConfirmation(output)
+          ? output
+          : isPendingConfirmation(output?.data)
+            ? (output.data as PendingConfirmation)
+            : null;
+      })
+      .find(Boolean);
+
+    if (pending) {
+      const confirmationResponse: ConversationalResponse = {
+        message: pending.message,
+        conversationType: prepared.intent.type,
+        status: "requires_confirmation",
+        confirmation: {
+          action: pending.tool,
+          riskLevel: pending.riskLevel,
+          message: pending.message,
+          parameters: pending.parameters,
+        },
+        toolExecutions: [
+          { tool: pending.tool, status: "planned", summary: "Awaiting your confirmation." },
+        ],
+        intent: prepared.intent,
+        activeTools: prepared.activeTools,
+      };
+
+      recordAuditEvent(
+        "conversation.confirmation_required",
+        {
+          projectId: adapter.projectId,
+          capability: prepared.intent.capability,
+          tool: pending.tool,
+          riskLevel: pending.riskLevel,
+        },
+        { userId: prepared.context.userId, organizationId: prepared.context.orgId }
+      );
+
+      return confirmationResponse;
+    }
+
+    // The plan said this question needs data the tools have now reported they do
+    // not hold. Refuse on those grounds rather than letting the wording step reach
+    // for the nearest available number — that is how a headcount became an answer
+    // about training need. Enforced here rather than left to a prompt rule, because
+    // a prompt rule is exactly what failed.
+    const blockingGap = findBlockingGap(
+      prepared.plan,
+      result.toolResults.map((toolResult) => {
+        const output = toolResult.output as Record<string, unknown> | undefined;
+        return output && typeof output === "object" && "data" in output
+          ? output.data
+          : output;
+      })
+    );
+
+    if (blockingGap) {
+      const refusal: ConversationalResponse = {
+        message: blockingGap.reason,
+        conversationType: prepared.intent.type,
+        status: "completed",
+        toolExecutions: result.toolResults.map((toolResult) => ({
+          tool: toolResult.toolName || "unknown",
+          status: "completed" as const,
+          summary: "Checked; the required data is not recorded.",
+        })),
+        activeTools: prepared.activeTools,
+        intent: prepared.intent,
+        citations: buildCitations(
+          result.toolResults.map((toolResult) => ({
+            toolName: toolResult.toolName,
+            output: toolResult.output,
+          }))
+        ),
+        data: { unavailableSignals: blockingGap.missing },
+      };
+
+      appendConversationHistory({
+        sessionId,
+        userId,
+        messages: [
+          { id: `assistant-${Date.now()}`, role: "assistant", content: refusal.message },
+        ],
+      });
+
+      recordAuditEvent(
+        "conversation.refused_no_data",
+        {
+          projectId: adapter.projectId,
+          capability: prepared.intent.capability,
+          missing: blockingGap.missing,
+        },
+        { userId: prepared.context.userId, organizationId: prepared.context.orgId }
+      );
+
+      return refusal;
     }
 
     const fallbackMessage = summarizeToolBackedResult(prepared, result.toolResults);
@@ -3807,11 +4393,20 @@ export async function generateConversationResponse(
         "I completed the request, but there was no visible text to display.",
       conversationType: prepared.intent.type,
       status: "completed",
-      toolExecutions: prepared.activeTools.map((toolName) => ({
-        tool: toolName,
-        status: "completed",
-        summary: "Executed through the shared conversational AI pipeline.",
+      // Reports what actually ran. Listing every *offered* tool as "completed" —
+      // which is what this did before — overstated the answer's backing, and made a
+      // reply the model produced without calling anything look fully sourced.
+      toolExecutions: result.toolResults.map((toolResult) => ({
+        tool: toolResult.toolName || "unknown",
+        status: "completed" as const,
+        summary: "Returned live records from the backend.",
       })),
+      citations: buildCitations(
+        result.toolResults.map((toolResult) => ({
+          toolName: toolResult.toolName,
+          output: toolResult.output,
+        }))
+      ),
       followUpSuggestions: [
         "Ask a follow-up question.",
         "Refine the result with more filters.",
@@ -3921,7 +4516,7 @@ export async function streamConversationResponse(
       model: createAiModel(),
       system: prepared.systemPrompt,
       messages,
-      stopWhen: stepCountIs(6),
+      stopWhen: stepCountIs(stepBudgetFor(prepared.plan)),
       maxRetries: 0,
       tools: prepared.tools,
       activeTools: prepared.activeTools,
