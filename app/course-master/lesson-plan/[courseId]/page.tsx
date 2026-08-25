@@ -55,6 +55,9 @@ import {
   type SubjectWithChapters,
 } from '../../data/chapters';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
+import {
+  getTotalKeyConceptCount as getSharedTotalKeyConceptCount,
+} from '../../data/conceptCounts';
 import { useCurriculumMeta } from '../../data/curriculum';
 import type { LmsSubject } from '../../data/lmsCourses';
 import { getSemanticIntelligenceForSelection } from '../../data/semanticIntelligence';
@@ -80,6 +83,7 @@ function CreateLessonPlanDialog({
   lessonPlanDraft,
   lessonPlanDraftErrors,
   isSavingLessonPlan,
+  lessonPlanSaveError,
   setLessonPlanDraft,
   setLessonPlanDraftErrors,
   onSave,
@@ -106,6 +110,15 @@ function CreateLessonPlanDialog({
             <X size={18} />
           </button>
         </div>
+
+        {lessonPlanSaveError ? (
+          <div
+            role="alert"
+            className="mt-5 rounded-[10px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[14px] text-[#B91C1C]"
+          >
+            {lessonPlanSaveError}
+          </div>
+        ) : null}
 
         <div className="mt-6 space-y-5">
           <div>
@@ -387,6 +400,17 @@ type LessonPlanApiPeriod = {
   }[];
 };
 
+/**
+ * A slot from the institute's timetable period master
+ * (GET /api/intelligence/lesson-plan-lookup/periods). Saving a lesson needs a
+ * real slot, because lms_lesson_plan_periods stores one row per period.
+ */
+type PeriodOption = {
+  period_id: number;
+  title?: string | null;
+  short_name?: string | null;
+};
+
 type LessonPlanApiMeta = {
   id: number;
   plan_title?: string | null;
@@ -434,6 +458,7 @@ type CreateLessonPlanDialogProps = {
   lessonPlanDraft: LessonPlanDraft;
   lessonPlanDraftErrors: LessonPlanDraftErrors;
   isSavingLessonPlan: boolean;
+  lessonPlanSaveError: string;
   setLessonPlanDraft: React.Dispatch<React.SetStateAction<LessonPlanDraft>>;
   setLessonPlanDraftErrors: React.Dispatch<React.SetStateAction<LessonPlanDraftErrors>>;
   onSave: () => void | Promise<void>;
@@ -506,36 +531,16 @@ function getCourseGradeLabel(classGrade: string) {
 }
 
 /**
- * Concepts actually stored for a chapter. Prefers the concept rows the API
- * returned, and falls back to the semantic record's own total when the rows
- * weren't expanded in the response.
+ * Total key concepts for the course header. The counting rule is shared with the
+ * student header so both sections report the same number for the same subject;
+ * only the demo-course fallback is specific to this screen.
  */
-function getChapterConceptCount(chapter: Chapter): number {
-  const conceptRows = chapter.concepts?.length ?? 0;
-  if (conceptRows > 0) return conceptRows;
-
-  const semanticTotal = Number(chapter.semantic?.total_concepts);
-  return Number.isFinite(semanticTotal) && semanticTotal > 0 ? semanticTotal : 0;
-}
-
 function getTotalKeyConceptCount(course: Course, chapters: Chapter[], subject?: LmsSubject | null) {
-  const liveCount = chapters.reduce((total, chapter) => total + getChapterConceptCount(chapter), 0);
-  if (liveCount > 0) return liveCount;
-
-  // The catalog's own subject-level total, for when chapter rows omit their concepts.
-  const subjectTotal = Number(
-    subject?.key_concepts_count ??
-      subject?.key_concept_count ??
-      subject?.concepts_count ??
-      subject?.total_concepts ??
+  return getSharedTotalKeyConceptCount(chapters, subject, () =>
+    chapters.reduce(
+      (total, chapter) => total + (getChapterKeyConcepts(course.id, chapter.id)?.count ?? 0),
       0
-  );
-  if (Number.isFinite(subjectTotal) && subjectTotal > 0) return subjectTotal;
-
-  // Demo courses carry no API concepts; their sample set is the only source.
-  return chapters.reduce(
-    (total, chapter) => total + (getChapterKeyConcepts(course.id, chapter.id)?.count ?? 0),
-    0
+    )
   );
 }
 
@@ -695,8 +700,34 @@ function formatHourLabel(hour: number) {
   return `${normalizedHour} ${suffix}`;
 }
 
+/**
+ * Slot text comes from each institute's own period master, so "P-3", "P3" and
+ * "3" all mean the third period. Anything naming a slot number resolves to that
+ * slot's hour - P1 is 09:00 and slots run an hour apart - rather than collapsing
+ * to P1, which stacked every unrecognised slot on the same 9 AM row under the
+ * same label.
+ */
+function resolvePeriodSlot(slot: string | number | null | undefined) {
+  const text = String(slot ?? '').trim().toUpperCase();
+  const direct = PERIOD_SLOT_TIME_MAP[text];
+  if (direct) return direct;
+
+  const slotNumber = Number(text.match(/\d+/)?.[0]);
+  // Past a 12-period day the number is not a slot in this timetable's sense, so
+  // those keep the old default instead of being placed at an invented hour.
+  if (Number.isFinite(slotNumber) && slotNumber >= 0 && slotNumber <= 12) {
+    return {
+      startHour: 8 + slotNumber,
+      startMinute: 0,
+      fallbackLabel: slotNumber === 0 ? 'AM' : `P${slotNumber}`,
+    };
+  }
+
+  return PERIOD_SLOT_TIME_MAP.P1;
+}
+
 function getSlotHourRange(slotLabel: string) {
-  const range = PERIOD_SLOT_TIME_MAP[slotLabel] ?? PERIOD_SLOT_TIME_MAP[String(slotLabel)] ?? PERIOD_SLOT_TIME_MAP.P1;
+  const range = resolvePeriodSlot(slotLabel);
   return { startHour: range.startHour, endHour: range.startHour + 1 };
 }
 
@@ -873,7 +904,9 @@ export default function LessonPlanPage() {
   const [lessonPlanLoading, setLessonPlanLoading] = useState(false);
   const [lessonPlanError, setLessonPlanError] = useState<string | null>(null);
   const [lessonPlanRefreshKey, setLessonPlanRefreshKey] = useState(0);
-  const [createdLessonPlans, setCreatedLessonPlans] = useState<LessonPlanEvent[]>([]);
+  // The institute's timetable slots, needed to turn the dialog's "periods
+  // needed" count into the real period rows the calendar is built from.
+  const [periodOptions, setPeriodOptions] = useState<PeriodOption[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [selectedDivisionId, setSelectedDivisionId] = useState<number | null>(null);
   const [divisionLoading, setDivisionLoading] = useState(false);
@@ -905,6 +938,7 @@ export default function LessonPlanPage() {
   });
   const [lessonPlanDraftErrors, setLessonPlanDraftErrors] = useState<LessonPlanDraftErrors>({});
   const [isSavingLessonPlan, setIsSavingLessonPlan] = useState(false);
+  const [lessonPlanSaveError, setLessonPlanSaveError] = useState('');
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -1081,6 +1115,41 @@ export default function LessonPlanPage() {
     };
   }, [currentStandardId, sessionContext.hostName, sessionContext.subInstituteId, sessionContext.token]);
 
+  // The timetable slots belong to the institute, not to a class, so this is
+  // fetched once per session rather than with the calendar.
+  useEffect(() => {
+    const { hostName, subInstituteId, token } = sessionContext;
+    if (!subInstituteId) return;
+
+    const controller = new AbortController();
+
+    const fetchPeriodOptions = async () => {
+      try {
+        const url = new URL(
+          `${(hostName || API_BASE_URL).replace(/\/$/, '')}/api/intelligence/lesson-plan-lookup/periods`
+        );
+        url.searchParams.set('sub_institute_id', subInstituteId);
+
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        const payload = await response.json().catch(() => ({}));
+        setPeriodOptions(Array.isArray(payload?.data) ? payload.data : []);
+      } catch (error) {
+        if ((error as Error)?.name !== 'AbortError') setPeriodOptions([]);
+      }
+    };
+
+    void fetchPeriodOptions();
+
+    return () => controller.abort();
+  }, [sessionContext]);
+
   useEffect(() => {
     if (!selectedDivisionId) {
       return;
@@ -1246,11 +1315,7 @@ export default function LessonPlanPage() {
   }, [courseChapters, selectedChapter]);
   const apiLessonPlanEvents = useMemo(() => {
     return apiPeriods.map((period) => {
-      const slotKey = String(period.period_slot).toUpperCase();
-      const slotConfig =
-        PERIOD_SLOT_TIME_MAP[slotKey] ??
-        PERIOD_SLOT_TIME_MAP[String(period.period_slot)] ??
-        PERIOD_SLOT_TIME_MAP.P1;
+      const slotConfig = resolvePeriodSlot(period.period_slot);
       const duration = Number(period.planned_duration_min) || 35;
       const endTime = addMinutesToTime(slotConfig.startHour, slotConfig.startMinute, duration);
 
@@ -1279,11 +1344,13 @@ export default function LessonPlanPage() {
       } satisfies LessonPlanEvent;
     });
   }, [apiPeriods]);
+  // Saving refetches, so the calendar shows only what the API actually stored.
+  // Nothing is appended locally - a lesson on screen is a lesson in the database.
   const lessonPlanEvents = useMemo(() => {
-    return [...apiLessonPlanEvents, ...createdLessonPlans].sort(
+    return [...apiLessonPlanEvents].sort(
       (left, right) => left.date.getTime() - right.date.getTime()
     );
-  }, [apiLessonPlanEvents, createdLessonPlans]);
+  }, [apiLessonPlanEvents]);
   const calendarCells = useMemo(() => getCalendarGrid(visibleMonth), [visibleMonth]);
   const weekDates = useMemo(() => getWeekDatesSunday(visibleMonth), [visibleMonth]);
   const eventMap = useMemo(() => {
@@ -1425,6 +1492,7 @@ export default function LessonPlanPage() {
   const closeCreateLessonPlanModal = () => {
     if (isSavingLessonPlan) return;
     setIsCreateLessonPlanOpen(false);
+    setLessonPlanSaveError('');
     resetLessonPlanDraft();
   };
 
@@ -1453,44 +1521,128 @@ export default function LessonPlanPage() {
       return;
     }
 
+    setLessonPlanSaveError('');
+
+    const syear = getSyear();
+    const { subInstituteId, termId, token, hostName } = sessionContext;
+    const teacherId = getRequestContext()?.user_id ?? 0;
+
+    // Every one of these identifies the plan the period hangs off. Saving without
+    // one would either fail validation server-side or file the lesson under a
+    // plan the calendar never queries, so it is refused here with a message that
+    // says which part of the session is missing.
+    if (!subInstituteId || !syear || !currentStandardId) {
+      setLessonPlanSaveError(
+        'Current session is missing the institute, academic year, or standard, so this lesson cannot be saved.'
+      );
+      return;
+    }
+    if (!selectedDivisionId) {
+      setLessonPlanSaveError('Select a division before creating a lesson plan.');
+      return;
+    }
+    if (!selectedSubjectId) {
+      setLessonPlanSaveError('Select a subject before creating a lesson plan.');
+      return;
+    }
+    if (!teacherId) {
+      setLessonPlanSaveError('Current session has no user id, so the lesson has no teacher to assign.');
+      return;
+    }
+
+    const requestedPeriods = Math.max(1, Number(lessonPlanDraft.periods) || 1);
+
+    if (periodOptions.length === 0) {
+      setLessonPlanSaveError(
+        'No timetable periods are configured for this institute, so a lesson cannot be scheduled. Add periods under Academic Setup first.'
+      );
+      return;
+    }
+
+    // One lms_lesson_plan_periods row per period needed. Slots already taken on
+    // that date in this class's plan are skipped so a save never double-books.
+    const takenPeriodIds = new Set(
+      apiPeriods
+        .filter((period) => period.scheduled_date === lessonPlanDraft.plannedDate)
+        .map((period) => Number(period.period_id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    );
+    const freeSlots = periodOptions.filter((slot) => !takenPeriodIds.has(Number(slot.period_id)));
+
+    if (freeSlots.length < requestedPeriods) {
+      setLessonPlanSaveError(
+        `Only ${freeSlots.length} of the ${periodOptions.length} periods are free on ${format(
+          new Date(`${lessonPlanDraft.plannedDate}T00:00:00`),
+          'dd MMM yyyy'
+        )}, but ${requestedPeriods} were requested. Pick another date or reduce the periods.`
+      );
+      return;
+    }
+
+    const slotsToBook = freeSlots.slice(0, requestedPeriods);
+    const conceptId = (selectedChapter?.concepts ?? []).find(
+      (concept) => concept.title === lessonPlanDraft.conceptTitle
+    )?.id;
+    const chapterId = selectedChapter && /^\d+$/.test(String(selectedChapter.id))
+      ? String(selectedChapter.id)
+      : '';
+
     setIsSavingLessonPlan(true);
 
-    const eventDate = new Date(`${lessonPlanDraft.plannedDate}T00:00:00`);
-    const nextEvent: LessonPlanEvent = {
-      id: `manual-${course?.id}-${Date.now()}`,
-      title: lessonPlanDraft.conceptTitle,
-      conceptTitle: lessonPlanDraft.conceptTitle,
-      chapterTitle: selectedChapter?.title ?? 'Custom lesson',
-      date: eventDate,
-      status: 'Planned',
-      statusLabel: 'Planned',
-      slotLabel: `P${lessonPlanDraft.periods || '2'}`,
-      periods: Number(lessonPlanDraft.periods || 2),
-      pedagogy: lessonPlanDraft.pedagogy || 'Teaching',
-      startTime: '9:00 AM',
-      endTime: '9:35 AM',
-      teacherName: 'Teacher name unavailable',
-      plannedDurationMin: 35,
-      periodType: 'Teaching',
-      concepts: [
-        {
-          conceptName: lessonPlanDraft.conceptTitle,
-          coveragePercent: 100,
-        },
-      ],
-    };
-
     try {
-      await new Promise((resolve) => {
-        window.setTimeout(resolve, 700);
-      });
+      // Written one at a time on purpose: the first request may have to create the
+      // parent lesson plan, and parallel writes would race on its unique key.
+      for (const slot of slotsToBook) {
+        const params = new URLSearchParams({
+          sub_institute_id: subInstituteId,
+          syear,
+          standard_id: String(currentStandardId),
+          division_id: String(selectedDivisionId),
+          subject_id: String(selectedSubjectId),
+          teacher_id: String(teacherId),
+          scheduled_date: lessonPlanDraft.plannedDate,
+          period_id: String(slot.period_id),
+          period_slot: String(slot.short_name || slot.period_id),
+          primary_concept_name: lessonPlanDraft.conceptTitle,
+        });
+        if (termId) params.set('term_id', termId);
+        if (conceptId && /^\d+$/.test(conceptId)) params.set('primary_concept_id', conceptId);
+        if (chapterId) params.set('chapter_id', chapterId);
+        else if (selectedChapter?.title) params.set('chapter_name', selectedChapter.title);
+        if (lessonPlanDraft.pedagogy) params.set('pedagogy_method', lessonPlanDraft.pedagogy);
+        if (lessonPlanDraft.objective.trim()) {
+          params.set('learning_objectives', lessonPlanDraft.objective.trim());
+        }
 
-      setCreatedLessonPlans((current) => [...current, nextEvent]);
+        const response = await fetch(
+          `${(hostName || API_BASE_URL).replace(/\/$/, '')}/api/intelligence/lesson-plan-periods`,
+          {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: params,
+          }
+        );
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.status === false) {
+          throw new Error(payload?.message || `Failed to save the lesson plan (${response.status}).`);
+        }
+      }
+
+      const eventDate = new Date(`${lessonPlanDraft.plannedDate}T00:00:00`);
       setVisibleMonth(new Date(eventDate.getFullYear(), eventDate.getMonth(), 1));
       setLessonPlanRefreshKey((current) => current + 1);
       setIsCreateLessonPlanOpen(false);
+      setLessonPlanSaveError('');
       resetLessonPlanDraft();
-      alert('Lesson plan saved successfully!');
+    } catch (error) {
+      setLessonPlanSaveError(
+        error instanceof Error ? error.message : 'Unable to save the lesson plan.'
+      );
     } finally {
       setIsSavingLessonPlan(false);
     }
@@ -1899,6 +2051,7 @@ export default function LessonPlanPage() {
           lessonPlanDraft={lessonPlanDraft}
           lessonPlanDraftErrors={lessonPlanDraftErrors}
           isSavingLessonPlan={isSavingLessonPlan}
+          lessonPlanSaveError={lessonPlanSaveError}
           setLessonPlanDraft={setLessonPlanDraft}
           setLessonPlanDraftErrors={setLessonPlanDraftErrors}
           onSave={handleSaveLessonPlan}
@@ -2612,6 +2765,7 @@ export default function LessonPlanPage() {
           lessonPlanDraft={lessonPlanDraft}
           lessonPlanDraftErrors={lessonPlanDraftErrors}
           isSavingLessonPlan={isSavingLessonPlan}
+          lessonPlanSaveError={lessonPlanSaveError}
           setLessonPlanDraft={setLessonPlanDraft}
           setLessonPlanDraftErrors={setLessonPlanDraftErrors}
           onSave={handleSaveLessonPlan}

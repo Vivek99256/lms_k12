@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
+import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import {
   BookOpen,
   Briefcase,
@@ -13,10 +14,8 @@ import {
   Dumbbell,
   FlaskConical,
   Globe,
-  GraduationCap,
   Library,
   ListTree,
-  Monitor,
   Music,
   Palette,
   PenTool,
@@ -192,11 +191,30 @@ export default function CourseMasterPage() {
   const router = useRouter();
   const { menuContext } = useAuth();
 
-  const [audienceMode, setAudienceMode] = useState<'Teacher' | 'Student'>(() => {
-    if (typeof window === 'undefined') return 'Teacher';
-    const stored = localStorage.getItem('learningManagementAudienceMode');
-    return stored === 'Student' ? 'Student' : 'Teacher';
+  // The audience toggle is a staff affordance for previewing the student view.
+  // Resolved during render rather than in an effect so a student never gets a
+  // painted frame of the teacher interface before it is hidden.
+  const [isStaff, setIsStaff] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return !isStudentSession();
   });
+
+
+  // The session can arrive after first paint, so the flag is re-read on mount.
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setIsStaff(!isStudentSession());
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // The audience follows the signed-in role and is not switchable: staff get the
+  // teacher interface, students the student one. With the Viewing-as toggle gone
+  // there is no stored preference left to strand anyone in the wrong view.
+  const effectiveAudienceMode: 'Teacher' | 'Student' = isStaff ? 'Teacher' : 'Student';
   const [data, setData] = useState<LmsCoursesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -410,7 +428,7 @@ export default function CourseMasterPage() {
    * with the true total alongside so the assistant never describes a window as the
    * whole catalogue.
    */
-  const catalogSubjects = audienceMode === 'Student' ? filteredStudentSubjects : null;
+  const catalogSubjects = effectiveAudienceMode === 'Student' ? filteredStudentSubjects : null;
 
   useRegisterPageAiContext(
     useMemo(() => {
@@ -442,7 +460,7 @@ export default function CourseMasterPage() {
         // which courses are listed, but calling it a filter made the assistant offer
         // "explain what this filtered view shows" on an unfiltered catalogue — a weak
         // suggestion occupying a slot a real question could use.
-        pageTitle: `Course Catalog (${audienceMode} view)`,
+        pageTitle: `Course Catalog (${effectiveAudienceMode} view)`,
         pageType: 'list' as const,
         searchQuery: search,
         filters: {
@@ -483,7 +501,7 @@ export default function CourseMasterPage() {
       search,
       standardFilter,
       categoryFilter,
-      audienceMode,
+      effectiveAudienceMode,
       standardOptions,
       categoryOptions,
       filteredGroups,
@@ -491,15 +509,12 @@ export default function CourseMasterPage() {
     ])
   );
 
-  useEffect(() => {
-    localStorage.setItem('learningManagementAudienceMode', audienceMode);
-  }, [audienceMode]);
 
   useEffect(() => {
-    if (audienceMode === 'Student') {
+    if (effectiveAudienceMode === 'Student') {
       setActiveLearningTab('learn');
     }
-  }, [audienceMode]);
+  }, [effectiveAudienceMode]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -723,40 +738,11 @@ export default function CourseMasterPage() {
               </h1>
             </div>
 
-            <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-              <span className="text-[13px] font-medium text-[#6B7B91]">Viewing as</span>
-              <div className="inline-flex rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-                <button
-                  type="button"
-                  onClick={() => setAudienceMode('Teacher')}
-                  className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                    audienceMode === 'Teacher'
-                      ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                      : 'text-[#6B7B91]'
-                  }`}
-                >
-                  <Monitor size={16} />
-                  Teacher
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAudienceMode('Student')}
-                  className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                    audienceMode === 'Student'
-                      ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                      : 'text-[#6B7B91]'
-                  }`}
-                >
-                  <GraduationCap size={16} />
-                  Student
-                </button>
-              </div>
-            </div>
           </div>
 
          
 
-          {audienceMode === 'Teacher' ? (
+          {effectiveAudienceMode === 'Teacher' ? (
             <div className="mt-1 flex flex-col gap-4">
                   {/* <div className="w-full xl:max-w-[360px]">
                     <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">
@@ -898,7 +884,7 @@ export default function CourseMasterPage() {
           </div>
         ) : (
           <>
-            {audienceMode === 'Teacher' ? (
+            {effectiveAudienceMode === 'Teacher' ? (
               <>  
                 {totalSubjects === 0 ? (
                   <div className="mt-8 rounded-[18px] border border-[#D9E1EE] bg-white px-6 py-16 text-center text-[#64748B] shadow-[0_2px_10px_rgba(15,23,42,0.05)]">

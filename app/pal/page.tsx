@@ -14,7 +14,6 @@ import {
   Lightbulb,
   Loader2,
   Lock,
-  Monitor,
   Play,
   RefreshCw,
   Sparkles,
@@ -71,7 +70,10 @@ type AudienceMode = 'Teacher' | 'Student';
 export default function PalEntryPage() {
   const router = useRouter();
   const [isStaff, setIsStaff] = useState(false);
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>('Teacher');
+  // Staff-only surface, and no longer switchable now that the Viewing-as toggle is
+  // gone. The teacher's own "view as student" flow below is unaffected: it runs off
+  // selectedStudent, not this.
+  const audienceMode: AudienceMode = 'Teacher';
   const [selectedStudent, setSelectedStudent] = useState<PalStudentSelection | null>(null);
   const [data, setData] = useState<PalLandingData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,8 +92,6 @@ export default function PalEntryPage() {
       if (staff) {
         const viewing = getViewAsStudent();
         if (viewing) setSelectedStudent(viewing);
-        const storedMode = localStorage.getItem('palAudienceMode');
-        if (storedMode === 'Student' || storedMode === 'Teacher') setAudienceMode(storedMode);
       }
     });
     return () => {
@@ -99,9 +99,6 @@ export default function PalEntryPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') localStorage.setItem('palAudienceMode', audienceMode);
-  }, [audienceMode]);
 
   // Enter/leave "view as student": persist so the Intelligence page picks it up.
   const enterStudentView = (student: PalStudentSelection | null) => {
@@ -225,37 +222,6 @@ export default function PalEntryPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {isStaff && (
-              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-                <span className="text-[13px] font-medium text-[#6B7B91]">Viewing as</span>
-                <div className="inline-flex rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-                  <button
-                    type="button"
-                    onClick={() => setAudienceMode('Teacher')}
-                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                      audienceMode === 'Teacher'
-                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                        : 'text-[#6B7B91]'
-                    }`}
-                  >
-                    <Monitor size={16} />
-                    Teacher
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAudienceMode('Student')}
-                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                      audienceMode === 'Student'
-                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                        : 'text-[#6B7B91]'
-                    }`}
-                  >
-                    <GraduationCap size={16} />
-                    Student
-                  </button>
-                </div>
-              </div>
-            )}
             <Button
               variant="outline"
               size="sm"
@@ -301,10 +267,7 @@ export default function PalEntryPage() {
               <span className="font-semibold">Misconceptions</span>) are per-student, so switch to{' '}
               <button
                 type="button"
-                onClick={() => {
-                  exitStudentView();
-                  setAudienceMode('Teacher');
-                }}
+                onClick={exitStudentView}
                 className="font-semibold text-sky-900 underline underline-offset-2 hover:text-sky-950"
               >
                 Teacher
