@@ -13,9 +13,12 @@
  * `/organization-management/employee-directory` endpoint instead (see
  * `employee-directory-api.ts`'s header comment for the full endpoint list),
  * using `buildSessionContext()` the same way every other ported module does.
- * The default mock rows (`defaultMockEmployees`) and the "loading only if a
- * session is on record" gate are preserved as-is so the screen still renders
- * something before/without a session, exactly like G2G.
+ * The "loading only if a session is on record" gate is preserved as-is.
+ *
+ * Unlike G2G, a failed fetch no longer falls back to hardcoded mock rows -
+ * it surfaces an `error` string (same shape as `use-role-permissions.ts`'s
+ * `error` field) so the screen can show a visible error instead of silently
+ * rendering fake employees.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -36,42 +39,9 @@ export interface FilterOption {
   value: string
 }
 
-const defaultMockEmployees: Employee[] = [
-  {
-    id: 1,
-    full_name: 'John Doe',
-    email: 'john.doe@example.com',
-    mobile: '+1 (555) 123-4567',
-    department_name: 'Engineering',
-    jobRole: 'Senior Developer',
-    designation: 'Senior Developer',
-    address: 'New York',
-    image: '',
-    occupation: 'Engineering',
-    status: 'Active',
-    lastActivity: 'Unknown',
-    join_Date: '2023-01-15',
-    profile_name: 'Admin',
-    skills: [],
-  },
-  {
-    id: 2,
-    full_name: 'Jane Smith',
-    email: 'jane.smith@example.com',
-    mobile: '+1 (555) 987-6543',
-    department_name: 'Human Resources',
-    jobRole: 'HR Manager',
-    designation: 'HR Manager',
-    address: 'San Francisco',
-    image: '',
-    occupation: 'HR',
-    status: 'Active',
-    lastActivity: 'Unknown',
-    join_Date: '2022-11-01',
-    profile_name: 'HR Admin',
-    skills: [],
-  },
-]
+function toMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback
+}
 
 /**
  * `filters` (department/job-role/status) are forwarded to the API as query
@@ -83,8 +53,9 @@ export function useEmployeeDirectory(filters?: EmployeeListFilters) {
   const [session] = useState(() => buildSessionContext())
   const ready = isEmployeeDirectorySessionReady(session)
 
-  const [employeesData, setEmployeesData] = useState<Employee[]>(defaultMockEmployees)
+  const [employeesData, setEmployeesData] = useState<Employee[]>([])
   const [loading, setLoading] = useState(ready)
+  const [error, setError] = useState<string | null>(null)
   const [departments, setDepartments] = useState<FilterOption[]>([])
   const [jobRoles, setJobRoles] = useState<FilterOption[]>([])
   const [pagination, setPagination] = useState<EmployeeListPagination | null>(null)
@@ -99,6 +70,7 @@ export function useEmployeeDirectory(filters?: EmployeeListFilters) {
   const load = useCallback(async () => {
     if (!ready) return
     setLoading(true)
+    setError(null)
     try {
       const response = await EmployeeDirectoryService.list(session, {
         department_id: departmentFilter,
@@ -127,7 +99,8 @@ export function useEmployeeDirectory(filters?: EmployeeListFilters) {
       }
     } catch (err) {
       console.error('Failed to fetch employees:', err)
-      setEmployeesData(defaultMockEmployees)
+      setError(toMessage(err, 'Failed to load employees'))
+      setEmployeesData([])
       setPagination(null)
     } finally {
       setLoading(false)
@@ -138,5 +111,5 @@ export function useEmployeeDirectory(filters?: EmployeeListFilters) {
     load()
   }, [load])
 
-  return { employeesData, loading, reload: load, departments, jobRoles, pagination }
+  return { employeesData, loading, error, reload: load, departments, jobRoles, pagination }
 }

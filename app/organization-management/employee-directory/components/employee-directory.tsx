@@ -38,6 +38,7 @@ import {
   ShieldAlert,
   UserPlus,
   Target,
+  AlertCircle,
 } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/g2g/data-table'
 import { FilterBar, type Filter } from '@/components/ui/g2g/filter-bar'
@@ -95,7 +96,7 @@ export function EmployeeDirectory() {
   // option lists, which never matched real data and made every filter appear
   // broken. Search moved server-side too (previously client-only) so that
   // pagination totals stay correct when it's combined with the other filters.
-  const { employeesData, loading, departments, jobRoles, pagination } = useEmployeeDirectory({
+  const { employeesData, loading, error, departments, jobRoles, pagination } = useEmployeeDirectory({
     department_id: departmentFilter,
     jobrole_id: jobRoleFilter,
     active_status: statusFilter === 'active' ? '1' : statusFilter === 'inactive' ? '0' : '',
@@ -251,6 +252,13 @@ export function EmployeeDirectory() {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6 duration-500 ease-out">
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {pulseCards.map((card, index) => {
           const Icon = card.icon
