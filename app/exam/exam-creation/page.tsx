@@ -17,6 +17,7 @@ import {
 import { SearchDropdown, type DropdownValue } from '@/components/search-dropdown';
 import { buildSessionContext } from '@/lib/erp-client';
 import { cn } from '@/lib/utils';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import {
   openPrintPreview,
   type TableExportColumn,
@@ -992,7 +993,19 @@ export default function AiExamPaperPage() {
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">Description</label>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-sm font-medium text-slate-700">Description</label>
+                <AiFieldAssistant
+                  value={paperDesc}
+                  onApply={setPaperDesc}
+                  fieldType="description"
+                  label="Paper description"
+                  module="exam"
+                  page="Exam creation"
+                  entityType="exam_paper"
+                  related={{ "Paper name": paperName }}
+                />
+              </div>
               <textarea
                 value={paperDesc}
                 onChange={(event) => setPaperDesc(event.target.value)}

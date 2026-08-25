@@ -13,6 +13,7 @@ import {
   erpSelectClass,
 } from "@/components/erp/erp-ui";
 import { RecordTable, type RecordColumn } from "@/components/erp/RecordTable";
+import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import { errorMessage } from "@/lib/erp-legacy";
 import {
   createAddProcess,
@@ -247,7 +248,20 @@ export function AddProcessPage() {
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="requirements">Process *</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="requirements">Process *</Label>
+                  <AiFieldAssistant
+                    value={input.requirements}
+                    onApply={(next) =>
+                      setInput((current) => ({ ...current, requirements: next }))
+                    }
+                    fieldType="instructions"
+                    label="Process steps"
+                    module="general"
+                    page="Add process"
+                    entityType="process"
+                  />
+                </div>
                 <Textarea
                   id="requirements"
                   rows={10}

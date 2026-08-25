@@ -37,6 +37,7 @@ import {
   Layers3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -2481,9 +2482,23 @@ export default function ChapterListPage() {
           </div>
 
           <div className="mt-5 space-y-1.5">
-            <Label htmlFor="manual-question-text" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
-              Question Text <span className="text-rose-500">*</span>
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="manual-question-text" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                Question Text <span className="text-rose-500">*</span>
+              </Label>
+              <AiFieldAssistant
+                value={manualQuestionText}
+                onApply={(next) => {
+                  setManualQuestionText(next);
+                  setManualQuestionError('');
+                }}
+                fieldType="question"
+                label="Question text"
+                module="course-master"
+                page="Chapter question bank"
+                entityType="question"
+              />
+            </div>
             <Textarea
               id="manual-question-text"
               value={manualQuestionText}
@@ -2550,9 +2565,23 @@ export default function ChapterListPage() {
             </div>
           ) : (
             <div className="mt-6 space-y-1.5">
-              <Label htmlFor="manual-model-answer" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
-                Model Answer
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="manual-model-answer" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                  Model Answer
+                </Label>
+                <AiFieldAssistant
+                  value={manualModelAnswer}
+                  onApply={setManualModelAnswer}
+                  fieldType="explanation"
+                  label="Model answer"
+                  module="course-master"
+                  page="Chapter question bank"
+                  entityType="question"
+                  // The question is the thing the answer must actually answer, so it
+                  // travels with the request rather than leaving the model to guess.
+                  related={{ "Question": manualQuestionText }}
+                />
+              </div>
               <Textarea
                 id="manual-model-answer"
                 value={manualModelAnswer}
@@ -4547,9 +4576,23 @@ export default function ChapterListPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="chapter-description" className="text-sm font-medium text-slate-700">
-                  Chapter Description
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="chapter-description" className="text-sm font-medium text-slate-700">
+                    Chapter Description
+                  </Label>
+                  <AiFieldAssistant
+                    value={chapterForm.chapterDescription}
+                    onApply={(next) =>
+                      setChapterForm((prev) => ({ ...prev, chapterDescription: next }))
+                    }
+                    fieldType="description"
+                    label="Chapter description"
+                    module="course-master"
+                    page="Chapters"
+                    entityType="chapter"
+                    related={{ "Chapter name": chapterForm.chapterName ?? '' }}
+                  />
+                </div>
                 <Textarea
                   id="chapter-description"
                   value={chapterForm.chapterDescription}

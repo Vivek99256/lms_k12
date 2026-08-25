@@ -768,6 +768,23 @@ export async function getStudentAttendanceDetail(
 /* Departments                                                                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * People-side datasets this assistant is not wired to.
+ *
+ * Returned by every department tool, not just the detailed one. A question like
+ * "which department needs the most training?" is answered by whichever tool the
+ * router picked, and if that tool stays silent about the gap the model fills it
+ * with the only number it has — headcount — and presents a staffing figure as a
+ * capability judgement.
+ */
+export const DEPARTMENT_UNAVAILABLE_SIGNALS = [
+  "skill matrix and competency ratings",
+  "training records and completion",
+  "workload or task allocation",
+  "staff attendance and leave",
+  "performance appraisal",
+] as const;
+
 export async function getDepartmentDirectory(
   input: z.infer<typeof departmentDirectoryInputSchema>,
   context: ProjectContext
@@ -813,6 +830,8 @@ export async function getDepartmentDirectory(
       totalEmployees: department.totalEmployees,
       employees: input.includeEmployees ? department.employees.slice(0, 25) : undefined,
     })),
+    availableSignals: ["department headcount", "sub-department structure", "employee names"],
+    unavailableSignals: [...DEPARTMENT_UNAVAILABLE_SIGNALS],
   };
 }
 
@@ -904,13 +923,7 @@ export async function getDepartmentInsight(
       "employee names within the department",
       "share of the total workforce",
     ],
-    unavailableSignals: [
-      "skill matrix and competency ratings",
-      "training records and completion",
-      "workload or task allocation",
-      "staff attendance and leave",
-      "performance appraisal",
-    ],
+    unavailableSignals: [...DEPARTMENT_UNAVAILABLE_SIGNALS],
   };
 }
 
@@ -1251,7 +1264,32 @@ export async function analyzeLmsData(
     },
     facts,
     unavailableDatasets,
+    // Lifted out of the individual datasets so a ranking question cannot miss it.
+    // Nested inside `facts` it reads as detail; at this level it is a constraint on
+    // what the answer may claim.
+    unavailableSignals: collectUnavailableSignals(facts),
   };
+}
+
+/**
+ * Gathers every `unavailableSignals` a loaded dataset declared, de-duplicated.
+ */
+function collectUnavailableSignals(facts: Record<string, unknown>): string[] {
+  const collected = new Set<string>();
+
+  for (const value of Object.values(facts)) {
+    const signals = (value as { unavailableSignals?: unknown })?.unavailableSignals;
+
+    if (Array.isArray(signals)) {
+      for (const signal of signals) {
+        if (typeof signal === "string") {
+          collected.add(signal);
+        }
+      }
+    }
+  }
+
+  return [...collected];
 }
 
 /* -------------------------------------------------------------------------- */

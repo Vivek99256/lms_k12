@@ -12,6 +12,7 @@ import {
   type FlashcardInput,
 } from '@/app/h5p/data/h5p';
 import { H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '@/app/h5p/components/shared';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -133,9 +134,21 @@ function FlashcardEditContent() {
 
                     <div className="space-y-4">
                       <div className="space-y-1.5">
-                        <Label htmlFor="card-question" className="text-slate-700">
-                          Question <span className="text-red-500">*</span>
-                        </Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="card-question" className="text-slate-700">
+                            Question <span className="text-red-500">*</span>
+                          </Label>
+                          <AiFieldAssistant
+                            value={card.question}
+                            onApply={(next) => updateField({ question: next })}
+                            fieldType="question"
+                            label="Flashcard question"
+                            module="h5p"
+                            page="Flashcards"
+                            entityType="h5p_flashcard"
+                            related={{ 'Answer / explanation': card.content }}
+                          />
+                        </div>
                         <Textarea
                           id="card-question"
                           rows={3}
@@ -148,9 +161,21 @@ function FlashcardEditContent() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label htmlFor="card-content" className="text-slate-700">
-                          Content / Explanation
-                        </Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="card-content" className="text-slate-700">
+                            Content / Explanation
+                          </Label>
+                          <AiFieldAssistant
+                            value={card.content}
+                            onApply={(next) => updateField({ content: next })}
+                            fieldType="explanation"
+                            label="Card explanation"
+                            module="h5p"
+                            page="Flashcards"
+                            entityType="h5p_flashcard"
+                            related={{ 'Question': card.question }}
+                          />
+                        </div>
                         <Textarea
                           id="card-content"
                           rows={5}

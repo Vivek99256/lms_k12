@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Bot as BotIcon,
@@ -9,6 +9,7 @@ import {
   Mic,
   Send,
   Square,
+  SquarePen,
   User,
   Volume2,
   VolumeX,
@@ -27,9 +28,26 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
-  TEACH_ASSISTANT_CONVERSATION_ID_KEY,
-  TEACH_ASSISTANT_MESSAGES_KEY,
+  beginChatPageSession,
+  ensureConversationId,
+  readStoredMessages,
+  startNewChatSession,
+  writeStoredMessages,
 } from '@/lib/chatbot-storage';
+// AI Workspace: the same panel, with four more things it can do. The conversational
+// path below is untouched — these are additional tabs beside it, not a replacement.
+// Deep import, not the package root: this module has no dependencies of its own, so a
+// client component can use it without pulling the server-side conversation engine in.
+import { toActionableFollowUps } from '@shared/conversational-ai-core/followup-suggestions';
+import { useAiWorkspace } from '@/hooks/use-ai-workspace';
+import { usePageAiContext } from '@/contexts/PageAiContext';
+import type { Capability } from '@/lib/intelligence/workspace';
+import { ActionsTab } from './ai-workspace/ActionsTab';
+import { AnalyseTab } from './ai-workspace/AnalyseTab';
+import { ConnectionsTab } from './ai-workspace/ConnectionsTab';
+import { CreateTab } from './ai-workspace/CreateTab';
+import { ContextBanner, WorkspaceTabs } from './ai-workspace/WorkspaceChrome';
+import { FlowStrip } from './ai-workspace/FlowStrip';
 
 type ChatMessage = {
   id: string;
@@ -45,6 +63,29 @@ type ChatMessage = {
     label: string;
   };
   module?: string;
+  /** Where the assistant thinks the conversation goes next. Rendered as chips. */
+  followUps?: string[];
+  /**
+   * What the answer actually rests on. Only the tools that really ran, with any
+   * data they reported they do not hold.
+   */
+  citations?: Array<{
+    tool: string;
+    module?: string;
+    available: boolean;
+    unavailableSignals?: string[];
+  }>;
+  /**
+   * A consequential action waiting on the user. Present only while unanswered —
+   * cleared once they confirm or cancel, so an old prompt cannot be clicked twice.
+   */
+  confirmation?: {
+    action: string;
+    riskLevel: 'low' | 'medium' | 'high';
+    message: string;
+  };
+  /** The question that produced the confirmation, replayed when they accept. */
+  confirmationFor?: string;
 };
 
 const MODULE_HANDOFF_COPY: Record<string, { title: string; description: string }> = {
@@ -130,23 +171,11 @@ function normalizeStoredMessages(messages: ChatMessage[]) {
   });
 }
 
-function ensureConversationId() {
-  if (typeof window === 'undefined') {
-    return 'server-conversation';
-  }
-
-  const existing = localStorage.getItem(TEACH_ASSISTANT_CONVERSATION_ID_KEY);
-  if (existing) {
-    return existing;
-  }
-
-  const nextId =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `conversation-${Date.now()}`;
-  localStorage.setItem(TEACH_ASSISTANT_CONVERSATION_ID_KEY, nextId);
-  return nextId;
-}
+/*
+ * Conversation id and message persistence now live in lib/chatbot-storage, because
+ * the "clear on refresh" rule has to be decided once per page load rather than per
+ * component mount — see the note in that module.
+ */
 
 function readStoredSession() {
   if (typeof window === 'undefined') {
@@ -191,7 +220,12 @@ function readStoredSession() {
   }
 }
 
-const SUGGESTED_PROMPTS = [
+/**
+ * Shown only when the workspace has no configured prompts for the current route —
+ * an unmapped module, or the config endpoint being unreachable. The assistant should
+ * never open with an empty panel.
+ */
+const FALLBACK_PROMPTS = [
   'Show my homework updates',
   'What is in my activity stream today?',
   'Show my LMS dashboard progress',
@@ -202,15 +236,13 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   const pathname = usePathname() || '/dashboard';
   const { executeNavigation } = useAgentActionHandler();
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const stored = localStorage.getItem(TEACH_ASSISTANT_MESSAGES_KEY);
-      return stored
-        ? normalizeStoredMessages(JSON.parse(stored) as ChatMessage[])
-        : [];
-    } catch {
-      return [];
-    }
+    // Runs before the first paint. On a genuine page load this wipes the stored
+    // thread and returns nothing; on a panel reopen within the same page it returns
+    // what was there. Doing it in an effect instead would briefly show the old
+    // conversation before clearing it.
+    beginChatPageSession();
+
+    return normalizeStoredMessages(readStoredMessages<ChatMessage>());
   });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -219,7 +251,107 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   const messagesRef = useRef<ChatMessage[]>(messages);
   const idCounterRef = useRef(readMessageCounter(messages));
   const session = useMemo(() => readStoredSession(), []);
-  const conversationId = useMemo(() => ensureConversationId(), []);
+
+  // State rather than a memo: "New chat" replaces it. The backend keys follow-up and
+  // workflow state on this id, so a fresh thread must carry a fresh one.
+  const [conversationId, setConversationId] = useState(() => ensureConversationId());
+
+  // Incremented by "New chat". An in-flight reply captures the value it started
+  // under and discards itself if the thread was reset while it was on the wire —
+  // otherwise the previous conversation's answer lands in the empty new one.
+  const chatSessionRef = useRef(0);
+
+  // What the page says it is showing — filters, search, KPI tiles, visible rows, the
+  // record it is about. Empty for a page that registers nothing, which is every page
+  // that has not adopted the provider yet, and harmless when empty.
+  const pageAi = usePageAiContext();
+
+  // Resolves the current module and record from the route, refines it with what the
+  // page reported, and asks the backend what the assistant can usefully offer here.
+  // Failing is survivable: `availableTabs` falls back to conversation alone, which is
+  // exactly what this panel was before.
+  const workspace = useAiWorkspace({
+    entityType: pageAi.entityType,
+    entityId: pageAi.entityId,
+    selectedRecords: pageAi.selectedRecords,
+    pageData: pageAi.pageData,
+  });
+  const [activeTab, setActiveTab] = useState<Capability>('conversational');
+
+  // Set when the user jumps to Create from a finding, so that tab runs the right
+  // template on arrival instead of showing a list they have to search again.
+  const [pendingTemplate, setPendingTemplate] = useState<string | null>(null);
+
+  // Content the user accepted in Create, waiting to be attached to the intervention
+  // in Actions. Held in the panel because it crosses a tab boundary.
+  const [acceptedDraft, setAcceptedDraft] = useState<string | null>(null);
+
+  /**
+   * Moves the user to the tab that owns the next step of the flow.
+   *
+   * The stage strip decides which one — the panel does not guess. That is what keeps
+   * a single next action rather than five competing buttons.
+   */
+  const goToNextAction = useCallback((capability: Capability) => {
+    setActiveTab(capability);
+  }, []);
+
+  // Navigating to a page that does not offer the open tab drops back to the
+  // conversation rather than showing an empty surface.
+  useEffect(() => {
+    if (!workspace.availableTabs.includes(activeTab)) {
+      setActiveTab('conversational');
+    }
+  }, [workspace.availableTabs, activeTab]);
+
+  /**
+   * The page snapshot as the conversation schema wants it.
+   *
+   * Sourced from the resolved workspace context rather than from the raw descriptor,
+   * so the assistant reasons over exactly what the suggestion engine reasoned over —
+   * already capped, already normalised, and in agreement with the prompts on screen.
+   * Undefined when the page said nothing, in which case the conversation is unchanged.
+   */
+  const conversationPageContext = useMemo(() => {
+    const page = workspace.context?.page;
+
+    if (!page) {
+      return undefined;
+    }
+
+    const snapshot = {
+      title: page.title ?? undefined,
+      type: page.type ?? undefined,
+      filters: page.filters?.length ? page.filters : undefined,
+      searchQuery: page.search_query ?? undefined,
+      metrics: page.metrics?.length ? page.metrics : undefined,
+      // Flattened: the schema carries attributes on the record itself, so a row reads
+      // as one object rather than a label wrapping a bag.
+      records: page.records?.length
+        ? page.records.map((record) => ({
+            id: (typeof record.id === 'string' || typeof record.id === 'number'
+              ? record.id
+              : undefined),
+            label: record.label ?? undefined,
+            ...record.attributes,
+          }))
+        : undefined,
+      recordCount: page.record_count || undefined,
+      selectedCount: workspace.context?.selected_records?.length || undefined,
+      availableActions: page.available_actions?.length ? page.available_actions : undefined,
+    };
+
+    return Object.values(snapshot).some((value) => value !== undefined) ? snapshot : undefined;
+  }, [workspace.context]);
+
+  // Context-aware prompts for this page, with the static list as a safety net.
+  const conversationalPrompts = useMemo(() => {
+    const configured = (workspace.suggestions.conversational ?? [])
+      .map((suggestion) => suggestion.prompt || suggestion.label)
+      .filter((prompt): prompt is string => Boolean(prompt && prompt.trim()));
+
+    return configured.length > 0 ? configured : FALLBACK_PROMPTS;
+  }, [workspace.suggestions]);
 
   const {
     supportedLanguages,
@@ -243,8 +375,7 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   }, [messages]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(TEACH_ASSISTANT_MESSAGES_KEY, JSON.stringify(messages.slice(-50)));
+    writeStoredMessages(messages.slice(-50));
   }, [messages]);
 
   useEffect(() => {
@@ -259,9 +390,74 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
     [messages]
   );
 
-  async function sendMessage(raw: string) {
+  /**
+   * Starts a fresh conversation without touching the page.
+   *
+   * Clears the thread and the stored copy, mints a new conversation id so the
+   * backend does not carry follow-up state across, and stops any voice activity —
+   * leaving the mic recording into a conversation the user just abandoned would be
+   * a surprise.
+   */
+  function handleNewChat() {
+    chatSessionRef.current += 1;
+
+    if (isRecording) stopRecording();
+    if (isSpeaking) stopSpeaking();
+
+    setConversationId(startNewChatSession());
+    setMessages([]);
+    messagesRef.current = [];
+    idCounterRef.current = 0;
+    setInput('');
+    setTranscript('');
+    setError(null);
+    clearError();
+    setIsLoading(false);
+    setActiveTab('conversational');
+  }
+
+  /**
+   * Retires a confirmation prompt once it has been answered.
+   *
+   * @param cancelled Appends a line saying nothing was done, so the transcript
+   *   records the decision rather than the prompt simply vanishing.
+   */
+  function clearConfirmation(messageId: string, cancelled = false) {
+    setMessages((current) => {
+      const next = current.map((message) =>
+        message.id === messageId
+          ? { ...message, confirmation: undefined, confirmationFor: undefined }
+          : message
+      );
+
+      if (!cancelled) {
+        return next;
+      }
+
+      idCounterRef.current += 1;
+      return [
+        ...next,
+        {
+          id: createMessageId('assistant', idCounterRef.current),
+          role: 'assistant' as const,
+          content: 'Cancelled — nothing was changed.',
+        },
+      ];
+    });
+  }
+
+  /**
+   * @param confirmedTools Tools the user has just authorised, when this send is a
+   *   confirmation of a consequential action rather than a new question. Cleared
+   *   every turn, so an authorisation never carries into a later message.
+   */
+  async function sendMessage(raw: string, confirmedTools?: string[]) {
     const trimmed = raw.trim();
     if (!trimmed || isLoading) return;
+
+    // Captured now; compared after the await so a reply that arrives after a reset
+    // is dropped instead of appended to the new thread.
+    const chatSession = chatSessionRef.current;
     idCounterRef.current += 1;
 
     const userMessage: ChatMessage = {
@@ -270,7 +466,14 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
       role: 'user',
     };
 
-    const nextMessages = [...messagesRef.current, userMessage];
+    // What the model sees always ends with the user's request, so a confirmation
+    // re-drives the same tool call. What the panel shows does not repeat it — a
+    // confirmation is a click, not a second question, and echoing the sentence
+    // again reads as a stutter.
+    const payloadMessages = [...messagesRef.current, userMessage];
+    const nextMessages = confirmedTools?.length
+      ? [...messagesRef.current]
+      : payloadMessages;
     setMessages(nextMessages);
     setInput('');
     setTranscript('');
@@ -286,13 +489,16 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
         },
         body: JSON.stringify({
           responseMode: 'json',
-          messages: nextMessages.map((message) => ({
+          messages: payloadMessages.map((message) => ({
             id: message.id,
             role: message.role,
             content: message.content,
           })),
           context: {
             conversationId,
+            // Present only on a confirmation turn. Without it a consequential tool
+            // refuses to execute and asks again.
+            confirmedTools,
             userId: session.userId,
             subInstituteId: session.subInstituteId,
             role: session.profileName,
@@ -303,6 +509,18 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
             syear: session.syear,
             termId: session.termId,
             route: pathname,
+            // The record this page is about, resolved server-side from the route.
+            // This is what makes "why is this student at risk?" answerable without
+            // the user naming anyone. Absent on list pages, and harmless when absent.
+            entityType: workspace.context?.entity_type ?? undefined,
+            entityId: workspace.context?.entity_id ?? undefined,
+            entityLabel: workspace.context?.entity_label ?? undefined,
+            // And what is actually on the screen — the module, the filters, the
+            // figures, a window onto the rows. This is what makes "summarise these"
+            // and "which of these need attention?" resolvable.
+            module: workspace.context?.module ?? undefined,
+            moduleLabel: workspace.context?.module_label ?? undefined,
+            page: conversationPageContext,
           },
         }),
       });
@@ -316,6 +534,19 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
           status?: string;
           conversationType?: string;
           activeTools?: string[];
+          followUpSuggestions?: string[];
+          confirmation?: {
+            action: string;
+            riskLevel: 'low' | 'medium' | 'high';
+            message: string;
+            parameters?: Record<string, unknown>;
+          };
+          citations?: Array<{
+            tool: string;
+            module?: string;
+            available: boolean;
+            unavailableSignals?: string[];
+          }>;
           navigation?: {
             route: string;
             query?: Record<string, string | number>;
@@ -325,7 +556,18 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
         };
       };
 
-      if (!response.ok) {
+      // The user pressed "New chat" while this was in flight. Their intent was to
+      // start over, so this answer is no longer wanted.
+      if (chatSession !== chatSessionRef.current) {
+        return;
+      }
+
+      // 403 carries a real assistant reply explaining what the user may not do.
+      // Rendering it as a normal message keeps a routine refusal from looking like
+      // a breakage; anything else non-OK is a genuine failure.
+      const isRefusal = response.status === 403 && Boolean(payload.message?.content);
+
+      if (!response.ok && !isRefusal) {
         throw new Error(payload.error || 'The AI assistant request failed.');
       }
 
@@ -352,11 +594,39 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
               typeof payload.response?.data?.module === 'string'
                 ? payload.response.data.module
                 : undefined,
+            // Only on the last bubble of a reply — repeating the same chips under
+            // every part of a multi-part answer reads as a stutter.
+            // A chip's label is sent verbatim as the next question, so only offer the
+            // ones that read as something a user could actually say. "Reply with the
+            // numbered option if shown." is advice, not an utterance — clicking it
+            // asked that sentence, matched nothing, and looped.
+            followUps:
+              index === assistantMessages.length - 1
+                ? toActionableFollowUps(payload.response?.followUpSuggestions)
+                : undefined,
+            // Same rule as the chips: sources belong under the last bubble only.
+            citations:
+              index === assistantMessages.length - 1
+                ? payload.response?.citations
+                : undefined,
+            confirmation:
+              index === assistantMessages.length - 1
+                ? payload.response?.confirmation
+                : undefined,
+            confirmationFor:
+              index === assistantMessages.length - 1 && payload.response?.confirmation
+                ? trimmed
+                : undefined,
           });
         });
         return nextMessages;
       });
     } catch (value: unknown) {
+      // Same guard on the failure path: a stale error is as unwelcome as a stale answer.
+      if (chatSession !== chatSessionRef.current) {
+        return;
+      }
+
       const message =
         value instanceof Error ? value.message : 'The AI assistant request failed.';
       setError(message);
@@ -370,7 +640,9 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
         },
       ]);
     } finally {
-      setIsLoading(false);
+      if (chatSession === chatSessionRef.current) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -394,21 +666,140 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
               <p className="text-[11px] font-medium text-gray-500">Text, voice, and multilingual AI</p>
             </div>
           </div>
-          <button
-            onClick={onToggleChatbot}
-            className="rounded-xl p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
-            title="Collapse Chatbot"
-          >
-            <ChevronLeft size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleNewChat}
+              disabled={messages.length === 0 && !isLoading}
+              className="rounded-xl p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500"
+              title="New chat"
+              aria-label="Start a new chat"
+            >
+              <SquarePen size={17} aria-hidden="true" />
+            </button>
+            <button
+              onClick={onToggleChatbot}
+              className="rounded-xl p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+              title="Collapse Chatbot"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          </div>
         </div>
 
+        {/*
+          What the assistant is currently looking at, and the abilities that make
+          sense here. Both come from the resolved route, so walking from a student
+          page to the fees list changes them without reopening the panel.
+        */}
+        <ContextBanner context={workspace.context} loading={workspace.loading} />
+        <WorkspaceTabs
+          tabs={workspace.availableTabs}
+          active={activeTab}
+          onChange={setActiveTab}
+        />
+
+        {activeTab !== 'conversational' ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            {activeTab === 'generative' ? (
+              <CreateTab
+                session={workspace.session}
+                context={workspace.context}
+                suggestions={workspace.suggestions.generative ?? []}
+                route={workspace.route}
+                presetTemplateKey={pendingTemplate}
+                onUse={(text) => {
+                  // Carried to Actions, where it is attached to the proposed
+                  // intervention — still behind the approval gate.
+                  setAcceptedDraft(text);
+                  setPendingTemplate(null);
+                  setActiveTab('workflow');
+                }}
+              />
+            ) : null}
+
+            {activeTab === 'agent' ? (
+              <AnalyseTab
+                session={workspace.session}
+                context={workspace.context}
+                suggestions={workspace.suggestions.agent ?? []}
+                route={workspace.route}
+                onSeeActions={() => setActiveTab('workflow')}
+                onGenerate={(templateKey) => {
+                  setPendingTemplate(templateKey);
+                  setActiveTab('generative');
+                }}
+                onCompleted={workspace.reloadFlow}
+              />
+            ) : null}
+
+            {activeTab === 'workflow' ? (
+              <ActionsTab
+                session={workspace.session}
+                context={workspace.context}
+                suggestions={workspace.suggestions.workflow ?? []}
+                pendingRecommendations={workspace.active.pending_recommendations}
+                route={workspace.route}
+                acceptedDraft={acceptedDraft}
+                onDismissDraft={() => setAcceptedDraft(null)}
+                onChanged={() => {
+                  void workspace.reload();
+                  void workspace.reloadFlow();
+                }}
+              />
+            ) : null}
+
+            {activeTab === 'ontology' ? (
+              <ConnectionsTab
+                session={workspace.session}
+                context={workspace.context}
+                views={workspace.ontologyViews}
+                route={workspace.route}
+              />
+            ) : null}
+          </div>
+        ) : (
+        <>
         <div className="min-h-0 flex-1 overflow-y-auto px-5">
-          {messages.length === 0 ? (
-            <div className="py-5">
+          {/*
+            The structured spine beside the free-text conversation: what has been
+            established about this record so far, and the one thing to do next.
+            Derived from real rows, so it stays true regardless of what was said in
+            chat. Absent on list pages, where there is no single record to track.
+          */}
+          {workspace.flow?.applicable ? (
+            <div className="pt-5">
+              <FlowStrip flow={workspace.flow} onAct={(capability) => goToNextAction(capability)} />
+            </div>
+          ) : null}
+
+          {messages.length === 0 && workspace.loading && !workspace.payload ? (
+            /*
+              Resolving. Showing the static fallback here and swapping it a moment
+              later reads as the panel changing its mind, so it waits instead.
+            */
+            <div className="py-5" aria-busy="true">
               <p className="mb-2 text-xs font-medium text-gray-900">Suggested prompts</p>
               <div className="flex flex-col gap-1.5">
-                {SUGGESTED_PROMPTS.map((prompt) => (
+                {[0, 1, 2, 3].map((row) => (
+                  <div
+                    key={row}
+                    className="h-[42px] animate-pulse rounded-2xl border border-gray-200/60 bg-gray-100/70"
+                  />
+                ))}
+              </div>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="py-5">
+              <p className="mb-2 text-xs font-medium text-gray-900">
+                {workspace.context?.entity_label
+                  ? `About ${workspace.context.entity_label}`
+                  : workspace.context?.module_label
+                    ? `In ${workspace.context.module_label}`
+                    : 'Suggested prompts'}
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {conversationalPrompts.map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
@@ -475,6 +866,99 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                         >
                           {message.navigation.label}
                         </button>
+                      </div>
+                    ) : null}
+
+                    {/*
+                      A real change, held until the user agrees to it. The tool has
+                      already declined to run once; nothing happens until Confirm is
+                      pressed, and the prompt disappears either way so it cannot be
+                      answered twice.
+                    */}
+                    {message.role === 'assistant' && message.confirmation ? (
+                      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+                        <p className="text-xs font-medium text-amber-900">
+                          Confirm this action
+                        </p>
+                        <p className="mt-1 text-[11px] leading-snug text-amber-800">
+                          {message.confirmation.message}
+                        </p>
+                        <div className="mt-2.5 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => {
+                              const action = message.confirmation!.action;
+                              const question = message.confirmationFor || '';
+                              clearConfirmation(message.id);
+                              void sendMessage(question, [action]);
+                            }}
+                            className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLoading}
+                            onClick={() => clearConfirmation(message.id, true)}
+                            className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/*
+                      What the answer rests on. Kept on every assistant turn rather
+                      than only the newest: the point of a source line is that it stays
+                      checkable after the conversation has moved on.
+                    */}
+                    {message.role === 'assistant' && message.citations?.length ? (
+                      <div className="mt-2.5 border-t border-gray-100 pt-2">
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                          Sources
+                        </p>
+                        <ul className="mt-1 space-y-0.5">
+                          {message.citations.map((citation) => (
+                            <li key={citation.tool} className="text-[11px] leading-snug text-gray-500">
+                              <span className={citation.available ? '' : 'text-amber-600'}>
+                                {citation.module || citation.tool}
+                                {citation.available ? '' : ' — no data returned'}
+                              </span>
+                              {citation.unavailableSignals?.length ? (
+                                <span className="text-amber-600">
+                                  {' '}
+                                  · not recorded: {citation.unavailableSignals.join(', ')}
+                                </span>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {/*
+                      Where the conversation can go next, offered only under the most
+                      recent answer. Older turns keep their text but lose their chips —
+                      a follow-up to a question three turns back is rarely what the
+                      user now means, and a panel full of stale chips is noise.
+                    */}
+                    {message.role === 'assistant' &&
+                    message.id === messages[messages.length - 1]?.id &&
+                    message.followUps?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {message.followUps.slice(0, 4).map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => void sendMessage(suggestion)}
+                            disabled={isLoading}
+                            className="rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-[#0D6EFD]/25 hover:bg-blue-50 hover:text-[#0D6EFD] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
                       </div>
                     ) : null}
                   </div>
@@ -632,6 +1116,8 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
             </div>
           ) : null}
         </div>
+        </>
+        )}
       </div>
     </aside>
   );

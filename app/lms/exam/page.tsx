@@ -35,6 +35,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 
 type ExamStatus = 'Scheduled' | 'Open' | 'Draft' | 'Closed';
 type AudienceMode = 'Teacher' | 'Student';
@@ -4230,8 +4231,18 @@ export default function StudentHomeworkIndexPage() {
                       </label>
 
                       <label className="block">
-                        <span className="mb-2.5 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
+                        <span className="mb-2.5 flex items-center justify-between text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
                           Description
+                          <AiFieldAssistant
+                            value={examDescription}
+                            onApply={setExamDescription}
+                            fieldType="instructions"
+                            label="Exam description"
+                            module="lms"
+                            page="Online exam"
+                            entityType="exam_paper"
+                            related={{ "Exam name": examName }}
+                          />
                         </span>
                         <textarea
                           value={examDescription}

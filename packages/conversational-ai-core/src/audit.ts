@@ -2,6 +2,11 @@ export type AuditEventType =
   | "conversation.request"
   | "conversation.response"
   | "conversation.confirmation_required"
+  // The plan required data the tools reported they do not hold, so the answer was
+  // refused rather than approximated. Worth auditing separately from a normal
+  // response: a rise here means questions are outrunning the data, not that the
+  // assistant is failing.
+  | "conversation.refused_no_data"
   | "tool.execution"
   | "voice.playback"
   | "voice.transcript";

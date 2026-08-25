@@ -38,6 +38,7 @@ import {
   Filler
 } from 'chart.js';
 import { Bar, Doughnut, Radar } from 'react-chartjs-2';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -1572,6 +1573,18 @@ export default function AdmissionManagementContent() {
                 </EnquiryModalField>
 
                 <EnquiryModalField label="Remarks" htmlFor="remarks" className="md:col-span-2 xl:col-span-3">
+                  {/* This field is uncontrolled (defaultValue), so the assistant drives
+                      the element by id rather than the form being refactored around it. */}
+                  <div className="mb-1 flex justify-end">
+                    <AiFieldAssistant
+                      targetId="remarks"
+                      fieldType="notes"
+                      label="Remarks"
+                      module="admissions"
+                      page="Admission enquiry"
+                      entityType="enquiry"
+                    />
+                  </div>
                   <textarea id="remarks" name="remarks" defaultValue={editingEnquiry?.remarks || ''} placeholder="Enter remarks" className={enquiryTextareaClassName} />
                 </EnquiryModalField>
 

@@ -2,6 +2,7 @@
 //add semi
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 import {
   BookOpen,
   Briefcase,
@@ -396,6 +397,99 @@ export default function CourseMasterPage() {
   }, [filteredGroups, visibleCount, totalSubjects]);
 
   const hasMore = visibleCount < totalSubjects;
+
+  /*
+   * Tell the assistant what the catalogue is showing.
+   *
+   * This page is the reason facets exist. Nothing is selected and usually nothing is
+   * filtered, so without the grade and category lists there is no page-specific
+   * material at all and the panel falls back to "what can I do on this page?" — which
+   * is exactly what it was doing.
+   *
+   * Only the courses that survive the current filters are sent, capped by the provider,
+   * with the true total alongside so the assistant never describes a window as the
+   * whole catalogue.
+   */
+  const catalogSubjects = audienceMode === 'Student' ? filteredStudentSubjects : null;
+
+  useRegisterPageAiContext(
+    useMemo(() => {
+      // Nothing useful to say until the catalogue has loaded.
+      if (loading || error || !data) {
+        return null;
+      }
+
+      const courses = catalogSubjects
+        ? catalogSubjects.map((subject) => ({
+            id: subject.subject_id,
+            label: subject.subject_name,
+            grade: subject.standard_name,
+            category: subject.category_name || subject.content_category,
+          }))
+        : filteredGroups.flatMap((group) =>
+            group.categories.flatMap((category) =>
+              category.subjects.map((subject) => ({
+                id: subject.subject_id,
+                label: subject.subject_name,
+                grade: group.standardName,
+                category: category.categoryName,
+              }))
+            )
+          );
+
+      return {
+        // The audience mode belongs in the title rather than in `filters`. It changes
+        // which courses are listed, but calling it a filter made the assistant offer
+        // "explain what this filtered view shows" on an unfiltered catalogue — a weak
+        // suggestion occupying a slot a real question could use.
+        pageTitle: `Course Catalog (${audienceMode} view)`,
+        pageType: 'list' as const,
+        searchQuery: search,
+        filters: {
+          // "all" is dropped at both ends, so an unfiltered catalogue reports no
+          // filters rather than "Grade: all".
+          grade: standardFilter,
+          category: categoryFilter,
+        },
+        facets: [
+          {
+            key: 'grade',
+            label: 'Grade',
+            values: standardOptions,
+            question: 'What courses are available for Grade {value}?',
+          },
+          {
+            key: 'category',
+            label: 'Category',
+            values: categoryOptions,
+            question: 'Show me the courses available under {value}.',
+          },
+        ],
+        records: courses,
+        recordCount: courses.length,
+        availableActions: [
+          { key: 'search_courses', label: 'Search the catalogue' },
+          { key: 'filter_by_grade', label: 'Filter by grade' },
+          { key: 'filter_by_category', label: 'Filter by category' },
+          { key: 'open_course', label: 'Open a course' },
+          { key: 'view_chapters', label: 'View a course’s chapters' },
+          { key: 'view_curriculum', label: 'View a course’s curriculum' },
+        ],
+      };
+    }, [
+      loading,
+      error,
+      data,
+      search,
+      standardFilter,
+      categoryFilter,
+      audienceMode,
+      standardOptions,
+      categoryOptions,
+      filteredGroups,
+      catalogSubjects,
+    ])
+  );
 
   useEffect(() => {
     localStorage.setItem('learningManagementAudienceMode', audienceMode);

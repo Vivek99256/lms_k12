@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import {
   Table,
   TableBody,
@@ -297,7 +298,22 @@ export default function CreateAssignmentPage() {
               />
             </div>
             <div className="space-y-2 md:col-span-2 xl:col-span-3">
-              <Label htmlFor="asg-desc">Description</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="asg-desc">Description</Label>
+                <AiFieldAssistant
+                  value={description}
+                  onApply={setDescription}
+                  fieldType="description"
+                  label="Assignment description"
+                  module="lms"
+                  page="Assignment"
+                  entityType="assignment"
+                  related={{ "Assignment title": title }}
+                  // The field itself caps at 50, so the model is told the same limit
+                  // rather than producing something the form will silently truncate.
+                  maxLength={50}
+                />
+              </div>
               <Textarea
                 id="asg-desc"
                 value={description}

@@ -15,6 +15,7 @@ import {
   type StudentSearchFilters,
 } from './api';
 import type { Student } from './components/StudentProfilesTab';
+import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 
 const classOptions = [
   { value: '', label: 'All Classes' },
@@ -166,6 +167,59 @@ export default function SearchStudentPage() {
       return matchesSearch && matchesClass && matchesStatus && matchesHouse;
     });
   }, [students, searchQuery, classFilter, statusFilter, houseFilter]);
+
+  /*
+   * Tell the assistant what this page is showing.
+   *
+   * Everything below is state this page already keeps, so adoption costs one hook. It
+   * is what turns "summarise these" and "which of these need attention?" from guesses
+   * into questions with a referent: the assistant sees the same filtered, searched,
+   * partly-selected set the user is looking at.
+   *
+   * Only the sorted list is sent, capped by the provider — a summary for a prompt, not
+   * a data transfer. `recordCount` carries the real total so the assistant never
+   * describes a window as if it were the whole set.
+   */
+  useRegisterPageAiContext(
+    useMemo(
+      () => ({
+        pageTitle: 'Student profiles',
+        pageType: 'list' as const,
+        searchQuery,
+        filters: {
+          class: classFilter,
+          status: statusFilter,
+          house: houseFilter,
+          ...studentSearch,
+        },
+        records: filteredStudents.map((student) => ({
+          id: student.id,
+          label: student.name,
+          admissionNo: student.admissionNo,
+          class: student.class,
+          status: student.status,
+          house: student.house,
+        })),
+        recordCount: filteredStudents.length,
+        selectedRecords: selectedStudents.map((id) => ({ entity: 'student', id })),
+        availableActions: [
+          { key: 'search', label: 'Search students' },
+          { key: 'filter', label: 'Filter by class, status or house' },
+          { key: 'view_profile', label: 'Open a student profile' },
+          { key: 'export', label: 'Export the list' },
+        ],
+      }),
+      [
+        searchQuery,
+        classFilter,
+        statusFilter,
+        houseFilter,
+        studentSearch,
+        filteredStudents,
+        selectedStudents,
+      ]
+    )
+  );
 
   // Sort students
   const sortedStudents = useMemo(() => {

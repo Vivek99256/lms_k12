@@ -15,6 +15,7 @@ import {
 import { SearchDropdown, type DropdownValue } from '@/components/search-dropdown';
 import { buildSessionContext } from '@/lib/erp-client';
 import { RecordTable, type RecordColumn } from '@/components/erp/RecordTable';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import {
   deleteSyllabus,
   fetchCurriculums,
@@ -320,19 +321,67 @@ export default function SyllabusPlanPage() {
 
             <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">Objectives</label>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="block text-sm font-medium text-slate-700">Objectives</label>
+                  <AiFieldAssistant
+                    value={form.objectives}
+                    onApply={(next) => patch({ objectives: next })}
+                    fieldType="learning_objective"
+                    label="Objectives"
+                    module="lms"
+                    page="Syllabus plan"
+                    entityType="syllabus_plan"
+                    related={{ "Plan title": form.title, "Learning outcomes": form.learningOutcomes }}
+                  />
+                </div>
                 <textarea value={form.objectives} onChange={(e) => patch({ objectives: e.target.value })} rows={3} className={textareaClass} />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">Learning Outcomes</label>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="block text-sm font-medium text-slate-700">Learning Outcomes</label>
+                  <AiFieldAssistant
+                    value={form.learningOutcomes}
+                    onApply={(next) => patch({ learningOutcomes: next })}
+                    fieldType="learning_objective"
+                    label="Learning outcomes"
+                    module="lms"
+                    page="Syllabus plan"
+                    entityType="syllabus_plan"
+                    related={{ "Objectives": form.objectives }}
+                  />
+                </div>
                 <textarea value={form.learningOutcomes} onChange={(e) => patch({ learningOutcomes: e.target.value })} rows={3} className={textareaClass} />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">Suggested Materials</label>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="block text-sm font-medium text-slate-700">Suggested Materials</label>
+                  <AiFieldAssistant
+                    value={form.suggestedMaterials}
+                    onApply={(next) => patch({ suggestedMaterials: next })}
+                    fieldType="description"
+                    label="Suggested materials"
+                    module="lms"
+                    page="Syllabus plan"
+                    entityType="syllabus_plan"
+                    related={{ "Objectives": form.objectives }}
+                  />
+                </div>
                 <textarea value={form.suggestedMaterials} onChange={(e) => patch({ suggestedMaterials: e.target.value })} rows={3} className={textareaClass} />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">Assessment Plan</label>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="block text-sm font-medium text-slate-700">Assessment Plan</label>
+                  <AiFieldAssistant
+                    value={form.assessmentPlan}
+                    onApply={(next) => patch({ assessmentPlan: next })}
+                    fieldType="instructions"
+                    label="Assessment plan"
+                    module="lms"
+                    page="Syllabus plan"
+                    entityType="syllabus_plan"
+                    related={{ "Objectives": form.objectives, "Learning outcomes": form.learningOutcomes }}
+                  />
+                </div>
                 <textarea value={form.assessmentPlan} onChange={(e) => patch({ assessmentPlan: e.target.value })} rows={3} className={textareaClass} />
               </div>
             </div>

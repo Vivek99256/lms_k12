@@ -2,8 +2,23 @@
 import React, { useEffect, useState } from 'react';
 import { BookOpen, Calendar, FileText, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 
 export default function Dashboard() {
+  /*
+   * Registers the page shape only.
+   *
+   * The stat tiles below are hardcoded placeholders, not retrieved figures. Passing
+   * them as `metrics` would put invented numbers into the assistant's prompt, and the
+   * grounding rules exist precisely to stop that — so they are deliberately withheld.
+   * The moment these tiles read from an API, add them here as `metrics` and the
+   * assistant can be asked about them.
+   */
+  useRegisterPageAiContext({
+    pageTitle: 'Dashboard',
+    pageType: 'dashboard',
+  });
+
    const [sessionData, setSessionData] = useState({
     url: "",
     token: "",

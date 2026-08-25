@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { BookOpen, Plus, Trash2, CheckCircle2, Settings, Layers, Save, AlertCircle, PlayCircle, Loader2 } from 'lucide-react';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -234,7 +235,28 @@ export default function CreateQuizPage() {
                       <div className="flex-1 space-y-5">
                         {/* Question Text */}
                         <div>
-                          <textarea 
+                          <div className="mb-1 flex items-center justify-between">
+                            <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                              Question {qIndex + 1}
+                            </span>
+                            <AiFieldAssistant
+                              value={q.text}
+                              onApply={(next) => updateQuestion(qIndex, 'text', next)}
+                              fieldType="question"
+                              label="Question"
+                              module="quiz"
+                              page="Create quiz"
+                              entityType="quiz_question"
+                              subject={selectedSubject?.name ?? null}
+                              related={{
+                                'Quiz title': quizDetails.title,
+                                // The options matter: "make it more specific" must not
+                                // produce a question none of the answers fit.
+                                'Answer options': q.options.filter(Boolean).join(' | '),
+                              }}
+                            />
+                          </div>
+                          <textarea
                             value={q.text}
                             onChange={(e) => updateQuestion(qIndex, 'text', e.target.value)}
                             placeholder="Enter your question here..."

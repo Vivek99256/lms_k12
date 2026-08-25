@@ -37,6 +37,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Badge } from '@/components/ui/badge';
 import { Calendar as DatePickerCalendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -242,9 +243,23 @@ function CreateLessonPlanDialog({
           </div>
 
           <div>
-            <Label className="mb-2 block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
-              Learning objectives
-            </Label>
+            <div className="mb-2 flex items-center justify-between">
+              <Label className="block text-[13px] font-semibold uppercase tracking-wide text-[#64748B]">
+                Learning objectives
+              </Label>
+              <AiFieldAssistant
+                value={lessonPlanDraft.objective}
+                onApply={(next) =>
+                  setLessonPlanDraft((current) => ({ ...current, objective: next }))
+                }
+                fieldType="learning_objective"
+                label="Learning objectives"
+                module="course-master"
+                page="Lesson plan"
+                entityType="lesson_plan"
+                disabled={isSavingLessonPlan}
+              />
+            </div>
             <Textarea
               rows={4}
               value={lessonPlanDraft.objective}

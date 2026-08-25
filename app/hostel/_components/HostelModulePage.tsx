@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { readNumber } from "@/lib/erp-client";
 import { exportRowsAsCsv, exportRowsAsExcel, exportRowsAsPdf, openPrintPreview, type TableExportColumn, type TableExportRow } from "@/lib/table-export";
 import { hostelConfigs, type HostelFieldConfig } from "../configs";
+import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import { deleteHostelModule, getHostelSetupSession, loadHostelModule, saveHostelModule, type HostelCustomField, type HostelModule, type HostelModuleData, type HostelOption, type HostelRecord } from "../setup-api";
 
 const PAGE_SIZE = 10;
@@ -271,7 +272,22 @@ export function HostelModulePage({ module }: { module: HostelModule }) {
   function renderField(field: HostelFieldConfig, sourceForm: Record<string, string>, onChange: (key: string, value: string) => void) {
     const value = text(sourceForm[field.key]);
     if (field.kind === "textarea") {
-      return <Textarea id={field.key} value={value} onChange={(event) => onChange(field.key, event.target.value)} className="mt-1" rows={4} />;
+      return (
+        <>
+          <div className="mt-1 flex justify-end">
+            <AiFieldAssistant
+              value={value}
+              onApply={(next) => onChange(field.key, next)}
+              fieldType="description"
+              label={field.label}
+              module="hostel"
+              page="Hostel setup"
+              entityType={field.key}
+            />
+          </div>
+          <Textarea id={field.key} value={value} onChange={(event) => onChange(field.key, event.target.value)} rows={4} />
+        </>
+      );
     }
     if (field.kind === "select") {
       const options = field.options?.map((option) => ({ id: option, label: option })) ?? optionsFor(field, sourceForm).map((option) => ({ id: String(option.id), label: optionLabel(option, field) }));
