@@ -8,6 +8,8 @@ export interface Chapter {
   number: number;
   title: string;
   content_categories?: Record<string, unknown[]>;
+  /** The chapter's topic breakdown (topic_master), in curriculum order. */
+  topics?: ChapterTopic[];
   concepts?: ChapterConcept[];
   teachingMethodologies: string[];
   resources: {
@@ -91,10 +93,23 @@ export interface ChapterSemantic {
   md_content?: string;
 }
 
+/**
+ * A topic inside a chapter. Chapters are split into topics, and topics into
+ * concepts, so the chapter list drills chapter -> topic -> concept.
+ */
+export interface ChapterTopic {
+  id: string;
+  title: string;
+  description: string;
+  sortOrder: number;
+}
+
 export interface ChapterConcept {
   id: string;
   title: string;
   description: string;
+  /** topic_master.id this concept sits under, or null when it predates the topic split. */
+  topicId: string | null;
   learningObjective?: string;
   semantic?: {
     learning_objective?: string;
@@ -118,6 +133,7 @@ interface ApiChapterSource {
   total_triz_content?: number | string;
   total_OER_content?: number | string;
   content_categories?: Record<string, unknown[]>;
+  topics?: ApiChapterTopicSource[];
   subject_id?: number;
   standard_id?: number;
   semantic?: ChapterSemantic;
@@ -143,9 +159,17 @@ interface ApiChapterSource {
 
 interface ApiChapterConceptSource {
   concept_id?: number | string;
+  topic_id?: number | string | null;
   concept_name?: string;
   concept_description?: string;
   semantic?: ChapterConcept['semantic'];
+}
+
+interface ApiChapterTopicSource {
+  topic_id?: number | string;
+  topic_name?: string;
+  topic_description?: string | null;
+  topic_sort_order?: number | string | null;
 }
 
 export interface SubjectWithChapters {
@@ -161,10 +185,35 @@ function mapChapterConcepts(concepts: ApiChapterConceptSource[] | undefined): Ch
       id: String(concept.concept_id ?? index + 1),
       title: concept.concept_name ?? `Concept ${index + 1}`,
       description: concept.concept_description ?? '',
+      topicId: normaliseTopicId(concept.topic_id),
       learningObjective: concept.semantic?.learning_objective,
       semantic: concept.semantic,
     }))
     .filter((concept) => concept.title.trim());
+}
+
+/** 0 and '' are "no topic" in the payload, so they normalise to null alongside null itself. */
+function normaliseTopicId(value: number | string | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const id = String(value).trim();
+  return id && id !== '0' ? id : null;
+}
+
+/**
+ * Topics come back already sorted by topic_sort_order, but the sort column is
+ * nullable, so ties fall back to payload order rather than jumping around.
+ */
+function mapChapterTopics(topics: ApiChapterTopicSource[] | undefined): ChapterTopic[] {
+  if (!Array.isArray(topics)) return [];
+
+  return topics
+    .map((topic, index) => ({
+      id: String(topic.topic_id ?? index + 1),
+      title: topic.topic_name ?? `Topic ${index + 1}`,
+      description: topic.topic_description ?? '',
+      sortOrder: Number(topic.topic_sort_order) || index + 1,
+    }))
+    .filter((topic) => topic.title.trim());
 }
 
 function mapConceptCategories(concepts: ChapterConcept[], fallback?: Record<string, unknown[]>) {
@@ -470,6 +519,8 @@ export interface ChapterContentAsset {
   file_type: string | null;
   content_category: string | null;
   concept_id?: number | string | null;
+  /** lms_concept.name, resolved through content_master.concept_id. */
+  concept_name?: string | null;
   created_at: string | null;
   source?: string | null;
 }
@@ -621,6 +672,12 @@ export interface UploadChapterContentInput {
   chapter_id: number;
   sub_institute_id: number;
   user_id: number;
+  /**
+   * Role of the signed-in user. The store endpoint only accepts Admin / Teacher /
+   * LMS Teacher, and has no Laravel session to read it from on an API call, so it
+   * has to travel with the request or the upload is rejected as unauthorized.
+   */
+  user_profile_name: string;
   subject_id?: number;
   standard_id?: number;
   syear?: string;
@@ -658,6 +715,7 @@ export async function uploadChapterContent(
   form.append('chapter_id', String(input.chapter_id));
   form.append('sub_institute_id', String(input.sub_institute_id));
   form.append('user_id', String(input.user_id));
+  form.append('user_profile_name', input.user_profile_name);
   if (input.subject_id != null) form.append('subject_id', String(input.subject_id));
   if (input.standard_id != null) form.append('standard_id', String(input.standard_id));
   if (input.syear) form.append('syear', input.syear);
@@ -833,7 +891,12 @@ export async function fetchNewChapterMaster(
 export interface QuestionBankApiQuestion {
   id: number;
   chapter_id: number;
-  topic_id?: number;
+  /** topic_master.id — a different id space from concept_id. */
+  topic_id?: number | null;
+  /** lms_concept.id the question is filed under. */
+  concept_id?: number | null;
+  /** Concept name stored on the question itself, for rows whose ids don't resolve. */
+  concept?: string | null;
   question: string;
   question_type: string;
   options?: Array<{
@@ -868,6 +931,63 @@ export async function fetchQuestionBank(chapterId: number): Promise<QuestionBank
     message: (raw.message as string) || 'Questions fetched successfully.',
     data: (raw.data as QuestionBankApiQuestion[]) ?? [],
   };
+}
+
+export interface UpdateQuestionBankPayload {
+  id: number;
+  sub_institute_id: number;
+  question: string;
+  question_type: 'MCQ' | 'Narrative';
+  marks: number;
+  concept_id?: number | null;
+  concept?: string | null;
+  model_answer?: string | null;
+  options?: Array<{ label: string; text: string; is_correct: boolean }>;
+}
+
+/**
+ * Persist an edited Question Bank question. Writes to the same rows
+ * fetchQuestionBank reads, so the caller only has to re-fetch to show the
+ * stored result.
+ */
+export async function updateQuestionBankQuestion(
+  payload: UpdateQuestionBankPayload
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-question-bank/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await readApiJson(res, 'Failed to save the question');
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to save the question'));
+  }
+}
+
+export interface DeleteQuestionBankPayload {
+  id: number;
+  sub_institute_id: number;
+}
+
+/**
+ * Remove a Question Bank question. The API soft-deletes it — the row keeps its
+ * id and gets a deleted_at stamp — so papers and exam answers that reference the
+ * question still resolve, while fetchQuestionBank no longer returns it.
+ */
+export async function deleteQuestionBankQuestion(
+  payload: DeleteQuestionBankPayload
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-question-bank/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await readApiJson(res, 'Failed to delete the question');
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to delete the question'));
+  }
 }
 
 export async function getSubjectAndChapters(
@@ -956,6 +1076,7 @@ export async function getSubjectAndChapters(
         number: Number(chapter.sort_order) || index + 1,
         title: chapter.chapter_name || '',
         content_categories: mapConceptCategories(concepts, chapter.content_categories),
+        topics: mapChapterTopics(chapter.topics),
         concepts,
         teachingMethodologies: [],
         resources: {

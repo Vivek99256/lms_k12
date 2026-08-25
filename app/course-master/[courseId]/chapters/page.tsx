@@ -60,6 +60,8 @@ import {
   getConceptIntelligenceData,
   getSubjectAndChapters,
   resolveSubjectDisplayName,
+  deleteQuestionBankQuestion,
+  updateQuestionBankQuestion,
   uploadChapterContent,
   type ChapterContentAsset,
   type ChapterSemantic,
@@ -69,7 +71,7 @@ import {
   type SubjectWithChapters,
 } from '../../data/chapters';
 import { ConceptIntelligenceTabs } from './ConceptIntelligenceTabs';
-import { getRequestContext } from '../../page';
+import { getRequestContext, getSyear } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import { useCurriculumMeta } from '../../data/curriculum';
@@ -165,6 +167,26 @@ const UPLOAD_TYPE_CONFIG: Record<
 
 type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity';
 type ChapterContentSource = 'Gamma AI' | 'Uploaded';
+
+/**
+ * content_master.source values written by the Generate Content flow. It has used
+ * more than one marker over time, so the badge matches against the whole set
+ * rather than a single string.
+ */
+const GENERATED_CONTENT_SOURCES = ['gamma ai', 'aigenerated'];
+
+/**
+ * Where a content row came from.
+ *
+ * Only an explicit generated marker counts as generated. Everything else is an
+ * upload — including rows with no source at all, which predate the source column
+ * being stamped and were created by the upload path.
+ */
+function resolveContentSource(source: string | null | undefined): ChapterContentSource {
+  return GENERATED_CONTENT_SOURCES.includes((source ?? '').trim().toLowerCase())
+    ? 'Gamma AI'
+    : 'Uploaded';
+}
 type ChapterContentPreview = 'presentation' | 'notes' | 'video' | 'pdf' | 'activity';
 
 interface ChapterContentItem {
@@ -175,6 +197,12 @@ interface ChapterContentItem {
   conceptTitle: string;
   contentCategory: string;
   conceptId: string | null;
+  /**
+   * Name of the mapped concept, from lms_concept via content_master.concept_id.
+   * Null when the content has not been mapped to a concept. Kept separate from
+   * `conceptTitle`, which holds the content category and drives grouping.
+   */
+  conceptName: string | null;
   type: ChapterContentType;
   source: ChapterContentSource;
   preview: ChapterContentPreview;
@@ -307,7 +335,7 @@ function buildApiChapterContentItems(
         asset.concept_id === null || asset.concept_id === undefined
           ? null
           : String(asset.concept_id).trim();
-      const source = asset.source === 'Gamma AI' ? 'Gamma AI' : 'Uploaded';
+      const source = resolveContentSource(asset.source);
 
       return {
         id: String(asset.id),
@@ -317,6 +345,7 @@ function buildApiChapterContentItems(
         conceptTitle: category,
         contentCategory: asset.content_category ?? category,
         conceptId: rawConceptId && rawConceptId !== '0' ? rawConceptId : null,
+        conceptName: asset.concept_name?.trim() ? asset.concept_name.trim() : null,
         type,
         source,
         preview: getChapterContentPreview(type),
@@ -471,6 +500,74 @@ function resolveChapterKeyConcepts(
   return getChapterKeyConcepts(courseId, chapter.id);
 }
 
+/** Bucket id for concepts that carry no topic_id — never a real topic_master row. */
+const UNGROUPED_TOPIC_ID = '__ungrouped__';
+
+/**
+ * A topic row in the chapter list, carrying the concepts that sit under it.
+ * `conceptIndex` stays the chapter-wide index into `content_categories`, so
+ * Concept Intelligence and question generation keep addressing a concept exactly
+ * the way they did before the topic level was inserted.
+ */
+interface ChapterTopicRow {
+  id: string;
+  title: string;
+  description: string;
+  concepts: Array<{ title: string; conceptIndex: number }>;
+}
+
+/**
+ * Split a chapter's concepts across its topics.
+ *
+ * Chapters extracted before the topic split have no topic_master rows, and even
+ * where topics exist some concepts still carry no topic_id. No case may hide a
+ * concept: partly-tagged chapters collect the rest under an "Other concepts" row,
+ * while a chapter whose topics hold no concepts at all (no topic rows, or none of
+ * its concepts tagged) returns no rows, so the caller lists its concepts directly
+ * rather than burying them behind a screen of empty topics.
+ */
+function buildChapterTopicRows(chapter: Chapter, conceptRows: string[]): ChapterTopicRow[] {
+  const topics = chapter.topics ?? [];
+  if (topics.length === 0) return [];
+
+  // The list renders concept titles, so the topic lookup is keyed by title.
+  const topicIdByConcept = new Map<string, string>();
+  for (const concept of chapter.concepts ?? []) {
+    if (concept.topicId) topicIdByConcept.set(concept.title, concept.topicId);
+  }
+
+  const rows = new Map<string, ChapterTopicRow>(
+    topics.map((topic) => [
+      topic.id,
+      { id: topic.id, title: topic.title, description: topic.description, concepts: [] },
+    ])
+  );
+
+  const ungrouped: ChapterTopicRow['concepts'] = [];
+  conceptRows.forEach((title, conceptIndex) => {
+    const topicId = topicIdByConcept.get(title);
+    const row = topicId ? rows.get(topicId) : undefined;
+    if (row) row.concepts.push({ title, conceptIndex });
+    else ungrouped.push({ title, conceptIndex });
+  });
+
+  // Topics that account for none of the chapter's concepts would be nothing but
+  // dead ends, so the topic level only appears once the data backs it.
+  if (ungrouped.length === conceptRows.length) return [];
+
+  const result = Array.from(rows.values());
+  if (ungrouped.length > 0) {
+    result.push({
+      id: UNGROUPED_TOPIC_ID,
+      title: 'Other concepts',
+      description: 'Concepts that are not mapped to a topic yet.',
+      concepts: ungrouped,
+    });
+  }
+
+  return result;
+}
+
 function buildTeacherResources(chapterTitle: string) {
   return [
     {
@@ -512,7 +609,7 @@ function buildTeacherResources(chapterTitle: string) {
 function getCourseClassroomLabel(courseId: string, classGrade: string) {
   const sectionLabel = getCourseSectionLabel(courseId);
   const sectionSuffix = sectionLabel.split(' ').pop() ?? sectionLabel;
-  return `${getCourseGradeLabel(classGrade)} ${sectionSuffix}`;
+  return `${getCourseGradeLabel(classGrade)} `;
 }
 
 function getChapterContentType(index: number): ChapterContentType {
@@ -622,6 +719,7 @@ function buildChapterContentItems(
       subtitle: `${chapterLabel} - ${gradeLabel}`,
       chapterTitle: chapter.title,
       conceptTitle,
+      conceptName: concept?.title ?? null,
       contentCategory: type === 'Teacher training presentation' ? 'Teacher Training' : conceptTitle,
       // Demo data has no real concept_id; approximate chapter-wise vs concept-wise
       // by alternating so both grouping views show sample content.
@@ -665,21 +763,24 @@ function truncateToWords(value: string, maxWords = 150): string {
   return words.slice(0, maxWords).join(' ') + '…';
 }
 
-function getQuestionBankConceptTitles(course: Course, chapter: Chapter) {
+/**
+ * Concepts a question can be filed under. These are the chapter's own concept
+ * rows from the chapter master API (`/lms/new_chapter_master`) — the same source
+ * the chapter dropdown uses — so the list is the tenant's real curriculum rather
+ * than a sample. `content_categories` covers chapters whose concept rows weren't
+ * expanded in the response. The full list is returned: capping it hid most of a
+ * chapter's concepts, since chapters carry up to 40-odd.
+ */
+function getQuestionBankConceptTitles(chapter: Chapter) {
   const savedConcepts = (chapter.concepts ?? [])
     .map((concept) => concept.title)
     .filter((title) => title.trim());
-  const keyConcepts = getChapterKeyConcepts(course.id, chapter.id)?.concepts.map((concept) => concept.title) ?? [];
   const categoryConcepts = Object.keys(chapter.content_categories ?? {}).filter(
     (title) => title.trim() && !/^(my course|videos|recorded videos)$/i.test(title.trim())
   );
-  const concepts = savedConcepts.length
-    ? savedConcepts
-    : keyConcepts.length
-      ? keyConcepts
-      : categoryConcepts;
+  const concepts = savedConcepts.length ? savedConcepts : categoryConcepts;
 
-  return Array.from(new Set(concepts.map((title) => title.trim()))).slice(0, 4);
+  return Array.from(new Set(concepts.map((title) => title.trim())));
 }
 
 function getQuestionBankCategory(course: Course, chapter: Chapter, conceptTitle: string) {
@@ -698,14 +799,25 @@ function isLikelyJson(value: string): boolean {
   return trimmed.startsWith('{') && trimmed.endsWith('}');
 }
 
+/**
+ * The question's type as stored against it. The API normalises the
+ * question_type_master label (which spells multiple-choice 'multiple') down to
+ * the two types the bank shows, so this only has to defend against casing.
+ */
+function normaliseQuestionBankType(value: string | undefined): QuestionBankQuestionType {
+  return (value ?? '').trim().toUpperCase() === 'MCQ' ? 'MCQ' : 'Narrative';
+}
+
 function deriveQuestionBankAnswer(
   q: QuestionBankApiQuestion
 ): { type: QuestionBankQuestionType; options?: QuestionBankOption[]; modelAnswer?: string } {
+  const type = normaliseQuestionBankType(q.question_type);
+
   if (q.options && q.options.length > 0) {
     return {
-      type: q.question_type === 'MCQ' ? 'MCQ' : 'Narrative',
+      type,
       options: q.options.map((o) => ({ label: o.label, text: o.text, isCorrect: o.is_correct })),
-      modelAnswer: q.question_type === 'MCQ' ? undefined : q.model_answer,
+      modelAnswer: type === 'MCQ' ? undefined : q.model_answer,
     };
   }
 
@@ -718,9 +830,8 @@ function deriveQuestionBankAnswer(
       };
 
       if (Array.isArray(parsed.options) && parsed.options.length > 0) {
-        const isMcq = (parsed.question_type ?? '').toLowerCase() === 'mcq';
         return {
-          type: isMcq ? 'MCQ' : 'Narrative',
+          type,
           options: parsed.options.map((o) => ({
             label: o.label,
             text: o.text,
@@ -735,10 +846,39 @@ function deriveQuestionBankAnswer(
   }
 
   return {
-    type: q.question_type === 'MCQ' ? 'MCQ' : 'Narrative',
+    type,
     options: undefined,
     modelAnswer: q.model_answer,
   };
+}
+
+/**
+ * The concept a question is filed under.
+ *
+ * A question carries two different links: `concept_id` points at lms_concept and
+ * `topic_id` at topic_master. They are separate id spaces, so each is resolved
+ * against its own list — matching a topic id against the concept rows is what used
+ * to yield "Topic 23740" labels and fill the concept dropdown with them. `concept`
+ * is the name stored on the question itself and covers rows whose ids no longer
+ * resolve against the chapter.
+ */
+function resolveQuestionConceptTitle(
+  q: QuestionBankApiQuestion,
+  chapter: Chapter | undefined
+): string {
+  if (q.concept_id) {
+    const byConceptId = chapter?.concepts?.find((c) => Number(c.id) === Number(q.concept_id));
+    if (byConceptId?.title.trim()) return byConceptId.title.trim();
+  }
+
+  if (q.concept?.trim()) return q.concept.trim();
+
+  if (q.topic_id) {
+    const byTopicId = chapter?.topics?.find((t) => Number(t.id) === Number(q.topic_id));
+    if (byTopicId?.title.trim()) return byTopicId.title.trim();
+  }
+
+  return 'General';
 }
 
 async function fetchMappedQuestionBank(
@@ -749,9 +889,7 @@ async function fetchMappedQuestionBank(
   const response = await fetchQuestionBank(chapterId);
 
   return response.data.map((q: QuestionBankApiQuestion) => {
-    const conceptTitle =
-      chapter?.concepts?.find((c) => Number(c.id) === q.topic_id)?.title ??
-      (q.topic_id ? `Topic ${q.topic_id}` : 'General');
+    const conceptTitle = resolveQuestionConceptTitle(q, chapter);
     const { type, options, modelAnswer } = deriveQuestionBankAnswer(q);
 
     return {
@@ -776,6 +914,7 @@ export default function ChapterListPage() {
   const searchParams = useSearchParams();
   const courseId = params?.courseId as string;
   const expandedChapterParam = searchParams?.get('expandedChapterId');
+  const expandedTopicParam = searchParams?.get('expandedTopicId');
 
   const [subjectData, setSubjectData] = useState<SubjectWithChapters | null>(null);
   const [subjectLoading, setSubjectLoading] = useState(true);
@@ -854,7 +993,9 @@ export default function ChapterListPage() {
         }
       : undefined;
   }, [courseId, subjectData?.chapters, subjectData?.subject]);
-  const allChapters = subjectData?.chapters ?? [];
+  // Memoised because a fresh [] each render would invalidate every hook that
+  // derives from the chapter list — including the question bank's concept options.
+  const allChapters = useMemo(() => subjectData?.chapters ?? [], [subjectData?.chapters]);
   // Both header stats come from live data: concept rows stored against the chapters,
   // and the board on the tenant's curriculum record.
   const totalConceptCount = useMemo(
@@ -913,6 +1054,9 @@ export default function ChapterListPage() {
   const [questionBankLoading, setQuestionBankLoading] = useState(false);
   const [questionBankError, setQuestionBankError] = useState('');
   const [isAddQuestionBankModalOpen, setIsAddQuestionBankModalOpen] = useState(false);
+  const [isSavingQuestionBankItem, setIsSavingQuestionBankItem] = useState(false);
+  const [deletingQuestionBankItemId, setDeletingQuestionBankItemId] = useState<string | null>(null);
+  const [questionBankDeleteError, setQuestionBankDeleteError] = useState('');
   const [manualQuestionChapterId, setManualQuestionChapterId] = useState('');
   const [manualQuestionConcept, setManualQuestionConcept] = useState('');
   const [manualQuestionType, setManualQuestionType] = useState<QuestionBankQuestionType>('MCQ');
@@ -930,8 +1074,11 @@ export default function ChapterListPage() {
   const [selectedLibraryChapterId, setSelectedLibraryChapterId] = useState('');
   const [contentLibraryTab, setContentLibraryTab] =
     useState<(typeof CONTENT_LIBRARY_TABS)[number]>('All content');
-  const [contentGroupBy, setContentGroupBy] =
-    useState<'Chapter wise' | 'Concept wise'>('Chapter wise');
+  // Grouping follows the resource type: Classroom Resources is chapter-wise,
+  // Teacher Resources is concept-wise. Derived instead of stored, so the two can
+  // never drift out of step and there is no toggle to leave in the wrong state.
+  const contentGroupBy: 'Chapter wise' | 'Concept wise' =
+    searchParams?.get('resourceType') === 'teacher' ? 'Concept wise' : 'Chapter wise';
   const [selectedContentItem, setSelectedContentItem] = useState<ChapterContentItem | null>(null);
   const [chapterContentCategories, setChapterContentCategories] = useState<
     Record<string, Record<string, ChapterContentAsset[]>>
@@ -1020,9 +1167,26 @@ export default function ChapterListPage() {
     return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
   }, [activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, contentLibraryTab, contentGroupBy, contentSourceFilter, contentResourceType, course]);
 
+  /**
+   * The chapter's content narrowed to the resource type currently on screen.
+   *
+   * Teacher Resources holds Teacher Training content and Classroom Resources holds
+   * everything else — the same split `filteredChapterContentItems` applies to the
+   * list below, reusing one classifier so the counts can never disagree with the
+   * items. Search, tab and source filters are deliberately not applied: these are
+   * the totals for the resource type, not for the current search.
+   */
+  const resourceScopedContentItems = useMemo(() => {
+    return chapterContentItems.filter((item) =>
+      contentResourceType === 'teacher'
+        ? isTeacherTrainingContent(item)
+        : !isTeacherTrainingContent(item)
+    );
+  }, [chapterContentItems, contentResourceType]);
+
   const contentSourceOptions = useMemo(
-    () => Array.from(new Set(chapterContentItems.map((item) => item.source))),
-    [chapterContentItems]
+    () => Array.from(new Set(resourceScopedContentItems.map((item) => item.source))),
+    [resourceScopedContentItems]
   );
 
   // The bank shows only questions that actually exist: what the API returned for the
@@ -1044,17 +1208,30 @@ export default function ChapterListPage() {
     [allChapters, manualQuestionChapterId]
   );
   const manualQuestionConceptOptions = useMemo(
-    () => (course && manualQuestionChapter ? getQuestionBankConceptTitles(course, manualQuestionChapter) : []),
-    [course, manualQuestionChapter]
+    () => (manualQuestionChapter ? getQuestionBankConceptTitles(manualQuestionChapter) : []),
+    [manualQuestionChapter]
   );
   const questionBankConceptOptions = useMemo(() => {
-    const conceptSource =
+    // Concepts come from the chapters loaded off `/lms/new_chapter_master` — the
+    // same source as the chapter dropdown — so every concept of the chapter is
+    // selectable even before a question exists for it. Concepts carried by the
+    // loaded questions are merged in so nothing already in the bank is unreachable.
+    const scopedChapters =
+      questionBankChapterFilter === 'all'
+        ? allChapters
+        : allChapters.filter((chapter) => chapter.id === questionBankChapterFilter);
+    const scopedQuestions =
       questionBankChapterFilter === 'all'
         ? questionBankItems
         : questionBankItems.filter((question) => question.chapterId === questionBankChapterFilter);
 
-    return Array.from(new Set(conceptSource.map((question) => question.conceptTitle)));
-  }, [questionBankChapterFilter, questionBankItems]);
+    const titles = [
+      ...scopedChapters.flatMap((chapter) => getQuestionBankConceptTitles(chapter)),
+      ...scopedQuestions.map((question) => question.conceptTitle),
+    ];
+
+    return Array.from(new Set(titles.map((title) => title.trim()).filter(Boolean)));
+  }, [allChapters, questionBankChapterFilter, questionBankItems]);
   const effectiveQuestionBankConceptFilter =
     questionBankConceptFilter === 'all' || questionBankConceptOptions.includes(questionBankConceptFilter)
       ? questionBankConceptFilter
@@ -1304,16 +1481,10 @@ export default function ChapterListPage() {
               (item.type === 'Revision notes' || item.type === 'PDF')) ||
              (contentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity');
 
-      // Chapter-wise shows only records without a concept_id; Concept-wise shows
-      // only records that carry a concept_id.
-      const matchesGroup =
-        contentGroupBy === 'Concept wise' ? item.conceptId !== null : item.conceptId === null;
-
-      return matchesSearch && matchesSource && matchesResourceType && matchesTab && matchesGroup;
+      return matchesSearch && matchesSource && matchesResourceType && matchesTab;
     });
   }, [
     chapterContentItems,
-    contentGroupBy,
     contentLibraryTab,
     contentResourceType,
     contentSearch,
@@ -1331,6 +1502,7 @@ export default function ChapterListPage() {
     isAddQuestionBankModalOpen ||
     questionModalConcept !== null;
   const expandedChapterId = view === 'teacher-resource' ? null : expandedChapterParam;
+  const expandedTopicId = expandedChapterId ? expandedTopicParam : null;
 
   useEffect(() => {
     if (!isAnyModalOpen) return;
@@ -1595,8 +1767,12 @@ export default function ChapterListPage() {
         chapter_id: Number(uploadChapterId),
         sub_institute_id: requestContext.sub_institute_id,
         user_id: requestContext.user_id,
+        user_profile_name: requestContext.user_profile_name,
         subject_id: Number(subjectData?.subject?.subject_id ?? subjectId) || undefined,
         standard_id: Number(subjectData?.subject?.standard_id ?? standardId) || undefined,
+        // Without this the row is stamped with the calendar year instead of the
+        // academic year, and drops out of the current year's content.
+        syear: getSyear() || undefined,
         content_type: uploadContentType,
         content_category: category,
         concept_id: conceptTitle,
@@ -1660,6 +1836,22 @@ export default function ChapterListPage() {
     } else {
       nextParams.delete('expandedChapterId');
     }
+    // A topic only exists inside its chapter, so switching or closing the
+    // chapter closes the topic with it.
+    nextParams.delete('expandedTopicId');
+
+    const nextQuery = nextParams.toString();
+    router.replace(`/course-master/${courseId}/chapters${nextQuery ? `?${nextQuery}` : ''}`);
+  };
+
+  const updateExpandedTopic = (chapterId: string, topicId: string | null) => {
+    const nextParams = new URLSearchParams(searchParams?.toString());
+    nextParams.set('expandedChapterId', chapterId);
+    if (topicId) {
+      nextParams.set('expandedTopicId', topicId);
+    } else {
+      nextParams.delete('expandedTopicId');
+    }
 
     const nextQuery = nextParams.toString();
     router.replace(`/course-master/${courseId}/chapters${nextQuery ? `?${nextQuery}` : ''}`);
@@ -1704,6 +1896,51 @@ export default function ChapterListPage() {
     setGeneratedQuestionPreviews([]);
   };
 
+  /**
+   * One concept row in the chapter list. `conceptIndex` is the chapter-wide index
+   * the Concept Intelligence view and the question generator address concepts by;
+   * `displayNumber` is only what the badge shows, so concepts stay numbered 1..n
+   * inside their own topic.
+   */
+  const renderConceptRow = (
+    chapter: Chapter,
+    conceptTitle: string,
+    conceptIndex: number,
+    displayNumber: number
+  ) => (
+    <div
+      key={conceptTitle}
+      className="flex flex-col gap-3 py-3.5 lg:flex-row lg:items-center lg:justify-between"
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
+          {displayNumber}
+        </div>
+        <p className="truncate text-[15px] font-medium text-slate-950">{conceptTitle}</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => openConceptIntelligenceView(chapter, conceptIndex)}
+          className="h-9 rounded-xl border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <Brain size={16} className="mr-2 text-[#4f46e5]" />
+          Concept Intelligence
+        </Button>
+        <Button
+          type="button"
+          onClick={() => openGenerateQuestionsModal(chapter, conceptTitle, conceptIndex)}
+          className="h-9 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] hover:bg-[#4338ca]"
+        >
+          <Sparkles size={16} className="mr-2" />
+          Generate Questions
+        </Button>
+      </div>
+    </div>
+  );
+
   const handleOpenContent = (item: ChapterContentItem) => {
     if (!item.contentUrl) return;
 
@@ -1738,6 +1975,8 @@ export default function ChapterListPage() {
   };
 
   const closeAddQuestionBankModal = () => {
+    // Closing mid-save would leave the request writing into a reset form.
+    if (isSavingQuestionBankItem) return;
     setIsAddQuestionBankModalOpen(false);
     resetManualQuestionForm();
   };
@@ -1757,7 +1996,7 @@ export default function ChapterListPage() {
 
     if (!targetChapter || !course) return;
 
-    const conceptOptions = getQuestionBankConceptTitles(course, targetChapter);
+    const conceptOptions = getQuestionBankConceptTitles(targetChapter);
     const targetConcept =
       effectiveQuestionBankConceptFilter !== 'all' &&
       conceptOptions.includes(effectiveQuestionBankConceptFilter)
@@ -1810,7 +2049,7 @@ export default function ChapterListPage() {
 
   const updateManualQuestionChapter = (chapterId: string) => {
     const nextChapter = allChapters.find((chapter) => chapter.id === chapterId) ?? null;
-    const nextConcepts = course && nextChapter ? getQuestionBankConceptTitles(course, nextChapter) : [];
+    const nextConcepts = nextChapter ? getQuestionBankConceptTitles(nextChapter) : [];
 
     setManualQuestionChapterId(chapterId);
     setManualQuestionConcept(nextConcepts[0] ?? '');
@@ -1825,7 +2064,7 @@ export default function ChapterListPage() {
     setManualQuestionError('');
   };
 
-  const submitManualQuestion = () => {
+  const submitManualQuestion = async () => {
     const chapter = allChapters.find((item) => item.id === manualQuestionChapterId);
     const marks = Number(manualQuestionMarks);
 
@@ -1880,6 +2119,71 @@ export default function ChapterListPage() {
           ? manualModelAnswer.trim() || 'Model answer not added yet.'
           : undefined,
     };
+
+    // Questions loaded from the API have a numeric id and a row behind them, so
+    // the edit has to go to the database. Manually added items exist only in this
+    // session, so they stay in local state as before.
+    const editedApiQuestionId =
+      editingQuestionBankItem && /^\d+$/.test(editingQuestionBankItem.id)
+        ? Number(editingQuestionBankItem.id)
+        : null;
+
+    if (editedApiQuestionId !== null) {
+      const requestContext = getRequestContext();
+      if (!requestContext) {
+        setManualQuestionError('Course master session data is missing.');
+        return;
+      }
+
+      // Sent alongside the name so the saved row keeps a real lms_concept link
+      // rather than only a label.
+      const matchedConcept = chapter.concepts?.find(
+        (item) => item.title === manualQuestionConcept
+      );
+
+      setIsSavingQuestionBankItem(true);
+      setManualQuestionError('');
+
+      try {
+        await updateQuestionBankQuestion({
+          id: editedApiQuestionId,
+          sub_institute_id: requestContext.sub_institute_id,
+          question: nextQuestion.question,
+          question_type: nextQuestion.type,
+          marks: nextQuestion.marks,
+          concept_id:
+            matchedConcept && /^\d+$/.test(matchedConcept.id) ? Number(matchedConcept.id) : null,
+          concept: nextQuestion.conceptTitle,
+          model_answer: nextQuestion.type === 'Narrative' ? manualModelAnswer.trim() : null,
+          options: nextQuestion.options?.map((option) => ({
+            label: option.label,
+            text: option.text,
+            is_correct: Boolean(option.isCorrect),
+          })),
+        });
+      } catch (error) {
+        setManualQuestionError(
+          error instanceof Error ? error.message : 'Failed to save the question.'
+        );
+        setIsSavingQuestionBankItem(false);
+        return;
+      }
+
+      setIsSavingQuestionBankItem(false);
+
+      // Drop any stale local override for this question — the list is about to be
+      // re-read from the database, and an override would shadow what was saved.
+      setQuestionBankItemEdits((current) => {
+        if (!(editingQuestionBankItem!.id in current)) return current;
+        const next = { ...current };
+        delete next[editingQuestionBankItem!.id];
+        return next;
+      });
+
+      closeAddQuestionBankModal();
+      loadQuestionBankItems(questionBankChapterFilter);
+      return;
+    }
 
     if (editingQuestionBankItem) {
       setQuestionBankItemEdits((current) => ({
@@ -2340,6 +2644,81 @@ export default function ChapterListPage() {
     );
   };
 
+  /**
+   * Chapter and concept line on a content card. The concept comes from the
+   * lms_concept mapping on the content row; content that has not been mapped to a
+   * concept shows the chapter alone rather than an empty pill.
+   */
+  const renderContentChapterConcept = (item: ChapterContentItem) => (
+    <div className="mb-3 flex flex-wrap items-center gap-1.5">
+      <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
+        <BookOpen size={11} className="shrink-0" />
+        {item.chapterTitle}
+      </span>
+      {item.conceptName ? (
+        <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#f1f5f9] px-3 py-1 text-[11px] font-medium text-slate-600">
+          <Brain size={11} className="shrink-0 text-[#4f46e5]" />
+          {item.conceptName}
+        </span>
+      ) : null}
+    </div>
+  );
+
+  /**
+   * Delete a Question Bank question. API-backed questions (numeric id) are
+   * soft-deleted server-side — the row keeps its id and gets a deleted_at stamp —
+   * and the card is dropped from local state straight away so the list updates
+   * without a refetch. Questions added in this session only exist locally, so
+   * they are just removed from state.
+   */
+  const handleDeleteQuestionBankItem = async (question: QuestionBankItem) => {
+    if (deletingQuestionBankItemId) return;
+
+    if (!window.confirm('Delete this question? It will be removed from the question bank.')) {
+      return;
+    }
+
+    setQuestionBankDeleteError('');
+
+    const dropLocalCopies = () => {
+      setApiQuestionBankItems((current) => current.filter((item) => item.id !== question.id));
+      setManualQuestionBankItems((current) => current.filter((item) => item.id !== question.id));
+      setQuestionBankItemEdits((current) => {
+        if (!(question.id in current)) return current;
+        const next = { ...current };
+        delete next[question.id];
+        return next;
+      });
+    };
+
+    if (!/^\d+$/.test(question.id)) {
+      dropLocalCopies();
+      return;
+    }
+
+    const requestContext = getRequestContext();
+    if (!requestContext) {
+      setQuestionBankDeleteError('Course master session data is missing.');
+      return;
+    }
+
+    setDeletingQuestionBankItemId(question.id);
+
+    try {
+      await deleteQuestionBankQuestion({
+        id: Number(question.id),
+        sub_institute_id: requestContext.sub_institute_id,
+      });
+      dropLocalCopies();
+    } catch (error: unknown) {
+      setQuestionBankDeleteError(
+        error instanceof Error ? error.message : 'Failed to delete the question.'
+      );
+    } finally {
+      setDeletingQuestionBankItemId(null);
+    }
+  };
+
   const renderQuestionBankQuestion = (question: QuestionBankItem) => {
     const visibleNumber = questionBankVisibleNumberById.get(question.id) ?? 1;
 
@@ -2414,10 +2793,12 @@ export default function ChapterListPage() {
           <Button
             type="button"
             variant="ghost"
-            className="h-10 rounded-2xl px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+            onClick={() => handleDeleteQuestionBankItem(question)}
+            disabled={deletingQuestionBankItemId !== null}
+            className="h-10 rounded-2xl px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Trash2 size={17} className="mr-2" />
-            Delete
+            {deletingQuestionBankItemId === question.id ? 'Deleting…' : 'Delete'}
           </Button>
         </div>
       </article>
@@ -2626,15 +3007,19 @@ export default function ChapterListPage() {
         <div className="flex items-center justify-end gap-4 border-t border-slate-200/90 px-7 py-4 sm:px-8">
           <button
             type="button"
+            disabled={isSavingQuestionBankItem}
             onClick={closeAddQuestionBankModal}
-            className="h-11 px-3 text-[16px] font-semibold text-slate-600 transition-colors hover:text-slate-950"
+            className="h-11 px-3 text-[16px] font-semibold text-slate-600 transition-colors hover:text-slate-950 disabled:cursor-not-allowed disabled:text-slate-400"
           >
             Cancel
           </button>
           <button
             type="button"
-            className="ds-btn ds-btn--primary ds-btn--md inline-flex h-11 items-center gap-2 rounded-xl bg-[#4f46e5] px-6 text-[16px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] transition-colors hover:bg-[#4338ca]"
-            onClick={submitManualQuestion}
+            disabled={isSavingQuestionBankItem}
+            className="ds-btn ds-btn--primary ds-btn--md inline-flex h-11 items-center gap-2 rounded-xl bg-[#4f46e5] px-6 text-[16px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] transition-colors hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:bg-[#c6c3f8]"
+            onClick={() => {
+              void submitManualQuestion();
+            }}
           >
             <svg
               width="18"
@@ -2653,7 +3038,11 @@ export default function ChapterListPage() {
             </svg>
             <span className="ds-btn__label">
               <span className="sc-interp">
-                {isEditingQuestionBankItem ? 'Save changes' : 'Add to bank'}
+                {isSavingQuestionBankItem
+                  ? 'Saving…'
+                  : isEditingQuestionBankItem
+                    ? 'Save changes'
+                    : 'Add to bank'}
               </span>
             </span>
           </button>
@@ -3463,6 +3852,19 @@ export default function ChapterListPage() {
             </div>
           </div>
 
+          {questionBankDeleteError ? (
+            <div className="mb-4 flex items-start justify-between gap-4 rounded-[8px] border border-rose-200 bg-rose-50 px-4 py-3">
+              <p className="text-sm font-medium text-rose-700">{questionBankDeleteError}</p>
+              <button
+                type="button"
+                onClick={() => setQuestionBankDeleteError('')}
+                className="shrink-0 text-sm font-semibold text-rose-800 hover:underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+
           {questionBankLoading ? (
             <div className="rounded-[8px] border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
               <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapter…</p>
@@ -3792,9 +4194,9 @@ export default function ChapterListPage() {
 
   if (view === 'content' && contentChapter) {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
-    const totalItems = chapterContentItems.length;
-    const gammaItems = chapterContentItems.filter((item) => item.source === 'Gamma AI').length;
-    const uploadedItems = chapterContentItems.filter((item) => item.source === 'Uploaded').length;
+    const totalItems = resourceScopedContentItems.length;
+    const gammaItems = resourceScopedContentItems.filter((item) => item.source === 'Gamma AI').length;
+    const uploadedItems = resourceScopedContentItems.filter((item) => item.source === 'Uploaded').length;
     const sourceLabel = contentSourceFilter === 'all' ? 'All sources' : contentSourceFilter;
     const activeChapterTitle = activeLibraryChapter?.title ?? contentChapter.title;
 
@@ -3895,24 +4297,16 @@ export default function ChapterListPage() {
 
               <div className="flex items-center justify-between gap-3 xl:justify-end">
                 <p className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Group By
+                  
                 </p>
-                <div className="inline-flex rounded-2xl bg-slate-100/90 p-1">
-                  {(['Chapter wise', 'Concept wise'] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setContentGroupBy(option)}
-                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                        contentGroupBy === option
-                          ? 'bg-white text-[#4f46e5] shadow-sm'
-                          : 'text-slate-500 hover:text-slate-900'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
+                <span className="inline-flex items-center gap-2 rounded-2xl bg-slate-100/90 px-4 py-2 text-sm font-semibold text-[#4f46e5]">
+                  {contentGroupBy === 'Concept wise' ? (
+                    <Brain size={15} />
+                  ) : (
+                    <BookOpen size={15} />
+                  )}
+                  {contentGroupBy}
+                </span>
               </div>
             </div>
           </div>
@@ -4025,8 +4419,10 @@ export default function ChapterListPage() {
           ) : contentGroupBy === 'Concept wise' ? (() => {
               const groups = new Map<string, { title: string; items: ChapterContentItem[] }>();
               filteredChapterContentItems.forEach((item) => {
-                const key = item.conceptId ?? 'unknown';
                 const title = item.conceptTitle || 'Unnamed concept';
+                // Keyed by name, not concept_id: content is rarely tagged with an
+                // id, and keying on it put every untagged item in one bucket.
+                const key = title.trim().toLowerCase();
                 const existing = groups.get(key);
                 if (existing) {
                   existing.items.push(item);
@@ -4071,9 +4467,7 @@ export default function ChapterListPage() {
                                 </div>
                               </div>
                               <div className="px-4 pb-4 pt-3">
-                                <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
-                                  {item.chapterTitle}
-                                </div>
+                                {renderContentChapterConcept(item)}
                                 <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
                                 <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
                                   <Button
@@ -4129,10 +4523,8 @@ export default function ChapterListPage() {
                       </div>
 
                       <div className="px-4 pb-4 pt-3">
-                        <div className="mb-3 rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
-                          {item.chapterTitle}
-                        </div>
-                         <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
+                        {renderContentChapterConcept(item)}
+                        <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
 
                         <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
                           
@@ -4434,6 +4826,9 @@ export default function ChapterListPage() {
               const chapterConceptRows = Object.keys(chapter.content_categories ?? {}).filter((concept) =>
                 concept.trim()
               );
+              // Chapter -> topic -> concept. Chapters with no topic_master rows come
+              // back with no topic rows and keep listing their concepts directly.
+              const chapterTopicRows = buildChapterTopicRows(chapter, chapterConceptRows);
 
               return (
                 <div
@@ -4512,39 +4907,65 @@ export default function ChapterListPage() {
                   {isExpanded && chapterConceptRows.length > 0 && (
                     <div className="border-t border-slate-200/80 bg-white px-6">
                       <div className="divide-y divide-slate-200/80">
-                        {chapterConceptRows.map((concept, index) => (
-                          <div
-                            key={concept}
-                            className="flex flex-col gap-3 py-3.5 lg:flex-row lg:items-center lg:justify-between"
-                          >
-                            <div className="flex min-w-0 items-center gap-3">
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
-                                {index + 1}
-                              </div>
-                              <p className="truncate text-[15px] font-medium text-slate-950">{concept}</p>
-                            </div>
+                        {chapterTopicRows.length > 0
+                          ? chapterTopicRows.map((topic, topicIndex) => {
+                              const isTopicExpanded = expandedTopicId === topic.id;
 
-                            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => openConceptIntelligenceView(chapter, index)}
-                                className="h-9 rounded-xl border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                              >
-                                <Brain size={16} className="mr-2 text-[#4f46e5]" />
-                                Concept Intelligence
-                              </Button>
-                              <Button
-                                type="button"
-                                onClick={() => openGenerateQuestionsModal(chapter, concept, index)}
-                                className="h-9 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] hover:bg-[#4338ca]"
-                              >
-                                <Sparkles size={16} className="mr-2" />
-                                Generate Questions
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
+                              return (
+                                <div key={topic.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateExpandedTopic(chapter.id, isTopicExpanded ? null : topic.id)
+                                    }
+                                    className="flex w-full items-center gap-3 py-3.5 text-left"
+                                  >
+                                    <ChevronDown
+                                      size={16}
+                                      className={cn(
+                                        'shrink-0 text-slate-500 transition-transform duration-200',
+                                        !isTopicExpanded && '-rotate-90'
+                                      )}
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block truncate text-[15px] font-semibold text-slate-950">
+                                        {`${topicIndex + 1}. ${topic.title}`}
+                                      </span>
+                                      {topic.description && (
+                                        <span className="mt-0.5 block truncate text-[13px] text-slate-500">
+                                          {topic.description}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                                      {topic.concepts.length} concept
+                                      {topic.concepts.length === 1 ? '' : 's'}
+                                    </span>
+                                  </button>
+
+                                  {isTopicExpanded &&
+                                    (topic.concepts.length === 0 ? (
+                                      <p className="border-t border-slate-200/60 py-3.5 pl-7 text-sm text-slate-500">
+                                        No concepts are mapped to this topic yet.
+                                      </p>
+                                    ) : (
+                                      <div className="divide-y divide-slate-200/60 border-t border-slate-200/60 pl-7">
+                                        {topic.concepts.map((concept, index) =>
+                                          renderConceptRow(
+                                            chapter,
+                                            concept.title,
+                                            concept.conceptIndex,
+                                            index + 1
+                                          )
+                                        )}
+                                      </div>
+                                    ))}
+                                </div>
+                              );
+                            })
+                          : chapterConceptRows.map((concept, index) =>
+                              renderConceptRow(chapter, concept, index, index + 1)
+                            )}
                       </div>
                     </div>
                   )}

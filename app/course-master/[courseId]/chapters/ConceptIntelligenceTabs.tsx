@@ -77,6 +77,16 @@ function getDisplayBody(
 
 type IconType = ComponentType<{ size?: number; className?: string }>;
 
+/**
+ * Tabs suppressed in the UI only.
+ *
+ * Nothing is deleted: the extraction still produces these sections, the API
+ * still returns them, the tenant tab-label registry still carries their names,
+ * and the panels further down still render them. Only the tab strip omits them,
+ * which makes them unreachable. Remove an id here to show that tab again.
+ */
+const HIDDEN_TAB_IDS = ['blueprint', 'rubrics', 'evidence', 'reasoning'];
+
 interface TabDef {
   id: string;
   label: string;
@@ -158,7 +168,9 @@ export function ConceptIntelligenceTabs({
       { id: 'evidence', label: 'Evidence', Icon: Quote, count: evidence.length },
       { id: 'reasoning', label: 'AI Reasoning', Icon: Sparkles, count: reasoningSections.length },
     ];
-    return all.filter((tab) => tab.id === 'overview' || tab.count > 0);
+    return all.filter(
+      (tab) => !HIDDEN_TAB_IDS.includes(tab.id) && (tab.id === 'overview' || tab.count > 0)
+    );
   }, [
     knowledge.length,
     abilities.length,
