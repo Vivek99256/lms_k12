@@ -372,7 +372,12 @@ function normalizeCapabilityKey(value: string | undefined) {
 }
 
 function isLikelyLmsQuery(text: string) {
-  return /dashboard|progress|performance|score|analysis|result|marks report|report card|activity|feed|stream|homework|assignment|submission|fee|defaulter|teacher|class|student|attendance|admission|application|enquiry|module|route|page|screen|lms|subject|course|curriculum|syllabus|chapter|department|division|standard|staff|employee|skill|training|institute|school/.test(
+  // `template`, `approval`, `recommendation` and `workflow` are listed because they
+  // name things this product actually holds. Without them a sentence like "which AI
+  // templates are available?" or "what needs my approval?" carried no recognised LMS
+  // word, so the general-knowledge branch claimed it and answered from the model's
+  // own head instead of from the library or the approval queue.
+  return /dashboard|progress|performance|score|analysis|result|marks report|report card|activity|feed|stream|homework|assignment|submission|fee|defaulter|teacher|class|student|attendance|admission|application|enquiry|template|approval|recommendation|workflow|module|route|page|screen|lms|subject|course|curriculum|syllabus|chapter|department|division|standard|staff|employee|skill|training|institute|school/.test(
     text
   );
 }
@@ -1101,6 +1106,22 @@ export function getContextualFollowUpIntent(context: ProjectContext): Conversati
         suggestedTool: "getCourseCatalog",
       };
     case "fees":
+      // A fee follow-up while one student is in focus is that student's own fee
+      // record, not the institute-wide defaulter list. Every other topic here
+      // already branches on focus.kind; fees was the one that did not, so
+      // "summarise their pending fees" after a student answer returned a list of
+      // other people's dues.
+      if (focus.kind === "student" && !MANY_STUDENT_FEE_SUBJECT.test(message.toLowerCase())) {
+        return {
+          ...base,
+          type: "analyse",
+          domain: "k12",
+          capability: focus.id ? "student_fee_details" : "student_fee_lookup",
+          requiredPermission: "lms:fees:collect",
+          suggestedTool: focus.id ? "getStudentFeeDetails" : "findStudentFeeRecord",
+        };
+      }
+
       return {
         ...base,
         type: "analyse",
@@ -1378,6 +1399,189 @@ function getIntelligenceIntent(text: string): ConversationIntent | null {
   };
 }
 
+/**
+ * The id of the record the current page is about, when that record is a student.
+ *
+ * A fee question asked from a student's page names its subject by standing on it,
+ * not by spelling it out, so "this student" has to be readable from the page
+ * context before the message can be routed to a single-student tool.
+ */
+function getPageStudentId(context: ProjectContext): string {
+  if ((context.entityType || "").toLowerCase() !== "student") {
+    return "";
+  }
+
+  const id = context.entityId;
+
+  if (typeof id === "number" && Number.isFinite(id)) {
+    return String(id);
+  }
+
+  return typeof id === "string" ? id.trim() : "";
+}
+
+/**
+ * The verbs that describe a piece of work rather than a lookup.
+ *
+ * One of these is ordinary phrasing — "explain the reason for this case" is still a
+ * single read. Two or more in one sentence is a request for several things at once,
+ * which no single tool can answer.
+ */
+const REASONING_VERBS =
+  /\b(analy[sz]e|analysis|identify|explain|compare|summari[sz]e|group|prioriti[sz]e|recommend|prepare|draft|review|rank|evaluate|assess|outline)\b/g;
+
+/**
+ * True when the message asks for more than one tool's worth of work.
+ *
+ * This exists because of a real failure mode: every narrow keyword branch below was
+ * written for a short, simple phrasing, and each one matches on a single word. A
+ * long question that happens to contain "fees", or "template", or "falling behind"
+ * was therefore collapsed into one lookup, and all the analysis, grouping and
+ * drafting the user actually asked for was silently discarded. The turn then read
+ * as plain conversation, because that is all that had run.
+ *
+ * Checked before those branches so the planner gets the turn and can sequence
+ * several tools. Deliberately conservative — a short question, or one with a single
+ * task verb, is still a lookup and still routes exactly as it did before.
+ */
+export function isMultiStepQuery(text: string): boolean {
+  if (text.trim().split(/\s+/).length < 14) {
+    return false;
+  }
+
+  const verbs = new Set(
+    (text.match(REASONING_VERBS) || []).map((verb) => verb.toLowerCase())
+  );
+
+  return verbs.size >= 2;
+}
+
+/**
+ * A request that should be answered from the template library.
+ *
+ * The library is the existing document template store; the assistant reads its
+ * `ai` category. Routing here rather than to the model is the point: a school that
+ * has designed its own wording should get that wording back, versioned and
+ * approved, not a fresh paraphrase of it.
+ */
+export function getAiTemplateIntent(text: string): ConversationIntent | null {
+  if (!/\btemplates?\b/.test(text)) {
+    return null;
+  }
+
+  // A question that merely *mentions* a template while asking for analysis, grouping
+  // and a drafted message is not a template lookup — the template is its last step.
+  // Claiming it here collapsed the whole request into a single library fetch.
+  if (isMultiStepQuery(text)) {
+    return null;
+  }
+
+  // The designer's own screens own creation and editing; the assistant reads.
+  if (/\b(create|design|edit|delete|rename|publish|duplicate)\b/.test(text)) {
+    return null;
+  }
+
+  const base = {
+    type: "ask" as const,
+    domain: "k12" as const,
+    entities: {},
+    confidence: 0.92,
+    requiresConfirmation: false,
+    requiredPermission: "lms:document_template:read",
+  };
+
+  // "Which templates are available?" wants the list; "use the X template" wants one.
+  const wantsList =
+    /\b(which|what|list|show|available|all|any)\b/.test(text) &&
+    !/\b(use|open|apply|draft\s+(from|with)|fill)\b/.test(text);
+
+  return wantsList
+    ? { ...base, capability: "ai_templates", suggestedTool: "listAiTemplates" }
+    : { ...base, capability: "ai_template_use", suggestedTool: "getAiTemplate" };
+}
+
+/**
+ * A request to act on one admission, as opposed to a request to see the list.
+ *
+ * Kept as a named constant because two branches need the same reading of the
+ * sentence: the intent router, and the module router that decides whether a
+ * follow-up still belongs to the admissions workflow.
+ */
+export const ADMISSION_CONFIRM_REQUEST =
+  /\badmission\s+confirmation\b|\b(confirm|approve|finalise|finalize|proceed\s+with)\b[^.?!]{0,40}\badmission\b|\b(confirm|approve|finalise|finalize)\b[^.?!]{0,25}\b(candidate|enquiry|application)\b/;
+
+/** A fee question that is about one student rather than about a defaulter list. */
+const SINGLE_STUDENT_FEE_SUBJECT =
+  /\b(?:this|that|the)\s+student\b|\bstudent'?s\b|\bhis\b|\bher\b|\btheir\b|\bfor\s+(?:this|that)\s+(?:child|kid|learner|pupil)\b/;
+
+/** A fee question that asks across students, which the defaulter list already answers. */
+const MANY_STUDENT_FEE_SUBJECT =
+  /\bdefaulters?\b|\bwhich\s+students?\b|\bhow\s+many\s+students?\b|\blist\s+(?:of\s+)?students?\b|\ball\s+students?\b|\bwho\s+(?:has|have)\s+not\s+paid\b|\bstudents?\s+with\s+(?:pending|unpaid|outstanding)\b/;
+
+/**
+ * Fee questions about a single student.
+ *
+ * These have to be claimed before the analytical branch below. "Summarise this
+ * student's pending fees" matches `summarise`, so it was being routed to the
+ * cross-module analysis tool and handed to the planner — which has no
+ * single-student fee tool to plan with, and settled on the result report instead.
+ * The user then got asked which *result report* they wanted, for a fees question.
+ *
+ * Deliberately narrow: it fires only when the message is about fees AND names one
+ * student, so defaulter lists, collection totals and every non-fee analytical
+ * question route exactly as they did before.
+ */
+export function getStudentFeeIntent(
+  context: ProjectContext,
+  text: string
+): ConversationIntent | null {
+  if (!/\bfee|fees|dues|outstanding|unpaid\b/.test(text)) {
+    return null;
+  }
+
+  // A question spanning students belongs to the defaulter list, not to one record.
+  if (MANY_STUDENT_FEE_SUBJECT.test(text)) {
+    return null;
+  }
+
+  // Collecting a fee is an action with its own workflow; only reading is claimed here.
+  if (/\bcollect\b|\bpay\b|\bpayment\s+of\b|\breceive\b/.test(text)) {
+    return null;
+  }
+
+  const pageStudentId = getPageStudentId(context);
+  const namesOneStudent = SINGLE_STUDENT_FEE_SUBJECT.test(text);
+
+  if (!namesOneStudent && !pageStudentId) {
+    return null;
+  }
+
+  // With an id in hand the detail tool can run straight away. Without one, the
+  // lookup tool finds the student first and the detail call follows from its result,
+  // which is the same two-step the fee collection flow already uses.
+  return pageStudentId
+    ? {
+        type: "analyse",
+        domain: "k12",
+        capability: "student_fee_details",
+        entities: { focusStudentId: pageStudentId },
+        confidence: 0.94,
+        requiresConfirmation: false,
+        requiredPermission: "lms:fees:collect",
+        suggestedTool: "getStudentFeeDetails",
+      }
+    : {
+        type: "analyse",
+        domain: "k12",
+        capability: "student_fee_lookup",
+        entities: {},
+        confidence: 0.9,
+        requiresConfirmation: false,
+        requiredPermission: "lms:fees:collect",
+        suggestedTool: "findStudentFeeRecord",
+      };
+}
+
 function getDeterministicIntent(context: ProjectContext): ConversationIntent | null {
   const text = context.latestUserMessage.content.trim().toLowerCase();
 
@@ -1427,12 +1631,51 @@ function getDeterministicIntent(context: ProjectContext): ConversationIntent | n
     };
   }
 
+  // A question asking for several things at once goes to the planner, before any of
+  // the single-tool branches can claim it on one matched keyword. Without this,
+  // "analyse the students with pending fees, explain why, group them by priority and
+  // draft a parent message" was answered by whichever branch matched first — and the
+  // reasoning, grouping and drafting never ran at all.
+  //
+  // Placed ahead of the intelligence layer deliberately: a cross-module request that
+  // happens to say "falling behind" is an analysis, not an academic-risk case. A
+  // question that genuinely asks for the risk agent ("which students are at academic
+  // risk and need intervention?") carries only one task verb and still routes there.
+  if (isMultiStepQuery(text)) {
+    return {
+      type: "analyse",
+      domain: "k12",
+      capability: "data_analysis",
+      entities: {},
+      confidence: 0.9,
+      requiresConfirmation: false,
+      requiredPermission: "lms:analysis:read",
+      suggestedTool: "analyzeLmsData",
+    };
+  }
+
   // Academic risk belongs to the intelligence layer, and has to be claimed before
   // the analytical branch below — that branch matches on "risk" and would send the
   // question to a dataset loader that can only return counts.
   const intelligenceIntent = getIntelligenceIntent(text);
   if (intelligenceIntent) {
     return intelligenceIntent;
+  }
+
+  // One student's fees is a record lookup, not a cross-module analysis. Claimed
+  // before the analytical branch because "summarise" would otherwise take it there.
+  const studentFeeIntent = getStudentFeeIntent(context, text);
+  if (studentFeeIntent) {
+    return studentFeeIntent;
+  }
+
+  // Templates come from the library, not from the model. Claimed before the
+  // analytical branch for the same reason as fees: "draft" and "prepare" sit in
+  // that regex, and a template request routed to cross-module analysis would have
+  // the model invent wording the school has already designed.
+  const templateIntent = getAiTemplateIntent(text);
+  if (templateIntent) {
+    return templateIntent;
   }
 
   // Analytical questions are routed to the cross-module analysis tool so the
@@ -1453,6 +1696,26 @@ function getDeterministicIntent(context: ProjectContext): ConversationIntent | n
   const moduleDataIntent = getModuleDataIntent(text);
   if (moduleDataIntent) {
     return moduleDataIntent;
+  }
+
+  // "Confirm the admission for Riya" asks to act on one candidate, not to list
+  // every enquiry. The generic branch below matches the bare word "admission", so
+  // it swallowed every natural confirm phrasing and re-showed the whole list —
+  // which is what made the user pick from five records they had not asked for. The
+  // narrower `confirm admission` branch further down could never be reached,
+  // because "confirm THE admission" does not match it and the generic branch had
+  // already returned.
+  if (ADMISSION_CONFIRM_REQUEST.test(text)) {
+    return {
+      type: "do",
+      domain: "k12",
+      capability: "admission_confirmation",
+      entities: {},
+      confidence: 0.95,
+      requiresConfirmation: false,
+      requiredPermission: "admission:enquiry:read",
+      suggestedTool: "findAdmissionCandidate",
+    };
   }
 
   if (/admission|application|enquiry/.test(text)) {
@@ -1655,6 +1918,9 @@ function getPermissions(profileName?: string) {
       "lms:course:read",
       "lms:attendance:read",
       "lms:analysis:read",
+      // Reading the template library. Templates hold no student rows; the data
+      // merged into one is fetched separately under that data own permission.
+      "lms:document_template:read",
     ];
   }
 
@@ -1675,6 +1941,7 @@ function getPermissions(profileName?: string) {
     "lms:course:read",
     "lms:attendance:read",
     "lms:analysis:read",
+    "lms:document_template:read",
     "hrms:department:read",
   ];
 }
@@ -1897,6 +2164,10 @@ Prefer these mappings:
 - one named student's attendance record or percentage -> getStudentAttendanceDetail
 - departments, sub-departments or employee distribution -> getDepartmentDirectory
 - total fee demand, collection, outstanding amount or collection rate -> getFeesSummary
+- which AI templates exist, available templates, the template library -> listAiTemplates
+- use, open or draft from a named AI template -> getAiTemplate
+- one student's pending fees, dues, fee breakdown or "summarise this student's fees" -> getStudentFeeDetails when a student id is known, otherwise findStudentFeeRecord
+- never answer a fees question with a result, marks or report-card tool
 - a named or current student's academic risk, "analyse this student", risk level, who is at risk, who is struggling, who needs intervention -> findStudentsAtRisk
 - why a student is at risk, or the evidence and reasoning behind a flag -> explainStudentRisk
 - what the system has flagged, open cases -> listIntelligenceCases

@@ -33,6 +33,9 @@ export type TemplateCategory =
   | 'admission'
   | 'exam'
   | 'circular'
+  // Templates the assistant is allowed to pick up. Same library, same designer,
+  // same version history — a category, not a second template system.
+  | 'ai'
   | 'general';
 
 export type TemplateStatus = 'draft' | 'published' | 'archived';

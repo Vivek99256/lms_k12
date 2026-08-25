@@ -11,6 +11,8 @@ import {
   admissionEnquiryInputSchema,
   admissionHydrateInputSchema,
   activityStreamInputSchema,
+  aiTemplateInputSchema,
+  aiTemplateListInputSchema,
   contextualSuggestionsSchema,
   feesDefaulterInputSchema,
   homeworkListInputSchema,
@@ -1496,6 +1498,116 @@ async function getStudentFeeDetails(
     : result;
 }
 
+/**
+ * The AI category of the existing `template_master` library.
+ *
+ * `template_master` is the library the school already designs in (Settings →
+ * Templates) and that the Fees receipt renders from today. Its `module_name`
+ * column is its category, so the assistant's templates are the rows filed under
+ * "AI" — not a store of their own. Reached over Laravel MCP, the same transport
+ * the fees and admissions tools use, so tenant scoping comes from the session
+ * rather than from anything the model supplies.
+ */
+const AI_TEMPLATE_MODULE = "AI";
+
+/** Unwraps the `{ result: { data: ... } }` envelope the MCP tools return. */
+function readMcpData(result: Record<string, unknown>): Record<string, unknown> {
+  const inner =
+    result.result && typeof result.result === "object"
+      ? (result.result as Record<string, unknown>)
+      : result;
+
+  return inner.data && typeof inner.data === "object"
+    ? (inner.data as Record<string, unknown>)
+    : inner;
+}
+
+async function listAiTemplates(
+  input: z.infer<typeof aiTemplateListInputSchema>,
+  context: ProjectContext
+) {
+  const result = await callBackendMcpTool(context, "ai.templates.list", {
+    search: input.search || undefined,
+  });
+  const data = readMcpData(result as Record<string, unknown>);
+  const templates = Array.isArray(data.templates)
+    ? (data.templates as Array<Record<string, unknown>>)
+    : [];
+
+  return {
+    source: "template_master",
+    module_name: AI_TEMPLATE_MODULE,
+    available: templates.length > 0,
+    totalCount: templates.length,
+    templates,
+    // Said plainly so the assistant reports an empty category as an empty
+    // category, rather than as the library being missing.
+    message:
+      templates.length > 0
+        ? undefined
+        : 'No templates are filed under the "AI" module in the template library yet.',
+  };
+}
+
+async function getAiTemplate(
+  input: z.infer<typeof aiTemplateInputSchema>,
+  context: ProjectContext
+) {
+  // Rendering needs a record to render against. With an enquiry in hand the
+  // template is filled with that enquiry's real values; without one the assistant
+  // can still say which templates exist.
+  const enquiryId = Number(input.enquiryId) || 0;
+
+  if (enquiryId <= 0) {
+    const listed = await listAiTemplates({ search: input.name }, context);
+
+    return {
+      ...listed,
+      needsRecord: true,
+      message:
+        listed.totalCount > 0
+          ? "Which admission enquiry should I use to fill the template?"
+          : listed.message,
+    };
+  }
+
+  const result = await callBackendMcpTool(context, "ai.templates.render", {
+    enquiry_id: enquiryId,
+    template_id: Number(input.templateId) || undefined,
+    title: input.name?.trim() || undefined,
+  });
+
+  const inner =
+    (result as Record<string, unknown>).result &&
+    typeof (result as Record<string, unknown>).result === "object"
+      ? ((result as Record<string, unknown>).result as Record<string, unknown>)
+      : (result as Record<string, unknown>);
+
+  if (inner.success === false) {
+    return {
+      source: "template_master",
+      module_name: AI_TEMPLATE_MODULE,
+      available: false,
+      message: inner.message,
+    };
+  }
+
+  const data = readMcpData(result as Record<string, unknown>);
+
+  return {
+    source: "template_master",
+    module_name: AI_TEMPLATE_MODULE,
+    available: true,
+    template: data.template,
+    enquiry: data.enquiry,
+    // The substituted values and any token the record could not fill, so the
+    // output can be checked against the record instead of taken on trust.
+    values: data.values,
+    unresolvedTokens: data.unresolved_tokens,
+    html: data.html,
+  };
+}
+
 async function getTeacherDailyReport(
   input: z.infer<typeof teacherDailyReportInputSchema>,
   context: ProjectContext
@@ -2596,6 +2708,31 @@ export function getLmsToolDefinitions(): ProjectToolDefinition[] {
       execute: getStudentFeeDetails,
     },
     {
+      name: "listAiTemplates",
+      description:
+        "List the templates filed under the AI module in the existing template_master library. " +
+        "Use when the user asks which templates are available, or before drafting any document, " +
+        "so the wording comes from a template the school designed rather than from the model.",
+      inputSchema: aiTemplateListInputSchema,
+      requiredPermissions: ["lms:document_template:read"],
+      riskLevel: "low",
+      requiresConfirmation: false,
+      capabilities: ["ai_templates", "template_library"],
+      execute: listAiTemplates,
+    },
+    {
+      name: "getAiTemplate",
+      description:
+        "Fill an AI-module template from template_master with a real admission enquiry and return " +
+        "the rendered output. Pass enquiryId; without it this only lists what is available.",
+      inputSchema: aiTemplateInputSchema,
+      requiredPermissions: ["lms:document_template:read"],
+      riskLevel: "low",
+      requiresConfirmation: false,
+      capabilities: ["ai_templates", "template_library"],
+      execute: getAiTemplate,
+    },
+    {
       name: "getTeacherDailyReport",
       description:
         "Load the teacher daily report summary from the LMS API with current user rights applied.",
@@ -2733,6 +2870,11 @@ export function getAllowedToolNamesForProfile(profileName?: string) {
       "listHomework",
       "getTeacherDailyReport",
       "searchStudents",
+      // Reading the AI category of the template library. Templates carry no student
+      // rows of their own, and the data merged into one is fetched separately under
+      // that data's own permission.
+      "listAiTemplates",
+      "getAiTemplate",
       ...MODULE_DATA_TOOL_NAMES.read,
       ...MODULE_DATA_TOOL_NAMES.analysis,
       // Teachers may read cases and run risk analysis over students they can

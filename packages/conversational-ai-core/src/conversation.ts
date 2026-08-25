@@ -1169,6 +1169,57 @@ async function getFallbackToolInput(prepared: PreparedConversation, toolName: st
         rollNo: rollNo || undefined,
         mobileNo: mobileNo || undefined,
       };
+    case "listAiTemplates":
+      return { search: undefined };
+    case "getAiTemplate": {
+      // A template is usually named, not numbered: "use the intervention letter
+      // template". The name is passed through and resolved against the library,
+      // so the assistant lands on the record the designer published rather than
+      // guessing an id.
+      const named = message.match(
+        /(?:use|open|apply|with|from|the)\s+(?:the\s+)?["“']?([^"”'\n]{2,80}?)["”']?\s+template\b/i
+      );
+      const templateId = Number(message.match(/\btemplate\s*#?(\d{1,9})\b/i)?.[1] || 0);
+
+      // The record to fill it with is the one the conversation already selected —
+      // the enquiry chosen from a list, or the record the page is about. Rendering
+      // a template against a re-parsed name would defeat the point of holding the
+      // selection at all.
+      const selected = getSelectedRecord(workflowState);
+      const enquiryId =
+        Number(
+          selected?.enquiryId ??
+            selected?.enquiry_id ??
+            selected?.id ??
+            readIntentEntity("focusId") ??
+            (String(prepared.context.entityType || "").toLowerCase() === "enquiry"
+              ? prepared.context.entityId
+              : 0)
+        ) || 0;
+
+      return {
+        templateId: templateId > 0 ? templateId : undefined,
+        name: named?.[1]?.trim() || undefined,
+        enquiryId: enquiryId > 0 ? enquiryId : undefined,
+      };
+    }
+    case "getStudentFeeDetails": {
+      // "This student" names its subject by standing on it. The id therefore comes
+      // from wherever the subject was already resolved — the page the user is on, or
+      // the record the previous answer was about — not from the sentence.
+      //
+      // Without this case the tool fell through to `default: return null`, and the
+      // caller's null branch announces a missing *result report* parameter. That is
+      // how a fees question came to be answered with a question about report types.
+      const pageStudentId =
+        (prepared.context.entityType || "").toLowerCase() === "student"
+          ? String(prepared.context.entityId ?? "").trim()
+          : "";
+      const studentId =
+        readIntentEntity("focusStudentId") || readIntentEntity("focusId") || pageStudentId;
+
+      return studentId ? { studentId } : null;
+    }
     case "getResultReport": {
       const reportOf = inferResultReportType(message);
       if (!reportOf) {
@@ -2059,8 +2110,36 @@ function summarizeToolBackedResult(
   }
 
   if (toolName === "getStudentFeeDetails") {
-    const pendingRows = Array.isArray(data.data) ? data.data.length : 0;
-    return `I loaded the student's fee details from the LMS backend${pendingRows > 0 ? ` with ${pendingRows} payment record(s)` : ""}.`;
+    // fees.getPending returns { data: { student, pending_items, pending_count } }.
+    // This read `data.data` as an array, which it never is, so the count was always
+    // zero and every student got the same sentence with none of their own numbers.
+    const payload = readRecord(data.data) || {};
+    const student = readRecord(payload.student) || {};
+    const name = readText(student.student_name) || "This student";
+    const className = readText(student.standard_name);
+    const subject = `${name}${className ? ` (${className})` : ""}`;
+    const items = readObjectArray(payload.pending_items);
+
+    if (items.length === 0) {
+      return `${subject} has no pending fees.`;
+    }
+
+    const total = items.reduce((sum, row) => sum + (readCount(row.remain) ?? 0), 0);
+    const lines = items.map((row) => {
+      const label = readText(row.fees_type) || readText(row.installment) || "Fee";
+      const installment = readText(row.installment);
+      const dueDate = readText(row.due_date);
+      const remaining = formatIndianAmount(row.remain);
+
+      return `- ${label}${installment && installment !== label ? ` (${installment})` : ""}: ${
+        remaining || "amount not recorded"
+      } pending${dueDate ? `, due ${dueDate}` : ""}`;
+    });
+
+    return [
+      `${subject} has ${items.length} pending fee item${items.length === 1 ? "" : "s"} totalling ${formatIndianAmount(total)}.`,
+      ...lines,
+    ].join("\n");
   }
 
   const moduleDataSummary = summarizeModuleDataResult(toolName, data);
@@ -3899,6 +3978,48 @@ async function executePreferredTool(
   };
 }
 
+/**
+ * The one detail a tool still needs, in the words of that tool's own subject.
+ *
+ * The result-report wording is kept verbatim for `getResultReport` so the existing
+ * behaviour and its callers are unchanged; every other tool now says what it is
+ * actually missing instead of borrowing that sentence.
+ */
+function describeMissingFallbackDetail(toolName: string): {
+  english: string;
+  hindi: string;
+  gujarati: string;
+  followUpSuggestions: string[];
+} {
+  if (toolName === "getStudentFeeDetails" || toolName === "findStudentFeeRecord") {
+    return {
+      english:
+        "I can fetch the pending fees, but I need to know which student. Open the student's record, or give me their name, enrollment number or roll number.",
+      hindi:
+        "मैं pending fees ला सकता हूँ, लेकिन मुझे यह जानना होगा कि किस student की। कृपया student का record खोलें, या उनका नाम, enrollment number या roll number बताइए.",
+      gujarati:
+        "હું pending fees લાવી શકું છું, પણ મને જાણવું જરૂરી છે કે કયા student ની. કૃપા કરીને student નો record ખોલો, અથવા તેમનું નામ, enrollment number કે roll number જણાવો.",
+      followUpSuggestions: [
+        "Name the student, or give their enrollment number.",
+        "Open the student's fee record and ask again.",
+      ],
+    };
+  }
+
+  return {
+    english:
+      "I can still fetch the backend data, but I need one more detail to continue: please specify which result report you want, such as overall report, merit report, classwise grade report, or marks report.",
+    hindi:
+      "मैं बैकएंड से डेटा ला सकता हूँ, लेकिन आगे बढ़ने के लिए मुझे एक और जानकारी चाहिए: कृपया बताइए कि आपको कौन-सी result report चाहिए, जैसे overall report, merit report, classwise grade report, या marks report.",
+    gujarati:
+      "હું બેકએન્ડમાંથી ડેટા મેળવી શકું છું, પરંતુ આગળ વધવા માટે મને એક વધુ માહિતી જોઈએ: કૃપા કરીને જણાવો કે તમને કઈ result report જોઈએ છે, જેમ કે overall report, merit report, classwise grade report, અથવા marks report.",
+    followUpSuggestions: [
+      "Specify the exact result report type.",
+      "Add class, division, term, or subject filters if needed.",
+    ],
+  };
+}
+
 async function executeQuotaFallback(
   prepared: PreparedConversation
 ): Promise<ConversationalResponse | null> {
@@ -3916,12 +4037,18 @@ async function executeQuotaFallback(
 
   const inferredInput = await getFallbackToolInput(prepared, toolName);
   if (inferredInput == null) {
+    // Which detail is missing depends on which tool is waiting. This message used to
+    // name the result report's parameter whatever the tool was, so a fees question
+    // that could not resolve its student was answered by asking which report type
+    // the user wanted.
+    const missingDetail = describeMissingFallbackDetail(toolName);
+
     return {
       message: buildLocalizedMessage(
         prepared.context.detectedLanguage,
-        "I can still fetch the backend data, but I need one more detail to continue: please specify which result report you want, such as overall report, merit report, classwise grade report, or marks report.",
-        "मैं बैकएंड से डेटा ला सकता हूँ, लेकिन आगे बढ़ने के लिए मुझे एक और जानकारी चाहिए: कृपया बताइए कि आपको कौन-सी result report चाहिए, जैसे overall report, merit report, classwise grade report, या marks report.",
-        "હું બેકએન્ડમાંથી ડેટા મેળવી શકું છું, પરંતુ આગળ વધવા માટે મને એક વધુ માહિતી જોઈએ: કૃપા કરીને જણાવો કે તમને કઈ result report જોઈએ છે, જેમ કે overall report, merit report, classwise grade report, અથવા marks report."
+        missingDetail.english,
+        missingDetail.hindi,
+        missingDetail.gujarati
       ),
       conversationType: prepared.intent.type,
       status: "requires_input",
@@ -3932,10 +4059,7 @@ async function executeQuotaFallback(
           summary: "Waiting for one required parameter before executing the LMS tool.",
         },
       ],
-      followUpSuggestions: [
-        "Specify the exact result report type.",
-        "Add class, division, term, or subject filters if needed.",
-      ],
+      followUpSuggestions: missingDetail.followUpSuggestions,
       intent: prepared.intent,
       activeTools: prepared.activeTools,
     };

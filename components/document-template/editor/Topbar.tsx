@@ -38,6 +38,7 @@ const CATEGORY_OPTIONS: { value: TemplateCategory; label: string }[] = [
   { value: 'admission', label: 'Admission document' },
   { value: 'exam', label: 'Exam document' },
   { value: 'circular', label: 'Circular' },
+  { value: 'ai', label: 'AI template' },
   { value: 'general', label: 'General' },
 ];
 

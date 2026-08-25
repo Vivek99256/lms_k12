@@ -281,3 +281,32 @@ export const moduleActionInputSchema = z.object({
   term: z.string().optional(),
   examType: z.string().optional(),
 });
+
+/**
+ * Templates the assistant may use, read from the existing document template
+ * library's `ai` category. There is no separate AI template store: these are the
+ * same records the designer at /document-templates creates and versions.
+ */
+export const aiTemplateListInputSchema = z.object({
+  search: z
+    .string()
+    .optional()
+    .describe("Optional text to match against the template name or description."),
+});
+
+export const aiTemplateInputSchema = z.object({
+  templateId: z
+    .number()
+    .optional()
+    .describe("The template's id, when it is already known."),
+  name: z
+    .string()
+    .optional()
+    .describe("The template's title, when the user referred to it by name."),
+  enquiryId: z
+    .number()
+    .optional()
+    .describe(
+      "The admission enquiry to fill the template with. Without it the assistant can only list what is available."
+    ),
+});

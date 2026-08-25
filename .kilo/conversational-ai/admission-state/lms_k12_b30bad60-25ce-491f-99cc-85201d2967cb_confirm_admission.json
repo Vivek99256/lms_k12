@@ -1,0 +1,137 @@
+{
+  "workflow": "confirm_admission",
+  "stage": "collecting_missing_fields",
+  "candidates": [
+    {
+      "enquiryId": 21,
+      "enquiryNo": "2022013",
+      "fullName": "Testing v Testing",
+      "mobile": "7894561230",
+      "status": "new"
+    },
+    {
+      "enquiryId": 20,
+      "enquiryNo": "2022012",
+      "fullName": "Abhi D Raval",
+      "mobile": "9924721800",
+      "status": "new"
+    },
+    {
+      "enquiryId": 19,
+      "enquiryNo": "2022011",
+      "fullName": "Riya Mayur Patel",
+      "mobile": "9685743256",
+      "status": "new"
+    },
+    {
+      "enquiryId": 17,
+      "enquiryNo": "2022010",
+      "fullName": "Prisha Mayur Sapriya",
+      "mobile": "9685743256",
+      "status": "new"
+    },
+    {
+      "enquiryId": 13,
+      "enquiryNo": "2022009",
+      "fullName": "Gajera Vivek Babubhai",
+      "mobile": "09925642448",
+      "status": "new"
+    },
+    {
+      "enquiryId": 10,
+      "enquiryNo": "2022008",
+      "fullName": "John Michael Smith",
+      "mobile": "9876543210",
+      "status": "new"
+    },
+    {
+      "enquiryId": 9,
+      "enquiryNo": "2022008",
+      "fullName": "John Michael Smith",
+      "mobile": "9876543210",
+      "status": "new"
+    },
+    {
+      "enquiryId": 8,
+      "enquiryNo": "2022008",
+      "fullName": "John Michael Smith",
+      "mobile": "9876543210",
+      "status": "new"
+    },
+    {
+      "enquiryId": 7,
+      "enquiryNo": "2022002",
+      "fullName": "Raj R R",
+      "mobile": "9909906511",
+      "standardName": "4",
+      "status": "approve"
+    },
+    {
+      "enquiryId": 1,
+      "enquiryNo": "2022001",
+      "fullName": "John Updated",
+      "mobile": "9876543211",
+      "standardName": "1",
+      "status": "approve"
+    }
+  ],
+  "hydratedData": {
+    "enquiryId": 20,
+    "mobile": "9924721800",
+    "status": "new",
+    "subInstituteId": "1",
+    "academicYear": "2022",
+    "raw": {
+      "enquiry": {
+        "enquiry_id": 20,
+        "registration_enquiry_id": null,
+        "enquiry_no": null,
+        "student_name": "Abhi D Raval",
+        "mobile": "9924721800",
+        "standard_id": null,
+        "standard_name": null,
+        "division_id": null,
+        "division_name": null,
+        "quota_id": null,
+        "quota_name": null,
+        "admission_date": null,
+        "status": "new"
+      },
+      "registration": {
+        "enquiry_id": 20,
+        "registration_enquiry_id": null,
+        "enquiry_no": null,
+        "student_name": "Abhi D Raval",
+        "mobile": "9924721800",
+        "standard_id": null,
+        "standard_name": null,
+        "division_id": null,
+        "division_name": null,
+        "quota_id": null,
+        "quota_name": null,
+        "admission_date": null,
+        "status": "new"
+      },
+      "student": null
+    }
+  },
+  "collectedFields": {},
+  "missingFields": [
+    "firstName",
+    "lastName",
+    "dateOfBirth",
+    "standardId",
+    "divisionId",
+    "studentQuotaId",
+    "admissionDate"
+  ],
+  "lastTool": "findAdmissionCandidate",
+  "selectedCandidate": {
+    "enquiryId": 20,
+    "enquiryNo": "2022012",
+    "fullName": "Abhi D Raval",
+    "mobile": "9924721800",
+    "status": "new"
+  },
+  "enquiryId": 20
+}

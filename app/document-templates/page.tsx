@@ -30,6 +30,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   admission: 'Admission documents',
   exam: 'Exam documents',
   circular: 'Circulars',
+  ai: 'AI templates',
   general: 'General',
 };
 

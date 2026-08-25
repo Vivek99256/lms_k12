@@ -34,6 +34,14 @@ const FEE_DEFAULTER_ROWS = [
   { id: "100234", studentName: "Sonika P Pansuriya", standard: "7", division: "C", enrollmentNo: "100234", pendingFees: 2000 },
 ];
 
+// Rows in the shape fees_collect_controller::studentFeesDetailAPI returns under
+// data.PENDING, which FeesPendingService passes through untouched.
+const PENDING_FEE_ITEMS = [
+  { fees_type: "Tuition Fee", installment: "Term 2", amount: 9000, paid: 4000, remain: 5000, due_date: "2026-09-10" },
+  { fees_type: "Transport Fee", installment: "Term 2", amount: 4500, paid: 0, remain: 4500, due_date: "2026-09-10" },
+  { fees_type: "Library Fee", installment: "Annual", amount: 3000, paid: 0, remain: 3000, due_date: "2026-10-01" },
+];
+
 const HOMEWORK_ROWS = [
   {
     id: 91,
@@ -144,6 +152,39 @@ function createHarness(): TestHarness {
           return true;
         });
         return { source: "lms_backend", students, totalCount: students.length };
+      },
+    },
+    {
+      name: "getStudentFeeDetails",
+      description: "Pending fee breakdown for one student",
+      inputSchema: z.object({ studentId: z.string() }),
+      requiredPermissions: [],
+      riskLevel: "low",
+      requiresConfirmation: false,
+      capabilities: ["student_fee_details"],
+      async execute(input: Record<string, unknown>) {
+        record("getStudentFeeDetails", input);
+        // The exact shape App\Services\Mcp\FeesPendingService returns through
+        // ToolResult::success, so the orchestration is exercised against the real
+        // payload rather than a convenient one.
+        return {
+          success: true,
+          tool: "fees.getPending",
+          message: "Pending fees loaded successfully.",
+          data: {
+            student: {
+              student_id: 233,
+              student_name: "Zeel J Tank",
+              enrollment_no: "233",
+              standard_name: "7 C",
+            },
+            pending_items: PENDING_FEE_ITEMS,
+            pending_count: PENDING_FEE_ITEMS.length,
+          },
+          error: null,
+          requiresConfirmation: false,
+          permission: { allowed: true },
+        };
       },
     },
     {
@@ -440,6 +481,171 @@ test("admissions: the existing list -> candidate flow keeps its context", async 
   assert.equal(lookup?.input.enquiryNo, "ENQ-2026-0042");
   assert.equal(resolved.status, "navigation_required");
   assert.equal(resolved.navigation?.route, "/admissions/confirmation");
+});
+
+/* -------------------------------------------------------------------------- */
+/* A selection prompt has to remember what it offered                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Runs a selection turn against a list the assistant has just displayed.
+ *
+ * The list is produced by a real listing turn, so the selection is resolved the
+ * only way that matters: against records the user was actually shown.
+ */
+async function selectFromOfferedList(conversationId: string, reply: string) {
+  const harness = createHarness();
+  const history: ConversationMessage[] = [];
+
+  const say = async (content: string, intent: Partial<ConversationIntent>) => {
+    harness.setIntent(intent);
+    history.push({ role: "user", content });
+    const response = await generateConversationResponse(
+      harness.adapter,
+      buildRequest(conversationId, [...history]),
+      []
+    );
+    history.push({ role: "assistant", content: response.message });
+    return response;
+  };
+
+  await say("How many admission enquiries are open?", {
+    capability: "pending_admissions",
+    suggestedTool: "listAdmissionEnquiries",
+  });
+
+  const offered = await say("Confirm the admission for Diya Mehta", {
+    capability: "admission_confirmation",
+    suggestedTool: "findAdmissionCandidate",
+  });
+
+  const chosen = await say(reply, {
+    capability: "admission_confirmation",
+    suggestedTool: "findAdmissionCandidate",
+  });
+
+  return { harness, offered, chosen };
+}
+
+test("admissions: a record chosen from the displayed list resolves to that record", async () => {
+  // The reported defect. The selection prompt was rendered and forgotten, so the
+  // next turn had no `matchedEntities` to resolve against and the flow collapsed
+  // into "No admission enquiry was selected. Please list pending admissions first."
+  const { chosen } = await selectFromOfferedList("sel-full", "Diya Mehta, ENQ-2026-0042");
+
+  assert.doesNotMatch(chosen.message, /no admission enquiry was selected/i);
+  assert.doesNotMatch(chosen.message, /list pending admissions first/i);
+  assert.equal(chosen.status, "navigation_required");
+  assert.equal(chosen.navigation?.route, "/admissions/confirmation");
+  assert.match(chosen.message, /Diya Mehta/);
+});
+
+test("admissions: the numbered option alone is enough", async () => {
+  // Nothing in "2" can be re-parsed from the sentence, so this only works when the
+  // list that produced the number was remembered.
+  const { chosen } = await selectFromOfferedList("sel-number", "2");
+
+  assert.equal(chosen.status, "navigation_required");
+  assert.match(chosen.message, /Diya Mehta/);
+});
+
+test("admissions: the name alone is enough", async () => {
+  const { chosen } = await selectFromOfferedList("sel-name", "Diya Mehta");
+
+  assert.equal(chosen.status, "navigation_required");
+  assert.match(chosen.message, /Diya Mehta/);
+});
+
+test("admissions: the reference alone is enough", async () => {
+  const { chosen } = await selectFromOfferedList("sel-ref", "ENQ-2026-0042");
+
+  assert.equal(chosen.status, "navigation_required");
+  assert.match(chosen.message, /Diya Mehta/);
+});
+
+test("admissions: the resolved record carries the backend identifiers forward", async () => {
+  const { harness } = await selectFromOfferedList("sel-ids", "2");
+
+  const lookup = harness.calls.filter((call) => call.tool === "findAdmissionCandidate").at(-1);
+  assert.ok(lookup, "the candidate lookup should have run");
+  assert.equal(lookup?.input.studentName, "Diya Mehta");
+  assert.equal(lookup?.input.enquiryNo, "ENQ-2026-0042");
+});
+
+test("admissions: an unmatched reply re-offers the same list instead of losing it", async () => {
+  const { chosen } = await selectFromOfferedList("sel-miss", "Someone Not Listed");
+
+  assert.equal(chosen.status, "requires_input");
+  assert.doesNotMatch(chosen.message, /no admission enquiry was selected/i);
+  // The list survives the miss, so the user can pick again without starting over.
+  assert.match(chosen.message, /Diya Mehta/);
+});
+
+/* -------------------------------------------------------------------------- */
+/* "Summarize this student's pending fees" — the reported defect               */
+/* -------------------------------------------------------------------------- */
+
+test("fees: one student's pending fees are fetched and summarised, not asked about", async () => {
+  const conversationId = "fees-student-summary";
+  const harness = createHarness();
+  const history: ConversationMessage[] = [];
+
+  const say = async (content: string) => {
+    history.push({ role: "user", content });
+    const response = await generateConversationResponse(
+      harness.adapter,
+      buildRequest(conversationId, [...history]),
+      []
+    );
+    history.push({ role: "assistant", content: response.message });
+    return response;
+  };
+
+  // What the adapter now produces for this question when a student is on screen.
+  harness.setIntent({
+    type: "analyse",
+    capability: "student_fee_details",
+    suggestedTool: "getStudentFeeDetails",
+    entities: { focusStudentId: "233" },
+  });
+
+  const response = await say("Summarize this student's pending fees.");
+
+  // The defect: this asked which *result report* was wanted.
+  assert.doesNotMatch(response.message, /result report|merit report|marks report/i);
+  assert.notEqual(response.status, "requires_input");
+
+  // The tool actually ran, with the student the page was about.
+  const call = harness.calls.filter((entry) => entry.tool === "getStudentFeeDetails").at(-1);
+  assert.equal(call?.input.studentId, "233");
+
+  // And the answer carries the real backend numbers rather than a generic reply.
+  assert.match(response.message, /Zeel J Tank/i);
+  assert.match(response.message, /12,?500|12500/);
+});
+
+test("fees: with no student resolved, the assistant asks about the student, not a report", async () => {
+  const conversationId = "fees-student-unknown";
+  const harness = createHarness();
+  const history: ConversationMessage[] = [];
+
+  harness.setIntent({
+    type: "analyse",
+    capability: "student_fee_details",
+    suggestedTool: "getStudentFeeDetails",
+    entities: {},
+  });
+
+  history.push({ role: "user", content: "Summarize this student's pending fees." });
+  const response = await generateConversationResponse(
+    harness.adapter,
+    buildRequest(conversationId, [...history]),
+    []
+  );
+
+  assert.equal(response.status, "requires_input");
+  assert.doesNotMatch(response.message, /result report|merit report|marks report/i);
+  assert.match(response.message, /student/i);
 });
 
 test.after(() => {
