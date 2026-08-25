@@ -35,6 +35,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -569,11 +576,47 @@ function PaginationButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}
     </button>
   );
+}
+
+/**
+ * Windows the page-number strip to at most 7 slots (first, last, the current
+ * page's neighbours, and "…" for the gaps) instead of one button per page —
+ * with dozens of pages the unwindowed list overflowed its footer bar.
+ */
+function getPaginationItems(current: number, total: number): (number | "ellipsis")[] {
+  const siblingCount = 1;
+  const totalVisible = siblingCount * 2 + 5;
+
+  if (total <= totalVisible) {
+    return Array.from({ length: total }, (_, index) => index + 1);
+  }
+
+  const leftSibling = Math.max(current - siblingCount, 1);
+  const rightSibling = Math.min(current + siblingCount, total);
+  const showLeftEllipsis = leftSibling > 2;
+  const showRightEllipsis = rightSibling < total - 1;
+
+  if (!showLeftEllipsis && showRightEllipsis) {
+    const leftRange = Array.from({ length: 3 + siblingCount * 2 }, (_, index) => index + 1);
+    return [...leftRange, "ellipsis", total];
+  }
+
+  if (showLeftEllipsis && !showRightEllipsis) {
+    const rightCount = 3 + siblingCount * 2;
+    const rightRange = Array.from({ length: rightCount }, (_, index) => total - rightCount + index + 1);
+    return [1, "ellipsis", ...rightRange];
+  }
+
+  const middleRange = Array.from(
+    { length: rightSibling - leftSibling + 1 },
+    (_, index) => leftSibling + index
+  );
+  return [1, "ellipsis", ...middleRange, "ellipsis", total];
 }
 
 function DetailLine({
@@ -1317,41 +1360,54 @@ export default function DepartmentPage() {
                   setPage(1);
                 }}
               />
-              <label className="relative">
-                <select
-                  value={status}
-                  onChange={(event) => {
-                    setStatus(event.target.value);
-                    setPage(1);
-                  }}
-                  className="h-9 appearance-none rounded-md border border-input bg-background px-2.5 pr-8 text-[12px] text-foreground outline-none focus-visible:border-ring"
-                >
-                  <option value="All">Status: All</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                  <option value="Pending">Pending</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              </label>
-              <label className="relative">
-                <select
-                  value={parentFilter}
-                  onChange={(event) => {
-                    setParentFilter(event.target.value);
-                    setPage(1);
-                  }}
-                  className="h-9 appearance-none rounded-md border border-input bg-background px-2.5 pr-8 text-[12px] text-foreground outline-none focus-visible:border-ring"
-                >
-                  <option value="All">Parent Department: All</option>
-                  <option value="Root">Root Departments</option>
+              <Select
+                value={status}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  setStatus(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger size="sm" className="h-9 w-[140px] rounded-md text-[12px]">
+                  <SelectValue>{status === "All" ? "Status: All" : status}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">Status: All</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={parentFilter}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  setParentFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger size="sm" className="h-9 w-[220px] rounded-md text-[12px]">
+                  <SelectValue>
+                    {parentFilter === "All"
+                      ? "Parent Department: All"
+                      : parentFilter === "Root"
+                        ? "Root Departments"
+                        : parentFilter}
+                  </SelectValue>
+                </SelectTrigger>
+                {/* max-h-(--available-height) + overflow-y-auto on SelectContent keeps this
+                    list within the viewport with a scrollbar instead of spilling over the
+                    page — the plain native <select> this replaced could not be constrained. */}
+                <SelectContent>
+                  <SelectItem value="All">Parent Department: All</SelectItem>
+                  <SelectItem value="Root">Root Departments</SelectItem>
                   {parentOptions.map((parent) => (
-                    <option key={parent} value={parent}>
+                    <SelectItem key={parent} value={parent}>
                       {parent}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              </label>
+                </SelectContent>
+              </Select>
               <Button type="button" variant="outline">
                 <Filter className="h-3.5 w-3.5" />
                 Filters
@@ -1455,13 +1511,13 @@ export default function DepartmentPage() {
               </Table>
             </div>
 
-            <div className="flex h-[51px] items-center justify-between border-t border-border px-3.5">
+            <div className="flex min-h-[51px] flex-col flex-wrap items-start justify-between gap-2 border-t border-border px-3.5 py-2.5 sm:flex-row sm:items-center">
               <p className="text-[11px] text-muted-foreground">
                 Showing {filteredDepartments.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0} to{" "}
                 {Math.min(currentPage * PAGE_SIZE, filteredDepartments.length)} of{" "}
                 {filteredDepartments.length} entries
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex max-w-full items-center gap-1.5 overflow-x-auto">
                 <PaginationButton
                   label="Previous page"
                   disabled={currentPage <= 1}
@@ -1469,21 +1525,31 @@ export default function DepartmentPage() {
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </PaginationButton>
-                {Array.from({ length: totalPages }).map((_, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => setPage(index + 1)}
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-md border text-[12px] font-semibold transition-colors",
-                      currentPage === index + 1
-                        ? "border-blue-600 bg-blue-600 text-white"
-                        : "border-border bg-background text-foreground hover:bg-muted"
-                    )}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
+                {getPaginationItems(currentPage, totalPages).map((item, index) =>
+                  item === "ellipsis" ? (
+                    <span
+                      key={`ellipsis-${index}`}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center text-[12px] text-muted-foreground"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setPage(item)}
+                      aria-current={currentPage === item ? "page" : undefined}
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-[12px] font-semibold transition-colors",
+                        currentPage === item
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "border-border bg-background text-foreground hover:bg-muted"
+                      )}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
                 <PaginationButton
                   label="Next page"
                   disabled={currentPage >= totalPages}
