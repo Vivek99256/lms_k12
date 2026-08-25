@@ -15,6 +15,7 @@ import * as dateFns from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { fromDateOnly } from "@/lib/date-only"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -36,13 +37,22 @@ interface DatePickerProps {
   toYear?: number
 }
 
-/** Strings arrive from forms and APIs; reject the ones date-fns would throw on. */
+/**
+ * Strings arrive from forms and APIs; reject the ones date-fns would throw on.
+ *
+ * A bare "YYYY-MM-DD" is parsed as local midnight (via `fromDateOnly`), not UTC
+ * midnight - `new Date("2026-01-02")` is defined to parse as UTC, which renders
+ * as 1 January west of Greenwich. Datetime strings (anything with a "T") keep
+ * the standard parse; those carry a real instant and their offset is meaningful.
+ */
 function toValidDate(value?: Date | string): Date | undefined {
   if (!value) return undefined
 
-  const parsed = value instanceof Date ? value : new Date(value)
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value
+  }
 
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  return fromDateOnly(value)
 }
 
 export function DatePicker({
