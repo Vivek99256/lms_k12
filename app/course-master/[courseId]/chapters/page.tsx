@@ -55,7 +55,6 @@ import { cn } from '@/lib/utils';
 import { type Course } from '../../data/courses';
 import {
   fetchChapterContent,
-  fetchQuestionBank,
   fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
   getConceptIntelligenceData,
@@ -68,9 +67,17 @@ import {
   type ChapterSemantic,
   type ConceptIntelEntry,
   type GeneratedQuestionPreview,
-  type QuestionBankApiQuestion,
   type SubjectWithChapters,
 } from '../../data/chapters';
+import {
+  fetchMappedQuestionBank,
+  groupQuestionBankItems,
+  type QuestionBankItem,
+  type QuestionBankChapterRef,
+  type QuestionBankQuestionType,
+} from '../../data/questionBank';
+import { QuestionBankQuestionCard } from '@/app/components/questionBank/QuestionBankQuestionCard';
+import { groupConceptsByTopic, type TopicGroup } from '../../data/chapterTopics';
 import { ConceptIntelligenceTabs } from './ConceptIntelligenceTabs';
 import { getRequestContext, getSyear } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
@@ -108,6 +115,7 @@ const QUESTION_TYPE_API_CONFIG: Record<
 const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
 const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
 const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity'] as const;
+const TEACHER_CONTENT_LIBRARY_TABS = ['All content', 'Presentations'] as const;
 
 const UPLOAD_TYPE_CONFIG: Record<
   (typeof UPLOAD_CONTENT_TYPES)[number],
@@ -220,37 +228,7 @@ interface ChapterContentItem {
   }[];
 }
 
-type QuestionBankQuestionType = (typeof QUESTION_TYPE_OPTIONS)[number];
 type QuestionOptionLabel = (typeof QUESTION_OPTION_LABELS)[number];
-
-interface QuestionBankOption {
-  label: string;
-  text: string;
-  isCorrect?: boolean;
-}
-
-interface QuestionBankItem {
-  id: string;
-  displayId: string;
-  chapterId: string;
-  chapterTitle: string;
-  conceptTitle: string;
-  category: string;
-  type: QuestionBankQuestionType;
-  marks: number;
-  question: string;
-  options?: QuestionBankOption[];
-  modelAnswer?: string;
-}
-
-interface QuestionBankGroup {
-  id: string;
-  chapterId: string;
-  chapterTitle: string;
-  conceptTitle: string;
-  category: string;
-  questions: QuestionBankItem[];
-}
 
 function getApiContentType(category: string, asset: ChapterContentAsset): ChapterContentType {
   const normalizedCategory = category.toLowerCase().replace(/[_\s]+/g, ' ').trim();
@@ -270,7 +248,11 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
 // Files the browser can only download (no native renderer). PDFs, images and
 // videos are deliberately absent - those render inline in a tab.
 const DOWNLOAD_ONLY_FILE_PATTERN = /\.(pptx?|docx?|xlsx?|csv|zip|rtf)(?:$|[?#])/i;
-const GAMMA_DECK_PATTERN = /(?:\/\/|\.)gamma\.app\//i;
+// A deck page lives on gamma.app itself. It must not match the export CDN,
+// assets.api.gamma.app, whose links are .pptx files: that host ends in
+// ".gamma.app/" too, so a looser pattern treated every export download as a
+// viewable deck and handed the raw .pptx straight to the browser.
+const GAMMA_DECK_PATTERN = /^https?:\/\/(?:www\.)?gamma\.app\//i;
 
 function isHttpUrl(value?: string | null): value is string {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
@@ -287,19 +269,33 @@ function isDownloadOnlyUrl(value: string): boolean {
   );
 }
 
-// Word/PowerPoint/Excel files render as a forced download in-browser with no
-// native preview, so they're routed through the Google Docs Viewer embed
-// instead of opened directly.
+// Word/PowerPoint/Excel files have no native browser preview, so opening one
+// directly is always a download. They go through a viewer instead.
 function isOfficeDocumentUrl(value: string, filename?: string | null): boolean {
-  return /\.(docx?|pptx?|xlsx?)(?:$|[?#])/i.test(filename ?? value);
+  return /\.(docx?|pptx?|xlsx?)(?:$|[?#])/i.test(value) ||
+    /\.(docx?|pptx?|xlsx?)(?:$|[?#])/i.test(filename ?? '');
 }
 
-// Gamma stores two links per generated asset: `url` holds the export file
-// (a .pptx download) while `filename` keeps the gamma.app deck link. Pick the
-// link a browser can render in a tab: a Gamma deck link renders natively,
-// an Office document goes through the Google Docs Viewer, other inline-
-// viewable links (PDFs, images) render directly, and anything else falls
-// back to the Office Online viewer so "Open" never downloads.
+/**
+ * Office Online renders the document as a page, so "Open" lands on something
+ * readable instead of a download. It fetches `src` server-side, which the
+ * content links allow: they are public, unauthenticated URLs.
+ *
+ * `view.aspx` rather than the Google Docs `embedded=true` viewer because Open
+ * targets a real tab, and the embedded viewer is built to sit in an iframe.
+ */
+function toOfficeViewerUrl(value: string): string {
+  return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(value)}`;
+}
+
+// Pick the link a browser can render in a tab: a Gamma deck page renders
+// natively, an Office document goes through the Office Online viewer, other
+// inline-viewable links (PDFs, images) render directly, and anything left over
+// falls back to the viewer too, so "Open" never downloads.
+//
+// Both `url` and `filename` can hold the same export link - the earlier
+// assumption that `filename` keeps a gamma.app deck link does not hold for the
+// stored data - so every candidate is classified rather than trusted by field.
 function resolveViewableContentUrl(asset: ChapterContentAsset): string | undefined {
   const candidates = [asset.url, asset.filename]
     .filter(isHttpUrl)
@@ -313,14 +309,12 @@ function resolveViewableContentUrl(asset: ChapterContentAsset): string | undefin
   if (deckLink) return deckLink;
 
   const officeDocLink = candidates.find((value) => isOfficeDocumentUrl(value, asset.filename));
-  if (officeDocLink) {
-    return `https://docs.google.com/viewer?url=${encodeURIComponent(officeDocLink)}&embedded=true`;
-  }
+  if (officeDocLink) return toOfficeViewerUrl(officeDocLink);
 
   const inlineViewable = candidates.find((value) => !isDownloadOnlyUrl(value));
   if (inlineViewable) return inlineViewable;
 
-  return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(candidates[0])}`;
+  return toOfficeViewerUrl(candidates[0]);
 }
 
 function buildApiChapterContentItems(
@@ -502,71 +496,31 @@ function resolveChapterKeyConcepts(
 }
 
 /** Bucket id for concepts that carry no topic_id — never a real topic_master row. */
-const UNGROUPED_TOPIC_ID = '__ungrouped__';
-
 /**
  * A topic row in the chapter list, carrying the concepts that sit under it.
  * `conceptIndex` stays the chapter-wide index into `content_categories`, so
  * Concept Intelligence and question generation keep addressing a concept exactly
  * the way they did before the topic level was inserted.
  */
-interface ChapterTopicRow {
-  id: string;
-  title: string;
-  description: string;
-  concepts: Array<{ title: string; conceptIndex: number }>;
-}
+type ChapterTopicRow = TopicGroup<{ title: string; conceptIndex: number }>;
 
 /**
- * Split a chapter's concepts across its topics.
- *
- * Chapters extracted before the topic split have no topic_master rows, and even
- * where topics exist some concepts still carry no topic_id. No case may hide a
- * concept: partly-tagged chapters collect the rest under an "Other concepts" row,
- * while a chapter whose topics hold no concepts at all (no topic rows, or none of
- * its concepts tagged) returns no rows, so the caller lists its concepts directly
- * rather than burying them behind a screen of empty topics.
+ * Split a chapter's concepts across its topics. The rule for when the topic level
+ * appears is shared with the student chapter list, so both sections group the same
+ * chapter the same way.
  */
 function buildChapterTopicRows(chapter: Chapter, conceptRows: string[]): ChapterTopicRow[] {
-  const topics = chapter.topics ?? [];
-  if (topics.length === 0) return [];
-
   // The list renders concept titles, so the topic lookup is keyed by title.
   const topicIdByConcept = new Map<string, string>();
   for (const concept of chapter.concepts ?? []) {
     if (concept.topicId) topicIdByConcept.set(concept.title, concept.topicId);
   }
 
-  const rows = new Map<string, ChapterTopicRow>(
-    topics.map((topic) => [
-      topic.id,
-      { id: topic.id, title: topic.title, description: topic.description, concepts: [] },
-    ])
+  return groupConceptsByTopic(
+    chapter.topics,
+    conceptRows.map((title, conceptIndex) => ({ title, conceptIndex })),
+    (concept) => topicIdByConcept.get(concept.title) ?? null
   );
-
-  const ungrouped: ChapterTopicRow['concepts'] = [];
-  conceptRows.forEach((title, conceptIndex) => {
-    const topicId = topicIdByConcept.get(title);
-    const row = topicId ? rows.get(topicId) : undefined;
-    if (row) row.concepts.push({ title, conceptIndex });
-    else ungrouped.push({ title, conceptIndex });
-  });
-
-  // Topics that account for none of the chapter's concepts would be nothing but
-  // dead ends, so the topic level only appears once the data backs it.
-  if (ungrouped.length === conceptRows.length) return [];
-
-  const result = Array.from(rows.values());
-  if (ungrouped.length > 0) {
-    result.push({
-      id: UNGROUPED_TOPIC_ID,
-      title: 'Other concepts',
-      description: 'Concepts that are not mapped to a topic yet.',
-      concepts: ungrouped,
-    });
-  }
-
-  return result;
 }
 
 function buildTeacherResources(chapterTitle: string) {
@@ -784,8 +738,10 @@ function getQuestionBankConceptTitles(chapter: Chapter) {
   return Array.from(new Set(concepts.map((title) => title.trim())));
 }
 
-function getQuestionBankCategory(course: Course, chapter: Chapter, conceptTitle: string) {
-  const haystack = `${chapter.title} ${conceptTitle}`.toLowerCase();
+// Takes the chapter's title rather than the chapter: that is all it reads, and it
+// lets the shared question-bank fetch pass its lighter chapter shape straight in.
+function getQuestionBankCategory(course: Course, chapterTitle: string, conceptTitle: string) {
+  const haystack = `${chapterTitle} ${conceptTitle}`.toLowerCase();
 
   if (/sound|amplitude|frequency|pitch|ultrasound|wave/.test(haystack)) return 'Sound';
   if (/force|motion|work|energy|electric|magnet|light/.test(haystack)) return 'Physics';
@@ -793,120 +749,6 @@ function getQuestionBankCategory(course: Course, chapter: Chapter, conceptTitle:
   if (/life|cell|organ|plant|animal|nutrition|respiration/.test(haystack)) return 'Biology';
 
   return course.subject || 'Concept';
-}
-
-function isLikelyJson(value: string): boolean {
-  const trimmed = value.trim();
-  return trimmed.startsWith('{') && trimmed.endsWith('}');
-}
-
-/**
- * The question's type as stored against it. The API normalises the
- * question_type_master label (which spells multiple-choice 'multiple') down to
- * the two types the bank shows, so this only has to defend against casing.
- */
-function normaliseQuestionBankType(value: string | undefined): QuestionBankQuestionType {
-  return (value ?? '').trim().toUpperCase() === 'MCQ' ? 'MCQ' : 'Narrative';
-}
-
-function deriveQuestionBankAnswer(
-  q: QuestionBankApiQuestion
-): { type: QuestionBankQuestionType; options?: QuestionBankOption[]; modelAnswer?: string } {
-  const type = normaliseQuestionBankType(q.question_type);
-
-  if (q.options && q.options.length > 0) {
-    return {
-      type,
-      options: q.options.map((o) => ({ label: o.label, text: o.text, isCorrect: o.is_correct })),
-      modelAnswer: type === 'MCQ' ? undefined : q.model_answer,
-    };
-  }
-
-  if (q.model_answer) {
-    try {
-      const parsed = JSON.parse(q.model_answer) as {
-        question_type?: string;
-        options?: Array<{ label: string; text: string; is_correct?: boolean }>;
-        correct_option?: string;
-      };
-
-      if (Array.isArray(parsed.options) && parsed.options.length > 0) {
-        return {
-          type,
-          options: parsed.options.map((o) => ({
-            label: o.label,
-            text: o.text,
-            isCorrect: o.is_correct ?? o.label === parsed.correct_option,
-          })),
-          modelAnswer: undefined,
-        };
-      }
-    } catch {
-      // model_answer isn't structured JSON — treat it as a plain-text model answer below.
-    }
-  }
-
-  return {
-    type,
-    options: undefined,
-    modelAnswer: q.model_answer,
-  };
-}
-
-/**
- * The concept a question is filed under.
- *
- * A question carries two different links: `concept_id` points at lms_concept and
- * `topic_id` at topic_master. They are separate id spaces, so each is resolved
- * against its own list — matching a topic id against the concept rows is what used
- * to yield "Topic 23740" labels and fill the concept dropdown with them. `concept`
- * is the name stored on the question itself and covers rows whose ids no longer
- * resolve against the chapter.
- */
-function resolveQuestionConceptTitle(
-  q: QuestionBankApiQuestion,
-  chapter: Chapter | undefined
-): string {
-  if (q.concept_id) {
-    const byConceptId = chapter?.concepts?.find((c) => Number(c.id) === Number(q.concept_id));
-    if (byConceptId?.title.trim()) return byConceptId.title.trim();
-  }
-
-  if (q.concept?.trim()) return q.concept.trim();
-
-  if (q.topic_id) {
-    const byTopicId = chapter?.topics?.find((t) => Number(t.id) === Number(q.topic_id));
-    if (byTopicId?.title.trim()) return byTopicId.title.trim();
-  }
-
-  return 'General';
-}
-
-async function fetchMappedQuestionBank(
-  chapterId: number,
-  chapter: Chapter | undefined,
-  course: Course | null | undefined
-): Promise<QuestionBankItem[]> {
-  const response = await fetchQuestionBank(chapterId);
-
-  return response.data.map((q: QuestionBankApiQuestion) => {
-    const conceptTitle = resolveQuestionConceptTitle(q, chapter);
-    const { type, options, modelAnswer } = deriveQuestionBankAnswer(q);
-
-    return {
-      id: String(q.id),
-      displayId: `QB-${q.id}`,
-      chapterId: String(q.chapter_id),
-      chapterTitle: chapter?.title ?? 'Unknown Chapter',
-      conceptTitle,
-      category: course ? getQuestionBankCategory(course, chapter ?? ({} as Chapter), conceptTitle) : 'Question Bank',
-      type,
-      marks: q.marks ?? 1,
-      question: q.question,
-      options,
-      modelAnswer,
-    };
-  });
 }
 
 export default function ChapterListPage() {
@@ -1107,6 +949,19 @@ export default function ChapterListPage() {
   const view = searchParams?.get('view');
   const contentResourceType = searchParams?.get('resourceType') === 'teacher' ? 'teacher' : 'classroom';
   const contentResourceLabel = contentResourceType === 'teacher' ? 'Teacher Resource' : 'Classroom Resource';
+  const availableContentLibraryTabs =
+    contentResourceType === 'teacher' ? TEACHER_CONTENT_LIBRARY_TABS : CONTENT_LIBRARY_TABS;
+  // A resource view can be opened while a type selected in the other view is still
+  // in state. Fall back to All content so both resource views always have a valid
+  // type filter and the visible tab matches the data being loaded.
+  // Widened to string[] on purpose: the two tab lists are different tuple types,
+  // so includes() on the union narrows its argument to the shorter tuple's members
+  // and rejects the very tabs this is meant to test for.
+  const activeContentLibraryTab = (availableContentLibraryTabs as readonly string[]).includes(
+    contentLibraryTab
+  )
+    ? contentLibraryTab
+    : 'All content';
   const activeChapterId = searchParams?.get('chapterId') ?? '';
   const resourceChapter =
     allChapters.find((chapter) => chapter.id === activeChapterId) || allChapters[0] || null;
@@ -1159,14 +1014,17 @@ export default function ChapterListPage() {
     });
   }, [resourceFileType, resourceSearch, teacherResources]);
 
+  // Source is deliberately absent from the cache key: the fetch below no longer
+  // narrows by it, so one response serves every source and changing the source is
+  // a client-side filter rather than a refetch.
   const chapterContentItems = useMemo(() => {
     if (!course || !activeLibraryChapter) return [];
-    const cacheKey = `${activeLibraryChapter.id}:${contentLibraryTab}:${contentGroupBy}:${contentSourceFilter}:${contentResourceType}`;
+    const cacheKey = `${activeLibraryChapter.id}:${activeContentLibraryTab}:${contentGroupBy}:${contentResourceType}`;
     const apiCategories = chapterContentCategories[cacheKey];
     if (apiCategories) return buildApiChapterContentItems(activeLibraryChapter, apiCategories);
     if (/^\d+$/.test(activeLibraryChapter.id)) return [];
     return buildChapterContentItems(course, activeLibraryChapter, activeLibraryChapterConcepts);
-  }, [activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, contentLibraryTab, contentGroupBy, contentSourceFilter, contentResourceType, course]);
+  }, [activeContentLibraryTab, activeLibraryChapter, activeLibraryChapterConcepts, chapterContentCategories, contentGroupBy, contentResourceType, course]);
 
   /**
    * The chapter's content narrowed to the resource type currently on screen.
@@ -1185,8 +1043,14 @@ export default function ChapterListPage() {
     );
   }, [chapterContentItems, contentResourceType]);
 
+  /**
+   * Every source present in this resource view, so the dropdown always offers the
+   * full choice. It is built from the unfiltered items on purpose: deriving it
+   * from the filtered list made the list collapse to whatever was already
+   * selected, leaving no way to switch straight to the other source.
+   */
   const contentSourceOptions = useMemo(
-    () => Array.from(new Set(resourceScopedContentItems.map((item) => item.source))),
+    () => Array.from(new Set(resourceScopedContentItems.map((item) => item.source))).sort(),
     [resourceScopedContentItems]
   );
 
@@ -1259,34 +1123,10 @@ export default function ChapterListPage() {
     () => new Map(filteredQuestionBankItems.map((question, index) => [question.id, index + 1])),
     [filteredQuestionBankItems]
   );
-  const groupedQuestionBankItems = useMemo(() => {
-    const groups: QuestionBankGroup[] = [];
-    const groupLookup = new Map<string, QuestionBankGroup>();
-
-    filteredQuestionBankItems.forEach((question) => {
-      const key = `${question.chapterId}-${question.conceptTitle}`;
-      const existingGroup = groupLookup.get(key);
-
-      if (existingGroup) {
-        existingGroup.questions.push(question);
-        return;
-      }
-
-      const group: QuestionBankGroup = {
-        id: key,
-        chapterId: question.chapterId,
-        chapterTitle: question.chapterTitle,
-        conceptTitle: question.conceptTitle,
-        category: question.category,
-        questions: [question],
-      };
-
-      groupLookup.set(key, group);
-      groups.push(group);
-    });
-
-    return groups;
-  }, [filteredQuestionBankItems]);
+  const groupedQuestionBankItems = useMemo(
+    () => groupQuestionBankItems(filteredQuestionBankItems),
+    [filteredQuestionBankItems]
+  );
 
   const presentationConceptOptions = useMemo(() => {
     if (!presentationChapterId || !course) return [];
@@ -1366,17 +1206,24 @@ export default function ChapterListPage() {
       setQuestionBankLoading(true);
       setQuestionBankError('');
 
+      // The teacher bank labels each question with the course's subject area. The
+      // student bank has no course in hand and takes the shared default instead.
+      const resolveCategory = (chapter: QuestionBankChapterRef | undefined, conceptTitle: string) =>
+        course ? getQuestionBankCategory(course, chapter?.title ?? '', conceptTitle) : 'Question Bank';
+
       const request =
         filterValue === 'all'
           ? Promise.all(
               allChapters
                 .filter((chapter) => /^\d+$/.test(chapter.id))
-                .map((chapter) => fetchMappedQuestionBank(Number(chapter.id), chapter, course).catch(() => []))
+                .map((chapter) =>
+                  fetchMappedQuestionBank(Number(chapter.id), chapter, resolveCategory).catch(() => [])
+                )
             ).then((results) => results.flat())
           : fetchMappedQuestionBank(
               Number(filterValue),
               allChapters.find((chapter) => chapter.id === filterValue),
-              course
+              resolveCategory
             );
 
       request
@@ -1408,7 +1255,7 @@ export default function ChapterListPage() {
   useEffect(() => {
     if (view !== 'content' || !activeLibraryChapter || !/^\d+$/.test(activeLibraryChapter.id)) return;
 
-    const cacheKey = `${activeLibraryChapter.id}:${contentLibraryTab}:${contentGroupBy}:${contentSourceFilter}:${contentResourceType}`;
+    const cacheKey = `${activeLibraryChapter.id}:${activeContentLibraryTab}:${contentGroupBy}:${contentResourceType}`;
     if (chapterContentCategories[cacheKey]) return;
 
     const requestContext = getRequestContext();
@@ -1425,11 +1272,13 @@ export default function ChapterListPage() {
           setContentError('');
         }
         const conceptWise = contentGroupBy === 'Concept wise';
-        const contentCategory = contentLibraryTab === 'All content' ? undefined : contentLibraryTab;
+        const contentCategory = activeContentLibraryTab === 'All content' ? undefined : activeContentLibraryTab;
+        // Source is not sent: the response has to carry every source so the
+        // dropdown can list them all, and `filteredChapterContentItems` already
+        // narrows to the selected one from `resolveContentSource`.
         return fetchChapterContent(Number(activeLibraryChapter.id), requestContext.sub_institute_id, {
           contentCategory,
           conceptWise,
-          source: contentSourceFilter === 'all' ? undefined : contentSourceFilter,
         });
       })
       .then((response) => {
@@ -1452,7 +1301,7 @@ export default function ChapterListPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeLibraryChapter, contentLibraryTab, contentGroupBy, contentSourceFilter, contentResourceType, view, chapterContentCategories]);
+  }, [activeContentLibraryTab, activeLibraryChapter, contentGroupBy, contentResourceType, view, chapterContentCategories]);
 
   const filteredChapterContentItems = useMemo(() => {
     return chapterContentItems.filter((item) => {
@@ -1475,18 +1324,18 @@ export default function ChapterListPage() {
           ? // In Teacher Resources, both "All content" and "Presentations" surface
             // every Teacher Training item regardless of its underlying type.
             true
-          : contentLibraryTab === 'All content' ||
-            (contentLibraryTab === 'Presentations' && item.type === 'Classroom presentation') ||
-            (contentLibraryTab === 'Videos' && item.type === 'Video') ||
-            (contentLibraryTab === 'Revision notes' &&
+          : activeContentLibraryTab === 'All content' ||
+            (activeContentLibraryTab === 'Presentations' && item.type === 'Classroom presentation') ||
+            (activeContentLibraryTab === 'Videos' && item.type === 'Video') ||
+            (activeContentLibraryTab === 'Revision notes' &&
               (item.type === 'Revision notes' || item.type === 'PDF')) ||
-             (contentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity');
+             (activeContentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity');
 
       return matchesSearch && matchesSource && matchesResourceType && matchesTab;
     });
   }, [
     chapterContentItems,
-    contentLibraryTab,
+    activeContentLibraryTab,
     contentResourceType,
     contentSearch,
     contentSourceFilter,
@@ -1859,6 +1708,9 @@ export default function ChapterListPage() {
   };
 
   const openChapterContentView = (chapter: Chapter, resourceType: 'classroom' | 'teacher' = 'classroom') => {
+    setContentLibraryTab('All content');
+    setContentSourceFilter('all');
+    setContentSearch('');
     const nextParams = new URLSearchParams(searchParams?.toString());
     nextParams.set('view', 'content');
     nextParams.set('resourceType', resourceType);
@@ -2103,7 +1955,7 @@ export default function ChapterListPage() {
       chapterId: chapter.id,
       chapterTitle: chapter.title,
       conceptTitle: manualQuestionConcept,
-      category: getQuestionBankCategory(course, chapter, manualQuestionConcept),
+      category: getQuestionBankCategory(course, chapter.title, manualQuestionConcept),
       type: manualQuestionType,
       marks,
       question: manualQuestionText.trim(),
@@ -2656,12 +2508,7 @@ export default function ChapterListPage() {
         <BookOpen size={11} className="shrink-0" />
         {item.chapterTitle}
       </span>
-      {item.conceptName ? (
-        <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#f1f5f9] px-3 py-1 text-[11px] font-medium text-slate-600">
-          <Brain size={11} className="shrink-0 text-[#4f46e5]" />
-          {item.conceptName}
-        </span>
-      ) : null}
+    
     </div>
   );
 
@@ -2720,68 +2567,15 @@ export default function ChapterListPage() {
     }
   };
 
-  const renderQuestionBankQuestion = (question: QuestionBankItem) => {
-    const visibleNumber = questionBankVisibleNumberById.get(question.id) ?? 1;
-
-    return (
-      <article
-        key={question.id}
-        className="rounded-[8px] border border-slate-200/90 bg-white px-5 py-5 shadow-[0_2px_8px_rgba(15,23,42,0.08)] sm:px-6"
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex min-w-0 gap-4">
-            <span className="shrink-0 pt-0.5 font-mono text-[14px] text-slate-600">
-              {question.displayId}
-            </span>
-            <h3 className="min-w-0 text-[18px] font-bold leading-7 text-slate-950">
-              {visibleNumber}. {question.question}
-            </h3>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2 self-start">
-            <span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-xs font-bold text-[#3157ff]">
-              {question.type}
-            </span>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-              {question.marks} mark{question.marks === 1 ? '' : 's'}
-            </span>
-          </div>
-        </div>
-
-        {question.options ? (
-          <div className="mt-4 space-y-2">
-            {question.options.map((option) => (
-              <div
-                key={`${question.id}-${option.label}`}
-                className={cn(
-                  'flex min-h-11 items-center gap-3 rounded-[6px] border px-3 text-[16px] transition-colors',
-                  option.isCorrect
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                    : 'border-slate-200 bg-white text-slate-900'
-                )}
-              >
-                <span className="shrink-0 font-mono text-sm font-semibold text-slate-600">
-                  {option.label}.
-                </span>
-                <span className="min-w-0 flex-1">{option.text}</span>
-                {option.isCorrect ? (
-                  <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {question.modelAnswer && !isLikelyJson(question.modelAnswer) ? (
-          <div className="mt-4 rounded-[6px] border border-slate-200 border-l-4 border-l-[#4f46e5] bg-[#f3f7fc] px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-              Model answer
-            </p>
-            <p className="mt-2 text-[16px] leading-7 text-slate-700">{question.modelAnswer}</p>
-          </div>
-        ) : null}
-
-        <div className="mt-4 flex justify-end gap-3 border-t border-slate-200/80 pt-3">
+  // Presentation is shared with the student bank; only these actions are the
+  // teacher's, so a student never gets an Edit or Delete control rendered at all.
+  const renderQuestionBankQuestion = (question: QuestionBankItem) => (
+    <QuestionBankQuestionCard
+      key={question.id}
+      question={question}
+      visibleNumber={questionBankVisibleNumberById.get(question.id) ?? 1}
+      actions={
+        <>
           <Button
             type="button"
             variant="ghost"
@@ -2801,10 +2595,10 @@ export default function ChapterListPage() {
             <Trash2 size={17} className="mr-2" />
             {deletingQuestionBankItemId === question.id ? 'Deleting…' : 'Delete'}
           </Button>
-        </div>
-      </article>
-    );
-  };
+        </>
+      }
+    />
+  );
 
   const isEditingQuestionBankItem = editingQuestionBankItem !== null;
   const addQuestionBankModal = isAddQuestionBankModalOpen ? (
@@ -4378,19 +4172,13 @@ export default function ChapterListPage() {
 
           <div className="mb-4 border-b border-slate-200/80">
             <div className="flex flex-wrap items-center gap-6 text-[15px]">
-              {CONTENT_LIBRARY_TABS.filter(
-                (tab) =>
-                  contentResourceType !== 'teacher' ||
-                  !(['Videos', 'Revision notes', 'Classroom activity'] as const).includes(
-                    tab as 'Videos' | 'Revision notes' | 'Classroom activity'
-                  )
-              ).map((tab) => (
+              {availableContentLibraryTabs.map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setContentLibraryTab(tab)}
                   className={`inline-flex items-center border-b-2 px-1 py-3 font-medium transition-colors ${
-                    contentLibraryTab === tab
+                    activeContentLibraryTab === tab
                       ? 'border-[#4f46e5] text-[#4f46e5]'
                       : 'border-transparent text-slate-500 hover:text-slate-900'
                   }`}
@@ -4412,7 +4200,10 @@ export default function ChapterListPage() {
               />
             </div>
 
-            <Select value={contentSourceFilter} onValueChange={(value) => setContentSourceFilter(value ?? '')}>
+            {/* Base UI clears the value when the selected item is picked again, and
+                '' is not a state this filter has - it would blank the trigger and
+                match nothing. Deselecting means "All sources". */}
+            <Select value={contentSourceFilter} onValueChange={(value) => setContentSourceFilter(value || 'all')}>
               <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm lg:w-[190px]">
                 <SelectValue>{sourceLabel}</SelectValue>
               </SelectTrigger>
@@ -4498,6 +4289,12 @@ export default function ChapterListPage() {
                               <div className="px-4 pb-4 pt-3">
                                 {renderContentChapterConcept(item)}
                                 <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
+                                <div>{item.conceptName ? (
+        <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#f1f5f9] px-3 py-1 text-[11px] font-medium text-slate-600">
+          <Brain size={11} className="shrink-0 text-[#4f46e5]" />
+          {item.conceptName}
+        </span>
+      ) : null}</div>
                                 <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
                                   <Button
                                     type="button"
@@ -4960,11 +4757,7 @@ export default function ChapterListPage() {
                                       <span className="block truncate text-[15px] font-semibold text-slate-950">
                                         {`${topicIndex + 1}. ${topic.title}`}
                                       </span>
-                                      {topic.description && (
-                                        <span className="mt-0.5 block truncate text-[13px] text-slate-500">
-                                          {topic.description}
-                                        </span>
-                                      )}
+                                      
                                     </span>
                                     <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                                       {topic.concepts.length} concept

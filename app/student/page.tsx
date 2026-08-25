@@ -15,9 +15,9 @@ import {
   FlaskConical,
   FolderOpen,
   Globe,
-  GraduationCap,
   Info,
   Library,
+  Lightbulb,
   ListTree,
   Palette,
   PenTool,
@@ -55,6 +55,15 @@ import {
   type ChapterContentAsset,
   type SubjectWithChapters,
 } from '@/app/course-master/data/chapters';
+import {
+  fetchMappedQuestionBank,
+  groupQuestionBankItems,
+  type QuestionBankItem,
+} from '@/app/course-master/data/questionBank';
+import { QuestionBankQuestionCard } from '@/app/components/questionBank/QuestionBankQuestionCard';
+import { groupConceptsByTopic } from '@/app/course-master/data/chapterTopics';
+import { getTotalKeyConceptCount } from '@/app/course-master/data/conceptCounts';
+import { getCurriculumLabel } from '@/app/course-master/data/curriculum';
 
 const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
   'My Course': BookOpen,
@@ -84,7 +93,7 @@ const CATEGORY_ACCENT_MAP: Record<string, string> = {
 
 const SECTION_BADGES = ['Section A', 'Section A', 'Section B', 'Section B'] as const;
 
-type StudentView = 'subjects' | 'curriculum' | 'chapters' | 'content';
+type StudentView = 'subjects' | 'curriculum' | 'chapters' | 'content' | 'question-bank';
 
 type StudentContentGroupBy = 'chapter' | 'concept';
 
@@ -157,7 +166,11 @@ type StudentChapterView = {
   concepts: Array<{
     id: string;
     name: string;
+    /** topic_master.id this concept sits under, null when it is untagged. */
+    topicId: string | null;
   }>;
+  /** topic_master rows for the chapter, in curriculum order. */
+  topics: Array<{ id: string; title: string; description: string }>;
   id: string;
   name: string;
   number: number;
@@ -421,20 +434,30 @@ function buildStudentUnits(unitData: UnitData[], outcomes: OutcomeNode[]): Stude
 
 function buildStudentChapters(chapters: Chapter[]): StudentChapterView[] {
   return chapters.map((chapter, index) => {
+    // topicId only exists on the concept rows. The content_categories fallback is
+    // a bare list of names, so those chapters have nothing to group by and fall
+    // back to a flat concept list, exactly as they do in the teacher list.
     const normalizedConcepts =
       chapter.concepts?.map((concept, conceptIndex) => ({
         id: String(concept.id ?? conceptIndex + 1),
         name: concept.title || `Concept ${conceptIndex + 1}`,
+        topicId: concept.topicId ?? null,
       })) ??
       Object.keys(chapter.content_categories ?? {}).map((conceptName, conceptIndex) => ({
         id: `${chapter.id}-${conceptIndex + 1}`,
         name: conceptName || `Concept ${conceptIndex + 1}`,
+        topicId: null,
       }));
 
     return {
       id: String(chapter.id),
       number: Number(chapter.number) || index + 1,
       name: chapter.title || 'Untitled chapter',
+      topics: (chapter.topics ?? []).map((topic) => ({
+        id: String(topic.id),
+        title: topic.title,
+        description: topic.description,
+      })),
       concepts: normalizedConcepts.filter((concept) => concept.name.trim()),
     };
   });
@@ -599,6 +622,8 @@ export default function StudentPage() {
   const [data, setData] = useState<LmsCoursesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedChapterId, setExpandedChapterId] = useState<string | null>(null);
+  // Keyed "chapterId:topicId" so the same topic id under two chapters cannot both open.
+  const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
   const [expandedUnitId, setExpandedUnitId] = useState<number | null>(null);
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
@@ -610,6 +635,12 @@ export default function StudentPage() {
   const [search, setSearch] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<StudentSubjectItem | null>(null);
   const [studentView, setStudentView] = useState<StudentView>('subjects');
+  const [questionBankItems, setQuestionBankItems] = useState<QuestionBankItem[]>([]);
+  const [questionBankLoading, setQuestionBankLoading] = useState(false);
+  const [questionBankError, setQuestionBankError] = useState<string | null>(null);
+  const [questionBankChapterFilter, setQuestionBankChapterFilter] = useState('all');
+  const [questionBankConceptFilter, setQuestionBankConceptFilter] = useState('all');
+  const [questionBankTypeFilter, setQuestionBankTypeFilter] = useState('all');
   const [subjectData, setSubjectData] = useState<SubjectWithChapters | null>(null);
 
   useEffect(() => {
@@ -659,19 +690,9 @@ export default function StudentPage() {
         fallbackSectionName;
       const sectionId = String(subject.section_id ?? subject.division_id ?? sectionName);
       const chapterCount = Number(subject.chapter_count ?? subject.chapters_count ?? subject.chapters?.length ?? 0);
-      const keyConceptCount = Number(
-        subject.key_concept_count ??
-          subject.key_concepts_count ??
-          subject.concepts_count ??
-          subject.total_concepts ??
-          subject.keyConcepts?.length ??
-          subject.concepts?.length ??
-          (Array.isArray(subject.chapters)
-            ? subject.chapters.reduce(
-                (sum, chapter) => sum + (Array.isArray(chapter.concepts) ? chapter.concepts.length : 0),
-                0
-              )
-            : 0)
+      const keyConceptCount = getTotalKeyConceptCount(
+        Array.isArray(subject.chapters) ? subject.chapters : [],
+        subject
       );
       const lessonPlanCount = Number(
         subject.lesson_plan_count ??
@@ -781,7 +802,12 @@ export default function StudentPage() {
     if (!subject) return;
 
     setSelectedSubject(subject);
-    if (viewParam === 'curriculum' || viewParam === 'chapters' || viewParam === 'content') {
+    if (
+      viewParam === 'curriculum' ||
+      viewParam === 'chapters' ||
+      viewParam === 'content' ||
+      viewParam === 'question-bank'
+    ) {
       setStudentView(viewParam);
     } else {
       setStudentView('subjects');
@@ -792,7 +818,8 @@ export default function StudentPage() {
     let cancelled = false;
 
     async function loadDetailData() {
-      if (!selectedSubject || (studentView !== 'curriculum' && studentView !== 'chapters' && studentView !== 'content')) {
+      const viewsNeedingDetail = ['curriculum', 'chapters', 'content', 'question-bank'];
+      if (!selectedSubject || !viewsNeedingDetail.includes(studentView)) {
         return;
       }
 
@@ -842,7 +869,10 @@ export default function StudentPage() {
     };
   }, [selectedSubject, studentView]);
 
-  const chapters = subjectData?.chapters ?? [];
+  // Memoised because `?? []` would hand out a fresh array on every render while
+  // subjectData is still null, which propagates through studentChapters into the
+  // question bank fetch effect and refetches forever.
+  const chapters = useMemo(() => subjectData?.chapters ?? [], [subjectData]);
   const detailSubject = subjectData?.subject ?? selectedSubject;
   const studentUnits = useMemo(
     () => buildStudentUnits(curriculumResponse?.unit_data ?? [], curriculumResponse?.outcomes ?? []),
@@ -947,19 +977,117 @@ export default function StudentPage() {
       chapters.length ??
       0
   );
-  const keyConceptCount = Number(
-    detailSubject?.key_concept_count ??
-      detailSubject?.key_concepts_count ??
-      detailSubject?.concepts_count ??
-      detailSubject?.keyConcepts?.length ??
-      detailSubject?.concepts?.length ??
-      selectedSubject?.keyConceptCount ??
-      chapters.reduce((sum, chapter) => sum + (chapter.concepts?.length ?? 0), 0)
+  // Counted from the chapters first, exactly as the teacher header does. The
+  // catalog returns key_concepts_count 0 for this subject even though its 16
+  // chapters carry 406 concepts, so a subject-level total can only be a fallback.
+  const keyConceptCount =
+    getTotalKeyConceptCount(chapters, detailSubject) || selectedSubject?.keyConceptCount || 0;
+  // Already reads "CBSE curriculum" / "ICSE curriculum", and is '' when the tenant
+  // has no curriculum record. The header drops the segment in that case rather than
+  // printing a placeholder - the old board-or-'Curriculum' fallback rendered the
+  // word twice, as "Curriculum curriculum".
+  const curriculumLabel = getCurriculumLabel(curriculumResponse?.curriculum_data ?? null);
+
+  // Questions are fetched for whichever chapter the dropdown selects, and for
+  // every chapter of the subject on 'all' - the same scope the teacher bank uses.
+  // State is set off a resolved promise so the effect body itself stays free of
+  // synchronous setState, matching how the content fetch on this screen behaves.
+  useEffect(() => {
+    if (studentView !== 'question-bank') return;
+
+    const scopedChapters =
+      questionBankChapterFilter === 'all'
+        ? studentChapters
+        : studentChapters.filter((chapter) => chapter.id === questionBankChapterFilter);
+    const fetchableChapters = scopedChapters.filter((chapter) => /^\d+$/.test(chapter.id));
+
+    let cancelled = false;
+
+    Promise.resolve()
+      .then(() => {
+        if (cancelled) return [] as QuestionBankItem[];
+
+        if (fetchableChapters.length === 0) {
+          setQuestionBankError('This chapter has no question bank.');
+          return [] as QuestionBankItem[];
+        }
+
+        setQuestionBankLoading(true);
+        setQuestionBankError(null);
+
+        // One chapter failing must not blank the whole bank on 'all'.
+        return Promise.all(
+          fetchableChapters.map((chapter) =>
+            fetchMappedQuestionBank(Number(chapter.id), {
+              title: chapter.name,
+              concepts: chapter.concepts.map((concept) => ({ id: concept.id, title: concept.name })),
+              topics: chapter.topics,
+            }).catch(() => [] as QuestionBankItem[])
+          )
+        ).then((results) => results.flat());
+      })
+      .then((items) => {
+        if (!cancelled) setQuestionBankItems(items);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setQuestionBankError(err instanceof Error ? err.message : 'Failed to load questions.');
+        setQuestionBankItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setQuestionBankLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [questionBankChapterFilter, studentChapters, studentView]);
+
+  const questionBankConceptOptions = useMemo(
+    () => Array.from(new Set(questionBankItems.map((question) => question.conceptTitle))).sort(),
+    [questionBankItems]
   );
-  const boardName =
-    curriculumResponse?.curriculum_data?.board ||
-    curriculumResponse?.curriculum_data?.framework ||
-    'Curriculum';
+
+  const questionBankChapterLabel =
+    questionBankChapterFilter === 'all'
+      ? 'All chapters'
+      : studentChapters.find((chapter) => chapter.id === questionBankChapterFilter)?.name ??
+        'All chapters';
+
+  // Narrowing the chapter can drop the concept that was picked. Rather than reset
+  // it behind the student's back, an out-of-scope concept just reads as 'all'.
+  const effectiveQuestionBankConceptFilter =
+    questionBankConceptFilter === 'all' ||
+    questionBankConceptOptions.includes(questionBankConceptFilter)
+      ? questionBankConceptFilter
+      : 'all';
+
+  const filteredQuestionBankItems = useMemo(() => {
+    return questionBankItems.filter((question) => {
+      const matchesChapter =
+        questionBankChapterFilter === 'all' || question.chapterId === questionBankChapterFilter;
+      const matchesConcept =
+        effectiveQuestionBankConceptFilter === 'all' ||
+        question.conceptTitle === effectiveQuestionBankConceptFilter;
+      const matchesType = questionBankTypeFilter === 'all' || question.type === questionBankTypeFilter;
+      return matchesChapter && matchesConcept && matchesType;
+    });
+  }, [
+    effectiveQuestionBankConceptFilter,
+    questionBankChapterFilter,
+    questionBankItems,
+    questionBankTypeFilter,
+  ]);
+
+  const groupedQuestionBankItems = useMemo(
+    () => groupQuestionBankItems(filteredQuestionBankItems),
+    [filteredQuestionBankItems]
+  );
+
+  const questionBankVisibleNumberById = useMemo(
+    () => new Map(filteredQuestionBankItems.map((question, index) => [question.id, index + 1])),
+    [filteredQuestionBankItems]
+  );
 
   const handleSelectSubject = (subject: StudentSubjectItem, nextView: 'curriculum' | 'chapters') => {
     setSelectedSubject(subject);
@@ -981,6 +1109,17 @@ export default function StudentPage() {
     setSelectedContentType('all');
     setContentGroupBy('chapter');
     setStudentView('content');
+  };
+
+  const handleOpenChapterQuestionBank = (chapter: StudentChapterView) => {
+    setSelectedChapter(chapter);
+    setQuestionBankError(null);
+    // Opens scoped to the chapter whose button was clicked; the dropdown can then
+    // widen it to the whole subject.
+    setQuestionBankChapterFilter(chapter.id);
+    setQuestionBankConceptFilter('all');
+    setQuestionBankTypeFilter('all');
+    setStudentView('question-bank');
   };
 
   const handleChapterChange = (value: string | null) => {
@@ -1093,18 +1232,6 @@ export default function StudentPage() {
             </p>
           </div>
 
-          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-            <span className="text-[13px] font-medium text-[#6B7B91]">Viewing as</span>
-            <div className="inline-flex rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold text-[#6B7B91]"
-              >
-                <GraduationCap size={16} />
-                Student
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -1195,16 +1322,18 @@ export default function StudentPage() {
               <div className="min-w-0">
                 <h1 className="text-[26px] font-semibold tracking-[-0.03em] text-[#0F172A] sm:text-[30px]">
                   {subjectName} {'\u2014'} {standardName}
-                  <span className="mx-1">·</span>
-                  {sectionName}
                 </h1>
 
                 <p className="mt-1 text-[15px] text-[#475569]">
                   {chapterCount} chapters
                   <span className="mx-1">·</span>
                   {keyConceptCount} key concepts
-                  <span className="mx-1">·</span>
-                  {boardName} curriculum
+                  {curriculumLabel ? (
+                    <>
+                      <span className="mx-1">·</span>
+                      {curriculumLabel}
+                    </>
+                  ) : null}
                 </p>
               </div>
 
@@ -1343,6 +1472,13 @@ export default function StudentPage() {
           <div className="mt-6 space-y-5">
             {studentChapters.map((chapter) => {
               const isExpanded = expandedChapterId === chapter.id;
+              // Chapter -> topic -> concept, using the same rule as the teacher
+              // list: chapters with no topic rows keep listing concepts directly.
+              const chapterTopicRows = groupConceptsByTopic(
+                chapter.topics,
+                chapter.concepts,
+                (concept) => concept.topicId
+              );
 
               return (
                 <div key={chapter.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -1365,38 +1501,102 @@ export default function StudentPage() {
                       </h3>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleOpenChapterContent(chapter);
-                      }}
-                      className="inline-flex items-center rounded-[14px] border border-[#C8D3E3] bg-white px-4 py-2.5 text-sm font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF]"
-                    >
-                      <FolderOpen size={16} className="mr-2" />
-                      Content
-                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenChapterContent(chapter);
+                        }}
+                        className="inline-flex items-center rounded-[14px] border border-[#C8D3E3] bg-white px-4 py-2.5 text-sm font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF]"
+                      >
+                        <FolderOpen size={16} className="mr-2" />
+                        Content
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenChapterQuestionBank(chapter);
+                        }}
+                        className="inline-flex items-center rounded-[14px] border border-[#C8D3E3] bg-white px-4 py-2.5 text-sm font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF]"
+                      >
+                        <ClipboardList size={16} className="mr-2" />
+                        Question Bank
+                      </button>
+                    </div>
                   </div>
 
                   {isExpanded ? (
-                    <div className="border-t border-slate-200 px-6 py-4">
-                      {chapter.concepts.length > 0 ? (
-                        <div>
-                          {chapter.concepts.map((concept, conceptIndex) => (
-                            <div
-                              key={concept.id}
-                              className="flex items-center gap-4 border-b border-slate-200 py-4 last:border-b-0"
-                            >
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-600">
-                                {conceptIndex + 1}
-                              </span>
-
-                              <p className="text-sm font-medium text-slate-900">{concept.name}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
+                    <div className="border-t border-slate-200 px-6 py-2">
+                      {chapter.concepts.length === 0 ? (
                         <p className="py-4 text-sm text-slate-500">No concepts available for this chapter.</p>
+                      ) : (
+                        <div className="divide-y divide-slate-200/80">
+                          {chapterTopicRows.length > 0
+                            ? chapterTopicRows.map((topic, topicIndex) => {
+                                const isTopicExpanded = expandedTopicId === `${chapter.id}:${topic.id}`;
+
+                                return (
+                                  <div key={topic.id}>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setExpandedTopicId(
+                                          isTopicExpanded ? null : `${chapter.id}:${topic.id}`
+                                        )
+                                      }
+                                      className="flex w-full items-center gap-3 py-3.5 text-left"
+                                    >
+                                      <ChevronRight
+                                        size={16}
+                                        className={`shrink-0 text-slate-500 transition-transform duration-200 ${
+                                          isTopicExpanded ? 'rotate-90' : ''
+                                        }`}
+                                      />
+                                      <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-[15px] font-semibold text-slate-950">
+                                          {`${topicIndex + 1}. ${topic.title}`}
+                                        </span>
+                                      
+                                      </span>
+                                      <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                                        {topic.concepts.length} concept
+                                        {topic.concepts.length === 1 ? '' : 's'}
+                                      </span>
+                                    </button>
+
+                                    {isTopicExpanded ? (
+                                      topic.concepts.length === 0 ? (
+                                        <p className="border-t border-slate-200/60 py-3.5 pl-7 text-sm text-slate-500">
+                                          No concepts are mapped to this topic yet.
+                                        </p>
+                                      ) : (
+                                        <div className="divide-y divide-slate-200/60 border-t border-slate-200/60 pl-7">
+                                          {topic.concepts.map((concept, conceptIndex) => (
+                                            <div key={concept.id} className="flex items-center gap-4 py-3.5">
+                                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-600">
+                                                {conceptIndex + 1}
+                                              </span>
+                                              <p className="text-sm font-medium text-slate-900">{concept.name}</p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )
+                                    ) : null}
+                                  </div>
+                                );
+                              })
+                            : chapter.concepts.map((concept, conceptIndex) => (
+                                <div key={concept.id} className="flex items-center gap-4 py-4">
+                                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-600">
+                                    {conceptIndex + 1}
+                                  </span>
+                                  <p className="text-sm font-medium text-slate-900">{concept.name}</p>
+                                </div>
+                              ))}
+                        </div>
                       )}
                     </div>
                   ) : null}
@@ -1476,6 +1676,172 @@ export default function StudentPage() {
             </article>
           );
         })}
+      </div>
+    );
+  };
+
+  /**
+   * The question bank a student sees: the same questions, options, correct answer
+   * and model answer the teacher bank shows, with no Add, Edit or Delete anywhere.
+   * Those controls are not merely hidden here - this view never renders them and
+   * never calls a write endpoint.
+   */
+  const renderQuestionBankView = () => {
+    const totalQuestions = filteredQuestionBankItems.length;
+    const scopeLabel =
+      questionBankChapterFilter === 'all'
+        ? 'this subject'
+        : studentChapters.find((chapter) => chapter.id === questionBankChapterFilter)?.name ??
+          'this chapter';
+
+    return (
+      <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-sm text-[#475569]">
+              <span className="inline-flex items-center gap-2">
+                <BookOpen size={14} />
+                Learn
+              </span>
+              <ChevronRight size={14} />
+              <span className="font-medium text-[#0F172A]">Question Bank</span>
+            </div>
+
+            <h2 className="mt-3 text-[32px] font-semibold tracking-[-0.03em] text-[#0F172A]">Question bank</h2>
+
+            <p className="mt-2 text-[16px] text-[#475569]">
+              Practice questions for {scopeLabel}, with the correct answer shown so you can check
+              your own work.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setStudentView('chapters')}
+            className="inline-flex items-center gap-2 self-start rounded-xl border border-[#C8D3E3] bg-white px-4 py-2.5 text-sm font-medium text-[#0F172A] shadow-[0_2px_6px_rgba(15,23,42,0.06)] transition hover:border-[#AAB8CF]"
+          >
+            <ArrowLeft size={16} />
+            Back
+          </button>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:px-5">
+          <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+            <Label className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Chapter
+            </Label>
+            <Select
+              value={questionBankChapterFilter}
+              onValueChange={(value) => setQuestionBankChapterFilter(value || 'all')}
+            >
+              <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 sm:w-[240px]">
+                <SelectValue>{questionBankChapterLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All chapters</SelectItem>
+                {studentChapters.map((chapter) => (
+                  <SelectItem key={chapter.id} value={chapter.id}>
+                    {`Chapter ${chapter.number} · ${chapter.name}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Label className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Concept
+            </Label>
+            <Select
+              value={effectiveQuestionBankConceptFilter}
+              onValueChange={(value) => setQuestionBankConceptFilter(value || 'all')}
+            >
+              <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 sm:w-[260px]">
+                <SelectValue>
+                  {effectiveQuestionBankConceptFilter === 'all'
+                    ? 'All concepts'
+                    : effectiveQuestionBankConceptFilter}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All concepts</SelectItem>
+                {questionBankConceptOptions.map((concept) => (
+                  <SelectItem key={concept} value={concept}>
+                    {concept}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Label className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Type
+            </Label>
+            <Select
+              value={questionBankTypeFilter}
+              onValueChange={(value) => setQuestionBankTypeFilter(value || 'all')}
+            >
+              <SelectTrigger className="h-11 w-full rounded-xl border-slate-200 bg-white text-slate-700 sm:w-[180px]">
+                <SelectValue>
+                  {questionBankTypeFilter === 'all' ? 'All types' : questionBankTypeFilter}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="MCQ">MCQ</SelectItem>
+                <SelectItem value="Narrative">Narrative</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <p className="shrink-0 text-sm font-medium text-slate-600">
+            {totalQuestions} question{totalQuestions === 1 ? '' : 's'}
+          </p>
+        </div>
+
+        <div className="mt-6">
+          {questionBankError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {questionBankError}
+            </div>
+          ) : questionBankLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="h-40 animate-pulse rounded-2xl bg-slate-100" />
+              ))}
+            </div>
+          ) : totalQuestions === 0 ? (
+            <div className="rounded-[18px] border border-[#D8E1F0] bg-white px-6 py-14 text-center text-[15px] text-[#64748B] shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+              No questions have been shared for this chapter yet.
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {groupedQuestionBankItems.map((group) => (
+                <section key={group.id}>
+                  <div className="mb-4 flex flex-col gap-3 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 flex-wrap items-center gap-3">
+                      <Lightbulb size={20} className="shrink-0 text-[#4f46e5]" />
+                      <h3 className="min-w-0 text-[20px] font-bold leading-7 text-slate-950">
+                        {group.conceptTitle}
+                      </h3>
+                    </div>
+
+                    <p className="text-sm font-medium text-slate-600">
+                      {group.questions.length} question{group.questions.length === 1 ? '' : 's'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-5">
+                    {group.questions.map((question) => (
+                      <QuestionBankQuestionCard
+                        key={question.id}
+                        question={question}
+                        visibleNumber={questionBankVisibleNumberById.get(question.id) ?? 1}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -1694,6 +2060,8 @@ export default function StudentPage() {
           renderCurriculumView()
         ) : studentView === 'chapters' ? (
           renderChaptersView()
+        ) : studentView === 'question-bank' ? (
+          renderQuestionBankView()
         ) : (
           renderContentView()
         )}

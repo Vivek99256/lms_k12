@@ -348,11 +348,20 @@ const innerTabs = [
   { label: 'Results dashboard', icon: GraduationCap, active: false },
 ];
 
-const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon }> = [
-  { label: 'PAL', icon: Monitor },
+const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon; hidden?: boolean }> = [
+  // PAL is hidden from the student learning tabs for now, not removed: the tab
+  // panel below still renders it, so flipping `hidden` back off restores it.
+  { label: 'PAL', icon: Monitor, hidden: true },
   { label: 'Online Exam', icon: FileText },
   { label: 'Offline Exam', icon: BookOpen },
 ];
+
+const visibleStudentViewTabs = studentViewTabs.filter((tab) => !tab.hidden);
+
+// Land on the first tab that is actually visible, so hiding PAL never leaves
+// the student view opened on a tab with no button to switch away from.
+const defaultStudentLearningTab: StudentLearningTab =
+  visibleStudentViewTabs[0]?.label ?? studentViewTabs[0].label;
 
 // Real student-facing PAL chapter/concept mastery is fetched from
 // /api/pal/mastery-map/{learnerId} (see fetchStudentChapterProgress below);
@@ -985,13 +994,13 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
 
 export default function StudentHomeworkIndexPage() {
   const { isChatbotOpen } = useContext(ChatbotLayoutContext);
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>(() => {
-    if (typeof window === 'undefined') return 'Teacher';
-    const session = getCreateExamSession();
-    if (session.userProfileName.trim().toUpperCase() === 'STUDENT') return 'Student';
-    const stored = localStorage.getItem('learningManagementAudienceMode');
-    return stored === 'Student' ? 'Student' : 'Teacher';
-  });
+  // Follows the signed-in profile and is not switchable. The Viewing-as toggle is
+  // gone, so a stored 'Student' preference would otherwise have left a teacher in
+  // the student view with no control to leave it.
+  const audienceMode: AudienceMode =
+    getCreateExamSession().userProfileName.trim().toUpperCase() === 'STUDENT'
+      ? 'Student'
+      : 'Teacher';
   const [apiExams, setApiExams] = useState<ExamRecord[]>([]);
   const [isLoadingExams, setIsLoadingExams] = useState(true);
   const [examLoadError, setExamLoadError] = useState('');
@@ -1002,7 +1011,7 @@ export default function StudentHomeworkIndexPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [typeFilter, setTypeFilter] = useState('All types');
-  const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>('PAL');
+  const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>(defaultStudentLearningTab);
   const [examFilters, setExamFilters] = useState({
     grade_id: '',
     standard_id: '',
@@ -2410,16 +2419,7 @@ export default function StudentHomeworkIndexPage() {
     };
   }, [isCreateExamOpen, mappingLevels.bloom.length, mappingLevels.dok.length]);
 
-  useEffect(() => {
-    if (isStudentProfile && audienceMode !== 'Student') {
-      setAudienceMode('Student');
-    }
-  }, [isStudentProfile, audienceMode]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem('learningManagementAudienceMode', audienceMode);
-  }, [audienceMode]);
 
   useEffect(() => {
     if (!activePracticeConceptId) return;
@@ -2480,37 +2480,6 @@ export default function StudentHomeworkIndexPage() {
                 </p>
               </div>
 
-              {!isStudentProfile && (
-              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-                <span className="text-[13px] font-medium text-[#6B7B91]">Viewing as</span>
-                <div className="inline-flex rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-                  <button
-                    type="button"
-                    onClick={() => setAudienceMode('Teacher')}
-                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                      audienceMode === 'Teacher'
-                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                        : 'text-[#6B7B91]'
-                    }`}
-                  >
-                    <Monitor size={16} />
-                    Teacher
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAudienceMode('Student')}
-                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                      audienceMode === 'Student'
-                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                        : 'text-[#6B7B91]'
-                    }`}
-                  >
-                    <GraduationCap size={16} />
-                    Student
-                  </button>
-                </div>
-              </div>
-              )}
             </div>
 
             {audienceMode === 'Teacher' && !isStudentProfile ? (
@@ -2689,7 +2658,7 @@ export default function StudentHomeworkIndexPage() {
             ) : (
               <div className="flex flex-col gap-5">
                 <div className="flex flex-wrap items-center gap-6 border-b border-[#D9E3F0] pb-3">
-                  {studentViewTabs.map((tab) => {
+                  {visibleStudentViewTabs.map((tab) => {
                     const TabIcon = tab.icon;
                     const isActive = studentLearningTab === tab.label;
 

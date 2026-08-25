@@ -16,8 +16,8 @@ import { getSubjectAndChapters, type Chapter, type SubjectWithChapters } from '.
 import type { Course } from '../../../data/courses';
 import { fetchLmsCourses, type LmsSubject } from '../../../data/lmsCourses';
 import {
-  CURRICULUM_NOT_CONFIGURED,
   fetchCurriculumData,
+  getCurriculumLabel,
   getCurriculumSession,
   type CurriculumApiResult,
   type OutcomeNode,
@@ -312,17 +312,17 @@ export default function CurriculumPage() {
     curriculumData?.curriculum_name ||
     'Curriculum';
 
-  // "16 chapters - 406 key concepts - Curriculum not configured", the same
-  // three parts the other two tabs show beneath the heading.
+  // "16 chapters - 406 key concepts - CBSE curriculum", the same three parts the
+  // other two tabs show beneath the heading. The board comes from the tenant's
+  // curriculum record, so when there is none the label is dropped rather than
+  // replaced with a placeholder.
   const headerMeta = useMemo(() => {
     const chapters = subjectData?.chapters ?? [];
     const conceptCount = chapters.reduce(
       (total, chapter) => total + getChapterConceptCount(chapter),
       0
     );
-    const curriculumLabel = curriculumResponse
-      ? curriculumData?.curriculum_name || CURRICULUM_NOT_CONFIGURED
-      : '';
+    const curriculumLabel = curriculumResponse ? getCurriculumLabel(curriculumData) : '';
 
     return [
       `${chapters.length} chapters`,
@@ -331,7 +331,7 @@ export default function CurriculumPage() {
     ]
       .filter(Boolean)
       .join(' - ');
-  }, [subjectData?.chapters, curriculumResponse, curriculumData?.curriculum_name]);
+  }, [subjectData?.chapters, curriculumResponse, curriculumData]);
 
   if (!courseId) {
     return (
