@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { AttendanceDrillDownDrawer, type DrillDownRecord } from '../attendance-tracking/components/attendance-drill-down-drawer'
+import { AttendanceDrillDownDrawer, type DrillDownRecord, type DayWiseAttendanceRecord } from '../attendance-tracking/components/attendance-drill-down-drawer'
 
 export interface GroupedRecord {
   id: string
@@ -23,9 +23,10 @@ export interface GroupedRecord {
   attendancePercentage?: number
   averageWorkingHours?: string
   totalWorkingHours?: string
-  status?: 'present' | 'late' | 'absent'
+  status?: 'present' | 'late' | 'absent' | 'early-going' | 'leave'
   date?: string
   department?: string
+  departmentId?: string
   employeeId?: string
   punchIn?: string
   punchOut?: string
@@ -43,13 +44,23 @@ interface AttendanceGroupedTableProps {
   searchValue: string
   onSearchChange: (value: string) => void
   onView?: (record: GroupedRecord) => void
+  /**
+   * Only invoked for `groupBy === 'organization'` rows (each row is a
+   * department, whose baked-in `recentRecords` is only a 3-row preview).
+   * Resolves the full employee roster for that department/date on demand;
+   * the drawer opens immediately with the preview and swaps in this result
+   * once it resolves.
+   */
+  resolveRecentRecords?: (record: GroupedRecord) => Promise<DrillDownRecord[]>
+  /** Passed straight through to AttendanceDrillDownDrawer - see its own doc comment. */
+  resolveEmployeeCalendar?: (row: DrillDownRecord) => Promise<DayWiseAttendanceRecord[]>
   className?: string
 }
 
 function getAttendanceBadge(percentage?: number) {
   if (percentage === undefined) return null
   if (percentage >= 90) return { tone: 'success' as const, label: 'Excellent' }
-  if (percentage >= 75) return { tone: 'default' as const, label: 'Good' }
+  if (percentage >= 75) return { tone: 'success' as const, label: 'Good' }
   if (percentage >= 60) return { tone: 'warning' as const, label: 'Average' }
   return { tone: 'destructive' as const, label: 'Poor' }
 }
@@ -60,11 +71,29 @@ export function AttendanceGroupedTable({
   searchValue,
   onSearchChange,
   onView,
+  resolveRecentRecords,
+  resolveEmployeeCalendar,
   className,
 }: AttendanceGroupedTableProps) {
   const [sortBy, setSortBy] = React.useState<string>('')
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc')
   const [drillDown, setDrillDown] = React.useState<GroupedRecord | null>(null)
+  const [resolvedRecords, setResolvedRecords] = React.useState<DrillDownRecord[] | null>(null)
+  const [resolvingDetail, setResolvingDetail] = React.useState(false)
+
+  const handleOpenDrillDown = (row: GroupedRecord) => {
+    setDrillDown(row)
+    setResolvedRecords(null)
+    onView?.(row)
+
+    if (groupBy === 'organization' && resolveRecentRecords) {
+      setResolvingDetail(true)
+      resolveRecentRecords(row)
+        .then((records) => setResolvedRecords(records))
+        .catch(() => setResolvedRecords(null))
+        .finally(() => setResolvingDetail(false))
+    }
+  }
 
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -244,7 +273,7 @@ export function AttendanceGroupedTable({
                         variant="ghost"
                         size="icon"
                         className="size-8 rounded-full"
-                        onClick={() => setDrillDown(row)}
+                        onClick={() => handleOpenDrillDown(row)}
                       >
                         <Eye className="size-4" />
                       </Button>
@@ -261,7 +290,9 @@ export function AttendanceGroupedTable({
         open={!!drillDown}
         onOpenChange={(val) => !val && setDrillDown(null)}
         record={drillDown as DrillDownRecord}
-        recentRecords={drillDown?.recentRecords ?? []}
+        recentRecords={resolvedRecords ?? drillDown?.recentRecords ?? []}
+        loading={resolvingDetail}
+        resolveEmployeeCalendar={resolveEmployeeCalendar}
       />
     </Card>
   )

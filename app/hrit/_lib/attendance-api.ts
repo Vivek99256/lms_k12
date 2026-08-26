@@ -285,6 +285,35 @@ export interface AttendanceReportParams {
   employeeId?: string
 }
 
+export interface DayDetailEntry {
+  user_id: number | string
+  employee_no?: string | null
+  full_name?: string | null
+  department?: string | null
+  department_id?: number | string | null
+  punchin_time?: string | null
+  punchout_time?: string | null
+  timestamp_diff?: string | null
+  expected_out?: string | null
+  status: 'present' | 'late' | 'absent' | 'early-going' | 'leave'
+}
+
+export interface DayDetailResponse {
+  status?: number | string
+  message?: string
+  date?: string
+  department_id?: string | number | null
+  employee_id?: string | number | null
+  employees?: DayDetailEntry[]
+}
+
+export interface LatestActivityDateResponse {
+  status?: number | string
+  message?: string
+  /** null when there is no recorded attendance at all in scope. */
+  date?: string | null
+}
+
 export interface AttendancePunchResponse {
   status?: number | string
   status_code?: number | string
@@ -389,14 +418,49 @@ export const hrmsService = {
       ...(params.employeeId && params.employeeId !== 'all' ? { 'emp_id[]': params.employeeId } : { emp_id: '0' }),
     })),
   /**
+   * /api/attendance/day-detail - every active employee in scope for a single
+   * date (LEFT JOIN, so absent/on-time-present employees are included, not
+   * just early leavers like getEarlyGoingAttendanceReport above).
+   */
+  getAttendanceDayDetail: (session: SessionContext, params: { date: string; departmentId?: string; employeeId?: string }) =>
+    apiGet<DayDetailResponse>(session, '/attendance/day-detail', {
+      ...withContextParams(session),
+      date: params.date,
+      ...(activeFilter(params.departmentId) ? { department_id: activeFilter(params.departmentId) as string } : {}),
+      ...(activeFilter(params.employeeId) ? { employee_id: activeFilter(params.employeeId) as string } : {}),
+    }),
+  /**
+   * /api/attendance/latest-activity-date - the most recent date with a real
+   * recorded punch, used to steer users away from a "today" (or, with
+   * fromDate/toDate, any applied date range's own end date) that has no
+   * data yet rather than silently showing an all-absent snapshot with no
+   * explanation.
+   */
+  getLatestActivityDate: (session: SessionContext, params?: { departmentId?: string; fromDate?: string; toDate?: string }) =>
+    apiGet<LatestActivityDateResponse>(session, '/attendance/latest-activity-date', {
+      ...withContextParams(session),
+      ...(activeFilter(params?.departmentId) ? { department_id: activeFilter(params?.departmentId) as string } : {}),
+      ...(params?.fromDate ? { from_date: params.fromDate } : {}),
+      ...(params?.toDate ? { to_date: params.toDate } : {}),
+    }),
+  /**
    * /api/attendance/my-attendance returns the punch rows for the window plus
    * the resolved day by day calendar. The legacy GET /hrms-attendance
    * (formType=MyAttendance) only ever answers for the current day.
+   *
+   * `userId` overrides the caller's own id (the default `user_id` param from
+   * withContextParams) with a specific employee's - used for the Attendance
+   * Report's per-employee day-wise drill-down, where an admin views someone
+   * else's calendar rather than their own. The backend only scopes by
+   * sub_institute_id (see AttendanceTrackingApiController::myAttendance),
+   * the same institute-wide access every other Attendance Report endpoint
+   * already grants an authenticated admin caller.
    */
-  getMyAttendance: (session: SessionContext, params?: { fromDate?: string; toDate?: string }) =>
+  getMyAttendance: (session: SessionContext, params?: { fromDate?: string; toDate?: string; userId?: string }) =>
     apiGet<MyAttendanceResponse>(session, '/attendance/my-attendance', withContextParams(session, {
       ...(params?.fromDate ? { from_date: params.fromDate } : {}),
       ...(params?.toDate ? { to_date: params.toDate } : {}),
+      ...(params?.userId ? { user_id: params.userId } : {}),
     })),
   punchAttendanceIn: (session: SessionContext, data: { date: string; time: string }) =>
     ensureAttendanceSuccess(apiPost<AttendancePunchResponse>(session, '/attendance/punch-in', {
