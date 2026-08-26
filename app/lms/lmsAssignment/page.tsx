@@ -194,7 +194,7 @@ export default function CreateAssignmentPage() {
   }
 
   return (
-    <RequireStaff>
+    <RequireStaff redirectTo="/lms/lmsAssignment_submission">
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900">Create Assignment</h1>

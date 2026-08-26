@@ -1524,7 +1524,9 @@ export default function StudentPage() {
               <div className="min-w-0 w-full max-w-[320px] shrink">
                 <Select value={String(selectedChapter?.id ?? '')} onValueChange={handleChapterChange}>
                   <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 shadow-sm">
-                    <SelectValue placeholder="Select chapter" />
+                    <SelectValue placeholder="Select chapter">
+                      {() => selectedChapter?.name ?? 'Select chapter'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {studentChapters.map((chapter) => (

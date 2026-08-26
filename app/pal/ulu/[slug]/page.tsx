@@ -40,7 +40,7 @@ export default async function UluDetailPage({
   if (!model.isReady || !model.context) {
     return (
       <PalEmptyState
-        title="ULU intelligence is not available"
+        title="Unified Learning Units intelligence is not available"
         message={model.error || 'No semantic intelligence is available for PAL yet.'}
         backHref={queryString ? `/pal/ulu?${queryString}` : '/pal/ulu'}
       />
@@ -54,9 +54,9 @@ export default async function UluDetailPage({
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1800px] space-y-6">
         <PalContextHero
-          eyebrow="ULU"
+          eyebrow="Unified Learning Units"
           title={selectedModule.title}
-          description="This ULU detail page is assembled from live semantic_intelligence data for the selected concept."
+          description="This Unified Learning Units detail page is assembled from live semantic_intelligence data for the selected concept."
           context={model.context}
           variant="ulu"
         />

@@ -115,15 +115,15 @@ export const FRAMEWORK_META: Record<FrameworkSlug, { title: string; subtitle: st
 
 export const ULU_META: Record<UluSlug, { title: string; subtitle: string }> = {
   'five-layer-structure': {
-    title: '5-Layer ULU Structure',
+    title: '5-Layer Unified Learning Units Structure',
     subtitle: 'Academic, skill, application, support, and optimization layers built from the current concept intelligence.',
   },
   'scenario-template': {
-    title: 'ULU Scenario Template',
+    title: 'Unified Learning Units Scenario Template',
     subtitle: 'Scenario-building ingredients derived from real-world application, pedagogy, misconception, and competency signals.',
   },
   'complete-examples': {
-    title: '6 Complete ULU Examples',
+    title: '6 Complete Unified Learning Units Examples',
     subtitle: 'Example learning-unit bundles assembled dynamically from the selected concept’s semantic evidence.',
   },
   'content-optimization-loop': {
@@ -732,7 +732,7 @@ function buildUluExamples(
       knowledgeItem ||
       skillItem ||
       application?.title ||
-      `ULU evidence bundle ${index + 1}`;
+      `Unified Learning Units evidence bundle ${index + 1}`;
 
     const detail =
       application?.detail ||
@@ -794,7 +794,7 @@ function buildUluModules(
       subtitle: ULU_META['five-layer-structure'].subtitle,
       summary: 'A Unified Learning Unit assembled from live semantic intelligence so the academic concept, skills, context, support, and improvement signals stay connected.',
       badges: ['academic core', 'dynamic', difficulty || 'difficulty unavailable'].filter(Boolean),
-      emptyMessage: 'No ULU layer data could be assembled from the current semantic intelligence record.',
+      emptyMessage: 'No Unified Learning Units layer data could be assembled from the current semantic intelligence record.',
       sections: [
         buildSection(
           'Academic core',
@@ -824,7 +824,7 @@ function buildUluModules(
         ),
         buildSection(
           'Applied context',
-          'Real-world application and pedagogy evidence that can turn the concept into a meaningful ULU experience.',
+          'Real-world application and pedagogy evidence that can turn the concept into a meaningful Unified Learning Units experience.',
           [
             ...buildItems(realWorld, ['application_type', 'application', 'example'], ['application', 'example'], ['relevance'], 5),
             ...buildItems(pedagogy, ['strategy'], ['why_effective', 'activity'], ['concept_name'], 5),
@@ -850,12 +850,12 @@ function buildUluModules(
       sections: [
         buildSection(
           'Context sources',
-          'Real-world applications that can anchor a ULU scenario in an authentic context.',
+          'Real-world applications that can anchor a Unified Learning Units scenario in an authentic context.',
           buildItems(realWorld, ['application_type', 'application', 'example'], ['example', 'application'], ['relevance'], 8)
         ),
         buildSection(
           'Academic hooks',
-          'Knowledge, objectives, and outcomes that can power the core challenge of the ULU scenario.',
+          'Knowledge, objectives, and outcomes that can power the core challenge of the Unified Learning Units scenario.',
           [
             ...buildListItems(knowledgeStrings, 'Knowledge', 4),
             ...buildItems(objectives, ['objective'], ['objective'], ['priority'], 3),
@@ -877,9 +877,9 @@ function buildUluModules(
       slug: 'complete-examples',
       title: ULU_META['complete-examples'].title,
       subtitle: ULU_META['complete-examples'].subtitle,
-      summary: 'Example ULU bundles composed entirely from the current concept’s knowledge, skill, objective, context, and misconception evidence.',
+      summary: 'Example Unified Learning Units bundles composed entirely from the current concept’s knowledge, skill, objective, context, and misconception evidence.',
       badges: ['examples', 'dynamic'],
-      emptyMessage: 'There is not enough concept evidence yet to assemble ULU example bundles.',
+      emptyMessage: 'There is not enough concept evidence yet to assemble Unified Learning Units example bundles.',
       sections: [
         buildSection(
           'Available example bundles',
@@ -892,7 +892,7 @@ function buildUluModules(
       slug: 'content-optimization-loop',
       title: ULU_META['content-optimization-loop'].title,
       subtitle: ULU_META['content-optimization-loop'].subtitle,
-      summary: 'Optimization inputs sourced from the current semantic intelligence record so ULU improvement can stay evidence-driven.',
+      summary: 'Optimization inputs sourced from the current semantic intelligence record so Unified Learning Units improvement can stay evidence-driven.',
       badges: ['optimization', 'dynamic'],
       emptyMessage: 'No assessment or optimization signals were found in the current semantic intelligence record.',
       sections: [

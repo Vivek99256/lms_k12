@@ -108,7 +108,22 @@ function isUnderRoute(pathname: string, href: string): boolean {
 }
 
 /**
- * The New PAL sub-nav, or null when this route is not part of New PAL.
+ * The "New PAL" level-2 menu node from the rights-filtered menu tree, or
+ * undefined if the current role has no access to it at all. New PAL sits at
+ * level 2 (under "LMS + PAL"), so this only needs to check one level down —
+ * no need for general-purpose recursion.
+ */
+function findNewPalMenuNode(items: MenuItem[]): SubmenuItem | undefined {
+  for (const level1 of items) {
+    const match = level1.submenus?.find((level2) => normalizeMenuLabel(level2.label) === 'new pal');
+    if (match) return match;
+  }
+  return undefined;
+}
+
+/**
+ * The New PAL sub-nav, or null when this route is not part of New PAL, or
+ * when the current role has no `can_view` rights on any of its sub-modules.
  *
  * Scoped to the New PAL workspace and the sub-modules it links to. A `/pal`
  * prefix is NOT enough: LMS + PAL → Test → PAL is the legacy PAL workspace at
@@ -118,15 +133,27 @@ function isUnderRoute(pathname: string, href: string): boolean {
  * The boundary check matters here — `/pal/framework` (legacy) and
  * `/pal/frameworks` (New PAL) differ by one character, so a plain
  * `startsWith` would drag the legacy page back in.
+ *
+ * NEW_PAL_LEVEL3_ITEMS supplies the display metadata (label, href, order);
+ * this only decides which of those items the caller's role is allowed to
+ * see, by cross-referencing the menu-rights API's "New PAL" node — the same
+ * data source Access Roles writes to and every other module's level-3 bar
+ * reads from.
  */
-function newPalLevel3Items(pathname: string): Level3Item[] | null {
+function newPalLevel3Items(pathname: string, menuItems: MenuItem[]): Level3Item[] | null {
   const lowerPath = pathname.toLowerCase().replace(/\/+$/, '') || '/';
 
   const inNewPal =
     isUnderRoute(lowerPath, '/pal/new') ||
     NEW_PAL_LEVEL3_ITEMS.some((item) => isUnderRoute(lowerPath, item.href));
 
-  return inNewPal ? NEW_PAL_LEVEL3_ITEMS : null;
+  if (!inNewPal) return null;
+
+  const newPalNode = findNewPalMenuNode(menuItems);
+  const allowedLabels = new Set((newPalNode?.submenus ?? []).map((submenu) => normalizeMenuLabel(submenu.label)));
+
+  const items = NEW_PAL_LEVEL3_ITEMS.filter((item) => allowedLabels.has(normalizeMenuLabel(item.label)));
+  return items.length ? items : null;
 }
 
 
@@ -427,7 +454,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // New PAL brings its own sub-nav. Every other route — including the legacy
     // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
     // menu-driven resolution below and gets whatever its own menu defines.
-    const newPalItems = newPalLevel3Items(pathname);
+    const newPalItems = newPalLevel3Items(pathname, menuItems);
     if (newPalItems) {
       return { parentLabel: 'New PAL', items: newPalItems };
     }
