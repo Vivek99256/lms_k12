@@ -208,8 +208,17 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'new_pal.index': '/pal/new',
   'new_pal': '/pal/new',
   'lms/new-pal': '/pal/new',
+  // Framework — registered by 2026_08_26_100000_add_new_pal_framework_ulu_
+  // pedagogy_engine_submodule_menus so its sidebar/rights-driven navigation
+  // matches the DashboardShell tab, which points at /pal/frameworks (a
+  // historical path outside /pal/new/*, same as ULU and Pedagogy Engine below).
+  'new_pal.frameworks': '/pal/frameworks',
   'new_pal.content_model': '/pal/new/content-model',
   'lms/new-pal/content-model': '/pal/new/content-model',
+  // Unified Learning Units — same migration as Framework above.
+  'new_pal.ulu': '/pal/ulu',
+  // Pedagogy Engine — same migration as Framework above.
+  'new_pal.pedagogy_engine': '/pal/pedagogy-engine',
   // Administration — the second New PAL level-3 sub-module, registered by
   // 2026_08_14_160100_add_administration_submodule_menu. Follows the same
   // `new_pal.<sub_module>` link convention as Content Model above rather than
