@@ -79,7 +79,10 @@ const UpcomingEventsWidget = lazy(() =>
 
 const SHIFT_END = '06:00 PM'
 const SHIFT_TOTAL_MINUTES = 510
-const CURRENT_DATE_LABEL = 'Today, 22 Jun 2026'
+
+function formatCurrentDateLabel(date: Date) {
+  return `Today, ${date.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}`
+}
 
 const statusLabelMap: Record<AttendanceStatus, string> = {
   present: 'Present',
@@ -141,6 +144,9 @@ function AttendanceDashboard() {
   const [calendarOpen, setCalendarOpen] = React.useState(false)
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [eventsOpen, setEventsOpen] = React.useState(false)
+  // Computed client-side (not at module scope) so it reflects the actual
+  // date the page is viewed on, not whatever date the app was built/loaded.
+  const currentDateLabel = React.useMemo(() => formatCurrentDateLabel(new Date()), [])
 
   const attendancePercentage = React.useMemo(() => {
     if (!monthlySummary) return 0
@@ -232,7 +238,7 @@ function AttendanceDashboard() {
           <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
             c
           </span>
-          <span className="flex-1 text-left">{CURRENT_DATE_LABEL}</span>
+          <span className="flex-1 text-left">{currentDateLabel}</span>
           <ChevronDown className="size-4 text-muted-foreground" />
         </Button>
       </header>
