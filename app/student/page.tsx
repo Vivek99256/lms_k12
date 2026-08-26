@@ -55,6 +55,7 @@ import {
   type ChapterContentAsset,
   type SubjectWithChapters,
 } from '@/app/course-master/data/chapters';
+import { resolveViewableUrl } from '@/app/course-master/data/content-links';
 import {
   fetchMappedQuestionBank,
   groupQuestionBankItems,
@@ -550,13 +551,23 @@ function normalizeChapterContent(
     (assets ?? []).map((rawAsset, index) => {
       const asset = rawAsset as ChapterContentAsset & Record<string, unknown>;
       const contentType = normalizeContentType(conceptName, asset);
+      // Not simply "the first link that is set": a raw .pptx export link opens a
+      // Save As dialog rather than the deck, so Open would download instead of
+      // showing anything. resolveViewableUrl picks the candidate a tab can
+      // actually render - the gamma.app deck page where there is one, the Office
+      // Online viewer for Office files, inline-viewable links as they are.
       const url =
-        readString(asset.url) ||
-        readString(asset.file_url) ||
-        readString(asset.content_url) ||
-        readString(asset.media_url) ||
-        readString(asset.link) ||
-        readString(asset.filename);
+        resolveViewableUrl(
+          [
+            readString(asset.url),
+            readString(asset.file_url),
+            readString(asset.content_url),
+            readString(asset.media_url),
+            readString(asset.link),
+            readString(asset.filename),
+          ],
+          readString(asset.filename)
+        ) ?? '';
 
       return {
         id: Number(asset.id ?? `${chapter.id}${index + 1}`),
@@ -1650,11 +1661,7 @@ export default function StudentPage() {
                 </p>
 
                 <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
-                  <p className="text-xs text-slate-500">
-                    {item.statText}
-                    <span className="mx-1">·</span>
-                    {item.updatedLabel}
-                  </p>
+                 
 
                   <button
                     type="button"
