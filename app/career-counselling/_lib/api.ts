@@ -4,7 +4,9 @@ import {
   createAuthHeaders,
   type ApiEnvelope,
 } from '@/lib/erp-client';
-import type { CareerRecord, InterestQuestion, InterestResult } from './types';
+import type {
+  AspirationInput, AspirationSnapshot, CareerRecord, InterestQuestion, InterestResult,
+} from './types';
 
 const KEYS = ['data', 'result', 'results', 'records', 'list', 'career', 'question'];
 
@@ -78,6 +80,23 @@ export async function loadRecords(
   params?: Record<string, string | number | undefined>
 ) {
   return recordsFrom(await careerRequest(endpoint, params));
+}
+
+export async function loadCurrentAspiration(): Promise<AspirationSnapshot | null> {
+  const payload = await careerRequest<{ data: AspirationSnapshot | null }>('studentAspiration');
+  return payload.data ?? null;
+}
+
+export async function saveAspiration(input: AspirationInput): Promise<AspirationSnapshot> {
+  const payload = await careerRequest<{ data: AspirationSnapshot }>('studentAspiration', {}, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return payload.data;
+}
+
+export async function loadOccupations(): Promise<CareerRecord[]> {
+  return loadRecords('allOccupation');
 }
 
 export async function loadQuestions(): Promise<InterestQuestion[]> {
