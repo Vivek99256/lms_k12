@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
+import ExamResultDashboard from '@/app/lms/exam/_result-dashboard/ExamResultDashboard';
 
 type ExamStatus = 'Scheduled' | 'Open' | 'Draft' | 'Closed';
 type AudienceMode = 'Teacher' | 'Student';
@@ -343,9 +344,11 @@ const examTypeOptions = [
 ];
 const attemptsAllowedOptions = ['1 attempt', '2 attempts', '3 attempts'];
 
-const innerTabs = [
-  { label: 'Exams', icon: FileText, active: true },
-  { label: 'Results dashboard', icon: GraduationCap, active: false },
+type ExamInnerTab = 'Exams' | 'Results dashboard';
+
+const innerTabs: Array<{ label: ExamInnerTab; icon: LucideIcon }> = [
+  { label: 'Exams', icon: FileText },
+  { label: 'Results dashboard', icon: GraduationCap },
 ];
 
 const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon; hidden?: boolean }> = [
@@ -1011,6 +1014,7 @@ export default function StudentHomeworkIndexPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [typeFilter, setTypeFilter] = useState('All types');
+  const [examInnerTab, setExamInnerTab] = useState<ExamInnerTab>('Exams');
   const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>(defaultStudentLearningTab);
   const [examFilters, setExamFilters] = useState({
     grade_id: '',
@@ -2484,28 +2488,35 @@ export default function StudentHomeworkIndexPage() {
 
             {audienceMode === 'Teacher' && !isStudentProfile ? (
               <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-5">
+                  {innerTabs.map((tab) => {
+                    const TabIcon = tab.icon;
+                    const isActive = examInnerTab === tab.label;
+
+                    return (
+                      <button
+                        key={tab.label}
+                        type="button"
+                        onClick={() => setExamInnerTab(tab.label)}
+                        className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
+                          isActive
+                            ? 'border-[#5846EA] text-[#5846EA]'
+                            : 'border-transparent text-[#5F7087] hover:text-[#334155]'
+                        }`}
+                      >
+                        <TabIcon size={16} />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {examInnerTab === 'Results dashboard' ? (
+                  <ExamResultDashboard />
+                ) : (
+                  <>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="flex flex-col gap-4">
-                    <div className="flex flex-wrap items-center gap-5">
-                      {innerTabs.map((tab) => {
-                        const TabIcon = tab.icon;
-
-                        return (
-                          <button
-                            key={tab.label}
-                            type="button"
-                            className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
-                              tab.active
-                                ? 'border-[#5846EA] text-[#5846EA]'
-                                : 'border-transparent text-[#5F7087]'
-                            }`}
-                          >
-                            <TabIcon size={16} />
-                            {tab.label}
-                          </button>
-                        );
-                      })}
-                    </div>
 
                     <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
                       <div className="relative w-full max-w-[320px]">
@@ -2654,6 +2665,8 @@ export default function StudentHomeworkIndexPage() {
                   </div>
                 ) : null}
               </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="flex flex-col gap-5">

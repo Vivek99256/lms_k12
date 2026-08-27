@@ -551,6 +551,30 @@ export interface SemanticIntelligenceResult extends ChapterSemantic {
 
 export type IntelligenceQuestionType = 'mcq' | 'narrative';
 
+export type IntelligenceBloomLevel =
+  | 'Remember'
+  | 'Understand'
+  | 'Apply'
+  | 'Analyze'
+  | 'Evaluate'
+  | 'Create';
+
+/**
+ * One row of the binding quota table the generator works to: how many questions
+ * to write at a given Bloom level, and the difficulty and marks they carry.
+ *
+ * Sending `quota` makes the mix explicit. Omitting it leaves the server to
+ * distribute the total itself - from the chapter's intelligence slice where one
+ * exists, otherwise from its own default Bloom weighting.
+ */
+export interface IntelligenceQuestionQuotaRow {
+  level: IntelligenceBloomLevel;
+  count: number;
+  difficulty?: string;
+  /** Ignored for MCQ, which the server always scores at 1 mark. */
+  points?: number;
+}
+
 export interface GenerateIntelligenceQuestionsRequest {
   concept_id: number;
   sub_institute_id: number;
@@ -562,6 +586,7 @@ export interface GenerateIntelligenceQuestionsRequest {
   total_questions: number;
   created_by: number;
   grade_id?: number;
+  quota?: IntelligenceQuestionQuotaRow[];
 }
 
 export interface GeneratedQuestionPreview {

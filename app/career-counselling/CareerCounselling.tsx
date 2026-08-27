@@ -12,11 +12,19 @@ import { Button } from '@/components/ui/button';
 import {
   Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { careerRequest, loadInterestResults, loadQuestions, loadRecords } from './_lib/api';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  careerRequest, loadCurrentAspiration, loadInterestResults, loadOccupations, loadQuestions,
+  loadRecords, saveAspiration,
+} from './_lib/api';
 import type {
-  CareerRecord, CareerSection, InterestQuestion, InterestResult, RequestState,
+  AspirationSnapshot, CareerRecord, CareerSection, CertaintyLevel, InterestQuestion,
+  InterestResult, RequestState,
 } from './_lib/types';
 
 const SECTIONS: Array<{
@@ -194,6 +202,187 @@ function Directory({ section }: { section: CareerSection }) {
   );
 }
 
+const CERTAINTY_OPTIONS: Array<{ value: CertaintyLevel; label: string }> = [
+  { value: 'not_sure', label: 'Not sure' },
+  { value: 'somewhat_sure', label: 'Somewhat sure' },
+  { value: 'very_sure', label: 'Very sure' },
+];
+
+function certaintyLabel(score: number | null) {
+  if (score == null) return '';
+  const closest = CERTAINTY_OPTIONS.reduce((best, option, index) => {
+    const scoreFor = [0.3, 0.6, 0.9][index];
+    return Math.abs(scoreFor - score) < Math.abs([0.3, 0.6, 0.9][best] - score) ? index : best;
+  }, 0);
+  return CERTAINTY_OPTIONS[closest].label;
+}
+
+function OccupationField({
+  id, label, occupations, occupationsLoading, value, onChange,
+}: {
+  id: string; label: string; occupations: CareerRecord[]; occupationsLoading: boolean;
+  value: string; onChange: (value: string) => void;
+}) {
+  const listId = `${id}-options`;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        list={listId}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={occupationsLoading ? 'Loading occupations…' : 'Choose from the list or type your own answer'}
+      />
+      <datalist id={listId}>
+        {occupations.map((record, index) => {
+          const code = text(record, ['onetsoc_code', 'code']);
+          const title = text(record, ['title', 'name']);
+          return code && title ? <option key={`${code}-${index}`} value={title} /> : null;
+        })}
+      </datalist>
+    </div>
+  );
+}
+
+function CareerCertaintyCard() {
+  const [current, setCurrent] = useState<AspirationSnapshot | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [occupations, setOccupations] = useState<CareerRecord[]>([]);
+  const [occupationsLoading, setOccupationsLoading] = useState(false);
+  const [occupationText, setOccupationText] = useState('');
+  const [certainty, setCertainty] = useState<CertaintyLevel | ''>('');
+  const [parentText, setParentText] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  const refresh = useCallback(async () => {
+    setLoading(true); setLoadError('');
+    try { setCurrent(await loadCurrentAspiration()); }
+    catch (err) { setLoadError(err instanceof Error ? err.message : 'Unable to load your answer.'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  function openForm() {
+    setSaveError('');
+    setOccupationText('');
+    setCertainty('');
+    setParentText('');
+    setOpen(true);
+    if (!occupations.length) {
+      setOccupationsLoading(true);
+      loadOccupations()
+        .then(setOccupations)
+        .catch(() => setOccupations([]))
+        .finally(() => setOccupationsLoading(false));
+    }
+  }
+
+  function matchOccupation(typed: string) {
+    const needle = typed.trim().toLowerCase();
+    if (!needle) return null;
+    return occupations.find((record) => text(record, ['title', 'name']).trim().toLowerCase() === needle) ?? null;
+  }
+
+  async function submit() {
+    const expectation = occupationText.trim();
+    if (!expectation) { setSaveError('Tell us what job you expect to have — choose one or type your own.'); return; }
+    if (!certainty) { setSaveError('Select how sure you are.'); return; }
+    setSaving(true); setSaveError('');
+    try {
+      const matchedOccupation = matchOccupation(occupationText);
+      const matchedParent = matchOccupation(parentText);
+      const saved = await saveAspiration({
+        occupation_id: matchedOccupation ? text(matchedOccupation, ['onetsoc_code', 'code']) : undefined,
+        occupation_name: matchedOccupation ? text(matchedOccupation, ['title', 'name']) : undefined,
+        expectation_age_30: expectation,
+        certainty,
+        parent_occupation_id: matchedParent ? text(matchedParent, ['onetsoc_code', 'code']) : undefined,
+        parent_occupation_name: matchedParent ? text(matchedParent, ['title', 'name']) : (parentText.trim() || undefined),
+      });
+      setCurrent(saved);
+      setOpen(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Unable to save your answer.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Career certainty</CardTitle>
+        <CardDescription>Step 1 of 4</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading…</p>
+        ) : loadError ? (
+          <p className="text-sm text-destructive">{loadError}</p>
+        ) : current ? (
+          <div className="space-y-2 text-sm">
+            <p><span className="text-muted-foreground">You said: </span><span className="font-medium">{current.occupation_name || current.expectation_age_30}</span></p>
+            <p><span className="text-muted-foreground">How sure: </span>{certaintyLabel(current.certainty)}</p>
+            {current.parent_occupation_name && (
+              <p><span className="text-muted-foreground">Family expects: </span>{current.parent_occupation_name}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-muted-foreground">Name and investigate an occupation you may want at age 30. Career certainty creates a clear starting point for exploration.</p>
+        )}
+        <Button variant={current ? 'outline' : 'default'} onClick={openForm}>{current ? 'Update answer' : 'Start'}</Button>
+      </CardContent>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Career certainty</DialogTitle>
+            <DialogDescription>Three quick questions. There is no right answer.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            {saveError && <p className="text-sm text-destructive" role="alert">{saveError}</p>}
+            <OccupationField
+              id="expectation-occupation"
+              label="What job do you expect to have at age 30?"
+              occupations={occupations}
+              occupationsLoading={occupationsLoading}
+              value={occupationText}
+              onChange={setOccupationText}
+            />
+            <div className="space-y-2">
+              <Label>How sure are you?</Label>
+              <RadioGroup value={certainty} onValueChange={(value) => setCertainty(value as CertaintyLevel)}>
+                {CERTAINTY_OPTIONS.map((option) => (
+                  <label key={option.value} className="flex items-center gap-2 text-sm">
+                    <RadioGroupItem value={option.value} id={`certainty-${option.value}`} />
+                    {option.label}
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+            <OccupationField
+              id="parent-occupation"
+              label="What job does your family expect for you? (optional)"
+              occupations={occupations}
+              occupationsLoading={occupationsLoading}
+              value={parentText}
+              onChange={setParentText}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+            <Button onClick={() => void submit()} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 function Assessment() {
   const [phase, setPhase] = useState<'intro' | 'questions' | 'results' | 'zone' | 'careers'>('intro');
   const [questions, setQuestions] = useState<InterestQuestion[]>([]);
@@ -353,7 +542,8 @@ export default function CareerCounselling() {
       </nav>
       {active === 'plan' ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          {PLAN.map(([title, description], index) => <Card key={title}><CardHeader><CardTitle>{title}</CardTitle><CardDescription>Step {index + 1} of 4</CardDescription></CardHeader><CardContent><p className="text-sm leading-6 text-muted-foreground">{description}</p></CardContent></Card>)}
+          <CareerCertaintyCard />
+          {PLAN.slice(1).map(([title, description], index) => <Card key={title}><CardHeader><CardTitle>{title}</CardTitle><CardDescription>Step {index + 2} of 4</CardDescription></CardHeader><CardContent><p className="text-sm leading-6 text-muted-foreground">{description}</p></CardContent></Card>)}
         </div>
       ) : active === 'assessment' ? <Assessment /> : <Directory section={active} />}
     </div>

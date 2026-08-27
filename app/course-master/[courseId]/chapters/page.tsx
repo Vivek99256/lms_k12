@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
+import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,6 +58,7 @@ import {
   fetchChapterContent,
   fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
+  type IntelligenceBloomLevel,
   getConceptIntelligenceData,
   getSubjectAndChapters,
   resolveSubjectDisplayName,
@@ -104,6 +106,80 @@ const UPLOAD_PRESENTATION_TYPES = ['Classroom presentation', 'Teacher training p
 const UPLOAD_VIDEO_TYPES = ['Recorded video', 'External video'] as const;
 const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
 const QUESTION_TYPE_OPTIONS = ['MCQ', 'Narrative'] as const;
+
+/**
+ * The Bloom ladder the generator works to, mirroring BLOOM_META in
+ * App\Services\QuestionGenerationService. `weight` is that service's own default
+ * distribution, used here only to seed the table when a teacher switches from
+ * Auto to a custom mix, so "custom" starts from what the server would have done
+ * rather than from zeros.
+ *
+ * Difficulty and marks are the server's defaults per level and are editable:
+ * both are honoured when a quota is sent. MCQ marks are not - the service pins
+ * every MCQ to 1 mark - so that column is hidden for MCQ.
+ */
+const BLOOM_LEVEL_META: ReadonlyArray<{
+  level: IntelligenceBloomLevel;
+  difficulty: string;
+  points: number;
+  weight: number;
+}> = [
+  { level: 'Remember', difficulty: 'Easy', points: 1, weight: 0.15 },
+  { level: 'Understand', difficulty: 'Easy', points: 2, weight: 0.3 },
+  { level: 'Apply', difficulty: 'Medium', points: 3, weight: 0.3 },
+  { level: 'Analyze', difficulty: 'Hard', points: 4, weight: 0.15 },
+  { level: 'Evaluate', difficulty: 'Hard', points: 5, weight: 0.1 },
+  { level: 'Create', difficulty: 'Hard', points: 5, weight: 0 },
+];
+
+const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'] as const;
+
+type BloomCounts = Record<IntelligenceBloomLevel, number>;
+type BloomDifficulties = Record<IntelligenceBloomLevel, string>;
+type BloomPoints = Record<IntelligenceBloomLevel, number>;
+
+const EMPTY_BLOOM_COUNTS = BLOOM_LEVEL_META.reduce((counts, meta) => {
+  counts[meta.level] = 0;
+  return counts;
+}, {} as BloomCounts);
+
+const DEFAULT_BLOOM_DIFFICULTIES = BLOOM_LEVEL_META.reduce((map, meta) => {
+  map[meta.level] = meta.difficulty;
+  return map;
+}, {} as BloomDifficulties);
+
+const DEFAULT_BLOOM_POINTS = BLOOM_LEVEL_META.reduce((map, meta) => {
+  map[meta.level] = meta.points;
+  return map;
+}, {} as BloomPoints);
+
+/**
+ * Split `total` across the Bloom levels by weight, largest-remainder style, so
+ * the parts always add back up to the total instead of drifting on rounding.
+ */
+function suggestedBloomCounts(total: number): BloomCounts {
+  if (!Number.isFinite(total) || total <= 0) return { ...EMPTY_BLOOM_COUNTS };
+
+  const exact = BLOOM_LEVEL_META.map((meta) => ({ level: meta.level, value: total * meta.weight }));
+  const counts = { ...EMPTY_BLOOM_COUNTS };
+  exact.forEach((entry) => {
+    counts[entry.level] = Math.floor(entry.value);
+  });
+
+  let remaining = total - Object.values(counts).reduce((sum, value) => sum + value, 0);
+  const byRemainder = [...exact]
+    .filter((entry) => entry.value > 0)
+    .sort((a, b) => b.value - Math.floor(b.value) - (a.value - Math.floor(a.value)));
+
+  let index = 0;
+  while (remaining > 0 && byRemainder.length > 0) {
+    counts[byRemainder[index % byRemainder.length].level] += 1;
+    remaining -= 1;
+    index += 1;
+  }
+
+  return counts;
+}
 const QUESTION_OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
 const QUESTION_TYPE_API_CONFIG: Record<
   (typeof QUESTION_TYPE_OPTIONS)[number],
@@ -243,78 +319,6 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   if (contentLabel.includes('classroom activity')) return 'Classroom activity';
   if (contentLabel.includes('pdf')) return 'PDF';
   return 'Revision notes';
-}
-
-// Files the browser can only download (no native renderer). PDFs, images and
-// videos are deliberately absent - those render inline in a tab.
-const DOWNLOAD_ONLY_FILE_PATTERN = /\.(pptx?|docx?|xlsx?|csv|zip|rtf)(?:$|[?#])/i;
-// A deck page lives on gamma.app itself. It must not match the export CDN,
-// assets.api.gamma.app, whose links are .pptx files: that host ends in
-// ".gamma.app/" too, so a looser pattern treated every export download as a
-// viewable deck and handed the raw .pptx straight to the browser.
-const GAMMA_DECK_PATTERN = /^https?:\/\/(?:www\.)?gamma\.app\//i;
-
-function isHttpUrl(value?: string | null): value is string {
-  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
-}
-
-// Export links are often signed URLs with no file extension in the path, so
-// also treat an explicit attachment disposition or an office format hint in the
-// query string as "this will download".
-function isDownloadOnlyUrl(value: string): boolean {
-  return (
-    DOWNLOAD_ONLY_FILE_PATTERN.test(value) ||
-    /response-content-disposition=[^&]*attachment/i.test(value) ||
-    /[?&][^=]*=(?:pptx|docx|xlsx)(?:$|[&#])/i.test(value)
-  );
-}
-
-// Word/PowerPoint/Excel files have no native browser preview, so opening one
-// directly is always a download. They go through a viewer instead.
-function isOfficeDocumentUrl(value: string, filename?: string | null): boolean {
-  return /\.(docx?|pptx?|xlsx?)(?:$|[?#])/i.test(value) ||
-    /\.(docx?|pptx?|xlsx?)(?:$|[?#])/i.test(filename ?? '');
-}
-
-/**
- * Office Online renders the document as a page, so "Open" lands on something
- * readable instead of a download. It fetches `src` server-side, which the
- * content links allow: they are public, unauthenticated URLs.
- *
- * `view.aspx` rather than the Google Docs `embedded=true` viewer because Open
- * targets a real tab, and the embedded viewer is built to sit in an iframe.
- */
-function toOfficeViewerUrl(value: string): string {
-  return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(value)}`;
-}
-
-// Pick the link a browser can render in a tab: a Gamma deck page renders
-// natively, an Office document goes through the Office Online viewer, other
-// inline-viewable links (PDFs, images) render directly, and anything left over
-// falls back to the viewer too, so "Open" never downloads.
-//
-// Both `url` and `filename` can hold the same export link - the earlier
-// assumption that `filename` keeps a gamma.app deck link does not hold for the
-// stored data - so every candidate is classified rather than trusted by field.
-function resolveViewableContentUrl(asset: ChapterContentAsset): string | undefined {
-  const candidates = [asset.url, asset.filename]
-    .filter(isHttpUrl)
-    .map((value) => value.trim());
-
-  if (!candidates.length) {
-    return asset.url || asset.filename || undefined;
-  }
-
-  const deckLink = candidates.find((value) => GAMMA_DECK_PATTERN.test(value));
-  if (deckLink) return deckLink;
-
-  const officeDocLink = candidates.find((value) => isOfficeDocumentUrl(value, asset.filename));
-  if (officeDocLink) return toOfficeViewerUrl(officeDocLink);
-
-  const inlineViewable = candidates.find((value) => !isDownloadOnlyUrl(value));
-  if (inlineViewable) return inlineViewable;
-
-  return toOfficeViewerUrl(candidates[0]);
 }
 
 function buildApiChapterContentItems(
@@ -935,6 +939,15 @@ export default function ChapterListPage() {
   } | null>(null);
   const [questionType, setQuestionType] = useState('');
   const [totalQuestions, setTotalQuestions] = useState('');
+  // Auto leaves the mix to the generator (which prefers the chapter's own
+  // intelligence slice when there is one). Turning it off sends an explicit
+  // quota, and from then on the teacher's numbers are what bind.
+  const [useAutoQuota, setUseAutoQuota] = useState(true);
+  const [bloomCounts, setBloomCounts] = useState<BloomCounts>({ ...EMPTY_BLOOM_COUNTS });
+  const [bloomDifficulties, setBloomDifficulties] = useState<BloomDifficulties>({
+    ...DEFAULT_BLOOM_DIFFICULTIES,
+  });
+  const [bloomPoints, setBloomPoints] = useState<BloomPoints>({ ...DEFAULT_BLOOM_POINTS });
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
   const [questionGenerationError, setQuestionGenerationError] = useState('');
   const [questionGenerationSuccess, setQuestionGenerationSuccess] = useState('');
@@ -1173,7 +1186,28 @@ export default function ChapterListPage() {
     Number.isInteger(totalQuestionsNumber) &&
     totalQuestionsNumber >= 1 &&
     totalQuestionsNumber <= 50;
-  const canGenerateQuestions = questionType !== '' && isTotalQuestionsValid && !isGeneratingQuestions;
+  const bloomCountTotal = BLOOM_LEVEL_META.reduce(
+    (sum, meta) => sum + (bloomCounts[meta.level] || 0),
+    0
+  );
+  // A custom mix has to add up: the server writes exactly the counts it is given,
+  // so a table summing to 12 when the teacher asked for 10 would quietly produce 12.
+  const isQuotaValid = useAutoQuota || (isTotalQuestionsValid && bloomCountTotal === totalQuestionsNumber);
+  const canGenerateQuestions =
+    questionType !== '' && isTotalQuestionsValid && isQuotaValid && !isGeneratingQuestions;
+
+  /** Seed the table from the server's own default split the first time it is shown. */
+  const handleToggleAutoQuota = (nextAuto: boolean) => {
+    setUseAutoQuota(nextAuto);
+    if (!nextAuto) {
+      setBloomCounts(suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0));
+    }
+  };
+
+  const handleBloomCountChange = (level: IntelligenceBloomLevel, raw: string) => {
+    const digits = raw.replace(/[^\d]/g, '');
+    setBloomCounts((current) => ({ ...current, [level]: digits === '' ? 0 : Number(digits) }));
+  };
 
   useEffect(() => {
     if (!contentChapter) return;
@@ -1736,6 +1770,14 @@ export default function ChapterListPage() {
     setSelectedContentItem(null);
   };
 
+  /** Back to Auto for the next concept, so one concept's mix never leaks into another. */
+  const resetQuestionMix = () => {
+    setUseAutoQuota(true);
+    setBloomCounts({ ...EMPTY_BLOOM_COUNTS });
+    setBloomDifficulties({ ...DEFAULT_BLOOM_DIFFICULTIES });
+    setBloomPoints({ ...DEFAULT_BLOOM_POINTS });
+  };
+
   const openGenerateQuestionsModal = (chapter: Chapter, conceptTitle: string, conceptIndex: number) => {
     setQuestionModalConcept({
       chapter,
@@ -1747,6 +1789,7 @@ export default function ChapterListPage() {
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    resetQuestionMix();
   };
 
   /**
@@ -1807,6 +1850,7 @@ export default function ChapterListPage() {
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    resetQuestionMix();
   };
 
   const resetManualQuestionForm = () => {
@@ -2094,6 +2138,21 @@ export default function ChapterListPage() {
         question_type_id: config.question_type_id,
         total_questions: totalQuestionsNumber,
         created_by: requestContext.user_id,
+        // Omitted entirely on Auto, so the server keeps deciding the mix exactly
+        // as it did before this control existed. Zero-count levels are dropped:
+        // the server reads a row's presence as "generate at this level".
+        ...(useAutoQuota
+          ? {}
+          : {
+              quota: BLOOM_LEVEL_META.filter((meta) => (bloomCounts[meta.level] || 0) > 0).map(
+                (meta) => ({
+                  level: meta.level,
+                  count: bloomCounts[meta.level],
+                  difficulty: bloomDifficulties[meta.level],
+                  points: bloomPoints[meta.level],
+                })
+              ),
+            }),
       });
 
       const inserted = response.data?.inserted;
@@ -2941,6 +3000,141 @@ export default function ChapterListPage() {
                 className="h-12 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none"
               />
               <p className="text-sm text-slate-500">Between 1 and 50</p>
+            </div>
+
+            <div className="space-y-3 rounded-[12px] border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Question mix
+                  </Label>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {useAutoQuota
+                      ? 'The generator chooses the spread across Bloom levels.'
+                      : 'You decide how many questions sit at each Bloom level.'}
+                  </p>
+                </div>
+                <div className="inline-flex overflow-hidden rounded-full border border-slate-300 text-sm font-semibold">
+                  {[
+                    { label: 'Auto', value: true },
+                    { label: 'Custom', value: false },
+                  ].map((option) => (
+                    <button
+                      key={option.label}
+                      type="button"
+                      onClick={() => handleToggleAutoQuota(option.value)}
+                      className={
+                        useAutoQuota === option.value
+                          ? 'bg-[#aea8ff] px-4 py-1.5 text-white'
+                          : 'bg-white px-4 py-1.5 text-slate-600 hover:bg-slate-50'
+                      }
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {useAutoQuota ? null : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[440px] text-sm">
+                      <thead>
+                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          <th className="pb-2 pr-3">Bloom level</th>
+                          <th className="pb-2 pr-3">Difficulty</th>
+                          <th className="pb-2 pr-3 text-right">Questions</th>
+                          {questionType === 'Narrative' ? (
+                            <th className="pb-2 text-right">Marks each</th>
+                          ) : null}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {BLOOM_LEVEL_META.map((meta) => (
+                          <tr key={meta.level}>
+                            <td className="py-2 pr-3 font-medium text-slate-900">{meta.level}</td>
+                            <td className="py-2 pr-3">
+                              <select
+                                aria-label={`Difficulty for ${meta.level}`}
+                                value={bloomDifficulties[meta.level]}
+                                onChange={(event) =>
+                                  setBloomDifficulties((current) => ({
+                                    ...current,
+                                    [meta.level]: event.target.value,
+                                  }))
+                                }
+                                className="h-9 w-full rounded-[8px] border border-slate-300 bg-white px-2 text-sm text-slate-700 outline-none focus:border-[#aea8ff]"
+                              >
+                                {DIFFICULTY_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-2 pr-3 text-right">
+                              <input
+                                aria-label={`Number of ${meta.level} questions`}
+                                inputMode="numeric"
+                                value={String(bloomCounts[meta.level] ?? 0)}
+                                onChange={(event) => handleBloomCountChange(meta.level, event.target.value)}
+                                className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#aea8ff]"
+                              />
+                            </td>
+                            {questionType === 'Narrative' ? (
+                              <td className="py-2 text-right">
+                                <input
+                                  aria-label={`Marks per ${meta.level} question`}
+                                  inputMode="numeric"
+                                  value={String(bloomPoints[meta.level] ?? 0)}
+                                  onChange={(event) =>
+                                    setBloomPoints((current) => ({
+                                      ...current,
+                                      [meta.level]: Number(event.target.value.replace(/[^\d]/g, '') || 0),
+                                    }))
+                                  }
+                                  className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#aea8ff]"
+                                />
+                              </td>
+                            ) : null}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p
+                      className={
+                        isQuotaValid
+                          ? 'text-sm font-medium text-emerald-700'
+                          : 'text-sm font-medium text-rose-700'
+                      }
+                    >
+                      {bloomCountTotal} of {isTotalQuestionsValid ? totalQuestionsNumber : 0} questions
+                      allocated
+                      {isQuotaValid ? '' : ' - the mix must add up to the total before you can generate.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBloomCounts(
+                          suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
+                        )
+                      }
+                      className="text-sm font-semibold text-[#6c63ff] hover:text-[#554dd6]"
+                    >
+                      Reset to suggested split
+                    </button>
+                  </div>
+
+                  {questionType === 'MCQ' ? (
+                    <p className="text-xs text-slate-500">
+                      MCQs are always scored at 1 mark each, so marks are not editable for this type.
+                    </p>
+                  ) : null}
+                </>
+              )}
             </div>
             {questionGenerationError ? (
               <p className="rounded-[10px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
