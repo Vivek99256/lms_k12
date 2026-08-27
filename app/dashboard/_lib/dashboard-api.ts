@@ -121,6 +121,39 @@ export type TeacherDashboardSummary = ApiStatusPayload & {
   students_by_class: Array<{ label: string; students: number }>;
 };
 
+export type TeacherTimetableSummary = ApiStatusPayload & {
+  timetable: Array<{
+    week_day: string;
+    period_id: number;
+    period_title: string;
+    start_time: string;
+    end_time: string;
+    subject_id: number;
+    subject_name: string;
+    standard_id: number;
+    standard_name: string;
+    division_id: number;
+    division_name: string;
+  }>;
+};
+
+export type TeacherFeeDuesSummary = ApiStatusPayload & {
+  summary: {
+    total_due_students: number;
+    total_due_amount: number;
+  };
+  students: Array<{
+    student_id: number;
+    student_name: string;
+    enrollment_no: string | null;
+    standard_name: string;
+    division_name: string;
+    total_fee: number;
+    paid_amount: number;
+    due_amount: number;
+  }>;
+};
+
 export type StudentDashboardSummary = ApiStatusPayload & {
   summary: {
     total_subjects: number;
@@ -146,4 +179,29 @@ export function fetchTeacherDashboard(session: DashboardSession, signal?: AbortS
 
 export function fetchStudentDashboard(session: DashboardSession, signal?: AbortSignal) {
   return postDashboardProxy<StudentDashboardSummary>('/api/dashboard/student', session, signal);
+}
+
+export function fetchTeacherFeeDues(session: DashboardSession, signal?: AbortSignal) {
+  return postDashboardProxy<TeacherFeeDuesSummary>('/api/dashboard/teacher-fee-dues', session, signal);
+}
+
+export function fetchTeacherTimetable(session: DashboardSession, signal?: AbortSignal) {
+  return postDashboardProxy<TeacherTimetableSummary>('/api/dashboard/teacher-timetable', session, signal);
+}
+
+/**
+ * Self-service "My ID card" — the rendered card is server-generated HTML
+ * (same Laravel template-filling logic as the admin teacher_icard tool,
+ * see student\TeacherIcardApiController::buildTeacherCardHtml()), so the
+ * payload is just that HTML string plus which template/grid it used.
+ */
+export type MyIcardSummary = ApiStatusPayload & {
+  html: string;
+  template: string;
+  row: number;
+  column: number;
+};
+
+export function fetchMyIcard(session: DashboardSession, signal?: AbortSignal) {
+  return postDashboardProxy<MyIcardSummary>('/api/dashboard/teacher-icard', session, signal);
 }
