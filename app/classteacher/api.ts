@@ -80,6 +80,9 @@ async function request(
 ): Promise<unknown> {
   const params = new URLSearchParams();
   appendCommonParams(params, currentSession);
+  if (currentSession.userId) {
+    params.set("user_id", currentSession.userId);
+  }
   const response = await fetch(
     `/api/proxy?path=${encodeURIComponent(path)}&${params.toString()}`,
     {
@@ -113,6 +116,7 @@ function body(currentSession: SessionContext, values: UnknownRecord): string {
     type: "API",
     sub_institute_id: currentSession.subInstituteId,
     syear: currentSession.syear,
+    user_id: readNumber(currentSession.userId),
   });
 }
 

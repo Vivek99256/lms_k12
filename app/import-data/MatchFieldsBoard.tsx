@@ -70,7 +70,7 @@ function Column({
       </div>
       <ul
         ref={setNodeRef}
-        className={cn('flex min-h-[220px] flex-1 flex-col gap-2 p-3 transition-colors', isOver && 'bg-blue-50/70')}
+        className={cn('flex min-h-[220px] flex-1 flex-col gap-2 p-3 transition-colors', isOver && 'bg-indigo-50/70')}
       >
         <SortableContext items={fields.map((f) => f.field)} strategy={verticalListSortingStrategy}>
           {fields.map((field) => (
@@ -187,7 +187,7 @@ export default function MatchFieldsBoard({
       </div>
       <DragOverlay>
         {activeField ? (
-          <li className="flex cursor-grabbing list-none items-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm shadow-md">
+          <li className="flex cursor-grabbing list-none items-center gap-2 rounded-lg border border-indigo-300 bg-white px-3 py-2 text-sm shadow-md">
             <GripVertical className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
             <span className="flex-1 truncate font-medium text-slate-800">{activeField.display_field}</span>
           </li>
