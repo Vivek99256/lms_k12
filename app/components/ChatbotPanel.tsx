@@ -30,8 +30,10 @@ import { cn } from '@/lib/utils';
 import {
   beginChatPageSession,
   ensureConversationId,
+  readLifecycleThreadId,
   readStoredMessages,
   startNewChatSession,
+  writeLifecycleThreadId,
   writeStoredMessages,
 } from '@/lib/chatbot-storage';
 // AI Workspace: the same panel, with four more things it can do. The conversational
@@ -298,7 +300,21 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   // two are different kinds of identifier — that one is a client-minted uuid, this is
   // the `ai_conversations` row the backend carries referents on, and it is what makes
   // "why is she at risk?" resolvable. Null until the first turn returns one.
+  //
+  // Hydrated from sessionStorage, not initialised to null. The panel is unmounted while
+  // collapsed (`{isChatbotOpen && <ChatbotPanel/>}` in DashboardShell), so a plain ref
+  // was reset every time the user closed and reopened it — while the transcript, which
+  // is persisted, came back in full. The next question then went to the backend with no
+  // conversation id, opened a second thread, and lost every referent from the visible
+  // conversation above it. The thread id has to persist on exactly the same terms as
+  // the messages: cleared by "New chat" and once per page load, kept across remounts.
   const lifecycleThreadRef = useRef<number | null>(null);
+  const lifecycleThreadHydrated = useRef(false);
+
+  if (!lifecycleThreadHydrated.current) {
+    lifecycleThreadHydrated.current = true;
+    lifecycleThreadRef.current = readLifecycleThreadId();
+  }
 
   // Which answer is currently showing its stages. One at a time: the ladder is twelve
   // rows tall, and several expanded at once turns the thread into a wall of diagnostics.
@@ -450,7 +466,10 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
     setConversationId(startNewChatSession());
     // A new thread must not inherit the previous one's referents, or "why is she at
     // risk?" would resolve against a student the user has just walked away from.
+    // `startNewChatSession()` above already cleared the stored id; clearing the ref and
+    // the key together keeps the two from disagreeing if that ever stops being true.
     lifecycleThreadRef.current = null;
+    writeLifecycleThreadId(null);
     setMessages([]);
     messagesRef.current = [];
     idCounterRef.current = 0;
@@ -566,6 +585,9 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
         }
 
         lifecycleThreadRef.current = result.conversation.id ?? lifecycleThreadRef.current;
+        // Persisted immediately, not on unmount: the panel can be collapsed at any
+        // moment and an unmount handler is not guaranteed to run before it is.
+        writeLifecycleThreadId(lifecycleThreadRef.current);
 
         const reply = toChatShapedReply(
           result,

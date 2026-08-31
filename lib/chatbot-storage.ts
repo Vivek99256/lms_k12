@@ -4,6 +4,18 @@ export const TEACH_ASSISTANT_MESSAGES_KEY = 'teach-assistant-messages';
 export const TEACH_ASSISTANT_CONVERSATION_ID_KEY = 'teach-assistant-conversation-id';
 
 /**
+ * The backend's `ai_conversations` row id for this thread.
+ *
+ * Stored beside the messages, and for the same reason. The transcript survives a panel
+ * collapse because it lives here; the thread id used to live only in a `useRef`, so it
+ * did not. The user reopened the panel, saw every previous message restored, asked a
+ * follow-up — and the backend received `conversation_id: null`, opened a second thread,
+ * and answered with no memory of the student named a moment earlier. Two halves of one
+ * conversation have to be persisted together or neither should be.
+ */
+export const TEACH_ASSISTANT_LIFECYCLE_THREAD_KEY = 'teach-assistant-lifecycle-thread';
+
+/**
  * Chat persistence.
  *
  * Two behaviours the panel needs, and they pull in opposite directions:
@@ -78,6 +90,7 @@ export function clearTeachAssistantStorage() {
 
   safeRemove(session, TEACH_ASSISTANT_MESSAGES_KEY);
   safeRemove(session, TEACH_ASSISTANT_CONVERSATION_ID_KEY);
+  safeRemove(session, TEACH_ASSISTANT_LIFECYCLE_THREAD_KEY);
 
   if (typeof window !== 'undefined') {
     try {
@@ -116,6 +129,48 @@ export function writeStoredMessages(messages: unknown[]) {
     storage.setItem(TEACH_ASSISTANT_MESSAGES_KEY, JSON.stringify(messages));
   } catch {
     // Quota exceeded, most likely. Losing persistence is preferable to breaking send.
+  }
+}
+
+/**
+ * The lifecycle thread id this session is part-way through, or null for a fresh one.
+ *
+ * Returns null rather than throwing on anything unparseable, so a corrupted key costs
+ * one thread's continuity instead of breaking the panel.
+ */
+export function readLifecycleThreadId(): number | null {
+  const storage = store();
+
+  if (!storage) return null;
+
+  try {
+    const raw = storage.getItem(TEACH_ASSISTANT_LIFECYCLE_THREAD_KEY);
+
+    if (!raw) return null;
+
+    const parsed = Number.parseInt(raw, 10);
+
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeLifecycleThreadId(id: number | null) {
+  const storage = store();
+
+  if (!storage) return;
+
+  try {
+    if (id === null) {
+      storage.removeItem(TEACH_ASSISTANT_LIFECYCLE_THREAD_KEY);
+
+      return;
+    }
+
+    storage.setItem(TEACH_ASSISTANT_LIFECYCLE_THREAD_KEY, String(id));
+  } catch {
+    // Quota or blocked storage. Losing continuity is preferable to breaking send.
   }
 }
 
