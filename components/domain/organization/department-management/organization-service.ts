@@ -43,7 +43,7 @@ async function apiGet<T>(
   const response = await fetch(url.toString(), {
     method: 'GET',
     cache: 'no-store',
-    headers: createAuthHeaders(session, 'application/json'),
+    headers: createAuthHeaders(session),
   })
 
   if (!response.ok) {
