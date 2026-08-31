@@ -364,3 +364,187 @@ export interface PendingApproval {
   expires_at: string | null;
   created_at: string | null;
 }
+
+// ---- The conversational front door (`/ask`) ---------------------------------
+//
+// `/ask` is the only endpoint that runs the whole architecture from a sentence, and
+// the only one that reports what each layer did. It returns two views of the same
+// turn: `trace`, the fifteen-stage backend ladder used for diagnostics, and
+// `lifecycle_trace`, the twelve-stage product lifecycle the console renders.
+
+export type StageStatus = "ran" | "skipped" | "blocked" | "pending" | "not_reached";
+
+/** One stage of the lifecycle, as it actually executed for one question. */
+export interface TraceStage {
+  key: string;
+  order: number;
+  layer: string;
+  status: StageStatus;
+  /** One plain sentence: what this stage did for this question. */
+  summary: string;
+  /** The class that genuinely does this work, so a reader can open it. */
+  component: string;
+  /** Where in the product a user sees the result of this stage. */
+  surface: string;
+  data: Record<string, unknown>;
+  /** {table, ids} — the rows this stage wrote or read. */
+  records: { table?: string; ids?: Array<number | string> } & Record<string, unknown>;
+  /** {api, sql} — how to confirm by hand that this stage really ran. */
+  verify: { api?: string; sql?: string } & Record<string, unknown>;
+  duration_ms: number | null;
+  /** Why a stage did not run. Present precisely when the summary cannot speak. */
+  note: string | null;
+}
+
+/** One label/value pair, as AnswerComposer::keyValues emits them. */
+export interface KeyValueItem {
+  label: string;
+  value: string;
+}
+
+/**
+ * One evidence row, as AnswerComposer::evidence emits it.
+ *
+ * `source` is a **string** — "attendance_student #4821", or "computed" when the value
+ * was derived rather than read. It is deliberately pre-formatted by the backend rather
+ * than left as an object, because the provenance is the claim: a row that cannot name
+ * where it came from is an assertion, and the backend is the layer that knows the
+ * difference.
+ */
+export interface EvidenceItem {
+  id: number | string | null;
+  kind: string | null;
+  summary: string;
+  value: string | null;
+  source: string;
+  observed_at: string | null;
+  verified: boolean;
+  is_generated: boolean;
+}
+
+export type AnswerSection =
+  | { type: "text"; title: string; body: string }
+  | { type: "records"; title: string; items: Array<Record<string, unknown>> }
+  | { type: "key_values"; title: string; items: KeyValueItem[] }
+  | { type: "evidence"; title: string; items: EvidenceItem[] }
+  | { type: "steps"; title: string; items: Array<Record<string, unknown>> }
+  | { type: "comparison"; title: string; items: Array<Record<string, unknown>> };
+
+/**
+ * An offered action is the next question with its subject pinned — so a button and a
+ * typed sentence go down the same code path and produce the same trace shape.
+ */
+export interface AnswerAction {
+  key: string;
+  label: string;
+  intent: string;
+  utterance: string;
+  payload: Record<string, number>;
+  style: string;
+}
+
+export interface AnswerPayload {
+  headline: string;
+  sections: AnswerSection[];
+  actions: AnswerAction[];
+  follow_ups: string[];
+}
+
+export interface AskIntent {
+  key: string;
+  label: string;
+  confidence: number;
+  slots: Record<string, unknown>;
+  matched?: Record<string, unknown>;
+  suggestions?: string[];
+}
+
+/**
+ * A module the lifecycle serves, and how deep it goes.
+ *
+ * Every module reports all twelve stages. `reaches_recommendation` and
+ * `reaches_action` say whether stages 10-12 can do anything for this module, and
+ * `depth_reason` is the sentence to show when they cannot — "no agent owns the fees
+ * domain yet" rather than a silent gap.
+ */
+export interface LifecycleModule {
+  key: string;
+  label: string;
+  entity_key: string | null;
+  capabilities: Partial<
+    Record<"conversational" | "generative" | "agent" | "workflow" | "ontology", boolean>
+  >;
+  mcp_tools: string[];
+  agent_key: string | null;
+  workflow_key: string | null;
+  case_type: string | null;
+  reaches_recommendation: boolean;
+  reaches_action: boolean;
+  depth_reason?: string;
+  /** How the backend decided this question belonged to this module. */
+  resolved_by?: string;
+}
+
+export interface AskResult {
+  conversation: {
+    id: number | null;
+    reference: string | null;
+    turn_id: number | null;
+    turn: number;
+  };
+  question: string;
+  intent: AskIntent;
+  answer: AnswerPayload;
+  /**
+   * The stage ladder.
+   *
+   * Under the standardised pipeline this is the same twelve stages as
+   * `lifecycle_trace`. Turns answered by the previous pipeline carry its
+   * fifteen-stage backend ladder here instead, which is why both keys exist and why
+   * the console reads `lifecycle_trace`.
+   */
+  trace: TraceStage[];
+  ladder: string[];
+  stage_counts: Partial<Record<StageStatus, number>>;
+  /** The twelve-stage product lifecycle: Conversational AI → Action. */
+  lifecycle_trace: TraceStage[];
+  lifecycle_stage_counts: Partial<Record<StageStatus, number>>;
+  /** Which module answered, and how deep it was able to go. */
+  module?: LifecycleModule;
+  /** The highest stage number this turn reached. */
+  depth_reached?: number;
+  /** Which pipeline answered: "lifecycle_v2" or "ask_service_v1". */
+  pipeline?: string;
+  links: Record<string, unknown>;
+  duration_ms: number;
+}
+
+export interface ConversationTurn {
+  id: number;
+  sequence: number;
+  question: string;
+  intent: { key: string; confidence: number | null; slots: Record<string, unknown> };
+  answer: AnswerPayload;
+  trace: TraceStage[];
+  stage_counts: Partial<Record<StageStatus, number>>;
+  lifecycle_trace: TraceStage[];
+  lifecycle_stage_counts: Partial<Record<StageStatus, number>>;
+  links: Record<string, number>;
+  duration_ms: number | null;
+  status: string;
+  asked_at: string | null;
+}
+
+export interface ConversationTranscript {
+  conversation: {
+    id: number;
+    reference: string;
+    module_key: string;
+    title: string | null;
+    memory: Record<string, unknown>;
+    turn_count: number;
+    started_at: string | null;
+    last_turn_at: string | null;
+  } | null;
+  turns: ConversationTurn[];
+}
