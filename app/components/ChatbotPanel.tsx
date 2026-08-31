@@ -42,6 +42,13 @@ import { toActionableFollowUps } from '@shared/conversational-ai-core/followup-s
 import { useAiWorkspace } from '@/hooks/use-ai-workspace';
 import { usePageAiContext } from '@/contexts/PageAiContext';
 import type { Capability } from '@/lib/intelligence/workspace';
+// The governed twelve-stage pipeline. Reached through the adapter below, which renders
+// its answer into the shape this panel already speaks, so the transport can change
+// without the render changing at the same time.
+import { ask } from '@/lib/intelligence/client';
+import { toChatShapedReply } from '@/lib/intelligence/ask-adapter';
+import type { AnswerAction, TraceStage } from '@/lib/intelligence/types';
+import { LifecycleTrace } from '@/components/intelligence/LifecycleTrace';
 import { ActionsTab } from './ai-workspace/ActionsTab';
 import { AnalyseTab } from './ai-workspace/AnalyseTab';
 import { ConnectionsTab } from './ai-workspace/ConnectionsTab';
@@ -86,7 +93,33 @@ type ChatMessage = {
   };
   /** The question that produced the confirmation, replayed when they accept. */
   confirmationFor?: string;
+  /**
+   * Actions the governed pipeline offered — approve, reject, and anything else that
+   * needs a person. Each is the next question with the id of the record it applies to
+   * pinned, so clicking one and typing the sentence go down the same path and produce
+   * the same trace. Distinct from `confirmation`, which authorises a *tool*; these
+   * authorise a *decision*, and the backend records it through the approval gate.
+   */
+  actions?: AnswerAction[];
+  /**
+   * The twelve lifecycle stages that produced this answer.
+   *
+   * Carried on the message rather than held as panel state, because it belongs to the
+   * turn: scrolling back to an older answer should show the stages that produced *it*,
+   * not the stages of whatever was asked most recently.
+   */
+  lifecycleTrace?: TraceStage[];
 };
+
+/**
+ * Which backend answers the conversational tab.
+ *
+ * While this is off the panel uses the model-driven chat route it was built against.
+ * While it is on, the same panel is answered by the governed twelve-stage pipeline and
+ * every reply carries the ladder that produced it. Both write to the same conversation
+ * tables, so it can be turned on and off without stranding a thread.
+ */
+const USE_LIFECYCLE_PIPELINE = process.env.NEXT_PUBLIC_AI_LIFECYCLE === '1';
 
 const MODULE_HANDOFF_COPY: Record<string, { title: string; description: string }> = {
   admissions: {
@@ -261,6 +294,16 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   // otherwise the previous conversation's answer lands in the empty new one.
   const chatSessionRef = useRef(0);
 
+  // The governed pipeline's own thread id. Separate from `conversationId` because the
+  // two are different kinds of identifier — that one is a client-minted uuid, this is
+  // the `ai_conversations` row the backend carries referents on, and it is what makes
+  // "why is she at risk?" resolvable. Null until the first turn returns one.
+  const lifecycleThreadRef = useRef<number | null>(null);
+
+  // Which answer is currently showing its stages. One at a time: the ladder is twelve
+  // rows tall, and several expanded at once turns the thread into a wall of diagnostics.
+  const [openTraceId, setOpenTraceId] = useState<string | null>(null);
+
   // What the page says it is showing — filters, search, KPI tiles, visible rows, the
   // record it is about. Empty for a page that registers nothing, which is every page
   // that has not adopted the provider yet, and harmless when empty.
@@ -405,6 +448,9 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
     if (isSpeaking) stopSpeaking();
 
     setConversationId(startNewChatSession());
+    // A new thread must not inherit the previous one's referents, or "why is she at
+    // risk?" would resolve against a student the user has just walked away from.
+    lifecycleThreadRef.current = null;
     setMessages([]);
     messagesRef.current = [];
     idCounterRef.current = 0;
@@ -450,8 +496,16 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
    * @param confirmedTools Tools the user has just authorised, when this send is a
    *   confirmation of a consequential action rather than a new question. Cleared
    *   every turn, so an authorisation never carries into a later message.
+   * @param actionPayload The record an offered action was rendered against. Sent so a
+   *   decision lands on the row the user was looking at rather than on whatever was
+   *   most recently mentioned. The sentence still drives the intent; this only removes
+   *   ambiguity about which record it applies to.
    */
-  async function sendMessage(raw: string, confirmedTools?: string[]) {
+  async function sendMessage(
+    raw: string,
+    confirmedTools?: string[],
+    actionPayload?: AnswerAction['payload']
+  ) {
     const trimmed = raw.trim();
     if (!trimmed || isLoading) return;
 
@@ -481,6 +535,63 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
     setIsLoading(true);
 
     try {
+      // ---- the governed pipeline ------------------------------------------
+      //
+      // One call runs all twelve stages and returns the ladder that produced the
+      // answer. The adapter renders it into the same shape the model route returns,
+      // so everything below this branch is untouched.
+      if (USE_LIFECYCLE_PIPELINE) {
+        const result = await ask(
+          {
+            token: session.token ?? null,
+            baseUrl: session.baseUrl ?? null,
+            instituteId: session.subInstituteId ?? null,
+            academicYear: session.syear ?? null,
+            termId: session.termId ?? null,
+          },
+          trimmed,
+          {
+            conversationId: lifecycleThreadRef.current,
+            payload: actionPayload,
+            // The screen the question was asked from. The backend treats a declared
+            // module as authoritative, so a fees question asked on the fees screen
+            // does not have to say the word "fees" to route there.
+            module: workspace.context?.module ?? null,
+            route: pathname,
+          }
+        );
+
+        if (chatSession !== chatSessionRef.current) {
+          return;
+        }
+
+        lifecycleThreadRef.current = result.conversation.id ?? lifecycleThreadRef.current;
+
+        const reply = toChatShapedReply(
+          result,
+          createMessageId('assistant', ++idCounterRef.current)
+        );
+
+        setMessages((current) => [
+          ...current,
+          {
+            id: reply.message.id,
+            role: 'assistant',
+            content: reply.message.content,
+            status: reply.response.status,
+            conversationType: reply.response.conversationType,
+            tools: reply.response.activeTools,
+            module: reply.response.data.module,
+            followUps: toActionableFollowUps(reply.response.followUpSuggestions),
+            citations: reply.response.citations,
+            actions: reply.actions,
+            lifecycleTrace: reply.response.data.lifecycleTrace,
+          },
+        ]);
+
+        return;
+      }
+
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
@@ -939,6 +1050,43 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                     ) : null}
 
                     {/*
+                      Decisions the answer is asking for — approve, reject, and anything
+                      else that needs a person.
+
+                      Rendered as buttons rather than chips because they are not
+                      suggestions: clicking one records a decision against a named record
+                      and, on approval, starts a workflow. Each carries the id it was
+                      rendered against, so the decision lands on the record the user was
+                      looking at rather than on whatever was most recently mentioned.
+
+                      Offered under the latest answer only. A stale approve button is
+                      the one piece of stale UI in this panel that could do real harm.
+                    */}
+                    {message.role === 'assistant' &&
+                    message.id === messages[messages.length - 1]?.id &&
+                    message.actions?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {message.actions.map((action) => (
+                          <button
+                            key={action.key}
+                            type="button"
+                            onClick={() =>
+                              void sendMessage(action.utterance, undefined, action.payload)
+                            }
+                            disabled={isLoading}
+                            className={
+                              action.style === 'danger'
+                                ? 'rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50'
+                                : 'rounded-lg border border-transparent bg-[#0D6EFD] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#0b5ed7] disabled:cursor-not-allowed disabled:opacity-50'
+                            }
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {/*
                       Where the conversation can go next, offered only under the most
                       recent answer. Older turns keep their text but lose their chips —
                       a follow-up to a question three turns back is rarely what the
@@ -959,6 +1107,58 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                             {suggestion}
                           </button>
                         ))}
+                      </div>
+                    ) : null}
+
+                    {/*
+                      How this answer was produced.
+
+                      Offered on every assistant turn, not only the latest: scrolling
+                      back to an earlier answer should show the stages that produced
+                      *it*. Collapsed by default, because the ladder is twelve rows and
+                      most of the time the answer is the point — but one click away,
+                      because the moment anyone doubts a number, "which stage read
+                      which table" is the only thing that settles it.
+                    */}
+                    {message.role === 'assistant' && message.lifecycleTrace?.length ? (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenTraceId((current) => (current === message.id ? null : message.id))
+                          }
+                          aria-expanded={openTraceId === message.id}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:border-[#0D6EFD]/25 hover:text-[#0D6EFD]"
+                        >
+                          {(() => {
+                            const ran = message.lifecycleTrace.filter((s) => s.status === 'ran').length;
+                            const blocked = message.lifecycleTrace.some((s) => s.status === 'blocked');
+                            const waiting = message.lifecycleTrace.some((s) => s.status === 'pending');
+
+                            return (
+                              <>
+                                <span
+                                  className={
+                                    blocked
+                                      ? 'size-1.5 rounded-full bg-red-500'
+                                      : waiting
+                                        ? 'size-1.5 rounded-full bg-amber-500'
+                                        : 'size-1.5 rounded-full bg-emerald-500'
+                                  }
+                                  aria-hidden
+                                />
+                                {openTraceId === message.id ? 'Hide' : 'How this was answered'}
+                                <span className="tabular-nums text-gray-400">
+                                  {ran}/{message.lifecycleTrace.length}
+                                </span>
+                              </>
+                            );
+                          })()}
+                        </button>
+
+                        {openTraceId === message.id ? (
+                          <LifecycleTrace stages={message.lifecycleTrace} className="mt-2" />
+                        ) : null}
                       </div>
                     ) : null}
                   </div>

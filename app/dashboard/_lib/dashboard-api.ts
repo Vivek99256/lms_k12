@@ -101,7 +101,8 @@ export type AdminDashboardSummary = ApiStatusPayload & {
     pending_parent_communications: number;
   };
   upcoming_birthdays: Array<{ student_name: string; standard_name: string; division_name: string; dob: string }>;
-  recent_fee_receipts: Array<{ receipt_no: string; amount: number; receiptdate: string; student_name: string }>;
+  /** `id` is only present on backends running the grouped receipt query; older responses omit it. */
+  recent_fee_receipts: Array<{ id?: number; receipt_no: string; amount: number; receiptdate: string; student_name: string }>;
   fee_collection_trend: Array<{ date: string; label: string; amount: number }>;
   students_by_class: Array<{ standard_id: number; standard_name: string; students: number }>;
 };

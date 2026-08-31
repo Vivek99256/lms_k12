@@ -2,11 +2,15 @@ import { API_BASE_URL } from "@/app/components/utils/api_url";
 import type {
   AgentRunResult,
   AiEnvelope,
+  AskIntent,
+  AskResult,
   CaseDetail,
   CaseRecord,
+  ConversationTranscript,
   DecisionResult,
   GenerationOutcome,
   GraphTraversal,
+  LifecycleModule,
   OntologyEntity,
   OntologyRelationship,
   PendingApproval,
@@ -136,6 +140,101 @@ function post<T>(context: IntelligenceContext, path: string, body: Record<string
     method: "POST",
     body: JSON.stringify({ ...body, meta: buildMeta(context) }),
   });
+}
+
+// ---- Ask — the conversational front door -----------------------------------
+
+/**
+ * Ask a question.
+ *
+ * This is the only call that runs the whole architecture from a sentence, and the
+ * only one that reports which of the twelve lifecycle stages ran. Everything the
+ * console renders comes from this one response — including the approve and reject
+ * buttons, which are just the next question with its subject pinned.
+ *
+ * `payload` exists so a button lands on the record the user was looking at rather
+ * than on whatever was most recently mentioned. The sentence still drives the
+ * intent; the payload only removes ambiguity about which record it applies to.
+ *
+ * `module` and `route` say where the question was asked from. Both are hints and
+ * neither is required: the backend treats a declared module as authoritative and a
+ * route as strong evidence, and falls back to reading the words. Sending them
+ * matters because the module decides which tools the turn may select and how far
+ * down the ladder it can go — a fees question asked on the fees screen should not
+ * have to say the word "fees" to be routed there.
+ */
+export function ask(
+  context: IntelligenceContext,
+  question: string,
+  options: {
+    conversationId?: number | null;
+    payload?: Partial<
+      Record<"case_id" | "student_id" | "recommendation_id" | "workflow_approval_id", number>
+    >;
+    limit?: number;
+    module?: string | null;
+    route?: string | null;
+  } = {}
+) {
+  return post<AskResult>(context, "/ask", {
+    question,
+    conversation_id: options.conversationId ?? null,
+    payload: options.payload ?? {},
+    limit: options.limit,
+    module: options.module ?? null,
+    route:
+      options.route ??
+      (typeof window === "undefined" ? null : window.location.pathname),
+  });
+}
+
+/**
+ * Which modules the lifecycle serves, and how deep each one goes.
+ *
+ * Every module reports all twelve stages. This says which of them can reach stage 10
+ * and beyond, and names what is missing for the ones that cannot — so a panel can
+ * tell a user "this module answers from real data but opens no cases" rather than
+ * silently rendering a shorter ladder.
+ */
+export function listLifecycleModules(context: IntelligenceContext) {
+  return get<{
+    pipeline: string;
+    stages: Array<{
+      key: string;
+      order: number;
+      layer: string;
+      component: string;
+      surface: string;
+    }>;
+    modules: LifecycleModule[];
+  }>(context, "/ask/modules");
+}
+
+/**
+ * Classification only — nothing runs and nothing is written.
+ *
+ * Use this to check that a rephrasing still lands on the intent you expect without
+ * starting an analysis to find out.
+ */
+export function interpretQuestion(
+  context: IntelligenceContext,
+  question: string,
+  memory?: Record<string, unknown>
+) {
+  return post<{ intent: AskIntent }>(context, "/ask/interpret", { question, memory });
+}
+
+/** The questions this module understands, for the console's starter chips. */
+export function listIntents(context: IntelligenceContext) {
+  return get<{ intents: Array<{ key: string; label: string; description: string; requires: string[] }> }>(
+    context,
+    "/ask/intents"
+  );
+}
+
+/** The thread, oldest turn first — what the console renders on reload. */
+export function getConversation(context: IntelligenceContext, conversationId: number) {
+  return get<ConversationTranscript>(context, `/conversations/${conversationId}`);
 }
 
 // ---- Signals, cases, evidence ---------------------------------------------
