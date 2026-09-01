@@ -1525,7 +1525,7 @@ export default function StudentPage() {
                         Content
                       </button>
 
-                      <button
+                      {/* <button
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
@@ -1535,7 +1535,7 @@ export default function StudentPage() {
                       >
                         <ClipboardList size={16} className="mr-2" />
                         Question Bank
-                      </button>
+                      </button> */}
                     </div>
                   </div>
 
