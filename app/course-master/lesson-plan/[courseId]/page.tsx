@@ -38,6 +38,12 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
+import { LessonIntelligencePanel } from './LessonIntelligencePanel';
+import {
+  LessonPlanDetailDialog,
+  type LessonPlanContent,
+  type LessonPlanDetail,
+} from './LessonPlanDetailDialog';
 import { Badge } from '@/components/ui/badge';
 import { Calendar as DatePickerCalendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +56,8 @@ import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { cn } from '@/lib/utils';
 import { getRequestContext, getSyear } from '../../page';
 import {
+  extractTeachingMethodologies,
+  fetchSemanticIntelligenceResult,
   getSubjectAndChapters,
   type Chapter,
   type SubjectWithChapters,
@@ -80,6 +88,11 @@ function CreateLessonPlanDialog({
   contextLabel,
   conceptOptions,
   pedagogyOptions,
+  pedagogyLoading,
+  pedagogyError,
+  aiGrade,
+  aiSubject,
+  aiRelated,
   lessonPlanDraft,
   lessonPlanDraftErrors,
   isSavingLessonPlan,
@@ -178,7 +191,11 @@ function CreateLessonPlanDialog({
                     </Button>
                   }
                 />
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent
+                  className="w-auto p-0"
+                  positionerClassName="z-[130]"
+                  align="start"
+                >
                   <DatePickerCalendar
                     mode="single"
                     selected={
@@ -242,8 +259,13 @@ function CreateLessonPlanDialog({
                 setLessonPlanDraft((current) => ({ ...current, pedagogy: value }))
               }
             >
-              <SelectTrigger className="h-12 rounded-[10px] border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A]">
-                <SelectValue placeholder="Select pedagogy" />
+              <SelectTrigger
+                disabled={isSavingLessonPlan || pedagogyLoading || !pedagogyOptions.length}
+                className="h-12 rounded-[10px] border-[#CBD5E1] bg-white px-4 text-[16px] text-[#0F172A]"
+              >
+                <SelectValue
+                  placeholder={pedagogyLoading ? 'Loading pedagogy...' : 'Select pedagogy'}
+                />
               </SelectTrigger>
               <SelectContent align="start">
                 {pedagogyOptions.map((pedagogy) => (
@@ -253,6 +275,11 @@ function CreateLessonPlanDialog({
                 ))}
               </SelectContent>
             </Select>
+            {!pedagogyLoading && !pedagogyOptions.length ? (
+              <p className="mt-1.5 text-[13px] text-[#94A3B8]">
+                {pedagogyError || 'No teaching pedagogy is available for this chapter.'}
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -270,6 +297,12 @@ function CreateLessonPlanDialog({
                 module="course-master"
                 page="Lesson plan"
                 entityType="lesson_plan"
+                // Without this the assistant drafts blind - "draft from title"
+                // has no title, and the result is generic filler rather than
+                // objectives for the concept actually being planned.
+                grade={aiGrade}
+                subject={aiSubject}
+                related={aiRelated}
                 disabled={isSavingLessonPlan}
               />
             </div>
@@ -360,6 +393,12 @@ type LessonPlanEvent = {
   plannedDurationMin?: number;
   periodType?: string;
   concepts: LessonPlanConceptCoverage[];
+  planJson?: LessonPlanContent | null;
+  learningObjectives?: string[];
+  bloomsLevel?: string | null;
+  dokLevel?: number | null;
+  pedagogyMethod?: string | null;
+  difficultyLevel?: string | null;
 };
 
 type LessonPlanDraft = {
@@ -394,6 +433,13 @@ type LessonPlanApiPeriod = {
   period_type?: string | null;
   planned_duration_min?: number | null;
   status?: LessonPlanApiStatus | null;
+  // Written by the micro planner (Phase 3); null until a lesson is generated.
+  plan_json?: LessonPlanContent | null;
+  learning_objectives?: string[] | null;
+  blooms_level?: string | null;
+  dok_level?: number | null;
+  pedagogy_method?: string | null;
+  difficulty_level?: string | null;
   concepts?: {
     concept_name?: string | null;
     coverage_percent?: number | null;
@@ -455,6 +501,12 @@ type CreateLessonPlanDialogProps = {
   contextLabel: string;
   conceptOptions: string[];
   pedagogyOptions: string[];
+  pedagogyLoading: boolean;
+  pedagogyError: string;
+  /** Context handed to the AI assistant so it drafts for this lesson, not in general. */
+  aiGrade: string;
+  aiSubject: string;
+  aiRelated: Record<string, string>;
   lessonPlanDraft: LessonPlanDraft;
   lessonPlanDraftErrors: LessonPlanDraftErrors;
   isSavingLessonPlan: boolean;
@@ -581,6 +633,31 @@ function addMinutesToTime(hour: number, minute: number, duration: number) {
       hour: 'numeric',
       minute: '2-digit',
     }),
+  };
+}
+
+
+/**
+ * The calendar's event model to the detail dialog's. Kept as a plain function so
+ * the dialog stays independent of how this page happens to shape its events.
+ */
+function toLessonPlanDetail(event: LessonPlanEvent): LessonPlanDetail {
+  return {
+    slotLabel: event.slotLabel,
+    date: event.date,
+    chapterTitle: event.chapterTitle,
+    conceptTitle: event.conceptTitle,
+    teacherName: event.teacherName,
+    periodType: event.periodType,
+    plannedDurationMin: event.plannedDurationMin,
+    bloomsLevel: event.bloomsLevel,
+    dokLevel: event.dokLevel,
+    // Fall back to the period's own pedagogy column when the generated plan has
+    // not set one, so the badge still says something useful.
+    pedagogyMethod: event.pedagogyMethod || event.pedagogy,
+    difficultyLevel: event.difficultyLevel,
+    learningObjectives: event.learningObjectives,
+    planJson: event.planJson,
   };
 }
 
@@ -774,6 +851,7 @@ function CalendarEventCard({
   style,
   onOpenHover,
   onCloseHover,
+  onSelect,
 }: {
   event: LessonPlanEvent;
   hoveredPeriodId: string | null;
@@ -781,6 +859,7 @@ function CalendarEventCard({
   style?: React.CSSProperties;
   onOpenHover: (element: HTMLElement, event: LessonPlanEvent) => void;
   onCloseHover: () => void;
+  onSelect: (event: LessonPlanEvent) => void;
 }) {
   const isActive = hoveredPeriodId === event.id;
   const isInactive = hoveredPeriodId !== null && hoveredPeriodId !== event.id;
@@ -793,6 +872,14 @@ function CalendarEventCard({
       onMouseLeave={onCloseHover}
       onFocus={(focusEvent) => onOpenHover(focusEvent.currentTarget, event)}
       onBlur={onCloseHover}
+      onClick={() => onSelect(event)}
+      onKeyDown={(keyEvent) => {
+        if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+          keyEvent.preventDefault();
+          onSelect(event);
+        }
+      }}
+      title="Open the full lesson plan"
       className={cn(
         getEventCardClasses(event.status),
         'transition-all duration-150',
@@ -898,8 +985,19 @@ export default function LessonPlanPage() {
   const routeStandardId = /^\d+$/.test(standardId) ? Number(standardId) : null;
   const [activeSemanticSection, setActiveSemanticSection] = useState('knowledge');
   const [visibleMonth, setVisibleMonth] = useState(() => new Date('2025-04-01T00:00:00'));
+  // The calendar is positioned once per plan. Without this guard every refetch
+  // (including the one right after saving a lesson) snapped the view back to the
+  // term start, hiding a lesson the teacher had just created in a later month.
+  const positionedForPlanRef = useRef<number | null>(null);
   const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>('month');
   const [isCreateLessonPlanOpen, setIsCreateLessonPlanOpen] = useState(false);
+  // Pedagogy strategies live in the chapter's heavy intelligence blob, which the
+  // chapter list endpoint strips. Fetch it lazily, only once the create dialog is
+  // actually open, and cache per chapter id so reopening is free.
+  const [chapterPedagogy, setChapterPedagogy] = useState<Record<string, string[]>>({});
+  const [pedagogyLoadingId, setPedagogyLoadingId] = useState<string | null>(null);
+  // Keyed by chapter so a failure on one chapter never leaks onto the next.
+  const [pedagogyErrors, setPedagogyErrors] = useState<Record<string, string>>({});
   const [apiPeriods, setApiPeriods] = useState<LessonPlanApiPeriod[]>([]);
   const [lessonPlanLoading, setLessonPlanLoading] = useState(false);
   const [lessonPlanError, setLessonPlanError] = useState<string | null>(null);
@@ -928,6 +1026,8 @@ export default function LessonPlanPage() {
     /^\d+$/.test(subjectId) ? Number(subjectId) : null
   );
   const [hoveredPeriod, setHoveredPeriod] = useState<LessonPlanEvent | null>(null);
+  // The lesson whose full generated plan is open, or null.
+  const [openLesson, setOpenLesson] = useState<LessonPlanEvent | null>(null);
   const [hoverPosition, setHoverPosition] = useState<HoverPopupPosition>({ top: 0, left: 0 });
   const [lessonPlanDraft, setLessonPlanDraft] = useState<LessonPlanDraft>({
     conceptTitle: '',
@@ -1242,8 +1342,22 @@ export default function LessonPlanPage() {
         const typedPayload = payload as LessonPlanApiResponse;
         const firstItem = Array.isArray(typedPayload.data) ? typedPayload.data[0] : null;
         setApiPeriods(Array.isArray(firstItem?.periods) ? firstItem.periods : []);
-        if (firstItem?.lesson_plan?.term_start_date) {
-          setVisibleMonth(new Date(`${firstItem.lesson_plan.term_start_date}T00:00:00`));
+        const planMeta = firstItem?.lesson_plan;
+        if (planMeta?.term_start_date && positionedForPlanRef.current !== planMeta.id) {
+          positionedForPlanRef.current = planMeta.id;
+
+          // Open on today's month when the term covers today - that is where a
+          // teacher's newly added lessons land - and on the term start otherwise.
+          const termStart = new Date(`${planMeta.term_start_date}T00:00:00`);
+          const termEnd = planMeta.term_end_date
+            ? new Date(`${planMeta.term_end_date}T00:00:00`)
+            : null;
+          const today = new Date();
+          const todayInTerm = today >= termStart && (!termEnd || today <= termEnd);
+
+          setVisibleMonth(
+            todayInTerm ? new Date(today.getFullYear(), today.getMonth(), 1) : termStart
+          );
         }
         setLessonPlanError(null);
       } catch (error) {
@@ -1306,13 +1420,79 @@ export default function LessonPlanPage() {
 
     return Array.from(new Set(concepts));
   }, [selectedChapter]);
+  // Only the parts that are actually filled in - an empty chapter or concept is
+  // noise in the prompt, not context.
+  const lessonPlanAiContext = useMemo(() => {
+    const related: Record<string, string> = {};
+    if (selectedChapter?.title) related.chapter = selectedChapter.title;
+    if (lessonPlanDraft.conceptTitle) related.concept = lessonPlanDraft.conceptTitle;
+    if (lessonPlanDraft.pedagogy) related.pedagogy = lessonPlanDraft.pedagogy;
+    if (lessonPlanDraft.plannedDate) related.planned_date = lessonPlanDraft.plannedDate;
+
+    return related;
+  }, [
+    selectedChapter,
+    lessonPlanDraft.conceptTitle,
+    lessonPlanDraft.pedagogy,
+    lessonPlanDraft.plannedDate,
+  ]);
+
+  const pedagogyChapterId =
+    selectedChapter && /^\d+$/.test(String(selectedChapter.id)) ? String(selectedChapter.id) : null;
   const pedagogyOptions = useMemo(() => {
-    const pedagogies =
-      selectedChapter?.teachingMethodologies?.length
-        ? selectedChapter.teachingMethodologies
-        : courseChapters.flatMap((chapter) => chapter.teachingMethodologies);
-    return Array.from(new Set(pedagogies));
-  }, [courseChapters, selectedChapter]);
+    const pedagogies = [
+      ...(pedagogyChapterId ? chapterPedagogy[pedagogyChapterId] ?? [] : []),
+      // Static/demo chapters never reach the intelligence endpoint, so keep the
+      // in-memory list as a fallback.
+      ...(selectedChapter?.teachingMethodologies ?? []),
+      ...courseChapters.flatMap((chapter) => chapter.teachingMethodologies),
+    ];
+    return Array.from(new Set(pedagogies.filter(Boolean)));
+  }, [chapterPedagogy, courseChapters, pedagogyChapterId, selectedChapter]);
+
+  useEffect(() => {
+    // Only cache successes: leaving a failed chapter uncached lets reopening the
+    // dialog retry it, and keeps this effect from re-running on its own writes.
+    if (!isCreateLessonPlanOpen || !pedagogyChapterId) return;
+    if (chapterPedagogy[pedagogyChapterId]) return;
+
+    let cancelled = false;
+    setPedagogyLoadingId(pedagogyChapterId);
+
+    fetchSemanticIntelligenceResult(pedagogyChapterId)
+      .then((result) => {
+        if (cancelled) return;
+        setChapterPedagogy((current) => ({
+          ...current,
+          [pedagogyChapterId]: extractTeachingMethodologies(result),
+        }));
+        setPedagogyErrors((current) => {
+          if (!current[pedagogyChapterId]) return current;
+          const next = { ...current };
+          delete next[pedagogyChapterId];
+          return next;
+        });
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setPedagogyErrors((current) => ({
+          ...current,
+          [pedagogyChapterId]:
+            error instanceof Error ? error.message : 'Failed to load teaching pedagogy.',
+        }));
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setPedagogyLoadingId((current) => (current === pedagogyChapterId ? null : current));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chapterPedagogy, isCreateLessonPlanOpen, pedagogyChapterId]);
+
+  const pedagogyLoading = pedagogyChapterId !== null && pedagogyLoadingId === pedagogyChapterId;
+  const pedagogyError = pedagogyChapterId ? pedagogyErrors[pedagogyChapterId] ?? '' : '';
   const apiLessonPlanEvents = useMemo(() => {
     return apiPeriods.map((period) => {
       const slotConfig = resolvePeriodSlot(period.period_slot);
@@ -1341,6 +1521,14 @@ export default function LessonPlanPage() {
               coveragePercent: Number(concept.coverage_percent) || 0,
             }))
           : [],
+        planJson: period.plan_json ?? null,
+        learningObjectives: Array.isArray(period.learning_objectives)
+          ? period.learning_objectives.filter((item): item is string => typeof item === 'string')
+          : [],
+        bloomsLevel: period.blooms_level ?? null,
+        dokLevel: period.dok_level ?? null,
+        pedagogyMethod: period.pedagogy_method ?? null,
+        difficultyLevel: period.difficulty_level ?? null,
       } satisfies LessonPlanEvent;
     });
   }, [apiPeriods]);
@@ -1991,7 +2179,9 @@ export default function LessonPlanPage() {
                   lessonPlanEvents.map((event, index) => (
                     <tr
                       key={event.id}
-                      className={`border-b border-[#D8E1F0] text-[15px] text-[#0F172A] ${
+                      onClick={() => setOpenLesson(event)}
+                      title="Open the full lesson plan"
+                      className={`cursor-pointer border-b border-[#D8E1F0] text-[15px] text-[#0F172A] transition hover:bg-[#EEF3FB] ${
                         index % 2 === 0 ? 'bg-white' : 'bg-[#FDFEFF]'
                       }`}
                     >
@@ -2048,6 +2238,11 @@ export default function LessonPlanPage() {
           contextLabel={lessonPlanContextLabel}
           conceptOptions={conceptOptions}
           pedagogyOptions={pedagogyOptions}
+          pedagogyLoading={pedagogyLoading}
+          pedagogyError={pedagogyError}
+          aiGrade={gradeLabel}
+          aiSubject={selectedSubjectLabel}
+          aiRelated={lessonPlanAiContext}
           lessonPlanDraft={lessonPlanDraft}
           lessonPlanDraftErrors={lessonPlanDraftErrors}
           isSavingLessonPlan={isSavingLessonPlan}
@@ -2393,6 +2588,16 @@ export default function LessonPlanPage() {
           </div>
         </div>
 
+        <LessonIntelligencePanel
+          baseUrl={sessionContext.hostName || API_BASE_URL}
+          subInstituteId={sessionContext.subInstituteId}
+          standardId={currentStandardId}
+          subjectId={selectedSubjectId}
+          divisionId={selectedDivisionId}
+          syear={getSyear()}
+          onScheduleChanged={() => setLessonPlanRefreshKey((key) => key + 1)}
+        />
+
         <div className="overflow-hidden rounded-[18px] border border-[#D8E1F0] bg-white shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
           <div className="flex flex-col gap-4 border-b border-[#E3EAF4] px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
             <h2 className="text-[18px] font-semibold text-[#0F172A]">{calendarHeaderTitle}</h2>
@@ -2620,6 +2825,7 @@ export default function LessonPlanPage() {
                             className="absolute left-2 right-2"
                             style={{ top: `${top}px`, height: `${height}px` }}
                             onOpenHover={openPeriodHover}
+                            onSelect={setOpenLesson}
                             onCloseHover={scheduleCloseHover}
                           />
                         );
@@ -2736,6 +2942,7 @@ export default function LessonPlanPage() {
                                   left: leftCalc,
                                 }}
                                 onOpenHover={openPeriodHover}
+                                onSelect={setOpenLesson}
                                 onCloseHover={scheduleCloseHover}
                               />
                             );
@@ -2762,6 +2969,11 @@ export default function LessonPlanPage() {
           contextLabel={lessonPlanContextLabel}
           conceptOptions={conceptOptions}
           pedagogyOptions={pedagogyOptions}
+          pedagogyLoading={pedagogyLoading}
+          pedagogyError={pedagogyError}
+          aiGrade={gradeLabel}
+          aiSubject={selectedSubjectLabel}
+          aiRelated={lessonPlanAiContext}
           lessonPlanDraft={lessonPlanDraft}
           lessonPlanDraftErrors={lessonPlanDraftErrors}
           isSavingLessonPlan={isSavingLessonPlan}
@@ -2769,6 +2981,11 @@ export default function LessonPlanPage() {
           setLessonPlanDraft={setLessonPlanDraft}
           setLessonPlanDraftErrors={setLessonPlanDraftErrors}
           onSave={handleSaveLessonPlan}
+        />
+
+        <LessonPlanDetailDialog
+          lesson={openLesson ? toLessonPlanDetail(openLesson) : null}
+          onClose={() => setOpenLesson(null)}
         />
 
         {hoveredPeriod ? (

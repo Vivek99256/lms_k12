@@ -317,7 +317,8 @@ export function AiFieldAssistant({
               type="button"
               disabled={disabled}
               aria-label={triggerLabel ?? `Edit ${label ?? "this field"} with AI`}
-              title={triggerLabel ?? "Edit with AI"}
+              title={busy ? "Writing a suggestion…" : (triggerLabel ?? "Edit with AI")}
+              aria-busy={busy}
               className={cn(
                 "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
                 "text-indigo-600 transition-colors",
@@ -327,7 +328,11 @@ export function AiFieldAssistant({
                 open && "bg-indigo-50 text-indigo-700"
               )}
             >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+              )}
             </button>
           }
         />
@@ -336,6 +341,12 @@ export function AiFieldAssistant({
           align="start"
           sideOffset={6}
           className="w-[26rem] max-w-[calc(100vw-2rem)] gap-0 p-0"
+          /* The assistant sits on ordinary forms but also inside modals, which
+             stack above the popover's default z-50 - there it would open behind
+             the dialog and every phase of the run (spinner, result, Apply) would
+             be invisible while the request quietly succeeded. Float it above the
+             dialog layer instead. */
+          positionerClassName="z-[130]"
         >
           {/* ---- header ---- */}
           <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5">
