@@ -17,6 +17,7 @@ function PopoverTrigger({
 
 function PopoverContent({
   className,
+  positionerClassName,
   align = "center",
   alignOffset = 0,
   side = "bottom",
@@ -26,7 +27,16 @@ function PopoverContent({
   Pick<
     PopoverPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset"
-  >) {
+  > & {
+    /**
+     * Classes for the portalled positioner. Pass a higher `z-*` here when the
+     * popover is opened from inside an overlay that stacks above `z-50`,
+     * otherwise the popup renders behind that overlay. `className` cannot do
+     * this: it lands on the popup, which is inside the positioner's own
+     * `isolate` stacking context.
+     */
+    positionerClassName?: string
+  }) {
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Positioner
@@ -34,7 +44,7 @@ function PopoverContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
-        className="isolate z-50 pointer-events-auto"
+        className={cn("isolate z-50 pointer-events-auto", positionerClassName)}
       >
         <PopoverPrimitive.Popup
           data-slot="popover-content"
