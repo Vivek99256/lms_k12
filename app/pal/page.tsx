@@ -44,6 +44,7 @@ import { getViewAsStudent, setViewAsStudent } from '@/app/pal/data/pal-view-as';
 import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 import { DiagnosticButton } from '@/app/pal/_components/DiagnosticPanel';
+import { AdaptiveLearningButton } from '@/app/pal/_components/AdaptiveLearningButton';
 import { PracticePanel } from '@/app/pal/_components/PracticePanel';
 import { fetchChapterGate, type ChapterGateData } from '@/app/pal/data/pal';
 
@@ -318,6 +319,7 @@ export default function PalEntryPage() {
                     onOpenModal={(kind, chapter) => openModal(kind, chapter, subject)}
                     studentId={data.student.studentId}
                     getContext={(chapter) => chapterContext(chapter, subject)}
+                    isStaff={isStaff}
                   />
                 ))}
               </div>
@@ -348,6 +350,7 @@ function SubjectCard({
   onOpenModal,
   studentId,
   getContext,
+  isStaff,
 }: {
   subject: PalSubject;
   expanded: boolean;
@@ -357,6 +360,7 @@ function SubjectCard({
   onOpenModal: (kind: ModalKind, chapter: PalChapter) => void;
   studentId: string;
   getContext: (chapter: PalChapter) => PalChapterContext;
+  isStaff: boolean;
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -398,6 +402,7 @@ function SubjectCard({
                 onOpenModal={(kind) => onOpenModal(kind, chapter)}
                 studentId={studentId}
                 context={getContext(chapter)}
+                isStaff={isStaff}
               />
             ))
           )}
@@ -414,6 +419,7 @@ function ChapterRow({
   onOpenModal,
   studentId,
   context,
+  isStaff,
 }: {
   chapter: PalChapter;
   attempts: PalLandingData['attemptsByChapter'][string];
@@ -421,6 +427,7 @@ function ChapterRow({
   onOpenModal: (kind: ModalKind) => void;
   studentId: string;
   context: PalChapterContext;
+  isStaff: boolean;
 }) {
   const hasAttempts = chapter.quizCount > 0;
   const [gate, setGate] = useState<ChapterGateData | null>(null);
@@ -502,6 +509,13 @@ function ChapterRow({
               establishes a baseline before instruction, so it's offered
               whether or not the student has quiz attempts yet. */}
           <DiagnosticButton studentId={studentId} context={context} />
+          {/* Adaptive Learning is a learner-facing feature: a student may only
+              ever start their own session, never a teacher/staff/admin acting
+              as (or "viewing as") a student — enforced independently on the
+              backend by the eso.student route middleware regardless of what
+              renders here, but the entry point itself must not offer a
+              staff-facing way to start it either. */}
+          {!isStaff && <AdaptiveLearningButton chapterId={context.chapterId} />}
           {hasAttempts && (
             <>
               <Button

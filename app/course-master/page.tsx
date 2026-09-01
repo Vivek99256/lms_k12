@@ -535,7 +535,7 @@ export default function CourseMasterPage() {
     return () => observer.disconnect();
   }, [hasMore, visibleCount]);
 
-  function renderSubjectCard(subject: LmsSubject) {
+  function renderSubjectCard(subject: LmsSubject) { 
     const routes = getCourseRoutes(subject.subject_id, subject.standard_id);
     const category = subject.category_name || subject.content_category;
     const SubjectIcon = CATEGORY_ICON_MAP[category] ?? BookOpen;
