@@ -377,3 +377,138 @@ export async function fetchChapterConcepts(chapterId: number, signal?: AbortSign
     return { id: num(r.id), name: readString(r.name) };
   });
 }
+
+// ── Chapter dashboard — the "where am I" screen before a concept ────────
+
+export type ChapterSectionStatus = 'locked' | 'not_started' | 'in_progress' | 'mastered';
+
+export interface ChapterSection {
+  conceptId: number;
+  name: string;
+  status: ChapterSectionStatus;
+  knowledgeMastery: number | null;
+  applicationMastery: number | null;
+}
+
+export interface MasterySignal {
+  key: string;
+  label: string;
+  /** 0-1, or null when there isn't enough recorded evidence yet. */
+  value: number | null;
+  hasEvidence: boolean;
+}
+
+export interface ChapterNextStep {
+  action: string;
+  title: string;
+  subtitle: string;
+  reasons: string[];
+  ctaLabel: string | null;
+  ruleFired: string;
+  hasEvidence: boolean;
+}
+
+export interface ChapterDashboard {
+  chapterId: number;
+  chapterName: string;
+  subjectId: number;
+  subjectName: string | null;
+  chapterComplete: boolean;
+  currentConceptId: number | null;
+  currentConceptName: string | null;
+  masteredConcepts: number;
+  totalConceptsInCurriculum: number;
+  responsesOnCurrentConcept: number;
+  allResponses: number;
+  nextStep: ChapterNextStep | null;
+  chapterSections: ChapterSection[];
+  masterySignals: MasterySignal[];
+}
+
+function mapChapterSection(raw: unknown): ChapterSection {
+  const r = toRecord(raw);
+  const status = readString(r.status);
+  return {
+    conceptId: num(r.concept_id),
+    name: readString(r.name),
+    status: status === 'locked' || status === 'in_progress' || status === 'mastered' ? status : 'not_started',
+    knowledgeMastery: numOrNull(r.knowledge_mastery),
+    applicationMastery: numOrNull(r.application_mastery),
+  };
+}
+
+function mapMasterySignal(raw: unknown): MasterySignal {
+  const r = toRecord(raw);
+  return {
+    key: readString(r.key),
+    label: readString(r.label),
+    value: numOrNull(r.value),
+    hasEvidence: Boolean(r.has_evidence),
+  };
+}
+
+function mapNextStep(raw: unknown): ChapterNextStep | null {
+  if (raw == null) return null;
+  const r = toRecord(raw);
+  const reasons = Array.isArray(r.reasons) ? r.reasons.map((reason) => readString(reason)) : [];
+  return {
+    action: readString(r.action),
+    title: readString(r.title),
+    subtitle: readString(r.subtitle),
+    reasons,
+    ctaLabel: r.cta_label == null ? null : readString(r.cta_label),
+    ruleFired: readString(r.rule_fired),
+    hasEvidence: Boolean(r.has_evidence),
+  };
+}
+
+function mapChapterDashboard(data: Record<string, unknown>): ChapterDashboard {
+  const sections = Array.isArray(data.chapter_sections) ? data.chapter_sections : [];
+  const signals = Array.isArray(data.mastery_signals) ? data.mastery_signals : [];
+
+  return {
+    chapterId: num(data.chapter_id),
+    chapterName: readString(data.chapter_name),
+    subjectId: num(data.subject_id),
+    subjectName: data.subject_name == null ? null : readString(data.subject_name),
+    chapterComplete: Boolean(data.chapter_complete),
+    currentConceptId: numOrNull(data.current_concept_id),
+    currentConceptName: data.current_concept_name == null ? null : readString(data.current_concept_name),
+    masteredConcepts: num(data.mastered_concepts),
+    totalConceptsInCurriculum: num(data.total_concepts_in_curriculum),
+    responsesOnCurrentConcept: num(data.responses_on_current_concept),
+    allResponses: num(data.all_responses),
+    nextStep: mapNextStep(data.next_step),
+    chapterSections: sections.map(mapChapterSection),
+    masterySignals: signals.map(mapMasterySignal),
+  };
+}
+
+/**
+ * Everything the chapter-level "Hello, {name}" dashboard needs in one call
+ * — see EsoPolicyService::chapterDashboard() on the backend. Read-only: this
+ * never advances a decision, so it's safe to call on every page view/refresh.
+ */
+export async function fetchChapterDashboard(learnerId: string, chapterId: number, signal?: AbortSignal): Promise<ChapterDashboard> {
+  const data = toRecord(await esoGet(`api/pal/eso/chapter-dashboard/${learnerId}/${chapterId}`, signal));
+  return mapChapterDashboard(data);
+}
+
+export interface AutoStudentDashboard {
+  /** True when the student's curriculum has no ESO-ready chapter anywhere yet — a real, honest empty state. */
+  noContent: boolean;
+  dashboard: ChapterDashboard | null;
+}
+
+/**
+ * The main-dashboard variant of fetchChapterDashboard(): no chapterId — the
+ * backend auto-picks the single most relevant chapter across the student's
+ * whole enrollment for `syear` (see EsoPolicyService::studentDashboard()).
+ */
+export async function fetchAutoStudentDashboard(learnerId: string, syear: string, signal?: AbortSignal): Promise<AutoStudentDashboard> {
+  const data = toRecord(await esoGet(`api/pal/eso/student-dashboard/${learnerId}?syear=${encodeURIComponent(syear)}`, signal));
+  if (data.no_content) {
+    return { noContent: true, dashboard: null };
+  }
+  return { noContent: false, dashboard: mapChapterDashboard(data) };
+}

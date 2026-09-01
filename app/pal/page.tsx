@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
   BookOpen,
@@ -69,7 +69,27 @@ const CATEGORY_STYLES: Record<PalContentCategory, { label: string; badge: string
 type AudienceMode = 'Teacher' | 'Student';
 
 export default function PalEntryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-16 text-sm text-slate-500">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Loading...
+        </div>
+      }
+    >
+      <PalEntryPageContent />
+    </Suspense>
+  );
+}
+
+function PalEntryPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Set by the PAL chapter dashboard's "Go to {subject}" button so the
+  // subject the student was just looking at opens expanded here, instead of
+  // always defaulting to the first subject in the list.
+  const openSubjectId = searchParams.get('subjectId');
   const [isStaff, setIsStaff] = useState(false);
   // Staff-only surface, and no longer switchable now that the Viewing-as toggle is
   // gone. The teacher's own "view as student" flow below is unaffected: it runs off
@@ -145,8 +165,12 @@ export default function PalEntryPage() {
                 signal: controller.signal,
               });
         setData(result);
-        // Expand the first subject by default for immediate context.
-        setOpenSubjects(result.subjects[0] ? { [result.subjects[0].id]: true } : {});
+        // Expand the subject requested via ?subjectId= (e.g. the chapter
+        // dashboard's "Go to {subject}" button) if it's in this list,
+        // otherwise fall back to the first subject for immediate context.
+        const requested = openSubjectId ? result.subjects.find((s) => s.id === openSubjectId) : undefined;
+        const toOpen = requested ?? result.subjects[0];
+        setOpenSubjects(toOpen ? { [toOpen.id]: true } : {});
       } catch (reason) {
         if (controller.signal.aborted) return;
         setError(reason instanceof Error ? reason.message : 'Unable to load PAL subjects.');
@@ -165,7 +189,7 @@ export default function PalEntryPage() {
       cancelled = true;
       controller.abort();
     };
-  }, [needsStudent, selectedStudent]);
+  }, [needsStudent, selectedStudent, openSubjectId]);
 
   const toggleSubject = (subjectId: string) =>
     setOpenSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
@@ -431,6 +455,7 @@ function ChapterRow({
 }) {
   const hasAttempts = chapter.quizCount > 0;
   const [gate, setGate] = useState<ChapterGateData | null>(null);
+  const router = useRouter();
 
   // Prerequisite gate check — Step 5 of the learning journey. A chapter with
   // no mapped concepts (most legacy chapters) comes back with an empty
@@ -464,7 +489,21 @@ function ChapterRow({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-slate-900">{chapter.name}</span>
+            {/* Students only — the chapter-level PAL dashboard ("Hello,
+                {name}") shows where they are before drilling into a
+                concept. Staff keep using the concept-picker modal below
+                instead, since the dashboard is a per-learner view. */}
+            {isStaff ? (
+              <span className="text-sm font-medium text-slate-900">{chapter.name}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push(`/pal/eso/chapter/${context.chapterId}`)}
+                className="text-sm font-medium text-slate-900 underline-offset-2 hover:text-indigo-700 hover:underline"
+              >
+                {chapter.name}
+              </button>
+            )}
             {hasAttempts && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                 {chapter.quizCount} quiz{chapter.quizCount === 1 ? '' : 'zes'}
