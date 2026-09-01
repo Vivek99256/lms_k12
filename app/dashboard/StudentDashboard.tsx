@@ -1,149 +1,94 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { BookOpen, ClipboardList, PenSquare, Award, Megaphone, School } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { fetchStudentDashboard, getDashboardSession, type StudentDashboardSummary } from '@/app/dashboard/_lib/dashboard-api';
-import { DashboardError, DashboardSkeleton, EmptyState, SectionPanel, StatCard } from '@/app/dashboard/_components/DashboardPrimitives';
-import { DashboardBarChart } from '@/app/dashboard/_components/DashboardBarChart';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
+import { useAuth } from '@/contexts/AuthContext';
+import { buildSessionContext } from '@/lib/erp-client';
+import { DashboardError, EmptyState } from '@/app/dashboard/_components/DashboardPrimitives';
+import { defaultLearnerId, fetchAutoStudentDashboard, type ChapterDashboard } from '@/app/pal/data/pal-eso';
+import ChapterDashboardView from '@/app/pal/eso/_components/ChapterDashboardView';
+
+/**
+ * The student's main /dashboard landing page — the PAL "Hello, {name}"
+ * chapter dashboard, with the chapter auto-picked across the student's
+ * whole enrollment (see EsoPolicyService::studentDashboard()) since there's
+ * no chapterId in this route. Content rendering is shared with the
+ * chapter-scoped route at app/pal/eso/chapter/[chapterId]/page.tsx via
+ * ChapterDashboardView — nothing here is static/mock data.
+ */
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const [data, setData] = useState<StudentDashboardSummary | null>(null);
+  const router = useRouter();
+  const [data, setData] = useState<ChapterDashboard | null>(null);
+  const [noContent, setNoContent] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback((signal?: AbortSignal) => {
+    const learnerId = defaultLearnerId();
+    const syear = buildSessionContext().syear;
+    if (!learnerId || !syear) {
+      setError('Your session is missing academic year information. Please sign in again.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
-    const session = getDashboardSession();
-    fetchStudentDashboard(session)
-      .then(setData)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
+    fetchAutoStudentDashboard(learnerId, syear, signal)
+      .then((result) => {
+        setNoContent(result.noContent);
+        setData(result.dashboard);
+      })
+      .catch((reason: unknown) => {
+        if (signal?.aborted) return;
+        setError(reason instanceof Error ? reason.message : 'Unable to load your PAL dashboard.');
+      })
+      .finally(() => {
+        if (!signal?.aborted) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
+    const controller = new AbortController();
+    // Deferred to a microtask so setLoading/setError inside load() don't
+    // fire synchronously within the effect body — same convention as
+    // app/pal/eso/page.tsx's refresh().
+    queueMicrotask(() => {
+      load(controller.signal);
+    });
+    return () => controller.abort();
   }, [load]);
 
   return (
     <div className="flex-1 overflow-auto p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Welcome back, {user?.name || 'Student'}</h1>
-        {data?.enrollment ? (
-          <p className="mt-1 text-slate-500">
-            {data.enrollment.standard_name} - {data.enrollment.section_name}
-          </p>
-        ) : (
-          <p className="mt-1 text-slate-500">Here&apos;s your learning summary for today.</p>
-        )}
-      </div>
+      {loading && (
+        <div className="flex min-h-[50vh] items-center justify-center text-sm text-slate-500">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Loading your PAL dashboard...
+        </div>
+      )}
 
-      {loading && <DashboardSkeleton />}
-      {!loading && error && <DashboardError message={error} onRetry={load} />}
+      {!loading && error && <DashboardError message={error} onRetry={() => load()} />}
 
-      {!loading && !error && data && (
+      {!loading && !error && noContent && (
         <>
-          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatCard label="Enrolled subjects" value={data.summary.total_subjects} icon={BookOpen} />
-            <StatCard
-              label="Pending homework"
-              value={data.summary.pending_homework}
-              icon={ClipboardList}
-              tone={data.summary.pending_homework > 0 ? 'warning' : 'default'}
-            />
-            <StatCard
-              label="Pending assignments"
-              value={data.summary.pending_assignments}
-              icon={PenSquare}
-              tone={data.summary.pending_assignments > 0 ? 'warning' : 'default'}
-            />
-          </div>
-
-          <SectionPanel title="Homework & assignments" description="Your progress this year" className="mb-6">
-            {data.task_status.every((row) => row.value === 0) ? (
-              <EmptyState message="No homework or assignments recorded yet." />
-            ) : (
-              <DashboardBarChart
-                labels={data.task_status.map((row) => row.label)}
-                values={data.task_status.map((row) => row.value)}
-              />
-            )}
-          </SectionPanel>
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <SectionPanel title="Pending homework" description="Not yet marked complete">
-              {data.pending_homework.length === 0 ? (
-                <EmptyState message="No pending homework. Nicely done." />
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {data.pending_homework.map((row) => (
-                    <div key={row.id} className="flex items-center justify-between py-3 text-sm">
-                      <div className="font-medium text-slate-900">{row.title}</div>
-                      <div className="text-slate-500">{row.date}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionPanel>
-
-            <SectionPanel title="Pending assignments" description="Awaiting your submission">
-              {data.pending_assignments.length === 0 ? (
-                <EmptyState message="No pending assignments." />
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {data.pending_assignments.map((row) => (
-                    <div key={row.id} className="flex items-center justify-between py-3 text-sm">
-                      <div className="font-medium text-slate-900">{row.title}</div>
-                      <div className="text-slate-500">{row.submission_date ?? 'No due date'}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionPanel>
-
-            <SectionPanel title="My subjects" description="Your enrolled subjects this year">
-              {data.my_subjects.length === 0 ? (
-                <EmptyState message="No subjects enrolled yet." />
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {data.my_subjects.map((s) => (
-                    <span key={s.id} className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-700">
-                      <School size={14} className="text-[#4F46E5]" strokeWidth={1.75} />
-                      {s.subject_name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </SectionPanel>
-
-            <SectionPanel title="Recent circulars" description="Notices for your class">
-              {data.recent_circulars.length === 0 ? (
-                <EmptyState message="No recent circulars for your class." />
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {data.recent_circulars.map((row) => (
-                    <div key={row.id} className="flex items-center gap-3 py-3 text-sm">
-                      <Megaphone size={16} className="text-[#4F46E5]" strokeWidth={1.75} />
-                      <div className="flex-1 font-medium text-slate-900">{row.title}</div>
-                      <div className="text-slate-500">{row.date_}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionPanel>
-
-            <SectionPanel title="Achievements" description="Badges and milestones" className="lg:col-span-2">
-              <EmptyState message="Achievements are coming soon." />
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-400">
-                <Award size={14} strokeWidth={1.75} />
-                This section will populate once gamification is enabled for your school.
-              </p>
-            </SectionPanel>
+          <h1 className="text-2xl font-bold text-slate-900">Hello, {user?.name || 'Student'}</h1>
+          <p className="mt-1 text-sm text-slate-500">This page shows where you are, and all students start from the same concept.</p>
+          <div className="mt-6">
+            <EmptyState message="Adaptive learning content isn't available for your subjects yet. Check back soon." />
           </div>
         </>
+      )}
+
+      {!loading && !error && !noContent && data && (
+        <ChapterDashboardView
+          studentName={user?.name}
+          data={data}
+          onGoToSubject={(subjectId) => router.push(`/pal?subjectId=${subjectId}`)}
+          onOpenConcept={(conceptId) => router.push(`/pal/eso?conceptId=${conceptId}&learnerId=${defaultLearnerId()}`)}
+        />
       )}
     </div>
   );
