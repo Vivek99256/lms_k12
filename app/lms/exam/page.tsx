@@ -819,6 +819,10 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
       const response = await fetch(`${API_BASE_URL}/lms/online_exam`, {
         method: 'POST',
         body: formData,
+        headers: {
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
       });
 
       const result = await response.json().catch(() => null);
@@ -1184,12 +1188,13 @@ export default function StudentHomeworkIndexPage() {
       });
 
       const response = await fetch(
-        `https://dev.triz.co.in/api/question-paper/${paper.id}?${queryParams.toString()}`,
+        `${API_BASE_URL}/api/question-paper/${paper.id}?${queryParams.toString()}`,
         {
           method: 'GET',
           cache: 'no-store',
           headers: {
             Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
         }
       );
@@ -1256,6 +1261,7 @@ export default function StudentHomeworkIndexPage() {
           cache: 'no-store',
           headers: {
             Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
         }
       );
@@ -1346,6 +1352,7 @@ export default function StudentHomeworkIndexPage() {
           cache: 'no-store',
           headers: {
             Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
         }
       );
@@ -1435,6 +1442,7 @@ export default function StudentHomeworkIndexPage() {
           cache: 'no-store',
           headers: {
             Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
         }
       );
@@ -1734,7 +1742,14 @@ export default function StudentHomeworkIndexPage() {
         url.searchParams.set('sub_institute_id', session.subInstituteId);
       }
 
-      const response = await fetch(url.toString(), { method: 'GET', cache: 'no-store' });
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
+      });
       const payload = (await response.json().catch(() => null)) as AdaptivePracticeApiResponse | null;
 
       if (!response.ok || Number(payload?.status_code) !== 1) {
@@ -1828,6 +1843,10 @@ export default function StudentHomeworkIndexPage() {
       const response = await fetch(url.toString(), {
         method: 'GET',
         signal,
+        headers: {
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
       });
       const payload = (await response.json()) as QuestionPaperApiResponse;
 
@@ -2013,7 +2032,11 @@ export default function StudentHomeworkIndexPage() {
 
       const response = await fetch(`${API_BASE_URL}/lms/submit-practice`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
         body: body.toString(),
       });
       const payload = (await response.json().catch(() => null)) as SubmitPracticeApiResponse | null;
@@ -2184,6 +2207,10 @@ export default function StudentHomeworkIndexPage() {
           method: 'POST',
           body: formData,
           signal: controller.signal,
+          headers: {
+            Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          },
         });
         const payload = (await response.json()) as LmsCoursesApiResponse;
 
@@ -2393,8 +2420,12 @@ export default function StudentHomeworkIndexPage() {
 
     (async () => {
       try {
+        const session = getCreateExamSession();
         const response = await fetch(`${API_BASE_URL}/api/question-mapping-levels`, {
-          headers: { Accept: 'application/json' },
+          headers: {
+            Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          },
           signal: controller.signal,
         });
         const result = (await response.json()) as {
