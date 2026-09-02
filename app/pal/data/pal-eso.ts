@@ -393,9 +393,12 @@ export interface ChapterSection {
 export interface MasterySignal {
   key: string;
   label: string;
+  description: string;
   /** 0-1, or null when there isn't enough recorded evidence yet. */
   value: number | null;
   hasEvidence: boolean;
+  /** Raw response count behind this signal, regardless of whether it clears the evidence threshold. */
+  responseCount: number;
 }
 
 export interface ChapterNextStep {
@@ -442,8 +445,10 @@ function mapMasterySignal(raw: unknown): MasterySignal {
   return {
     key: readString(r.key),
     label: readString(r.label),
+    description: readString(r.description),
     value: numOrNull(r.value),
     hasEvidence: Boolean(r.has_evidence),
+    responseCount: num(r.response_count),
   };
 }
 
@@ -511,4 +516,194 @@ export async function fetchAutoStudentDashboard(learnerId: string, syear: string
     return { noContent: true, dashboard: null };
   }
   return { noContent: false, dashboard: mapChapterDashboard(data) };
+}
+
+// ── Concept mastery details — the "Mastery details" modal ───────────────
+
+export interface SupportBucket {
+  count: number;
+  correct: number;
+}
+
+export interface MisconceptionEntry {
+  description: string;
+  corrected: boolean;
+  detectedAt: string | null;
+}
+
+export interface RecentResponse {
+  question: string;
+  correct: boolean;
+  at: string | null;
+}
+
+export interface ConceptMasteryDetails {
+  conceptId: number;
+  conceptName: string;
+  chapterId: number;
+  status: ChapterSectionStatus;
+  responsesOnConcept: number;
+  confidenceNote: string;
+  masterySignals: MasterySignal[];
+  supportWithHint: SupportBucket;
+  supportIndependent: SupportBucket;
+  misconceptions: MisconceptionEntry[];
+  recentResponses: RecentResponse[];
+}
+
+function mapSupportBucket(raw: unknown): SupportBucket {
+  const r = toRecord(raw);
+  return { count: num(r.count), correct: num(r.correct) };
+}
+
+/**
+ * Everything the "Mastery details" modal for one concept needs — see
+ * EsoPolicyService::conceptMasteryDetails() on the backend. Read-only, same
+ * as fetchChapterDashboard.
+ */
+export async function fetchConceptMasteryDetails(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<ConceptMasteryDetails> {
+  const data = toRecord(await esoGet(`api/pal/eso/concept-mastery-details/${learnerId}/${conceptId}`, signal));
+  const signals = Array.isArray(data.mastery_signals) ? data.mastery_signals : [];
+  const misconceptions = Array.isArray(data.misconceptions) ? data.misconceptions : [];
+  const recentResponses = Array.isArray(data.recent_responses) ? data.recent_responses : [];
+  const status = readString(data.status);
+
+  return {
+    conceptId: num(data.concept_id),
+    conceptName: readString(data.concept_name),
+    chapterId: num(data.chapter_id),
+    status: status === 'locked' || status === 'in_progress' || status === 'mastered' ? status : 'not_started',
+    responsesOnConcept: num(data.responses_on_concept),
+    confidenceNote: readString(data.confidence_note),
+    masterySignals: signals.map(mapMasterySignal),
+    supportWithHint: mapSupportBucket(data.support_with_hint),
+    supportIndependent: mapSupportBucket(data.support_independent),
+    misconceptions: misconceptions.map((row) => {
+      const r = toRecord(row);
+      return {
+        description: readString(r.description),
+        corrected: Boolean(r.corrected),
+        detectedAt: r.detected_at == null ? null : readString(r.detected_at),
+      };
+    }),
+    recentResponses: recentResponses.map((row) => {
+      const r = toRecord(row);
+      return {
+        question: readString(r.question),
+        correct: Boolean(r.correct),
+        at: r.at == null ? null : readString(r.at),
+      };
+    }),
+  };
+}
+
+// ── Knowledge map — the whole chapter's real concept-relationship graph ──
+
+/**
+ * Like ChapterSectionStatus, plus 'not_ready' for a concept with no K/A/S
+ * nodes authored at all, and 'retained' for a concept whose every node has
+ * independently survived a D5 spaced-retrieval check (a real,
+ * already-written eso_learner_node_state.status value — see
+ * EsoPolicyService::isConceptRetained() — surfaced as its own label here
+ * rather than folded into 'mastered').
+ */
+export type KnowledgeMapNodeStatus = ChapterSectionStatus | 'not_ready' | 'retained';
+
+export type KnowledgeMapEdgeType = 'direct_prerequisite' | 'related';
+
+export interface KnowledgeMapConcept {
+  conceptId: number;
+  name: string;
+  status: KnowledgeMapNodeStatus;
+  responses: number;
+  misconceptionCount: number;
+  /** Longest prerequisite chain beneath it — the vertical layout axis. */
+  depth: number;
+  isCurrent: boolean;
+  /** Real prerequisite names not yet mastered — this card's own "why is this locked" reason. Empty unless status is 'locked'. */
+  blockingPrerequisiteNames: string[];
+}
+
+export interface KnowledgeMapEdge {
+  /** For 'direct_prerequisite': the prerequisite. For 'related': arbitrary (undirected). */
+  fromConceptId: number;
+  /** For 'direct_prerequisite': the dependent concept that needs fromConceptId first. */
+  toConceptId: number;
+  type: KnowledgeMapEdgeType;
+}
+
+export interface KnowledgeMap {
+  chapterId: number;
+  chapterName: string;
+  /** Real chapter_master.chapter_desc, or null when the chapter has none on file — never fabricated. */
+  chapterDescription: string | null;
+  currentConceptId: number;
+  concepts: KnowledgeMapConcept[];
+  edges: KnowledgeMapEdge[];
+  lockedConceptNames: string[];
+  blockingPrerequisiteNames: string[];
+  stats: {
+    concepts: number;
+    directPrerequisites: number;
+    related: number;
+    misconceptions: number;
+  };
+}
+
+function knowledgeMapStatus(value: unknown): KnowledgeMapNodeStatus {
+  const s = readString(value);
+  return s === 'locked' || s === 'in_progress' || s === 'mastered' || s === 'retained' || s === 'not_ready' ? s : 'not_started';
+}
+
+/**
+ * The whole chapter's real concept-relationship graph, with one concept
+ * marked current, on the same ESO mastery pipeline as the rest of the
+ * student dashboard — see EsoPolicyService::chapterKnowledgeMap() on the
+ * backend. A dedicated feature, not an extension of the separate
+ * BKT/Coherence-Map system.
+ */
+export async function fetchKnowledgeMap(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<KnowledgeMap> {
+  const data = toRecord(await esoGet(`api/pal/eso/knowledge-map/${learnerId}/${conceptId}`, signal));
+  const concepts = Array.isArray(data.concepts) ? data.concepts : [];
+  const edges = Array.isArray(data.edges) ? data.edges : [];
+  const stats = toRecord(data.stats);
+  const locked = Array.isArray(data.locked_concept_names) ? data.locked_concept_names : [];
+  const blocking = Array.isArray(data.blocking_prerequisite_names) ? data.blocking_prerequisite_names : [];
+
+  return {
+    chapterId: num(data.chapter_id),
+    chapterName: readString(data.chapter_name),
+    chapterDescription: data.chapter_description == null ? null : readString(data.chapter_description),
+    currentConceptId: num(data.current_concept_id),
+    concepts: concepts.map((row) => {
+      const r = toRecord(row);
+      const blockingNames = Array.isArray(r.blocking_prerequisite_names) ? r.blocking_prerequisite_names : [];
+      return {
+        conceptId: num(r.concept_id),
+        name: readString(r.name),
+        status: knowledgeMapStatus(r.status),
+        responses: num(r.responses),
+        misconceptionCount: num(r.misconception_count),
+        depth: num(r.depth),
+        isCurrent: Boolean(r.is_current),
+        blockingPrerequisiteNames: blockingNames.map((name) => readString(name)),
+      };
+    }),
+    edges: edges.map((row) => {
+      const r = toRecord(row);
+      return {
+        fromConceptId: num(r.from_concept_id),
+        toConceptId: num(r.to_concept_id),
+        type: readString(r.type) === 'related' ? 'related' : 'direct_prerequisite',
+      };
+    }),
+    lockedConceptNames: locked.map((name) => readString(name)),
+    blockingPrerequisiteNames: blocking.map((name) => readString(name)),
+    stats: {
+      concepts: num(stats.concepts),
+      directPrerequisites: num(stats.direct_prerequisites),
+      related: num(stats.related),
+      misconceptions: num(stats.misconceptions),
+    },
+  };
 }

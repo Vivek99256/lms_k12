@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, BookOpen, CheckCircle2, Circle, ListChecks, Lock, MessageSquareText, Target, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowRight, BookOpen, CheckCircle2, Circle, ListChecks, Lock, MessageSquareText, Target } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { EmptyState, SectionPanel, StatCard } from '@/app/dashboard/_components/DashboardPrimitives';
-import type { ChapterDashboard, ChapterSection, ChapterSectionStatus, MasterySignal } from '@/app/pal/data/pal-eso';
+import { type ChapterDashboard, type ChapterSection, type ChapterSectionStatus, type MasterySignal } from '@/app/pal/data/pal-eso';
 
 /**
  * The "Hello, {name}" chapter-level PAL dashboard content — everything
@@ -19,16 +20,19 @@ import type { ChapterDashboard, ChapterSection, ChapterSectionStatus, MasterySig
 export default function ChapterDashboardView({
   studentName,
   data,
+  learnerId,
   onGoToSubject,
   onOpenConcept,
 }: {
   studentName?: string;
   data: ChapterDashboard;
+  learnerId: string;
   onGoToSubject: (subjectId: number) => void;
   onOpenConcept: (conceptId: number) => void;
 }) {
+  const router = useRouter();
   const [showWhy, setShowWhy] = useState(false);
-  const [showMasteryDetails, setShowMasteryDetails] = useState(false);
+  const initialMasteryConceptId = data.currentConceptId ?? data.chapterSections[0]?.conceptId ?? null;
 
   return (
     <>
@@ -36,7 +40,10 @@ export default function ChapterDashboardView({
         studentName={studentName}
         data={data}
         onGoToSubject={onGoToSubject}
-        onSeeMasteryDetails={() => setShowMasteryDetails(true)}
+        onSeeMasteryDetails={() =>
+          initialMasteryConceptId &&
+          router.push(`/pal/eso/mastery/${initialMasteryConceptId}?learnerId=${learnerId}&chapterId=${data.chapterId}`)
+        }
       />
 
       <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -73,8 +80,6 @@ export default function ChapterDashboardView({
           <MasterySignalsList signals={data.masterySignals} />
         </SectionPanel>
       </div>
-
-      {showMasteryDetails && <MasteryDetailsModal data={data} onClose={() => setShowMasteryDetails(false)} />}
     </>
   );
 }
@@ -277,47 +282,6 @@ function MasterySignalsList({ signals }: { signals: MasterySignal[] }) {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function MasteryDetailsModal({ data, onClose }: { data: ChapterDashboard; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/45" onClick={onClose} />
-      <div className="relative w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-          <div>
-            <h3 className="text-base font-semibold text-slate-900">Mastery details</h3>
-            <p className="text-xs text-slate-500">{data.chapterName}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="max-h-[70vh] space-y-2 overflow-y-auto px-5 py-4">
-          {data.chapterSections.length === 0 ? (
-            <EmptyState message="No sections to show mastery for yet." />
-          ) : (
-            data.chapterSections.map((section) => (
-              <div key={section.conceptId} className="rounded-lg border border-slate-200 px-3 py-2.5">
-                <div className="text-sm font-medium text-slate-900">{section.name}</div>
-                <div className="mt-1 flex gap-4 text-xs text-slate-500">
-                  <span>Knowledge: {section.knowledgeMastery != null ? `${Math.round(section.knowledgeMastery * 100)}%` : 'Not enough evidence'}</span>
-                  <span>
-                    Application: {section.applicationMastery != null ? `${Math.round(section.applicationMastery * 100)}%` : 'Not enough evidence'}
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
     </div>
   );
 }
