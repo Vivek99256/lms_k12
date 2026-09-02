@@ -12,6 +12,7 @@ import {
   Save,
   Award,
 } from 'lucide-react';
+import { CareerIntelligence } from '@/app/career-counselling/_components/CareerIntelligence';
 import {
   Chart as ChartJS,
   RadialLinearScale,
@@ -389,7 +390,7 @@ export function StudentDetailDrawer({
   onGenerateCertificate,
   onPrintIDCard,
 }: StudentDetailDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'form' | 'academics' | 'attendance' | 'documents'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'form' | 'academics' | 'attendance' | 'documents' | 'career'>('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [editStudent, setEditStudent] = useState<Student | null>(null);
   const [showCertificate, setShowCertificate] = useState(false);
@@ -732,6 +733,8 @@ export function StudentDetailDrawer({
             </div>
           </div>
         );
+      case 'career':
+        return <CareerIntelligence studentId={student.id} />;
       default:
         return null;
     }
@@ -780,7 +783,7 @@ export function StudentDetailDrawer({
           {/* Tab Navigation */}
           <div className="border-b border-slate-200 bg-slate-50/50 px-6">
             <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-              {(['overview', 'form', 'academics', 'attendance', 'documents'] as const).map((tab) => (
+              {(['overview', 'form', 'academics', 'attendance', 'documents', 'career'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => {
@@ -799,6 +802,8 @@ export function StudentDetailDrawer({
                       <Edit className="w-3.5 h-3.5" />
                       Edit
                     </span>
+                  ) : tab === 'career' ? (
+                    'Career intelligence'
                   ) : (
                     tab
                   )}

@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
-  BookOpen, BriefcaseBusiness, Building2, ChevronLeft, ChevronRight,
-  CircleHelp, Compass, GraduationCap, LoaderCircle, RefreshCw, Search,
-  Sparkles, Target, UserRoundCheck, UsersRound,
+  Activity, BookOpen, BriefcaseBusiness, Building2, ChevronLeft, ChevronRight,
+  CircleCheck, CircleHelp, Compass, GraduationCap, LoaderCircle, RefreshCw, Search,
+  Sparkles, Target, TriangleAlert, UserRoundCheck, UsersRound,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,13 +18,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { CareerIntelligence } from './_components/CareerIntelligence';
 import {
-  careerRequest, loadCurrentAspiration, loadInterestResults, loadOccupations, loadQuestions,
-  loadRecords, saveAspiration,
+  careerRequest, loadAlignment, loadCurrentAspiration, loadInterestResults, loadOccupations,
+  loadQuestions, loadRecords, saveAspiration,
 } from './_lib/api';
 import type {
-  AspirationSnapshot, CareerRecord, CareerSection, CertaintyLevel, InterestQuestion,
-  InterestResult, RequestState,
+  AlignmentPayload, AlignmentStatus, AspirationSnapshot, CareerRecord, CareerSection,
+  CertaintyLevel, InterestQuestion, InterestResult, RequestState,
 } from './_lib/types';
 
 const SECTIONS: Array<{
@@ -39,6 +40,7 @@ const SECTIONS: Array<{
   { id: 'experts', label: 'Expert advice', description: 'Connect with career counsellors', icon: UsersRound },
   { id: 'sectors', label: 'Career sectors', description: 'Learn about industry sectors', icon: BookOpen },
   { id: 'match', label: 'Match profile', description: 'Review matching occupations', icon: Sparkles },
+  { id: 'intelligence', label: 'Career intelligence', description: 'Review evidence collected toward your career goal', icon: Activity },
 ];
 
 const DIRECTORY_CONFIG: Partial<Record<CareerSection, {
@@ -245,11 +247,12 @@ function OccupationField({
   );
 }
 
-function CareerCertaintyCard() {
+function CareerCertaintyCard({ open, onOpenChange }: {
+  open: boolean; onOpenChange: (open: boolean) => void;
+}) {
   const [current, setCurrent] = useState<AspirationSnapshot | null>(null);
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
   const [occupations, setOccupations] = useState<CareerRecord[]>([]);
   const [occupationsLoading, setOccupationsLoading] = useState(false);
   const [occupationText, setOccupationText] = useState('');
@@ -267,12 +270,12 @@ function CareerCertaintyCard() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  function openForm() {
+  useEffect(() => {
+    if (!open) return;
     setSaveError('');
     setOccupationText('');
     setCertainty('');
     setParentText('');
-    setOpen(true);
     if (!occupations.length) {
       setOccupationsLoading(true);
       loadOccupations()
@@ -280,7 +283,10 @@ function CareerCertaintyCard() {
         .catch(() => setOccupations([]))
         .finally(() => setOccupationsLoading(false));
     }
-  }
+    // Reset the form fresh every time the dialog opens, regardless of who opened it
+    // (the "Start"/"Update answer" button here, or the alignment card's prompt).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   function matchOccupation(typed: string) {
     const needle = typed.trim().toLowerCase();
@@ -305,7 +311,7 @@ function CareerCertaintyCard() {
         parent_occupation_name: matchedParent ? text(matchedParent, ['title', 'name']) : (parentText.trim() || undefined),
       });
       setCurrent(saved);
-      setOpen(false);
+      onOpenChange(false);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Unable to save your answer.');
     } finally {
@@ -335,9 +341,9 @@ function CareerCertaintyCard() {
         ) : (
           <p className="text-sm leading-6 text-muted-foreground">Name and investigate an occupation you may want at age 30. Career certainty creates a clear starting point for exploration.</p>
         )}
-        <Button variant={current ? 'outline' : 'default'} onClick={openForm}>{current ? 'Update answer' : 'Start'}</Button>
+        <Button variant={current ? 'outline' : 'default'} onClick={() => onOpenChange(true)}>{current ? 'Update answer' : 'Start'}</Button>
       </CardContent>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Career certainty</DialogTitle>
@@ -374,11 +380,77 @@ function CareerCertaintyCard() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
             <Button onClick={() => void submit()} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </Card>
+  );
+}
+
+const RECOGNISED_ALIGNMENT_STATUSES: AlignmentStatus[] = ['ALIGNED', 'MISALIGNED', 'INSUFFICIENT_DATA'];
+
+function CareerAlignmentCard({ onStartCertainty }: { onStartCertainty: () => void }) {
+  const [payload, setPayload] = useState<AlignmentPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try { setPayload(await loadAlignment()); }
+    // A failed call must never read as a silent "you're fine" — it collapses
+    // to the same INSUFFICIENT_DATA state as a missing/unrecognised status.
+    catch { setPayload(null); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const status: AlignmentStatus =
+    payload && RECOGNISED_ALIGNMENT_STATUSES.includes(payload.alignment_status)
+      ? payload.alignment_status
+      : 'INSUFFICIENT_DATA';
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Career alignment</CardTitle>
+        <CardDescription>Step 3 of 4</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading…</p>
+        ) : status === 'ALIGNED' ? (
+          <div className="flex items-start gap-3">
+            <CircleCheck className="mt-0.5 size-5 shrink-0 text-emerald-600" />
+            <p className="text-sm">Your plan can reach your goal.</p>
+          </div>
+        ) : status === 'MISALIGNED' ? (
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-500" />
+              <p className="text-sm">
+                Your current subjects don&apos;t yet lead to {payload?.stated_ambition?.occupation_name || payload?.stated_ambition?.occupation_id || 'your goal'}. Talk to your counsellor.
+              </p>
+            </div>
+            {payload?.break_point && (payload.break_point.missing_subjects.length > 0 || payload.break_point.deadline_date) && (
+              <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3 text-sm">
+                {payload.break_point.missing_subjects.length > 0 && (
+                  <p><span className="text-muted-foreground">Missing subject{payload.break_point.missing_subjects.length > 1 ? 's' : ''}: </span>{payload.break_point.missing_subjects.join(', ')}</p>
+                )}
+                {payload.break_point.deadline_date && (
+                  <p><span className="text-muted-foreground">Deadline: </span>{payload.break_point.deadline_date}</p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm leading-6 text-muted-foreground">Tell us what you want to be first.</p>
+            <Button variant="outline" onClick={onStartCertainty}>Go to Career certainty</Button>
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
@@ -515,6 +587,7 @@ export default function CareerCounselling() {
   const [active, setActive] = useState<CareerSection>(
     requested && SECTIONS.some((item) => item.id === requested) ? requested : 'plan'
   );
+  const [certaintyOpen, setCertaintyOpen] = useState(false);
 
   useEffect(() => {
     const nextSection =
@@ -542,10 +615,14 @@ export default function CareerCounselling() {
       </nav>
       {active === 'plan' ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <CareerCertaintyCard />
-          {PLAN.slice(1).map(([title, description], index) => <Card key={title}><CardHeader><CardTitle>{title}</CardTitle><CardDescription>Step {index + 2} of 4</CardDescription></CardHeader><CardContent><p className="text-sm leading-6 text-muted-foreground">{description}</p></CardContent></Card>)}
+          <CareerCertaintyCard open={certaintyOpen} onOpenChange={setCertaintyOpen} />
+          {(() => { const [title, description] = PLAN[1]; return <Card key={title}><CardHeader><CardTitle>{title}</CardTitle><CardDescription>Step 2 of 4</CardDescription></CardHeader><CardContent><p className="text-sm leading-6 text-muted-foreground">{description}</p></CardContent></Card>; })()}
+          <CareerAlignmentCard onStartCertainty={() => setCertaintyOpen(true)} />
+          {(() => { const [title, description] = PLAN[3]; return <Card key={title}><CardHeader><CardTitle>{title}</CardTitle><CardDescription>Step 4 of 4</CardDescription></CardHeader><CardContent><p className="text-sm leading-6 text-muted-foreground">{description}</p></CardContent></Card>; })()}
         </div>
-      ) : active === 'assessment' ? <Assessment /> : <Directory section={active} />}
+      ) : active === 'assessment' ? <Assessment />
+        : active === 'intelligence' ? <CareerIntelligence />
+        : <Directory section={active} />}
     </div>
   );
 }
