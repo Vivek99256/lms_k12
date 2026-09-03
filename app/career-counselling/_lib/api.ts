@@ -5,8 +5,8 @@ import {
   type ApiEnvelope,
 } from '@/lib/erp-client';
 import type {
-  AlignmentPayload, AspirationInput, AspirationSnapshot, CareerEvidencePayload, CareerRecord,
-  InterestQuestion, InterestResult,
+  AlignmentPayload, AspirationInput, AspirationSnapshot, CareerEvidencePayload,
+  CareerRecommendationPayload, CareerRecord, InterestQuestion, InterestResult,
 } from './types';
 
 const KEYS = ['data', 'result', 'results', 'records', 'list', 'career', 'question'];
@@ -118,6 +118,18 @@ export async function loadAlignment(studentId?: string): Promise<AlignmentPayloa
  */
 export async function loadCareerEvidence(studentId?: string): Promise<CareerEvidencePayload> {
   const payload = await careerRequest<{ data: CareerEvidencePayload }>('studentCareerEvidence', {
+    student_id: studentId,
+  });
+  return payload.data;
+}
+
+/**
+ * Knowledge-based adjacent-career recommendation — `student_id` omission
+ * rule mirrors `loadAlignment`/`loadCareerEvidence` exactly (self via
+ * session, or an explicit id for a staff view, authorized server-side).
+ */
+export async function loadCareerRecommendation(studentId?: string): Promise<CareerRecommendationPayload> {
+  const payload = await careerRequest<{ data: CareerRecommendationPayload }>('careerRecommendation', {
     student_id: studentId,
   });
   return payload.data;

@@ -147,3 +147,52 @@ export interface CareerEvidencePayload {
   missing_subjects: string[];
   insufficient_data_reason?: string;
 }
+
+/**
+ * Knowledge-Based Career Recommendation Engine (Laravel repo:
+ * App\CareerIntelligence\KnowledgeMatchService / AlternativeOccupationRecommender
+ * / AlignmentBandClassifier / CareerRecommendationExplainer). Backs the
+ * `careerRecommendation` endpoint used by "Explore Adjacent Careers".
+ *
+ * `alignmentBand` is a presentation-layer label over `matchPercentage` — a
+ * counsellor-facing interpretation, never a second scoring pass — so it is
+ * only ever one of these three configured bands.
+ */
+export type AlignmentBand = 'Strong Match' | 'Partial Match' | 'Weak Match';
+
+export interface CareerRecommendationAspiration {
+  occupation_code: string;
+  occupation_name: string | null;
+  matchPercentage: number;
+  alignmentBand: AlignmentBand;
+}
+
+export interface RelatedCareer {
+  occupation_code: string;
+  occupation_name: string;
+  matchPercentage: number;
+  scoreImprovement: number;
+  topMatchedKnowledgeDomains: string[];
+}
+
+export interface KnowledgeDevelopmentArea {
+  knowledge: string;
+  importance: number;
+  level: number;
+}
+
+export interface CareerRecommendationNarrative {
+  alignmentSummary: string | null;
+  relatedCareersGuidance: string | null;
+  knowledgeDevelopmentIntro: string | null;
+}
+
+export interface CareerRecommendationPayload {
+  student_id: string;
+  currentAspiration: CareerRecommendationAspiration | null;
+  relatedCareersWithBetterAlignment: RelatedCareer[];
+  knowledgeDevelopmentAreas: KnowledgeDevelopmentArea[];
+  narrative: CareerRecommendationNarrative;
+  alignment: AlignmentStatus | 'INSUFFICIENT_DATA';
+  insufficient_data_reason?: string;
+}

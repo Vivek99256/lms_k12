@@ -611,7 +611,7 @@ export default function CareerCounselling() {
         <div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex items-center gap-2 text-sm font-medium text-primary"><Compass className="size-4" />Student development</div><h1 className="mt-2 text-2xl font-semibold tracking-tight">Career counselling</h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground">Explore pathways, understand your interests, and turn career ideas into a practical education plan.</p></div><Badge variant="secondary"><UserRoundCheck />Guided planning</Badge></div>
       </header>
       <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Career counselling sections">
-        {SECTIONS.map((section) => { const Icon = section.icon; return <Button key={section.id} variant={active === section.id ? 'default' : 'outline'} onClick={() => selectSection(section.id)} aria-current={active === section.id ? 'page' : undefined} title={section.description}><Icon />{section.label}</Button>; })}
+        {SECTIONS.map((section) => { const Icon = section.icon; return <Button key={section.id} variant={active === section.id ? 'default' : 'outline'} className={active === section.id ? 'bg-[#0D6EFD] border-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90' : ''} onClick={() => selectSection(section.id)} aria-current={active === section.id ? 'page' : undefined} title={section.description}><Icon />{section.label}</Button>; })}
       </nav>
       {active === 'plan' ? (
         <div className="grid gap-4 lg:grid-cols-2">
