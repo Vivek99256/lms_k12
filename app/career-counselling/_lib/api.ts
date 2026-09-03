@@ -5,7 +5,7 @@ import {
   type ApiEnvelope,
 } from '@/lib/erp-client';
 import type {
-  AlignmentPayload, AspirationInput, AspirationSnapshot, CareerEvidencePayload,
+  AlignmentBand, AlignmentPayload, AspirationInput, AspirationSnapshot, CareerEvidencePayload,
   CareerRecommendationPayload, CareerRecord, InterestQuestion, InterestResult,
 } from './types';
 
@@ -133,6 +133,74 @@ export async function loadCareerRecommendation(studentId?: string): Promise<Care
     student_id: studentId,
   });
   return payload.data;
+}
+
+/**
+ * Best-fit career ranking derived from the same `careerRecommendation`
+ * endpoint: surfaces the student's current aspiration (if any) plus
+ * every related career the knowledge-based recommender scored higher
+ * than it, ordered by `matchPercentage` desc so the Match Profile tab
+ * can show the top-N most aligned occupations against the student's
+ * profile. The endpoint itself is the source of truth; this is just
+ * a presentation-layer reshape.
+ */
+export function rankBestFitCareers(payload: CareerRecommendationPayload): Array<{
+  occupation_code: string;
+  occupation_name: string;
+  matchPercentage: number;
+  alignmentBand: AlignmentBand;
+  isCurrentAspiration: boolean;
+  scoreImprovement: number;
+  topMatchedKnowledgeDomains: string[];
+}> {
+  const items: Array<{
+    occupation_code: string;
+    occupation_name: string;
+    matchPercentage: number;
+    alignmentBand: AlignmentBand;
+    isCurrentAspiration: boolean;
+    scoreImprovement: number;
+    topMatchedKnowledgeDomains: string[];
+  }> = [];
+
+  if (payload.currentAspiration) {
+    items.push({
+      occupation_code: payload.currentAspiration.occupation_code,
+      occupation_name: payload.currentAspiration.occupation_name || payload.currentAspiration.occupation_code,
+      matchPercentage: payload.currentAspiration.matchPercentage,
+      alignmentBand: payload.currentAspiration.alignmentBand,
+      isCurrentAspiration: true,
+      scoreImprovement: 0,
+      topMatchedKnowledgeDomains: [],
+    });
+  }
+
+  payload.relatedCareersWithBetterAlignment.forEach((career) => {
+    items.push({
+      occupation_code: career.occupation_code,
+      occupation_name: career.occupation_name,
+      matchPercentage: career.matchPercentage,
+      alignmentBand: classifyBand(career.matchPercentage),
+      isCurrentAspiration: false,
+      scoreImprovement: career.scoreImprovement,
+      topMatchedKnowledgeDomains: career.topMatchedKnowledgeDomains,
+    });
+  });
+
+  return items.sort((a, b) => b.matchPercentage - a.matchPercentage);
+}
+
+/**
+ * Presentation-layer mapping from `matchPercentage` to the same
+ * three configured bands the backend's `AlignmentBandClassifier`
+ * produces, so a related career's band is consistent with the
+ * current aspiration's. Anything unexpected falls back to the
+ * neutral band.
+ */
+function classifyBand(percentage: number): AlignmentBand {
+  if (percentage >= 75) return 'Strong Match';
+  if (percentage >= 45) return 'Partial Match';
+  return 'Weak Match';
 }
 
 export async function loadOccupations(): Promise<CareerRecord[]> {
