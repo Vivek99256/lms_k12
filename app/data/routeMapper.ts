@@ -471,6 +471,15 @@ const CAPABILITY_INTELLIGENCE_ROUTE_NAME_MAP: Record<string, string> = {
   'capability_intelligence.capability_explorer': '/capability-intelligence/capability-explorer',
 };
 
+const ENTERPRISE_BRAIN_ROUTE_NAME_MAP: Record<string, string> = {
+  'enterprise_brain.index': '/enterprise-brain',
+  'enterprise-brain.index': '/enterprise-brain',
+  'enterprise_brain': '/enterprise-brain',
+  'enterprise-brain': '/enterprise-brain',
+  'brain.index': '/enterprise-brain',
+  'brain': '/enterprise-brain',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -665,6 +674,11 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const capabilityIntelligenceRoute = CAPABILITY_INTELLIGENCE_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (capabilityIntelligenceRoute) {
     return capabilityIntelligenceRoute;
+  }
+
+  const enterpriseBrainRoute = ENTERPRISE_BRAIN_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (enterpriseBrainRoute) {
+    return enterpriseBrainRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
