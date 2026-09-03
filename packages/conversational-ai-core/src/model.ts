@@ -11,5 +11,8 @@ export function createAiModel() {
     );
   }
 
-  return google(process.env.GEMINI_MODEL || "gemini-2.5-flash");
+  // gemini-2.5-flash has been retired and now refuses new callers outright,
+  // which surfaced as every AI field edit failing with a provider error.
+  // Override per-environment with GEMINI_MODEL to move to a newer model.
+  return google(process.env.GEMINI_MODEL || "gemini-3.6-flash");
 }

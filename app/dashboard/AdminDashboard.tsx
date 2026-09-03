@@ -100,8 +100,8 @@ export default function AdminDashboard() {
                 <EmptyState message="No fee receipts yet today." />
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {data.recent_fee_receipts.map((row) => (
-                    <div key={row.receipt_no} className="flex items-center justify-between py-3 text-sm">
+                  {data.recent_fee_receipts.map((row, i) => (
+                    <div key={row.id ?? i} className="flex items-center justify-between py-3 text-sm">
                       <div>
                         <div className="font-medium text-slate-900">{row.student_name}</div>
                         <div className="text-slate-500">Receipt {row.receipt_no}</div>

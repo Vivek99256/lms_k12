@@ -5,7 +5,8 @@ import {
   type ApiEnvelope,
 } from '@/lib/erp-client';
 import type {
-  AspirationInput, AspirationSnapshot, CareerRecord, InterestQuestion, InterestResult,
+  AlignmentPayload, AspirationInput, AspirationSnapshot, CareerEvidencePayload, CareerRecord,
+  InterestQuestion, InterestResult,
 } from './types';
 
 const KEYS = ['data', 'result', 'results', 'records', 'list', 'career', 'question'];
@@ -91,6 +92,33 @@ export async function saveAspiration(input: AspirationInput): Promise<Aspiration
   const payload = await careerRequest<{ data: AspirationSnapshot }>('studentAspiration', {}, {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+  return payload.data;
+}
+
+/**
+ * `student_id` is omitted for a student viewing their own alignment (the
+ * Laravel side infers the current student from the session token) and
+ * supplied when staff open it from a student's profile, mirroring
+ * `loadCareerEvidence` above.
+ */
+export async function loadAlignment(studentId?: string): Promise<AlignmentPayload> {
+  const payload = await careerRequest<{ data: AlignmentPayload }>('careerAlignment', {
+    student_id: studentId,
+  });
+  return payload.data;
+}
+
+/**
+ * `student_id` is omitted for a student viewing their own Career Intelligence
+ * tab (the Laravel side infers the current student from the session token,
+ * same as `studentAspiration`/`careerAlignment`) and supplied when staff open
+ * it from a student's profile — authorization for viewing another student's
+ * evidence is enforced server-side, same as every other proxied endpoint.
+ */
+export async function loadCareerEvidence(studentId?: string): Promise<CareerEvidencePayload> {
+  const payload = await careerRequest<{ data: CareerEvidencePayload }>('studentCareerEvidence', {
+    student_id: studentId,
   });
   return payload.data;
 }

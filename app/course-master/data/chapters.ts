@@ -437,6 +437,35 @@ function asTextList(value: unknown, key: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Teaching-pedagogy strategy names for a chapter, deduped in first-seen order.
+ *
+ * The generator writes these per concept, inside the heavy intelligence blob at
+ * `full_intelegance_json.concepts[].pedagogy_recommendations[].strategy` - not
+ * at the top level of the blob, and not on the chapter list payload at all
+ * (`/lms/new_chapter_master` deliberately strips the blob, so a Chapter from
+ * getSubjectAndChapters() carries no pedagogy). Callers must therefore pass a
+ * result from fetchSemanticIntelligenceResult(); the other two shapes are read
+ * defensively because older extractions did put pedagogy higher up.
+ */
+export function extractTeachingMethodologies(
+  semantic: ChapterSemantic | SemanticIntelligenceResult | null | undefined
+): string[] {
+  if (!semantic) return [];
+
+  const blob = semantic.full_intelegance_json ?? semantic.full_intelligence_json;
+
+  return Array.from(
+    new Set([
+      ...asTextList(semantic.pedagogy, 'strategy'),
+      ...asTextList(blob?.pedagogy, 'strategy'),
+      ...asArray<Record<string, unknown>>(blob?.concepts).flatMap((concept) =>
+        asTextList(concept?.pedagogy_recommendations, 'strategy')
+      ),
+    ])
+  );
+}
+
 export function getConceptIntelligenceData(
   chapter: Chapter,
   conceptTitle: string
