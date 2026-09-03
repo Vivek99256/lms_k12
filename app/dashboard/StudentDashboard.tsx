@@ -86,6 +86,7 @@ export default function StudentDashboard() {
         <ChapterDashboardView
           studentName={user?.name}
           data={data}
+          learnerId={defaultLearnerId()}
           onGoToSubject={(subjectId) => router.push(`/pal?subjectId=${subjectId}`)}
           onOpenConcept={(conceptId) => router.push(`/pal/eso?conceptId=${conceptId}&learnerId=${defaultLearnerId()}`)}
         />

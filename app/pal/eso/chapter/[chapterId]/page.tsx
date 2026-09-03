@@ -100,6 +100,7 @@ function PalChapterDashboard() {
         <ChapterDashboardView
           studentName={user?.name}
           data={data}
+          learnerId={learnerId}
           onGoToSubject={(subjectId) => router.push(`/pal?subjectId=${subjectId}`)}
           onOpenConcept={(conceptId) => router.push(`/pal/eso?conceptId=${conceptId}${learnerId ? `&learnerId=${learnerId}` : ''}`)}
         />
