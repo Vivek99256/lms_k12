@@ -20,12 +20,12 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CareerIntelligence } from './_components/CareerIntelligence';
 import {
-  careerRequest, loadAlignment, loadCurrentAspiration, loadInterestResults, loadOccupations,
-  loadQuestions, loadRecords, saveAspiration,
+  careerRequest, loadAlignment, loadCareerRecommendation, loadCurrentAspiration, loadInterestResults,
+  loadOccupations, loadQuestions, loadRecords, rankBestFitCareers, saveAspiration,
 } from './_lib/api';
 import type {
-  AlignmentPayload, AlignmentStatus, AspirationSnapshot, CareerRecord, CareerSection,
-  CertaintyLevel, InterestQuestion, InterestResult, RequestState,
+  AlignmentBand, AlignmentPayload, AlignmentStatus, AspirationSnapshot, CareerRecord, CareerSection,
+  CertaintyLevel, InterestQuestion, InterestResult, KnowledgeDevelopmentArea, RequestState,
 } from './_lib/types';
 
 const SECTIONS: Array<{
@@ -52,7 +52,6 @@ const DIRECTORY_CONFIG: Partial<Record<CareerSection, {
   employers: { endpoint: 'getEmployerData', title: 'Employer profiles', empty: 'No employer profiles are available.' },
   experts: { endpoint: 'ExpertAdvice', title: 'Expert advice', empty: 'No experts match the selected pathway.', queryKey: 'title' },
   sectors: { endpoint: 'ExploreSector', title: 'Career sectors', empty: 'No sector content is available.', queryKey: 'title' },
-  match: { endpoint: 'matchProfile', title: 'Matching occupations', empty: 'No matching occupations are available.' },
 };
 
 const PLAN = [
@@ -87,6 +86,148 @@ function RequestMessage({ loading, error, empty, retry }: {
   }
   if (empty) return <div className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">{empty}</div>;
   return null;
+}
+
+const BAND_TONE: Record<AlignmentBand, string> = {
+  'Strong Match': 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  'Partial Match': 'border-amber-200 bg-amber-50 text-amber-700',
+  'Weak Match': 'border-red-200 bg-red-50 text-red-700',
+};
+
+/**
+ * "Matching Occupations" — the single place on the Match Profile tab
+ * where occupation recommendations live. Top-N occupations ranked by
+ * knowledge-match percentage against the student's profile, sourced
+ * from the same `careerRecommendation` endpoint that powers Career
+ * Intelligence's recommendation panel, so the two views always agree.
+ * The ranking itself comes from `rankBestFitCareers` in `_lib/api.ts`.
+ */
+function MatchingOccupationsCard({ studentId }: { studentId?: string }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [aspiration, setAspiration] = useState<AspirationSnapshot | null>(null);
+  const [items, setItems] = useState<ReturnType<typeof rankBestFitCareers>>([]);
+  const [knowledgeAreas, setKnowledgeAreas] = useState<KnowledgeDevelopmentArea[]>([]);
+  const [knowledgeIntro, setKnowledgeIntro] = useState('');
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [payload, current] = await Promise.all([
+        loadCareerRecommendation(studentId),
+        loadCurrentAspiration().catch(() => null),
+      ]);
+      setItems(rankBestFitCareers(payload));
+      setKnowledgeAreas(payload.knowledgeDevelopmentAreas ?? []);
+      setKnowledgeIntro(payload.narrative.knowledgeDevelopmentIntro ?? '');
+      setAspiration(current);
+    } catch (err) {
+      setItems([]);
+      setKnowledgeAreas([]);
+      setKnowledgeIntro('');
+      setError(err instanceof Error ? err.message : 'Unable to load matching occupations.');
+    } finally {
+      setLoading(false);
+    }
+  }, [studentId]);
+
+  useEffect(() => {
+    // The request owns loading/error/data state for this card, same
+    // pattern as the top-level CareerIntelligence refresh().
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refresh();
+  }, [refresh]);
+
+  const top = items.slice(0, 5);
+  const aspirationCode = aspiration?.occupation_id || null;
+  const showKnowledgeAreas = !loading && !error && top.length > 0 && knowledgeAreas.length > 0;
+
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2"><Sparkles className="size-4" />Matching Occupations</CardTitle>
+            <CardDescription>
+              Occupations that align most strongly with your demonstrated knowledge, assessment evidence, interests, and profile.
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void refresh()}><RefreshCw />Refresh</Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {aspiration?.occupation_name && (
+          <p className="text-sm text-muted-foreground">
+            Your current aspiration: <span className="font-medium text-foreground">{aspiration.occupation_name}</span>
+          </p>
+        )}
+        <RequestMessage
+          loading={loading}
+          error={error}
+          empty={!loading && !error && top.length === 0
+            ? 'Complete your aspiration and assessment to see matching occupations.'
+            : undefined}
+          retry={() => void refresh()}
+        />
+        {!loading && !error && top.length > 0 && (
+          <ol className="space-y-3">
+            {top.map((item, index) => {
+              const isCurrent = item.isCurrentAspiration || (aspirationCode != null && aspirationCode === item.occupation_code);
+              return (
+                <li
+                  key={item.occupation_code}
+                  className={`rounded-xl border p-4 ${isCurrent ? 'border-indigo-300 bg-indigo-50/40' : 'bg-card'}`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold">{index + 1}</span>
+                        <h4 className="truncate font-medium">{item.occupation_name}</h4>
+                        {isCurrent && <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-[#4F46E5]">Your current aspiration</Badge>}
+                        <Badge variant="outline" className={BAND_TONE[item.alignmentBand]}>{item.alignmentBand}</Badge>
+                      </div>
+                      {item.topMatchedKnowledgeDomains.length > 0 && (
+                        <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>Knowledge match:</span>
+                          {item.topMatchedKnowledgeDomains.map((domain) => (
+                            <Badge key={domain} variant="outline">{domain}</Badge>
+                          ))}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fit score</p>
+                      <p className="text-2xl font-semibold">{item.matchPercentage.toFixed(1)}%</p>
+                      {!isCurrent && item.scoreImprovement > 0 && (
+                        <p className="text-xs text-emerald-600">+{item.scoreImprovement.toFixed(1)}% vs. current</p>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {showKnowledgeAreas && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+            <h3 className="text-sm font-semibold text-amber-700">Knowledge Development Areas</h3>
+            {knowledgeIntro && <p className="mt-0.5 text-xs text-muted-foreground">{knowledgeIntro}</p>}
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {knowledgeAreas.map((area) => (
+                <li key={area.knowledge}>
+                  <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">{area.knowledge}</Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Fit scores reflect knowledge-domain alignment with the student&apos;s profile and recorded evidence. Compare with your current aspiration above before deciding.
+        </p>
+      </CardContent>
+    </Card>
+  );
 }
 
 function Directory({ section }: { section: CareerSection }) {
@@ -622,6 +763,7 @@ export default function CareerCounselling() {
         </div>
       ) : active === 'assessment' ? <Assessment />
         : active === 'intelligence' ? <CareerIntelligence />
+        : active === 'match' ? <MatchingOccupationsCard />
         : <Directory section={active} />}
     </div>
   );

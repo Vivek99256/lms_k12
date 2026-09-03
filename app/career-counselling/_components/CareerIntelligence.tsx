@@ -16,11 +16,11 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { loadAlignment, loadCareerEvidence, loadCareerRecommendation } from '../_lib/api';
+import { loadAlignment, loadCareerEvidence } from '../_lib/api';
 import { CAREER_EVIDENCE_STATUS_LABEL, EVIDENCE_LEVEL_LABEL, formatEventDate } from '../_lib/evidence';
 import type {
-  AlignmentBand, AlignmentPayload, AlignmentStatus, CareerEvidencePayload, CareerEvidenceStatus,
-  CareerRecommendationPayload, EvidenceLevel,
+  AlignmentPayload, AlignmentStatus, CareerEvidencePayload, CareerEvidenceStatus,
+  EvidenceLevel,
 } from '../_lib/types';
 
 /**
@@ -68,24 +68,6 @@ const LEVEL_BADGE_CLASS: Record<EvidenceLevel, string> = {
 };
 
 const RECOGNISED_ALIGNMENT_STATUSES: AlignmentStatus[] = ['ALIGNED', 'MISALIGNED', 'INSUFFICIENT_DATA'];
-
-/**
- * Purely a display mapping for the three bands the config-driven
- * AlignmentBandClassifier (Laravel repo) can return — never a threshold or
- * scoring decision of its own. Any other string means the backend added a
- * new band without a matching UI update; render it plainly rather than
- * guessing a tone for it.
- */
-const ALIGNMENT_BAND_TONE: Record<AlignmentBand, { badge: string; text: string }> = {
-  'Strong Match': TONE.success,
-  'Partial Match': TONE.warning,
-  'Weak Match': TONE.danger,
-};
-
-function AlignmentBandBadge({ band }: { band: AlignmentBand | string }) {
-  const tone = ALIGNMENT_BAND_TONE[band as AlignmentBand];
-  return <Badge variant="outline" className={tone?.badge ?? TONE.neutral.badge}>{band}</Badge>;
-}
 
 type Severity = 'high' | 'medium' | 'low';
 
@@ -423,7 +405,7 @@ const COUNSELLOR_ACTIONS = [
   { type: 'discuss_pathway', icon: Compass, title: 'Discuss Pathway', subtitle: 'Talk to the student about options' },
   { type: 'review_subjects', icon: BookOpen, title: 'Review Subjects', subtitle: 'Review subject change possibilities' },
   { type: 'parent_discussion', icon: Users, title: 'Parent Discussion', subtitle: 'Schedule parent meeting' },
-  { type: 'explore_adjacent', icon: Sparkles, title: 'Best Fit Careers', subtitle: 'See similar career options' },
+  { type: 'explore_adjacent', icon: Sparkles, title: 'Explore Adjacent Careers', subtitle: 'See similar career options' },
   { type: 'action_plan', icon: ClipboardList, title: 'Set Action Plan', subtitle: 'Create counselling action plan' },
 ] as const;
 
@@ -433,22 +415,41 @@ function CounsellorActions({ onSelectAction }: { onSelectAction: (type: string) 
       <CardContent>
         <h3 className="flex items-center gap-2 font-semibold"><ClipboardList className="size-4" />Counsellor Actions</h3>
         <div className="mt-2 divide-y">
-          {COUNSELLOR_ACTIONS.map((action) => (
-            <button
-              key={action.type}
-              type="button"
-              onClick={() => onSelectAction(action.type)}
-              className="flex w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-muted/50"
-            >
-              <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${TONE.brand.icon}`}>
-                <action.icon className="size-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{action.title}</p>
-                <p className="text-xs text-muted-foreground">{action.subtitle}</p>
-              </div>
-            </button>
-          ))}
+          {COUNSELLOR_ACTIONS.map((action) => {
+            // "Explore Adjacent Careers" is a label only — the actual
+            // ranked occupation matches live in the Match Profile tab,
+            // so clicking it here has no destination. Render it as a
+            // non-interactive row rather than a button.
+            const nonInteractive = action.type === 'explore_adjacent';
+            const body = (
+              <>
+                <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${TONE.brand.icon}`}>
+                  <action.icon className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{action.title}</p>
+                  <p className="text-xs text-muted-foreground">{action.subtitle}</p>
+                </div>
+              </>
+            );
+            if (nonInteractive) {
+              return (
+                <div key={action.type} className="flex w-full items-center gap-3 py-2.5" aria-disabled>
+                  {body}
+                </div>
+              );
+            }
+            return (
+              <button
+                key={action.type}
+                type="button"
+                onClick={() => onSelectAction(action.type)}
+                className="flex w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+              >
+                {body}
+              </button>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
@@ -456,126 +457,12 @@ function CounsellorActions({ onSelectAction }: { onSelectAction: (type: string) 
 }
 
 /**
- * "Explore Adjacent Careers" (Counsellor Actions). Knowledge-based, not
- * evidence-only — deliberately kept as its own opt-in panel rather than
- * folded into the evidence-first sections above it, so the "no match
- * scores" framing on the main view stays true for everything except this
- * explicitly knowledge-scored feature.
+ * "Explore Adjacent Careers" (Counsellor Actions) used to surface a
+ * knowledge-based panel here, but those ranked occupation matches now
+ * live in the Match Profile tab's Matching Occupations section. The
+ * Counsellor Action row remains as a non-interactive label for
+ * historical continuity, with no on-click destination.
  */
-function AdjacentCareersPanel({ studentId, onClose }: { studentId?: string; onClose: () => void }) {
-  const [data, setData] = useState<CareerRecommendationPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    // The request owns loading/error/data state for this panel, same pattern
-    // as the top-level CareerIntelligence refresh() below.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    setError('');
-    loadCareerRecommendation(studentId)
-      .then((payload) => { if (!cancelled) setData(payload); })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : 'Unable to load adjacent careers.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [studentId]);
-
-  return (
-    <Card className="border-indigo-200">
-      <CardContent>
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="flex items-center gap-2 font-semibold"><Sparkles className="size-4" />Best Fit Careers</h3>
-          <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
-        </div>
-
-        {loading && (
-          <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircle className="size-4 animate-spin" />Loading knowledge-based recommendations…
-          </div>
-        )}
-
-        {!loading && (error || !data) && (
-          <CenterMessage icon={CircleAlert} title="Unable to load adjacent careers" description={error || 'Something went wrong.'} />
-        )}
-
-        {!loading && data && data.alignment === 'INSUFFICIENT_DATA' && (
-          <CenterMessage
-            icon={CircleAlert}
-            title="Not enough data yet"
-            description={data.insufficient_data_reason || 'A current aspiration and demonstrated knowledge are both needed for this analysis.'}
-          />
-        )}
-
-        {!loading && data && data.currentAspiration && (
-          <div className="mt-3 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current Aspiration</p>
-                <p className="text-base font-semibold">{data.currentAspiration.occupation_name || data.currentAspiration.occupation_code}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Knowledge Match</p>
-                <p className="text-lg font-semibold">{data.currentAspiration.matchPercentage.toFixed(1)}%</p>
-              </div>
-              <AlignmentBandBadge band={data.currentAspiration.alignmentBand} />
-            </div>
-
-            {data.narrative.alignmentSummary && (
-              <p className="text-sm text-muted-foreground">{data.narrative.alignmentSummary}</p>
-            )}
-
-            {data.relatedCareersWithBetterAlignment.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold">Related Careers With Better Alignment</h4>
-                {data.narrative.relatedCareersGuidance && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{data.narrative.relatedCareersGuidance}</p>
-                )}
-                <ul className="mt-2 divide-y">
-                  {data.relatedCareersWithBetterAlignment.map((career) => (
-                    <li key={career.occupation_code} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{career.occupation_name}</p>
-                        {career.topMatchedKnowledgeDomains.length > 0 && (
-                          <p className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
-                            Matched:
-                            {career.topMatchedKnowledgeDomains.map((domain) => (
-                              <Badge key={domain} variant="outline" className={TONE.neutral.badge}>{domain}</Badge>
-                            ))}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold">{career.matchPercentage.toFixed(1)}%</p>
-                        <p className={`text-xs ${TONE.success.text}`}>+{career.scoreImprovement.toFixed(1)}% better alignment</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {data.knowledgeDevelopmentAreas.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold">Knowledge Development Areas</h4>
-                {data.narrative.knowledgeDevelopmentIntro && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{data.narrative.knowledgeDevelopmentIntro}</p>
-                )}
-                <ul className="mt-2 flex flex-wrap gap-1.5">
-                  {data.knowledgeDevelopmentAreas.map((area) => (
-                    <li key={area.knowledge}>
-                      <Badge variant="outline" className={TONE.warning.badge}>{area.knowledge}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 const INTERVENTION_TYPES = [
   { value: 'discuss_pathway', label: 'Discuss pathway' },
@@ -683,7 +570,6 @@ export function CareerIntelligence({ studentId }: { studentId?: string }) {
   const [error, setError] = useState('');
   const [interventionType, setInterventionType] = useState('');
   const [entries, setEntries] = useState<InterventionEntry[]>([]);
-  const [showAdjacentCareers, setShowAdjacentCareers] = useState(false);
   const noteRef = useRef<HTMLInputElement | null>(null);
 
   const refresh = useCallback(async () => {
@@ -711,14 +597,11 @@ export function CareerIntelligence({ studentId }: { studentId?: string }) {
   }, [refresh]);
 
   const onSelectAction = useCallback((type: string) => {
-    if (type === 'explore_adjacent') {
-      // Reveals the knowledge-based panel rather than jumping to the
-      // intervention log — 'explore_adjacent' still exists as a loggable
-      // intervention type separately, once the counsellor has actually
-      // discussed it with the student.
-      setShowAdjacentCareers(true);
-      return;
-    }
+    // 'explore_adjacent' is intentionally not handled here — the
+    // Counsellor Actions row is rendered as a non-interactive label,
+    // because the actual ranked occupation matches live in the Match
+    // Profile tab's Matching Occupations section, not here.
+    if (type === 'explore_adjacent') return;
     setInterventionType(type);
     noteRef.current?.focus();
     noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -766,9 +649,6 @@ export function CareerIntelligence({ studentId }: { studentId?: string }) {
         <EvidenceSummaryPanel data={data} />
         <CounsellorActions onSelectAction={onSelectAction} />
       </div>
-      {showAdjacentCareers && (
-        <AdjacentCareersPanel studentId={studentId} onClose={() => setShowAdjacentCareers(false)} />
-      )}
       <LogInterventionForm
         interventionType={interventionType}
         setInterventionType={setInterventionType}
