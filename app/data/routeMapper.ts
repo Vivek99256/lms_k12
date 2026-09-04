@@ -318,6 +318,14 @@ const STUDENT_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'student/student_strength_report': '/student/report/student_strength_report',
   'agewise.index': '/student/report/agewise_report',
   'student/agewise': '/student/report/agewise_report',
+  'student_homework_report.index': '/lms/homework/report',
+  'student_homework_report_index': '/lms/homework/report',
+  'student/student_homework_report': '/lms/homework/report',
+  'show_student_homework_report': '/lms/homework/report',
+  'student_homework_submission_report.index': '/lms/homework/submission-report',
+  'student_homework_submission_report_index': '/lms/homework/submission-report',
+  'student/student_homework_submission_report': '/lms/homework/submission-report',
+  'show_student_homework_submission_report': '/lms/homework/submission-report',
 };
 
 // Legacy ERP modules now served by the stateless migration API.

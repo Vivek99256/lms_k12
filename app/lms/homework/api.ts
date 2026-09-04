@@ -76,6 +76,26 @@ export type SubmissionReportRow = {
   submissionFile: string;
   aiGeneratedFile: string;
   completionStatus: string;
+  /** "Checking" | "Evaluated" | "OCR Failed" | "Evaluation Failed" | "Failed" | "" (not yet submitted) */
+  aiStatus: string;
+  aiFailureReason: string;
+  aiScore: number | null;
+  aiTotalQuestions: number | null;
+  aiPercentage: number | null;
+  reviewedPdfUrl: string;
+  evaluatedAt: string;
+};
+
+export type AiEvaluationStatus = {
+  id: number;
+  aiStatus: string;
+  aiFailureReason: string;
+  aiScore: number | null;
+  aiTotalQuestions: number | null;
+  aiPercentage: number | null;
+  reviewedPdfUrl: string;
+  submissionRemarks: string;
+  evaluatedAt: string;
 };
 
 export type HomeworkFilters = {
@@ -135,6 +155,12 @@ function profile(): { profileName: string; userName: string } {
 
 function message(payload: unknown, fallback: string) {
   return isRecord(payload) ? readString(payload.message) || fallback : fallback;
+}
+
+function readNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
 }
 
 /** JSON POST through the Next.js proxy to a token-authenticated api.php endpoint. */
@@ -285,6 +311,27 @@ function toSubmissionReport(row: UnknownRecord): SubmissionReportRow {
     submissionFile: readString(row.submission_file),
     aiGeneratedFile: readString(row.ai_generated_file),
     completionStatus: readString(row.completion_status),
+    aiStatus: readString(row.ai_status),
+    aiFailureReason: readString(row.ai_failure_reason),
+    aiScore: readNullableNumber(row.ai_score),
+    aiTotalQuestions: readNullableNumber(row.ai_total_questions),
+    aiPercentage: readNullableNumber(row.ai_percentage),
+    reviewedPdfUrl: readString(row.reviewed_pdf_path) || readString(row.ai_generated_file),
+    evaluatedAt: readString(row.evaluated_at),
+  };
+}
+
+function toAiEvaluationStatus(row: UnknownRecord): AiEvaluationStatus {
+  return {
+    id: readNumber(row.id),
+    aiStatus: readString(row.ai_status),
+    aiFailureReason: readString(row.ai_failure_reason),
+    aiScore: readNullableNumber(row.ai_score),
+    aiTotalQuestions: readNullableNumber(row.ai_total_questions),
+    aiPercentage: readNullableNumber(row.ai_percentage),
+    reviewedPdfUrl: readString(row.reviewed_pdf_path),
+    submissionRemarks: readString(row.submission_remarks),
+    evaluatedAt: readString(row.evaluated_at),
   };
 }
 
@@ -405,4 +452,12 @@ export async function listSubmissionReport(
     status: filters.status || null,
   });
   return dataRows(payload).map(toSubmissionReport);
+}
+
+/** Polls the AI evaluation status/result for one homework submission (used to refresh "Checking..." rows). */
+export async function getAiEvaluationStatus(
+  homeworkId: number
+): Promise<AiEvaluationStatus> {
+  const payload = await postJson(`lms-homework/ai-status/${homeworkId}`, {});
+  return toAiEvaluationStatus(isRecord(payload.data) ? payload.data : {});
 }
