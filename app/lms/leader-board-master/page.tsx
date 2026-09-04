@@ -28,6 +28,7 @@ import {
   type LbMasterRow,
 } from '@/app/lms/leader-board-master/api';
 import RequireStaff from '@/app/lms/_shared/RequireStaff';
+import './page.css';
 
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
@@ -209,7 +210,7 @@ export default function LeaderBoardMasterPage() {
 
   return (
     <RequireStaff>
-    <div className="min-h-full px-4 py-5 sm:px-6">
+    <div className="lms-lbm-shell min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1500px] space-y-5">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
