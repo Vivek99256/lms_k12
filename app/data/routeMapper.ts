@@ -745,30 +745,34 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     frontDeskRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (frontDeskRoute) return frontDeskRoute;
 
-  const careerCounsellingRoutes: Record<string, string> = {
-    'career_counselling.index': '/career-counselling',
-    'career-counselling.index': '/career-counselling',
-    'career_counselling': '/career-counselling',
-    'career-counselling': '/career-counselling',
-    'career_counselling/plan': '/career-counselling',
-    'career_counselling/education': '/career-counselling?section=explore',
-    'career_counselling/explore': '/career-counselling?section=explore',
-    'career_counselling/knowing-yourself': '/career-counselling?section=assessment',
-    'career_counselling/interest-profile': '/career-counselling?section=assessment',
-    'career_counselling/college': '/career-counselling?section=colleges',
-    'career_counselling/courses': '/career-counselling?section=courses',
-    'career_counselling/profile': '/career-counselling?section=employers',
-    'career_counselling/expert-advice': '/career-counselling?section=experts',
-    'career_counselling/explore-sectors': '/career-counselling?section=sectors',
-    'career_counselling/match-profile': '/career-counselling?section=match',
-    'knowing-yourself': '/career-counselling?section=assessment',
-    'match-profile': '/career-counselling?section=match',
-    'expert-advice': '/career-counselling?section=experts',
-    'explore-sectors': '/career-counselling?section=sectors',
+  const careerIntelligenceRoutes: Record<string, string> = {
+    'career_counselling.index': '/career-intelligence',
+    'career-counselling.index': '/career-intelligence',
+    'career_counselling': '/career-intelligence',
+    'career-counselling': '/career-intelligence',
+    'career_intelligence.index': '/career-intelligence',
+    'career-intelligence.index': '/career-intelligence',
+    'career_intelligence': '/career-intelligence',
+    'career-intelligence': '/career-intelligence',
+    'career_counselling/plan': '/career-intelligence',
+    'career_counselling/education': '/career-intelligence',
+    'career_counselling/explore': '/career-intelligence',
+    'career_counselling/knowing-yourself': '/career-intelligence',
+    'career_counselling/interest-profile': '/career-intelligence',
+    'career_counselling/college': '/career-intelligence',
+    'career_counselling/courses': '/career-intelligence',
+    'career_counselling/profile': '/career-intelligence',
+    'career_counselling/expert-advice': '/career-intelligence',
+    'career_counselling/explore-sectors': '/career-intelligence',
+    'career_counselling/match-profile': '/career-intelligence?section=match',
+    'knowing-yourself': '/career-intelligence',
+    'match-profile': '/career-intelligence?section=match',
+    'expert-advice': '/career-intelligence',
+    'explore-sectors': '/career-intelligence',
   };
-  const careerCounsellingRoute =
-    careerCounsellingRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
-  if (careerCounsellingRoute) return careerCounsellingRoute;
+  const careerIntelligenceRoute =
+    careerIntelligenceRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerIntelligenceRoute) return careerIntelligenceRoute;
 
   if (cleanLink.toLowerCase() === 'other_fee_map.index') {
     return '/fees/master/additional-fees-mapping';

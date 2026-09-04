@@ -12,7 +12,7 @@ import {
   Save,
   Award,
 } from 'lucide-react';
-import { CareerIntelligence } from '@/app/career-counselling/_components/CareerIntelligence';
+import { CareerIntelligence } from '@/app/career-intelligence/_components/CareerIntelligence';
 import {
   Chart as ChartJS,
   RadialLinearScale,
