@@ -222,13 +222,11 @@ export default function CreateAssignmentPage() {
       ) : null}
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <SearchDropdown
-            fields={academicFields}
-            values={filters}
-            onChange={(values) => setFilters(values)}
-          />
-        </div>
+        <SearchDropdown
+          fields={academicFields}
+          values={filters}
+          onChange={(values) => setFilters(values)}
+        />
         <div className="mt-5 flex justify-end">
           <Button type="button" onClick={loadStudents} disabled={loading}>
             {loading ? (

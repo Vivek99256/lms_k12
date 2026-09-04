@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ClipboardList,
@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Table,
   TableBody,
@@ -20,10 +21,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  getAssignmentAiStatus,
   listAnnotateAssignments,
   type AnnotateRow,
 } from "@/app/lms/lmsAnnotate_assignment/api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
+
+const AI_POLL_INTERVAL_MS = 8000;
+
+function aiStatusVariant(
+  status: string
+): "processing" | "active" | "error" | "default" {
+  const normalized = status.toLowerCase();
+  if (normalized === "checking") return "processing";
+  if (normalized === "evaluated") return "active";
+  if (normalized.includes("fail")) return "error";
+  return "default";
+}
+
+function aiStatusLabel(status: string): string {
+  return status.toLowerCase() === "checking" ? "Checking..." : status || "-";
+}
 
 export default function AnnotateAssignmentPage() {
   const [rows, setRows] = useState<AnnotateRow[]>([]);
@@ -50,6 +68,54 @@ export default function AnnotateAssignmentPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Poll AI evaluation status for rows still "Checking" so the badge/score/PDF
+  // link update in place once EvaluateAssignmentSubmissionJob finishes.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  useEffect(() => {
+    const checkingIds = rows
+      .filter((row) => row.aiStatus.toLowerCase() === "checking")
+      .map((row) => row.id);
+    if (!checkingIds.length) return;
+
+    const interval = setInterval(async () => {
+      const stillChecking = rowsRef.current.filter(
+        (row) => row.aiStatus.toLowerCase() === "checking"
+      );
+      if (!stillChecking.length) {
+        clearInterval(interval);
+        return;
+      }
+      const updates = await Promise.all(
+        stillChecking.map(async (row) => {
+          try {
+            return await getAssignmentAiStatus(row.id);
+          } catch {
+            return null;
+          }
+        })
+      );
+      setRows((current) =>
+        current.map((row) => {
+          const update = updates.find((item) => item && item.id === row.id);
+          if (!update) return row;
+          return {
+            ...row,
+            aiStatus: update.aiStatus,
+            aiFailureReason: update.aiFailureReason,
+            aiScore: update.aiScore,
+            aiTotalQuestions: update.aiTotalQuestions,
+            aiPercentage: update.aiPercentage,
+            reviewedPdfUrl: update.reviewedPdfUrl || row.reviewedPdfUrl,
+            evaluatedAt: update.evaluatedAt,
+          };
+        })
+      );
+    }, AI_POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [rows]);
 
   return (
     <RequireStaff>
@@ -93,6 +159,9 @@ export default function AnnotateAssignmentPage() {
                 <TableHead>Submission date</TableHead>
                 <TableHead>Assignment paper</TableHead>
                 <TableHead>Submission</TableHead>
+                <TableHead>AI Score</TableHead>
+                <TableHead>Reviewed PDF</TableHead>
+                <TableHead>AI Status</TableHead>
                 <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -100,7 +169,7 @@ export default function AnnotateAssignmentPage() {
               {loading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={10}
+                    colSpan={13}
                     className="h-24 text-center text-slate-500"
                   >
                     <LoaderCircle className="mx-auto size-6 animate-spin text-slate-300" />
@@ -145,6 +214,50 @@ export default function AnnotateAssignmentPage() {
                       )}
                     </TableCell>
                     <TableCell>
+                      {row.aiScore !== null && row.aiTotalQuestions !== null ? (
+                        <span className="font-mono text-sm tabular-nums">
+                          {row.aiScore}/{row.aiTotalQuestions}
+                          {row.aiPercentage !== null ? (
+                            <span className="ml-1 text-slate-500">
+                              ({row.aiPercentage}%)
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.reviewedPdfUrl ? (
+                        <a
+                          href={row.reviewedPdfUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          <Download className="size-4" /> Download Evaluation
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.aiStatus ? (
+                        <StatusBadge
+                          variant={aiStatusVariant(row.aiStatus)}
+                          label={aiStatusLabel(row.aiStatus)}
+                          icon={
+                            row.aiStatus.toLowerCase() === "checking" ? (
+                              <LoaderCircle className="size-3 animate-spin" />
+                            ) : undefined
+                          }
+                          title={row.aiFailureReason || undefined}
+                        />
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {!row.studentSubmitted ? (
                         <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
                           Awaiting submission
@@ -167,7 +280,7 @@ export default function AnnotateAssignmentPage() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={10}
+                    colSpan={13}
                     className="h-28 text-center text-slate-500"
                   >
                     <ClipboardList className="mx-auto mb-2 size-8 text-slate-300" />

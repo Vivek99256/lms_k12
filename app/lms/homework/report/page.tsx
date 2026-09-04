@@ -35,10 +35,10 @@ import {
   type TableExportRow,
 } from "@/lib/table-export";
 import {
-  bulkDeleteHomework,
-  listHomework,
-  type HomeworkRecord,
-} from "@/app/lms/homework/api";
+  bulkDeleteAssignments,
+  listAssignments,
+  type AnnotateRow,
+} from "@/app/lms/lmsAnnotate_assignment/api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
 
 const academicFields: DropdownField[] = [
@@ -107,7 +107,7 @@ function StudentHomeworkReport() {
   }));
   const [fromDate, setFromDate] = useState(handoffFilters.fromDate);
   const [toDate, setToDate] = useState(handoffFilters.toDate);
-  const [rows, setRows] = useState<HomeworkRecord[]>([]);
+  const [rows, setRows] = useState<AnnotateRow[]>([]);
   const [selected, setSelected] = useState<Set<number>>(assistantSelection);
   const [query, setQuery] = useState(handoffFilters.query);
   const [page, setPage] = useState(1);
@@ -127,11 +127,11 @@ function StudentHomeworkReport() {
     setSelected(assistantSelection());
     setPage(1);
     try {
-      const data = await listHomework({
+      const data = await listAssignments({
         grade: readValue(filters.section ?? ""),
-        standard: readValue(filters.standard ?? ""),
-        division: readValue(filters.division ?? ""),
-        subject: readValue(filters.subject ?? ""),
+        standardId: readValue(filters.standard ?? ""),
+        divisionId: readValue(filters.division ?? ""),
+        subjectId: readValue(filters.subject ?? ""),
         fromDate,
         toDate,
       });
@@ -185,7 +185,7 @@ function StudentHomeworkReport() {
     description: row.description,
     standard: [row.standardName, row.divisionName].filter(Boolean).join(" - "),
     subject: row.subjectName,
-    date: row.date,
+    date: row.assignedOn,
   }));
 
   function toggle(id: number) {
@@ -224,7 +224,7 @@ function StudentHomeworkReport() {
     setNotice("");
     setDeleting(true);
     try {
-      const count = await bulkDeleteHomework(Array.from(selected));
+      const count = await bulkDeleteAssignments(Array.from(selected));
       setNotice(`${count} homework record(s) deleted successfully.`);
       await load();
     } catch (deleteError: unknown) {
@@ -289,6 +289,7 @@ function StudentHomeworkReport() {
             fields={academicFields}
             values={filters}
             onChange={(values) => setFilters(values)}
+            className="contents"
           />
           <div className="space-y-2">
             <Label htmlFor="from-date">From date</Label>
@@ -451,9 +452,9 @@ function StudentHomeworkReport() {
                         {row.description || "-"}
                       </TableCell>
                       <TableCell>
-                        {row.image ? (
+                        {row.examPdfUrl ? (
                           <a
-                            href={row.image}
+                            href={row.examPdfUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 underline"
@@ -468,7 +469,7 @@ function StudentHomeworkReport() {
                         {[row.standardName, row.divisionName].filter(Boolean).join(" - ") || "-"}
                       </TableCell>
                       <TableCell>{row.subjectName || "-"}</TableCell>
-                      <TableCell>{row.date || "-"}</TableCell>
+                      <TableCell>{row.assignedOn || "-"}</TableCell>
                     </TableRow>
                   ))
                 ) : (
