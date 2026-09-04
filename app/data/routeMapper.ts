@@ -179,6 +179,13 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lms_syllabus': '/lms/syllabus-plan',
   'lmsleaderboard.index': '/lms/leader-board',
   'lms/lmsleaderboard': '/lms/leader-board',
+  // Social & Collaborative — tblmenumaster stores the legacy (misspelled)
+  // route name "lmsSocialCollabrotive.index"; the Next.js page uses the
+  // corrected spelling, so both variants are mapped.
+  'lmssocialcollabrotive.index': '/lms/social-collaborative',
+  'lms/lmssocialcollabrotive': '/lms/social-collaborative',
+  'lmssocialcollaborative.index': '/lms/social-collaborative',
+  'lms/lmssocialcollaborative': '/lms/social-collaborative',
   // MASTER modules
   'lb_master.index': '/lms/leader-board-master',
   'lms/lb_master': '/lms/leader-board-master',
