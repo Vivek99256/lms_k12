@@ -18,16 +18,11 @@ export const ROUTES = {
     searchStudent: '/students/search_student',
   },
 
-  careerCounselling: {
-    home: '/career-counselling',
-    explore: '/career-counselling?section=explore',
-    assessment: '/career-counselling?section=assessment',
-    colleges: '/career-counselling?section=colleges',
-    courses: '/career-counselling?section=courses',
-    employers: '/career-counselling?section=employers',
-    experts: '/career-counselling?section=experts',
-    sectors: '/career-counselling?section=sectors',
-    match: '/career-counselling?section=match',
+  careerIntelligence: {
+    home: '/career-intelligence',
+    plan: '/career-intelligence',
+    match: '/career-intelligence?section=match',
+    intelligence: '/career-intelligence?section=intelligence',
   },
   
   // Result routes (paths mirror the legacy Laravel result route group)

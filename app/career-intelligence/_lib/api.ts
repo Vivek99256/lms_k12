@@ -6,7 +6,7 @@ import {
 } from '@/lib/erp-client';
 import type {
   AlignmentBand, AlignmentPayload, AspirationInput, AspirationSnapshot, CareerEvidencePayload,
-  CareerRecommendationPayload, CareerRecord, InterestQuestion, InterestResult,
+  CareerRecommendationPayload, CareerRecord,
 } from './types';
 
 const KEYS = ['data', 'result', 'results', 'records', 'list', 'career', 'question'];
@@ -205,38 +205,4 @@ function classifyBand(percentage: number): AlignmentBand {
 
 export async function loadOccupations(): Promise<CareerRecord[]> {
   return loadRecords('allOccupation');
-}
-
-export async function loadQuestions(): Promise<InterestQuestion[]> {
-  const rows = await loadRecords('intrestQuestions', { start: 1, end: 60 });
-  return rows.slice(0, 60).map((row, index) => ({
-    id: String(row.id ?? row.question_id ?? index + 1),
-    text: String(row.text ?? row.question ?? row.title ?? ''),
-  })).filter((item) => item.text);
-}
-
-export async function loadInterestResults(
-  answers?: string,
-  scores?: Record<string, number>
-): Promise<InterestResult[]> {
-  const payload = answers
-    ? await careerRequest('intrestResults', { answers })
-    : await careerRequest('intrestEnterScore', scores);
-  const rows = recordsFrom(payload);
-  if (rows.length) {
-    return rows.map((row) => ({
-      area: String(row.area ?? row.name ?? row.title ?? ''),
-      score: Number(row.score ?? row.value ?? 0),
-      description: String(row.description ?? row.details ?? ''),
-    })).filter((item) => item.area);
-  }
-  if (payload && typeof payload === 'object') {
-    return ['Realistic', 'Investigative', 'Artistic', 'Social', 'Enterprising', 'Conventional']
-      .map((area) => ({
-        area,
-        score: Number((payload as CareerRecord)[area] ?? scores?.[area] ?? 0),
-        description: '',
-      }));
-  }
-  return [];
 }
