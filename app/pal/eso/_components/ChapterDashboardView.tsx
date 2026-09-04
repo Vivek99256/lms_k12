@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, BookOpen, CheckCircle2, Circle, ListChecks, Lock, MessageSquareText, Target } from 'lucide-react';
+import { ArrowRight, Award, BookOpen, CheckCircle2, Circle, Flame, ListChecks, Lock, MessageSquareText, RefreshCw, Target } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { EmptyState, SectionPanel, StatCard } from '@/app/dashboard/_components/DashboardPrimitives';
@@ -54,6 +54,83 @@ export default function ChapterDashboardView({
           tone={data.masteredConcepts > 0 ? 'positive' : 'default'}
         />
         <StatCard label="Current concept" value={data.currentConceptName ?? 'Chapter complete'} icon={Target} />
+        {/* Both from the existing PAL gamification tables — previously only
+            reachable by navigating to /pal/new/gamification/* directly. */}
+        <StatCard
+          label="Learning streak"
+          value={data.gamification.streakCurrent > 0 ? `${data.gamification.streakCurrent} day${data.gamification.streakCurrent === 1 ? '' : 's'}` : 'Not started'}
+          icon={Flame}
+          tone={data.gamification.streakCurrent > 0 ? 'positive' : 'default'}
+        />
+        <StatCard
+          label="Badges earned"
+          value={data.gamification.badgesEarned}
+          icon={Award}
+          tone={data.gamification.badgesEarned > 0 ? 'positive' : 'default'}
+        />
+      </div>
+
+      {/* A spaced review that is due right now. Pull-based by design (nothing
+          notifies the student out of app), so this is the only place they
+          would find out — it has to be on the landing screen. */}
+      {data.reviewsDue > 0 && (
+        <div
+          data-eso-reviews-due={data.reviewsDue}
+          className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3"
+        >
+          <div className="flex items-start gap-2.5">
+            <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+            <div>
+              <div className="text-sm font-medium text-sky-900">Quick review</div>
+              <p className="text-xs text-sky-700">
+                {data.reviewsDue === 1
+                  ? 'One concept is ready for review — a short check to keep it solid.'
+                  : `${data.reviewsDue} concepts are ready for review — short checks to keep them solid.`}
+              </p>
+            </div>
+          </div>
+          {data.currentConceptId != null && (
+            <Button
+              size="sm"
+              data-eso-start-review
+              onClick={() => onOpenConcept(data.currentConceptId as number)}
+              className="bg-sky-600 text-white hover:bg-sky-700"
+            >
+              Start review
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Recognition the student actually earned, with a route to the rest. */}
+      {(data.gamification.recentBadge || data.gamification.streakHeadline) && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-2.5">
+            <Award className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              {data.gamification.recentBadge && (
+                <div className="text-sm font-medium text-amber-900">
+                  Latest badge · {data.gamification.recentBadge.name}
+                </div>
+              )}
+              {data.gamification.streakHeadline && (
+                <p className="text-xs text-amber-800">{data.gamification.streakHeadline}</p>
+              )}
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => router.push('/pal/new/gamification/badges')}
+            className="border-amber-300 text-amber-800 hover:bg-amber-100"
+          >
+            See all badges
+          </Button>
+        </div>
+      )}
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard label="Responses on this concept" value={data.responsesOnCurrentConcept} icon={MessageSquareText} />
         <StatCard label="All responses" value={data.allResponses} icon={BookOpen} />
       </div>

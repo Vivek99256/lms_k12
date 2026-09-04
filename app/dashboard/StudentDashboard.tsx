@@ -63,11 +63,24 @@ export default function StudentDashboard() {
 
   return (
     <div className="flex-1 overflow-auto p-8">
+      {/* The greeting and the shape of the page are known before any request
+          returns, so they paint immediately. Previously the whole screen was a
+          single centred spinner until the dashboard call completed, which on
+          this estate (remote database) is long enough to look like a failure. */}
       {loading && (
-        <div className="flex min-h-[50vh] items-center justify-center text-sm text-slate-500">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Loading your PAL dashboard...
-        </div>
+        <>
+          <h1 className="text-2xl font-bold text-slate-900">Hello, {user?.name || 'Student'}</h1>
+          <p className="mt-1 text-sm text-slate-500">This page shows where you are, and all students start from the same concept.</p>
+          <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-24 animate-pulse rounded-lg border border-slate-200 bg-slate-50" />
+            ))}
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading your progress...
+          </div>
+        </>
       )}
 
       {!loading && error && <DashboardError message={error} onRetry={() => load()} />}

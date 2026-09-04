@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Circle, Loader2 } from 'lucide-react';
 
@@ -237,6 +238,100 @@ function MasteryDetailsContent({
         </p>
       </div>
 
+      {/* The two numbers the mastery rule actually turns on, against the
+          thresholds they are judged by. Computed by the engine all along; this
+          screen simply never received them until now. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <MasteryFigure
+          label="Knowledge"
+          value={details.knowledgeMastery}
+          threshold={details.knowledgeThreshold}
+        />
+        <MasteryFigure
+          label="Application"
+          value={details.applicationMastery}
+          threshold={details.applicationThreshold}
+        />
+        <div className="rounded-lg border border-slate-200 p-3">
+          <div className="text-xs text-slate-500">Attempts</div>
+          <div className="mt-1 text-lg font-semibold text-slate-900">{details.attempts}</div>
+          <div className="text-xs text-slate-400">{details.responsesOnConcept} recorded responses</div>
+        </div>
+      </div>
+
+      {/* Spaced review state. `scheduled` is only ever true after a real D4
+          verdict, so this is absent for a concept still in progress. */}
+      {details.retention.scheduled && (
+        <div
+          data-eso-retention-panel
+          className={`rounded-lg border px-4 py-3 ${
+            details.retention.dueNow ? 'border-sky-200 bg-sky-50' : 'border-slate-200 bg-slate-50'
+          }`}
+        >
+          <div className={`text-sm font-medium ${details.retention.dueNow ? 'text-sky-900' : 'text-slate-800'}`}>
+            {details.retention.dueNow ? 'Review is due now' : 'Review scheduled'}
+          </div>
+          <p className={`mt-0.5 text-xs ${details.retention.dueNow ? 'text-sky-700' : 'text-slate-500'}`}>
+            {details.retention.stageLabel ?? `Stage ${details.retention.stage}`}
+            {details.retention.nextReviewAt &&
+              ` · next check ${new Date(details.retention.nextReviewAt).toLocaleDateString()}`}
+            {details.retention.nodesRetained > 0 && ` · ${details.retention.nodesRetained} already re-verified`}
+          </p>
+        </div>
+      )}
+
+      {/* Optional enrichment, and the real advance step — both only present
+          once the concept is genuinely cleared. */}
+      {details.enrichment.length > 0 && (
+        <div data-eso-enrichment className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <div className="text-sm font-medium text-emerald-900">Want to go deeper? (optional)</div>
+          <p className="text-xs text-emerald-700">Nothing here is graded — it won&apos;t change your mastery.</p>
+          <ul className="mt-2 space-y-1.5">
+            {details.enrichment.map((item, index) => (
+              <li key={`${item.title}-${index}`} className="text-sm">
+                {item.url ? (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-emerald-800 underline hover:text-emerald-900"
+                  >
+                    {item.title}
+                  </a>
+                ) : (
+                  <span className="font-medium text-emerald-800">{item.title}</span>
+                )}
+                {item.description && <div className="text-xs text-emerald-700">{item.description}</div>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {details.status === 'mastered' && (
+        <div className="rounded-lg border border-slate-200 p-4">
+          {details.nextConcept ? (
+            <>
+              <div className="text-sm font-medium text-slate-900">Ready for what&apos;s next</div>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Its prerequisites are satisfied, so you can start it now.
+              </p>
+              <Link
+                href={`/pal/eso?conceptId=${details.nextConcept.conceptId}`}
+                data-eso-next-concept={details.nextConcept.conceptId}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                Continue to {details.nextConcept.name ?? 'the next concept'}
+              </Link>
+            </>
+          ) : (
+            <div className="text-sm text-slate-700">
+              You&apos;ve completed this chapter. Reviews will keep coming back to keep it solid.
+            </div>
+          )}
+        </div>
+      )}
+
       <div>
         <h5 className="text-sm font-semibold text-slate-900">How PAL checks mastery</h5>
         <p className="text-xs text-slate-500">PAL looks at 6 things separately, because they can move apart.</p>
@@ -362,6 +457,28 @@ function SupportBox({ title, bucket }: { title: string; bucket: { count: number;
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * One of the two mastery figures the D4 rule turns on, shown against the
+ * threshold it is judged by so "82%" means something. `null` is a real state —
+ * the concept has no node of that type, or no evidence yet — and is shown as
+ * such rather than as 0%.
+ */
+function MasteryFigure({ label, value, threshold }: { label: string; value: number | null; threshold: number }) {
+  const met = value != null && value >= threshold;
+
+  return (
+    <div className={`rounded-lg border p-3 ${met ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200'}`}>
+      <div className={`text-xs ${met ? 'text-emerald-700' : 'text-slate-500'}`}>{label}</div>
+      <div className={`mt-1 text-lg font-semibold ${met ? 'text-emerald-900' : 'text-slate-900'}`}>
+        {value == null ? 'No evidence' : `${Math.round(value * 100)}%`}
+      </div>
+      <div className={`text-xs ${met ? 'text-emerald-700' : 'text-slate-400'}`}>
+        {met ? 'Threshold met' : `Needs ${Math.round(threshold * 100)}%`}
+      </div>
     </div>
   );
 }
