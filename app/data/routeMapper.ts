@@ -774,6 +774,29 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     careerIntelligenceRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (careerIntelligenceRoute) return careerIntelligenceRoute;
 
+  const careerAwarenessRoutes: Record<string, string> = {
+    'career_awareness.index': '/career-awareness',
+    'career-awareness.index': '/career-awareness',
+    'career_awareness': '/career-awareness',
+    'career-awareness': '/career-awareness',
+    'thinking_in_career_plan': '/career-awareness',
+  };
+  const careerAwarenessRoute =
+    careerAwarenessRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerAwarenessRoute) return careerAwarenessRoute;
+
+  const careerExplorerRoutes: Record<string, string> = {
+    'career_explore.index': '/career-explorer',
+    'career-explore.index': '/career-explorer',
+    'career_explore': '/career-explorer',
+    'career-explore': '/career-explorer',
+    'education.index': '/career-explorer',
+    'education': '/career-explorer',
+  };
+  const careerExplorerRoute =
+    careerExplorerRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerExplorerRoute) return careerExplorerRoute;
+
   if (cleanLink.toLowerCase() === 'other_fee_map.index') {
     return '/fees/master/additional-fees-mapping';
   }
