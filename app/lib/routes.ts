@@ -24,6 +24,14 @@ export const ROUTES = {
     match: '/career-intelligence?section=match',
     intelligence: '/career-intelligence?section=intelligence',
   },
+
+  careerAwareness: {
+    home: '/career-awareness',
+  },
+
+  careerExplorer: {
+    home: '/career-explorer',
+  },
   
   // Result routes (paths mirror the legacy Laravel result route group)
   result: {
