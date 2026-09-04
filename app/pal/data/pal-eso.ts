@@ -137,6 +137,83 @@ export interface EsoAction {
   status?: string;
   ruleFired: string;
   llmInstruction: string | null;
+  /** D3 only: the misconception's own description, for showing what was detected. */
+  misconceptionDescription?: string | null;
+  /**
+   * D3 only: what the student can check the misconception call against — the
+   * answer they actually chose, and how many times this same misconception has
+   * been flagged on this node before now.
+   */
+  evidence?: {
+    chosenAnswer: string | null;
+    previousOccurrences: number;
+  } | null;
+  /**
+   * D4 only, and only on the FIRST practice call for a node: the "why is this
+   * worth practising" nudge. Null whenever there is nothing honest to say.
+   */
+  motivationInstruction?: string | null;
+  /** Student-facing wording of the same nudge, shown when Pal can't render. */
+  motivationFallback?: string | null;
+  /** D2 staleness probe only: the prerequisite item to answer, and how old the evidence was. */
+  item?: EsoQuestion | null;
+  /** D2 probe and D5 retrieval: how long since this node last had evidence. */
+  daysSinceLastEvidence?: number | null;
+  /**
+   * D5 only: the student-facing wording of the retention recap, shown when Pal
+   * can't render `llmInstruction`. Null when the concept has no approved
+   * material to build a recap from — no recap is ever invented.
+   */
+  recapFallback?: string | null;
+  /** D5 only: which rung of the retention ladder this node is on. */
+  retentionStage?: number | null;
+  /**
+   * D4 mastery only. Exploratory content for a concept just mastered, from the
+   * existing PAL suggested-content pipeline. Display-only — skipping it has no
+   * effect on mastery, retention or evidence. Empty when nothing is authored.
+   */
+  enrichment?: Array<{
+    title: string;
+    description: string | null;
+    url: string | null;
+    contentType: string | null;
+    category: string;
+  }>;
+  /**
+   * D4 mastery only. The next concept in this chapter the student may actually
+   * start — never one whose prerequisites are unmet. Null when none remains.
+   */
+  nextConcept?: { conceptId: number; name: string | null } | null;
+  /** D4 mastery only: nothing unmastered and unlocked is left in the chapter. */
+  chapterComplete?: boolean;
+  /**
+   * What this screen asks of the student, so teach can stop pretending to be
+   * practice attempt #1:
+   *   'acknowledge'         — read the explanation, then ask to be checked (teach)
+   *   'check_understanding' — answer the CFU questions (check_understanding | reteach)
+   *   'answer'              — answer one scored practice question (practice)
+   */
+  expects?: 'acknowledge' | 'check_understanding' | 'answer' | null;
+  /**
+   * The concept's learning object from the PAL content model, when one
+   * genuinely exists. `mediaUrl` is only ever non-null for an AUTHORED asset —
+   * a `derived` variant is an authoring specification whose format describes
+   * what should be built, so it carries rich text and no media.
+   */
+  learningContent?: {
+    variant: number;
+    format: string;
+    formatLabel: string;
+    h5pType: string | null;
+    title: string | null;
+    body: string | null;
+    mediaUrl: string | null;
+    source: 'authored' | 'derived';
+  } | null;
+  /** CFU only: how many questions the gate will serve. */
+  cfuItemCount?: number | null;
+  /** CFU only: how many check cycles this node has already failed. */
+  cfuAttempts?: number | null;
 }
 
 export interface DecisionLogEntry {
@@ -188,6 +265,58 @@ function mapAction(raw: unknown): EsoAction {
     status: r.status == null ? undefined : readString(r.status),
     ruleFired: readString(r.rule_fired),
     llmInstruction: r.llm_instruction == null ? null : readString(r.llm_instruction),
+    misconceptionDescription: r.misconception_description == null ? null : readString(r.misconception_description),
+    evidence:
+      r.evidence == null
+        ? null
+        : {
+            chosenAnswer: toRecord(r.evidence).chosen_answer == null ? null : readString(toRecord(r.evidence).chosen_answer),
+            previousOccurrences: num(toRecord(r.evidence).previous_occurrences),
+          },
+    motivationInstruction: r.motivation_instruction == null ? null : readString(r.motivation_instruction),
+    motivationFallback: r.motivation_fallback == null ? null : readString(r.motivation_fallback),
+    item: r.item == null ? null : mapQuestion(r.item),
+    daysSinceLastEvidence: numOrNull(r.days_since_last_evidence),
+    recapFallback: r.recap_fallback == null ? null : readString(r.recap_fallback),
+    retentionStage: numOrNull(r.retention_stage),
+    enrichment: (Array.isArray(r.enrichment) ? r.enrichment : []).map((raw) => {
+      const e = toRecord(raw);
+      return {
+        title: readString(e.title),
+        description: e.description == null ? null : readString(e.description),
+        url: e.url == null ? null : readString(e.url),
+        contentType: e.content_type == null ? null : readString(e.content_type),
+        category: readString(e.category),
+      };
+    }),
+    nextConcept:
+      r.next_concept == null
+        ? null
+        : {
+            conceptId: num(toRecord(r.next_concept).concept_id),
+            name: toRecord(r.next_concept).name == null ? null : readString(toRecord(r.next_concept).name),
+          },
+    chapterComplete: r.chapter_complete === true,
+    expects:
+      r.expects === 'acknowledge' || r.expects === 'check_understanding' || r.expects === 'answer'
+        ? r.expects
+        : null,
+    learningContent: (() => {
+      if (r.learning_content == null) return null;
+      const c = toRecord(r.learning_content);
+      return {
+        variant: num(c.variant),
+        format: readString(c.format),
+        formatLabel: readString(c.format_label),
+        h5pType: c.h5p_type == null ? null : readString(c.h5p_type),
+        title: c.title == null ? null : readString(c.title),
+        body: c.body == null ? null : readString(c.body),
+        mediaUrl: c.media_url == null ? null : readString(c.media_url),
+        source: c.source === 'authored' ? ('authored' as const) : ('derived' as const),
+      };
+    })(),
+    cfuItemCount: numOrNull(r.cfu_item_count),
+    cfuAttempts: numOrNull(r.cfu_attempts),
   };
 }
 
@@ -284,6 +413,43 @@ export async function recordAttempt(
         hint_used: input.hintUsed ?? false,
         mode: input.mode,
       },
+      signal
+    )
+  );
+}
+
+// ── CFU: the check between teaching and practice ─────────────────────────
+
+/**
+ * The questions for a node's check of understanding. These are graded, but
+ * they are NOT mastery evidence — the engine records them with mode='cfu' and
+ * never applies a mastery update for them.
+ */
+export async function fetchCheckUnderstandingItems(
+  learnerId: string,
+  nodeId: number,
+  signal?: AbortSignal
+): Promise<EsoQuestion[]> {
+  try {
+    const data = await esoGet(`api/pal/eso/cfu-items/${learnerId}/${nodeId}`, signal);
+    const rows = Array.isArray(data) ? data : [];
+    return rows.map(mapQuestion);
+  } catch {
+    return []; // 404 = no tagged item for this node yet, same expected state as practice.
+  }
+}
+
+export async function submitCheckUnderstanding(
+  learnerId: string,
+  nodeId: number,
+  conceptId: number,
+  responses: Array<{ answerMasterId: number }>,
+  signal?: AbortSignal
+): Promise<EsoAction> {
+  return mapAction(
+    await esoPost(
+      `api/pal/eso/cfu/${learnerId}/${nodeId}/check`,
+      { concept_id: conceptId, responses: responses.map((r) => ({ answer_master_id: r.answerMasterId })) },
       signal
     )
   );
@@ -426,6 +592,17 @@ export interface ChapterDashboard {
   nextStep: ChapterNextStep | null;
   chapterSections: ChapterSection[];
   masterySignals: MasterySignal[];
+  /** Streak + badge headline from the existing PAL gamification tables. */
+  gamification: {
+    streakCurrent: number;
+    streakHeadline: string | null;
+    badgesEarned: number;
+    recentBadge: { name: string; awardedAt: string | null } | null;
+  };
+  /** How many nodes have a spaced review due right now, across all concepts. */
+  reviewsDue: number;
+  /** True once the current concept is cleared and enrichment is on offer. */
+  enrichmentAvailable: boolean;
 }
 
 function mapChapterSection(raw: unknown): ChapterSection {
@@ -486,6 +663,24 @@ function mapChapterDashboard(data: Record<string, unknown>): ChapterDashboard {
     nextStep: mapNextStep(data.next_step),
     chapterSections: sections.map(mapChapterSection),
     masterySignals: signals.map(mapMasterySignal),
+    gamification: (() => {
+      const g = toRecord(data.gamification);
+      const recent = g.recent_badge == null ? null : toRecord(g.recent_badge);
+      return {
+        streakCurrent: num(g.streak_current),
+        streakHeadline: g.streak_headline == null ? null : readString(g.streak_headline),
+        badgesEarned: num(g.badges_earned),
+        recentBadge:
+          recent == null
+            ? null
+            : {
+                name: readString(recent.name),
+                awardedAt: recent.awarded_at == null ? null : readString(recent.awarded_at),
+              },
+      };
+    })(),
+    reviewsDue: num(data.reviews_due),
+    enrichmentAvailable: data.enrichment_available === true,
   };
 }
 
@@ -542,6 +737,24 @@ export interface ConceptMasteryDetails {
   conceptName: string;
   chapterId: number;
   status: ChapterSectionStatus;
+  /** The two numbers the D4 rule actually turns on, with their thresholds. */
+  knowledgeMastery: number | null;
+  applicationMastery: number | null;
+  knowledgeThreshold: number;
+  applicationThreshold: number;
+  attempts: number;
+  /** Where this concept sits on the spaced-retention ladder. */
+  retention: {
+    scheduled: boolean;
+    dueNow: boolean;
+    stage: number;
+    stageLabel: string | null;
+    nextReviewAt: string | null;
+    nodesRetained: number;
+  };
+  /** Only once mastered: where the student may go next, and what to explore. */
+  nextConcept: { conceptId: number; name: string | null } | null;
+  enrichment: Array<{ title: string; description: string | null; url: string | null }>;
   responsesOnConcept: number;
   confidenceNote: string;
   masterySignals: MasterySignal[];
@@ -573,6 +786,37 @@ export async function fetchConceptMasteryDetails(learnerId: string, conceptId: n
     conceptName: readString(data.concept_name),
     chapterId: num(data.chapter_id),
     status: status === 'locked' || status === 'in_progress' || status === 'mastered' ? status : 'not_started',
+    knowledgeMastery: numOrNull(data.knowledge_mastery),
+    applicationMastery: numOrNull(data.application_mastery),
+    knowledgeThreshold: num(data.knowledge_threshold),
+    applicationThreshold: num(data.application_threshold),
+    attempts: num(data.attempts),
+    retention: (() => {
+      const r = toRecord(data.retention);
+      return {
+        scheduled: r.scheduled === true,
+        dueNow: r.due_now === true,
+        stage: num(r.stage),
+        stageLabel: r.stage_label == null ? null : readString(r.stage_label),
+        nextReviewAt: r.next_review_at == null ? null : readString(r.next_review_at),
+        nodesRetained: num(r.nodes_retained),
+      };
+    })(),
+    nextConcept:
+      data.next_concept == null
+        ? null
+        : {
+            conceptId: num(toRecord(data.next_concept).concept_id),
+            name: toRecord(data.next_concept).name == null ? null : readString(toRecord(data.next_concept).name),
+          },
+    enrichment: (Array.isArray(data.enrichment) ? data.enrichment : []).map((raw) => {
+      const e = toRecord(raw);
+      return {
+        title: readString(e.title),
+        description: e.description == null ? null : readString(e.description),
+        url: e.url == null ? null : readString(e.url),
+      };
+    }),
     responsesOnConcept: num(data.responses_on_concept),
     confidenceNote: readString(data.confidence_note),
     masterySignals: signals.map(mapMasterySignal),
