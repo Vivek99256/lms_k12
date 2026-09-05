@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LoaderCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CareerExplorerTabBar } from '../_components/CareerExplorerTabBar';
 import { ProfileImage } from '../_components/ProfileImage';
 import { loadEmployers } from '../_lib/api';
 import type { EmployerItem } from '../_lib/types';
@@ -38,8 +37,6 @@ export default function EmployerProfileHub() {
 
   return (
     <div className="container mx-auto px-4">
-      <CareerExplorerTabBar />
-
       <section className="mb-10 overflow-hidden rounded-[10px] bg-[#0D6EFD] pt-4 md:rounded-[48px] md:pt-8">
         <div className="rounded-t-[26px] bg-card p-[10px] md:rounded-t-[48px] md:p-[35px]">
         <h1 className="py-3 text-[26px] font-semibold text-[#0D6EFD] underline md:text-4xl">

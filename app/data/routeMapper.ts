@@ -787,6 +787,22 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     'career_awareness': '/career-awareness',
     'career-awareness': '/career-awareness',
     'thinking_in_career_plan': '/career-awareness',
+    'career_awareness.certainty': '/career-awareness/certainty',
+    'career-awareness.certainty': '/career-awareness/certainty',
+    'career_awareness_certainty': '/career-awareness/certainty',
+    'career-awareness-certainty': '/career-awareness/certainty',
+    'career_awareness.ambition': '/career-awareness/ambition',
+    'career-awareness.ambition': '/career-awareness/ambition',
+    'career_awareness_ambition': '/career-awareness/ambition',
+    'career-awareness-ambition': '/career-awareness/ambition',
+    'career_awareness.alignment': '/career-awareness/alignment',
+    'career-awareness.alignment': '/career-awareness/alignment',
+    'career_awareness_alignment': '/career-awareness/alignment',
+    'career-awareness-alignment': '/career-awareness/alignment',
+    'career_awareness.originality': '/career-awareness/originality',
+    'career-awareness.originality': '/career-awareness/originality',
+    'career_awareness_originality': '/career-awareness/originality',
+    'career-awareness-originality': '/career-awareness/originality',
   };
   const careerAwarenessRoute =
     careerAwarenessRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
@@ -799,6 +815,14 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     'career-explore': '/career-explorer',
     'education.index': '/career-explorer',
     'education': '/career-explorer',
+    'career_explore.find_occupation': '/career-explorer',
+    'career-explore.find_occupation': '/career-explorer',
+    'career_explore.college': '/career-explorer/college',
+    'career-explore.college': '/career-explorer/college',
+    'career_explore.courses': '/career-explorer/courses',
+    'career-explore.courses': '/career-explorer/courses',
+    'career_explore.employers': '/career-explorer/employers',
+    'career-explore.employers': '/career-explorer/employers',
   };
   const careerExplorerRoute =
     careerExplorerRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
