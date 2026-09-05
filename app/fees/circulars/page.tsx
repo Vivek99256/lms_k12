@@ -458,7 +458,7 @@ export default function FeesCircularsPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:p-4 lg:p-5">
+      <div className="mx-auto space-y-4 p-3 sm:p-4 lg:p-5">
         <section className="grid grid-cols-1 gap-3 md:grid-cols-5">
           <MetricCard title="Months selected" value={String(metrics.months)} icon={<ReceiptText className="h-4 w-4" />} />
           <MetricCard title="Receipt books" value={String(metrics.receiptBooks)} icon={<FileText className="h-4 w-4" />} />

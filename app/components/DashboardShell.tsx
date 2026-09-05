@@ -13,6 +13,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { useFeesLevel3Nav } from '@/app/fees/_lib/use-fees-level3-nav';
 
 interface SelectedBranch {
   level1Key: string;
@@ -432,6 +433,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key) ?? null;
   }, [selectedBranch, selectedL1]);
 
+  const feesLevel3Menu = useFeesLevel3Nav({
+    selectedLevel2Label: selectedL2?.label,
+    pathname,
+  });
+
   const searchLevel3FromMenu = (items: MenuItem[], path: string): { parentLabel: string; items: Level3Item[] } | null => {
     if (!path || !items.length) return null;
     for (const item of items) {
@@ -457,6 +463,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     const newPalItems = newPalLevel3Items(pathname, menuItems);
     if (newPalItems) {
       return { parentLabel: 'New PAL', items: newPalItems };
+    }
+    // Fees shows its seven categories here; each links to its own page, which
+    // carries that category's menus as its own tab bar. The hook returns null
+    // for every non-Fees context, so no other module's navigation is affected.
+    // For Fees it never returns null — it holds a loading placeholder instead —
+    // so the old Fees level-3 list below is unreachable, even for one frame.
+    if (feesLevel3Menu) {
+      return feesLevel3Menu;
     }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
