@@ -24,6 +24,34 @@ export type QuestionBankChapterRef = {
 
 export const QUESTION_BANK_TYPES = ['MCQ', 'Narrative'] as const;
 
+/**
+ * The PAL learning-flow categories, in the order a learner meets them.
+ *
+ * These mirror `lms_question_master.category` (and `pal_question_metadata.stage`,
+ * which the PAL engine reads). `value` must stay byte-identical to what question
+ * generation stores: the bank matches the stored value exactly, and the ERP
+ * endpoint accepts the same value as a server-side filter.
+ */
+export const QUESTION_BANK_CATEGORIES = [
+  { value: 'prerequisite', label: 'Prerequisite check', step: 1 },
+  { value: 'adaptive_diagnostic', label: 'Adaptive diagnostic', step: 2 },
+  { value: 'concept_diagnostic', label: 'Concept diagnosis', step: 3 },
+  { value: 'concept_understanding', label: 'Check for understanding', step: 6 },
+  { value: 'misconception_detection', label: 'Misconception detection', step: 6 },
+  { value: 'prerequisite_concept_check', label: 'Prerequisite re-check', step: 7 },
+  { value: 'adaptive_test', label: 'Adaptive practice', step: 8 },
+  { value: 'mastery_check', label: 'Mastery check', step: 9 },
+  { value: 'mastery_reverification', label: 'Mastery re-verification', step: 11 },
+] as const;
+
+export type QuestionBankCategory = (typeof QUESTION_BANK_CATEGORIES)[number]['value'];
+
+/** Teacher-facing label for a stored category value. */
+export function questionBankCategoryLabel(value?: string | null): string {
+  if (!value) return 'Uncategorised';
+  return QUESTION_BANK_CATEGORIES.find((c) => c.value === value)?.label ?? value;
+}
+
 export type QuestionBankQuestionType = (typeof QUESTION_BANK_TYPES)[number];
 
 export interface QuestionBankOption {
@@ -39,6 +67,9 @@ export interface QuestionBankItem {
   chapterTitle: string;
   conceptTitle: string;
   category: string;
+  /** PAL learning-flow category from lms_question_master.category. Distinct from
+   *  `category` above, which is the caller's subject-area label. */
+  palCategory: string | null;
   type: QuestionBankQuestionType;
   marks: number;
   question: string;
@@ -171,6 +202,7 @@ export async function fetchMappedQuestionBank(
       chapterTitle: chapter?.title ?? 'Unknown Chapter',
       conceptTitle,
       category: resolveCategory ? resolveCategory(chapter, conceptTitle) : 'Question Bank',
+      palCategory: q.category ?? null,
       type,
       marks: q.marks ?? 1,
       question: q.question,

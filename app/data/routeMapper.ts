@@ -486,6 +486,15 @@ const CAPABILITY_INTELLIGENCE_ROUTE_NAME_MAP: Record<string, string> = {
   'capability_intelligence.capability_explorer': '/capability-intelligence/capability-explorer',
 };
 
+const ENTERPRISE_BRAIN_ROUTE_NAME_MAP: Record<string, string> = {
+  'enterprise_brain.index': '/enterprise-brain',
+  'enterprise-brain.index': '/enterprise-brain',
+  'enterprise_brain': '/enterprise-brain',
+  'enterprise-brain': '/enterprise-brain',
+  'brain.index': '/enterprise-brain',
+  'brain': '/enterprise-brain',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -682,6 +691,11 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return capabilityIntelligenceRoute;
   }
 
+  const enterpriseBrainRoute = ENTERPRISE_BRAIN_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (enterpriseBrainRoute) {
+    return enterpriseBrainRoute;
+  }
+
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
     return '/fees/master/fees-config-master';
   }
@@ -752,6 +766,26 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     frontDeskRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (frontDeskRoute) return frontDeskRoute;
 
+  // Level-2 "Career Counselling" section — a standalone module (not nested
+  // under career-intelligence) with Interest Profile and Knowing Yourself as
+  // its two Level-3 pages. Checked ahead of careerIntelligenceRoutes below so
+  // these two specific route names resolve here instead of falling through
+  // to the generic career_counselling.* aliases that still point at the
+  // (separately renamed) career-intelligence module.
+  const careerCounsellingRoutes: Record<string, string> = {
+    'career_counselling/interest-profile': '/career-counselling/interest-profile',
+    'career-counselling/interest-profile': '/career-counselling/interest-profile',
+    'career_counselling_interest_profile': '/career-counselling/interest-profile',
+    'interest-profile': '/career-counselling/interest-profile',
+    'career_counselling/knowing-yourself': '/career-counselling/knowing-yourself',
+    'career-counselling/knowing-yourself': '/career-counselling/knowing-yourself',
+    'career_counselling_knowing-yourself': '/career-counselling/knowing-yourself',
+    'knowing-yourself': '/career-counselling/knowing-yourself',
+  };
+  const careerCounsellingRoute =
+    careerCounsellingRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerCounsellingRoute) return careerCounsellingRoute;
+
   const careerIntelligenceRoutes: Record<string, string> = {
     'career_counselling.index': '/career-intelligence',
     'career-counselling.index': '/career-intelligence',
@@ -764,15 +798,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     'career_counselling/plan': '/career-intelligence',
     'career_counselling/education': '/career-intelligence',
     'career_counselling/explore': '/career-intelligence',
-    'career_counselling/knowing-yourself': '/career-intelligence',
-    'career_counselling/interest-profile': '/career-intelligence',
     'career_counselling/college': '/career-intelligence',
     'career_counselling/courses': '/career-intelligence',
     'career_counselling/profile': '/career-intelligence',
     'career_counselling/expert-advice': '/career-intelligence',
     'career_counselling/explore-sectors': '/career-intelligence',
     'career_counselling/match-profile': '/career-intelligence?section=match',
-    'knowing-yourself': '/career-intelligence',
     'match-profile': '/career-intelligence?section=match',
     'expert-advice': '/career-intelligence',
     'explore-sectors': '/career-intelligence',
@@ -780,6 +811,53 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const careerIntelligenceRoute =
     careerIntelligenceRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (careerIntelligenceRoute) return careerIntelligenceRoute;
+
+  const careerAwarenessRoutes: Record<string, string> = {
+    'career_awareness.index': '/career-awareness',
+    'career-awareness.index': '/career-awareness',
+    'career_awareness': '/career-awareness',
+    'career-awareness': '/career-awareness',
+    'thinking_in_career_plan': '/career-awareness',
+    'career_awareness.certainty': '/career-awareness/certainty',
+    'career-awareness.certainty': '/career-awareness/certainty',
+    'career_awareness_certainty': '/career-awareness/certainty',
+    'career-awareness-certainty': '/career-awareness/certainty',
+    'career_awareness.ambition': '/career-awareness/ambition',
+    'career-awareness.ambition': '/career-awareness/ambition',
+    'career_awareness_ambition': '/career-awareness/ambition',
+    'career-awareness-ambition': '/career-awareness/ambition',
+    'career_awareness.alignment': '/career-awareness/alignment',
+    'career-awareness.alignment': '/career-awareness/alignment',
+    'career_awareness_alignment': '/career-awareness/alignment',
+    'career-awareness-alignment': '/career-awareness/alignment',
+    'career_awareness.originality': '/career-awareness/originality',
+    'career-awareness.originality': '/career-awareness/originality',
+    'career_awareness_originality': '/career-awareness/originality',
+    'career-awareness-originality': '/career-awareness/originality',
+  };
+  const careerAwarenessRoute =
+    careerAwarenessRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerAwarenessRoute) return careerAwarenessRoute;
+
+  const careerExplorerRoutes: Record<string, string> = {
+    'career_explore.index': '/career-explorer',
+    'career-explore.index': '/career-explorer',
+    'career_explore': '/career-explorer',
+    'career-explore': '/career-explorer',
+    'education.index': '/career-explorer',
+    'education': '/career-explorer',
+    'career_explore.find_occupation': '/career-explorer',
+    'career-explore.find_occupation': '/career-explorer',
+    'career_explore.college': '/career-explorer/college',
+    'career-explore.college': '/career-explorer/college',
+    'career_explore.courses': '/career-explorer/courses',
+    'career-explore.courses': '/career-explorer/courses',
+    'career_explore.employers': '/career-explorer/employers',
+    'career-explore.employers': '/career-explorer/employers',
+  };
+  const careerExplorerRoute =
+    careerExplorerRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerExplorerRoute) return careerExplorerRoute;
 
   if (cleanLink.toLowerCase() === 'other_fee_map.index') {
     return '/fees/master/additional-fees-mapping';

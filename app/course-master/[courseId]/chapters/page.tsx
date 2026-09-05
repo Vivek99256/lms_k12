@@ -74,6 +74,8 @@ import {
 import {
   fetchMappedQuestionBank,
   groupQuestionBankItems,
+  questionBankCategoryLabel,
+  QUESTION_BANK_CATEGORIES,
   type QuestionBankItem,
   type QuestionBankChapterRef,
   type QuestionBankQuestionType,
@@ -894,6 +896,7 @@ export default function ChapterListPage() {
   const [questionBankChapterFilter, setQuestionBankChapterFilter] = useState('all');
   const [questionBankConceptFilter, setQuestionBankConceptFilter] = useState('all');
   const [questionBankTypeFilter, setQuestionBankTypeFilter] = useState('all');
+  const [questionBankCategoryFilter, setQuestionBankCategoryFilter] = useState('all');
   const [manualQuestionBankItems, setManualQuestionBankItems] = useState<QuestionBankItem[]>([]);
   const [questionBankItemEdits, setQuestionBankItemEdits] = useState<Record<string, QuestionBankItem>>({});
   const [editingQuestionBankItem, setEditingQuestionBankItem] = useState<QuestionBankItem | null>(null);
@@ -1123,11 +1126,17 @@ export default function ChapterListPage() {
         question.conceptTitle === effectiveQuestionBankConceptFilter;
       const matchesType =
         questionBankTypeFilter === 'all' || question.type === questionBankTypeFilter;
+      // Questions generated before the category column existed carry null, so
+      // they are only ever hidden by an explicit category choice, never by 'all'.
+      const matchesCategory =
+        questionBankCategoryFilter === 'all' ||
+        question.palCategory === questionBankCategoryFilter;
 
-      return matchesChapter && matchesConcept && matchesType;
+      return matchesChapter && matchesConcept && matchesType && matchesCategory;
     });
   }, [
     effectiveQuestionBankConceptFilter,
+    questionBankCategoryFilter,
     questionBankChapterFilter,
     questionBankItems,
     questionBankTypeFilter,
@@ -1763,6 +1772,9 @@ export default function ChapterListPage() {
     setQuestionBankChapterFilter(chapter.id);
     setQuestionBankConceptFilter('all');
     setQuestionBankTypeFilter('all');
+    // Categories differ from chapter to chapter, so a selection carried over
+    // from the last one can leave the bank looking empty rather than filtered.
+    setQuestionBankCategoryFilter('all');
     router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
   };
 
@@ -2000,6 +2012,9 @@ export default function ChapterListPage() {
       chapterTitle: chapter.title,
       conceptTitle: manualQuestionConcept,
       category: getQuestionBankCategory(course, chapter.title, manualQuestionConcept),
+      // A hand-written question has no learning-flow category: those are assigned
+      // by question generation. Preserve it on edit rather than dropping it.
+      palCategory: editingQuestionBankItem?.palCategory ?? null,
       type: manualQuestionType,
       marks,
       question: manualQuestionText.trim(),
@@ -2133,11 +2148,12 @@ export default function ChapterListPage() {
         subject_id: numericSubjectId,
         standard_id: numericStandardId,
         concept_id: conceptId,
-        sub_institute_id: requestContext.sub_institute_id,
         question_type: config.question_type,
         question_type_id: config.question_type_id,
         total_questions: totalQuestionsNumber,
-        created_by: requestContext.user_id,
+        // sub_institute_id / created_by are no longer sent: the server reads
+        // both from the bearer token. requestContext is still checked above so
+        // the modal fails early when the user has no usable session at all.
         // Omitted entirely on Auto, so the server keeps deciding the mix exactly
         // as it did before this control existed. Zero-count levels are dropped:
         // the server reads a row's presence as "generate at this level".
@@ -3793,7 +3809,7 @@ export default function ChapterListPage() {
               {questionCountLabel}
             </p>
 
-            <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[225px_275px_215px_auto]">
+            <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[minmax(170px,200px)_minmax(180px,230px)_minmax(130px,150px)_minmax(190px,215px)_auto]">
               <Select
                 value={questionBankChapterFilter}
                 onValueChange={(value) => {
@@ -3852,6 +3868,27 @@ export default function ChapterListPage() {
                   {QUESTION_TYPE_OPTIONS.map((type) => (
                     <SelectItem key={type} value={type}>
                       {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={questionBankCategoryFilter}
+                onValueChange={(value) => setQuestionBankCategoryFilter(value ?? 'all')}
+              >
+                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                  <SelectValue>
+                    {questionBankCategoryFilter === 'all'
+                      ? 'All Categories'
+                      : questionBankCategoryLabel(questionBankCategoryFilter)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {QUESTION_BANK_CATEGORIES.map((category) => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.step}. {category.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

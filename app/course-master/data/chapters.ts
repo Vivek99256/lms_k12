@@ -1,6 +1,7 @@
 import { fetchLmsCourses, type ApiChapter, type LmsSubject } from './lmsCourses';
 import { getRequestContext, getSyear } from '../page';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { buildSessionContext } from '@/lib/erp-client';
 
 export interface Chapter {
   id: string;
@@ -604,16 +605,22 @@ export interface IntelligenceQuestionQuotaRow {
   points?: number;
 }
 
+/**
+ * NOTE: `sub_institute_id` and `created_by` are deliberately absent.
+ *
+ * The endpoint now runs behind `api.session`, which derives the tenant and the
+ * author from the verified JWT. Posting them was how any caller could write AI
+ * questions into any school attributed to any user; the server ignores them now
+ * (they are not in the validator), so sending them would be misleading.
+ */
 export interface GenerateIntelligenceQuestionsRequest {
   concept_id: number;
-  sub_institute_id: number;
   subject_id: number;
   standard_id: number;
   chapter_id: number;
   question_type_id: number;
   question_type: IntelligenceQuestionType;
   total_questions: number;
-  created_by: number;
   grade_id?: number;
   quota?: IntelligenceQuestionQuotaRow[];
 }
@@ -864,13 +871,38 @@ function getApiErrorMessage(raw: Record<string, unknown>, fallback: string) {
 export async function generateIntelligenceQuestions(
   request: GenerateIntelligenceQuestionsRequest
 ): Promise<GenerateIntelligenceQuestionsResponse> {
+  const session = buildSessionContext();
+
+  if (!session.token) {
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+
   const res = await fetch(`${API_BASE_URL}/api/intelligence/questions/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      // Required: the endpoint is behind `api.session`, and the tenant/author
+      // written to lms_question_master come from this token, not the body.
+      Authorization: `Bearer ${session.token}`,
+    },
     body: JSON.stringify(request),
   });
 
   const raw = await readApiJson(res, 'Failed to generate questions');
+  if (res.status === 401) {
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+  if (res.status === 403) {
+    throw new Error(
+      getApiErrorMessage(raw, 'You are not authorised to generate questions for this concept.')
+    );
+  }
+  if (res.status === 429) {
+    throw new Error(
+      getApiErrorMessage(raw, 'Too many generation requests. Please wait a moment and try again.')
+    );
+  }
   if (!res.ok || raw.status === false) {
     throw new Error(getApiErrorMessage(raw, 'Failed to generate questions'));
   }
@@ -951,6 +983,9 @@ export interface QuestionBankApiQuestion {
   concept_id?: number | null;
   /** Concept name stored on the question itself, for rows whose ids don't resolve. */
   concept?: string | null;
+  /** PAL learning-flow category, e.g. 'misconception_detection'. Null on rows
+   *  generated before the category column existed. */
+  category?: string | null;
   question: string;
   question_type: string;
   options?: Array<{

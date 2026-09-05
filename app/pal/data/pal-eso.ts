@@ -732,6 +732,95 @@ export interface RecentResponse {
   at: string | null;
 }
 
+export interface SuggestedContentItem {
+  title: string;
+  description: string | null;
+  url: string | null;
+  category: string;
+  /** True only for the development placeholder set below. */
+  isSample?: boolean;
+}
+
+/**
+ * Development placeholder for the Suggested content tab.
+ *
+ * The real source is PedagogySuggestedContentService, reached through
+ * EsoEnrichmentResolver and returned on `concept-mastery-details` as
+ * `suggested_content`. That pipeline is fully wired — Chapter 1014 simply has
+ * nothing authored yet (all four of its content buckets return zero rows), so
+ * a demo would otherwise show an empty tab.
+ *
+ * These rows are shaped EXACTLY like the API's, and are only substituted when
+ * the API returns an empty list. Authoring real `content_master` rows makes
+ * them disappear with no code change. Each is flagged `isSample` so the UI can
+ * say what it is rather than passing placeholders off as authored material.
+ */
+export const SAMPLE_SUGGESTED_CONTENT: SuggestedContentItem[] = [
+  {
+    title: 'Concept explanation — how metals conduct',
+    description: 'A short read on why metals carry heat and electricity, and what makes them different from non-metals.',
+    url: null,
+    category: 'explanation',
+    isSample: true,
+  },
+  {
+    title: 'Worked example — identifying an unknown sample',
+    description: 'Step through classifying a material from its lustre, malleability and conductivity.',
+    url: null,
+    category: 'example',
+    isSample: true,
+  },
+  {
+    title: 'Practice activity — sort the materials',
+    description: 'Ten quick items sorting everyday materials into metal and non-metal.',
+    url: null,
+    category: 'practice',
+    isSample: true,
+  },
+  {
+    title: 'Quick review — properties at a glance',
+    description: 'A one-page summary to skim before your next review check.',
+    url: null,
+    category: 'review',
+    isSample: true,
+  },
+];
+
+/** One gated node type's evidence position, straight from the D1 verdict. */
+export interface MasteryGate {
+  applicable: boolean;
+  requiredEvents: number;
+  validEvents: number;
+  remainingEvents: number;
+  independentRemaining: number;
+  meetsFloor: boolean;
+  notAssessed: boolean;
+}
+
+export interface MasteryPlan {
+  knowledge: MasteryGate | null;
+  application: MasteryGate | null;
+  remainingEvents: number;
+  misconceptionBlocks: boolean;
+  stale: boolean;
+}
+
+function mapMasteryGate(raw: unknown): MasteryGate | null {
+  const g = toRecord(raw);
+  if (g.applicable !== true) {
+    return { applicable: false, requiredEvents: 0, validEvents: 0, remainingEvents: 0, independentRemaining: 0, meetsFloor: false, notAssessed: false };
+  }
+  return {
+    applicable: true,
+    requiredEvents: num(g.required_events),
+    validEvents: num(g.valid_events),
+    remainingEvents: num(g.remaining_events),
+    independentRemaining: num(g.independent_remaining),
+    meetsFloor: g.meets_floor === true,
+    notAssessed: g.not_assessed === true,
+  };
+}
+
 export interface ConceptMasteryDetails {
   conceptId: number;
   conceptName: string;
@@ -755,6 +844,14 @@ export interface ConceptMasteryDetails {
   /** Only once mastered: where the student may go next, and what to explore. */
   nextConcept: { conceptId: number; name: string | null } | null;
   enrichment: Array<{ title: string; description: string | null; url: string | null }>;
+  /**
+   * Distance to mastery, counted in demonstrations — the same numbers the D1
+   * verdict grants mastery on. Null when the concept is locked and no verdict
+   * was computed.
+   */
+  plan: MasteryPlan | null;
+  /** From the existing PAL pedagogy pipeline; empty when nothing is authored. */
+  suggestedContent: SuggestedContentItem[];
   responsesOnConcept: number;
   confidenceNote: string;
   masterySignals: MasterySignal[];
@@ -815,6 +912,28 @@ export async function fetchConceptMasteryDetails(learnerId: string, conceptId: n
         title: readString(e.title),
         description: e.description == null ? null : readString(e.description),
         url: e.url == null ? null : readString(e.url),
+      };
+    }),
+    plan:
+      data.plan == null
+        ? null
+        : (() => {
+            const p = toRecord(data.plan);
+            return {
+              knowledge: mapMasteryGate(p.knowledge),
+              application: mapMasteryGate(p.application),
+              remainingEvents: num(p.remaining_events),
+              misconceptionBlocks: p.misconception_blocks === true,
+              stale: p.stale === true,
+            };
+          })(),
+    suggestedContent: (Array.isArray(data.suggested_content) ? data.suggested_content : []).map((raw) => {
+      const s = toRecord(raw);
+      return {
+        title: readString(s.title),
+        description: s.description == null ? null : readString(s.description),
+        url: s.url == null ? null : readString(s.url),
+        category: readString(s.category),
       };
     }),
     responsesOnConcept: num(data.responses_on_concept),
