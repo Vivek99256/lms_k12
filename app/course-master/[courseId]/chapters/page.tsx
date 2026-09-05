@@ -2133,11 +2133,12 @@ export default function ChapterListPage() {
         subject_id: numericSubjectId,
         standard_id: numericStandardId,
         concept_id: conceptId,
-        sub_institute_id: requestContext.sub_institute_id,
         question_type: config.question_type,
         question_type_id: config.question_type_id,
         total_questions: totalQuestionsNumber,
-        created_by: requestContext.user_id,
+        // sub_institute_id / created_by are no longer sent: the server reads
+        // both from the bearer token. requestContext is still checked above so
+        // the modal fails early when the user has no usable session at all.
         // Omitted entirely on Auto, so the server keeps deciding the mix exactly
         // as it did before this control existed. Zero-count levels are dropped:
         // the server reads a row's presence as "generate at this level".
