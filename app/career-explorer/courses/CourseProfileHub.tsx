@@ -1,8 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { LoaderCircle, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { BookOpen, Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
+} from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { SearchInput } from '@/components/ui/search-input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CareerExplorerPageHeader } from '../_components/CareerExplorerPageHeader';
 import { loadCourses } from '../_lib/api';
 import type { CourseItem } from '../_lib/types';
 
@@ -35,63 +43,71 @@ export default function CourseProfileHub() {
   );
 
   return (
-    <div className="container mx-auto px-4">
-      <section className="mb-10 overflow-hidden rounded-[10px] bg-[#0D6EFD] pt-4 md:rounded-[48px] md:pt-8">
-        <div className="rounded-t-[26px] bg-card p-[10px] md:rounded-t-[48px] md:p-[35px]">
-        <h1 className="py-3 text-[26px] font-semibold text-[#0D6EFD] underline md:text-4xl">
-          Explore Your Future Course&apos;s
-        </h1>
-        <p className="xl:text-[18px] font-medium text-muted-foreground py-[6px] xl:py-[12px]">
-          Search courses by name
-        </p>
+    <div className="space-y-5 p-1 md:p-2">
+      <CareerExplorerPageHeader
+        icon={BookOpen}
+        title="Course profile"
+        description="Explore courses that suit your future — search by name below."
+        badgeIcon={BookOpen}
+        badgeLabel="Programmes"
+      />
 
-        <input
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="w-full h-[45px] px-[15px] mt-3 rounded-[10px] border border-input bg-background text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          placeholder="Search by course Name"
-          type="text"
-        />
-
-        {loading && (
-          <div className="flex min-h-32 items-center justify-center gap-2 mt-10 text-sm text-muted-foreground">
-            <LoaderCircle className="size-4 animate-spin" />
-            Loading coursesÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦
+      <Card>
+        <CardHeader className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <CardTitle>Courses</CardTitle>
+            <CardDescription>{loading ? 'Loading…' : `${filtered.length} course${filtered.length === 1 ? '' : 's'} found.`}</CardDescription>
           </div>
-        )}
-
-        {!loading && error && (
-          <div className="flex min-h-32 flex-col items-center justify-center gap-3 mt-10 text-center">
-            <p className="max-w-lg text-sm text-destructive">{error}</p>
-            <Button variant="outline" onClick={refresh}>
-              <RefreshCw />
-              Try again
-            </Button>
+          <div className="w-full sm:w-72 lg:w-[420px]">
+            <SearchInput
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by course name"
+              icon={<Search className="size-4" />}
+            />
           </div>
-        )}
+        </CardHeader>
+        <CardContent>
+          {loading && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {[...Array(4)].map((_, index) => <Skeleton key={index} className="h-36 w-full rounded-xl" />)}
+            </div>
+          )}
 
-        {!loading && !error && filtered.length === 0 && (
-          <div className="mt-10 text-sm text-muted-foreground">No course found.</div>
-        )}
+          {!loading && error && (
+            <ErrorState title="Unable to load courses" description={error} retry={() => void refresh()} />
+          )}
 
-        {!loading && !error && filtered.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-10">
-            {filtered.map((item, index) => (
-              <div key={`${item.course_name}-${index}`} className="rounded-[14px] border border-border p-4 bg-background">
-                <h2 className="text-lg font-semibold text-[#0D6EFD]">{item.course_name}</h2>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-md border border-border p-2 text-muted-foreground">Level: {item.course_level}</div>
-                  <div className="rounded-md border border-border p-2 text-muted-foreground">Programme: {item.programme}</div>
-                  <div className="rounded-md border border-border p-2 text-muted-foreground">Type: {item.course_type}</div>
-                  <div className="rounded-md border border-border p-2 text-muted-foreground">Fees: {item.course_fees}</div>
-                </div>
-                <p className="mt-3 text-sm text-muted-foreground">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        </div>
-      </section>
+          {!loading && !error && filtered.length === 0 && (
+            <EmptyState icon={<BookOpen className="size-8" />} title="No courses found" description="Try a different search term." />
+          )}
+
+          {!loading && !error && filtered.length > 0 && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {filtered.map((item, index) => <CourseCard key={`${item.course_name}-${index}`} item={item} />)}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+function CourseCard({ item }: { item: CourseItem }) {
+  return (
+    <Card size="sm" className="transition-shadow hover:shadow-md">
+      <CardContent>
+        <CardTitle className="text-[#0D6EFD]">{item.course_name}</CardTitle>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {item.course_level && <Badge variant="outline">{item.course_level}</Badge>}
+          {item.programme && <Badge variant="outline">{item.programme}</Badge>}
+          {item.course_type && <Badge variant="outline">{item.course_type}</Badge>}
+          {item.course_fees && (
+            <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">₹{item.course_fees}</Badge>
+          )}
+        </div>
+        {item.description && <p className="mt-3 text-sm leading-6 text-muted-foreground">{item.description}</p>}
+      </CardContent>
+    </Card>
   );
 }
