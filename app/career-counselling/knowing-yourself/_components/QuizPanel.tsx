@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import type { RiasecQuestion } from '../../_lib/types';
 
 const EMOJIS = [
@@ -13,12 +12,15 @@ const EMOJIS = [
   { src: '/images/career-counselling/knowing-yourself/Rofl.png', label: 'Strongly like' },
 ] as const;
 
+// Hardcoded Tailwind palette colors (not --destructive/--warning/etc. CSS-var
+// tokens), matching the TONE convention used across the Career Intelligence
+// modules (see app/career-intelligence/_components/CareerIntelligence.tsx).
 const EMOJI_TONES = [
-  'border-destructive/40 bg-destructive/10 data-[selected=true]:bg-destructive/20',
-  'border-warning/40 bg-warning/10 data-[selected=true]:bg-warning/20',
-  'border-border bg-muted data-[selected=true]:bg-muted-foreground/20',
-  'border-primary/40 bg-primary/10 data-[selected=true]:bg-primary/20',
-  'border-success/40 bg-success/10 data-[selected=true]:bg-success/20',
+  'border-red-300 bg-red-100 transition-colors data-[selected=true]:border-red-500 data-[selected=true]:bg-red-200',
+  'border-amber-300 bg-amber-100 transition-colors data-[selected=true]:border-amber-500 data-[selected=true]:bg-amber-200',
+  'border-slate-300 bg-slate-100 transition-colors data-[selected=true]:border-slate-500 data-[selected=true]:bg-slate-300',
+  'border-sky-300 bg-sky-100 transition-colors data-[selected=true]:border-sky-500 data-[selected=true]:bg-sky-200',
+  'border-emerald-300 bg-emerald-100 transition-colors data-[selected=true]:border-emerald-500 data-[selected=true]:bg-emerald-200',
 ];
 
 interface QuizPanelProps {
@@ -47,7 +49,12 @@ export function QuizPanel({ questions, selectedOptions, onSelect, onSubmit, onBa
       <div className="flex items-center justify-between gap-4 text-sm">
         <div className="flex flex-1 items-center gap-3">
           <span className="text-muted-foreground">Progress</span>
-          <Progress value={progress} className="max-w-xs" />
+          <div className="h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-[#4F46E5] transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
         <span className="whitespace-nowrap font-medium">
           {answeredCount} of {questions.length} questions
