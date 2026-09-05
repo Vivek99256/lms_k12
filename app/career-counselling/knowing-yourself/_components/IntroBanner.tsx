@@ -1,28 +1,22 @@
 'use client';
 
-// Ported from the source app's Yourself/header component — the counselling
-// intro banner that sits at the top of the legacy /knowing-yourself route.
+import { HeartHandshake } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+
+// Native replacement for the source app's Yourself/header banner — same
+// message, rebuilt as a design-system card instead of raw legacy imagery.
 export function IntroBanner() {
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/images/career-counselling/knowing-yourself/Frame 719.jpg"
-        alt=""
-        className="h-[120px] w-full object-cover"
-      />
-      <div className="space-y-4 p-5">
-        <p className="mx-auto max-w-3xl text-center text-sm leading-6 text-muted-foreground md:text-base">
+    <Card className="border-indigo-200 bg-indigo-50/60">
+      <CardContent className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[#4F46E5]">
+          <HeartHandshake className="size-5" />
+        </div>
+        <p className="text-sm leading-6 text-muted-foreground">
           Today, the art of talking therapies such as counselling are used to help people come to
           terms with many problems they are facing, with an ultimate aim of overcoming them.
         </p>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/career-counselling/knowing-yourself/Frame 467.png"
-          alt=""
-          className="w-full rounded-lg"
-        />
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -2,19 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Compass } from 'lucide-react';
+import {
+  CircleAlert, Compass, LoaderCircle, RefreshCw, RotateCcw, Trophy,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle,
 } from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
 import { loadInterestQuestions, loadInterestResults } from '../../_lib/api';
 import type { RiasecQuestion, RiasecResultItem } from '../../_lib/types';
 import { IntroBanner } from './IntroBanner';
 import { QuizPanel } from './QuizPanel';
-import { RIASEC_COLORS, RiasecDoughnutChart } from './RiasecDoughnutChart';
+import { RiasecDoughnutChart } from './RiasecDoughnutChart';
 import { RiasecResultModal } from './RiasecResultModal';
+import { getAreaMeta } from './riasecMeta';
 
 const TOTAL_STEPS = 6;
 
@@ -68,6 +70,40 @@ function decodeAnswers(answers: string): Record<number, number> {
   return restored;
 }
 
+function CenterMessage({
+  title, description, retry,
+}: { title: string; description?: string; retry: () => void }) {
+  return (
+    <div className="flex min-h-40 flex-col items-center justify-center gap-2 text-center">
+      <CircleAlert className="size-6 text-muted-foreground" />
+      <p className="text-sm font-medium">{title}</p>
+      {description && <p className="max-w-md text-sm text-muted-foreground">{description}</p>}
+      <Button variant="outline" size="sm" className="mt-1" onClick={retry}><RefreshCw />Try again</Button>
+    </div>
+  );
+}
+
+function ScoreTile({ item, onClick }: { item: RiasecResultItem; maxScore: number; onClick: () => void }) {
+  const meta = getAreaMeta(item.area);
+  const Icon = meta.icon;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/50"
+    >
+      <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${meta.iconClass}`}>
+        <Icon className="size-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{item.area}</p>
+        <p className="text-xs text-muted-foreground">Tap to learn more</p>
+      </div>
+      <p className="text-xl font-semibold">{item.score}</p>
+    </button>
+  );
+}
+
 export function KnowingYourselfHub() {
   const router = useRouter();
   const pathname = usePathname();
@@ -106,7 +142,7 @@ export function KnowingYourselfHub() {
       const data = await loadInterestQuestions();
       setQuestions(data);
     } catch {
-      setQuestionsError('Could not load the interest profile questions. Please try again.');
+      setQuestionsError('Could not load the interest profile questions.');
     } finally {
       setQuestionsLoading(false);
     }
@@ -125,7 +161,7 @@ export function KnowingYourselfHub() {
       const data = await loadInterestResults(currentAnswers);
       setResult(data);
     } catch {
-      setResultsError('Could not load your interest profile results. Please try again.');
+      setResultsError('Could not load your interest profile results.');
     } finally {
       setResultsLoading(false);
     }
@@ -139,6 +175,16 @@ export function KnowingYourselfHub() {
   }, [step, answers, refreshResults]);
 
   const introStep = useMemo(() => INTRO_STEPS[Math.min(step, 4) - 1], [step]);
+
+  const topArea = useMemo(() => {
+    if (!result?.length) return null;
+    return result.reduce((best, item) => (item.score > best.score ? item : best), result[0]);
+  }, [result]);
+
+  const maxScore = useMemo(
+    () => (result?.length ? Math.max(...result.map((item) => item.score)) : 0),
+    [result]
+  );
 
   const handleSelect = (questionIdx: number, emojiIdx: number) => {
     setSelectedOptions((prev) => ({ ...prev, [questionIdx]: emojiIdx }));
@@ -168,15 +214,21 @@ export function KnowingYourselfHub() {
             </div>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">Knowing yourself</h1>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              The RISEC Interest Profiler helps you find out what your interests are and how they
+              The RIASEC Interest Profiler helps you find out what your interests are and how they
               relate to the world of work.
             </p>
           </div>
           <Badge variant="secondary">Step {step} of {TOTAL_STEPS}</Badge>
         </div>
+        <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-[#4F46E5] transition-all"
+            style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
+          />
+        </div>
       </header>
 
-      <IntroBanner />
+      {step <= 4 && <IntroBanner />}
 
       {step <= 4 && (
         <Card>
@@ -217,12 +269,12 @@ export function KnowingYourselfHub() {
           </CardHeader>
           <CardContent>
             {questionsLoading ? (
-              <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-                <Spinner className="size-4" />
+              <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
+                <LoaderCircle className="size-4 animate-spin" />
                 Loading questions…
               </div>
             ) : questionsError ? (
-              <p className="py-10 text-center text-sm text-destructive">{questionsError}</p>
+              <CenterMessage title="Unable to load questions" description={questionsError} retry={() => void refreshQuestions()} />
             ) : (
               <QuizPanel
                 questions={questions}
@@ -237,56 +289,70 @@ export function KnowingYourselfHub() {
       )}
 
       {step === TOTAL_STEPS && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Here are your Interest Profiler results</CardTitle>
-            <CardDescription>
-              Click any interest area below to learn more about what it means.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {resultsLoading ? (
-              <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-                <Spinner className="size-4" />
+        <>
+          {resultsLoading ? (
+            <Card>
+              <CardContent className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
+                <LoaderCircle className="size-4 animate-spin" />
                 Loading your results…
-              </div>
-            ) : resultsError ? (
-              <p className="py-10 text-center text-sm text-destructive">{resultsError}</p>
-            ) : (
-              <div className="flex flex-col gap-8 sm:flex-row sm:items-center">
-                <div className="mx-auto w-full max-w-[220px] sm:mx-0">
-                  <RiasecDoughnutChart result={result ?? []} />
-                </div>
-                <ul className="flex-1 divide-y">
-                  {(result ?? []).map((item, index) => (
-                    <li key={item.area} className="flex items-center justify-between gap-3 py-2 text-sm">
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 text-left text-primary underline-offset-4 hover:underline"
-                        onClick={() => setActiveItem(item)}
-                      >
-                        <span
-                          className="size-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: RIASEC_COLORS[index] }}
-                        />
-                        {item.area}
-                      </button>
-                      <span className="font-semibold">{item.score}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-          <CardFooter className="justify-between bg-transparent px-(--card-spacing) pb-(--card-spacing)">
-            <Button type="button" variant="outline" onClick={() => setStep(5)}>
-              Back to quiz
-            </Button>
-            <Button type="button" variant="outline" onClick={handleRetake}>
-              Retake assessment
-            </Button>
-          </CardFooter>
-        </Card>
+              </CardContent>
+            </Card>
+          ) : resultsError ? (
+            <Card>
+              <CardContent>
+                <CenterMessage title="Unable to load your results" description={resultsError} retry={() => void refreshResults(answers)} />
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {topArea && (
+                <Card className="border-indigo-200 bg-indigo-50/60">
+                  <CardContent className="flex items-center gap-3">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[#4F46E5]">
+                      <Trophy className="size-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Your strongest interest area</p>
+                      <p className="text-lg font-semibold text-[#4F46E5]">{topArea.area}</p>
+                      <p className="text-sm text-muted-foreground">Score {topArea.score} — tap any area below to learn what it means.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Your RIASEC interest profile</CardTitle>
+                  <CardDescription>
+                    Your interests are the work you like to do. The more a career meets your interests,
+                    the more likely it is to be satisfying and rewarding to you.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 lg:grid-cols-[minmax(0,220px)_1fr] lg:items-center">
+                    <div className="mx-auto w-full max-w-[220px]">
+                      <RiasecDoughnutChart result={result ?? []} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {(result ?? []).map((item) => (
+                        <ScoreTile key={item.area} item={item} maxScore={maxScore} onClick={() => setActiveItem(item)} />
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="justify-between bg-transparent px-(--card-spacing) pb-(--card-spacing)">
+                  <Button type="button" variant="outline" onClick={() => setStep(5)}>
+                    Back to quiz
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleRetake}>
+                    <RotateCcw />
+                    Retake assessment
+                  </Button>
+                </CardFooter>
+              </Card>
+            </>
+          )}
+        </>
       )}
 
       <RiasecResultModal item={activeItem} onOpenChange={(open) => !open && setActiveItem(null)} />
