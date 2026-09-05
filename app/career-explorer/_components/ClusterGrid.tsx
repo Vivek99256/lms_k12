@@ -1,5 +1,9 @@
 'use client';
 
+import { Compass, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { ClusterItem } from '../_lib/types';
 
 interface ClusterGridProps {
@@ -10,24 +14,39 @@ interface ClusterGridProps {
 }
 
 export function ClusterGrid({ items, onSelect, onAdvice, onExplore }: ClusterGridProps) {
-  if (!items.length) return <div className="mt-10 text-sm text-muted-foreground">No results found.</div>;
+  if (!items.length) {
+    return <EmptyState title="No results found" description="Try a different filter combination or search term." />;
+  }
 
   return (
-    <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
       {items.map((item, index) => {
         const label = item.career_cluster ?? item.career_pathway ?? item.title ?? '';
         return (
-          <div key={`${item.career_id ?? label}-${index}`} className="flex w-full flex-col">
-            <button type="button" onClick={() => onSelect(item, index)} className="relative w-full overflow-hidden text-left transition duration-300 hover:scale-[1.02]">
+          <Card key={`${item.career_id ?? label}-${index}`} size="sm" className="overflow-hidden transition-shadow hover:shadow-md">
+            <button type="button" onClick={() => onSelect(item, index)} className="block w-full text-left">
               {/* eslint-disable-next-line @next/next/no-img-element -- source comes from the ERP API. */}
-              <img className="h-auto w-full object-cover" src={item.image} alt={label} />
-              <div className="absolute top-0 flex h-[35%] w-full items-center justify-center bg-foreground/80 px-3 text-center text-sm xl:text-base"><h2 className="text-background">{label}</h2></div>
+              <img className="h-32 w-full object-cover" src={item.image} alt={label} />
+              <CardContent className="pt-3">
+                <CardTitle className="truncate">{label}</CardTitle>
+              </CardContent>
             </button>
-            <div className="mt-2 flex flex-col gap-1.5">
-              <button type="button" onClick={() => onAdvice(item)} className="w-full bg-[#0D6EFD] px-2 py-1.5 text-center text-sm text-white hover:bg-[#0b5ed7]">Advise from experts</button>
-              <button type="button" onClick={() => onExplore(item)} className="w-full bg-[#0D6EFD] px-2 py-1.5 text-center text-sm text-white hover:bg-[#0b5ed7]">Explore more on sector</button>
-            </div>
-          </div>
+            <CardContent className="flex flex-col gap-1.5 pt-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onAdvice(item)}
+                className="border-[#0D6EFD]/20 text-[#0D6EFD] hover:bg-[#0D6EFD]/10 hover:text-[#0D6EFD]"
+              >
+                <Sparkles />
+                Advise from experts
+              </Button>
+              <Button size="sm" onClick={() => onExplore(item)} className="bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90">
+                <Compass />
+                Explore sector
+              </Button>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

@@ -2,8 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { LoaderCircle, Menu, RefreshCw, X } from 'lucide-react';
+import { Compass, Filter, LoaderCircle, Search, SlidersHorizontal } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ErrorState } from '@/components/ui/error-state';
+import { SearchInput } from '@/components/ui/search-input';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from '@/components/ui/sheet';
 import { EduSideMenu } from './_components/EduSideMenu';
 import { ClusterGrid } from './_components/ClusterGrid';
 import { ResultsList } from './_components/ResultsList';
@@ -27,7 +34,7 @@ export default function CareerExplorerHub() {
   const [error, setError] = useState('');
   const [clusters, setClusters] = useState<ClusterItem[]>([]);
   const [sideMenu, setSideMenu] = useState<SideMenuSection[]>([]);
-  const [mobileMenu, setMobileMenu] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const [drillPath, setDrillPath] = useState<DrillStep[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({});
@@ -132,6 +139,7 @@ export default function CareerExplorerHub() {
   const resultsMode = hasSelectedFilters(selectedFilters) || searchResults !== null;
   const activeResults = searchResults ?? filterResults ?? [];
   const activeResultsLoading = searchLoading || filterLoading;
+  const activeFilterCount = Object.values(selectedFilters).reduce((total, ids) => total + ids.length, 0);
 
   const bannerTitle = drillPath.length
     ? drillPath[drillPath.length - 1].item.career_cluster ?? drillPath[drillPath.length - 1].item.career_pathway ?? ''
@@ -146,116 +154,142 @@ export default function CareerExplorerHub() {
     return (
       <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircle className="size-4 animate-spin" />
-        Loading career explorerâ€¦
+        Loading career explorer…
       </div>
     );
   }
 
   if (error) {
-    return (
-      <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-center">
-        <p className="max-w-lg text-sm text-destructive">{error}</p>
-        <Button variant="outline" onClick={refresh}>
-          <RefreshCw />
-          Try again
-        </Button>
-      </div>
-    );
+    return <ErrorState title="Unable to load career explorer" description={error} retry={refresh} />;
   }
 
+  const filterPanel = <EduSideMenu sideMenu={sideMenu} selectedFilters={selectedFilters} onChange={handleFiltersChange} />;
+
   return (
-    <div className="container mx-auto px-4">
-      <div className="bg-[#0D6EFD] w-[100%] mt-[42px] rounded-[26px] md:rounded-[48px]">
-        <div className="flex gap-[20px] items-center px-10 py-[18px] pr-[20px]">
-          <button type="button" onClick={() => setMobileMenu(true)} className="block lg:hidden text-white">
-            <Menu className="size-5" />
-          </button>
-          <h3 className="xl:text-[18px] font-semibold text-white">EDUCATION LEVEL</h3>
+    <div className="space-y-5 p-1 md:p-2">
+      <header className="rounded-xl border bg-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium text-[#0D6EFD]">
+              <span className="flex size-6 items-center justify-center rounded-md bg-[#0D6EFD]/10">
+                <Compass className="size-3.5" />
+              </span>
+              Career explorer
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight">Find occupation</h1>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+              Browse career clusters and pathways, or search directly by keyword, career name, or major.
+            </p>
+          </div>
+          <Badge variant="outline" className="border-[#0D6EFD]/20 bg-[#0D6EFD]/10 text-[#0D6EFD]">
+            <Search />
+            Discovery
+          </Badge>
+        </div>
+      </header>
+
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Search for careers</CardTitle>
+          <CardDescription>Enter a keyword, career name, or major to search directly.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSearchSubmit} className="flex w-full flex-col gap-2 sm:flex-row">
+            <SearchInput
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Enter keyword, career name or major"
+              icon={<Search className="size-4" />}
+              size="lg"
+              className="h-11"
+            />
+            <Button type="submit" disabled={searchLoading} className="bg-[#0D6EFD] text-white hover:bg-[#0D6EFD]/90">
+              {searchLoading ? <LoaderCircle className="animate-spin" /> : <Search />}
+              Search
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+        <Card className="hidden self-start lg:block lg:sticky lg:top-4">
+          <CardContent>{filterPanel}</CardContent>
+        </Card>
+
+        <div className="lg:hidden">
+          <Button
+            variant="outline"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="border-[#0D6EFD]/20 text-[#0D6EFD] hover:bg-[#0D6EFD]/10 hover:text-[#0D6EFD]"
+          >
+            <SlidersHorizontal />
+            Filters
+            {activeFilterCount > 0 && (
+              <Badge variant="outline" className="border-[#0D6EFD]/20 bg-[#0D6EFD]/10 text-[#0D6EFD]">{activeFilterCount}</Badge>
+            )}
+          </Button>
+          <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+            <SheetContent side="left" className="overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <Filter className="size-4 text-[#0D6EFD]" />
+                  Filters
+                </SheetTitle>
+              </SheetHeader>
+              {filterPanel}
+            </SheetContent>
+          </Sheet>
         </div>
 
-        <div className="flex gap-[5px] w-[100%] px-3 lg:pl-[20px]">
-          <div className="hidden lg:block w-[30%] xl:w-[30%]">
-            <EduSideMenu sideMenu={sideMenu} selectedFilters={selectedFilters} onChange={handleFiltersChange} />
-          </div>
-
-          {mobileMenu && (
-            <div className="fixed top-0 z-10 block w-full h-screen overflow-y-auto left-0 lg:hidden bg-[#0D6EFD]">
-              <div className="flex justify-end p-3">
-                <button type="button" onClick={() => setMobileMenu(false)} className="text-white">
-                  <X className="size-5" />
-                </button>
-              </div>
-              <EduSideMenu sideMenu={sideMenu} selectedFilters={selectedFilters} onChange={handleFiltersChange} />
-            </div>
-          )}
-
-          <div className="w-full lg:w-[70%] xl:w-[75%] bg-card rounded-[10px] md:rounded-[48px] mb-10 p-[10px] md:p-[35px]">
+        <Card>
+          <CardHeader>
             {drillPath.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 pb-4 text-sm text-muted-foreground">
-                <button type="button" className="underline" onClick={() => syncPath([])}>
+              <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+                <button type="button" className="hover:text-foreground hover:underline" onClick={() => syncPath([])}>
                   All clusters
                 </button>
                 {drillPath.map((step, i) => (
-                  <span key={i} className="flex items-center gap-2">
+                  <span key={i} className="flex items-center gap-1.5">
                     <span>/</span>
-                    <button type="button" className="underline" onClick={() => syncPath(drillPath.slice(0, i + 1))}>
+                    <button
+                      type="button"
+                      className="hover:text-foreground hover:underline"
+                      onClick={() => syncPath(drillPath.slice(0, i + 1))}
+                    >
                       {step.item.career_cluster ?? step.item.career_pathway ?? `Level ${i + 1}`}
                     </button>
                   </span>
                 ))}
               </div>
             )}
+            <CardTitle>{bannerTitle || 'Explore careers and see what catches your eye'}</CardTitle>
+            <CardDescription>
+              {resultsMode
+                ? 'Occupations matching your search or selected filters.'
+                : 'Browse career clusters, drill into pathways, and discover occupations.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!resultsMode && !isLeafLevel && (
+              <ClusterGrid
+                items={currentLevelItems}
+                onSelect={handleSelectCluster}
+                onAdvice={(item) => router.push(`/career-explorer/expert-advice?title=${encodeURIComponent(item.career_cluster ?? item.career_pathway ?? "")}`)}
+                onExplore={(item) => router.push(`/career-explorer/explore-sectors?title=${encodeURIComponent(item.career_cluster ?? item.career_pathway ?? "")}`)}
+              />
+            )}
+            {!resultsMode && isLeafLevel && <ResultsList items={currentLevelItems} />}
 
-            <h3 className="text-[20px] xl:text-[28px] font-semibold text-card-foreground">
-              Explore Careers and See What Catches Your Eye
-            </h3>
-            <p className="xl:text-[18px] font-medium text-muted-foreground py-[6px] xl:py-[12px]">
-              Search careers by keyword, category, education level, and / or the results of questionnaires
-            </p>
+            {resultsMode && activeResultsLoading && (
+              <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
+                <LoaderCircle className="size-4 animate-spin" />
+                Loading results…
+              </div>
+            )}
 
-            <div className="bg-[#0D6EFD] mt-5 xl:mt-0 py-[35px] px-[15px] rounded-[20px]">
-              <h2 className="text-[18px] xl:text-[30px] text-white">Search For Careers</h2>
-              <form onSubmit={handleSearchSubmit} className="flex w-full gap-1 mt-3">
-                <input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  className="w-full h-[45px] px-[15px] rounded-[10px] border border-input bg-background text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Enter keyword, career name or major"
-                  type="text"
-                />
-                <button type="submit" className="bg-secondary text-secondary-foreground text-[16px] w-[121px] rounded-[10px]">
-                  Submit
-                </button>
-              </form>
-            </div>
-
-            <div className="w-[100%] mt-10">
-              {bannerTitle && !resultsMode && (
-                <div className="relative mt-[20px]">
-                  <div className="rounded-[10px] w-[70%] mx-auto bg-foreground/80">
-                    <div className="text-center py-[8px] text-[22px] 2xl:text-[30px]">
-                      <h2 className="text-background">{bannerTitle}</h2>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!resultsMode && !isLeafLevel && (
-                <ClusterGrid items={currentLevelItems} onSelect={handleSelectCluster} onAdvice={(item) => router.push(`/career-explorer/expert-advice?title=${encodeURIComponent(item.career_cluster ?? item.career_pathway ?? "")}`)} onExplore={(item) => router.push(`/career-explorer/explore-sectors?title=${encodeURIComponent(item.career_cluster ?? item.career_pathway ?? "")}`)} />
-              )}
-              {!resultsMode && isLeafLevel && <ResultsList items={currentLevelItems} />}
-
-              {resultsMode && activeResultsLoading && (
-                <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <LoaderCircle className="size-4 animate-spin" />
-                  Loading resultsâ€¦
-                </div>
-              )}
-
-              {resultsMode && !activeResultsLoading && <ResultsList items={activeResults} />}
-            </div>
-          </div>
-        </div>
+            {resultsMode && !activeResultsLoading && <ResultsList items={activeResults} />}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -1,9 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Flag, LoaderCircle, MapPin, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ProfileImage } from '../_components/ProfileImage';
+import { Flag, GraduationCap, MapPin, Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
+} from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { SearchInput } from '@/components/ui/search-input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CareerExplorerPageHeader } from '../_components/CareerExplorerPageHeader';
 import { loadInstitutes } from '../_lib/api';
 import type { InstituteItem } from '../_lib/types';
 
@@ -26,6 +33,7 @@ export default function CollegeProfileHub() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
   }, []);
 
@@ -35,76 +43,76 @@ export default function CollegeProfileHub() {
   );
 
   return (
-    <div className="container mx-auto px-4">
-      <section className="mb-10 overflow-hidden rounded-[10px] bg-[#0D6EFD] pt-4 md:rounded-[48px] md:pt-8">
-        <div className="rounded-t-[26px] bg-card px-4 py-5 md:rounded-t-[48px] md:px-10 md:py-6">
-          <h1 className="py-3 text-[26px] font-semibold text-[#0D6EFD] underline md:text-4xl">
-            Explore Your Future College&apos;s
-          </h1>
-          <p className="text-lg text-muted-foreground md:text-2xl">
-            Students can explore which university and suburbs are suitable for your future.
-          </p>
-        </div>
+    <div className="space-y-5 p-1 md:p-2">
+      <CareerExplorerPageHeader
+        icon={GraduationCap}
+        title="College profile"
+        description="Explore colleges and universities that suit your future — search by name below."
+        badgeIcon={GraduationCap}
+        badgeLabel="Higher education"
+      />
 
-        <div className="bg-card px-4 pb-8 md:px-10">
-          <input
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            className="mt-3 h-[45px] w-full rounded-[10px] border border-input bg-background px-[15px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            placeholder="Search by College Name"
-            type="text"
-          />
-
+      <Card>
+        <CardHeader className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <CardTitle>Colleges</CardTitle>
+            <CardDescription>{loading ? 'Loading…' : `${filtered.length} college${filtered.length === 1 ? '' : 's'} found.`}</CardDescription>
+          </div>
+          <div className="w-full sm:w-72 lg:w-[420px]">
+            <SearchInput
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by college name"
+              icon={<Search className="size-4" />}
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
           {loading && (
-            <div className="mt-10 flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin" />
-              Loading colleges...
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {[...Array(4)].map((_, index) => <Skeleton key={index} className="h-32 w-full rounded-xl" />)}
             </div>
           )}
 
           {!loading && error && (
-            <div className="mt-10 flex min-h-32 flex-col items-center justify-center gap-3 text-center">
-              <p className="max-w-lg text-sm text-destructive">{error}</p>
-              <Button variant="outline" onClick={refresh}>
-                <RefreshCw />
-                Try again
-              </Button>
-            </div>
+            <ErrorState title="Unable to load colleges" description={error} retry={() => void refresh()} />
           )}
 
           {!loading && !error && filtered.length === 0 && (
-            <div className="mt-10 flex h-[200px] items-center justify-center text-muted-foreground">No colleges found.</div>
+            <EmptyState icon={<GraduationCap className="size-8" />} title="No colleges found" description="Try a different search term." />
           )}
 
           {!loading && !error && filtered.length > 0 && (
-            <div className="mt-7 grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {filtered.map((item, index) => <CollegeCard key={`${item.id ?? item.college_name}-${index}`} item={item} />)}
             </div>
           )}
-        </div>
-      </section>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
 function CollegeCard({ item }: { item: InstituteItem }) {
   return (
-    <article className="w-full rounded-lg border bg-background p-4 shadow-md transition hover:shadow-lg hover:shadow-blue-500/50">
-      <h2 className="mb-3 break-words text-lg font-bold text-[#0D6EFD]">{item.college_name}</h2>
-
-      <div className="flex flex-col gap-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-        <span className="w-fit rounded-sm bg-yellow-200 px-2 py-1 text-xs text-black">Featured</span>
-        <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-center md:justify-end">
-          <div className="flex items-center gap-2"><MapPin className="size-4 shrink-0 text-[#b9b7e8]" /><span>{[item.district, item.state].filter(Boolean).join(', ') || 'N/A'}</span></div>
-          <div className="flex items-center gap-2"><Flag className="size-4 shrink-0 text-[#b9b7e8]" /><span>{item.type ?? 'N/A'}</span></div>
+    <Card size="sm" className="transition-shadow hover:shadow-md">
+      <CardContent>
+        <div className="flex items-start justify-between gap-3">
+          <CardTitle className="text-[#0D6EFD]">{item.college_name}</CardTitle>
+          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">Featured</Badge>
         </div>
-      </div>
 
-      <dl className="mt-4 space-y-2 text-sm">
-        <div className="flex justify-between gap-4"><dt className="font-bold text-foreground">Minority</dt><dd>{item.minority || 'null'}</dd></div>
-        <div className="flex justify-between gap-4"><dt className="font-bold text-foreground">Level</dt><dd className="text-right">{item.level || 'null'}</dd></div>
-        <div className="flex justify-between gap-4"><dt className="font-bold text-foreground">Women</dt><dd>{item.women || 'null'}</dd></div>
-      </dl>
-    </article>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+          <span className="flex items-center gap-1.5"><MapPin className="size-4 shrink-0" />{[item.district, item.state].filter(Boolean).join(', ') || 'N/A'}</span>
+          <span className="flex items-center gap-1.5"><Flag className="size-4 shrink-0" />{item.type ?? 'N/A'}</span>
+        </div>
+
+        <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
+          <div><dt className="text-xs text-muted-foreground">Minority</dt><dd className="font-medium text-foreground">{item.minority || '—'}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Level</dt><dd className="font-medium text-foreground">{item.level || '—'}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Women</dt><dd className="font-medium text-foreground">{item.women || '—'}</dd></div>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
