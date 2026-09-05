@@ -983,6 +983,9 @@ export interface QuestionBankApiQuestion {
   concept_id?: number | null;
   /** Concept name stored on the question itself, for rows whose ids don't resolve. */
   concept?: string | null;
+  /** PAL learning-flow category, e.g. 'misconception_detection'. Null on rows
+   *  generated before the category column existed. */
+  category?: string | null;
   question: string;
   question_type: string;
   options?: Array<{
