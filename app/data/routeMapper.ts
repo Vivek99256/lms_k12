@@ -752,6 +752,26 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     frontDeskRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (frontDeskRoute) return frontDeskRoute;
 
+  // Level-2 "Career Counselling" section — a standalone module (not nested
+  // under career-intelligence) with Interest Profile and Knowing Yourself as
+  // its two Level-3 pages. Checked ahead of careerIntelligenceRoutes below so
+  // these two specific route names resolve here instead of falling through
+  // to the generic career_counselling.* aliases that still point at the
+  // (separately renamed) career-intelligence module.
+  const careerCounsellingRoutes: Record<string, string> = {
+    'career_counselling/interest-profile': '/career-counselling/interest-profile',
+    'career-counselling/interest-profile': '/career-counselling/interest-profile',
+    'career_counselling_interest_profile': '/career-counselling/interest-profile',
+    'interest-profile': '/career-counselling/interest-profile',
+    'career_counselling/knowing-yourself': '/career-counselling/knowing-yourself',
+    'career-counselling/knowing-yourself': '/career-counselling/knowing-yourself',
+    'career_counselling_knowing-yourself': '/career-counselling/knowing-yourself',
+    'knowing-yourself': '/career-counselling/knowing-yourself',
+  };
+  const careerCounsellingRoute =
+    careerCounsellingRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerCounsellingRoute) return careerCounsellingRoute;
+
   const careerIntelligenceRoutes: Record<string, string> = {
     'career_counselling.index': '/career-intelligence',
     'career-counselling.index': '/career-intelligence',
@@ -764,15 +784,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     'career_counselling/plan': '/career-intelligence',
     'career_counselling/education': '/career-intelligence',
     'career_counselling/explore': '/career-intelligence',
-    'career_counselling/knowing-yourself': '/career-intelligence',
-    'career_counselling/interest-profile': '/career-intelligence',
     'career_counselling/college': '/career-intelligence',
     'career_counselling/courses': '/career-intelligence',
     'career_counselling/profile': '/career-intelligence',
     'career_counselling/expert-advice': '/career-intelligence',
     'career_counselling/explore-sectors': '/career-intelligence',
     'career_counselling/match-profile': '/career-intelligence?section=match',
-    'knowing-yourself': '/career-intelligence',
     'match-profile': '/career-intelligence?section=match',
     'expert-advice': '/career-intelligence',
     'explore-sectors': '/career-intelligence',

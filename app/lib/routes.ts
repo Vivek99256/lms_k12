@@ -25,6 +25,14 @@ export const ROUTES = {
     intelligence: '/career-intelligence?section=intelligence',
   },
 
+  // Level-2 "Career Counselling" section, with Interest Profile and Knowing
+  // Yourself as its two Level-3 pages — a standalone module, not nested
+  // under career-intelligence.
+  careerCounselling: {
+    interestProfile: '/career-counselling/interest-profile',
+    knowingYourself: '/career-counselling/knowing-yourself',
+  },
+
   careerAwareness: {
     home: '/career-awareness',
     certainty: '/career-awareness/certainty',
