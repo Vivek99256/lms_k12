@@ -12,6 +12,7 @@ import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
+import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
 import { BRAIN_MENU_LABEL, BRAIN_ROOT, BRAIN_SECTIONS } from '@/lib/brain/navigation';
@@ -529,6 +530,27 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   };
 
+  /**
+   * A hit from the top-bar menu search. Level 2 reuses the sidebar's own
+   * selection flow verbatim (module dashboard / New PAL / first Level 3), so a
+   * searched module behaves exactly like a clicked one. Level 3 opens its screen
+   * with the owning branch selected, which is what drives the sub-header.
+   */
+  const handleMenuSearchNavigate = async (entry: MenuSearchEntry) => {
+    if (entry.level === 2 && entry.level1 && entry.level2) {
+      await handleLevel2Select(entry.level2, entry.level1);
+      return;
+    }
+
+    if (entry.level === 3) {
+      setSelectedBranch({ level1Key: entry.level1Key, level2Key: entry.level2Key });
+      setMasterMenuFetchedFor(null);
+      if (entry.level1 && entry.level2) await fetchMasterMenu(entry.level1.id, entry.level2);
+    }
+
+    if (entry.route) router.push(entry.route);
+  };
+
   const selectedL1 = useMemo(() => {
     if (!selectedBranch?.level1Key) return null;
     return displayedMenuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key) ?? null;
@@ -627,6 +649,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <Header
           onToggleChatbot={toggleChatbot}
           isChatbotOpen={isChatbotOpen}
+          menuItems={menuItems}
+          onMenuSearchNavigate={handleMenuSearchNavigate}
         />
         <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main

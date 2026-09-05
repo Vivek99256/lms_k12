@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot } from 'lucide-react';
+import { Bell, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import HeaderMenuSearch from '@/app/components/HeaderMenuSearch';
+import type { MenuItem } from '@/app/data/menuItems';
+import type { MenuSearchEntry } from '@/app/data/menuSearch';
 
 const profileMenuItems = [
   'Implementation',
@@ -37,9 +40,14 @@ const getStoredSelection = (key: string) => {
 export default function Header({
   onToggleChatbot,
   isChatbotOpen,
+  menuItems = [],
+  onMenuSearchNavigate,
 }: {
   onToggleChatbot: () => void;
   isChatbotOpen: boolean;
+  /** The shell's rights-filtered menu tree — what the top-bar search searches. */
+  menuItems?: MenuItem[];
+  onMenuSearchNavigate?: (entry: MenuSearchEntry) => void;
 }) {
   const { user, logout, refreshAcademicTerms, academicTerms, academicYears } = useAuth();
   const router = useRouter();
@@ -190,6 +198,17 @@ export default function Header({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // The shell owns menu navigation, because opening a screen also has to move
+  // the sidebar's selected branch and its Level 3 sub-header. Without it, a
+  // plain route push is still better than a dead search box.
+  const handleMenuSearchNavigate = (entry: MenuSearchEntry) => {
+    if (onMenuSearchNavigate) {
+      onMenuSearchNavigate(entry);
+      return;
+    }
+    if (entry.route) router.push(entry.route);
+  };
+
   const renderDropdown = (
     isOpen: boolean,
     position: { top: number; left: number } | null,
@@ -234,10 +253,7 @@ export default function Header({
         <button className="p-2 hover:bg-gray-100 rounded-full lg:hidden"><Menu size={20} /></button>
         
         <div className="flex-1 max-w-xl mr-2">
-          <div className="search-bar flex items-center bg-white border border-gray-200 pl-5 pr-4 py-2 rounded-full">
-            <Search size={18} className="text-gray-400 mr-3" />
-            <input type="text" placeholder="Search for subjects, chapters, students..." className="flex-1 bg-transparent text-sm outline-none" />
-          </div>
+          <HeaderMenuSearch menuItems={menuItems} onNavigate={handleMenuSearchNavigate} />
         </div>
       </div>
 
