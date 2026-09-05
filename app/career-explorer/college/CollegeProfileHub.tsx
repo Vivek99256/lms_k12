@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Flag, LoaderCircle, MapPin, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CareerExplorerTabBar } from '../_components/CareerExplorerTabBar';
 import { ProfileImage } from '../_components/ProfileImage';
 import { loadInstitutes } from '../_lib/api';
 import type { InstituteItem } from '../_lib/types';
@@ -37,8 +36,6 @@ export default function CollegeProfileHub() {
 
   return (
     <div className="container mx-auto px-4">
-      <CareerExplorerTabBar />
-
       <section className="mb-10 overflow-hidden rounded-[10px] bg-[#0D6EFD] pt-4 md:rounded-[48px] md:pt-8">
         <div className="rounded-t-[26px] bg-card px-4 py-5 md:rounded-t-[48px] md:px-10 md:py-6">
           <h1 className="py-3 text-[26px] font-semibold text-[#0D6EFD] underline md:text-4xl">

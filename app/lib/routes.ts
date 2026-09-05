@@ -27,10 +27,17 @@ export const ROUTES = {
 
   careerAwareness: {
     home: '/career-awareness',
+    certainty: '/career-awareness/certainty',
+    ambition: '/career-awareness/ambition',
+    alignment: '/career-awareness/alignment',
+    originality: '/career-awareness/originality',
   },
 
   careerExplorer: {
     home: '/career-explorer',
+    college: '/career-explorer/college',
+    courses: '/career-explorer/courses',
+    employers: '/career-explorer/employers',
   },
   
   // Result routes (paths mirror the legacy Laravel result route group)

@@ -390,7 +390,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
       {level2Panel && typeof document !== 'undefined' && createPortal(
         <div
           data-level2-panel
-          className="fixed flex flex-col bg-white rounded-2xl border border-gray-200/70 shadow-[0_8px_30px_rgb(0,0,0,0.08)] py-3"
+          className="fixed flex flex-col rounded-2xl border bg-popover py-3 shadow-lg"
           style={{
             top: level2Panel.top === undefined ? undefined : `${level2Panel.top}px`,
             bottom: level2Panel.bottom === undefined ? undefined : `${level2Panel.bottom}px`,
@@ -401,8 +401,8 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
           }}
         >
           <div className="shrink-0 px-4 py-2 mb-1">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Level 2 Menu</p>
-            <h3 className="text-sm font-bold text-gray-900 truncate">{level2Panel.item.label}</h3>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Level 2 Menu</p>
+            <h3 className="truncate text-sm font-bold text-popover-foreground">{level2Panel.item.label}</h3>
           </div>
           <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-auto scroll-smooth scrollbar-hide px-3 pb-2 pr-2">
             {level2Columns.map((column, columnIndex) => (
@@ -424,16 +424,16 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
                       onClick={() => handleLevel2Click(submenu)}
                       className={`h-10 w-full flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-semibold transition-all cursor-pointer text-left
                         ${isSubActive
-                          ? 'border-blue-100 bg-blue-50/80 text-[#0D6EFD] shadow-sm'
-                          : 'border-gray-200/80 bg-white text-gray-600 shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:border-gray-300 hover:bg-gray-50/80 hover:text-gray-900 hover:shadow-sm'
+                          ? 'border-[#0D6EFD]/20 bg-[#0D6EFD]/10 text-[#0D6EFD] shadow-sm'
+                          : 'border-border bg-card text-muted-foreground shadow-xs hover:border-muted-foreground/30 hover:bg-muted/60 hover:text-foreground hover:shadow-sm'
                         }`}
                     >
-                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${isSubActive ? 'bg-blue-100 text-[#0D6EFD]' : 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${isSubActive ? 'bg-[#0D6EFD]/10 text-[#0D6EFD]' : 'bg-muted text-muted-foreground'}`}>
                         {SubIcon ? <SubIcon size={15} /> : submenu.label.charAt(0).toUpperCase()}
                       </span>
                       <span className="min-w-0 flex-1 truncate">{submenu.label}</span>
                       {hasLevel3 && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0">
+                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                           +{submenu.submenus!.length}
                         </span>
                       )}

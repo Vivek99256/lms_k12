@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoaderCircle, Menu, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CareerExplorerTabBar } from './_components/CareerExplorerTabBar';
 import { EduSideMenu } from './_components/EduSideMenu';
 import { ClusterGrid } from './_components/ClusterGrid';
 import { ResultsList } from './_components/ResultsList';
@@ -166,7 +165,6 @@ export default function CareerExplorerHub() {
 
   return (
     <div className="container mx-auto px-4">
-      <CareerExplorerTabBar />
       <div className="bg-[#0D6EFD] w-[100%] mt-[42px] rounded-[26px] md:rounded-[48px]">
         <div className="flex gap-[20px] items-center px-10 py-[18px] pr-[20px]">
           <button type="button" onClick={() => setMobileMenu(true)} className="block lg:hidden text-white">
