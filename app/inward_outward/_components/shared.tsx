@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import type { Feedback } from '../_lib/types';
 
 export function PageFrame({ children }: { children: ReactNode }) {
-  return <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:p-4 lg:p-5">{children}</div>;
+  return <div className="mx-auto space-y-4 p-3 sm:p-4 lg:p-5">{children}</div>;
 }
 
 export function PageHeader({ title, description, action }: { title: string; description: string; action?: ReactNode }) {

@@ -1,0 +1,51 @@
+.lms-lbm-shell {
+  background-color: #EAF0F8;
+}
+
+/* The outer table container rendered by RecordTable: <div class="overflow-hidden rounded-xl border border-slate-200"> */
+.lms-lbm-shell .lms-lbm-table-card,
+.lms-lbm-shell > .mx-auto > div.space-y-5 > div.space-y-3 > div.overflow-hidden {
+  background-color: transparent !important;
+  border-color: #D6DEEA !important;
+  box-shadow: none !important;
+}
+
+.lms-lbm-shell table,
+.lms-lbm-shell [data-slot="table"] {
+  background-color: transparent;
+}
+
+.lms-lbm-shell thead tr,
+.lms-lbm-shell [data-slot="table-header"] tr {
+  background-color: rgba(219, 230, 244, 0.55) !important;
+}
+
+.lms-lbm-shell thead th,
+.lms-lbm-shell [data-slot="table-head"] {
+  color: #1E293B !important;
+  font-weight: 600;
+  border-bottom: 1px solid #C9D3E3 !important;
+  background-color: transparent !important;
+}
+
+.lms-lbm-shell tbody tr,
+.lms-lbm-shell [data-slot="table-row"] {
+  background-color: rgba(255, 255, 255, 0.45) !important;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #DCE4F0 !important;
+}
+
+.lms-lbm-shell tbody tr:hover,
+.lms-lbm-shell [data-slot="table-row"]:hover {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.lms-lbm-shell tbody tr:last-child,
+.lms-lbm-shell [data-slot="table-body"] tr:last-child {
+  border-bottom: none !important;
+}
+
+.lms-lbm-shell tbody td,
+.lms-lbm-shell [data-slot="table-cell"] {
+  color: #334155;
+}

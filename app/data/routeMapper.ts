@@ -179,6 +179,13 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lms_syllabus': '/lms/syllabus-plan',
   'lmsleaderboard.index': '/lms/leader-board',
   'lms/lmsleaderboard': '/lms/leader-board',
+  // Social & Collaborative — tblmenumaster stores the legacy (misspelled)
+  // route name "lmsSocialCollabrotive.index"; the Next.js page uses the
+  // corrected spelling, so both variants are mapped.
+  'lmssocialcollabrotive.index': '/lms/social-collaborative',
+  'lms/lmssocialcollabrotive': '/lms/social-collaborative',
+  'lmssocialcollaborative.index': '/lms/social-collaborative',
+  'lms/lmssocialcollaborative': '/lms/social-collaborative',
   // MASTER modules
   'lb_master.index': '/lms/leader-board-master',
   'lms/lb_master': '/lms/leader-board-master',
@@ -318,6 +325,14 @@ const STUDENT_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'student/student_strength_report': '/student/report/student_strength_report',
   'agewise.index': '/student/report/agewise_report',
   'student/agewise': '/student/report/agewise_report',
+  'student_homework_report.index': '/lms/homework/report',
+  'student_homework_report_index': '/lms/homework/report',
+  'student/student_homework_report': '/lms/homework/report',
+  'show_student_homework_report': '/lms/homework/report',
+  'student_homework_submission_report.index': '/lms/homework/submission-report',
+  'student_homework_submission_report_index': '/lms/homework/submission-report',
+  'student/student_homework_submission_report': '/lms/homework/submission-report',
+  'show_student_homework_submission_report': '/lms/homework/submission-report',
 };
 
 // Legacy ERP modules now served by the stateless migration API.
@@ -751,30 +766,81 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     frontDeskRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (frontDeskRoute) return frontDeskRoute;
 
-  const careerCounsellingRoutes: Record<string, string> = {
-    'career_counselling.index': '/career-counselling',
-    'career-counselling.index': '/career-counselling',
-    'career_counselling': '/career-counselling',
-    'career-counselling': '/career-counselling',
-    'career_counselling/plan': '/career-counselling',
-    'career_counselling/education': '/career-counselling?section=explore',
-    'career_counselling/explore': '/career-counselling?section=explore',
-    'career_counselling/knowing-yourself': '/career-counselling?section=assessment',
-    'career_counselling/interest-profile': '/career-counselling?section=assessment',
-    'career_counselling/college': '/career-counselling?section=colleges',
-    'career_counselling/courses': '/career-counselling?section=courses',
-    'career_counselling/profile': '/career-counselling?section=employers',
-    'career_counselling/expert-advice': '/career-counselling?section=experts',
-    'career_counselling/explore-sectors': '/career-counselling?section=sectors',
-    'career_counselling/match-profile': '/career-counselling?section=match',
-    'knowing-yourself': '/career-counselling?section=assessment',
-    'match-profile': '/career-counselling?section=match',
-    'expert-advice': '/career-counselling?section=experts',
-    'explore-sectors': '/career-counselling?section=sectors',
+  const careerIntelligenceRoutes: Record<string, string> = {
+    'career_counselling.index': '/career-intelligence',
+    'career-counselling.index': '/career-intelligence',
+    'career_counselling': '/career-intelligence',
+    'career-counselling': '/career-intelligence',
+    'career_intelligence.index': '/career-intelligence',
+    'career-intelligence.index': '/career-intelligence',
+    'career_intelligence': '/career-intelligence',
+    'career-intelligence': '/career-intelligence',
+    'career_counselling/plan': '/career-intelligence',
+    'career_counselling/education': '/career-intelligence',
+    'career_counselling/explore': '/career-intelligence',
+    'career_counselling/knowing-yourself': '/career-intelligence',
+    'career_counselling/interest-profile': '/career-intelligence',
+    'career_counselling/college': '/career-intelligence',
+    'career_counselling/courses': '/career-intelligence',
+    'career_counselling/profile': '/career-intelligence',
+    'career_counselling/expert-advice': '/career-intelligence',
+    'career_counselling/explore-sectors': '/career-intelligence',
+    'career_counselling/match-profile': '/career-intelligence?section=match',
+    'knowing-yourself': '/career-intelligence',
+    'match-profile': '/career-intelligence?section=match',
+    'expert-advice': '/career-intelligence',
+    'explore-sectors': '/career-intelligence',
   };
-  const careerCounsellingRoute =
-    careerCounsellingRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
-  if (careerCounsellingRoute) return careerCounsellingRoute;
+  const careerIntelligenceRoute =
+    careerIntelligenceRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerIntelligenceRoute) return careerIntelligenceRoute;
+
+  const careerAwarenessRoutes: Record<string, string> = {
+    'career_awareness.index': '/career-awareness',
+    'career-awareness.index': '/career-awareness',
+    'career_awareness': '/career-awareness',
+    'career-awareness': '/career-awareness',
+    'thinking_in_career_plan': '/career-awareness',
+    'career_awareness.certainty': '/career-awareness/certainty',
+    'career-awareness.certainty': '/career-awareness/certainty',
+    'career_awareness_certainty': '/career-awareness/certainty',
+    'career-awareness-certainty': '/career-awareness/certainty',
+    'career_awareness.ambition': '/career-awareness/ambition',
+    'career-awareness.ambition': '/career-awareness/ambition',
+    'career_awareness_ambition': '/career-awareness/ambition',
+    'career-awareness-ambition': '/career-awareness/ambition',
+    'career_awareness.alignment': '/career-awareness/alignment',
+    'career-awareness.alignment': '/career-awareness/alignment',
+    'career_awareness_alignment': '/career-awareness/alignment',
+    'career-awareness-alignment': '/career-awareness/alignment',
+    'career_awareness.originality': '/career-awareness/originality',
+    'career-awareness.originality': '/career-awareness/originality',
+    'career_awareness_originality': '/career-awareness/originality',
+    'career-awareness-originality': '/career-awareness/originality',
+  };
+  const careerAwarenessRoute =
+    careerAwarenessRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerAwarenessRoute) return careerAwarenessRoute;
+
+  const careerExplorerRoutes: Record<string, string> = {
+    'career_explore.index': '/career-explorer',
+    'career-explore.index': '/career-explorer',
+    'career_explore': '/career-explorer',
+    'career-explore': '/career-explorer',
+    'education.index': '/career-explorer',
+    'education': '/career-explorer',
+    'career_explore.find_occupation': '/career-explorer',
+    'career-explore.find_occupation': '/career-explorer',
+    'career_explore.college': '/career-explorer/college',
+    'career-explore.college': '/career-explorer/college',
+    'career_explore.courses': '/career-explorer/courses',
+    'career-explore.courses': '/career-explorer/courses',
+    'career_explore.employers': '/career-explorer/employers',
+    'career-explore.employers': '/career-explorer/employers',
+  };
+  const careerExplorerRoute =
+    careerExplorerRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerExplorerRoute) return careerExplorerRoute;
 
   if (cleanLink.toLowerCase() === 'other_fee_map.index') {
     return '/fees/master/additional-fees-mapping';

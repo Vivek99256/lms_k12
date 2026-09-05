@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 export function PageFrame({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:p-4 lg:p-5">
+      <div className="mx-auto  space-y-4 ">
         {children}
       </div>
     </div>

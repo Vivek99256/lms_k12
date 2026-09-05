@@ -7,17 +7,79 @@ import {
 } from '@/lib/erp-client';
 
 /**
- * LMS → Leader Board data layer (lmsLeaderboardController, student display).
+ * LMS Engagement -> Leader Board data layer.
  *
- *   GET /lms/lmsLeaderboard?type=API&sub_institute_id&user_id&user_profile_id&syear
- *     → { status, message, lb_Data: {...} | [] }
+ * Talks to the K12 REST API added for this module (Laravel:
+ * App\Http\Controllers\api\lms\LmsLeaderboardApiController), NOT the legacy
+ * `/lms/lmsLeaderboard` Blade route the page used to scrape:
  *
- * lb_Data is an object when the student has points, or an empty array otherwise.
- * Ranking = SUM(points) DESC within the student's standard/year (top-5); the
- * medal/tier is hard-coded "Bronze" in Laravel (no tier logic exists), and
- * lb_points is only ever read — nothing in the backend awards points yet.
- * The controller now reads tenant/user from the request (headless fallback).
+ *   GET /api/lms/leaderboard            my summary (points, modules, rank, toppers)
+ *   GET /api/lms/leaderboard/filters    the years/classes/modules that have data
+ *   GET /api/lms/leaderboard/rankings   the whole class ranking, paginated
+ *
+ * Auth is the standard ERP bearer JWT; the tenant, the user and the academic
+ * year are all derived from that token server-side, so nothing identifying is
+ * sent from here. `syear`/`term_id` are passed only to let the signed-in user
+ * switch academic year, exactly like the header year switcher does elsewhere.
  */
+
+export interface LbModule {
+  moduleName: string;
+  label: string;
+  icon: string;
+  description: string;
+  points: number;
+  entries: { date: string; points: number }[];
+}
+
+export interface LbRanking {
+  rank: number;
+  userId: number;
+  name: string;
+  points: number;
+  avatarUrl: string;
+  isCurrentUser: boolean;
+}
+
+export interface LeaderBoard {
+  hasData: boolean;
+  syear: number;
+  totalPoints: number;
+  rank: number | null;
+  classSize: number;
+  medal: string;
+  standardName: string;
+  sectionName: string;
+  modules: LbModule[];
+  toppers: LbRanking[];
+}
+
+export interface LbFilterOptions {
+  syears: number[];
+  standards: { id: number; name: string }[];
+  modules: { value: string; label: string }[];
+}
+
+export interface LbRankingFilters {
+  standardId?: string;
+  moduleName?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export interface LbRankingPage {
+  items: LbRanking[];
+  page: number;
+  perPage: number;
+  total: number;
+  lastPage: number;
+}
+
+// ---------------------------------------------------------------------------
+// Plumbing
+// ---------------------------------------------------------------------------
 
 function requireSession(): SessionContext {
   const session = buildSessionContext();
@@ -32,97 +94,135 @@ function toArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
-async function readJson(res: Response, fallback: string): Promise<unknown> {
-  const text = (await res.text()).trim();
-  if (!text) return {};
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
-  }
+/** Build a request URL carrying the year context the API needs. */
+function apiUrl(session: SessionContext, path: string, params: Record<string, string | undefined> = {}): URL {
+  const url = new URL(`${session.baseUrl}/api/lms/${path}`);
+  if (session.syear) url.searchParams.set('syear', session.syear);
+  if (session.termId) url.searchParams.set('term_id', session.termId);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') url.searchParams.set(key, value);
+  });
+  return url;
 }
 
-function userProfileId(): string {
-  if (typeof window === 'undefined') return '';
-  try {
-    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
-    return readString(menuContext.user_profile_id ?? userData.user_profile_id ?? userData.profile_id);
-  } catch {
-    return '';
-  }
-}
-
-export interface LbModule {
-  name: string;
-  points: number;
-}
-
-export interface LbTopper {
-  rank: number;
-  name: string;
-  points: number;
-  isCurrentUser: boolean;
-}
-
-export interface LeaderBoard {
-  hasData: boolean;
-  totalPoints: number;
-  rank: number;
-  medal: string;
-  modules: LbModule[];
-  toppers: LbTopper[];
-}
-
-export async function fetchLeaderBoard(signal?: AbortSignal): Promise<LeaderBoard> {
-  const session = requireSession();
-
-  const url = new URL(`${session.baseUrl}/lms/lmsLeaderboard`);
-  url.searchParams.set('type', 'API');
-  url.searchParams.set('sub_institute_id', session.subInstituteId);
-  url.searchParams.set('user_id', session.userId);
-  url.searchParams.set('user_profile_id', userProfileId());
-  url.searchParams.set('syear', session.syear);
-
+async function getJson(url: URL, session: SessionContext, signal?: AbortSignal): Promise<Record<string, unknown>> {
   const res = await fetch(url.toString(), {
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the leader board.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the leader board'));
 
-  const lbData = raw.lb_Data;
-  // Empty array => no points yet.
-  if (Array.isArray(lbData) || !lbData) {
-    return { hasData: false, totalPoints: 0, rank: 0, medal: 'Bronze', modules: [], toppers: [] };
+  const text = (await res.text()).trim();
+  let body: Record<string, unknown> = {};
+  if (text) {
+    try {
+      body = toRecord(JSON.parse(text));
+    } catch {
+      throw new Error(`The server returned an unexpected response (HTTP ${res.status}).`);
+    }
   }
 
-  const data = toRecord(lbData);
+  if (!res.ok || body.success === false) {
+    // Never surface a raw backend error; the API already writes user-safe copy.
+    const message = readString(body.message);
+    if (res.status === 401) throw new Error('Your session has expired. Please sign in again.');
+    throw new Error(message || `Unable to load the leader board (HTTP ${res.status}).`);
+  }
 
-  // modulewise_points: { module_name: { ICON, DATA: { date: points } } }
-  const modules: LbModule[] = Object.entries(toRecord(data.modulewise_points)).map(([name, value]) => {
-    const node = toRecord(value);
-    const dataMap = toRecord(node.DATA);
-    const points = Object.values(dataMap).reduce<number>((sum, v) => sum + readNumber(v), 0);
-    return { name, points };
-  });
+  return body;
+}
 
-  const toppers: LbTopper[] = toArray(data.classdata).map((entry, index) => {
-    const r = toRecord(entry);
-    return {
-      rank: index + 1,
-      name: readString(r.student_name).trim() || `Student ${index + 1}`,
-      points: readNumber(r.total_points),
-      isCurrentUser: readString(r.user_id) === session.userId,
-    };
-  });
+// ---------------------------------------------------------------------------
+// Mapping
+// ---------------------------------------------------------------------------
+
+function mapRanking(entry: unknown): LbRanking {
+  const row = toRecord(entry);
+  return {
+    rank: readNumber(row.rank),
+    userId: readNumber(row.user_id),
+    name: readString(row.student_name).trim() || 'Unnamed learner',
+    points: readNumber(row.total_points),
+    avatarUrl: readString(row.avatar_url),
+    isCurrentUser: row.is_current_user === true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Endpoints
+// ---------------------------------------------------------------------------
+
+export async function fetchLeaderBoard(syear?: string, signal?: AbortSignal): Promise<LeaderBoard> {
+  const session = requireSession();
+  const url = apiUrl(session, 'leaderboard', { syear, top_limit: '10' });
+  const data = toRecord((await getJson(url, session, signal)).data);
+  const learner = toRecord(data.learner);
 
   return {
-    hasData: true,
-    totalPoints: readNumber(data.total_points),
-    rank: readNumber(data.student_rank),
-    medal: 'Bronze',
-    modules,
-    toppers,
+    hasData: data.has_data === true,
+    syear: readNumber(data.syear),
+    totalPoints: readNumber(learner.total_points),
+    rank: learner.rank == null ? null : readNumber(learner.rank),
+    classSize: readNumber(learner.class_size),
+    medal: readString(learner.medal) || 'Bronze',
+    standardName: readString(learner.standard_name),
+    sectionName: readString(learner.section_name),
+    modules: toArray(data.modules).map((entry) => {
+      const row = toRecord(entry);
+      return {
+        moduleName: readString(row.module_name),
+        label: readString(row.label) || readString(row.module_name),
+        icon: readString(row.icon),
+        description: readString(row.description),
+        points: readNumber(row.points),
+        entries: toArray(row.entries).map((item) => {
+          const point = toRecord(item);
+          return { date: readString(point.date), points: readNumber(point.points) };
+        }),
+      };
+    }),
+    toppers: toArray(data.toppers).map(mapRanking),
+  };
+}
+
+export async function fetchLbFilterOptions(signal?: AbortSignal): Promise<LbFilterOptions> {
+  const session = requireSession();
+  const data = toRecord((await getJson(apiUrl(session, 'leaderboard/filters'), session, signal)).data);
+
+  return {
+    syears: toArray(data.syears).map((year) => readNumber(year)),
+    standards: toArray(data.standards).map((entry) => {
+      const row = toRecord(entry);
+      return { id: readNumber(row.id), name: readString(row.name) };
+    }),
+    modules: toArray(data.modules).map((entry) => {
+      const row = toRecord(entry);
+      return { value: readString(row.value), label: readString(row.label) };
+    }),
+  };
+}
+
+export async function fetchLbRankings(
+  filters: LbRankingFilters = {},
+  signal?: AbortSignal
+): Promise<LbRankingPage> {
+  const session = requireSession();
+  const url = apiUrl(session, 'leaderboard/rankings', {
+    standard_id: filters.standardId,
+    module_name: filters.moduleName,
+    from: filters.from,
+    to: filters.to,
+    page: String(filters.page ?? 1),
+    per_page: String(filters.perPage ?? 20),
+  });
+
+  const body = await getJson(url, session, signal);
+  const meta = toRecord(body.meta);
+
+  return {
+    items: toArray(body.data).map(mapRanking),
+    page: readNumber(meta.current_page) || 1,
+    perPage: readNumber(meta.per_page) || 20,
+    total: readNumber(meta.total),
+    lastPage: readNumber(meta.last_page) || 1,
   };
 }
