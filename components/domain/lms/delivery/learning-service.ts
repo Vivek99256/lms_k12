@@ -72,7 +72,7 @@ async function apiGet<T>(
 async function apiPost<T>(
   session: SessionContext,
   path: string,
-  body: Record<string, unknown>,
+  body: object,
 ): Promise<T> {
   const response = await fetch(apiUrl(path, session), {
     method: 'POST',
@@ -92,7 +92,7 @@ async function apiPost<T>(
 async function apiPut<T>(
   session: SessionContext,
   path: string,
-  body: Record<string, unknown>,
+  body: object,
 ): Promise<T> {
   const response = await fetch(apiUrl(path, session), {
     method: 'PUT',
@@ -146,7 +146,7 @@ function withCommon(session: SessionContext, extra?: Record<string, string | num
   }
 }
 
-function withAuth(session: SessionContext, profileName?: string, extra: Record<string, unknown> = {}) {
+function withAuth(session: SessionContext, profileName?: string, extra: object = {}) {
   return {
     token: session.token,
     sub_institute_id: session.subInstituteId,
@@ -495,6 +495,14 @@ export interface CertificateQuery {
   search?: string
   courseId?: number
   profileName?: string
+  /**
+   * One employee's certificates, for an administrator viewing their record.
+   *
+   * Only honoured alongside scope: 'all', which the server already gates on
+   * the authoring profile — so this narrows a set the caller may see rather
+   * than widening one they may not.
+   */
+  userId?: number
 }
 
 export interface CertificateListResponse {
@@ -510,6 +518,7 @@ export const lmsCertificateService = {
       ...(query.scope ? { scope: query.scope } : {}),
       ...(query.search ? { search: query.search } : {}),
       ...(query.courseId ? { course_id: String(query.courseId) } : {}),
+      ...(query.userId ? { user_id: String(query.userId) } : {}),
     })),
 
   /** POST api/g2g-lms/my-learning/certificates - idempotent; 422 until every lesson is done. */

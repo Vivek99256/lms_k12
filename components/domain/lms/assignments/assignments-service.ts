@@ -56,6 +56,7 @@ export interface LmsAssignment {
   initials: string
   course_name: string
   type: string
+  department: string | null
   assignment_type: string
   due_date: string | null
   status: string
@@ -247,6 +248,17 @@ export const lmsAssignmentsService = {
   /** POST assignments/bulk-status — batch status update. */
   bulkUpdateStatus: (session: SessionContext, ids: number[], status: string) =>
     apiPost<AssignmentApiResponse<unknown>>(session, '/bulk-status', { ids, status }),
+
+  /**
+   * POST assignments/request — a learner asks to take a course.
+   * Lands in the Approval Queue (`getPending`/`review`/`bulkReview` below)
+   * rather than becoming an active assignment straight away.
+   */
+  requestEnrollment: (session: SessionContext, courseId: number, dueDate?: string | null) =>
+    apiPost<AssignmentApiResponse<unknown>>(session, '/request', {
+      course_id: courseId,
+      ...(dueDate ? { due_date: dueDate } : {}),
+    }),
 
   /** GET assignments/learners — learners in this tenant, for the picker. */
   searchLearners: (session: SessionContext, search: string) =>

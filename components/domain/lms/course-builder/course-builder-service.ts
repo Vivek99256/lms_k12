@@ -99,6 +99,8 @@ export interface CourseSettings {
   issue_certificate: boolean;
   certificate_template: string | null;
   recert_alerts: boolean;
+  /** Passing this course writes the mapped competency rating without a review step. */
+  auto_apply_rating: boolean;
   enrollment_rule: EnrollmentRule;
   restrict_departments: number[] | null;
   restrict_roles: string[] | null;
@@ -163,6 +165,66 @@ export interface AssessmentPayload {
   result_show_ans?: boolean;
   exam_type?: string | null;
   question_ids?: number[];
+}
+
+/**
+ * `correct` is present here and NOWHERE on a learner-facing path — the
+ * authoring endpoint is admin-gated precisely so this field can exist.
+ */
+export interface QuestionOptionDraft {
+  id?: number;
+  answer: string;
+  correct: boolean;
+}
+
+/** A question on a paper, with its options and which of them are right. */
+export interface PaperQuestion {
+  id: number;
+  question_title: string | null;
+  description: string | null;
+  points: number;
+  hint_text: string | null;
+  options: { id: number; answer: string; correct: boolean }[];
+}
+
+export interface PaperQuestionsResponse {
+  status: boolean;
+  data: PaperQuestion[];
+  total_marks: number;
+}
+
+/**
+ * What the author submits. An empty `options` array means a WRITTEN answer;
+ * options with none marked correct are refused by the server — that
+ * combination can never be marked.
+ */
+export interface QuestionPayload {
+  question_title: string;
+  description?: string | null;
+  points?: number;
+  hint_text?: string | null;
+  options?: QuestionOptionDraft[];
+}
+
+export interface GenerateQuestionsResult {
+  created: number;
+  dropped: number;
+}
+
+/** A competency mapped to a course, i.e. what the course develops. */
+export interface CourseCompetency {
+  id: number;
+  competency_id: number;
+  competency_name: string | null;
+  competency_code: string | null;
+  proficiency_level: number | null;
+  is_primary: boolean;
+}
+
+export interface CourseCompetencyInput {
+  competency_id: number;
+  proficiency_level?: number | null;
+  is_primary?: boolean;
 }
 
 export interface BuilderCoursePayload {
@@ -300,6 +362,47 @@ export const lmsCourseBuilderService = {
   deleteAssessment: (session: SessionContext, id: number) =>
     apiDelete<BuilderApiResponse<null>>(session, `/g2g-lms/course-builder/assessments/${id}`),
 
+  /* ── Questions on a quiz ── */
+
+  paperQuestions: (session: SessionContext, paperId: number) =>
+    apiGet<PaperQuestionsResponse>(session, `/g2g-lms/course-builder/assessments/${paperId}/questions`),
+
+  addQuestion: (session: SessionContext, paperId: number, payload: QuestionPayload) =>
+    apiPost<BuilderApiResponse<{ id: number }>>(
+      session,
+      `/g2g-lms/course-builder/assessments/${paperId}/questions`,
+      payload,
+    ),
+
+  updateQuestion: (
+    session: SessionContext,
+    paperId: number,
+    questionId: number,
+    payload: QuestionPayload,
+  ) =>
+    apiPut<BuilderApiResponse<null>>(
+      session,
+      `/g2g-lms/course-builder/assessments/${paperId}/questions/${questionId}`,
+      payload,
+    ),
+
+  deleteQuestion: (session: SessionContext, paperId: number, questionId: number) =>
+    apiDelete<BuilderApiResponse<null>>(
+      session,
+      `/g2g-lms/course-builder/assessments/${paperId}/questions/${questionId}`,
+    ),
+
+  /**
+   * Write this quiz from the course's own modules and lessons. Appends —
+   * never replaces what an author already wrote.
+   */
+  generateQuestions: (session: SessionContext, paperId: number, count: number) =>
+    apiPost<BuilderApiResponse<GenerateQuestionsResult>>(
+      session,
+      `/g2g-lms/course-builder/assessments/${paperId}/questions/generate`,
+      { count },
+    ),
+
   /* ── Audience ── */
 
   previewAudience: (session: SessionContext, courseId: number, audience: AudiencePayload) =>
@@ -314,6 +417,28 @@ export const lmsCourseBuilderService = {
       session,
       `/g2g-lms/course-builder/courses/${courseId}/audience`,
       audience
+    ),
+
+  /* ── Competencies this course develops ── */
+
+  courseCompetencies: (session: SessionContext, courseId: number) =>
+    apiGet<BuilderApiResponse<CourseCompetency[]>>(
+      session,
+      `/g2g-lms/course-builder/courses/${courseId}/competencies`,
+    ),
+
+  /** SYNC — replaces the course's complete competency list. */
+  syncCourseCompetencies: (session: SessionContext, courseId: number, items: CourseCompetencyInput[]) =>
+    apiPost<BuilderApiResponse<{ course_id: number; written: number; removed: number }>>(
+      session,
+      `/g2g-lms/course-builder/courses/${courseId}/competencies`,
+      { items },
+    ),
+
+  removeCourseCompetency: (session: SessionContext, id: number) =>
+    apiDelete<BuilderApiResponse<{ removed: boolean }>>(
+      session,
+      `/g2g-lms/course-builder/competencies/${id}`,
     ),
 };
 

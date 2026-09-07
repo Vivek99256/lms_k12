@@ -39,6 +39,7 @@ import {
   X,
 } from 'lucide-react'
 import { format } from 'date-fns'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { SearchInput } from '@/components/ui/search-input'
@@ -46,6 +47,7 @@ import { Select } from '@/components/ui/g2g/select'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { buildSessionContext } from '@/lib/erp-client'
 import { lmsDashboardService } from '../dashboard/dashboard-service'
+import { lmsAssignmentsService } from '../assignments/assignments-service'
 import { Progress } from '@/components/ui/progress'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -235,6 +237,50 @@ export function LearningCatalog() {
     }
   }
 
+  /**
+   * Ask for a course instead of joining it.
+   *
+   * ── THIS IS WHAT FILLS THE APPROVAL QUEUE ─────────────────────────────────
+   *
+   * `POST assignments/request` existed, the Approval Queue that reads it
+   * existed, `review`/`bulkReview` existed, and approving already called
+   * `ensureEnrolment` so a decision reached the learner's course list. The one
+   * missing piece was a client — there was no service method and no button
+   * anywhere, so nothing in the product could put a row into that queue. An
+   * admin could open Approval Queue every day and find it empty by
+   * construction.
+   *
+   * Offered alongside Enrol rather than replacing it: a learner may join an
+   * open course directly, and ask when they would rather have it approved and
+   * recorded as an assignment with a due date.
+   */
+  const requestCourse = async (courseId: number, courseName: string) => {
+    const ctx = buildSessionContext()
+    if (!ctx.token || !ctx.subInstituteId || !ctx.userId) {
+      setEnrolMessage({ ok: false, text: 'Your ERP session is unavailable. Please sign in again.' })
+      return
+    }
+    setEnrollingId(courseId)
+    setEnrolMessage(null)
+    try {
+      await lmsAssignmentsService.requestEnrollment(ctx, courseId)
+      setEnrolMessage({
+        ok: true,
+        text: `Requested ${courseName}. An administrator will review it.`,
+      })
+    } catch (reason) {
+      // The server refuses a duplicate request and one for a course already
+      // held, and says which - those sentences are more use than a generic
+      // failure, so they are shown verbatim.
+      setEnrolMessage({
+        ok: false,
+        text: reason instanceof Error ? reason.message : 'Unable to request this course.',
+      })
+    } finally {
+      setEnrollingId(null)
+    }
+  }
+
   const catalog = useCourseCatalog(10)
   const {
     courses,
@@ -285,6 +331,21 @@ export function LearningCatalog() {
     setFormCourse(course)
     setFormOpen(true)
     setDetailsCourse(null)
+  }
+
+  /*
+   * Open a course in the Course Builder.
+   *
+   * The sheet above edits the sub_std_map columns; the wizard edits everything
+   * else — passing score, attempts, enrolment rule, visibility, availability
+   * window — and is the only writer of lms_course_settings. Without a way in
+   * from here, a course created by this sheet could never acquire any of
+   * that, because the wizard could only ever create.
+   */
+  const router = useRouter()
+  const openInBuilder = (course: CatalogCourse) => {
+    setDetailsCourse(null)
+    router.push(`/people-competency/lms/course-builder?courseId=${course.id}`)
   }
 
   const runBulk = async (action: 'activate' | 'deactivate' | 'delete') => {
@@ -367,11 +428,11 @@ export function LearningCatalog() {
       render: (_, row) => (
         <div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger render={
               <Button variant="ghost" size="icon" className="size-8" aria-label="Course actions">
                 <ListFilter className="size-4 rotate-90 text-muted-foreground" />
               </Button>
-            </DropdownMenuTrigger>
+            } />
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => setDetailsCourse(row)}>
                 <BookOpen className="mr-2 size-4" /> View details
@@ -380,6 +441,9 @@ export function LearningCatalog() {
                 <>
                   <DropdownMenuItem onSelect={() => openEdit(row)}>
                     <Pencil className="mr-2 size-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => openInBuilder(row)}>
+                    <Layers className="mr-2 size-4" /> Open in Course Builder
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() =>
@@ -707,6 +771,9 @@ export function LearningCatalog() {
               enrollingId={enrollingId}
               enrolledIds={enrolledIds}
               onEnrol={(course) => void enrol(course.id, course.display_name ?? `Course ${course.id}`)}
+              onRequest={(course) =>
+                void requestCourse(course.id, course.display_name ?? `Course ${course.id}`)
+              }
               onOpenDetails={setDetailsCourse}
             />
           )}
@@ -760,6 +827,7 @@ export function LearningCatalog() {
         onOpenChange={(open) => !open && setDetailsCourse(null)}
         canAuthor={canAuthor}
         onEdit={openEdit}
+        onOpenInBuilder={openInBuilder}
         onDelete={(course) => {
           setDetailsCourse(null)
           setPendingDelete(course)

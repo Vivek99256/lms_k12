@@ -34,6 +34,8 @@ import {
   type CoursePrerequisite,
   type CourseVisibility,
   type EnrollmentRule,
+  type PaperQuestion,
+  type QuestionPayload,
 } from './course-builder-service';
 
 function toMessage(error: unknown, fallback: string) {
@@ -67,6 +69,8 @@ export interface CourseBuilderForm {
   certificate_template: string;
   certificate_validity_months: string;
   recert_alerts: boolean;
+  /** Passing this course writes the mapped competency rating without a review step. */
+  auto_apply_rating: boolean;
 
   // Step 5
   enrollment_rule: EnrollmentRule;
@@ -96,6 +100,7 @@ const EMPTY_FORM: CourseBuilderForm = {
   certificate_template: '',
   certificate_validity_months: '',
   recert_alerts: false,
+  auto_apply_rating: false,
   enrollment_rule: 'open',
   restrict_departments: [],
   restrict_roles: [],
@@ -140,7 +145,7 @@ function toNumberOrNull(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function useCourseBuilder() {
+export function useCourseBuilder(editingId?: number | null) {
   const session = useMemo(() => buildSessionContext(), []);
 
   const [step, setStep] = useState(1);
@@ -152,6 +157,15 @@ export function useCourseBuilder() {
 
   const [modules, setModules] = useState<BuilderModule[]>([]);
   const [assessments, setAssessments] = useState<BuilderAssessment[]>([]);
+  /**
+   * The questions on ONE paper — whichever the author has open.
+   *
+   * Loaded per paper rather than for all of them at once: a course can carry
+   * several quizzes, and only one is being edited at a time.
+   */
+  const [openPaperId, setOpenPaperId] = useState<number | null>(null);
+  const [paperQuestions, setPaperQuestions] = useState<PaperQuestion[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
 
   const [categories, setCategories] = useState<string[]>([]);
   const [types, setTypes] = useState<string[]>([]);
@@ -162,9 +176,12 @@ export function useCourseBuilder() {
   const [courseOptions, setCourseOptions] = useState<CoursePrerequisite[]>([]);
 
   const [loadingOptions, setLoadingOptions] = useState(true);
+  const [loadingCourse, setLoadingCourse] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const isEditing = useMemo(() => editingId != null && editingId > 0, [editingId]);
 
   const setField = useCallback(
     <K extends keyof CourseBuilderForm>(key: K, value: CourseBuilderForm[K]) => {
@@ -282,6 +299,7 @@ export function useCourseBuilder() {
         issue_certificate: form.issue_certificate,
         certificate_template: form.certificate_template || null,
         recert_alerts: form.recert_alerts,
+        auto_apply_rating: form.auto_apply_rating,
         enrollment_rule: form.enrollment_rule,
         restrict_departments: form.restrict_departments.length ? form.restrict_departments : null,
         restrict_roles: form.restrict_roles.length ? form.restrict_roles : null,
@@ -357,23 +375,27 @@ export function useCourseBuilder() {
     [session]
   );
 
-  const run = useCallback(async (operation: () => Promise<void>, success: string, fallback: string) => {
-    setSaving(true);
-    setError(null);
-    setMessage(null);
+  const run = useCallback(
+    async (operation: () => Promise<void | string>, success: string | null, fallback: string) => {
+      setSaving(true);
+      setError(null);
+      setMessage(null);
 
-    try {
-      await operation();
-      setMessage(success);
-      return { ok: true, message: success };
-    } catch (writeError) {
-      const failure = toMessage(writeError, fallback);
-      setError(failure);
-      return { ok: false, message: failure };
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+      try {
+        const returned = await operation();
+        const outcome = success ?? (typeof returned === 'string' ? returned : 'Done.');
+        setMessage(outcome);
+        return { ok: true, message: outcome };
+      } catch (writeError) {
+        const failure = toMessage(writeError, fallback);
+        setError(failure);
+        return { ok: false, message: failure };
+      } finally {
+        setSaving(false);
+      }
+    },
+    []
+  );
 
   const addModule = useCallback(
     (name: string) =>
@@ -491,6 +513,170 @@ export function useCourseBuilder() {
     [run, session, courseId, reloadAssessments]
   );
 
+  /* ── Questions on a quiz ── */
+
+  const reloadQuestions = useCallback(
+    async (paperId: number) => {
+      setQuestionsLoading(true);
+      try {
+        const response = await lmsCourseBuilderService.paperQuestions(session, paperId);
+        setPaperQuestions(response.data ?? []);
+      } catch {
+        setPaperQuestions([]);
+      } finally {
+        setQuestionsLoading(false);
+      }
+    },
+    [session]
+  );
+
+  /** Open a paper for question editing, or close the one that is open. */
+  const openPaper = useCallback(
+    (paperId: number | null) => {
+      setOpenPaperId(paperId);
+      setPaperQuestions([]);
+      if (paperId !== null) void reloadQuestions(paperId);
+    },
+    [reloadQuestions]
+  );
+
+  /**
+   * Ask the AI to write this quiz from the course's content.
+   *
+   * Reports what actually happened rather than a flat "done": a run that
+   * wrote fewer than asked has to say so.
+   */
+  const generateQuestions = useCallback(
+    (paperId: number, count: number) =>
+      run(
+        async () => {
+          const response = await lmsCourseBuilderService.generateQuestions(session, paperId, count);
+          await reloadQuestions(paperId);
+          if (courseId) await reloadAssessments(courseId);
+          return response.message;
+        },
+        null,
+        'The questions could not be generated.'
+      ),
+    [run, session, reloadQuestions, reloadAssessments, courseId]
+  );
+
+  const addQuestion = useCallback(
+    (paperId: number, payload: QuestionPayload) =>
+      run(
+        async () => {
+          await lmsCourseBuilderService.addQuestion(session, paperId, payload);
+          await reloadQuestions(paperId);
+          // total_ques changed on the paper, so the list above it must agree.
+          if (courseId) await reloadAssessments(courseId);
+        },
+        'Question added.',
+        'Failed to add the question.'
+      ),
+    [run, session, reloadQuestions, reloadAssessments, courseId]
+  );
+
+  const updateQuestion = useCallback(
+    (paperId: number, questionId: number, payload: QuestionPayload) =>
+      run(
+        async () => {
+          await lmsCourseBuilderService.updateQuestion(session, paperId, questionId, payload);
+          await reloadQuestions(paperId);
+          if (courseId) await reloadAssessments(courseId);
+        },
+        'Question updated.',
+        'Failed to update the question.'
+      ),
+    [run, session, reloadQuestions, reloadAssessments, courseId]
+  );
+
+  const removeQuestion = useCallback(
+    (paperId: number, questionId: number) =>
+      run(
+        async () => {
+          await lmsCourseBuilderService.deleteQuestion(session, paperId, questionId);
+          await reloadQuestions(paperId);
+          if (courseId) await reloadAssessments(courseId);
+        },
+        'Question removed.',
+        'Failed to remove the question.'
+      ),
+    [run, session, reloadQuestions, reloadAssessments, courseId]
+  );
+
+  const loadCourse = useCallback(
+    async (id: number) => {
+      if (!session.token) {
+        setError('Your session has expired. Sign in again to load this course.');
+        return;
+      }
+
+      setLoadingOptions(true);
+      setError(null);
+      setMessage(null);
+
+      try {
+        const response = await lmsCourseBuilderService.load(session, id);
+        const course = response.data as Record<string, unknown> | undefined;
+        const settings = response.settings;
+
+        if (!course) {
+          setError('Course not found.');
+          return;
+        }
+
+        setForm((current) => ({
+          ...current,
+          display_name: (course.display_name as string) ?? '',
+          subject_code: (course.subject_code as string) ?? '',
+          short_name: (course.short_name as string) ?? '',
+          sort_order: course.sort_order != null ? String(course.sort_order) : '1',
+          description: (settings?.description as string) ?? '',
+          subject_type: (course.subject_type as string) ?? '',
+          duration: settings?.duration_minutes != null ? formatDuration(Number(settings.duration_minutes)) : '',
+          subject_category: (course.subject_category as string) ?? '',
+          language: (settings?.language as string) ?? '',
+          is_mandatory: Boolean(settings?.is_mandatory),
+          discussion_enabled: Boolean(settings?.discussion_enabled),
+          visibility: (settings?.visibility as CourseVisibility) ?? 'all',
+          standard_id: course.standard_id != null ? String(course.standard_id) : '',
+          jobrole: (course.jobrole as string) ?? '',
+          status: Boolean((course.status as number) ?? 1),
+          thumbnail: null,
+          passing_score: settings?.passing_score != null ? String(settings.passing_score) : '',
+          max_attempts: settings?.max_attempts != null ? String(settings.max_attempts) : '',
+          issue_certificate: settings?.issue_certificate ?? true,
+          certificate_template: (settings?.certificate_template as string) ?? '',
+          certificate_validity_months: course.certificate_validity_months != null ? String(course.certificate_validity_months) : '',
+          recert_alerts: Boolean(settings?.recert_alerts),
+          auto_apply_rating: Boolean(settings?.auto_apply_rating),
+          enrollment_rule: (settings?.enrollment_rule as EnrollmentRule) ?? 'open',
+          restrict_departments: (settings?.restrict_departments as number[]) ?? [],
+          restrict_roles: (settings?.restrict_roles as string[]) ?? [],
+          available_from: (settings?.available_from as string) ?? '',
+          available_until: (settings?.available_until as string) ?? '',
+        }));
+
+        setPrerequisites(response.prerequisites ?? []);
+        setCourseId(id);
+        await reloadModules(id);
+        await reloadAssessments(id);
+        setStep(1);
+      } catch (loadError) {
+        setError(toMessage(loadError, 'Failed to load the course.'));
+      } finally {
+        setLoadingOptions(false);
+      }
+    },
+    [session, reloadModules, reloadAssessments]
+  );
+
+  useEffect(() => {
+    if (editingId && editingId > 0) {
+      void loadCourse(editingId);
+    }
+  }, [editingId, loadCourse]);
+
   /* ── Step navigation ── */
 
   const goNext = useCallback(async () => {
@@ -578,6 +764,15 @@ export function useCourseBuilder() {
     addAssessment,
     removeAssessment,
 
+    openPaperId,
+    openPaper,
+    paperQuestions,
+    questionsLoading,
+    generateQuestions,
+    addQuestion,
+    updateQuestion,
+    removeQuestion,
+
     categories,
     types,
     departments,
@@ -586,6 +781,8 @@ export function useCourseBuilder() {
     certificateTemplates,
 
     loadingOptions,
+    loadingCourse,
+    isEditing,
     saving,
     message,
     error,
@@ -600,6 +797,7 @@ export function useCourseBuilder() {
     preview,
     checklist,
     formatDuration,
+    loadCourse,
   };
 }
 

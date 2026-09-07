@@ -55,6 +55,12 @@ import { Button } from '@/components/ui/g2g/button'
 import { Input } from '@/components/ui/g2g/input'
 import { Card, CardContent } from '@/components/ui/g2g/card'
 import { Select } from '@/components/ui/g2g/select'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
 import { DataTable, type Column } from '@/components/ui/g2g/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Badge } from '@/components/ui/badge'
@@ -101,6 +107,7 @@ function AssignLearningDialog({
 
   const [learnerQuery, setLearnerQuery] = useState('')
   const [learners, setLearners] = useState<AssignmentLearner[]>([])
+  const [learnersState, setLearnersState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [selectedLearners, setSelectedLearners] = useState<AssignmentLearner[]>([])
 
   const [courseQuery, setCourseQuery] = useState('')
@@ -129,11 +136,28 @@ function AssignLearningDialog({
   // Debounced so typing does not fire a request per keystroke.
   React.useEffect(() => {
     if (!open) return
+    setLearnersState('loading')
     const timer = setTimeout(() => {
       lmsAssignmentsService
         .searchLearners(resolveSession(), learnerQuery)
-        .then((response) => setLearners(response.data ?? []))
-        .catch(() => setLearners([]))
+        .then((response) => {
+          // Some list endpoints on this backend return a Laravel paginator
+          // (`{ data: { data: [...] } }`) instead of a flat array — unwrap
+          // it so a paginated response isn't mistaken for an empty one.
+          const raw = response.data as unknown
+          const list = Array.isArray(raw)
+            ? raw
+            : Array.isArray((raw as { data?: unknown })?.data)
+              ? ((raw as { data: AssignmentLearner[] }).data)
+              : []
+          setLearners(list)
+          setLearnersState('idle')
+        })
+        .catch((err) => {
+          console.error('Failed to load learners for the Assign Learning picker:', err)
+          setLearners([])
+          setLearnersState('error')
+        })
     }, 300)
     return () => clearTimeout(timer)
   }, [open, learnerQuery, resolveSession])
@@ -233,7 +257,13 @@ function AssignLearningDialog({
               </div>
             )}
             <div className="max-h-32 overflow-y-auto rounded-lg border border-border/60">
-              {learners.length === 0 ? (
+              {learnersState === 'loading' ? (
+                <p className="px-3 py-2 text-xs text-muted-foreground">Searching...</p>
+              ) : learnersState === 'error' ? (
+                <p className="px-3 py-2 text-xs text-destructive">
+                  Could not load learners. Check your connection and try again.
+                </p>
+              ) : learners.length === 0 ? (
                 <p className="px-3 py-2 text-xs text-muted-foreground">No learners found.</p>
               ) : (
                 learners.map((learner) => (
@@ -502,6 +532,10 @@ export function LearningAssignments() {
     loading,
     error,
     assignments,
+    changeStatus,
+    departmentOptions,
+    assignedByOptions,
+    learningTypeOptions,
     stats,
     filters,
     selectedIds,
@@ -826,10 +860,37 @@ export function LearningAssignments() {
     {
       id: 'id',
       header: '',
-      render: () => (
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-          <MoreVertical className="size-4" />
-        </Button>
+      /*
+       * It now carries the per-row status change, which is what the single
+       * `updateStatus` endpoint was built for and which nothing called: the
+       * only way to change one assignment was to tick it and use a bulk action.
+       */
+      render: (_, row) => (
+        <div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground"
+                aria-label={`Actions for ${row.learner_name}`}
+              >
+                <MoreVertical className="size-4" />
+              </Button>
+            } />
+            <DropdownMenuContent align="end">
+              {(['Not Started', 'In Progress', 'Completed'] as const).map((status) => (
+                <DropdownMenuItem
+                  key={status}
+                  disabled={row.status === status}
+                  onSelect={() => void changeStatus(row.id, status)}
+                >
+                  Mark {status}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       ),
     },
   ]
@@ -1068,15 +1129,17 @@ export function LearningAssignments() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 font-bold bg-background shadow-sm"
-                disabled={selectedIds.length === 0}
-                onClick={() => setShowAssignDialog(true)}
-              >
-                Assign
-              </Button>
+              {/*
+                * "Assign" was enabled BY a selection and then threw it away -
+                * the dialog resets all its state on open, so picking five rows
+                * and clicking Assign opened an empty form. It no longer claims
+                * to act on the selection; that action lives on the header
+                * "Assign Learning" button instead.
+                *
+                * "Enroll" was renamed. It called handleBulkUpdate('In
+                * Progress'), which sets a progress status and creates no
+                * enrolment of any kind. It now says what it does.
+                */}
               <Button
                 variant="outline"
                 size="sm"
@@ -1084,8 +1147,24 @@ export function LearningAssignments() {
                 disabled={selectedIds.length === 0}
                 onClick={() => handleBulkUpdate('In Progress')}
               >
-                Enroll
+                Mark In Progress
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 font-bold bg-background shadow-sm"
+                disabled={selectedIds.length === 0}
+                onClick={() => handleBulkUpdate('Completed')}
+              >
+                Mark Completed
+              </Button>
+              {/*
+                These previously called handleBulkUpdate('Completed') and
+                ('Rejected') - which set progress status, not an approval, and
+                'Rejected' was not even a valid progress value. Approvals now go
+                to the review endpoint, and the buttons only appear where an
+                approval decision actually applies.
+              */}
               {activeTab === 'approval' && canReview && (
                 <>
                   <Button
@@ -1108,14 +1187,15 @@ export function LearningAssignments() {
                   </Button>
                 </>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 font-bold bg-background shadow-sm gap-2 ml-2"
-                disabled={selectedIds.length === 0}
-              >
-                More <ChevronDown className="size-3" />
-              </Button>
+              {/*
+                * "More" is gone rather than given a menu.
+                *
+                * It had no onClick at all: select rows, watch it light up,
+                * click it, nothing. There is no action it was meant to hold -
+                * every bulk action this screen has is already on this toolbar,
+                * and the per-row menu now covers single rows. A button that
+                * exists to look complete is worse than no button.
+                */}
             </div>
           </div>
 
@@ -1426,11 +1506,16 @@ export function LearningAssignments() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Learning Type</label>
+                {/*
+                  * "Learning Path" is gone: no service, type or table for it
+                  * exists anywhere in this product, so it was an option that
+                  * could only ever return nothing. The rest come from the rows
+                  * actually loaded.
+                  */}
                 <Select
                   options={[
                     { label: 'All', value: 'All' },
-                    { label: 'Course', value: 'Course' },
-                    { label: 'Learning Path', value: 'Learning Path' },
+                    ...learningTypeOptions.map((value: string) => ({ label: value, value })),
                   ]}
                   value={filters.learningType}
                   onChange={(val) => setFilter('learningType', val)}
@@ -1454,8 +1539,16 @@ export function LearningAssignments() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Department</label>
+                {/*
+                  * Was `[{All}]`, hardcoded - a labelled dropdown with exactly
+                  * one choice, in front of a filter that had no field to read
+                  * because the payload never carried a department at all.
+                  */}
                 <Select
-                  options={[{ label: 'All', value: 'All' }]}
+                  options={[
+                    { label: 'All', value: 'All' },
+                    ...departmentOptions.map((value: string) => ({ label: value, value })),
+                  ]}
                   value={filters.department}
                   onChange={(val) => setFilter('department', val)}
                 />
@@ -1473,8 +1566,16 @@ export function LearningAssignments() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assigned By</label>
+                {/*
+                  * The predicate for this filter was already correct and
+                  * working; only the input could not express anything but
+                  * "All". Values come from the assignments themselves.
+                  */}
                 <Select
-                  options={[{ label: 'All', value: 'All' }]}
+                  options={[
+                    { label: 'All', value: 'All' },
+                    ...assignedByOptions.map((value: string) => ({ label: value, value })),
+                  ]}
                   value={filters.assignedBy}
                   onChange={(val) => setFilter('assignedBy', val)}
                 />

@@ -87,7 +87,7 @@ async function apiGet<T>(
 async function apiPost<T>(
   session: SessionContext,
   path: string,
-  body: Record<string, unknown>,
+  body: object,
 ): Promise<T> {
   const response = await fetch(apiUrl(path, session), {
     method: 'POST',
@@ -107,7 +107,7 @@ async function apiPost<T>(
 async function apiPut<T>(
   session: SessionContext,
   path: string,
-  body: Record<string, unknown>,
+  body: object,
 ): Promise<T> {
   const response = await fetch(apiUrl(path, session), {
     method: 'PUT',
@@ -161,7 +161,7 @@ function withCommon(session: SessionContext, extra?: Record<string, string | num
   }
 }
 
-function withAuth(session: SessionContext, extra: Record<string, unknown> = {}) {
+function withAuth(session: SessionContext, extra: object = {}) {
   return {
     token: session.token,
     sub_institute_id: session.subInstituteId,

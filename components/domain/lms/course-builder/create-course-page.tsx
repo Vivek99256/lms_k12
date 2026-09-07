@@ -27,7 +27,7 @@
  *   doc-comment.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ChevronRight,
   Clock,
@@ -47,6 +47,7 @@ import {
   Loader2,
   AlertCircle,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/g2g/button';
@@ -62,6 +63,7 @@ import { cn } from '@/lib/utils';
 import { useCourseBuilder } from './use-course-builder';
 import type { ContentKind, CourseVisibility, EnrollmentRule } from './course-builder-service';
 import { CourseAudiencePanel } from './course-audience-panel';
+import { CourseCompetencyInlinePanel } from './course-competency-inline-panel';
 
 /* ─── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -98,20 +100,28 @@ const LEARNING_CATALOG_PATH = '/people-competency/lms/learning-catalog';
 
 /* ─── Page ─────────────────────────────────────────────────────────────────── */
 
-export function CreateCoursePage() {
+export function CreateCoursePage({ initialCourseId }: { initialCourseId?: number }) {
   const router = useRouter();
   const builder = useCourseBuilder();
   const {
     step, steps, goNext, goBack, goToStep,
     form, setField, errors,
     courseId, prerequisites, setPrerequisites, courseOptions,
-    modules, contentCount, addModule, removeModule, addContent, removeContent,
+    modules, contentCount, addModule, renameModule, removeModule, addContent, removeContent,
     assessments, addAssessment, removeAssessment,
+    openPaperId, openPaper, paperQuestions, questionsLoading,
+    generateQuestions, addQuestion, updateQuestion, removeQuestion,
     categories, types, departments, jobRoles, languages, certificateTemplates,
     loadingOptions, saving, message, error, dismiss,
-    saveDraft, publish,
+    saveDraft, publish, loadCourse,
     preview, checklist,
   } = builder;
+
+  useEffect(() => {
+    if (initialCourseId && initialCourseId !== courseId) {
+      void loadCourse(initialCourseId);
+    }
+  }, [initialCourseId, courseId, loadCourse]);
 
   const [newModuleName, setNewModuleName] = useState('');
   const [contentDraft, setContentDraft] = useState<{
@@ -121,6 +131,16 @@ export function CreateCoursePage() {
     url: string;
   } | null>(null);
   const [quizName, setQuizName] = useState('');
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [questionDraft, setQuestionDraft] = useState<{
+    id: number | null;
+    question_title: string;
+    points: string;
+    options: { answer: string; correct: boolean }[];
+  } | null>(null);
+  /** How many capabilities this course is mapped to — see the auto-apply-rating warning below. */
+  const [competencyCount, setCompetencyCount] = useState(0);
 
   const jobRoleOptions = jobRoles
     .filter((role) => !form.standard_id || String(role.department_id ?? '') === String(form.standard_id))
@@ -133,6 +153,8 @@ export function CreateCoursePage() {
     if (result.ok) router.push(LEARNING_CATALOG_PATH);
   };
 
+  const isEditing = Boolean(initialCourseId);
+
   return (
     <div className="flex h-full w-full flex-col pb-10">
       {/* Top Header */}
@@ -143,9 +165,9 @@ export function CreateCoursePage() {
             <ChevronRight className="size-3" />
             <span>Course Builder</span>
             <ChevronRight className="size-3" />
-            <span className="text-primary">{courseId ? `Draft #${courseId}` : 'Create New Course'}</span>
+            <span className="text-primary">{isEditing ? `Edit Course #${initialCourseId}` : courseId ? `Draft #${courseId}` : 'Create New Course'}</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Course Builder</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{isEditing ? 'Edit Course' : 'Course Builder'}</h1>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2 font-semibold shadow-sm" disabled={saving} onClick={() => void saveDraft()}>
@@ -159,7 +181,7 @@ export function CreateCoursePage() {
       </div>
 
       {/* Stepper */}
-      <Card className="mb-6 overflow-hidden rounded-xl border-border/80 bg-card shadow-sm">
+      <Card className="mb-6 shrink-0 overflow-hidden rounded-xl border-border/80 bg-card shadow-sm">
         <CardContent className="p-0">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex flex-1 items-center">
@@ -487,22 +509,81 @@ export function CreateCoursePage() {
                     modules.map((module) => (
                       <div key={module.id} className="overflow-hidden rounded-lg border border-border/60 bg-background shadow-sm">
                         <div className="flex items-center gap-3 border-b border-border/40 bg-muted/30 p-3">
-                          <div className="flex flex-1 flex-col">
-                            <span className="text-sm font-bold text-foreground">{module.chapter_name}</span>
-                            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              {module.content?.length ?? 0} item{(module.content?.length ?? 0) === 1 ? '' : 's'}
-                            </span>
+                          {renamingId === module.id ? (
+                            <div className="flex flex-1 items-center gap-2">
+                              <Input
+                                className="h-8 bg-background"
+                                value={renameDraft}
+                                onChange={(event) => setRenameDraft(event.target.value)}
+                                onBlur={() => {
+                                  const trimmed = renameDraft.trim();
+                                  if (trimmed && trimmed !== module.chapter_name) {
+                                    void renameModule(module.id, trimmed);
+                                  }
+                                  setRenamingId(null);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    const trimmed = renameDraft.trim();
+                                    if (trimmed && trimmed !== module.chapter_name) {
+                                      void renameModule(module.id, trimmed);
+                                    }
+                                    setRenamingId(null);
+                                  }
+                                  if (event.key === 'Escape') {
+                                    setRenamingId(null);
+                                  }
+                                }}
+                                autoFocus
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex flex-1 flex-col">
+                              <span className="text-sm font-bold text-foreground">{module.chapter_name}</span>
+                              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                {module.content?.length ?? 0} item{(module.content?.length ?? 0) === 1 ? '' : 's'}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            {renamingId === module.id ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Cancel rename"
+                                className="size-7 text-muted-foreground hover:text-foreground"
+                                disabled={saving}
+                                onClick={() => setRenamingId(null)}
+                              >
+                                <X className="size-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Rename ${module.chapter_name}`}
+                                className="size-7 text-muted-foreground hover:text-foreground"
+                                disabled={saving}
+                                onClick={() => {
+                                  setRenamingId(module.id);
+                                  setRenameDraft(module.chapter_name);
+                                }}
+                              >
+                                <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Delete ${module.chapter_name}`}
+                              className="size-7 text-muted-foreground hover:text-destructive"
+                              disabled={saving}
+                              onClick={() => void removeModule(module.id)}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Delete ${module.chapter_name}`}
-                            className="size-7 text-muted-foreground hover:text-destructive"
-                            disabled={saving}
-                            onClick={() => void removeModule(module.id)}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
                         </div>
 
                         <div className="flex flex-col gap-3 p-4">
@@ -590,19 +671,30 @@ export function CreateCoursePage() {
               <>
                 <CardHeader className="border-b border-border/40 px-6 pb-4 pt-6">
                   <CardTitle className="text-lg font-bold">Assessments &amp; Quizzes</CardTitle>
-                  <p className="mt-1 text-sm font-medium text-muted-foreground">Add tests to evaluate learner understanding.</p>
+                  <p className="mt-1 text-sm font-medium text-muted-foreground">
+                    Add tests to evaluate learner understanding.
+                  </p>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col gap-6 p-6">
                   <div className="flex items-center gap-2">
-                    <Input placeholder="New quiz name" className="h-9" value={quizName} onChange={(event) => setQuizName(event.target.value)} />
+                    <Input
+                      placeholder="New quiz name"
+                      className="h-9"
+                      value={quizName}
+                      onChange={(event) => setQuizName(event.target.value)}
+                    />
                     <Button
                       size="sm"
                       className="shrink-0 gap-2"
                       disabled={saving || !quizName.trim()}
                       onClick={() =>
-                        void addAssessment({ paper_name: quizName.trim(), attempt_allowed: Number(form.max_attempts) || null, exam_type: 'quiz' }).then(
-                          (result) => { if (result.ok) setQuizName(''); }
-                        )
+                        void addAssessment({
+                          paper_name: quizName.trim(),
+                          attempt_allowed: Number(form.max_attempts) || null,
+                          exam_type: 'quiz',
+                        }).then((result) => {
+                          if (result.ok) setQuizName('')
+                        })
                       }
                     >
                       <Plus className="size-4" /> Add Quiz
@@ -616,32 +708,365 @@ export function CreateCoursePage() {
                       </div>
                       <p className="text-sm font-bold text-foreground">No assessments configured.</p>
                       <p className="mt-1 max-w-sm text-center text-xs text-muted-foreground">
-                        Courses without assessments will be marked complete when all modules are viewed.
+                        Courses without assessments will be marked complete when all modules are
+                        viewed.
                       </p>
                     </div>
                   ) : (
                     <div className="flex flex-col divide-y divide-border/50 rounded-lg border border-border/60">
-                      {assessments.map((assessment) => (
-                        <div key={assessment.id} className="flex items-center gap-3 p-3">
-                          <div className="flex min-w-0 flex-1 flex-col">
-                            <span className="truncate text-sm font-bold text-foreground">{assessment.paper_name}</span>
-                            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              {assessment.total_ques} question{assessment.total_ques === 1 ? '' : 's'}
-                              {assessment.attempt_allowed ? ` · ${assessment.attempt_allowed} attempts` : ''}
-                            </span>
+                      {assessments.map((assessment) => {
+                        const open = openPaperId === assessment.id
+
+                        return (
+                          <div key={assessment.id} className="flex flex-col">
+                            <div className="flex items-center gap-3 p-3">
+                              <div className="flex min-w-0 flex-1 flex-col">
+                                <span className="truncate text-sm font-bold text-foreground">
+                                  {assessment.paper_name}
+                                </span>
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                  {assessment.total_ques} question
+                                  {assessment.total_ques === 1 ? '' : 's'}
+                                  {assessment.attempt_allowed
+                                    ? ` · ${assessment.attempt_allowed} attempts`
+                                    : ''}
+                                </span>
+                                {/*
+                                  * Say it plainly. A quiz with no questions
+                                  * cannot be sat, and the quiz panel on the
+                                  * learner side will have nothing to show —
+                                  * which was the state of EVERY quiz authored
+                                  * through this product until now.
+                                  */}
+                                {assessment.total_ques === 0 && (
+                                  <span className="mt-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                                    No questions yet — learners cannot sit this quiz.
+                                  </span>
+                                )}
+                              </div>
+                              <Button
+                                variant={open ? 'default' : 'outline'}
+                                size="sm"
+                                className="shrink-0 gap-1.5 font-semibold"
+                                onClick={() => {
+                                  setQuestionDraft(null)
+                                  openPaper(open ? null : assessment.id)
+                                }}
+                              >
+                                <FileText className="size-3.5" />
+                                {open ? 'Done' : 'Questions'}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Delete ${assessment.paper_name}`}
+                                className="size-7 text-muted-foreground hover:text-destructive"
+                                disabled={saving}
+                                onClick={() => void removeAssessment(assessment.id)}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+
+                            {open && (
+                              <div className="flex flex-col gap-3 border-t border-border/40 bg-muted/20 p-3">
+                                {questionsLoading ? (
+                                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Loader2 className="size-3.5 animate-spin" /> Loading questions…
+                                  </p>
+                                ) : paperQuestions.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    No questions yet. Add the first one below.
+                                  </p>
+                                ) : (
+                                  <ol className="flex flex-col gap-2">
+                                    {paperQuestions.map((question, index) => (
+                                      <li
+                                        key={question.id}
+                                        className="flex items-start gap-2 rounded-md border border-border/60 bg-background p-2.5"
+                                      >
+                                        <span className="mt-0.5 text-xs font-bold text-muted-foreground">
+                                          {index + 1}.
+                                        </span>
+                                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                          <span className="text-sm font-semibold text-foreground">
+                                            {question.question_title}
+                                          </span>
+                                          <span className="text-[11px] text-muted-foreground">
+                                            {question.points}{' '}
+                                            {question.points === 1 ? 'mark' : 'marks'} {'·'}{' '}
+                                            {question.options.length === 0
+                                              ? 'written answer'
+                                              : `${question.options.length} options`}
+                                          </span>
+                                          {question.options.length > 0 && (
+                                            <div className="flex flex-col gap-0.5">
+                                              {question.options.map((option) => (
+                                                <span
+                                                  key={option.id}
+                                                  className={cn(
+                                                    'text-[11px]',
+                                                    option.correct
+                                                      ? 'font-bold text-emerald-600 dark:text-emerald-400'
+                                                      : 'text-muted-foreground',
+                                                  )}
+                                                >
+                                                  {option.correct ? '✓ ' : '· '}
+                                                  {option.answer}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          aria-label={`Edit question ${index + 1}`}
+                                          className="size-7 text-muted-foreground"
+                                          onClick={() =>
+                                            setQuestionDraft({
+                                              id: question.id,
+                                              question_title: question.question_title ?? '',
+                                              points: String(question.points),
+                                              options: question.options.map((o) => ({
+                                                answer: o.answer,
+                                                correct: o.correct,
+                                              })),
+                                            })
+                                          }
+                                        >
+                                          <FileText className="size-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          aria-label={`Remove question ${index + 1}`}
+                                          className="size-7 text-muted-foreground hover:text-destructive"
+                                          disabled={saving}
+                                          onClick={() =>
+                                            void removeQuestion(assessment.id, question.id)
+                                          }
+                                        >
+                                          <Trash2 className="size-3.5" />
+                                        </Button>
+                                      </li>
+                                    ))}
+                                  </ol>
+                                )}
+
+                                {questionDraft === null ? (
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-fit gap-2 font-semibold"
+                                      onClick={() =>
+                                        setQuestionDraft({
+                                          id: null,
+                                          question_title: '',
+                                          points: '1',
+                                          // Two blank options is the shape most
+                                          // authors want; clearing both makes it
+                                          // a written answer instead.
+                                          options: [
+                                            { answer: '', correct: true },
+                                            { answer: '', correct: false },
+                                          ],
+                                        })
+                                      }
+                                    >
+                                      <Plus className="size-4" /> Add question
+                                    </Button>
+
+                                    {/*
+                                      * ── WRITE THE QUIZ FROM THE COURSE ────
+                                      *
+                                      * Nothing generated questions for a course
+                                      * quiz before this. The model is given
+                                      * this course's own modules and lesson
+                                      * text as the source.
+                                      */}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-fit gap-2 font-semibold"
+                                      disabled={saving}
+                                      onClick={() => {
+                                        void generateQuestions(assessment.id, 5)
+                                      }}
+                                    >
+                                      <Sparkles className="size-4" /> Write 5 with AI
+                                    </Button>
+
+                                    <span className="text-xs text-muted-foreground">
+                                      {modules.length === 0
+                                        ? 'Add modules in step 2 first — questions are written from the course content.'
+                                        : competencyCount === 0
+                                          ? 'Questions come from this course’s lessons. Map a capability below to have them measure one.'
+                                          : 'Questions are written from this course’s lessons and tied to the capabilities above.'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col gap-3 rounded-lg border border-primary/40 bg-background p-3">
+                                    <Textarea
+                                      rows={2}
+                                      placeholder="Question"
+                                      value={questionDraft.question_title}
+                                      onChange={(event) =>
+                                        setQuestionDraft({
+                                          ...questionDraft,
+                                          question_title: event.target.value,
+                                        })
+                                      }
+                                    />
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <label className="text-xs font-bold text-foreground">
+                                        Marks
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        min={1}
+                                        className="h-8 w-20"
+                                        value={questionDraft.points}
+                                        onChange={(event) =>
+                                          setQuestionDraft({
+                                            ...questionDraft,
+                                            points: event.target.value,
+                                          })
+                                        }
+                                      />
+                                      <span className="text-[11px] text-muted-foreground">
+                                        {questionDraft.options.length === 0
+                                          ? 'Written answer — marked by a person.'
+                                          : 'Tick every option that is correct.'}
+                                      </span>
+                                    </div>
+
+                                    {questionDraft.options.map((option, index) => (
+                                      <div key={index} className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          className="size-4 shrink-0"
+                                          checked={option.correct}
+                                          aria-label={`Option ${index + 1} is correct`}
+                                          onChange={(event) =>
+                                            setQuestionDraft({
+                                              ...questionDraft,
+                                              options: questionDraft.options.map((o, i) =>
+                                                i === index
+                                                  ? { ...o, correct: event.target.checked }
+                                                  : o,
+                                              ),
+                                            })
+                                          }
+                                        />
+                                        <Input
+                                          className="h-8"
+                                          placeholder={`Option ${index + 1}`}
+                                          value={option.answer}
+                                          onChange={(event) =>
+                                            setQuestionDraft({
+                                              ...questionDraft,
+                                              options: questionDraft.options.map((o, i) =>
+                                                i === index
+                                                  ? { ...o, answer: event.target.value }
+                                                  : o,
+                                              ),
+                                            })
+                                          }
+                                        />
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          aria-label={`Remove option ${index + 1}`}
+                                          className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                                          onClick={() =>
+                                            setQuestionDraft({
+                                              ...questionDraft,
+                                              options: questionDraft.options.filter(
+                                                (_, i) => i !== index,
+                                              ),
+                                            })
+                                          }
+                                        >
+                                          <X className="size-3.5" />
+                                        </Button>
+                                      </div>
+                                    ))}
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5"
+                                        onClick={() =>
+                                          setQuestionDraft({
+                                            ...questionDraft,
+                                            options: [
+                                              ...questionDraft.options,
+                                              { answer: '', correct: false },
+                                            ],
+                                          })
+                                        }
+                                      >
+                                        <Plus className="size-3.5" /> Option
+                                      </Button>
+
+                                      <Button
+                                        size="sm"
+                                        className="gap-1.5 font-semibold"
+                                        disabled={saving || !questionDraft.question_title.trim()}
+                                        onClick={() => {
+                                          const payload = {
+                                            question_title: questionDraft.question_title.trim(),
+                                            points: Number(questionDraft.points) || 1,
+                                            // Blank options are dropped rather
+                                            // than sent: an author who cleared
+                                            // them meant a written answer.
+                                            options: questionDraft.options
+                                              .filter((o) => o.answer.trim())
+                                              .map((o) => ({
+                                                answer: o.answer.trim(),
+                                                correct: o.correct,
+                                              })),
+                                          }
+
+                                          const action =
+                                            questionDraft.id === null
+                                              ? addQuestion(assessment.id, payload)
+                                              : updateQuestion(
+                                                  assessment.id,
+                                                  questionDraft.id,
+                                                  payload,
+                                                )
+
+                                          void action.then((result) => {
+                                            if (result.ok) setQuestionDraft(null)
+                                          })
+                                        }}
+                                      >
+                                        {saving && <Loader2 className="size-3.5 animate-spin" />}
+                                        {questionDraft.id === null
+                                          ? 'Add question'
+                                          : 'Save changes'}
+                                      </Button>
+
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setQuestionDraft(null)}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Delete ${assessment.paper_name}`}
-                            className="size-7 text-muted-foreground hover:text-destructive"
-                            disabled={saving}
-                            onClick={() => void removeAssessment(assessment.id)}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
 
@@ -649,14 +1074,88 @@ export function CreateCoursePage() {
                     <h3 className="text-sm font-bold">Global Assessment Rules</h3>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-foreground">Minimum Passing Score (%)</label>
-                        <Input type="number" placeholder="80" className="h-9" value={form.passing_score} onChange={(event) => setField('passing_score', event.target.value)} />
+                        <label className="text-xs font-bold text-foreground">
+                          Minimum Passing Score (%)
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="80"
+                          className="h-9"
+                          value={form.passing_score}
+                          onChange={(event) => setField('passing_score', event.target.value)}
+                        />
                         <FieldError message={errors.passing_score} />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-foreground">Maximum Attempts Allowed</label>
-                        <Input type="number" placeholder="Unlimited" className="h-9" value={form.max_attempts} onChange={(event) => setField('max_attempts', event.target.value)} />
+                        <label className="text-xs font-bold text-foreground">
+                          Maximum Attempts Allowed
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="Unlimited"
+                          className="h-9"
+                          value={form.max_attempts}
+                          onChange={(event) => setField('max_attempts', event.target.value)}
+                        />
                         <FieldError message={errors.max_attempts} />
+                      </div>
+                    </div>
+
+                    {/*
+                      * ── WHAT THIS COURSE BUILDS ─────────────────────────────
+                      *
+                      * CourseCompetencyInlinePanel maps a course to a
+                      * capability from the primary authoring flow. A pass can
+                      * then move that capability's rating, and the course can
+                      * be suggested to anyone with a matching gap.
+                      *
+                      * It sits here rather than in Publish Settings because the
+                      * setting directly beneath it is meaningless without it.
+                      */}
+                    <div className="space-y-2 border-t border-border/40 pt-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Capabilities this course builds
+                      </h4>
+                      <CourseCompetencyInlinePanel
+                        courseId={courseId}
+                        onCountChange={setCompetencyCount}
+                      />
+                    </div>
+
+                    {/*
+                      * ── WHAT PASSING ACTUALLY DOES ──────────────────────────
+                      *
+                      * Off by default, and it says what it does rather than
+                      * naming the flag: an admin deciding this needs to know a
+                      * record changes without them, not what the column is
+                      * called.
+                      */}
+                    <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/10 p-4">
+                      <Checkbox
+                        id="auto-apply-rating"
+                        className="mt-0.5"
+                        checked={form.auto_apply_rating}
+                        onCheckedChange={(checked) =>
+                          setField('auto_apply_rating', Boolean(checked))
+                        }
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <label
+                          htmlFor="auto-apply-rating"
+                          className="cursor-pointer text-sm font-bold text-foreground"
+                        >
+                          Update capability records when a learner passes
+                        </label>
+                        <span className="text-xs leading-snug text-muted-foreground">
+                          A passing score raises the learner&rsquo;s rating on the capabilities this
+                          course is mapped to, closing their gap without waiting for a review.
+                        </span>
+                        {form.auto_apply_rating && competencyCount === 0 && (
+                          <span className="mt-1 text-xs font-medium text-warning">
+                            This course isn&rsquo;t mapped to any capability yet, so passing it will
+                            not move anything. Map one above.
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -160,6 +160,14 @@ export interface CertificateQuery {
   scope?: 'mine' | 'all';
   search?: string;
   courseId?: number;
+  /**
+   * One employee's certificates, for an administrator viewing their record.
+   *
+   * Only honoured alongside scope: 'all', which the server already gates on
+   * the authoring profile — so this narrows a set the caller may see rather
+   * than widening one they may not.
+   */
+  userId?: number;
 }
 
 export interface CertificateListResponse {
@@ -197,6 +205,7 @@ export const lmsCertificationsRecordsService = {
         scope: query.scope,
         search: query.search,
         course_id: query.courseId,
+        user_id: query.userId,
       })
     ),
 

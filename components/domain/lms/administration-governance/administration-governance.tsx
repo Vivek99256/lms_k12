@@ -94,7 +94,7 @@ const HEALTH_DOT: Record<HealthStatus, string> = {
 
 const EMPTY_USER = {
   first_name: '', last_name: '', email: '', mobile: '', employee_no: '',
-  user_profile_id: '', department_id: '', user_name: '', password: '',
+  user_profile_id: '', department_id: '', user_name: '', password: '', status: true,
 }
 
 /* ─── Page ─────────────────────────────────────────────────────────────────── */
@@ -154,6 +154,7 @@ export function AdministrationGovernance() {
         department_id: user.department_id ? String(user.department_id) : '',
         user_name: user.user_name ?? '',
         password: '',
+        status: Boolean(user.status),
       })
     } else {
       setEditingUser(null)
@@ -172,7 +173,7 @@ export function AdministrationGovernance() {
         employee_no: userForm.employee_no || null,
         user_profile_id: Number(userForm.user_profile_id),
         department_id: userForm.department_id ? Number(userForm.department_id) : null,
-        status: 1,
+        status: userForm.status ? 1 : 0,
         // Only sent on create; an empty password on update leaves it unchanged.
         ...(editingUser ? {} : { user_name: userForm.user_name.trim() }),
         ...(userForm.password ? { password: userForm.password } : {}),
@@ -452,6 +453,25 @@ export function AdministrationGovernance() {
                       <Input className="h-9" type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} />
                     </Field>
                   </FormRow>
+                  {/*
+                   * The status control the table's own badge implied existed.
+                   * Deactivating is how access is withdrawn without deleting
+                   * the person's learning record.
+                   */}
+                  <label className="flex w-fit items-center gap-2 text-xs font-semibold text-foreground">
+                    <input
+                      type="checkbox"
+                      className="size-4"
+                      checked={userForm.status}
+                      onChange={(e) => setUserForm({ ...userForm, status: e.target.checked })}
+                    />
+                    Active
+                    {!userForm.status && (
+                      <span className="font-normal text-muted-foreground">
+                        &mdash; this user will not be able to sign in
+                      </span>
+                    )}
+                  </label>
                   <div className="flex gap-2">
                     <Button
                       size="sm"

@@ -94,6 +94,10 @@ export function useAdministrationGovernance() {
     actions: [], entity_types: [],
   })
   const [auditAction, setAuditAction] = useState('')
+  const [auditSearch, setAuditSearch] = useState('')
+  const [auditEntityType, setAuditEntityType] = useState('')
+  const [auditFrom, setAuditFrom] = useState('')
+  const [auditTo, setAuditTo] = useState('')
   const [auditPage, setAuditPage] = useState(1)
 
   const [loading, setLoading] = useState(true)
@@ -216,6 +220,10 @@ export function useAdministrationGovernance() {
       const response = await lmsAdministrationGovernanceService.auditLogs(session, {
         page: auditPage,
         action: auditAction || undefined,
+        search: auditSearch.trim() || undefined,
+        entityType: auditEntityType || undefined,
+        from: auditFrom || undefined,
+        to: auditTo || undefined,
       })
       setAuditLogs(response.data ?? [])
       if (response.meta) setAuditMeta({ journey_events: 0, ...response.meta })
@@ -224,7 +232,7 @@ export function useAdministrationGovernance() {
       setAuditLogs([])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auditPage, auditAction])
+  }, [auditPage, auditAction, auditSearch, auditEntityType, auditFrom, auditTo])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -543,6 +551,41 @@ export function useAdministrationGovernance() {
     auditAction,
     setAuditAction: (value: string) => {
       setAuditAction(value)
+      setAuditPage(1)
+    },
+    /*
+     * Every filter resets the page.
+     *
+     * Narrowing while on page 4 of the unfiltered log lands on a page the
+     * filtered result may not have, and the table reads as empty when it is
+     * not.
+     */
+    auditSearch,
+    setAuditSearch: (value: string) => {
+      setAuditSearch(value)
+      setAuditPage(1)
+    },
+    auditEntityType,
+    setAuditEntityType: (value: string) => {
+      setAuditEntityType(value)
+      setAuditPage(1)
+    },
+    auditFrom,
+    setAuditFrom: (value: string) => {
+      setAuditFrom(value)
+      setAuditPage(1)
+    },
+    auditTo,
+    setAuditTo: (value: string) => {
+      setAuditTo(value)
+      setAuditPage(1)
+    },
+    resetAuditFilters: () => {
+      setAuditSearch('')
+      setAuditEntityType('')
+      setAuditFrom('')
+      setAuditTo('')
+      setAuditAction('')
       setAuditPage(1)
     },
     auditPage,
