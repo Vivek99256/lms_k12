@@ -925,7 +925,7 @@ export default function ChapterListPage() {
   const [contentLibraryTab, setContentLibraryTab] =
     useState<(typeof CONTENT_LIBRARY_TABS)[number]>('All content');
   // Grouping follows the resource type: Classroom Resources is chapter-wise,
-  // Teacher Resources is concept-wise. Derived instead of stored, so the two can
+  // Teacher Workspace is concept-wise. Derived instead of stored, so the two can
   // never drift out of step and there is no toggle to leave in the wrong state.
   const contentGroupBy: 'Chapter wise' | 'Concept wise' =
     searchParams?.get('resourceType') === 'teacher' ? 'Concept wise' : 'Chapter wise';
@@ -964,7 +964,7 @@ export default function ChapterListPage() {
 
   const view = searchParams?.get('view');
   const contentResourceType = searchParams?.get('resourceType') === 'teacher' ? 'teacher' : 'classroom';
-  const contentResourceLabel = contentResourceType === 'teacher' ? 'Teacher Resource' : 'Classroom Resource';
+  const contentResourceLabel = contentResourceType === 'teacher' ? 'Teacher Workspace' : 'Classroom Resource';
   const availableContentLibraryTabs =
     contentResourceType === 'teacher' ? TEACHER_CONTENT_LIBRARY_TABS : CONTENT_LIBRARY_TABS;
   // A resource view can be opened while a type selected in the other view is still
@@ -1045,7 +1045,7 @@ export default function ChapterListPage() {
   /**
    * The chapter's content narrowed to the resource type currently on screen.
    *
-   * Teacher Resources holds Teacher Training content and Classroom Resources holds
+   * Teacher Workspace holds Teacher Training content and Classroom Resources holds
    * everything else — the same split `filteredChapterContentItems` applies to the
    * list below, reusing one classifier so the counts can never disagree with the
    * items. Search, tab and source filters are deliberately not applied: these are
@@ -1357,14 +1357,14 @@ export default function ChapterListPage() {
       const matchesSource = contentSourceFilter === 'all' || item.source === contentSourceFilter;
 
       const isTeacherTraining = isTeacherTrainingContent(item);
-      // Teacher Resources only ever shows Teacher Training content; Classroom
+      // Teacher Workspace only ever shows Teacher Training content; Classroom
       // Resources never shows it.
       const matchesResourceType =
         contentResourceType === 'teacher' ? isTeacherTraining : !isTeacherTraining;
 
       const matchesTab =
         contentResourceType === 'teacher'
-          ? // In Teacher Resources, both "All content" and "Presentations" surface
+          ? // In Teacher Workspace, both "All content" and "Presentations" surface
             // every Teacher Training item regardless of its underlying type.
             true
           : activeContentLibraryTab === 'All content' ||
@@ -3435,7 +3435,7 @@ export default function ChapterListPage() {
               <ChevronRight size={14} className="text-slate-400" />
               <span className="font-medium text-slate-500">{resourceChapter.title}</span>
               <ChevronRight size={14} className="text-slate-400" />
-              <span className="font-semibold text-blue-600">Teacher Resources</span>
+              <span className="font-semibold text-blue-600">Teacher Workspace</span>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -3444,7 +3444,7 @@ export default function ChapterListPage() {
                   <Sparkles size={13} />
                   Resource Studio
                 </div>
-                <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">Teacher Resources</h1>
+                <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">Teacher Workspace</h1>
                 <p className="mt-2 text-slate-600">
                   Curate supporting assets for <span className="font-semibold text-slate-900">{resourceChapter.title}</span> with a cleaner upload flow and a professional resource library.
                 </p>
@@ -3520,7 +3520,7 @@ export default function ChapterListPage() {
 
           <div className="mb-8 rounded-[28px] border border-slate-200/70 bg-white shadow-sm">
             <div className="border-b border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.05),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] px-6 py-5 sm:px-8">
-              <h2 className="text-xl font-bold text-slate-900">Add Teacher Resource</h2>
+              <h2 className="text-xl font-bold text-slate-900">Add Teacher Workspace Item</h2>
               <p className="mt-1 text-sm text-slate-500">Upload files, tag them to the right pedagogy, and keep instructor materials easy to discover.</p>
             </div>
 
@@ -3620,7 +3620,7 @@ export default function ChapterListPage() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Teacher Resource Target</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Teacher Workspace Target</p>
                     <p className="mt-1 text-sm text-slate-600">
                       Aim to keep at least {resourceChapter.resources.teacherResource} curated assets available for instructors in this chapter.
                     </p>
@@ -4928,7 +4928,7 @@ export default function ChapterListPage() {
                       className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                     >
                       <FolderOpen size={16} className="mr-2" />
-                      Teacher Resource
+                      Teacher Workspace
                     </Button>
                     <Button
                       type="button"
