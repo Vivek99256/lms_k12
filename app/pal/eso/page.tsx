@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
   defaultLearnerId,
-  fetchDiagnosticItems,
+  fetchDiagnostic,
+  DIAGNOSTIC_GROUPS,
   fetchNextAction,
   fetchPracticeItem,
   fetchConceptMasteryDetails,
@@ -23,6 +24,8 @@ import {
   submitDiagnostic,
   submitRetrievalCheck,
   type DiagnosticItem,
+  type DiagnosticPayload,
+  type DiagnosticAvailability,
   type EsoAction,
   type EsoQuestion,
   type ConceptMasteryDetails,
@@ -706,17 +709,101 @@ function FlowStep({
 
 // ── D1: diagnostic ───────────────────────────────────────────────────────
 
+/**
+ * One diagnostic question. Extracted so the grouped and flat renderings share
+ * exactly one markup path — the flat list is still how every chapter whose
+ * questions carry no authored stage serves its diagnostic.
+ */
+function DiagnosticQuestion({
+  item,
+  index,
+  selected,
+  onSelect,
+}: {
+  item: DiagnosticItem;
+  index: number;
+  selected: number | undefined;
+  onSelect: (optionId: number) => void;
+}) {
+  return (
+    <div data-eso-question-id={item.questionId} data-eso-node-id={item.nodeId} className="rounded-lg border border-slate-200 p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
+          {index + 1}
+        </span>
+        <Badge variant="secondary">{item.nodeType}</Badge>
+      </div>
+      <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+      <div className="mt-2 space-y-1.5">
+        {item.options.map((option) => (
+          <label
+            key={option.id}
+            data-eso-option-id={option.id}
+            className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+              selected === option.id ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <input
+              type="radio"
+              name={`diagnostic-${item.questionId}`}
+              checked={selected === option.id}
+              onChange={() => onSelect(option.id)}
+              className="h-4 w-4 accent-violet-600"
+            />
+            <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The empty state, told truthfully.
+ *
+ * The old copy blamed "Phase 0 tagging" whatever the actual reason, which was
+ * misleading whenever questions existed but were draft or unmapped. The
+ * student-facing line stays plain in every case; the specific cause is shown
+ * only to staff, who are the ones who can act on it.
+ */
+function DiagnosticUnavailable({ availability }: { availability: DiagnosticAvailability | null }) {
+  const viewAsStudent = useViewAsStudent();
+  const isStaff = viewAsStudent !== null;
+
+  const staffDetail = (() => {
+    if (!availability || availability.reason === 'none_authored') {
+      return 'No diagnostic questions have been authored for this concept yet.';
+    }
+    if (availability.reason === 'awaiting_approval') {
+      return `${availability.authored} diagnostic question(s) exist, but none are approved yet.`;
+    }
+    if (availability.reason === 'awaiting_node_mapping') {
+      return `${availability.approved} approved question(s) exist, but none are mapped to a K/A/S node yet.`;
+    }
+    return `${availability.authored} question(s) exist; none are currently both approved and node-mapped.`;
+  })();
+
+  return (
+    <Alert>
+      <div className="space-y-1">
+        <p>No diagnostic questions are currently available for this concept.</p>
+        {isStaff && <p className="text-xs text-slate-500">{staffDetail}</p>}
+      </div>
+    </Alert>
+  );
+}
+
 function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string; conceptId: number; onAdvance: () => void }) {
-  const [items, setItems] = useState<DiagnosticItem[] | null>(null);
+  const [payload, setPayload] = useState<DiagnosticPayload | null>(null);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchDiagnosticItems(learnerId, conceptId)
+    fetchDiagnostic(learnerId, conceptId)
       .then((data) => {
-        if (!cancelled) setItems(data);
+        if (!cancelled) setPayload(data);
       })
       .catch((reason) => {
         if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load the diagnostic.');
@@ -727,11 +814,22 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
   }, [learnerId, conceptId]);
 
   if (error) return <Alert tone="error">{error}</Alert>;
-  if (items === null) return <CenteredSpinner label="Building your diagnostic..." />;
-  if (items.length === 0) {
-    return <Alert>No diagnostic questions are tagged for this concept yet — Phase 0 tagging is still in progress.</Alert>;
+  if (payload === null) return <CenteredSpinner label="Building your diagnostic..." />;
+
+  const items = payload.items;
+
+  // Global empty state only when nothing is servable at all — never because a
+  // single group happens to be empty.
+  if (items.length === 0 && payload.groupedTotal === 0) {
+    return <DiagnosticUnavailable availability={payload.availability} />;
   }
 
+  // Grouped view when the content is authored with stages; otherwise the flat
+  // list, which is how every currently-tagged chapter serves its diagnostic.
+  const grouped = payload.groupedTotal > 0;
+
+  // Whichever set is on screen is the set that can be answered and submitted.
+  const answerable = grouped ? DIAGNOSTIC_GROUPS.flatMap(({ key }) => payload.groups[key]) : items;
   const answeredCount = Object.keys(answers).length;
 
   const submit = async () => {
@@ -741,7 +839,12 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
       await submitDiagnostic(
         learnerId,
         conceptId,
-        items.map((item) => ({ nodeId: item.nodeId, answerMasterId: answers[item.questionId] })).filter((r) => r.answerMasterId != null)
+        // Grouped and flat renderings answer into the same `answers` map, so
+        // submission walks whichever set was actually shown. Scoring is
+        // untouched: every response still carries its own node_id.
+        answerable
+          .map((item) => ({ nodeId: item.nodeId, answerMasterId: answers[item.questionId] }))
+          .filter((r) => r.answerMasterId != null)
       );
       onAdvance();
     } catch (reason) {
@@ -758,7 +861,45 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
         <CardDescription>A few questions to find out what you already know, so we can skip it.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {items.map((item, index) => (
+        {grouped &&
+          DIAGNOSTIC_GROUPS.map(({ key, label, description }) => {
+            const groupItems = payload.groups[key];
+            return (
+              <section key={key} data-eso-diagnostic-group={key} className="rounded-lg border border-slate-200 p-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-slate-900">{label}</h3>
+                  <span className="text-xs text-slate-500">
+                    {groupItems.length === 0
+                      ? 'No questions'
+                      : `${groupItems.length} question${groupItems.length === 1 ? '' : 's'}`}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+
+                {/* Each group handles its own empty result — one empty group
+                    never hides the others. */}
+                {groupItems.length === 0 ? (
+                  <p className="mt-3 text-sm text-slate-400">
+                    No {label.toLowerCase()} questions available for this concept.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {groupItems.map((item, index) => (
+                      <DiagnosticQuestion
+                        key={item.questionId}
+                        item={item}
+                        index={index}
+                        selected={answers[item.questionId]}
+                        onSelect={(optionId) => setAnswers((prev) => ({ ...prev, [item.questionId]: optionId }))}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+
+        {!grouped && items.map((item, index) => (
           <div key={item.questionId} data-eso-question-id={item.questionId} data-eso-node-id={item.nodeId} className="rounded-lg border border-slate-200 p-4">
             <div className="mb-2 flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
