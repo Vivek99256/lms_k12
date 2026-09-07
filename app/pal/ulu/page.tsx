@@ -34,7 +34,7 @@ export default async function PalUluParentPage({
   if (!model.isReady || !model.context) {
     return (
       <PalEmptyState
-        title="ULU intelligence is not available"
+        title="Unified Learning Units intelligence is not available"
         message={model.error || 'No semantic intelligence is available for PAL yet.'}
       />
     );
@@ -46,9 +46,9 @@ export default async function PalUluParentPage({
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1800px] space-y-6">
         <PalContextHero
-          eyebrow="ULU"
-          title="ULU"
-          description="This ULU view is dynamically assembled from semantic_intelligence. When no chapter is selected, PAL automatically loads the latest available semantic record."
+          eyebrow="Unified Learning Units"
+          title="Unified Learning Units"
+          description="This Unified Learning Units view is dynamically assembled from semantic_intelligence. When no chapter is selected, PAL automatically loads the latest available semantic record."
           context={model.context}
           variant="ulu"
         />

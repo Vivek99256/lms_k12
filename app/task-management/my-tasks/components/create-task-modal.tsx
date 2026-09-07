@@ -367,7 +367,7 @@ export function CreateTaskModal({ isOpen, onClose, onCreated }: Props) {
         localStorage.setItem('pendingTasksCount', String(Number(localStorage.getItem('pendingTasksCount') || 0) + 1))
       } catch { /* local notification storage is best-effort */ }
       try {
-        await fetch(`${session.baseUrl}/api/send-notification`, {
+        await fetch('/api/proxy?path=api/send-notification', {
           method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` },
           body: JSON.stringify(notification),
         })

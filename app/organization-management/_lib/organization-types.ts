@@ -25,10 +25,27 @@ export interface Employee {
   image: string;
   occupation: string;
   status: string;
+  /** Raw `tbluser.status` (0/1) from the list API - drives Suspend/Restore Access. Null when the source row didn't carry one. */
+  status_code: number | null;
   lastActivity: string;
   join_Date: string;
   profile_name: string;
   skills: any[]; // Array of skill objects
+}
+
+/**
+ * `.../employee-directory/reference-data` response payload - the option
+ * lists + defaults the Add Employee flow needs. Ported from G2G's
+ * `services/organization/employee-directory.ts` `ReferenceData` type.
+ */
+export interface ReferenceData {
+  departments: { id: number; name: string; parent_id: number | null }[];
+  job_roles: { id: number; name: string; department_id: number | null; category: string | null }[];
+  user_profiles: { id: number; name: string }[];
+  levels_of_responsibility: { id: number; level: number; guiding_phrase: string | null }[];
+  managers: { id: number; first_name: string | null; last_name: string | null; employee_no: string | null }[];
+  next_employee_no: string;
+  default_schedule: unknown[];
 }
 
 /** Ported from G2G's `services/organization/employee-profile-service.ts`. */

@@ -14,8 +14,11 @@ import {
   type AttendanceOption,
   type AttendanceWeeklyResponse,
   type DepartmentAttendanceEmployee,
-  type EarlyGoingAttendanceEntry,
+  type DayDetailEntry,
+  type LaravelAttendanceCalendarDay,
+  type SessionContext,
 } from '@/app/hrit/_lib/attendance-api'
+import type { DrillDownRecord, DayWiseAttendanceRecord } from '@/app/hrit/attendance-management/attendance-tracking/components/attendance-drill-down-drawer'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { Eye } from 'lucide-react'
@@ -233,25 +236,87 @@ function formatMinutes(totalMinutes: number) {
   return `${hours}h ${minutes}m`
 }
 
-function mapEarlyGoingRecord(entry: EarlyGoingAttendanceEntry, departmentsById: Map<string, string>): EarlyGoingRecord {
-  const user = entry.get_user ?? entry.getUser
-  const expectedOut = entry.expected_time ?? undefined
-  const earlyByMin = expectedOut ? minutesBetween(entry.punchout_time, `${entry.day} ${expectedOut}`) : 0
-  const departmentId = String(user?.department_id ?? '')
+/**
+ * Prefers the backend's own timestamp_diff (a TIME column, e.g. "08:30:00")
+ * when present, but that column isn't reliably populated by every
+ * punch-in/out code path in this codebase - falls back to computing the
+ * duration directly from punchin_time/punchout_time so Working Hours still
+ * shows whenever both punches actually exist for that calendar day.
+ */
+function calendarWorkingHours(day: LaravelAttendanceCalendarDay): string {
+  const diffMatch = day.timestamp_diff?.match(/^(\d{1,2}):(\d{2})/)
+  if (diffMatch) {
+    const hours = Number(diffMatch[1])
+    const minutes = Number(diffMatch[2])
+    if (hours > 0 || minutes > 0) return formatMinutes(hours * 60 + minutes)
+  }
+  if (day.punchin_time && day.punchout_time) {
+    const minutes = minutesBetween(day.punchin_time, day.punchout_time)
+    if (minutes > 0) return formatMinutes(minutes)
+  }
+  return '--'
+}
+
+/**
+ * The single-day views (Daily Details, department "View") can only ever
+ * show one date's punches, but the applied date range's own end date is
+ * often the wrong one to pick - a "this month" range whose second half
+ * hasn't happened yet, or simply a fresh institute where "today" has
+ * nothing recorded, both leave the single-day view blank even though the
+ * range as a whole (and its own aggregate totals) has real attendance.
+ * Resolves the latest date that actually has a punch, first within the
+ * applied range, then - if the range itself has nothing - across all time,
+ * so the report only ever falls back to `to` when there is truly no
+ * attendance recorded anywhere in scope.
+ */
+async function resolveEffectiveDayDetailDate(
+  context: SessionContext,
+  params: { departmentId?: string; from: string; to: string },
+): Promise<string> {
+  try {
+    const withinRange = await hrmsService.getLatestActivityDate(context, {
+      departmentId: params.departmentId,
+      fromDate: params.from,
+      toDate: params.to,
+    })
+    if (withinRange.date) return withinRange.date
+
+    const anyTime = await hrmsService.getLatestActivityDate(context, { departmentId: params.departmentId })
+    if (anyTime.date) return anyTime.date
+  } catch {
+    // Non-critical - fall through to the applied range's own end date.
+  }
+  return params.to || params.from
+}
+
+function mapDayDetailRecord(entry: DayDetailEntry, date: string): EarlyGoingRecord {
+  const expectedOut = entry.expected_out ?? undefined
+  const earlyByMin =
+    entry.status === 'early-going' && expectedOut && entry.punchout_time
+      ? minutesBetween(entry.punchout_time, `${date} ${expectedOut}`)
+      : 0
 
   return {
-    id: String(entry.atten_id ?? entry.id),
-    employee: entry.employee_name ?? formatName([user?.first_name, user?.middle_name, user?.last_name]),
-    employeeId: entry.employee_no ?? user?.employee_no ?? String(entry.user_id),
-    department: entry.department ?? departmentsById.get(departmentId) ?? (departmentId || '--'),
-    date: entry.day,
+    id: String(entry.user_id),
+    employee: entry.full_name ?? '--',
+    employeeId: entry.employee_no ?? String(entry.user_id),
+    department: entry.department ?? '--',
+    date,
     punchIn: formatTime(entry.punchin_time),
     punchOut: formatTime(entry.punchout_time),
     expectedOut: expectedOut ?? '--',
     earlyBy: formatMinutes(earlyByMin),
     earlyByMin,
-    status: entry.punchin_time ? 'present' : 'absent',
+    status: entry.status,
   }
+}
+
+const statusDisplay: Record<EarlyGoingRecord['status'], { variant: 'active' | 'pending' | 'error' | 'default'; label: string }> = {
+  present: { variant: 'active', label: 'Present' },
+  late: { variant: 'pending', label: 'Late' },
+  'early-going': { variant: 'pending', label: 'Early Going' },
+  absent: { variant: 'error', label: 'Absent' },
+  leave: { variant: 'default', label: 'On Leave' },
 }
 
 function matchesSearch(record: EarlyGoingRecord, search: string) {
@@ -285,10 +350,10 @@ function getEarlyGoingColumns(onView: (record: EarlyGoingRecord) => void): Colum
       header: 'Status',
       render: (value) => (
         <StatusBadge
-          variant={value === 'present' ? 'active' : value === 'late' ? 'pending' : 'error'}
+          variant={statusDisplay[value as EarlyGoingRecord['status']].variant}
           className="h-6 px-2.5 text-xs font-semibold"
         >
-          {value === 'present' ? 'Present' : value === 'late' ? 'Late' : 'Absent'}
+          {statusDisplay[value as EarlyGoingRecord['status']].label}
         </StatusBadge>
       ),
     },
@@ -332,27 +397,41 @@ function AttendanceReportsPage() {
   const [apiError, setApiError] = React.useState<string | null>(null)
   const [attendanceKpis, setAttendanceKpis] = React.useState<AttendanceKpiResponse | null>(null)
   const [weeklySummary, setWeeklySummary] = React.useState<AttendanceWeeklyResponse | null>(null)
-  // /attendance/report-filters (the attendance-specific endpoint) currently
-  // 500s server-side ("Class App\Models\HRMS\hrmsDepartmentModel not found")
-  // so it never returns a department list - see reportFilterDepartments
-  // below for the working fallback this page uses instead.
+  // /attendance/report-filters intermittently fails to authenticate in this
+  // environment - see reportFilterDepartments below for the working fallback.
   const [reportFilterDepartments, setReportFilterDepartments] = React.useState<AttendanceOption[]>([])
   const { options: leaveOptions } = useLeaveOptions()
-  // Departments are shared institute-wide master data, not Leave-specific -
-  // reusing the Leave module's already-working /leave/options department
-  // list is a safe substitute while the attendance endpoint stays broken,
-  // and this also self-heals: once the backend model is fixed,
-  // reportFilterDepartments stops being empty and takes priority again.
+  const [employeeOptions, setEmployeeOptions] = React.useState<AttendanceOption[]>([])
+  const [employeesLoading, setEmployeesLoading] = React.useState(false)
+  const [departmentReport, setDepartmentReport] = React.useState<DepartmentAttendanceEmployee[]>([])
+  // The department_id every filtered call (KPIs, weekly summary, day-detail,
+  // department-wise report) actually matches against comes straight from
+  // departmentReport's own hrms_departments join (department_id is a
+  // GROUP_CONCAT of that employee's department id(s), normally a single
+  // value). Deriving the dropdown from THIS - once it has loaded, on the
+  // initial unfiltered "all departments" fetch - guarantees the value the
+  // user picks is in the same id space every other endpoint expects.
+  // /attendance/report-filters and the Leave module's department list stay
+  // as fallbacks for the brief window before the first fetch resolves, but
+  // both have been observed to use a different id space than
+  // hrms_departments, which silently filters everything down to "no data
+  // found" once applied.
+  const departmentOptionsFromReport = React.useMemo<AttendanceOption[]>(() => {
+    const byId = new Map<string, string>()
+    departmentReport.forEach((record) => {
+      const id = record.department_id ? String(record.department_id).split(',')[0].trim() : ''
+      if (id && record.department) byId.set(id, record.department)
+    })
+    return Array.from(byId.entries()).map(([value, label]) => ({ value, label }))
+  }, [departmentReport])
   const departmentOptions = React.useMemo<AttendanceOption[]>(() => {
+    if (departmentOptionsFromReport.length > 0) return departmentOptionsFromReport
     if (reportFilterDepartments.length > 0) return reportFilterDepartments
     return (leaveOptions?.departments ?? []).map((department) => ({
       value: department.value,
       label: department.label,
     }))
-  }, [reportFilterDepartments, leaveOptions])
-  const [employeeOptions, setEmployeeOptions] = React.useState<AttendanceOption[]>([])
-  const [employeesLoading, setEmployeesLoading] = React.useState(false)
-  const [departmentReport, setDepartmentReport] = React.useState<DepartmentAttendanceEmployee[]>([])
+  }, [departmentOptionsFromReport, reportFilterDepartments, leaveOptions])
   const [earlyGoingRows, setEarlyGoingRows] = React.useState<EarlyGoingRecord[]>([])
   const [appliedFilters, setAppliedFilters] = React.useState<AppliedFilters>(() => ({
     from: initialDate,
@@ -361,10 +440,7 @@ function AttendanceReportsPage() {
     employee: 'all',
   }))
   const pageSize = 10
-  const departmentsById = React.useMemo(
-    () => new Map(departmentOptions.map((option) => [option.value, option.label])),
-    [departmentOptions],
-  )
+  const [latestActivityNote, setLatestActivityNote] = React.useState<string | null>(null)
 
   const formatDate = (date: Date) => {
     const yyyy = date.getFullYear()
@@ -413,6 +489,7 @@ function AttendanceReportsPage() {
   const handleDateRangeChange = (range: { from: string; to: string }) => {
     setDateRange(range)
     setQuickFilter('custom')
+    setLatestActivityNote(null)
   }
 
   // Employees are scoped to the department, so a department change invalidates
@@ -432,6 +509,7 @@ function AttendanceReportsPage() {
     setSearch('')
     setPage(1)
     setAppliedFilters({ from: today, to: today, department: 'all', employee: 'all' })
+    setLatestActivityNote(null)
   }
 
   // API rows only - the report never falls back to sample data.
@@ -450,6 +528,84 @@ function AttendanceReportsPage() {
     })
     setPage(1)
   }
+
+  // Every active employee in a department, with their Present/Absent/Late
+  // DAY COUNTS across the whole applied date range (the "View" action's
+  // full roster, see AttendanceGroupedTable's resolveRecentRecords) - not
+  // scoped to appliedFilters.employee, since the point of this drill-down is
+  // to show the whole department regardless of which single employee (if
+  // any) the report is currently filtered to.
+  //
+  // This deliberately reuses departmentReport (already loaded for the
+  // Table Focus summary, no extra fetch needed) rather than a single day's
+  // punch snapshot: a single day's Punch In/Out can never agree with the
+  // period-total KPI cards shown above it in the drawer (e.g. "Late: 34"
+  // for a department is a whole-range total; picking any one day to show
+  // punches for will usually show 0 late that day, which read as broken
+  // even though both numbers were individually correct) - showing the same
+  // period-total day counts per employee here instead means the roster
+  // always sums to exactly what the cards above it already say.
+  const resolveDepartmentRoster = React.useCallback(
+    async (record: GroupedRecord): Promise<DrillDownRecord[]> => {
+      if (!record.departmentId) return record.recentRecords ?? []
+
+      const departmentIds = record.departmentId.split(',').map((id) => id.trim()).filter(Boolean)
+
+      return departmentReport
+        .filter((emp) => departmentIds.includes(String(emp.department_id ?? '').split(',')[0].trim()))
+        .map((emp) => {
+          const workingDays = toNumber(emp.workingDays)
+          const presentDays = toNumber(emp.total_att_day)
+          const absentDays = toNumber(emp.total_ab_day)
+          const lateDays = toNumber(emp.late)
+
+          return {
+            id: String(emp.user_id),
+            userId: String(emp.user_id),
+            date: `${appliedFilters.from} to ${appliedFilters.to}`,
+            employee: emp.full_name ?? '--',
+            employeeId: emp.employee_no ?? String(emp.user_id),
+            department: emp.department ?? '--',
+            presentDays,
+            absentDays,
+            lateDays,
+            workingDays,
+            attendancePercentage: workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 0,
+          }
+        })
+    },
+    [departmentReport, appliedFilters],
+  )
+
+  // Drills one employee's period-total row (Present Days: 16, etc.) down
+  // into the actual dates behind it - reuses /api/attendance/my-attendance
+  // (AttendanceTrackingApiController::myAttendance), which already builds a
+  // full day-by-day calendar with punch/status per date, just normally used
+  // for an employee's own self-service view rather than an admin looking up
+  // someone else's.
+  const resolveEmployeeCalendar = React.useCallback(
+    async (row: DrillDownRecord): Promise<DayWiseAttendanceRecord[]> => {
+      if (!row.userId) return []
+
+      const context = buildSessionContext()
+      const response = await hrmsService.getMyAttendance(context, {
+        userId: row.userId,
+        fromDate: appliedFilters.from,
+        toDate: appliedFilters.to,
+      })
+
+      return (response.calendar ?? []).map((day) => ({
+        id: day.date,
+        date: day.date,
+        dayName: day.day_name ?? '--',
+        punchIn: formatTime(day.punchin_time),
+        punchOut: formatTime(day.punchout_time),
+        workingHours: calendarWorkingHours(day),
+        status: day.status,
+      }))
+    },
+    [appliedFilters],
+  )
 
   const handleExport = () => {
     console.log('Export clicked')
@@ -543,7 +699,18 @@ function AttendanceReportsPage() {
         const context = buildSessionContext()
         const departmentId = getApiDepartmentId(appliedFilters.department)
         const employeeId = getApiEmployeeId(appliedFilters.employee)
-        const [kpis, weekly, departmentSummary, earlyGoing] = await Promise.all([
+        const reportDate = await resolveEffectiveDayDetailDate(context, {
+          departmentId,
+          from: appliedFilters.from,
+          to: appliedFilters.to,
+        })
+        if (cancelled) return
+        setLatestActivityNote(
+          reportDate !== (appliedFilters.to || appliedFilters.from)
+            ? `${appliedFilters.to || appliedFilters.from} has no recorded attendance, so Daily Details and "View" below are showing the most recent date that does: ${reportDate}.`
+            : null,
+        )
+        const [kpis, weekly, departmentSummary, dayDetail] = await Promise.all([
           hrmsService.getAttendanceKpis(context, { departmentId, employeeId }),
           hrmsService.getAttendanceWeeklySummary(context, {
             fromDate: appliedFilters.from,
@@ -557,8 +724,8 @@ function AttendanceReportsPage() {
             departmentId: departmentId ?? 'all',
             employeeId: employeeId ?? 'all',
           }),
-          hrmsService.getEarlyGoingAttendanceReport(context, {
-            date: appliedFilters.to || appliedFilters.from,
+          hrmsService.getAttendanceDayDetail(context, {
+            date: reportDate,
             departmentId: departmentId ?? 'all',
             employeeId: employeeId ?? 'all',
           }),
@@ -568,7 +735,7 @@ function AttendanceReportsPage() {
           setAttendanceKpis(kpis)
           setWeeklySummary(weekly)
           setDepartmentReport(departmentSummary.empData ?? [])
-          setEarlyGoingRows((earlyGoing.hrmsList ?? []).map((entry) => mapEarlyGoingRecord(entry, departmentsById)))
+          setEarlyGoingRows((dayDetail.employees ?? []).map((entry) => mapDayDetailRecord(entry, reportDate)))
         }
       } catch (error) {
         if (!cancelled) {
@@ -590,16 +757,16 @@ function AttendanceReportsPage() {
     return () => {
       cancelled = true
     }
-  }, [appliedFilters, departmentsById, user])
+  }, [appliedFilters, user])
 
   const groupedTableData = React.useMemo((): GroupedRecord[] => {
     if (departmentReport.length > 0) {
       if (groupBy === 'organization' || groupBy === 'date') {
-        const deptMap = new Map<string, { employees: number; present: number; absent: number; late: number; earlyGoing: number; workingDays: number }>()
+        const deptMap = new Map<string, { employees: number; present: number; absent: number; late: number; earlyGoing: number; workingDays: number; departmentIds: Set<string> }>()
         departmentReport.forEach((record) => {
           const dept = record.department || '--'
           if (!deptMap.has(dept)) {
-            deptMap.set(dept, { employees: 0, present: 0, absent: 0, late: 0, earlyGoing: 0, workingDays: 0 })
+            deptMap.set(dept, { employees: 0, present: 0, absent: 0, late: 0, earlyGoing: 0, workingDays: 0, departmentIds: new Set() })
           }
           const entry = deptMap.get(dept)!
           entry.employees += 1
@@ -608,18 +775,32 @@ function AttendanceReportsPage() {
           entry.late += toNumber(record.late)
           entry.earlyGoing += 0
           entry.workingDays += toNumber(record.workingDays)
+          // A sub_institute can have more than one hrms_departments row
+          // sharing the same display name (duplicate data entry) - this
+          // table groups by name, so it needs every id that name maps to,
+          // not just one, or the "View" roster comes up short of this
+          // row's own employee count.
+          String(record.department_id ?? '')
+            .split(',')
+            .map((id) => id.trim())
+            .filter(Boolean)
+            .forEach((id) => entry.departmentIds.add(id))
         })
 
         return Array.from(deptMap.entries()).map(([dept, vals]) => ({
           id: `${groupBy}-${dept}`,
           date: groupBy === 'date' ? `${appliedFilters.from} to ${appliedFilters.to}` : undefined,
           department: dept,
+          departmentId: Array.from(vals.departmentIds).join(','),
           employees: vals.employees,
           present: vals.present,
           absent: vals.absent,
           late: vals.late,
           earlyGoing: vals.earlyGoing,
           attendancePercentage: vals.workingDays > 0 ? Math.round((vals.present / vals.workingDays) * 100) : 0,
+          // Preview only - View fetches the full roster on demand via
+          // resolveRecentRecords (organization grouping) since this dataset
+          // is scoped to the report's single reporting date, not the range.
           recentRecords: earlyGoingData.filter((record) => record.department === dept).slice(0, 3),
         }))
       }
@@ -769,12 +950,13 @@ function AttendanceReportsPage() {
     }
 
     // Fallback before the department report has loaded: derive from the
-    // single-day early-going report, which carries a real per-record status.
-    // This IS a single-day snapshot, so totalSlots === totalEmployees here.
+    // day-detail report, which is a full-roster LEFT JOIN carrying a real
+    // per-employee status (present/late/early-going/absent/leave). This IS a
+    // single-day snapshot, so totalSlots === totalEmployees here.
     const presentCount = earlyGoingData.filter((record) => record.status === 'present').length
-    const totalEmployees = attendanceKpis?.active_employees ?? earlyGoingData.length
-    const absentCount = Math.max(0, totalEmployees - presentCount)
+    const absentCount = earlyGoingData.filter((record) => record.status === 'absent').length
     const lateCount = earlyGoingData.filter((record) => record.status === 'late').length
+    const totalEmployees = earlyGoingData.length || attendanceKpis?.active_employees || 0
 
     return { totalEmployees, presentCount, absentCount, lateCount, earlyGoingCount, totalSlots: totalEmployees || 1 }
   }, [departmentReport, earlyGoingData, attendanceKpis])
@@ -893,6 +1075,8 @@ function AttendanceReportsPage() {
         groupBy={groupBy}
         searchValue={search}
         onSearchChange={setSearch}
+        resolveRecentRecords={resolveDepartmentRoster}
+        resolveEmployeeCalendar={resolveEmployeeCalendar}
         className="sm:col-span-2"
       />
     </div>
@@ -950,6 +1134,12 @@ function AttendanceReportsPage() {
         onChange={(id: string) => setViewMode(id as ViewTabId)}
       />
 
+      {latestActivityNote && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+          {latestActivityNote}
+        </div>
+      )}
+
       {apiError && (
         <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive">
           {apiError}
@@ -979,10 +1169,10 @@ function AttendanceReportsPage() {
               <div>
                 <p className="text-muted-foreground">Status</p>
                 <StatusBadge
-                  variant={viewRecord.status === 'present' ? 'active' : viewRecord.status === 'late' ? 'pending' : 'error'}
+                  variant={statusDisplay[viewRecord.status].variant}
                   className="mt-0.5 h-6 px-2.5 text-xs font-semibold"
                 >
-                  {viewRecord.status === 'present' ? 'Present' : viewRecord.status === 'late' ? 'Late' : 'Absent'}
+                  {statusDisplay[viewRecord.status].label}
                 </StatusBadge>
               </div>
               <div>

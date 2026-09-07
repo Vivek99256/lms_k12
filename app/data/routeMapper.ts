@@ -179,6 +179,13 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lms_syllabus': '/lms/syllabus-plan',
   'lmsleaderboard.index': '/lms/leader-board',
   'lms/lmsleaderboard': '/lms/leader-board',
+  // Social & Collaborative — tblmenumaster stores the legacy (misspelled)
+  // route name "lmsSocialCollabrotive.index"; the Next.js page uses the
+  // corrected spelling, so both variants are mapped.
+  'lmssocialcollabrotive.index': '/lms/social-collaborative',
+  'lms/lmssocialcollabrotive': '/lms/social-collaborative',
+  'lmssocialcollaborative.index': '/lms/social-collaborative',
+  'lms/lmssocialcollaborative': '/lms/social-collaborative',
   // MASTER modules
   'lb_master.index': '/lms/leader-board-master',
   'lms/lb_master': '/lms/leader-board-master',
@@ -208,8 +215,17 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'new_pal.index': '/pal/new',
   'new_pal': '/pal/new',
   'lms/new-pal': '/pal/new',
+  // Framework — registered by 2026_08_26_100000_add_new_pal_framework_ulu_
+  // pedagogy_engine_submodule_menus so its sidebar/rights-driven navigation
+  // matches the DashboardShell tab, which points at /pal/frameworks (a
+  // historical path outside /pal/new/*, same as ULU and Pedagogy Engine below).
+  'new_pal.frameworks': '/pal/frameworks',
   'new_pal.content_model': '/pal/new/content-model',
   'lms/new-pal/content-model': '/pal/new/content-model',
+  // Unified Learning Units — same migration as Framework above.
+  'new_pal.ulu': '/pal/ulu',
+  // Pedagogy Engine — same migration as Framework above.
+  'new_pal.pedagogy_engine': '/pal/pedagogy-engine',
   // Administration — the second New PAL level-3 sub-module, registered by
   // 2026_08_14_160100_add_administration_submodule_menu. Follows the same
   // `new_pal.<sub_module>` link convention as Content Model above rather than
@@ -309,6 +325,14 @@ const STUDENT_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'student/student_strength_report': '/student/report/student_strength_report',
   'agewise.index': '/student/report/agewise_report',
   'student/agewise': '/student/report/agewise_report',
+  'student_homework_report.index': '/lms/homework/report',
+  'student_homework_report_index': '/lms/homework/report',
+  'student/student_homework_report': '/lms/homework/report',
+  'show_student_homework_report': '/lms/homework/report',
+  'student_homework_submission_report.index': '/lms/homework/submission-report',
+  'student_homework_submission_report_index': '/lms/homework/submission-report',
+  'student/student_homework_submission_report': '/lms/homework/submission-report',
+  'show_student_homework_submission_report': '/lms/homework/submission-report',
 };
 
 // Legacy ERP modules now served by the stateless migration API.
@@ -460,6 +484,41 @@ const CAPABILITY_INTELLIGENCE_ROUTE_NAME_MAP: Record<string, string> = {
   'capability_intelligence.capability_library': '/capability-intelligence/capability-library',
   'capability_intelligence.competency_framework': '/capability-intelligence/competency-framework',
   'capability_intelligence.capability_explorer': '/capability-intelligence/capability-explorer',
+};
+
+/**
+ * LMS (People & Competency) → Learning Dashboard, Learning Catalog, My
+ * Learning, Assignments, Sessions & Calendar, Certifications & Records,
+ * Course Builder, Administration & Governance, Assessments under
+ * /people-competency/lms. PACKAGE 0 (shared scaffolding) of a G2G → LMS-K12
+ * migration — see app/people-competency/lms/** (layout only so far; the 9
+ * screens themselves land in packages 1-4) and next_lms_erp's
+ * database/migrations/<...>_add_g2g_lms_menu.php for the matching backend
+ * menu-master rows (link values kept identical to these keys). Same pattern
+ * as TALENT_ROUTE_NAME_MAP / ORGANIZATION_MANAGEMENT_ROUTE_NAME_MAP: this
+ * module is NOT the existing native LMS (app/lms, app/g2g-lms — untouched,
+ * unrelated) — it is a fresh Next.js-only surface under a new `g2g_lms.*`
+ * key namespace, so it cannot collide with any legacy LMS route name.
+ */
+const G2G_LMS_ROUTE_NAME_MAP: Record<string, string> = {
+  'g2g_lms.learning_dashboard': '/people-competency/lms/learning-dashboard',
+  'g2g_lms.learning_catalog': '/people-competency/lms/learning-catalog',
+  'g2g_lms.my_learning': '/people-competency/lms/my-learning',
+  'g2g_lms.assignments': '/people-competency/lms/assignments',
+  'g2g_lms.sessions_calendar': '/people-competency/lms/sessions-calendar',
+  'g2g_lms.certifications_records': '/people-competency/lms/certifications-records',
+  'g2g_lms.course_builder': '/people-competency/lms/course-builder',
+  'g2g_lms.administration_governance': '/people-competency/lms/administration-governance',
+  'g2g_lms.assessments': '/people-competency/lms/assessments',
+};
+
+const ENTERPRISE_BRAIN_ROUTE_NAME_MAP: Record<string, string> = {
+  'enterprise_brain.index': '/enterprise-brain',
+  'enterprise-brain.index': '/enterprise-brain',
+  'enterprise_brain': '/enterprise-brain',
+  'enterprise-brain': '/enterprise-brain',
+  'brain.index': '/enterprise-brain',
+  'brain': '/enterprise-brain',
 };
 
 export function mapApiLinkToRoute(link: string | null | undefined): string {
@@ -658,6 +717,19 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return capabilityIntelligenceRoute;
   }
 
+  const enterpriseBrainRoute = ENTERPRISE_BRAIN_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (enterpriseBrainRoute) {
+    return enterpriseBrainRoute;
+  }
+
+  // LMS (People & Competency) → Learning Dashboard, Learning Catalog, My
+  // Learning, Assignments, Sessions & Calendar, Certifications & Records,
+  // Course Builder, Administration & Governance, Assessments.
+  const g2gLmsRoute = G2G_LMS_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (g2gLmsRoute) {
+    return g2gLmsRoute;
+  }
+
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
     return '/fees/master/fees-config-master';
   }
@@ -728,30 +800,98 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     frontDeskRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (frontDeskRoute) return frontDeskRoute;
 
+  // Level-2 "Career Counselling" section — a standalone module (not nested
+  // under career-intelligence) with Interest Profile and Knowing Yourself as
+  // its two Level-3 pages. Checked ahead of careerIntelligenceRoutes below so
+  // these two specific route names resolve here instead of falling through
+  // to the generic career_counselling.* aliases that still point at the
+  // (separately renamed) career-intelligence module.
   const careerCounsellingRoutes: Record<string, string> = {
-    'career_counselling.index': '/career-counselling',
-    'career-counselling.index': '/career-counselling',
-    'career_counselling': '/career-counselling',
-    'career-counselling': '/career-counselling',
-    'career_counselling/plan': '/career-counselling',
-    'career_counselling/education': '/career-counselling?section=explore',
-    'career_counselling/explore': '/career-counselling?section=explore',
-    'career_counselling/knowing-yourself': '/career-counselling?section=assessment',
-    'career_counselling/interest-profile': '/career-counselling?section=assessment',
-    'career_counselling/college': '/career-counselling?section=colleges',
-    'career_counselling/courses': '/career-counselling?section=courses',
-    'career_counselling/profile': '/career-counselling?section=employers',
-    'career_counselling/expert-advice': '/career-counselling?section=experts',
-    'career_counselling/explore-sectors': '/career-counselling?section=sectors',
-    'career_counselling/match-profile': '/career-counselling?section=match',
-    'knowing-yourself': '/career-counselling?section=assessment',
-    'match-profile': '/career-counselling?section=match',
-    'expert-advice': '/career-counselling?section=experts',
-    'explore-sectors': '/career-counselling?section=sectors',
+    'career_counselling/interest-profile': '/career-counselling/interest-profile',
+    'career-counselling/interest-profile': '/career-counselling/interest-profile',
+    'career_counselling_interest_profile': '/career-counselling/interest-profile',
+    'interest-profile': '/career-counselling/interest-profile',
+    'career_counselling/knowing-yourself': '/career-counselling/knowing-yourself',
+    'career-counselling/knowing-yourself': '/career-counselling/knowing-yourself',
+    'career_counselling_knowing-yourself': '/career-counselling/knowing-yourself',
+    'knowing-yourself': '/career-counselling/knowing-yourself',
   };
   const careerCounsellingRoute =
     careerCounsellingRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (careerCounsellingRoute) return careerCounsellingRoute;
+
+  const careerIntelligenceRoutes: Record<string, string> = {
+    'career_counselling.index': '/career-intelligence',
+    'career-counselling.index': '/career-intelligence',
+    'career_counselling': '/career-intelligence',
+    'career-counselling': '/career-intelligence',
+    'career_intelligence.index': '/career-intelligence',
+    'career-intelligence.index': '/career-intelligence',
+    'career_intelligence': '/career-intelligence',
+    'career-intelligence': '/career-intelligence',
+    'career_counselling/plan': '/career-intelligence',
+    'career_counselling/education': '/career-intelligence',
+    'career_counselling/explore': '/career-intelligence',
+    'career_counselling/college': '/career-intelligence',
+    'career_counselling/courses': '/career-intelligence',
+    'career_counselling/profile': '/career-intelligence',
+    'career_counselling/expert-advice': '/career-intelligence',
+    'career_counselling/explore-sectors': '/career-intelligence',
+    'career_counselling/match-profile': '/career-intelligence?section=match',
+    'match-profile': '/career-intelligence?section=match',
+    'expert-advice': '/career-intelligence',
+    'explore-sectors': '/career-intelligence',
+  };
+  const careerIntelligenceRoute =
+    careerIntelligenceRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerIntelligenceRoute) return careerIntelligenceRoute;
+
+  const careerAwarenessRoutes: Record<string, string> = {
+    'career_awareness.index': '/career-awareness',
+    'career-awareness.index': '/career-awareness',
+    'career_awareness': '/career-awareness',
+    'career-awareness': '/career-awareness',
+    'thinking_in_career_plan': '/career-awareness',
+    'career_awareness.certainty': '/career-awareness/certainty',
+    'career-awareness.certainty': '/career-awareness/certainty',
+    'career_awareness_certainty': '/career-awareness/certainty',
+    'career-awareness-certainty': '/career-awareness/certainty',
+    'career_awareness.ambition': '/career-awareness/ambition',
+    'career-awareness.ambition': '/career-awareness/ambition',
+    'career_awareness_ambition': '/career-awareness/ambition',
+    'career-awareness-ambition': '/career-awareness/ambition',
+    'career_awareness.alignment': '/career-awareness/alignment',
+    'career-awareness.alignment': '/career-awareness/alignment',
+    'career_awareness_alignment': '/career-awareness/alignment',
+    'career-awareness-alignment': '/career-awareness/alignment',
+    'career_awareness.originality': '/career-awareness/originality',
+    'career-awareness.originality': '/career-awareness/originality',
+    'career_awareness_originality': '/career-awareness/originality',
+    'career-awareness-originality': '/career-awareness/originality',
+  };
+  const careerAwarenessRoute =
+    careerAwarenessRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerAwarenessRoute) return careerAwarenessRoute;
+
+  const careerExplorerRoutes: Record<string, string> = {
+    'career_explore.index': '/career-explorer',
+    'career-explore.index': '/career-explorer',
+    'career_explore': '/career-explorer',
+    'career-explore': '/career-explorer',
+    'education.index': '/career-explorer',
+    'education': '/career-explorer',
+    'career_explore.find_occupation': '/career-explorer',
+    'career-explore.find_occupation': '/career-explorer',
+    'career_explore.college': '/career-explorer/college',
+    'career-explore.college': '/career-explorer/college',
+    'career_explore.courses': '/career-explorer/courses',
+    'career-explore.courses': '/career-explorer/courses',
+    'career_explore.employers': '/career-explorer/employers',
+    'career-explore.employers': '/career-explorer/employers',
+  };
+  const careerExplorerRoute =
+    careerExplorerRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerExplorerRoute) return careerExplorerRoute;
 
   if (cleanLink.toLowerCase() === 'other_fee_map.index') {
     return '/fees/master/additional-fees-mapping';

@@ -171,7 +171,22 @@
       "id": "assistant-1787659110643",
       "role": "assistant",
       "content": "There are 10 open admission enquiries. I was unable to find any AI templates for \"admission follow-up\" in the document template library. Therefore, I cannot prepare the follow-up communication using an approved AI template.\n\nThe open admission enquiries are:\n*   Testing v Testing (Enquiry No: 2022013, Mobile: 7894561230, Status: new)\n*   Abhi D Raval (Enquiry No: 2022012, Mobile: 9924721800, Status: new)\n*   Riya Mayur Patel (Enquiry No: 2022011, Mobile: 9685743256, Status: new, Follow-up: 2026-08-13)\n*   Prisha Mayur Sapriya (Enquiry No: 2022010, Mobile: 9685743256, Status: new, Follow-up: 2026-08-14)\n*   Gajera Vivek Babubhai (Enquiry No: 2022009, Mobile: 09925642448, Status: new, Follow-up: 2026-07-17)\n*   John Michael Smith (Enquiry No: 2022008, Mobile: 9876543210, Status: new)\n*   John Michael Smith (Enquiry No: 2022008, Mobile: 9876543210, Status: new)\n*   John Michael Smith (Enquiry No: 2022008, Mobile: 9876543210, Status: new)\n*   Raj R R (Enquiry No: 2022002, Mobile: 9909906511, Standard: 4, Status: approve, Follow-up: 2026-06-10)\n*   John Updated (Enquiry No: 2022001, Mobile: 9876543211, Standard: 1, Status: approve, Follow-up: 2025-07-01)"
+    },
+    {
+      "id": "user-1",
+      "role": "user",
+      "content": "what is this enterprise brain menu?"
+    },
+    {
+      "id": "user-1",
+      "role": "user",
+      "content": "Which students are showing academic risk and need intervention?"
+    },
+    {
+      "id": "assistant-1788412829108",
+      "role": "assistant",
+      "content": "4 students are showing academic risk.\n\nAbhi Raval (6-C) — critical risk. Abhi Raval: assessment performance is averaging 28.3% across the last 3 assessments, and 4 of 5 assigned activities were incomplete, 4 of them in Science. Likely cause: Incomplete practice is leaving specific concepts unconsolidated before assessment. (55% confidence) Recommendation #363: Start an academic intervention for Abhi Raval in Science — awaiting approval.\n\nRavi singh (2-A) — critical risk. Ravi singh: 3 of 5 assigned activities were incomplete. Likely cause: The student is present but disengaging from independent work. (50% confidence) Recommendation #364: Start an academic intervention for Ravi singh in Audiobooks — awaiting approval.\n\nAakasa Pandya — high risk. Aakasa Pandya: assessment performance declined from 62.7% to 61.4% across the last 3 assessments, and 4 of 9 assigned activities were incomplete. Likely cause: Incomplete practice is leaving specific concepts unconsolidated before assessment. (55% confidence) Recommendation #361: Start an academic intervention for Aakasa Pandya in Audiobooks — awaiting approval.\n\nDharmishtha dve (7-A) — high risk. Dharmishtha dve: assessment performance declined from 73% to 71.8% across the last 3 assessments, and 3 of 10 assigned activities were incomplete. Likely cause: Incomplete practice is leaving specific concepts unconsolidated before assessment. (55% confidence) Recommendation #362: Start an academic intervention for Dharmishtha dve in Audiobooks — awaiting approval.\n\nNothing has been created yet — each recommendation needs approval."
     }
   ],
-  "updatedAt": "2026-08-25T11:58:30.647Z"
+  "updatedAt": "2026-09-03T05:20:29.109Z"
 }

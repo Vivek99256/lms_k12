@@ -11,7 +11,7 @@ export interface EarlyGoingRecord {
   expectedOut: string
   earlyBy: string
   earlyByMin: number
-  status: 'present' | 'late' | 'absent'
+  status: 'present' | 'late' | 'absent' | 'early-going' | 'leave'
 }
 
 export const savedReports = [

@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
+import ExamResultDashboard from '@/app/lms/exam/_result-dashboard/ExamResultDashboard';
 
 type ExamStatus = 'Scheduled' | 'Open' | 'Draft' | 'Closed';
 type AudienceMode = 'Teacher' | 'Student';
@@ -343,16 +344,27 @@ const examTypeOptions = [
 ];
 const attemptsAllowedOptions = ['1 attempt', '2 attempts', '3 attempts'];
 
-const innerTabs = [
-  { label: 'Exams', icon: FileText, active: true },
-  { label: 'Results dashboard', icon: GraduationCap, active: false },
+type ExamInnerTab = 'Exams' | 'Results dashboard';
+
+const innerTabs: Array<{ label: ExamInnerTab; icon: LucideIcon }> = [
+  { label: 'Exams', icon: FileText },
+  { label: 'Results dashboard', icon: GraduationCap },
 ];
 
-const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon }> = [
-  { label: 'PAL', icon: Monitor },
+const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon; hidden?: boolean }> = [
+  // PAL is hidden from the student learning tabs for now, not removed: the tab
+  // panel below still renders it, so flipping `hidden` back off restores it.
+  { label: 'PAL', icon: Monitor, hidden: true },
   { label: 'Online Exam', icon: FileText },
   { label: 'Offline Exam', icon: BookOpen },
 ];
+
+const visibleStudentViewTabs = studentViewTabs.filter((tab) => !tab.hidden);
+
+// Land on the first tab that is actually visible, so hiding PAL never leaves
+// the student view opened on a tab with no button to switch away from.
+const defaultStudentLearningTab: StudentLearningTab =
+  visibleStudentViewTabs[0]?.label ?? studentViewTabs[0].label;
 
 // Real student-facing PAL chapter/concept mastery is fetched from
 // /api/pal/mastery-map/{learnerId} (see fetchStudentChapterProgress below);
@@ -810,6 +822,10 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
       const response = await fetch(`${API_BASE_URL}/lms/online_exam`, {
         method: 'POST',
         body: formData,
+        headers: {
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
       });
 
       const result = await response.json().catch(() => null);
@@ -985,13 +1001,13 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
 
 export default function StudentHomeworkIndexPage() {
   const { isChatbotOpen } = useContext(ChatbotLayoutContext);
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>(() => {
-    if (typeof window === 'undefined') return 'Teacher';
-    const session = getCreateExamSession();
-    if (session.userProfileName.trim().toUpperCase() === 'STUDENT') return 'Student';
-    const stored = localStorage.getItem('learningManagementAudienceMode');
-    return stored === 'Student' ? 'Student' : 'Teacher';
-  });
+  // Follows the signed-in profile and is not switchable. The Viewing-as toggle is
+  // gone, so a stored 'Student' preference would otherwise have left a teacher in
+  // the student view with no control to leave it.
+  const audienceMode: AudienceMode =
+    getCreateExamSession().userProfileName.trim().toUpperCase() === 'STUDENT'
+      ? 'Student'
+      : 'Teacher';
   const [apiExams, setApiExams] = useState<ExamRecord[]>([]);
   const [isLoadingExams, setIsLoadingExams] = useState(true);
   const [examLoadError, setExamLoadError] = useState('');
@@ -1002,7 +1018,8 @@ export default function StudentHomeworkIndexPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [typeFilter, setTypeFilter] = useState('All types');
-  const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>('PAL');
+  const [examInnerTab, setExamInnerTab] = useState<ExamInnerTab>('Exams');
+  const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>(defaultStudentLearningTab);
   const [examFilters, setExamFilters] = useState({
     grade_id: '',
     standard_id: '',
@@ -1175,12 +1192,13 @@ export default function StudentHomeworkIndexPage() {
       });
 
       const response = await fetch(
-        `https://dev.triz.co.in/api/question-paper/${paper.id}?${queryParams.toString()}`,
+        `${API_BASE_URL}/api/question-paper/${paper.id}?${queryParams.toString()}`,
         {
           method: 'GET',
           cache: 'no-store',
           headers: {
             Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
         }
       );
@@ -1247,6 +1265,7 @@ export default function StudentHomeworkIndexPage() {
           cache: 'no-store',
           headers: {
             Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
         }
       );
@@ -1337,6 +1356,7 @@ export default function StudentHomeworkIndexPage() {
           cache: 'no-store',
           headers: {
             Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
         }
       );
@@ -1426,6 +1446,7 @@ export default function StudentHomeworkIndexPage() {
           cache: 'no-store',
           headers: {
             Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
           },
         }
       );
@@ -1725,7 +1746,14 @@ export default function StudentHomeworkIndexPage() {
         url.searchParams.set('sub_institute_id', session.subInstituteId);
       }
 
-      const response = await fetch(url.toString(), { method: 'GET', cache: 'no-store' });
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
+      });
       const payload = (await response.json().catch(() => null)) as AdaptivePracticeApiResponse | null;
 
       if (!response.ok || Number(payload?.status_code) !== 1) {
@@ -1819,6 +1847,10 @@ export default function StudentHomeworkIndexPage() {
       const response = await fetch(url.toString(), {
         method: 'GET',
         signal,
+        headers: {
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
       });
       const payload = (await response.json()) as QuestionPaperApiResponse;
 
@@ -2004,7 +2036,11 @@ export default function StudentHomeworkIndexPage() {
 
       const response = await fetch(`${API_BASE_URL}/lms/submit-practice`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
         body: body.toString(),
       });
       const payload = (await response.json().catch(() => null)) as SubmitPracticeApiResponse | null;
@@ -2175,6 +2211,10 @@ export default function StudentHomeworkIndexPage() {
           method: 'POST',
           body: formData,
           signal: controller.signal,
+          headers: {
+            Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          },
         });
         const payload = (await response.json()) as LmsCoursesApiResponse;
 
@@ -2384,8 +2424,12 @@ export default function StudentHomeworkIndexPage() {
 
     (async () => {
       try {
+        const session = getCreateExamSession();
         const response = await fetch(`${API_BASE_URL}/api/question-mapping-levels`, {
-          headers: { Accept: 'application/json' },
+          headers: {
+            Accept: 'application/json',
+            ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+          },
           signal: controller.signal,
         });
         const result = (await response.json()) as {
@@ -2410,16 +2454,7 @@ export default function StudentHomeworkIndexPage() {
     };
   }, [isCreateExamOpen, mappingLevels.bloom.length, mappingLevels.dok.length]);
 
-  useEffect(() => {
-    if (isStudentProfile && audienceMode !== 'Student') {
-      setAudienceMode('Student');
-    }
-  }, [isStudentProfile, audienceMode]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem('learningManagementAudienceMode', audienceMode);
-  }, [audienceMode]);
 
   useEffect(() => {
     if (!activePracticeConceptId) return;
@@ -2480,63 +2515,39 @@ export default function StudentHomeworkIndexPage() {
                 </p>
               </div>
 
-              {!isStudentProfile && (
-              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-                <span className="text-[13px] font-medium text-[#6B7B91]">Viewing as</span>
-                <div className="inline-flex rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-                  <button
-                    type="button"
-                    onClick={() => setAudienceMode('Teacher')}
-                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                      audienceMode === 'Teacher'
-                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                        : 'text-[#6B7B91]'
-                    }`}
-                  >
-                    <Monitor size={16} />
-                    Teacher
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAudienceMode('Student')}
-                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                      audienceMode === 'Student'
-                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                        : 'text-[#6B7B91]'
-                    }`}
-                  >
-                    <GraduationCap size={16} />
-                    Student
-                  </button>
-                </div>
-              </div>
-              )}
             </div>
 
             {audienceMode === 'Teacher' && !isStudentProfile ? (
               <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-5">
+                  {innerTabs.map((tab) => {
+                    const TabIcon = tab.icon;
+                    const isActive = examInnerTab === tab.label;
+
+                    return (
+                      <button
+                        key={tab.label}
+                        type="button"
+                        onClick={() => setExamInnerTab(tab.label)}
+                        className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
+                          isActive
+                            ? 'border-[#5846EA] text-[#5846EA]'
+                            : 'border-transparent text-[#5F7087] hover:text-[#334155]'
+                        }`}
+                      >
+                        <TabIcon size={16} />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {examInnerTab === 'Results dashboard' ? (
+                  <ExamResultDashboard />
+                ) : (
+                  <>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="flex flex-col gap-4">
-                    <div className="flex flex-wrap items-center gap-5">
-                      {innerTabs.map((tab) => {
-                        const TabIcon = tab.icon;
-
-                        return (
-                          <button
-                            key={tab.label}
-                            type="button"
-                            className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
-                              tab.active
-                                ? 'border-[#5846EA] text-[#5846EA]'
-                                : 'border-transparent text-[#5F7087]'
-                            }`}
-                          >
-                            <TabIcon size={16} />
-                            {tab.label}
-                          </button>
-                        );
-                      })}
-                    </div>
 
                     <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
                       <div className="relative w-full max-w-[320px]">
@@ -2685,11 +2696,13 @@ export default function StudentHomeworkIndexPage() {
                   </div>
                 ) : null}
               </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="flex flex-col gap-5">
                 <div className="flex flex-wrap items-center gap-6 border-b border-[#D9E3F0] pb-3">
-                  {studentViewTabs.map((tab) => {
+                  {visibleStudentViewTabs.map((tab) => {
                     const TabIcon = tab.icon;
                     const isActive = studentLearningTab === tab.label;
 

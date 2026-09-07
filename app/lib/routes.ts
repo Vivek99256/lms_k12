@@ -18,16 +18,34 @@ export const ROUTES = {
     searchStudent: '/students/search_student',
   },
 
+  careerIntelligence: {
+    home: '/career-intelligence',
+    plan: '/career-intelligence',
+    match: '/career-intelligence?section=match',
+    intelligence: '/career-intelligence?section=intelligence',
+  },
+
+  // Level-2 "Career Counselling" section, with Interest Profile and Knowing
+  // Yourself as its two Level-3 pages — a standalone module, not nested
+  // under career-intelligence.
   careerCounselling: {
-    home: '/career-counselling',
-    explore: '/career-counselling?section=explore',
-    assessment: '/career-counselling?section=assessment',
-    colleges: '/career-counselling?section=colleges',
-    courses: '/career-counselling?section=courses',
-    employers: '/career-counselling?section=employers',
-    experts: '/career-counselling?section=experts',
-    sectors: '/career-counselling?section=sectors',
-    match: '/career-counselling?section=match',
+    interestProfile: '/career-counselling/interest-profile',
+    knowingYourself: '/career-counselling/knowing-yourself',
+  },
+
+  careerAwareness: {
+    home: '/career-awareness',
+    certainty: '/career-awareness/certainty',
+    ambition: '/career-awareness/ambition',
+    alignment: '/career-awareness/alignment',
+    originality: '/career-awareness/originality',
+  },
+
+  careerExplorer: {
+    home: '/career-explorer',
+    college: '/career-explorer/college',
+    courses: '/career-explorer/courses',
+    employers: '/career-explorer/employers',
   },
   
   // Result routes (paths mirror the legacy Laravel result route group)

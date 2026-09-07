@@ -13,36 +13,14 @@ const BASE_PATH = "requirements";
 const STATIC_SUB_INSTITUTE_ID = "0";
 const PROCESS_FLAG = "1";
 
-export type AddProcessMenuOption = {
-  id: number;
-  menuTitle: string;
-  menuDetails: string;
-};
-
 export type AddProcessRecord = {
   id: number;
   menuId: number;
+  /** For converted rows this is the procedure key, e.g. "LMS + PAL 6.9.4". */
   menuName: string;
   requirements: string;
   createdByName: string;
 };
-
-export type AddProcessBoard = {
-  records: AddProcessRecord[];
-  menuOptions: AddProcessMenuOption[];
-};
-
-function mapMenuOption(record: UnknownRecord): AddProcessMenuOption | null {
-  const id = readNumber(record.parent_menu_id);
-  const menuTitle = readString(record.menu_title).trim();
-  if (!id || !menuTitle) return null;
-
-  return {
-    id,
-    menuTitle,
-    menuDetails: `${id}/${menuTitle}`,
-  };
-}
 
 function mapRecord(record: UnknownRecord): AddProcessRecord {
   return {
@@ -59,20 +37,17 @@ function readPayloadList(payload: UnknownRecord, key: string): UnknownRecord[] {
   return recordArray(value);
 }
 
-export async function loadAddProcessBoard(): Promise<AddProcessBoard> {
+/**
+ * Every stored row.
+ *
+ * The legacy screen also fetched `requirements/create` for its menu picker.
+ * Converted processes are keyed by procedure, not by menu, so that request and
+ * the whole menu vocabulary are gone - one call instead of two.
+ */
+export async function loadAddProcessRecords(): Promise<AddProcessRecord[]> {
   try {
-    const [listPayload, createPayload] = await Promise.all([
-      legacyRequest(BASE_PATH),
-      legacyRequest(`${BASE_PATH}/create`),
-    ]);
-
-    const records = readPayloadList(listPayload, "TrizProcess").map(mapRecord);
-    const menuOptions = readPayloadList(createPayload, "allMenu")
-      .map(mapMenuOption)
-      .filter((option): option is AddProcessMenuOption => Boolean(option))
-      .sort((left, right) => left.menuTitle.localeCompare(right.menuTitle, undefined, { sensitivity: "base" }));
-
-    return { records, menuOptions };
+    const payload = await legacyRequest(BASE_PATH);
+    return readPayloadList(payload, "TrizProcess").map(mapRecord);
   } catch (value: unknown) {
     throw new Error(errorMessage(value, "Add Process data could not be loaded."));
   }

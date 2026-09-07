@@ -541,6 +541,25 @@ function EmployeeOverviewSheet({
     await loadData()
   }
 
+  /**
+   * KNOWN ISSUE (2026-08-25 migration audit): `updateSkillRating()` 422s on
+   * every real call - see its docblock in `employee-directory-api.ts` for the
+   * full root cause. Short version: `matrixId` here is a
+   * `.../competency-profile` item id (job-role KASBA catalog), not an
+   * `s_skill_matrix` row id, which is what `PUT .../{id}/skills/{matrixId}`
+   * actually validates against.
+   *
+   * A working item-level rating endpoint DOES exist on the backend
+   * (`POST /competency/kasba-rating`, wired as `EmployeeDirectoryService.
+   * rateKasbaItem()`) - but it validates `kasba_item_id` against its own
+   * `competency_kasba_item` table, and this screen's `matrixId`/`category`
+   * don't correspond to that table's ids either (confirmed by reading both
+   * controllers; there is no shared id space between `.../competency-profile`
+   * and `competency_kasba_item`). Swapping the call below for `rateKasbaItem`
+   * would trade one failing call for another, not fix the bug. Left as-is
+   * pending a backend change that reconciles the two id spaces (or returns
+   * `competency-profile` items keyed by `competency_kasba_item.id`).
+   */
   const handleSaveRating = async (category: string, matrixId: string, level: number) => {
     if (!employee?.id) return
     await updateSkillRating(employee.id, matrixId, level)

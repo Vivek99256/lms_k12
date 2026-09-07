@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select } from '@/components/ui/g2g/select'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { cn } from '@/lib/utils'
+import { toDateOnly } from '@/lib/date-only'
 import { resolveTaskSession, toMessage } from '../../_lib/task-session'
 import { projectsService } from '../../_lib/projects-api'
 import type { ProjectOptions, ProjectPayload, ProjectRecord, ProjectStatus } from '../../_lib/task-types'
@@ -130,7 +131,7 @@ export function CreateProjectModal({ isOpen, onClose, options, project, onSaved 
 
           {step === 3 && <div className="space-y-5">
             <Field label="Strategic Priority"><div className="grid grid-cols-3 gap-3">{(['High','Medium','Low'] as const).map((priority) => <Button type="button" variant="ghost" key={priority} onClick={() => set('priority', priority)} className={cn('rounded-xl border-2 px-4 py-3 text-sm font-bold', form.priority === priority ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-transparent bg-background/50 text-muted-foreground hover:bg-muted')}><PriorityBadge priority={priority} /></Button>)}</div></Field>
-            <div className="grid gap-4 sm:grid-cols-2"><Field label={<><CalendarIcon className="size-4" />Start Date *</>}><DatePicker value={form.start_date} onChange={(value) => set('start_date', typeof value === 'string' ? value : value?.toISOString().slice(0, 10) ?? '')} placeholder="Select start date" /></Field><Field label={<><CalendarIcon className="size-4" />Target End Date *</>}><DatePicker value={form.due_date} onChange={(value) => set('due_date', typeof value === 'string' ? value : value?.toISOString().slice(0, 10) ?? '')} placeholder="Select target date" /></Field></div>
+            <div className="grid gap-4 sm:grid-cols-2"><Field label={<><CalendarIcon className="size-4" />Start Date *</>}><DatePicker value={form.start_date} onChange={(value) => set('start_date', toDateOnly(value))} placeholder="Select start date" /></Field><Field label={<><CalendarIcon className="size-4" />Target End Date *</>}><DatePicker value={form.due_date} onChange={(value) => set('due_date', toDateOnly(value))} placeholder="Select target date" /></Field></div>
             <Field label={<><DollarSign className="size-4" />Budget Estimate (Optional)</>}><Input type="number" value={form.budget_estimate ?? ''} onChange={(value) => set('budget_estimate', value)} placeholder="0.00" /></Field>
           </div>}
 

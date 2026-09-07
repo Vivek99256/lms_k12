@@ -808,36 +808,41 @@ export default function SearchDropdown({
             )}
           </label>
 
-          <select
-            id="subject-dropdown"
-            name="subject_id"
-            value={formValues.subject}
-            multiple={Boolean(multiple.subject)}
-            required={required.subject}
-            disabled={disabled.subject || loading.subject || !canUseStandardChild}
-            onChange={handleSubjectChange}
-            className={cn(
-              selectClassName,
-              multiple.subject ? "min-h-28 py-2" : "h-11"
-            )}
-          >
-            {!multiple.subject && (
-              <option value="">
-                {loading.subject
-                  ? "Loading subjects..."
-                  : placeholders.subject || "Select Subject"}
-              </option>
-            )}
+          <div className="relative">
+            <select
+              id="subject-dropdown"
+              name="subject_id"
+              value={formValues.subject}
+              multiple={Boolean(multiple.subject)}
+              required={required.subject}
+              disabled={disabled.subject || loading.subject || !canUseStandardChild}
+              onChange={handleSubjectChange}
+              className={cn(
+                selectClassName,
+                multiple.subject ? "min-h-28 py-2" : "h-11"
+              )}
+            >
+              {!multiple.subject && (
+                <option value="">
+                  {loading.subject
+                    ? "Loading subjects..."
+                    : placeholders.subject || "Select Subject"}
+                </option>
+              )}
 
-            {uniqueSubjects.map((subject) => (
-              <option
-                key={subject.subject_id}
-                value={String(subject.subject_id)}
-              >
-                {subject.subject_name}
-              </option>
-            ))}
-          </select>
+              {uniqueSubjects.map((subject) => (
+                <option
+                  key={subject.subject_id}
+                  value={String(subject.subject_id)}
+                >
+                  {subject.subject_name}
+                </option>
+              ))}
+            </select>
+            {!multiple.subject ? (
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            ) : null}
+          </div>
 
           {errors.subject && (
             <p className="text-xs text-red-600">{errors.subject}</p>

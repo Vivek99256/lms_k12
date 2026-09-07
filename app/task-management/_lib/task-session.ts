@@ -70,6 +70,15 @@ export class TaskApiError extends Error {
  * page still surfaces a readable error), and throws `TaskApiError` on a
  * non-2xx response.
  */
+function buildProxyUrl(path: string, params: Record<string, string | undefined> = {}): string {
+  const proxyParams = new URLSearchParams()
+  proxyParams.set('path', path.startsWith('/') ? path.slice(1) : path)
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') proxyParams.set(key, value)
+  })
+  return `/api/proxy?${proxyParams.toString()}`
+}
+
 async function taskRequest<T>(
   session: TaskSession,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
@@ -86,14 +95,21 @@ async function taskRequest<T>(
     if (value !== undefined && value !== '') search.set(key, value)
   })
 
-  const url = `${session.baseUrl}/api${path}${search.toString() ? `?${search.toString()}` : ''}`
   const isForm = Boolean(options?.form)
+  const isBrowser = typeof window !== 'undefined'
+
+  let url: string
+  if (isBrowser) {
+    url = buildProxyUrl('api/' + path.replace(/^\//, ''), options?.params)
+  } else {
+    url = `${session.baseUrl}/api${path}${search.toString() ? `?${search.toString()}` : ''}`
+  }
 
   const response = await fetch(url, {
     method,
     cache: 'no-store',
     headers: {
-      ...createAuthHeaders(session, isForm ? undefined : 'application/json'),
+      ...createAuthHeaders(session, isForm ? undefined : options?.body !== undefined ? 'application/json' : undefined),
       ...options?.headers,
     },
     body: isForm ? options?.form : options?.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -226,3 +242,5 @@ export function resolveTaskSession(): TaskSession | null {
   const session = getTaskSession()
   return isTaskSessionReady(session) ? session : null
 }
+
+export { buildProxyUrl }

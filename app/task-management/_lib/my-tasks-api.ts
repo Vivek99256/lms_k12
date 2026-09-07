@@ -33,6 +33,7 @@
  */
 
 import {
+  buildProxyUrl,
   createAuthHeaders,
   TaskApiError,
   taskApiGet,
@@ -75,7 +76,8 @@ async function legacyGet<T>(session: TaskSession, path: string, params: Record<s
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== '') search.set(key, value)
   })
-  const url = `${session.baseUrl}${path}${search.toString() ? `?${search.toString()}` : ''}`
+  const isBrowser = typeof window !== 'undefined'
+  const url = isBrowser ? buildProxyUrl(path, params) : `${session.baseUrl}${path}${search.toString() ? `?${search.toString()}` : ''}`
   const response = await fetch(url, { headers: createAuthHeaders(session), cache: 'no-store' })
   const payload = (await response.json().catch(() => ({}))) as unknown
   if (!response.ok) throw new TaskApiError(legacyMessage(payload, `API Error: ${response.status} ${response.statusText}`), response.status)
@@ -83,7 +85,9 @@ async function legacyGet<T>(session: TaskSession, path: string, params: Record<s
 }
 
 async function legacyPostForm<T>(session: TaskSession, path: string, form: FormData): Promise<T> {
-  const response = await fetch(`${session.baseUrl}${path}`, {
+  const isBrowser = typeof window !== 'undefined'
+  const url = isBrowser ? buildProxyUrl(path) : `${session.baseUrl}${path}`
+  const response = await fetch(url, {
     method: 'POST',
     headers: createAuthHeaders(session),
     body: form,
@@ -94,7 +98,9 @@ async function legacyPostForm<T>(session: TaskSession, path: string, form: FormD
 }
 
 async function legacyPost<T>(session: TaskSession, path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${session.baseUrl}${path}`, {
+  const isBrowser = typeof window !== 'undefined'
+  const url = isBrowser ? buildProxyUrl(path) : `${session.baseUrl}${path}`
+  const response = await fetch(url, {
     method: 'POST',
     headers: createAuthHeaders(session, 'application/json'),
     body: JSON.stringify(body),
@@ -241,7 +247,9 @@ export const myTasksApi = {
   deleteLegacyTask: (session: TaskSession, id: string) => {
     const params = toTaskParams(session)
     const query = new URLSearchParams(params).toString()
-    return fetch(`${session.baseUrl}/task/${id}?${query}`, { method: 'DELETE', headers: createAuthHeaders(session) })
+    const isBrowser = typeof window !== 'undefined'
+    const url = isBrowser ? `/api/proxy?path=task/${id}&${query}` : `${session.baseUrl}/task/${id}?${query}`
+    return fetch(url, { method: 'DELETE', headers: createAuthHeaders(session) })
       .then(async (response) => {
         const payload = (await response.json().catch(() => ({}))) as { status_code: string | number; message: string }
         if (!response.ok) throw new TaskApiError(legacyMessage(payload, `API Error: ${response.status}`), response.status)
@@ -323,7 +331,7 @@ export const myTasksApi = {
           employees?: Array<{ id: number | string; first_name: string; middle_name?: string; last_name?: string }>
         }>
       >
-    }>(session, '/jobroles-by-department', { sub_institute_id: session.subInstituteId }),
+    }>(session, '/jobroles-by-department', toTaskParams(session)),
 
   getAssignmentUsers: (session: TaskSession) =>
     legacyGet<

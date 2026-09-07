@@ -124,6 +124,8 @@ const statusVariantMap: Record<string, VariantProps<typeof statusBadgeVariants>[
   absent: 'error',
   'half-day': 'pending',
   leave: 'default',
+  'early-going': 'warning',
+  'Early Going': 'warning',
   Live: 'active',
   live: 'active',
   'sent-back': 'processing',

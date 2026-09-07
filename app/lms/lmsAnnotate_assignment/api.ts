@@ -16,18 +16,43 @@ import {
 
 export type AnnotateRow = {
   id: number;
+  enrollmentNo: string;
   standardName: string;
+  divisionName: string;
+  mobile: string;
   studentName: string;
   subjectName: string;
   title: string;
+  description: string;
   assignedOn: string;
   submissionDate: string;
   examPdfUrl: string;
   submissionFileUrl: string;
+  teacherRemarks: string;
   studentSubmitted: boolean;
   teacherReviewed: boolean;
   studentId: number;
   examId: number;
+  /** "Checking" | "Evaluated" | "OCR Failed" | "Evaluation Failed" | "Failed" | "" (not yet submitted) */
+  aiStatus: string;
+  aiFailureReason: string;
+  aiScore: number | null;
+  aiTotalQuestions: number | null;
+  aiPercentage: number | null;
+  reviewedPdfUrl: string;
+  evaluatedAt: string;
+};
+
+export type AiEvaluationStatus = {
+  id: number;
+  aiStatus: string;
+  aiFailureReason: string;
+  aiScore: number | null;
+  aiTotalQuestions: number | null;
+  aiPercentage: number | null;
+  reviewedPdfUrl: string;
+  teacherRemarks: string;
+  evaluatedAt: string;
 };
 
 export type ReviewQuestion = {
@@ -94,6 +119,12 @@ function message(payload: unknown, fallback: string) {
   return isRecord(payload) ? readString(payload.message) || fallback : fallback;
 }
 
+function readNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
 /** JSON POST through the Next.js proxy to a token-authenticated api.php endpoint. */
 async function postJson(path: string, values: UnknownRecord): Promise<UnknownRecord> {
   const current = session();
@@ -138,18 +169,44 @@ const dataRows = (payload: UnknownRecord): UnknownRecord[] => records(payload.da
 function toAnnotateRow(row: UnknownRecord): AnnotateRow {
   return {
     id: readNumber(row.id),
+    enrollmentNo: readString(row.enrollment_no),
     standardName: readString(row.standard_name),
+    divisionName: readString(row.division_name),
+    mobile: readString(row.mobile),
     studentName: readString(row.student_name).trim(),
     subjectName: readString(row.subject_name),
     title: readString(row.title),
+    description: readString(row.description),
     assignedOn: readString(row.created_date_fmt),
     submissionDate: readString(row.submission_date_fmt),
     examPdfUrl: readString(row.exam_pdf_url),
     submissionFileUrl: readString(row.submission_file_url),
+    teacherRemarks: readString(row.teacher_remarks),
     studentSubmitted: readString(row.student_submission_status) === "Y",
     teacherReviewed: readString(row.teacher_submission_status) === "Y",
     studentId: readNumber(row.student_id),
     examId: readNumber(row.exam_id),
+    aiStatus: readString(row.ai_status),
+    aiFailureReason: readString(row.ai_failure_reason),
+    aiScore: readNullableNumber(row.ai_score),
+    aiTotalQuestions: readNullableNumber(row.ai_total_questions),
+    aiPercentage: readNullableNumber(row.ai_percentage),
+    reviewedPdfUrl: readString(row.reviewed_pdf_path),
+    evaluatedAt: readString(row.evaluated_at),
+  };
+}
+
+function toAiEvaluationStatus(row: UnknownRecord): AiEvaluationStatus {
+  return {
+    id: readNumber(row.id),
+    aiStatus: readString(row.ai_status),
+    aiFailureReason: readString(row.ai_failure_reason),
+    aiScore: readNullableNumber(row.ai_score),
+    aiTotalQuestions: readNullableNumber(row.ai_total_questions),
+    aiPercentage: readNullableNumber(row.ai_percentage),
+    reviewedPdfUrl: readString(row.reviewed_pdf_path),
+    teacherRemarks: readString(row.teacher_remarks),
+    evaluatedAt: readString(row.evaluated_at),
   };
 }
 
@@ -158,17 +215,61 @@ function toAnnotateRow(row: UnknownRecord): AnnotateRow {
 // ---------------------------------------------------------------------------
 
 /** All assignments for the teacher's annotate/review list. */
-export async function listAnnotateAssignments(filters?: {
+export type AnnotateListFilters = {
+  grade?: string;
   standardId?: string;
   divisionId?: string;
   subjectId?: string;
-}): Promise<AnnotateRow[]> {
+  fromDate?: string;
+  toDate?: string;
+  status?: "" | "Y" | "N";
+};
+
+export async function listAnnotateAssignments(
+  filters?: AnnotateListFilters
+): Promise<AnnotateRow[]> {
   const payload = await postJson("lms-assignment/annotate-list", {
+    grade: filters?.grade || null,
     standard_id: filters?.standardId || null,
     division_id: filters?.divisionId || null,
     subject_id: filters?.subjectId || null,
+    from_date: filters?.fromDate || null,
+    to_date: filters?.toDate || null,
+    status: filters?.status || null,
   });
   return dataRows(payload).map(toAnnotateRow);
+}
+
+export type AssignmentListFilters = {
+  grade?: string;
+  standardId?: string;
+  divisionId?: string;
+  subjectId?: string;
+  fromDate?: string;
+  toDate?: string;
+};
+
+/** All assigned lms_assignment rows (Student Homework Report — assignment listing). */
+export async function listAssignments(
+  filters?: AssignmentListFilters
+): Promise<AnnotateRow[]> {
+  const payload = await postJson("lms-assignment/list", {
+    grade: filters?.grade || null,
+    standard_id: filters?.standardId || null,
+    division_id: filters?.divisionId || null,
+    subject_id: filters?.subjectId || null,
+    from_date: filters?.fromDate || null,
+    to_date: filters?.toDate || null,
+  });
+  return dataRows(payload).map(toAnnotateRow);
+}
+
+/** Bulk-delete lms_assignment rows. Returns the number of rows deleted. */
+export async function bulkDeleteAssignments(ids: number[]): Promise<number> {
+  const payload = await postJson("lms-assignment/bulk-delete", {
+    selected_students: ids.join(","),
+  });
+  return readNumber(payload.deleted);
 }
 
 /** Load one assignment's question paper + questions for the grading screen. */
@@ -217,4 +318,12 @@ export async function submitAnnotation(input: {
     teacher_remarks: input.teacherRemarks,
   });
   return readNumber(payload.obtain_marks);
+}
+
+/** Polls the AI evaluation status/result for one assignment (used to refresh "Checking..." rows). */
+export async function getAssignmentAiStatus(
+  assignmentId: number
+): Promise<AiEvaluationStatus> {
+  const payload = await postJson(`lms-assignment/ai-status/${assignmentId}`, {});
+  return toAiEvaluationStatus(isRecord(payload.data) ? payload.data : {});
 }

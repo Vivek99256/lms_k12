@@ -50,11 +50,11 @@ import {
   type ApiEnvelope,
   type SessionContext,
 } from '@/lib/erp-client';
-import type { Employee, EmployeeProfileFullResponse } from './organization-types';
+import type { Employee, EmployeeProfileFullResponse, ReferenceData } from './organization-types';
 
 export { buildSessionContext };
 export type { SessionContext };
-export type { Employee, EmployeeProfileFullResponse };
+export type { Employee, EmployeeProfileFullResponse, ReferenceData };
 
 // ---------------------------------------------------------------------------
 // Low-level transport
@@ -70,7 +70,7 @@ function messageFrom(payload: unknown, fallback: string): string {
 
 async function request<T>(
   session: SessionContext,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   options?: { params?: Record<string, string | undefined>; body?: unknown; form?: FormData }
 ): Promise<T> {
@@ -99,6 +99,8 @@ async function request<T>(
 
 const apiGet = <T,>(session: SessionContext, path: string, params?: Record<string, string | undefined>) =>
   request<T>(session, 'GET', path, { params });
+const apiPost = <T,>(session: SessionContext, path: string, body: unknown) =>
+  request<T>(session, 'POST', path, { body });
 const apiPut = <T,>(session: SessionContext, path: string, body: unknown) =>
   request<T>(session, 'PUT', path, { body });
 const apiPostForm = <T,>(session: SessionContext, path: string, form: FormData) =>
@@ -118,6 +120,32 @@ function withContextParams(session: SessionContext, extra?: Record<string, strin
 
 export function isEmployeeDirectorySessionReady(session: SessionContext): boolean {
   return Boolean(session.token && session.subInstituteId);
+}
+
+// ---------------------------------------------------------------------------
+// Reference data / create / status - backend counterpart added alongside
+// `EmployeeDirectoryController::referenceData()/create()/{id}/invite`; ported
+// per the migration brief against G2G's `services/organization/
+// employee-directory.ts` (`employeeDirectoryService.referenceData/create/
+// setStatus`).
+// ---------------------------------------------------------------------------
+
+export interface ReferenceDataResponse {
+  status_code?: number | string;
+  message?: string;
+  data?: ReferenceData;
+}
+
+export interface CreateEmployeeResponse {
+  status_code?: number | string;
+  message?: string;
+  data?: Record<string, any>;
+  invite_sent?: boolean;
+}
+
+export interface StatusResponse {
+  status_code?: number | string;
+  message?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +203,10 @@ export function normalizeEmployeeListItem(item: any): Employee {
     // Backend `tbluser.status` is a raw 0/1 integer; the ported UI (badges,
     // status filter) expects the G2G-style 'Active'/'Inactive' string.
     status: normalizeEmployeeStatus(item.status),
+    // Raw 0/1 alongside the normalized 'Active'/'Inactive' label above - the
+    // row action menu (Suspend/Restore Access) needs the actual 0/1 to send
+    // back to `setStatus()`, not the display string.
+    status_code: item.status !== undefined && item.status !== null && item.status !== '' ? Number(item.status) : null,
     lastActivity: item.last_activity || 'Unknown',
     join_Date: item.join_date || 'Unknown',
     profile_name: item.profile_name || 'Unknown',
@@ -204,6 +236,24 @@ export const EmployeeDirectoryService = {
       withContextParams(session)
     ),
 
+  /** GET `/organization-management/employee-directory/reference-data` - option lists + defaults for the Add Employee flow. */
+  referenceData: (session: SessionContext) =>
+    apiGet<ReferenceDataResponse>(
+      session,
+      '/organization-management/employee-directory/reference-data',
+      withContextParams(session)
+    ),
+
+  /** POST `/organization-management/employee-directory/create` - onboards a new employee and (best-effort) sends their invite. */
+  create: (session: SessionContext, payload: Record<string, any>) =>
+    apiPost<CreateEmployeeResponse>(session, '/organization-management/employee-directory/create', payload),
+
+  /** PATCH `/organization-management/employee-directory/{id}/status` - Suspend/Restore Access; `status`: 1 = active, 0 = suspended. */
+  setStatus: (session: SessionContext, id: string | number, status: 0 | 1) =>
+    request<StatusResponse>(session, 'PATCH', `/organization-management/employee-directory/${id}/status`, {
+      body: { status },
+    }),
+
   update: (session: SessionContext, id: string | number, payload: Record<string, any>) =>
     apiPut<{ status?: string | number; message?: string }>(
       session,
@@ -227,12 +277,54 @@ export const EmployeeDirectoryService = {
       type_id: String(jobRoleId),
     }),
 
+  /**
+   * KNOWN ISSUE (2026-08-25 migration audit): this call 422s in practice.
+   * `PUT .../{id}/skills/{matrixId}` (`EmployeeDirectoryController::
+   * updateSkillRating`) validates `proficiency_level` as `required|integer|
+   * min:0|max:5` against `s_skill_matrix`, but the `matrixId` this screen
+   * actually has on hand comes from `mapKabaRatings()` in
+   * `employee-directory-sheets.tsx`, whose ids are read out of the
+   * `.../{id}/competency-profile` payload (job-role-derived KASBA items) -
+   * not `s_skill_matrix` rows. There is a *working* item-level rating
+   * endpoint (`POST /competency/kasba-rating`, `KasbaRatingController::
+   * store`, wired below as `rateKasbaItem()`), but it validates against its
+   * own `competency_kasba_item` table, which the competency-profile payload's
+   * ids also do not line up with 1:1 - so neither call can be safely swapped
+   * in as a drop-in fix without a backend change reconciling the two id
+   * spaces. Left in place; do not remove without confirming the id mismatch
+   * is resolved.
+   */
   updateSkillRating: (session: SessionContext, id: string | number, matrixId: number | string, level: number) =>
     apiPut<any>(
       session,
       `/organization-management/employee-directory/${id}/skills/${matrixId}`,
       { proficiency_level: level }
     ),
+
+  /**
+   * POST `/competency/kasba-rating` (`KasbaRatingController::store`) - rates
+   * ONE KASBA item (1-5; the backend rejects 0, since "unrated" and "rated
+   * 0" are deliberately distinct there) for one employee. This is the
+   * "direct-item KASBA rating" endpoint referenced in `updateSkillRating`'s
+   * docblock above - genuinely a different, working write path, not the
+   * broken `.../skills/{matrixId}` one. `kasbaType` isn't sent - the backend
+   * validates `kasba_item_id`/`user_id`/`rating` only and doesn't take a
+   * category - but it's kept in the signature so a caller working from
+   * `CompetencyRatingTab`'s `(category, id, level)` shape can pass it through
+   * without reshaping its call site.
+   */
+  rateKasbaItem: (
+    session: SessionContext,
+    employeeId: string | number,
+    kasbaType: string,
+    itemId: number | string,
+    level: number
+  ) =>
+    apiPost<StatusResponse & { data?: { kasba_item_id: number; user_id: number } }>(session, '/competency/kasba-rating', {
+      user_id: employeeId,
+      kasba_item_id: itemId,
+      rating: level,
+    }),
 
   kpis: (session: SessionContext) =>
     apiGet<any>(session, '/organization-management/employee-directory/analytics/kpis', withContextParams(session)),

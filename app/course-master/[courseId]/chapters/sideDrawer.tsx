@@ -1,7 +1,7 @@
 'use client';
 
 // sideDrawer.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,39 @@ const CONTENT_TYPE_OPTIONS = [
 // Mirrors UPLOAD_PRESENTATION_TYPES in the chapters page: the library reads this
 // string out of content_category to decide the Teacher Resource lane.
 const TEACHER_TRAINING_CONTENT_CATEGORY = 'Teacher training presentation';
+
+/**
+ * The concept-intelligence dimensions a generated resource can be grounded in.
+ *
+ * Each one is a list on a concept entry of the chapter's semantic intelligence
+ * JSON, flattened to a single line for the prompt. `field` is the key on that
+ * entry, `valueKeys` are tried in order for the text inside each list item.
+ *
+ * A teacher ticks the ones a resource should be built from. Anything unticked
+ * is reported to the model as "Not specified" - the same string a genuinely
+ * missing list produces - so the prompt templates, which reference these values
+ * inline, stay readable instead of developing blank holes.
+ */
+const INTELLIGENCE_DIMENSIONS = [
+  { key: 'knowledge', label: 'Knowledge', promptLabel: 'Knowledge', field: 'knowledge_items', valueKeys: ['knowledge'] },
+  { key: 'ability', label: 'Ability', promptLabel: 'Ability', field: 'abilities', valueKeys: ['ability'] },
+  { key: 'skill', label: 'Skill', promptLabel: 'Skill', field: 'skills', valueKeys: ['skill'] },
+  { key: 'competency', label: 'Competency', promptLabel: 'Competency', field: 'competencies', valueKeys: ['competency'] },
+  { key: 'blooms', label: "Bloom's level", promptLabel: 'BloomLevel', field: 'blooms', valueKeys: ['level'] },
+  { key: 'dok', label: 'Depth of Knowledge', promptLabel: 'DOKLevel', field: 'dok', valueKeys: ['level'] },
+  { key: 'pedagogy', label: 'Suggested pedagogy', promptLabel: 'SuggestedPedagogy', field: 'pedagogy_recommendations', valueKeys: ['strategy'] },
+  { key: 'realWorld', label: 'Real-world applications', promptLabel: 'RealTimeApplications', field: 'real_world_applications', valueKeys: ['example', 'application'] },
+  { key: 'misconceptions', label: 'Common misconceptions', promptLabel: 'CommonMisconceptions', field: 'misconceptions', valueKeys: ['misconception'] },
+  { key: 'objectives', label: 'Learning objectives', promptLabel: 'LearningObjectives', field: 'learning_objectives', valueKeys: ['objective'] },
+  { key: 'outcomes', label: 'Learning outcomes', promptLabel: 'LearningOutcomes', field: 'learning_outcomes', valueKeys: ['outcome'] },
+  { key: 'prerequisites', label: 'Prerequisites', promptLabel: 'Prerequisites', field: 'prerequisites', valueKeys: ['concept_name'] },
+] as const;
+
+type IntelligenceKey = (typeof INTELLIGENCE_DIMENSIONS)[number]['key'];
+
+const ALL_INTELLIGENCE_KEYS: IntelligenceKey[] = INTELLIGENCE_DIMENSIONS.map((dimension) => dimension.key);
+
+const NOT_SPECIFIED = 'Not specified';
 const PDF_FORMATTING_INSTRUCTIONS = `PDF formatting instructions:
 - Generate the final answer as clean HTML suitable for direct PDF conversion.
 - Use semantic HTML tags such as <h2>, <h3>, <p>, <strong>, <ul>, <ol>, <li>, and <table> where appropriate.
@@ -111,6 +144,17 @@ export function GeneratePresentationDrawer({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [generationSuccess, setGenerationSuccess] = useState<string | null>(null);
+  // Which intelligence dimensions the resource is grounded in. Everything is
+  // ticked by default, which is exactly what was sent before this was selectable.
+  const [selectedIntelligence, setSelectedIntelligence] = useState<IntelligenceKey[]>(ALL_INTELLIGENCE_KEYS);
+  // Classroom Resource covers the whole chapter, so it gets a concept picker of
+  // its own. Empty means "every concept", so a chapter whose intelligence has
+  // not loaded yet still generates exactly as it did before.
+  const [selectedConceptNames, setSelectedConceptNames] = useState<string[]>([]);
+  // Loaded when the chapter is chosen rather than at Generate, because the
+  // options a teacher picks from come out of it.
+  const [chapterIntelligence, setChapterIntelligence] = useState<SemanticIntelligenceResult | null>(null);
+  const [isLoadingIntelligence, setIsLoadingIntelligence] = useState(false);
 
   // Get concept options for the selected chapter from API-loaded chapter data
   const presentationConceptOptions = useMemo(() => {
@@ -122,6 +166,25 @@ export function GeneratePresentationDrawer({
       title: concept.title,
     }));
   }, [presentationChapterId, allChapters]);
+
+  // The chapters page seeds initialConcept with a concept *title* -- its content
+  // library groups concepts by name and carries no ids -- while the Select below is
+  // keyed by concept id. Matching on either means a seeded title still resolves to
+  // its concept instead of leaving the trigger stuck on its placeholder, which read
+  // as "no concept selected" even on chapters that had concepts.
+  const resolveConceptId = useCallback(
+    (chapterId: string, conceptIdOrTitle: string) => {
+      if (!chapterId || !conceptIdOrTitle) return '';
+      const concepts = allChapters.find((ch) => ch.id === chapterId)?.concepts ?? [];
+      const needle = conceptIdOrTitle.trim().toLowerCase();
+      const match = concepts.find(
+        (concept) =>
+          concept.id === conceptIdOrTitle || concept.title.trim().toLowerCase() === needle
+      );
+      return match?.id ?? '';
+    },
+    [allChapters]
+  );
 
   // Update concept selection when chapter changes in teacher training mode
   useEffect(() => {
@@ -148,20 +211,14 @@ export function GeneratePresentationDrawer({
 
     const timeoutId = window.setTimeout(() => {
       setPresentationChapterId(initialChapterId);
-      setPresentationConcept(initialConcept);
+      setPresentationConcept(resolveConceptId(initialChapterId, initialConcept));
       setGenerationError(null);
       setGenerationSuccess(null);
       setIsGenerating(false);
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [isOpen, initialChapterId, initialConcept]);
-
-  const extractText = (arr: unknown[] | undefined, key: string): string => {
-    if (!Array.isArray(arr) || arr.length === 0) return 'Not specified';
-    const text = arr.map((a) => (a as Record<string, unknown>)?.[key]).filter(Boolean).join('; ');
-    return text || 'Not specified';
-  };
+  }, [isOpen, initialChapterId, initialConcept, resolveConceptId]);
 
   const extractAnyText = (arr: unknown[] | undefined, keys: string[]): string => {
     if (!Array.isArray(arr) || arr.length === 0) return 'Not specified';
@@ -194,6 +251,96 @@ export function GeneratePresentationDrawer({
     return String(concept?.concept_name ?? entry.topic_title ?? entry.topic_name ?? 'Concept');
   };
 
+  /**
+   * One dimension of a concept entry, flattened for the prompt.
+   *
+   * Returns NOT_SPECIFIED when the teacher has not selected the dimension, so
+   * the value reads to the model exactly like intelligence that was never
+   * captured - which every prompt template already knows how to handle.
+   */
+  const dimensionValue = (
+    entry: Record<string, unknown> | undefined,
+    dimension: (typeof INTELLIGENCE_DIMENSIONS)[number],
+    selected: IntelligenceKey[]
+  ): string => {
+    if (!selected.includes(dimension.key)) return NOT_SPECIFIED;
+    return extractAnyText(entry?.[dimension.field] as unknown[] | undefined, [...dimension.valueKeys]);
+  };
+
+  /** The concepts the chapter's intelligence actually describes, for the picker. */
+  const intelligenceConceptNames = useMemo(() => {
+    const chapter = allChapters.find((ch) => ch.id === presentationChapterId);
+    if (!chapter) return [];
+    const payload = getSemanticPayload(chapter, chapterIntelligence);
+    const names = getConceptEntries(payload.intelligence).map(getEntryConceptName).filter(Boolean);
+    return Array.from(new Set(names));
+  }, [allChapters, presentationChapterId, chapterIntelligence]);
+
+  /** Empty selection means "all of them", so a chapter with no picker still works. */
+  const effectiveConceptNames =
+    selectedConceptNames.length > 0 ? selectedConceptNames : intelligenceConceptNames;
+
+  // Pull the chapter's intelligence as soon as a chapter is picked: the options
+  // below are built from it, and handleGenerate then reuses it instead of
+  // fetching the same thing again.
+  useEffect(() => {
+    if (!isOpen || !presentationChapterId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    // Deferred rather than called straight from the effect body, so the loading
+    // flag does not trigger a second render inside this one.
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setIsLoadingIntelligence(true);
+
+      fetchSemanticIntelligenceResult(presentationChapterId)
+        .then((result) => {
+          if (!cancelled) setChapterIntelligence(result);
+        })
+        .catch(() => {
+          // A chapter with no extraction is a normal state, not an error: the
+          // picker simply has nothing to offer and generation falls back to
+          // whatever semantic data the chapter row itself carries.
+          if (!cancelled) setChapterIntelligence(null);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoadingIntelligence(false);
+        });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, presentationChapterId]);
+
+  // Concepts belong to a chapter, so a selection cannot survive changing one.
+  useEffect(() => {
+    queueMicrotask(() => setSelectedConceptNames([]));
+  }, [presentationChapterId]);
+
+  const toggleIntelligence = (key: IntelligenceKey) => {
+    setSelectedIntelligence((current) =>
+      current.includes(key) ? current.filter((value) => value !== key) : [...current, key]
+    );
+  };
+
+  const toggleConceptName = (name: string) => {
+    setSelectedConceptNames((current) => {
+      // '[] means all', so the first untick has to start from the full list and
+      // remove one, otherwise unticking a concept would silently select it.
+      const base = current.length > 0 ? current : intelligenceConceptNames;
+      if (!base.includes(name)) return [...base, name];
+
+      const next = base.filter((value) => value !== name);
+      // Refuse to empty the list: [] is the "all concepts" sentinel, so removing
+      // the last tick would silently turn "none" back into "everything".
+      return next.length > 0 ? next : base;
+    });
+  };
+
   const constructPrompt = (chapter: Chapter, semanticResult?: SemanticIntelligenceResult | null): string => {
     const standard = course?.classGrade || 'Standard';
     const subject = course?.subject || 'Subject';
@@ -202,39 +349,22 @@ export function GeneratePresentationDrawer({
     const semanticPayload = getSemanticPayload(chapter, semanticResult);
     const entries = getConceptEntries(semanticPayload.intelligence);
 
+    // Only the concepts the teacher ticked, and within each of those only the
+    // intelligence dimensions they ticked. An unticked dimension is left out of
+    // the block entirely rather than written as "Not specified", so the model is
+    // not handed a long list of blanks to invent around.
+    const chosenEntries = entries.filter((entry) =>
+      effectiveConceptNames.length === 0 || effectiveConceptNames.includes(getEntryConceptName(entry))
+    );
+
     let conceptsYaml = '';
-    if (entries.length > 0) {
-      for (const entry of entries) {
-        const conceptName = getEntryConceptName(entry);
-        const knowledge = extractText((entry as Record<string, unknown>)?.knowledge_items as unknown[] | undefined, 'knowledge');
-        const ability = extractText((entry as Record<string, unknown>)?.abilities as unknown[] | undefined, 'ability');
-        const skill = extractText((entry as Record<string, unknown>)?.skills as unknown[] | undefined, 'skill');
-        const competency = extractText((entry as Record<string, unknown>)?.competencies as unknown[] | undefined, 'competency');
-        const blooms = extractText((entry as Record<string, unknown>)?.blooms as unknown[] | undefined, 'level');
-        const dok = extractText((entry as Record<string, unknown>)?.dok as unknown[] | undefined, 'level');
-        const pedagogy = extractText((entry as Record<string, unknown>)?.pedagogy_recommendations as unknown[] | undefined, 'strategy');
-        const rwa = extractAnyText((entry as Record<string, unknown>)?.real_world_applications as unknown[] | undefined, ['example', 'application']);
-        const misconceptions = extractText((entry as Record<string, unknown>)?.misconceptions as unknown[] | undefined, 'misconception');
-        const objectives = extractText((entry as Record<string, unknown>)?.learning_objectives as unknown[] | undefined, 'objective');
-        const outcomes = extractText((entry as Record<string, unknown>)?.learning_outcomes as unknown[] | undefined, 'outcome');
-        const prerequisites = extractText((entry as Record<string, unknown>)?.prerequisites as unknown[] | undefined, 'concept_name');
-
-        conceptsYaml += `  - Concept: ${conceptName}
-    Knowledge: ${knowledge}
-    Ability: ${ability}
-    Skill: ${skill}
-    Competency: ${competency}
-    BloomLevel: ${blooms}
-    DOKLevel: ${dok}
-    SuggestedPedagogy: ${pedagogy}
-    RealTimeApplications: ${rwa}
-    CommonMisconceptions: ${misconceptions}
-    LearningObjectives: ${objectives}
-    LearningOutcomes: ${outcomes}
-    Prerequisites: ${prerequisites}
-
-`;
+    for (const entry of chosenEntries) {
+      conceptsYaml += `  - Concept: ${getEntryConceptName(entry)}\n`;
+      for (const dimension of INTELLIGENCE_DIMENSIONS) {
+        if (!selectedIntelligence.includes(dimension.key)) continue;
+        conceptsYaml += `    ${dimension.promptLabel}: ${dimensionValue(entry, dimension, selectedIntelligence)}\n`;
       }
+      conceptsYaml += '\n';
     }
 
     return `You are an expert instructional designer, curriculum architect, competency-based education specialist, and classroom presentation generator aligned with NCERT, NEP 2020, NCF, NCTE, and NPST principles.
@@ -353,19 +483,27 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
       return entryConceptName === conceptTitle;
     });
 
+    // This template threads the values through all 18 slides, not just the data
+    // block, so an unselected dimension has to resolve to NOT_SPECIFIED rather
+    // than vanish - dropping it would leave holes mid-sentence.
+    const read = (key: IntelligenceKey) => {
+      const dimension = INTELLIGENCE_DIMENSIONS.find((item) => item.key === key)!;
+      return dimensionValue(conceptEntry, dimension, selectedIntelligence);
+    };
+
     const conceptName = conceptTitle;
-    const knowledge = extractText((conceptEntry as Record<string, unknown>)?.knowledge_items as unknown[] | undefined, 'knowledge');
-    const ability = extractText((conceptEntry as Record<string, unknown>)?.abilities as unknown[] | undefined, 'ability');
-    const skill = extractText((conceptEntry as Record<string, unknown>)?.skills as unknown[] | undefined, 'skill');
-    const competency = extractText((conceptEntry as Record<string, unknown>)?.competencies as unknown[] | undefined, 'competency');
-    const blooms = extractText((conceptEntry as Record<string, unknown>)?.blooms as unknown[] | undefined, 'level');
-    const dok = extractText((conceptEntry as Record<string, unknown>)?.dok as unknown[] | undefined, 'level');
-    const pedagogy = extractText((conceptEntry as Record<string, unknown>)?.pedagogy_recommendations as unknown[] | undefined, 'strategy');
-    const rwa = extractAnyText((conceptEntry as Record<string, unknown>)?.real_world_applications as unknown[] | undefined, ['example', 'application']);
-    const misconceptions = extractText((conceptEntry as Record<string, unknown>)?.misconceptions as unknown[] | undefined, 'misconception');
-    const objectives = extractText((conceptEntry as Record<string, unknown>)?.learning_objectives as unknown[] | undefined, 'objective');
-    const outcomes = extractText((conceptEntry as Record<string, unknown>)?.learning_outcomes as unknown[] | undefined, 'outcome');
-    const prerequisites = extractText((conceptEntry as Record<string, unknown>)?.prerequisites as unknown[] | undefined, 'concept_name');
+    const knowledge = read('knowledge');
+    const ability = read('ability');
+    const skill = read('skill');
+    const competency = read('competency');
+    const blooms = read('blooms');
+    const dok = read('dok');
+    const pedagogy = read('pedagogy');
+    const rwa = read('realWorld');
+    const misconceptions = read('misconceptions');
+    const objectives = read('objectives');
+    const outcomes = read('outcomes');
+    const prerequisites = read('prerequisites');
 
     return `Teacher Training PPT — Master Prompt Template (Single-Concept, Suggested-Pedagogy Oriented + Differentiated Instruction)
 
@@ -512,8 +650,12 @@ ${groundTruthContent}`;
     }
 
     const entries = getConceptEntries(semanticPayload.intelligence);
-    const keyConcepts = entries.length > 0
-      ? entries.map(getEntryConceptName).filter(Boolean).join(', ')
+    const chosenNames = entries
+      .map(getEntryConceptName)
+      .filter((name) => Boolean(name) && (effectiveConceptNames.length === 0 || effectiveConceptNames.includes(name)));
+
+    const keyConcepts = chosenNames.length > 0
+      ? chosenNames.join(', ')
       : (chapter.concepts ?? []).map((concept) => concept.title).filter(Boolean).join(', ') || 'all key concepts from the chapter';
 
     const isRevisionNotes = selectedContentType.trim().toLowerCase() === 'revision notes';
@@ -561,11 +703,15 @@ ${groundTruthContent}`;
         return;
       }
 
-      let semanticResult: SemanticIntelligenceResult | null = null;
-      try {
-        semanticResult = await fetchSemanticIntelligenceResult(chapter.id);
-      } catch (error) {
-        console.warn('[GeneratePresentation] Falling back to chapter semantic data:', error);
+      // Already fetched when the chapter was picked, to build the options above.
+      // Only go back to the network if that has not landed yet.
+      let semanticResult: SemanticIntelligenceResult | null = chapterIntelligence;
+      if (!semanticResult) {
+        try {
+          semanticResult = await fetchSemanticIntelligenceResult(chapter.id);
+        } catch (error) {
+          console.warn('[GeneratePresentation] Falling back to chapter semantic data:', error);
+        }
       }
       const prompt = isPresentation
         ? isTeacherTraining
@@ -841,7 +987,13 @@ ${groundTruthContent}`;
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="" disabled>No concepts available</SelectItem>
+                      // Not a SelectItem: Radix throws on an empty-string item value,
+                      // which took the whole dropdown down instead of showing this.
+                      <div className="px-2 py-2 text-[15px] text-slate-500">
+                        {presentationChapterId
+                          ? 'No concepts available for this chapter yet.'
+                          : 'Select a chapter first.'}
+                      </div>
                     )}
                   </SelectContent>
                 </Select>
@@ -869,6 +1021,94 @@ ${groundTruthContent}`;
           )}
 
          
+          {/* Intelligence options - what the resource is actually grounded in. */}
+          <div className="mt-6 rounded-2xl border border-slate-200/80 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Intelligence options
+                </Label>
+                <p className="mt-1 text-[13px] leading-6 text-slate-500">
+                  Choose which concept intelligence the AI is given. Everything is included by default.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedIntelligence(ALL_INTELLIGENCE_KEYS);
+                  setSelectedConceptNames([]);
+                }}
+                className="text-[13px] font-semibold text-[#4f46e5] hover:text-[#4338ca]"
+              >
+                Select all
+              </button>
+            </div>
+
+            {!presentationChapterId ? (
+              <p className="mt-3 text-[13px] text-slate-500">Select a chapter to see its intelligence.</p>
+            ) : isLoadingIntelligence ? (
+              <p className="mt-3 inline-flex items-center gap-2 text-[13px] text-slate-500">
+                <Loader2 size={14} className="animate-spin" />
+                Loading chapter intelligence...
+              </p>
+            ) : (
+              <>
+                {presentationMode === 'Classroom' ? (
+                  <div className="mt-4">
+                    <p className="text-[13px] font-semibold text-slate-700">Concepts to cover</p>
+                    {intelligenceConceptNames.length === 0 ? (
+                      <p className="mt-2 text-[13px] text-slate-500">
+                        This chapter has no extracted concept intelligence yet, so the whole chapter is used.
+                      </p>
+                    ) : (
+                      <div className="mt-2 grid max-h-[180px] gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
+                        {intelligenceConceptNames.map((name) => (
+                          <label
+                            key={name}
+                            className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-[13px] text-slate-700 hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={effectiveConceptNames.includes(name)}
+                              onChange={() => toggleConceptName(name)}
+                              className="mt-0.5 h-4 w-4 shrink-0 accent-[#4f46e5]"
+                            />
+                            <span className="leading-5">{name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                <div className="mt-4">
+                  <p className="text-[13px] font-semibold text-slate-700">Intelligence to include</p>
+                  <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                    {INTELLIGENCE_DIMENSIONS.map((dimension) => (
+                      <label
+                        key={dimension.key}
+                        className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-[13px] text-slate-700 hover:bg-slate-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIntelligence.includes(dimension.key)}
+                          onChange={() => toggleIntelligence(dimension.key)}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-[#4f46e5]"
+                        />
+                        <span className="leading-5">{dimension.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {selectedIntelligence.length === 0 ? (
+                    <p className="mt-2 text-[13px] font-medium text-amber-700">
+                      Nothing selected - the resource will be built from the chapter text alone.
+                    </p>
+                  ) : null}
+                </div>
+              </>
+            )}
+          </div>
+
           {generationError && (
             <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {generationError}

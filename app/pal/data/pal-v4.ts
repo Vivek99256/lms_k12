@@ -39,6 +39,31 @@ function toStringArray(value: unknown): string[] {
   return single ? [single] : [];
 }
 
+/**
+ * The shared readNumber()/readString() turn null into a confident `0` / `''`.
+ *
+ * That is exactly wrong for this screen. The PAL engines now return null for
+ * anything they cannot actually measure -- an unassessed learner's velocity, a
+ * rural/urban context that has no source table at all, a Bloom level where no
+ * question carried a Bloom tag -- and coercing those to 0 renders identically
+ * to a real measurement of zero. On a learner-risk dashboard that is worse
+ * than a blank: it reads as "measured, and bad".
+ *
+ * Use these for any field the backend may legitimately report as unmeasurable,
+ * and render the null as "Not tracked" rather than as a number.
+ */
+function readNullableNumber(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function readNullableString(value: unknown): string | null {
+  if (value == null) return null;
+  const stringValue = readString(value);
+  return stringValue === '' ? null : stringValue;
+}
+
 /** Fetch a V4 endpoint and unwrap the `{success, data}` envelope. */
 async function fetchV4Data(path: string, signal?: AbortSignal): Promise<unknown> {
   const session = buildSessionContext();
@@ -103,30 +128,37 @@ export interface V4Misconception {
 }
 
 export interface V4Competency {
-  masteryScore: number;
-  bloomLevel: number;
+  hasData: boolean;
+  masteryScore: number | null;
+  bloomLevel: number | null;
   knowledgeGaps: number;
   activeMisconceptions: V4Misconception[];
-  learningVelocity: number;
-  proficiencyTrend: string;
+  conceptDependencies: number;
+  learningVelocity: number | null;
+  proficiencyTrend: string | null;
 }
 
 export interface V4Dimension {
   label: string;
-  value: number;
+  /** null => the backend has no source for this dimension at all. */
+  value: number | null;
   /** 0-100 for a bar; undefined => no bar. */
   percent?: number;
 }
 
 export interface V4LearnerState {
+  hasData: boolean;
   competency: V4Competency;
   social: V4Dimension[];
+  socialHasData: boolean;
   metacognition: V4Dimension[];
+  metacognitionHasData: boolean;
   contextual: {
+    hasData: boolean;
     preferredDevice: string[];
-    bandwidthQuality: string;
-    languagePreference: string;
-    ruralUrbanContext: string;
+    bandwidthQuality: string | null;
+    languagePreference: string | null;
+    ruralUrbanContext: string | null;
   };
   updatedAt: string;
 }
@@ -135,11 +167,16 @@ function mapDimensions(
   record: Record<string, unknown>,
   fields: { key: string; label: string; percent?: boolean }[]
 ): V4Dimension[] {
-  return fields.map((field) => ({
-    label: field.label,
-    value: readNumber(record[field.key]),
-    percent: field.percent ? Math.min(100, Math.max(0, readNumber(record[field.key]))) : undefined,
-  }));
+  return fields.map((field) => {
+    const value = readNullableNumber(record[field.key]);
+    return {
+      label: field.label,
+      value,
+      // No bar at all when there is nothing to measure -- a 0-width bar reads
+      // as a measured zero.
+      percent: field.percent && value !== null ? Math.min(100, Math.max(0, value)) : undefined,
+    };
+  });
 }
 
 export async function fetchLearnerState(
@@ -152,10 +189,16 @@ export async function fetchLearnerState(
   const metacognition = toRecord(data.metacognition);
   const contextual = toRecord(data.contextual);
 
+  const hasCompetency = competency.has_data === true;
+
   return {
+    hasData: hasCompetency,
     competency: {
-      masteryScore: readNumber(competency.mastery_score),
-      bloomLevel: readNumber(competency.bloom_level),
+      hasData: hasCompetency,
+      // Only a learner with competency rows has a mastery score. Without them
+      // this used to render 0%, i.e. "knows nothing" rather than "never tested".
+      masteryScore: hasCompetency ? readNullableNumber(competency.mastery_score) : null,
+      bloomLevel: readNullableNumber(competency.bloom_level),
       knowledgeGaps: toArray(competency.knowledge_gaps).length,
       activeMisconceptions: toArray(competency.active_misconceptions).map((entry) => {
         const record = toRecord(entry);
@@ -165,8 +208,11 @@ export async function fetchLearnerState(
           severity: readNumber(record.severity),
         };
       }),
-      learningVelocity: readNumber(competency.learning_velocity),
-      proficiencyTrend: readString(competency.proficiency_trend) || 'stable',
+      conceptDependencies: toArray(competency.concept_dependencies).length,
+      learningVelocity: readNullableNumber(competency.learning_velocity),
+      // No 'stable' fallback: that asserted a flat trend for every learner the
+      // engine could not actually measure.
+      proficiencyTrend: readNullableString(competency.proficiency_trend),
     },
     social: mapDimensions(social, [
       { key: 'peer_collaboration_count', label: 'Peer collaborations' },
@@ -182,11 +228,18 @@ export async function fetchLearnerState(
       { key: 'planning_behavior', label: 'Planning', percent: true },
       { key: 'strategy_awareness', label: 'Strategy awareness', percent: true },
     ]),
+    socialHasData: social.has_data === true,
+    metacognitionHasData: metacognition.has_data === true,
     contextual: {
+      hasData: contextual.has_data === true,
       preferredDevice: toStringArray(contextual.preferred_device),
-      bandwidthQuality: readString(contextual.bandwidth_quality) || 'unknown',
-      languagePreference: readString(contextual.language_preference) || 'en',
-      ruralUrbanContext: readString(contextual.rural_urban_context) || 'urban',
+      // These three had hard-coded fallbacks ('unknown' / 'en' / 'urban') that
+      // rendered as measured facts. 'urban' in particular was shown for every
+      // learner in the estate while no rural/urban column exists anywhere in
+      // the schema. Null now, and the UI labels it "Not tracked".
+      bandwidthQuality: readNullableString(contextual.bandwidth_quality),
+      languagePreference: readNullableString(contextual.language_preference),
+      ruralUrbanContext: readNullableString(contextual.rural_urban_context),
     },
     updatedAt: readString(data.updated_at),
   };
@@ -196,14 +249,20 @@ export async function fetchLearnerState(
 
 export interface V4Velocity {
   period: string;
-  conceptsMastered: number;
-  velocity: number;
-  velocityChangePercent: number;
-  retentionStability: number;
-  remediationCycles: number;
-  bloomGrowth: number;
-  timeToProficiencyHours: number;
-  classification: string;
+  hasData: boolean;
+  asOf: string | null;
+  daysSinceEvidence: number | null;
+  conceptsMastered: number | null;
+  velocity: number | null;
+  /** Rank against the cohort; the classification band is derived from this. */
+  velocityPercentile: number | null;
+  cohortSize: number | null;
+  velocityChangePercent: number | null;
+  retentionStability: number | null;
+  remediationCycles: number | null;
+  bloomGrowth: number | null;
+  timeToProficiencyHours: number | null;
+  classification: string | null;
 }
 
 export async function fetchVelocity(
@@ -216,43 +275,64 @@ export async function fetchVelocity(
   );
   return {
     period: readString(data.period) || period,
-    conceptsMastered: readNumber(data.concepts_mastered),
-    velocity: readNumber(data.velocity),
-    velocityChangePercent: readNumber(data.velocity_change_percent),
-    retentionStability: readNumber(data.retention_stability),
-    remediationCycles: readNumber(data.remediation_cycles),
-    bloomGrowth: readNumber(data.bloom_growth),
-    timeToProficiencyHours: readNumber(data.time_to_proficiency_hours),
-    classification: readString(data.classification) || 'struggling',
+    hasData: data.has_data === true,
+    // The window these figures cover. Competency evidence is backdated to the
+    // answers that produced it, so the backend anchors each learner's window
+    // to their OWN last evidence rather than to today -- `asOf` is that
+    // anchor, and `daysSinceEvidence` says how stale it is.
+    asOf: readNullableString(data.as_of),
+    daysSinceEvidence: readNullableNumber(data.days_since_evidence),
+    conceptsMastered: readNullableNumber(data.concepts_mastered),
+    velocity: readNullableNumber(data.velocity),
+    velocityPercentile: readNullableNumber(data.velocity_percentile),
+    cohortSize: readNullableNumber(data.cohort_size),
+    velocityChangePercent: readNullableNumber(data.velocity_change_percent),
+    retentionStability: readNullableNumber(data.retention_stability),
+    remediationCycles: readNullableNumber(data.remediation_cycles),
+    bloomGrowth: readNullableNumber(data.bloom_growth),
+    timeToProficiencyHours: readNullableNumber(data.time_to_proficiency_hours),
+    // No 'struggling' fallback -- an unassessed learner is not a slow one, and
+    // this label drives intervention.
+    classification: readNullableString(data.classification),
   };
 }
 
 export interface V4Plateau {
-  isPlateau: boolean;
-  daysInPlateau: number;
-  recentVelocity: number;
-  olderVelocity: number;
+  hasData: boolean;
+  asOf: string | null;
+  /** null => not determinable, which is not the same as "no plateau". */
+  isPlateau: boolean | null;
+  daysInPlateau: number | null;
+  recentVelocity: number | null;
+  olderVelocity: number | null;
   triggerIntervention: boolean;
   recommendedActions: string[];
 }
 
 export async function fetchPlateau(learnerId: string, signal?: AbortSignal): Promise<V4Plateau> {
   const data = toRecord(await fetchV4Data(`api/pal/plateau/${encodeURIComponent(learnerId)}`, signal));
+  const hasData = data.has_data === true;
   return {
-    isPlateau: Boolean(data.is_plateau),
-    daysInPlateau: readNumber(data.days_in_plateau),
-    recentVelocity: readNumber(data.recent_velocity),
-    olderVelocity: readNumber(data.older_velocity),
+    hasData,
+    asOf: readNullableString(data.as_of),
+    // Boolean(null) is false, which would claim "no plateau detected" for a
+    // learner the engine could not assess at all.
+    isPlateau: hasData ? Boolean(data.is_plateau) : null,
+    daysInPlateau: readNullableNumber(data.days_in_plateau),
+    recentVelocity: readNullableNumber(data.recent_velocity),
+    olderVelocity: readNullableNumber(data.older_velocity),
     triggerIntervention: Boolean(data.trigger_intervention),
     recommendedActions: toStringArray(data.recommended_actions),
   };
 }
 
 export interface V4Regression {
-  isRegressing: boolean;
-  currentMastery: number;
-  previousMastery: number;
-  declinePercent: number;
+  hasData: boolean;
+  asOf: string | null;
+  isRegressing: boolean | null;
+  currentMastery: number | null;
+  previousMastery: number | null;
+  declinePercent: number | null;
   decliningConcepts: number;
   triggerSpacedReview: boolean;
   recommendedActions: string[];
@@ -263,11 +343,14 @@ export async function fetchRegression(
   signal?: AbortSignal
 ): Promise<V4Regression> {
   const data = toRecord(await fetchV4Data(`api/pal/regression/${encodeURIComponent(learnerId)}`, signal));
+  const hasData = data.has_data === true;
   return {
-    isRegressing: Boolean(data.is_regressing),
-    currentMastery: readNumber(data.current_mastery),
-    previousMastery: readNumber(data.previous_mastery),
-    declinePercent: readNumber(data.decline_percent),
+    hasData,
+    asOf: readNullableString(data.as_of),
+    isRegressing: hasData ? Boolean(data.is_regressing) : null,
+    currentMastery: readNullableNumber(data.current_mastery),
+    previousMastery: readNullableNumber(data.previous_mastery),
+    declinePercent: readNullableNumber(data.decline_percent),
     decliningConcepts: toArray(data.declining_concepts).length,
     triggerSpacedReview: Boolean(data.trigger_spaced_review),
     recommendedActions: toStringArray(data.recommended_actions),
@@ -326,12 +409,27 @@ export async function fetchRisk(
 
 // --- misconception cluster + remediation -----------------------------------
 
+/**
+ * A misconception comes from one of two registries and their ids overlap, so
+ * `source` is part of the identity, not decoration -- it must be sent back to
+ * fetchRemediation(). See the backend's MisconceptionIntelligenceEngine.
+ */
+export type V4ClusterSource = 'library' | 'runtime';
+
 export interface V4Cluster {
   id: number;
+  source: V4ClusterSource;
+  tag: string | null;
   pattern: string;
   category: string;
   rootCause: string;
+  correctiveAction: string | null;
   frequency: number;
+  prevalenceRate: number | null;
+  severity: string | null;
+  teacherConfirmed: boolean;
+  /** 'draft' for all but one library row today -- surface it, don't hide it. */
+  qualityStatus: string | null;
 }
 
 export async function fetchMisconceptionCluster(
@@ -343,18 +441,37 @@ export async function fetchMisconceptionCluster(
     const record = toRecord(entry);
     return {
       id: readNumber(record.id),
+      source: readString(record.source) === 'library' ? 'library' : 'runtime',
+      tag: readNullableString(record.tag),
       pattern: readString(record.pattern),
       category: readString(record.category),
       rootCause: readString(record.root_cause),
+      correctiveAction: readNullableString(record.corrective_action),
       frequency: readNumber(record.frequency),
+      prevalenceRate: readNullableNumber(record.prevalence_rate),
+      severity: readNullableString(record.severity),
+      teacherConfirmed: record.teacher_confirmed === true,
+      qualityStatus: readNullableString(record.quality_status),
     };
   });
 }
 
+export interface V4RemediationItem {
+  id: number;
+  type: string;
+  content: string;
+  pedagogy: string;
+  /** null until this corrective has actually been served to someone. */
+  effectiveness: number | null;
+  servedCount: number | null;
+  qualityStatus: string | null;
+}
+
 export interface V4Remediation {
   found: boolean;
+  source: V4ClusterSource;
   aiContent: string;
-  preDefined: { id: number; type: string; content: string; pedagogy: string; effectiveness: number }[];
+  preDefined: V4RemediationItem[];
   alternativePedagogies: { type: string; reason: string }[];
   recommendedSequence: number[];
 }
@@ -362,11 +479,16 @@ export interface V4Remediation {
 export async function fetchRemediation(
   learnerId: string,
   misconceptionId: string,
+  source: V4ClusterSource = 'runtime',
   signal?: AbortSignal
 ): Promise<V4Remediation> {
+  // `source` disambiguates the two registries -- without it the backend
+  // defaults to 'runtime' and a library misconception id resolves to the wrong
+  // row (or to nothing at all).
   const data = toRecord(
     await fetchV4Data(
-      `api/pal/remediation/${encodeURIComponent(learnerId)}/${encodeURIComponent(misconceptionId)}`,
+      `api/pal/remediation/${encodeURIComponent(learnerId)}/${encodeURIComponent(misconceptionId)}` +
+        `?source=${encodeURIComponent(source)}`,
       signal
     )
   );
@@ -374,6 +496,7 @@ export async function fetchRemediation(
   if (readString(data.error)) {
     return {
       found: false,
+      source,
       aiContent: '',
       preDefined: [],
       alternativePedagogies: [],
@@ -384,15 +507,22 @@ export async function fetchRemediation(
   const ai = toRecord(data.ai_generated);
   return {
     found: true,
+    source: readString(data.source) === 'library' ? 'library' : 'runtime',
     aiContent: readString(ai.content),
     preDefined: toArray(data.pre_defined_remediations).map((entry) => {
       const record = toRecord(entry);
       return {
         id: readNumber(record.id),
-        type: readString(record.type),
-        content: readString(record.content),
-        pedagogy: readString(record.pedagogy),
-        effectiveness: readNumber(record.effectiveness),
+        // Library correctives carry `format`/`title`/`body`; runtime ones
+        // carry `type`/`content`. Read both so one mapper serves both shapes.
+        type: readString(record.type) || readString(record.format),
+        content: readString(record.content) || readString(record.body) || readString(record.title),
+        pedagogy: readString(record.pedagogy) || readString(record.h5p_type),
+        effectiveness: readNullableNumber(
+          record.effectiveness != null ? record.effectiveness : record.resolution_rate
+        ),
+        servedCount: readNullableNumber(record.served_count),
+        qualityStatus: readNullableString(record.quality_status),
       };
     }),
     alternativePedagogies: toArray(data.alternative_pedagogies).map((entry) => {

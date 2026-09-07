@@ -36,6 +36,7 @@ import {
   MoreHorizontal,
   User,
   ShieldAlert,
+  ShieldCheck,
   UserPlus,
   Target,
   AlertCircle,
@@ -47,6 +48,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/g2g/ca
 import { StatusBadge } from '@/components/ui/status-badge'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/g2g/dropdown-menu'
 import { useEmployeeDirectory } from '../../_lib/use-employee-directory'
+import { buildSessionContext, EmployeeDirectoryService } from '../../_lib/employee-directory-api'
 import type { Employee } from '../../_lib/organization-types'
 
 const LazyEmployeeDirectorySheets = lazy(() =>
@@ -96,7 +98,7 @@ export function EmployeeDirectory() {
   // option lists, which never matched real data and made every filter appear
   // broken. Search moved server-side too (previously client-only) so that
   // pagination totals stay correct when it's combined with the other filters.
-  const { employeesData, loading, error, departments, jobRoles, pagination } = useEmployeeDirectory({
+  const { employeesData, loading, error, departments, jobRoles, pagination, reload } = useEmployeeDirectory({
     department_id: departmentFilter,
     jobrole_id: jobRoleFilter,
     active_status: statusFilter === 'active' ? '1' : statusFilter === 'inactive' ? '0' : '',
@@ -104,6 +106,47 @@ export function EmployeeDirectory() {
     page: String(page),
     per_page: String(PAGE_SIZE),
   })
+
+  const [notice, setNotice] = React.useState<string | null>(null)
+  const [statusChangingId, setStatusChangingId] = React.useState<string | number | null>(null)
+
+  /** A CSV of exactly what's on screen, built from the rows already loaded - ported from G2G's `exportCsv()`. */
+  function exportCsv(rows: Employee[]) {
+    const headers = ['Name', 'Email', 'Mobile', 'Department', 'Job Role', 'Status', 'Joined']
+    const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+    const body = rows.map((employee) =>
+      [employee.full_name, employee.email, employee.mobile, employee.department_name, employee.jobRole, employee.status, employee.join_Date]
+        .map(escape)
+        .join(','),
+    )
+    const csv = [headers.map(escape).join(','), ...body].join('\r\n')
+
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `employees-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    setNotice(`Exported ${rows.length} employee${rows.length === 1 ? '' : 's'}.`)
+  }
+
+  /** Suspend/Restore Access - ported from G2G's `changeStatus()`. */
+  async function changeStatus(employee: Employee, next: 0 | 1) {
+    const verb = next === 0 ? 'Suspend access for' : 'Restore access for'
+    if (!window.confirm(`${verb} ${employee.full_name}?`)) return
+
+    setStatusChangingId(employee.id)
+    try {
+      const session = buildSessionContext()
+      const response = await EmployeeDirectoryService.setStatus(session, employee.id, next)
+      await reload()
+      setNotice(response?.message || 'Status updated.')
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Failed to update status.')
+    } finally {
+      setStatusChangingId(null)
+    }
+  }
 
   const filters: Filter[] = React.useMemo(() => [
     {
@@ -240,15 +283,33 @@ export function EmployeeDirectory() {
                 <User className="mr-2 h-4 w-4" /> View Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer text-destructive focus-visible:bg-destructive/10">
-                <ShieldAlert className="mr-2 h-4 w-4" /> Suspend Access
-              </DropdownMenuItem>
+              {row.status_code === 0 ? (
+                <DropdownMenuItem
+                  onClick={() => void changeStatus(row, 1)}
+                  disabled={statusChangingId === row.id}
+                  className="cursor-pointer"
+                >
+                  <ShieldCheck className="mr-2 h-4 w-4" /> Restore Access
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => void changeStatus(row, 0)}
+                  disabled={statusChangingId === row.id}
+                  className="cursor-pointer text-destructive focus-visible:bg-destructive/10"
+                >
+                  <ShieldAlert className="mr-2 h-4 w-4" /> Suspend Access
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       ),
     },
-  ], [])
+    // changeStatus closes over `reload`/`statusChangingId`, recreated every
+    // render - same tradeoff G2G's source column memo makes (see its
+    // eslint-disable-next-line above `], [])`).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [statusChangingId])
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6 duration-500 ease-out">
@@ -256,6 +317,12 @@ export function EmployeeDirectory() {
         <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
+        </div>
+      )}
+
+      {notice && (
+        <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+          {notice}
         </div>
       )}
 
@@ -288,10 +355,22 @@ export function EmployeeDirectory() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="hidden cursor-pointer sm:flex">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled
+            title="CSV import is not available yet"
+            className="hidden cursor-pointer sm:flex"
+          >
             <Upload className="mr-2 h-4 w-4" /> Import
           </Button>
-          <Button variant="ghost" size="sm" className="hidden cursor-pointer sm:flex">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => exportCsv(pageData)}
+            disabled={loading || pageData.length === 0}
+            className="hidden cursor-pointer sm:flex"
+          >
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
           <div className="mx-2 hidden h-6 w-px bg-border sm:block" />

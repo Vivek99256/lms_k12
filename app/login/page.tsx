@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { ArrowLeft, CheckCircle2, Mail, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
@@ -15,13 +16,34 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState('');
+  const [showForgotModal, setShowForgotModal] = useState(false);
+
+  useEffect(() => {
+    setGoogleClientId(
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || ''
+    );
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const existing = document.querySelector('script[data-google-gsi="true"]');
+    if (existing) return;
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.setAttribute('data-google-gsi', 'true');
+    document.head.appendChild(script);
+  }, [googleClientId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +65,55 @@ export default function LoginPage() {
     } catch {
       setError('Something went wrong. Please try again.');
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    if (!googleClientId) {
+      setError('Google sign-in is not configured. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID and try again.');
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+
+    const win = window as unknown as { google?: any };
+    if (!win.google?.accounts?.id) {
+      setError('Google sign-in failed to load. Please refresh the page.');
+      return;
+    }
+
+    setIsGoogleLoading(true);
+    try {
+      win.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: async (response: { credential?: string }) => {
+          const credential = response?.credential;
+          if (!credential) {
+            setError('Google sign-in was cancelled.');
+            setIsGoogleLoading(false);
+            return;
+          }
+          const result = await loginWithGoogle(credential);
+          if (!result.success) {
+            setError(result.error || 'Unable to sign in with Google.');
+            setIsGoogleLoading(false);
+            return;
+          }
+          localStorage.removeItem('selectedMenuBranch');
+          setShowSuccess(true);
+          window.setTimeout(() => {
+            router.replace('/dashboard');
+          }, 1100);
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+
+      win.google.accounts.id.prompt();
+    } catch {
+      setError('Unable to start Google sign-in. Please try again.');
+      setIsGoogleLoading(false);
     }
   };
 
@@ -212,7 +283,13 @@ export default function LoginPage() {
                 </div>
                 <span className="text-sm text-gray-600">Remember me</span>
               </label>
-              <button type="button" className="text-sm font-medium text-[#4169E1] hover:text-[#3658c7] transition-colors">Forgot password?</button>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(true)}
+                className="text-sm font-medium text-[#4169E1] hover:text-[#3658c7] transition-colors"
+              >
+                Forgot password?
+              </button>
             </div>
 
             <button
@@ -246,29 +323,47 @@ export default function LoginPage() {
 
           {/* Social Login */}
           <div className="grid grid-cols-1 gap-3">
-            <button className="flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all group">
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isGoogleLoading || !googleClientId}
+              title={!googleClientId ? 'Google sign-in not configured' : 'Continue with Google'}
+              className="flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
               </svg>
-              <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">Continue with Google</span>
+              <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                {isGoogleLoading ? 'Connecting to Google…' : 'Continue with Google'}
+              </span>
             </button>
           </div>
+{/* 
+  Sign up link
+  <p className="text-center text-sm text-gray-500 mt-7">
+    Don&apos;t have an account?{' '}
+    <button className="font-semibold text-[#4169E1] hover:text-[#3658c7] transition-colors">
+      Sign up for free
+    </button>
+  </p>
 
-          {/* Sign up link */}
-          <p className="text-center text-sm text-gray-500 mt-7">
-            Don&apos;t have an account?{' '}
-            <button className="font-semibold text-[#4169E1] hover:text-[#3658c7] transition-colors">Sign up for free</button>
-          </p>
-
-          {/* Mock hint */}
-          <p className="text-center text-[11px] text-gray-400 mt-5">
-            Demo mode — use any email and password to sign in
-          </p>
+  Mock hint
+  <p className="text-center text-[11px] text-gray-400 mt-5">
+    Demo mode — use any email and password to sign in
+  </p>
+*/}
         </div>
       </div>
+
+      {/* Forgot password modal — pops over the login screen without leaving it. */}
+      <ForgotPasswordModal
+        open={showForgotModal}
+        defaultEmail={email}
+        onClose={() => setShowForgotModal(false)}
+      />
 
       {/* Post-submit success animation — checkmark draw-in, then redirect */}
       {showSuccess && (
@@ -335,6 +430,179 @@ export default function LoginPage() {
           animation: successText 0.6s ease-out forwards;
         }
       `}</style>
+    </div>
+  );
+}
+
+function ForgotPasswordModal({
+  open,
+  defaultEmail,
+  onClose,
+}: {
+  open: boolean;
+  defaultEmail: string;
+  onClose: () => void;
+}) {
+  const [email, setEmail] = useState(defaultEmail);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setEmail(defaultEmail);
+      setError('');
+      setSuccess(false);
+      setIsLoading(false);
+    }
+  }, [open, defaultEmail]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      // Laravel returns { success: true|false, message }. Treat either an
+      // explicit success:true OR any 2xx as a success — the endpoint used
+      // to send emails through a non-API controller, so the safest UX is
+      // 'show the success state' once we got an OK response.
+      if (res.ok && (data?.success === true || data?.success === undefined)) {
+        setSuccess(true);
+        return;
+      }
+      if (data?.success === false) {
+        setError(data?.message || 'Unable to send reset link. Please try again.');
+        return;
+      }
+      if (!res.ok) {
+        setError(data?.message || 'Unable to send reset link. Please try again.');
+        return;
+      }
+      setSuccess(true);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="forgot-password-title"
+    >
+      <div
+        className="relative w-full max-w-[440px] rounded-2xl bg-white shadow-2xl border border-gray-200/50 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-3 top-3 p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <X size={18} />
+        </button>
+
+        {success ? (
+          <div className="p-8 text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-5">
+              <CheckCircle2 size={32} className="text-green-600" />
+            </div>
+            <h2 id="forgot-password-title" className="text-xl font-bold text-gray-900 mb-2">Check your email</h2>
+            <p className="text-sm text-gray-500 mb-7">
+              If an account exists for <span className="font-semibold text-gray-700">{email}</span>, we've sent password reset instructions.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-3 px-4 bg-gradient-to-r from-[#4169E1] to-blue-600 hover:from-[#3658c7] hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-[#4169E1]/25 transition-all duration-200"
+            >
+              Back to sign in
+            </button>
+          </div>
+        ) : (
+          <div className="p-8">
+            <h2 id="forgot-password-title" className="text-xl font-bold text-gray-900 mb-1.5">Forgot your password?</h2>
+            <p className="text-sm text-gray-500 mb-6">No worries - enter the email tied to your account and we'll send you a reset link.</p>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm flex items-center gap-2.5">
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    id="forgot-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    placeholder="you@example.com"
+                    required
+                    autoFocus
+                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4169E1]/20 focus:border-[#4169E1] transition-all text-sm"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 px-4 bg-gradient-to-r from-[#4169E1] to-blue-600 hover:from-[#3658c7] hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-[#4169E1]/25 hover:shadow-xl hover:shadow-[#4169E1]/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Sending reset link...
+                  </>
+                ) : (
+                  'Send reset link'
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full flex items-center justify-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <ArrowLeft size={14} />
+                Back to sign in
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

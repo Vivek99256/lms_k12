@@ -414,7 +414,7 @@ export function PalModuleGrid({
           <div className="p-6">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">
               <Orbit className="h-4 w-4" />
-              ULU dashboard
+              Unified Learning Units dashboard
             </div>
             <h2 className="mt-3 text-xl font-bold text-slate-900">5-layer learning-unit flow with application and optimization</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">

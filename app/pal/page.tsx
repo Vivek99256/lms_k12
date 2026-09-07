@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
   BookOpen,
@@ -14,7 +14,6 @@ import {
   Lightbulb,
   Loader2,
   Lock,
-  Monitor,
   Play,
   RefreshCw,
   Sparkles,
@@ -45,6 +44,7 @@ import { getViewAsStudent, setViewAsStudent } from '@/app/pal/data/pal-view-as';
 import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 import { DiagnosticButton } from '@/app/pal/_components/DiagnosticPanel';
+import { AdaptiveLearningButton } from '@/app/pal/_components/AdaptiveLearningButton';
 import { PracticePanel } from '@/app/pal/_components/PracticePanel';
 import { fetchChapterGate, type ChapterGateData } from '@/app/pal/data/pal';
 
@@ -69,9 +69,32 @@ const CATEGORY_STYLES: Record<PalContentCategory, { label: string; badge: string
 type AudienceMode = 'Teacher' | 'Student';
 
 export default function PalEntryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-16 text-sm text-slate-500">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Loading...
+        </div>
+      }
+    >
+      <PalEntryPageContent />
+    </Suspense>
+  );
+}
+
+function PalEntryPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Set by the PAL chapter dashboard's "Go to {subject}" button so the
+  // subject the student was just looking at opens expanded here, instead of
+  // always defaulting to the first subject in the list.
+  const openSubjectId = searchParams.get('subjectId');
   const [isStaff, setIsStaff] = useState(false);
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>('Teacher');
+  // Staff-only surface, and no longer switchable now that the Viewing-as toggle is
+  // gone. The teacher's own "view as student" flow below is unaffected: it runs off
+  // selectedStudent, not this.
+  const audienceMode: AudienceMode = 'Teacher';
   const [selectedStudent, setSelectedStudent] = useState<PalStudentSelection | null>(null);
   const [data, setData] = useState<PalLandingData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,8 +113,6 @@ export default function PalEntryPage() {
       if (staff) {
         const viewing = getViewAsStudent();
         if (viewing) setSelectedStudent(viewing);
-        const storedMode = localStorage.getItem('palAudienceMode');
-        if (storedMode === 'Student' || storedMode === 'Teacher') setAudienceMode(storedMode);
       }
     });
     return () => {
@@ -99,9 +120,6 @@ export default function PalEntryPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') localStorage.setItem('palAudienceMode', audienceMode);
-  }, [audienceMode]);
 
   // Enter/leave "view as student": persist so the Intelligence page picks it up.
   const enterStudentView = (student: PalStudentSelection | null) => {
@@ -147,8 +165,12 @@ export default function PalEntryPage() {
                 signal: controller.signal,
               });
         setData(result);
-        // Expand the first subject by default for immediate context.
-        setOpenSubjects(result.subjects[0] ? { [result.subjects[0].id]: true } : {});
+        // Expand the subject requested via ?subjectId= (e.g. the chapter
+        // dashboard's "Go to {subject}" button) if it's in this list,
+        // otherwise fall back to the first subject for immediate context.
+        const requested = openSubjectId ? result.subjects.find((s) => s.id === openSubjectId) : undefined;
+        const toOpen = requested ?? result.subjects[0];
+        setOpenSubjects(toOpen ? { [toOpen.id]: true } : {});
       } catch (reason) {
         if (controller.signal.aborted) return;
         setError(reason instanceof Error ? reason.message : 'Unable to load PAL subjects.');
@@ -167,7 +189,7 @@ export default function PalEntryPage() {
       cancelled = true;
       controller.abort();
     };
-  }, [needsStudent, selectedStudent]);
+  }, [needsStudent, selectedStudent, openSubjectId]);
 
   const toggleSubject = (subjectId: string) =>
     setOpenSubjects((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
@@ -225,37 +247,6 @@ export default function PalEntryPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {isStaff && (
-              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-                <span className="text-[13px] font-medium text-[#6B7B91]">Viewing as</span>
-                <div className="inline-flex rounded-[14px] border border-[#DFE6F2] bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-                  <button
-                    type="button"
-                    onClick={() => setAudienceMode('Teacher')}
-                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                      audienceMode === 'Teacher'
-                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                        : 'text-[#6B7B91]'
-                    }`}
-                  >
-                    <Monitor size={16} />
-                    Teacher
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAudienceMode('Student')}
-                    className={`inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[14px] font-semibold transition ${
-                      audienceMode === 'Student'
-                        ? 'border border-[#7C6CF4] bg-white text-[#1F2A44] shadow-[0_4px_12px_rgba(124,108,244,0.18)]'
-                        : 'text-[#6B7B91]'
-                    }`}
-                  >
-                    <GraduationCap size={16} />
-                    Student
-                  </button>
-                </div>
-              </div>
-            )}
             <Button
               variant="outline"
               size="sm"
@@ -301,10 +292,7 @@ export default function PalEntryPage() {
               <span className="font-semibold">Misconceptions</span>) are per-student, so switch to{' '}
               <button
                 type="button"
-                onClick={() => {
-                  exitStudentView();
-                  setAudienceMode('Teacher');
-                }}
+                onClick={exitStudentView}
                 className="font-semibold text-sky-900 underline underline-offset-2 hover:text-sky-950"
               >
                 Teacher
@@ -355,6 +343,7 @@ export default function PalEntryPage() {
                     onOpenModal={(kind, chapter) => openModal(kind, chapter, subject)}
                     studentId={data.student.studentId}
                     getContext={(chapter) => chapterContext(chapter, subject)}
+                    isStaff={isStaff}
                   />
                 ))}
               </div>
@@ -385,6 +374,7 @@ function SubjectCard({
   onOpenModal,
   studentId,
   getContext,
+  isStaff,
 }: {
   subject: PalSubject;
   expanded: boolean;
@@ -394,6 +384,7 @@ function SubjectCard({
   onOpenModal: (kind: ModalKind, chapter: PalChapter) => void;
   studentId: string;
   getContext: (chapter: PalChapter) => PalChapterContext;
+  isStaff: boolean;
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -435,6 +426,7 @@ function SubjectCard({
                 onOpenModal={(kind) => onOpenModal(kind, chapter)}
                 studentId={studentId}
                 context={getContext(chapter)}
+                isStaff={isStaff}
               />
             ))
           )}
@@ -451,6 +443,7 @@ function ChapterRow({
   onOpenModal,
   studentId,
   context,
+  isStaff,
 }: {
   chapter: PalChapter;
   attempts: PalLandingData['attemptsByChapter'][string];
@@ -458,9 +451,11 @@ function ChapterRow({
   onOpenModal: (kind: ModalKind) => void;
   studentId: string;
   context: PalChapterContext;
+  isStaff: boolean;
 }) {
   const hasAttempts = chapter.quizCount > 0;
   const [gate, setGate] = useState<ChapterGateData | null>(null);
+  const router = useRouter();
 
   // Prerequisite gate check — Step 5 of the learning journey. A chapter with
   // no mapped concepts (most legacy chapters) comes back with an empty
@@ -494,7 +489,21 @@ function ChapterRow({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-slate-900">{chapter.name}</span>
+            {/* Students only — the chapter-level PAL dashboard ("Hello,
+                {name}") shows where they are before drilling into a
+                concept. Staff keep using the concept-picker modal below
+                instead, since the dashboard is a per-learner view. */}
+            {isStaff ? (
+              <span className="text-sm font-medium text-slate-900">{chapter.name}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push(`/pal/eso/chapter/${context.chapterId}`)}
+                className="text-sm font-medium text-slate-900 underline-offset-2 hover:text-indigo-700 hover:underline"
+              >
+                {chapter.name}
+              </button>
+            )}
             {hasAttempts && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                 {chapter.quizCount} quiz{chapter.quizCount === 1 ? '' : 'zes'}
@@ -539,6 +548,13 @@ function ChapterRow({
               establishes a baseline before instruction, so it's offered
               whether or not the student has quiz attempts yet. */}
           <DiagnosticButton studentId={studentId} context={context} />
+          {/* Adaptive Learning is a learner-facing feature: a student may only
+              ever start their own session, never a teacher/staff/admin acting
+              as (or "viewing as") a student — enforced independently on the
+              backend by the eso.student route middleware regardless of what
+              renders here, but the entry point itself must not offer a
+              staff-facing way to start it either. */}
+          {!isStaff && <AdaptiveLearningButton chapterId={context.chapterId} />}
           {hasAttempts && (
             <>
               <Button

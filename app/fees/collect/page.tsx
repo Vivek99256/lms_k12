@@ -605,7 +605,7 @@ export default function FeesCollectPage() {
 
   return (
     <div className="min-h-screen ">
-      <div className="mx-auto max-w-[1500px] space-y-5 p-4 md:p-5 lg:p-6">
+      <div className="mx-auto max-w-[1500px] space-y-5 ">
         <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-sm ring-1 ring-slate-200/70">
           <CardHeader className="border-b border-slate-100 pb-4">
             <CardTitle className="text-lg font-semibold text-slate-900">Fees Collection Dashboard</CardTitle>

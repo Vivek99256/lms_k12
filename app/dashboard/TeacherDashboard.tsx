@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Users, School, BookOpen, ClipboardList, PenSquare, CalendarCheck, Megaphone, NotebookPen } from 'lucide-react';
+import { Users, School, BookOpen, ClipboardList, PenSquare, CalendarCheck, Megaphone, NotebookPen, Clock, Wallet, IdCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchTeacherDashboard, getDashboardSession, type TeacherDashboardSummary } from '@/app/dashboard/_lib/dashboard-api';
 import { DashboardError, DashboardSkeleton, EmptyState, QuickActionLink, SectionPanel, StatCard } from '@/app/dashboard/_components/DashboardPrimitives';
@@ -60,10 +60,13 @@ export default function TeacherDashboard() {
 
           <SectionPanel title="Quick actions" className="mb-6">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <QuickActionLink href="/attendance" label="Take attendance" icon={CalendarCheck} />
+              <QuickActionLink href="/attendance/attendance_dashboard" label="Take attendance" icon={CalendarCheck} />
               <QuickActionLink href="/lms/homework" label="Post homework" icon={NotebookPen} />
-              <QuickActionLink href="/lms/assignment" label="Grade assignments" icon={PenSquare} />
-              <QuickActionLink href="/general/circular" label="Post circular" icon={Megaphone} />
+              <QuickActionLink href="/lms/lmsAnnotate_assignment" label="Grade assignments" icon={PenSquare} />
+              <QuickActionLink href="/front_desk/circular" label="Post circular" icon={Megaphone} />
+              <QuickActionLink href="/lms/teacher-timetable" label="My timetable" icon={Clock} />
+              <QuickActionLink href="/fees/teacher-dues" label="Fee dues (my class)" icon={Wallet} />
+              <QuickActionLink href="/student/my_icard" label="My ID card" icon={IdCard} />
             </div>
           </SectionPanel>
 

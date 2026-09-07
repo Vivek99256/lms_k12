@@ -194,7 +194,7 @@ export default function CreateAssignmentPage() {
   }
 
   return (
-    <RequireStaff>
+    <RequireStaff redirectTo="/lms/lmsAssignment_submission">
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900">Create Assignment</h1>
@@ -222,13 +222,11 @@ export default function CreateAssignmentPage() {
       ) : null}
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <SearchDropdown
-            fields={academicFields}
-            values={filters}
-            onChange={(values) => setFilters(values)}
-          />
-        </div>
+        <SearchDropdown
+          fields={academicFields}
+          values={filters}
+          onChange={(values) => setFilters(values)}
+        />
         <div className="mt-5 flex justify-end">
           <Button type="button" onClick={loadStudents} disabled={loading}>
             {loading ? (

@@ -353,7 +353,7 @@ export default function FeesCancelRefundPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:p-4 lg:p-5">
+      <div className="mx-auto  space-y-4 ">
         <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <MetricCard title="Receipts found" value={String(metrics.receiptCount)} icon={<ReceiptText className="h-4 w-4" />} />
           <MetricCard title="Eligible to cancel" value={String(metrics.eligibleCount)} icon={<CheckCircle2 className="h-4 w-4" />} />

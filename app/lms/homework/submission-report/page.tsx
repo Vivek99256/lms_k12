@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Download,
   FileSpreadsheet,
@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Table,
   TableBody,
@@ -33,10 +34,27 @@ import {
   type TableExportRow,
 } from "@/lib/table-export";
 import {
-  listSubmissionReport,
-  type SubmissionReportRow,
-} from "@/app/lms/homework/api";
+  getAssignmentAiStatus,
+  listAnnotateAssignments,
+  type AnnotateRow,
+} from "@/app/lms/lmsAnnotate_assignment/api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
+
+const AI_POLL_INTERVAL_MS = 8000;
+
+function aiStatusVariant(
+  status: string
+): "processing" | "active" | "error" | "default" {
+  const normalized = status.toLowerCase();
+  if (normalized === "checking") return "processing";
+  if (normalized === "evaluated") return "active";
+  if (normalized.includes("fail")) return "error";
+  return "default";
+}
+
+function aiStatusLabel(status: string): string {
+  return status.toLowerCase() === "checking" ? "Checking..." : status || "-";
+}
 
 const academicFields: DropdownField[] = [
   "section",
@@ -57,8 +75,8 @@ const exportColumns: TableExportColumn[] = [
   { key: "title", label: "Title" },
   { key: "description", label: "Description" },
   { key: "submissionDate", label: "Submission Date" },
-  { key: "remark", label: "Remark" },
-  { key: "takenBy", label: "Taken By" },
+  { key: "remark", label: "Teacher Remarks" },
+  { key: "aiScore", label: "AI Score" },
   { key: "status", label: "Status" },
 ];
 
@@ -78,7 +96,7 @@ export default function StudentHomeworkSubmissionReportPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [status, setStatus] = useState<"" | "Y" | "N">("");
-  const [rows, setRows] = useState<SubmissionReportRow[]>([]);
+  const [rows, setRows] = useState<AnnotateRow[]>([]);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
@@ -92,11 +110,11 @@ export default function StudentHomeworkSubmissionReportPage() {
     setSearched(true);
     setPage(1);
     try {
-      const data = await listSubmissionReport({
+      const data = await listAnnotateAssignments({
         grade: readValue(filters.section ?? ""),
-        standard: readValue(filters.standard ?? ""),
-        division: readValue(filters.division ?? ""),
-        subject: readValue(filters.subject ?? ""),
+        standardId: readValue(filters.standard ?? ""),
+        divisionId: readValue(filters.division ?? ""),
+        subjectId: readValue(filters.subject ?? ""),
         fromDate,
         toDate,
         status,
@@ -114,11 +132,60 @@ export default function StudentHomeworkSubmissionReportPage() {
     }
   }, [filters, fromDate, toDate, status]);
 
+  // Poll AI evaluation status for rows still "Checking" so the badge/score/PDF
+  // link update in place once EvaluateAssignmentSubmissionJob finishes.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  useEffect(() => {
+    const checkingIds = rows
+      .filter((row) => row.aiStatus.toLowerCase() === "checking")
+      .map((row) => row.id);
+    if (!checkingIds.length) return;
+
+    const interval = setInterval(async () => {
+      const stillChecking = rowsRef.current.filter(
+        (row) => row.aiStatus.toLowerCase() === "checking"
+      );
+      if (!stillChecking.length) {
+        clearInterval(interval);
+        return;
+      }
+      const updates = await Promise.all(
+        stillChecking.map(async (row) => {
+          try {
+            return await getAssignmentAiStatus(row.id);
+          } catch {
+            return null;
+          }
+        })
+      );
+      setRows((current) =>
+        current.map((row) => {
+          const update = updates.find((item) => item && item.id === row.id);
+          if (!update) return row;
+          return {
+            ...row,
+            aiStatus: update.aiStatus,
+            aiFailureReason: update.aiFailureReason,
+            aiScore: update.aiScore,
+            aiTotalQuestions: update.aiTotalQuestions,
+            aiPercentage: update.aiPercentage,
+            reviewedPdfUrl: update.reviewedPdfUrl || row.reviewedPdfUrl,
+            teacherRemarks: update.teacherRemarks || row.teacherRemarks,
+            evaluatedAt: update.evaluatedAt,
+          };
+        })
+      );
+    }, AI_POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
     if (!search) return rows;
     return rows.filter((row) =>
-      [row.studentName, row.title, row.description, row.stdDiv, row.submissionTakenBy]
+      [row.studentName, row.title, row.description, row.standardName, row.divisionName]
         .some((value) => value.toLowerCase().includes(search))
     );
   }, [rows, query]);
@@ -134,15 +201,18 @@ export default function StudentHomeworkSubmissionReportPage() {
     serial: String(index + 1),
     grNo: row.enrollmentNo,
     name: row.studentName,
-    stdDiv: row.stdDiv,
+    stdDiv: [row.standardName, row.divisionName].filter(Boolean).join("-"),
     mobile: row.mobile,
-    sentDate: row.homeworkDate,
+    sentDate: row.assignedOn,
     title: row.title,
     description: row.description,
     submissionDate: row.submissionDate,
-    remark: row.submissionRemarks,
-    takenBy: row.submissionTakenBy,
-    status: row.completionStatus === "Y" ? "Submitted" : "Pending",
+    remark: row.teacherRemarks,
+    aiScore:
+      row.aiScore !== null && row.aiTotalQuestions !== null
+        ? `${row.aiScore}/${row.aiTotalQuestions}`
+        : "-",
+    status: row.aiStatus || (row.studentSubmitted ? "Submitted" : "Pending"),
   }));
 
   return (
@@ -153,7 +223,8 @@ export default function StudentHomeworkSubmissionReportPage() {
           Student Homework Submission Report
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Track homework submissions, remarks and checked work.
+          Track assignment submissions, remarks and AI-checked work
+          (sourced from the LMS Assignment module).
         </p>
       </header>
 
@@ -172,6 +243,7 @@ export default function StudentHomeworkSubmissionReportPage() {
             fields={academicFields}
             values={filters}
             onChange={(values) => setFilters(values)}
+            className="contents"
           />
           <div className="space-y-2">
             <Label htmlFor="from-date">From date</Label>
@@ -268,7 +340,7 @@ export default function StudentHomeworkSubmissionReportPage() {
                 onClick={() =>
                   openPrintPreview({
                     title: "Student Homework Submission Report",
-                    subtitle: "Homework submissions",
+                    subtitle: "Assignment submissions",
                     columns: exportColumns,
                     rows: exportRows,
                   })
@@ -291,17 +363,19 @@ export default function StudentHomeworkSubmissionReportPage() {
                   <TableHead>Sent Date</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>File</TableHead>
+                  <TableHead>Assignment Paper</TableHead>
                   <TableHead>Submission Date</TableHead>
-                  <TableHead>Remark</TableHead>
-                  <TableHead>Taken By</TableHead>
+                  <TableHead>Teacher Remarks</TableHead>
+                  <TableHead>AI Score</TableHead>
+                  <TableHead>Reviewed PDF</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Student File</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="h-24 text-center text-slate-500">
+                    <TableCell colSpan={15} className="h-24 text-center text-slate-500">
                       <LoaderCircle className="mx-auto size-6 animate-spin text-slate-300" />
                     </TableCell>
                   </TableRow>
@@ -313,17 +387,19 @@ export default function StudentHomeworkSubmissionReportPage() {
                       </TableCell>
                       <TableCell>{row.enrollmentNo || "-"}</TableCell>
                       <TableCell>{row.studentName}</TableCell>
-                      <TableCell>{row.stdDiv || "-"}</TableCell>
+                      <TableCell>
+                        {[row.standardName, row.divisionName].filter(Boolean).join("-") || "-"}
+                      </TableCell>
                       <TableCell>{row.mobile || "-"}</TableCell>
-                      <TableCell>{row.homeworkDate || "-"}</TableCell>
+                      <TableCell>{row.assignedOn || "-"}</TableCell>
                       <TableCell>{row.title || "-"}</TableCell>
                       <TableCell className="max-w-48 truncate" title={row.description}>
                         {row.description || "-"}
                       </TableCell>
                       <TableCell>
-                        {row.image ? (
+                        {row.examPdfUrl ? (
                           <a
-                            href={row.image}
+                            href={row.examPdfUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 underline"
@@ -335,42 +411,74 @@ export default function StudentHomeworkSubmissionReportPage() {
                         )}
                       </TableCell>
                       <TableCell>{row.submissionDate || "-"}</TableCell>
-                      <TableCell className="max-w-48 truncate" title={row.submissionRemarks}>
-                        {row.submissionRemarks || "-"}
+                      <TableCell className="max-w-48 whitespace-pre-line" title={row.teacherRemarks}>
+                        {row.teacherRemarks || "-"}
                       </TableCell>
-                      <TableCell>{row.submissionTakenBy || "-"}</TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1">
-                          {row.submissionFile ? (
-                            <a
-                              href={row.submissionFile}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-blue-600 underline"
-                            >
-                              <FileText className="size-3" />
-                              Submitted
-                            </a>
-                          ) : null}
-                          {row.aiGeneratedFile ? (
-                            <a
-                              href={row.aiGeneratedFile}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-emerald-600 underline"
-                            >
-                              <FileText className="size-3" />
-                              Checked
-                            </a>
-                          ) : null}
-                          {!row.submissionFile && !row.aiGeneratedFile ? "-" : null}
-                        </div>
+                        {row.aiScore !== null && row.aiTotalQuestions !== null ? (
+                          <span className="font-mono text-sm tabular-nums">
+                            {row.aiScore}/{row.aiTotalQuestions}
+                            {row.aiPercentage !== null ? (
+                              <span className="ml-1 text-slate-500">
+                                ({row.aiPercentage}%)
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.reviewedPdfUrl ? (
+                          <a
+                            href={row.reviewedPdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-blue-600 underline"
+                          >
+                            <Download className="size-3" />
+                            Download Evaluation
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.aiStatus ? (
+                          <StatusBadge
+                            variant={aiStatusVariant(row.aiStatus)}
+                            label={aiStatusLabel(row.aiStatus)}
+                            icon={
+                              row.aiStatus.toLowerCase() === "checking" ? (
+                                <LoaderCircle className="size-3 animate-spin" />
+                              ) : undefined
+                            }
+                            title={row.aiFailureReason || undefined}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.studentSubmitted && row.submissionFileUrl ? (
+                          <a
+                            href={row.submissionFileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-blue-600 underline"
+                          >
+                            <FileText className="size-3" />
+                            Submitted
+                          </a>
+                        ) : (
+                          "-"
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={13} className="h-28 text-center text-slate-500">
+                    <TableCell colSpan={15} className="h-28 text-center text-slate-500">
                       <FileText className="mx-auto mb-2 size-8 text-slate-300" />
                       No submissions found for the selected filters.
                     </TableCell>

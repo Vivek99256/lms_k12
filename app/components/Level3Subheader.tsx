@@ -273,7 +273,12 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
           )}
         </div>
 
-        {(items.length > 0 || masterLoading || masterMenuGroups.length > 0 || masterItems.length > 0) && (
+        {/*
+          Enterprise Brain screens are not backed by the LMS master-menu rights
+          table, so the Master button would open an empty panel there.
+        */}
+        {!pathname.startsWith('/enterprise-brain') &&
+          (items.length > 0 || masterLoading || masterMenuGroups.length > 0 || masterItems.length > 0) && (
           <div className="relative shrink-0" data-master-dropdown ref={masterPanelRef}>
             <button
               type="button"

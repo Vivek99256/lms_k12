@@ -13,7 +13,12 @@ import { useResizablePanel } from '@/hooks/use-resizable-panel';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
+import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { BrainCircuit } from 'lucide-react';
+import { BRAIN_MENU_LABEL, BRAIN_ROOT, BRAIN_SECTIONS } from '@/lib/brain/navigation';
+import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
+import { useFeesLevel3Nav } from '@/app/fees/_lib/use-fees-level3-nav';
 
 interface SelectedBranch {
   level1Key: string;
@@ -48,6 +53,31 @@ const FEES_SETUP_MASTER_LABEL_ORDER = new Map(
 
 function normalizeMenuLabel(label: string) {
   return label.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function isBrainVisibleByLmsSession() {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}');
+    const isAdmin = Number(userData.is_admin ?? menuContext.is_admin ?? 0);
+    const profileName = String(menuContext.user_profile_name ?? userData.user_profile ?? '').toLowerCase();
+    const profileId = Number(menuContext.user_profile_id ?? userData.user_profile_id ?? 0);
+    const hasTenant = (userData.sub_institute_id != null && userData.sub_institute_id !== '') || (menuContext.sub_institute_id != null && menuContext.sub_institute_id !== '');
+    const hasUser = (userData.id != null && userData.id !== '') || (menuContext.user_id != null && menuContext.user_id !== '');
+
+    return hasTenant && hasUser && (
+      isAdmin === 1 ||
+      isAdmin === 2 ||
+      profileId === 1 ||
+      profileName.includes('admin') ||
+      profileName.includes('principal') ||
+      profileName.includes('management')
+    );
+  } catch {
+    return false;
+  }
 }
 
 function getFilteredMasterMenuItems(items: SubmenuItem[], selectedMenu: SubmenuItem) {
@@ -109,7 +139,22 @@ function isUnderRoute(pathname: string, href: string): boolean {
 }
 
 /**
- * The New PAL sub-nav, or null when this route is not part of New PAL.
+ * The "New PAL" level-2 menu node from the rights-filtered menu tree, or
+ * undefined if the current role has no access to it at all. New PAL sits at
+ * level 2 (under "LMS + PAL"), so this only needs to check one level down —
+ * no need for general-purpose recursion.
+ */
+function findNewPalMenuNode(items: MenuItem[]): SubmenuItem | undefined {
+  for (const level1 of items) {
+    const match = level1.submenus?.find((level2) => normalizeMenuLabel(level2.label) === 'new pal');
+    if (match) return match;
+  }
+  return undefined;
+}
+
+/**
+ * The New PAL sub-nav, or null when this route is not part of New PAL, or
+ * when the current role has no `can_view` rights on any of its sub-modules.
  *
  * Scoped to the New PAL workspace and the sub-modules it links to. A `/pal`
  * prefix is NOT enough: LMS + PAL → Test → PAL is the legacy PAL workspace at
@@ -119,15 +164,27 @@ function isUnderRoute(pathname: string, href: string): boolean {
  * The boundary check matters here — `/pal/framework` (legacy) and
  * `/pal/frameworks` (New PAL) differ by one character, so a plain
  * `startsWith` would drag the legacy page back in.
+ *
+ * NEW_PAL_LEVEL3_ITEMS supplies the display metadata (label, href, order);
+ * this only decides which of those items the caller's role is allowed to
+ * see, by cross-referencing the menu-rights API's "New PAL" node — the same
+ * data source Access Roles writes to and every other module's level-3 bar
+ * reads from.
  */
-function newPalLevel3Items(pathname: string): Level3Item[] | null {
+function newPalLevel3Items(pathname: string, menuItems: MenuItem[]): Level3Item[] | null {
   const lowerPath = pathname.toLowerCase().replace(/\/+$/, '') || '/';
 
   const inNewPal =
     isUnderRoute(lowerPath, '/pal/new') ||
     NEW_PAL_LEVEL3_ITEMS.some((item) => isUnderRoute(lowerPath, item.href));
 
-  return inNewPal ? NEW_PAL_LEVEL3_ITEMS : null;
+  if (!inNewPal) return null;
+
+  const newPalNode = findNewPalMenuNode(menuItems);
+  const allowedLabels = new Set((newPalNode?.submenus ?? []).map((submenu) => normalizeMenuLabel(submenu.label)));
+
+  const items = NEW_PAL_LEVEL3_ITEMS.filter((item) => allowedLabels.has(normalizeMenuLabel(item.label)));
+  return items.length ? items : null;
 }
 
 
@@ -146,6 +203,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
 
   const [userProfileName, setUserProfileName] = useState('');
+  const [hasBrainAccess, setHasBrainAccess] = useState(() => isBrainVisibleByLmsSession());
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -154,6 +212,72 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       return ctx?.user_profile_name ? ctx.user_profile_name.toString().trim() : prev;
     });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkBrainAccess() {
+      if (typeof window === 'undefined') return;
+      try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        const token = String(userData.user_token || userData.token || '');
+        if (!token) {
+          setHasBrainAccess(isBrainVisibleByLmsSession());
+          return;
+        }
+
+        const res = await fetch(`${BRAIN_API_BASE_URL}/api/brain/access`, {
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) {
+          setHasBrainAccess(Boolean(res.ok && data?.allowed) || isBrainVisibleByLmsSession());
+        }
+      } catch {
+        if (!cancelled) setHasBrainAccess(isBrainVisibleByLmsSession());
+      }
+    }
+
+    checkBrainAccess();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const displayedMenuItems = useMemo<MenuItem[]>(() => {
+    if (!hasBrainAccess) return menuItems;
+    const alreadyPresent = menuItems.some((item) => normalizeMenuLabel(item.label) === 'enterprise brain');
+    if (alreadyPresent) return menuItems;
+
+    // Built as an ordinary three-level MenuItem so the existing Sidebar flyout
+    // and Level3Subheader drive it: Level 1 Enterprise Brain -> Level 2 section
+    // -> Level 3 screen. No Brain-specific navigation component exists.
+    return [
+      ...menuItems,
+      {
+        id: 'enterprise-brain',
+        icon: BrainCircuit,
+        label: BRAIN_MENU_LABEL,
+        href: BRAIN_ROOT,
+        submenus: BRAIN_SECTIONS.map((section) => ({
+          id: `enterprise-brain-${section.key}`,
+          parentId: 'enterprise-brain',
+          label: section.label,
+          href: section.href,
+          icon: section.icon,
+          submenus: section.screens.map((screen) => ({
+            id: `enterprise-brain-${section.key}-${screen.key}`,
+            parentId: `enterprise-brain-${section.key}`,
+            label: screen.label,
+            href: screen.href,
+          })),
+        })),
+      },
+    ];
+  }, [hasBrainAccess, menuItems]);
 
   const [fetchedMasterMenuItems, setFetchedMasterMenuItems] = useState<SubmenuItem[]>([]);
   const [masterMenuGroups, setMasterMenuGroups] = useState<Record<string, unknown>[]>([]);
@@ -164,7 +288,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     const lower = (checkPath || '').toLowerCase();
     if (!lower || lower === '/dashboard' || lower === '/') return true;
 
-    for (const item of menuItems) {
+    for (const item of displayedMenuItems) {
       // Check link field first (from API), then fallback to href
       const itemRoute = item.link ? mapApiLinkToRoute(item.link) : item.href;
       if (itemRoute && itemRoute !== '#' && lower.startsWith(itemRoute.toLowerCase())) return true;
@@ -182,36 +306,45 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       }
     }
     return false;
-  }, [menuItems]);
+  }, [displayedMenuItems]);
 
   useEffect(() => {
-    if (!menuItems.length || selectedBranch) return;
+    if (!displayedMenuItems.length || selectedBranch) return;
 
     const currentPath = pathname.toLowerCase();
-    for (const level1 of menuItems) {
+    // Most specific branch wins. Enterprise Brain's Overview section is routed
+    // at /enterprise-brain, a prefix of every other Brain route, so a
+    // first-match scan would select Overview for all of them.
+    let match: SelectedBranch | null = null;
+    let matchLength = -1;
+
+    for (const level1 of displayedMenuItems) {
       for (const level2 of level1.submenus ?? []) {
         const level2Route = level2.link ? mapApiLinkToRoute(level2.link) : level2.href;
-        const level3Match = level2.submenus?.some((level3) => {
-          const route = level3.link ? mapApiLinkToRoute(level3.link) : level3.href;
-          return route !== '#' && currentPath === route.toLowerCase();
-        });
+        const level3Route = level2.submenus
+          ?.map((level3) => (level3.link ? mapApiLinkToRoute(level3.link) : level3.href))
+          .find((route) => route !== '#' && currentPath === route.toLowerCase());
         const level2Match = level2Route !== '#' && currentPath.startsWith(level2Route.toLowerCase());
         const dashboardRoute = resolveModuleDashboardRoute(level2.label);
         const dashboardMatch = Boolean(dashboardRoute && currentPath.startsWith(dashboardRoute.toLowerCase()));
 
-        if (level2Match || level3Match || dashboardMatch) {
-          // Restore the active menu branch on refresh/direct navigation so its
-          // permission-filtered Master menu can be fetched for the sub-header.
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setSelectedBranch({
-            level1Key: getMenuKey(level1),
-            level2Key: getMenuKey(level2),
-          });
-          return;
-        }
+        if (!level2Match && !level3Route && !dashboardMatch) continue;
+
+        const length = level3Route ? level3Route.length : level2Match ? level2Route.length : (dashboardRoute?.length ?? 0);
+        if (length <= matchLength) continue;
+
+        match = { level1Key: getMenuKey(level1), level2Key: getMenuKey(level2) };
+        matchLength = length;
       }
     }
-  }, [menuItems, pathname, selectedBranch]);
+
+    if (match) {
+      // Restore the active menu branch on refresh/direct navigation so its
+      // permission-filtered Master menu can be fetched for the sub-header.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedBranch(match);
+    }
+  }, [displayedMenuItems, pathname, selectedBranch]);
 
    const fetchMasterMenu = useCallback(async (mainMenuId: number | string | undefined, menuItem: SubmenuItem | undefined) => {
     if (!mainMenuId || !menuItem) return;
@@ -285,8 +418,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, [masterMenuFetchedFor]);
 
   useEffect(() => {
-    if (!hasLoadedRef.current && selectedBranch && menuItems.length > 1) {
-      const selectedLevel1 = menuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key);
+    if (!hasLoadedRef.current && selectedBranch && displayedMenuItems.length > 1) {
+      const selectedLevel1 = displayedMenuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key);
       const selectedLevel2 = selectedLevel1?.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key);
       if (!selectedLevel2?.submenus?.length) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -301,6 +434,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       }
 
       if (!isKnownMenuPath(pathname)) {
+        return;
+      }
+
+      // Every Enterprise Brain route resolves to a real page, including the
+      // section landing pages and /capabilities/[id]. The "land on the first
+      // Level 3" redirect below exists for modules whose Level 2 has no screen
+      // of its own, and applying it here would bounce a deep link back to the
+      // first sibling.
+      if (pathname.toLowerCase().startsWith(BRAIN_ROOT)) {
         return;
       }
 
@@ -325,10 +467,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         }
       }
     }
-    if (menuItems.length > 0) {
+    if (displayedMenuItems.length > 0) {
       hasLoadedRef.current = true;
     }
-  }, [menuItems, selectedBranch, pathname, router, isKnownMenuPath]);
+  }, [displayedMenuItems, selectedBranch, pathname, router, isKnownMenuPath]);
 
   const toggleChatbot = () => {
     setIsChatbotOpen((prev) => {
@@ -336,11 +478,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       setIsRightToolbarOpen(!next);
       return next;
     });
-  };
-
-  const toggleRightToolbar = () => {
-    if (isChatbotOpen) return;
-    setIsRightToolbarOpen((prev) => !prev);
   };
 
   const handleLevel1Select = (item: MenuItem) => {
@@ -356,6 +493,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       level2Key: getMenuKey(submenu),
     });
     setMasterMenuFetchedFor(null);
+
+    // Each Enterprise Brain section has a landing page of its own listing its
+    // screens with live counts, so a section click lands there rather than
+    // jumping past it into the first screen. It also has no LMS master menu.
+    if (String(parent.id ?? '') === 'enterprise-brain') {
+      if (submenu.href && submenu.href !== '#') router.push(submenu.href);
+      return;
+    }
 
     await fetchMasterMenu(parent.id, submenu);
 
@@ -388,13 +533,37 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
   };
 
+  /**
+   * A hit from the top-bar menu search. Level 2 reuses the sidebar's own
+   * selection flow verbatim (module dashboard / New PAL / first Level 3), so a
+   * searched module behaves exactly like a clicked one. Level 3 opens its screen
+   * with the owning branch selected, which is what drives the sub-header.
+   */
+  const handleMenuSearchNavigate = async (entry: MenuSearchEntry) => {
+    if (entry.level === 2 && entry.level1 && entry.level2) {
+      await handleLevel2Select(entry.level2, entry.level1);
+      return;
+    }
+
+    if (entry.level === 3) {
+      setSelectedBranch({ level1Key: entry.level1Key, level2Key: entry.level2Key });
+      setMasterMenuFetchedFor(null);
+      if (entry.level1 && entry.level2) await fetchMasterMenu(entry.level1.id, entry.level2);
+    }
+
+    if (entry.route) router.push(entry.route);
+  };
+
   const selectedL1 = useMemo(() => {
     if (!selectedBranch?.level1Key) return null;
-    return menuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key) ?? null;
-  }, [menuItems, selectedBranch]);
+    return displayedMenuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key) ?? null;
+  }, [displayedMenuItems, selectedBranch]);
 
   useEffect(() => {
     if (!selectedBranch?.level2Key || !selectedL1 || masterMenuFetchedFor) return;
+    // Enterprise Brain screens are not backed by the LMS master-menu rights
+    // table, so asking for their master menu only produces a failed request.
+    if (String(selectedL1.id ?? '') === 'enterprise-brain') return;
 
       const selectedLevel2 = selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key);
       if (selectedLevel2) {
@@ -408,36 +577,55 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key) ?? null;
   }, [selectedBranch, selectedL1]);
 
+  const feesLevel3Menu = useFeesLevel3Nav({
+    selectedLevel2Label: selectedL2?.label,
+    pathname,
+  });
+
   const searchLevel3FromMenu = (items: MenuItem[], path: string): { parentLabel: string; items: Level3Item[] } | null => {
     if (!path || !items.length) return null;
+
+    let best: { parentLabel: string; items: Level3Item[] } | null = null;
+    let bestLength = -1;
+
     for (const item of items) {
-      if (item.submenus && item.href && !item.href.startsWith('#')) {
-        for (const submenu of item.submenus) {
-          // Check both link (from API) and href fields
-          const linkRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : null;
-          const submenuRoute = (linkRoute && linkRoute !== '#') ? linkRoute : submenu.href;
-          const submenuHref = (submenuRoute || '').toLowerCase();
-          if (submenu.submenus?.length && submenuHref !== '#' && path.startsWith(submenuHref)) {
-            return { parentLabel: submenu.label, items: submenu.submenus as Level3Item[] };
-          }
-        }
+      if (!item.submenus || !item.href || item.href.startsWith('#')) continue;
+      for (const submenu of item.submenus) {
+        // Check both link (from API) and href fields
+        const linkRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : null;
+        const submenuRoute = (linkRoute && linkRoute !== '#') ? linkRoute : submenu.href;
+        const submenuHref = (submenuRoute || '').toLowerCase();
+        if (!submenu.submenus?.length || submenuHref === '#' || !submenuHref) continue;
+        if (!path.startsWith(submenuHref) || submenuHref.length <= bestLength) continue;
+
+        best = { parentLabel: submenu.label, items: submenu.submenus as Level3Item[] };
+        bestLength = submenuHref.length;
       }
     }
-    return null;
+
+    return best;
   };
 
   const level3Menu = (() => {
     // New PAL brings its own sub-nav. Every other route — including the legacy
     // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
     // menu-driven resolution below and gets whatever its own menu defines.
-    const newPalItems = newPalLevel3Items(pathname);
+    const newPalItems = newPalLevel3Items(pathname, displayedMenuItems);
     if (newPalItems) {
       return { parentLabel: 'New PAL', items: newPalItems };
+    }
+    // Fees shows its seven categories here; each links to its own page, which
+    // carries that category's menus as its own tab bar. The hook returns null
+    // for every non-Fees context, so no other module's navigation is affected.
+    // For Fees it never returns null — it holds a loading placeholder instead —
+    // so the old Fees level-3 list below is unreachable, even for one frame.
+    if (feesLevel3Menu) {
+      return feesLevel3Menu;
     }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
     }
-    const found = searchLevel3FromMenu(menuItems, pathname);
+    const found = searchLevel3FromMenu(displayedMenuItems, pathname);
     if (!found) return null;
     return found;
   })();
@@ -453,7 +641,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     <PageAiContextProvider>
     <div className="app-shell-background flex h-screen overflow-hidden">
       <Sidebar
-        menuItems={menuItems}
+        menuItems={displayedMenuItems}
         loading={loading}
         error={error}
         refetch={refetch}
@@ -464,6 +652,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <Header
           onToggleChatbot={toggleChatbot}
           isChatbotOpen={isChatbotOpen}
+          menuItems={menuItems}
+          onMenuSearchNavigate={handleMenuSearchNavigate}
         />
         <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main

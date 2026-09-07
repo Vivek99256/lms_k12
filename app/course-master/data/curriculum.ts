@@ -155,21 +155,29 @@ export async function fetchCurriculumData(
  * Returns '' when the tenant has no curriculum record yet — callers must then
  * omit the board rather than substituting a default.
  */
-export function getCurriculumBoard(curriculum: CurriculumData | null): string {
+/**
+ * The fields these labels read. Structural so callers holding their own curriculum
+ * shape - the student screen keeps a local copy of this record - can label it
+ * without re-deriving the rule or converting the type.
+ */
+export type CurriculumLabelSource = {
+  board?: string | null;
+  framework?: string | null;
+  curriculum_name?: string | null;
+} | null;
+
+export function getCurriculumBoard(curriculum: CurriculumLabelSource): string {
   return readString(curriculum?.board).trim();
 }
-
-/** Shown when the tenant has no curriculum record for the subject. */
-export const CURRICULUM_NOT_CONFIGURED = 'Curriculum not configured';
 
 /**
  * Header label for the tenant's curriculum — "CBSE curriculum", "ICSE curriculum",
  * "GSEB curriculum", and so on for whichever board the tenant has configured.
  * Falls back to the framework or the curriculum name when the board itself isn't
- * set, and to '' when nothing is known (callers decide between hiding the label
- * and showing CURRICULUM_NOT_CONFIGURED).
+ * set, and to '' when nothing is known, in which case callers omit the label
+ * rather than substituting a default board.
  */
-export function getCurriculumLabel(curriculum: CurriculumData | null): string {
+export function getCurriculumLabel(curriculum: CurriculumLabelSource): string {
   const board = getCurriculumBoard(curriculum);
   if (board) return `${board} curriculum`;
 
@@ -203,8 +211,8 @@ export async function fetchCurriculumMeta(
  * The tenant's curriculum for a subject, as a header-ready label.
  *
  * `loading` separates "not fetched yet" from "fetched, nothing configured" so the
- * header can stay quiet while the request is in flight instead of flashing the
- * not-configured text.
+ * header can stay quiet while the request is in flight instead of flashing a
+ * label that is about to change.
  */
 export function useCurriculumMeta(
   subjectId: string,
@@ -236,7 +244,7 @@ export function useCurriculumMeta(
   return {
     curriculum,
     board: getCurriculumBoard(curriculum),
-    label: loading ? '' : label || CURRICULUM_NOT_CONFIGURED,
+    label: loading ? '' : label,
     loading,
   };
 }

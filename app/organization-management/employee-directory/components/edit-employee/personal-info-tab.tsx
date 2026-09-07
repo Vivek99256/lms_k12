@@ -61,6 +61,12 @@ export function PersonalInfoTab({ employee, departments, jobRoles, userProfiles 
     ifsc_code: '',
     amount: '',
     transfer_type: '',
+    monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false,
+    monday_in_date: '09:00', monday_out_date: '18:00',
+    tuesday_in_date: '09:00', tuesday_out_date: '18:00',
+    wednesday_in_date: '09:00', wednesday_out_date: '18:00',
+    thursday_in_date: '09:00', thursday_out_date: '18:00',
+    friday_in_date: '09:00', friday_out_date: '18:00',
   });
 
   useEffect(() => {
@@ -93,6 +99,22 @@ export function PersonalInfoTab({ employee, departments, jobRoles, userProfiles 
         ifsc_code: employee.ifsc_code || employee.ifsc || '',
         amount: employee.amount || '',
         transfer_type: employee.transfer_type || '',
+        monday: employee.monday ?? true,
+        tuesday: employee.tuesday ?? true,
+        wednesday: employee.wednesday ?? true,
+        thursday: employee.thursday ?? true,
+        friday: employee.friday ?? true,
+        saturday: employee.saturday ?? false,
+        monday_in_date: (employee.monday_in_date || '09:00').slice(0, 5),
+        monday_out_date: (employee.monday_out_date || '18:00').slice(0, 5),
+        tuesday_in_date: (employee.tuesday_in_date || '09:00').slice(0, 5),
+        tuesday_out_date: (employee.tuesday_out_date || '18:00').slice(0, 5),
+        wednesday_in_date: (employee.wednesday_in_date || '09:00').slice(0, 5),
+        wednesday_out_date: (employee.wednesday_out_date || '18:00').slice(0, 5),
+        thursday_in_date: (employee.thursday_in_date || '09:00').slice(0, 5),
+        thursday_out_date: (employee.thursday_out_date || '18:00').slice(0, 5),
+        friday_in_date: (employee.friday_in_date || '09:00').slice(0, 5),
+        friday_out_date: (employee.friday_out_date || '18:00').slice(0, 5),
       });
     }
   }, [employee]);
@@ -323,10 +345,20 @@ export function PersonalInfoTab({ employee, departments, jobRoles, userProfiles 
                 <div className="space-y-2">
                   <Label>Working Days</Label>
                   <div className="flex flex-wrap gap-4 pt-2">
-                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                      <label key={day} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <Checkbox defaultChecked={['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(day)} />
-                        {day}
+                    {[
+                      { short: 'Mon', field: 'monday' },
+                      { short: 'Tue', field: 'tuesday' },
+                      { short: 'Wed', field: 'wednesday' },
+                      { short: 'Thu', field: 'thursday' },
+                      { short: 'Fri', field: 'friday' },
+                      { short: 'Sat', field: 'saturday' },
+                    ].map(({ short, field }) => (
+                      <label key={field} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={(formData as any)[field]}
+                          onCheckedChange={(checked: boolean) => handleChange(field, checked)}
+                        />
+                        {short}
                       </label>
                     ))}
                   </div>
@@ -334,11 +366,23 @@ export function PersonalInfoTab({ employee, departments, jobRoles, userProfiles 
 
                 <div className="space-y-4 mt-6">
                   <Label className="text-sm font-semibold border-b pb-1">Shift Timings</Label>
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => (
-                    <div key={day} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <span className="text-sm font-medium">{day}</span>
-                      <TimePicker value="09:00" />
-                      <TimePicker value="18:00" />
+                  {[
+                    { label: 'Monday', field: 'monday' },
+                    { label: 'Tuesday', field: 'tuesday' },
+                    { label: 'Wednesday', field: 'wednesday' },
+                    { label: 'Thursday', field: 'thursday' },
+                    { label: 'Friday', field: 'friday' },
+                  ].map(({ label, field }) => (
+                    <div key={field} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                      <span className="text-sm font-medium">{label}</span>
+                      <TimePicker
+                        value={(formData as any)[`${field}_in_date`]}
+                        onChange={(time) => handleChange(`${field}_in_date`, time)}
+                      />
+                      <TimePicker
+                        value={(formData as any)[`${field}_out_date`]}
+                        onChange={(time) => handleChange(`${field}_out_date`, time)}
+                      />
                     </div>
                   ))}
                 </div>
