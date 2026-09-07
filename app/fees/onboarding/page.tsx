@@ -1,14 +1,21 @@
 'use client';
 
-import { FeesCategoryPage } from '@/app/fees/_components/fees-category-page';
-import { FEES_ONBOARDING_SCREENS } from '@/app/fees/onboarding/_screens/onboarding-screens';
+import { PageFrame } from '@/app/fees/_components/fees-shared';
+import { ModuleJourney } from '@/app/general/onboarding/_components/ModuleJourney';
 
 /**
- * Fees → onboarding. Shares FeesCategoryPage with the other Fees categories and
- * supplies its own tabs, which are static placeholders until these screens are
- * built. Any real menu the user has rights to still comes from the database and
- * follows them.
+ * Fees → Onboarding.
+ *
+ * Unlike the other Fees categories this is not a tab strip over Fees menus:
+ * onboarding a module is the same journey everywhere, already built and backed
+ * by real data under /general/onboarding/fees. So this route renders that same
+ * journey rather than the placeholder tabs it used to show. No Back button —
+ * the Fees category bar above is where the user came from.
  */
 export default function Page() {
-  return <FeesCategoryPage categoryKey="onboarding" staticScreens={FEES_ONBOARDING_SCREENS} />;
+  return (
+    <PageFrame>
+      <ModuleJourney moduleKey="fees" />
+    </PageFrame>
+  );
 }
