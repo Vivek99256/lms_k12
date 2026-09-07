@@ -57,7 +57,7 @@ export default function LmsTeacherDashboardPage() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <QuickActionLink href="/lms/dashboard" label="View student progress" icon={GraduationCap} />
                   <QuickActionLink href="/lms/teacher-diary" label="Open teacher diary" icon={NotebookPen} />
-                  <QuickActionLink href="/lms/lms_teacherResource" label="Browse teacher resources" icon={LibraryBig} />
+                  <QuickActionLink href="/lms/lms_teacherResource" label="Browse teacher workspace" icon={LibraryBig} />
                 </div>
               </SectionPanel>
 

@@ -28,7 +28,7 @@ const CONTENT_TYPE_OPTIONS = [
   { label: 'Remedial Class', value: 'Remedial Class', apiValue: 'remedial_class' },
 ] as const;
 // Mirrors UPLOAD_PRESENTATION_TYPES in the chapters page: the library reads this
-// string out of content_category to decide the Teacher Resource lane.
+// string out of content_category to decide the Teacher Workspace lane.
 const TEACHER_TRAINING_CONTENT_CATEGORY = 'Teacher training presentation';
 
 /**
@@ -685,13 +685,13 @@ ${groundTruthContent}`;
       }
 
       const normalizedContentType = contentType.trim().toLowerCase();
-      // The Teacher Resource tab always produces a deck, whatever the Classroom
+      // The Teacher Workspace tab always produces a deck, whatever the Classroom
       // tab's content type happens to be left on.
       const isTeacherTraining = presentationMode === 'Teacher training';
       const isPresentation = isTeacherTraining || normalizedContentType === 'presentation';
       const exportFormat = isPresentation ? 'pptx' : 'pdf';
       // content_category is what splits the library into Classroom Resource vs
-      // Teacher Resource, so teacher-training decks must be filed under their own
+      // Teacher Workspace, so teacher-training decks must be filed under their own
       // category instead of the generic 'presentation'.
       const apiContentType = isTeacherTraining
         ? TEACHER_TRAINING_CONTENT_CATEGORY
@@ -881,7 +881,7 @@ ${groundTruthContent}`;
                       : 'text-slate-600 hover:text-slate-900'
                   )}
                 >
-                  {mode === 'Classroom' ? 'Classroom Resource' : 'Teacher Resource'}
+                  {mode === 'Classroom' ? 'Classroom Resource' : 'Teacher Workspace'}
                 </button>
               ))}
             </div>

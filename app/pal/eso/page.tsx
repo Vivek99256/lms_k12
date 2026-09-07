@@ -1647,12 +1647,12 @@ function MasteredStep({ action }: { action: EsoAction }) {
           {action.applicationMastery != null && <div>Application: {Math.round(action.applicationMastery * 100)}%</div>}
         </div>
 
-        {/* Enrichment, when the existing PAL content pipeline has something for
+        {/* Extension Activity, when the existing PAL content pipeline has something for
             this chapter. Explicitly optional: nothing here is scored, and
             skipping it costs the student nothing. Absent entirely when no
-            enrichment is authored — never a placeholder. */}
+            extension activity is authored — never a placeholder. */}
         {action.enrichment != null && action.enrichment.length > 0 && (
-          <div data-eso-enrichment className="space-y-2 rounded-lg border border-emerald-200 bg-white p-4">
+          <div data-eso-extension-activity className="space-y-2 rounded-lg border border-emerald-200 bg-white p-4">
             <div className="text-sm font-medium text-emerald-900">Want to go deeper? (optional)</div>
             <p className="text-xs text-emerald-700">
               Nothing here is graded — it won&apos;t change your mastery either way.
