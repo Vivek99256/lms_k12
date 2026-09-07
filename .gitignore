@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...and the contract is opted in: it names the keys this app reads and carries
+# no values, so it has to travel with the repo or nobody else can configure it.
+!.env.example
 
 # vercel
 .vercel

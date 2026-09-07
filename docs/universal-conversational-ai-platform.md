@@ -18,7 +18,7 @@ The core runtime must support:
 - multilingual interaction
 - voice I/O
 - MCP tool discovery and execution
-- Gemini through Vercel AI SDK
+- model access owned by the backend, behind a single provider key
 - streaming, memory, analytics, and auditability
 
 ## 2. Architecture
@@ -59,18 +59,14 @@ The core runtime must support:
 ## 3. Runtime Flow
 
 ```text
-User -> UI -> /api/ai/chat
-     -> trusted session context resolution
-     -> project adapter resolution
-     -> discovery snapshot lookup
-     -> intent classification
-     -> security inspection
-     -> router decision
-     -> Gemini via Vercel AI SDK
-     -> tool execution / MCP execution
-     -> response streaming
-     -> memory update
-     -> audit + telemetry
+User -> UI -> /api/ai/ask/stream
+     -> Next.js SSE translation only
+     -> Laravel lifecycle API
+     -> trusted scope and permission resolution
+     -> intent and module resolution
+     -> Laravel MCP tool execution
+     -> lifecycle trace, audit and telemetry
+     -> streamed answer and stage updates
 ```
 
 ## 4. Universal Package Layout
@@ -81,32 +77,22 @@ packages/
     src/
       audit.ts
       context.ts
-      conversation.ts
-      discovery.ts
+      conversation-focus.ts
+      entity-selection.ts
+      followup-state.ts
       history.ts
       memory.ts
-      model.ts
-      project-registry.ts
       response-schema.ts
-      router.ts
       schemas.ts
       security.ts
-      tools.ts
-      types.ts
-  conversational-mcp-core/
-    src/
-      index.ts
       types.ts
 lib/
   ai/
-    adapters/
-      lms-k12/
-        adapter.ts
-        schemas.ts
-        server-api.ts
-        tools.ts
+    local-model.ts
     mcp-client.ts
-    project-resolver.ts
+  intelligence/
+    ask-adapter.ts
+    ask-stream.ts
 docs/
   conversational-ai-architecture.md
   universal-conversational-ai-platform.md
@@ -114,17 +100,19 @@ docs/
 
 ## 5. Folder Responsibilities
 
-- `conversation.ts`: shared request preparation, tool orchestration, response generation, streaming.
-- `discovery.ts`: normalized contracts for controllers, routes, services, permissions, database entities, and discovered tools.
-- `router.ts`: dynamic decision layer that maps intent plus discovery snapshot into tool or knowledge routing.
+- Laravel owns request preparation, tool orchestration, response generation, streaming,
+  discovery and routing through its governed lifecycle.
 - `memory.ts`: short-term and long-term memory contracts.
 - `security.ts`: prompt-injection and tool-execution guard contracts.
-- `project-registry.ts`: adapter registration and safe project resolution.
-- `adapters/<project>`: the only place where project-specific APIs, DTOs, and permission mappings live.
+- `lib/intelligence/ask-stream.ts`: translates Laravel's SSE events into AI SDK UI
+  message chunks; it never plans, calls a model or executes a tool.
+- `lib/ai/local-model.ts`: the bounded provider factory for non-conversational local
+  helpers such as field editing.
 
 ## 6. Dynamic Backend Discovery
 
-Dynamic behavior must come from an indexed project snapshot, not from ad hoc hardcoded route lists in prompts.
+Dynamic behavior comes from Laravel's module registry and MCP tool registry, not from
+an indexed Next.js project snapshot or ad hoc route lists in prompts.
 
 Recommended discovery sources at startup or build time:
 
@@ -177,21 +165,50 @@ Routing outcomes:
 - require human confirmation
 - deny by policy
 
-## 9. Vercel AI SDK and Gemini
+## 9. Model access, and what the Vercel AI SDK is for
 
-Use:
+This section previously described the client calling Gemini directly — `streamText`
+for conversation, `generateObject` for intent classification, the `@ai-sdk/google`
+provider in the browser tier. None of that is the runtime any more, and the change is
+the point of the architecture rather than an implementation detail.
 
-- `streamText` for default conversational streaming
-- `generateText` for structured JSON mode and server-side fallbacks
-- `generateObject` for intent classification and extraction
-- Google provider from `@ai-sdk/google`
+**Model access lives in the backend.** Laravel selects one driver through
+`AI_PROVIDER` (`gemini` | `openrouter` | `deepseek`) and holds the only key that
+matters; see `config/ai.php`. A turn's model call happens there, inside the governed
+lifecycle, where it is scoped to a tenant, audited, and bounded by the tools the
+module is bound to. The client holds no key for conversation and cannot reach a model
+on its own.
 
-Recommended production additions:
+**Intent classification is deterministic, not generated.** `IntentClassifier` matches
+anchors, weighted signals and full-phrase patterns, and the planner routes on the
+result. `generateObject` is not involved: an approval records a decision against a
+student's record, and a route that can differ on a Tuesday is not one you can replay.
 
-- model tier routing: flash for classification, pro for complex reasoning
-- retry policy with circuit breaker
-- abort propagation from client disconnect
-- token budgeting by tenant and capability
+**The SDK is the transport and render layer.** `@ai-sdk/react`'s `useChat` owns the UI
+message protocol, streaming state and aborts — and nothing else. It never decides what
+a turn means. Concretely:
+
+- Laravel streams named SSE events — `stage`, `token`, `done`, `error`.
+- `app/api/ai/ask/stream` is a thin proxy that forwards the question upstream and
+  translates that dialect into UI message chunks. It runs no model, selects no tools,
+  and takes its upstream host from the server's own environment, never the request.
+- Lifecycle stages arrive as typed data parts while the turn runs, so the twelve-stage
+  ladder fills in row by row instead of appearing complete at the end.
+- `lib/intelligence/ask-adapter.ts` renders both a finished turn and a partial one
+  through one composition, so a turn does not change appearance the moment it lands.
+
+**One deliberate exception.** Field editing (`app/api/ai/field-edit`) still calls a
+model locally through `@ai-sdk/google`, because it is a stateless text transform over
+one form field: it reads no ERP data, invokes no tools, persists nothing, and needs an
+immediate single value. Routing it through the lifecycle would make a form helper
+appear to have inspected school records when it has not. If Laravel grows an equally
+narrow field-edit endpoint, this becomes a proxy like the rest.
+
+Of the production additions this section used to recommend, **abort propagation is
+implemented**: the browser's cancel travels through the proxy to Laravel via the
+request signal, so stopping a turn stops the work rather than only closing the
+browser's ear. Model tier routing, retry policy and per-tenant token budgeting belong
+to the backend's provider configuration, not to the client.
 
 ## 10. MCP Architecture
 
@@ -421,20 +438,23 @@ Kubernetes:
 
 ## 22. Environment Variables
 
-```env
-AI_PROJECT_ID=lms_k12
-GOOGLE_GENERATIVE_AI_API_KEY=
-AI_MODEL_PRIMARY=gemini-2.5-flash
-AI_MODEL_REASONING=gemini-2.5-pro
-AI_DISCOVERY_CACHE_TTL_SECONDS=900
-AI_MEMORY_PROVIDER=redis
-REDIS_URL=
-MCP_SERVER_URL=
-MCP_AUTH_TOKEN=
-NEXT_PUBLIC_ERP_BASE_URL=
-NEXT_PUBLIC_API_BASE_URL_DEV=
-NEXT_PUBLIC_API_BASE_URL_PROD=
-```
+`.env.example` is the contract, on both sides — this section deliberately does not
+restate it, because the copy in this document had drifted to the point where seven of
+its twelve keys were read by nothing (`AI_PROJECT_ID`, `AI_MODEL_PRIMARY`,
+`AI_MODEL_REASONING`, `AI_DISCOVERY_CACHE_TTL_SECONDS`, `AI_MEMORY_PROVIDER`,
+`REDIS_URL`, `MCP_SERVER_URL`, `MCP_AUTH_TOKEN`). A list of variables in prose has no
+way to fail when it stops being true; the example files sit next to the code that
+reads them.
+
+- **Client** — `lms_k12/.env.example`: where the backend is, the one local model key
+  for field edit, and nothing else. No conversational model key lives here.
+- **Backend** — `next_lms_erp/.env.example`: `AI_PROVIDER` selects one driver and that
+  driver owns the only conversational model key, plus the `AI_*` lifecycle settings
+  and the `MCP_*` server settings.
+
+Model access, memory and tool execution are the backend's (§9), so the keys that used
+to appear here for discovery caching, a Redis memory provider and a separately
+addressed MCP server have no client-side counterpart to configure.
 
 ## 23. Best Practices
 
