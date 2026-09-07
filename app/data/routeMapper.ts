@@ -486,6 +486,32 @@ const CAPABILITY_INTELLIGENCE_ROUTE_NAME_MAP: Record<string, string> = {
   'capability_intelligence.capability_explorer': '/capability-intelligence/capability-explorer',
 };
 
+/**
+ * LMS (People & Competency) → Learning Dashboard, Learning Catalog, My
+ * Learning, Assignments, Sessions & Calendar, Certifications & Records,
+ * Course Builder, Administration & Governance, Assessments under
+ * /people-competency/lms. PACKAGE 0 (shared scaffolding) of a G2G → LMS-K12
+ * migration — see app/people-competency/lms/** (layout only so far; the 9
+ * screens themselves land in packages 1-4) and next_lms_erp's
+ * database/migrations/<...>_add_g2g_lms_menu.php for the matching backend
+ * menu-master rows (link values kept identical to these keys). Same pattern
+ * as TALENT_ROUTE_NAME_MAP / ORGANIZATION_MANAGEMENT_ROUTE_NAME_MAP: this
+ * module is NOT the existing native LMS (app/lms, app/g2g-lms — untouched,
+ * unrelated) — it is a fresh Next.js-only surface under a new `g2g_lms.*`
+ * key namespace, so it cannot collide with any legacy LMS route name.
+ */
+const G2G_LMS_ROUTE_NAME_MAP: Record<string, string> = {
+  'g2g_lms.learning_dashboard': '/people-competency/lms/learning-dashboard',
+  'g2g_lms.learning_catalog': '/people-competency/lms/learning-catalog',
+  'g2g_lms.my_learning': '/people-competency/lms/my-learning',
+  'g2g_lms.assignments': '/people-competency/lms/assignments',
+  'g2g_lms.sessions_calendar': '/people-competency/lms/sessions-calendar',
+  'g2g_lms.certifications_records': '/people-competency/lms/certifications-records',
+  'g2g_lms.course_builder': '/people-competency/lms/course-builder',
+  'g2g_lms.administration_governance': '/people-competency/lms/administration-governance',
+  'g2g_lms.assessments': '/people-competency/lms/assessments',
+};
+
 const ENTERPRISE_BRAIN_ROUTE_NAME_MAP: Record<string, string> = {
   'enterprise_brain.index': '/enterprise-brain',
   'enterprise-brain.index': '/enterprise-brain',
@@ -694,6 +720,14 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const enterpriseBrainRoute = ENTERPRISE_BRAIN_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (enterpriseBrainRoute) {
     return enterpriseBrainRoute;
+  }
+
+  // LMS (People & Competency) → Learning Dashboard, Learning Catalog, My
+  // Learning, Assignments, Sessions & Calendar, Certifications & Records,
+  // Course Builder, Administration & Governance, Assessments.
+  const g2gLmsRoute = G2G_LMS_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (g2gLmsRoute) {
+    return g2gLmsRoute;
   }
 
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
