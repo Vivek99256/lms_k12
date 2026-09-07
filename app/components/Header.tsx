@@ -124,10 +124,21 @@ export default function Header({
     if (effectiveTerm) localStorage.setItem('selectedAcademicTerm', effectiveTerm);
   }, [effectiveYear, effectiveTerm]);
 
+  // Re-fetch every server-rendered page in the current segment so the
+  // dashboard aggregates, fee summaries, and the rest of the app pick up
+  // the freshly-selected (year, term) from sessionStorage on the next pass.
   useEffect(() => {
     void refreshAcademicTerms(effectiveYear);
+    router.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveYear]);
+
+  useEffect(() => {
+    // Same reasoning for term changes — the server reads it from sessionStorage
+    // too, so we have to nudge the router to re-render with the new value.
+    router.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveTerm]);
 
   const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
   const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);

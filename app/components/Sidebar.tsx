@@ -371,20 +371,22 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
             })}
           </nav>
         </div>
-
+{/*
         <div className={`pb-4 mt-auto flex ${isCollapsed ? 'justify-center px-2' : 'px-4'}`}>
           <div className={`bg-gray-50/80 border border-gray-100 flex items-center hover:bg-gray-100 transition-colors w-full ${isCollapsed ? 'p-2 rounded-[20px] justify-center' : 'p-3 rounded-2xl gap-3'}`}>
             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-[#0D6EFD] font-bold border-2 border-white shadow-sm shrink-0">
               AD
             </div>
+ 
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-bold text-gray-900 truncate">Admin User</h4>
                 <p className="text-[11px] text-gray-500 truncate">Premium Plan</p>
               </div>
-            )}
+            )}              
           </div>
         </div>
+*/}        
       </div>
 
       {level2Panel && typeof document !== 'undefined' && createPortal(
