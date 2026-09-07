@@ -8,6 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: { name: string; email: string; avatar?: string } | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (credential: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   menuContext: {
     sub_institute_id: number;
@@ -142,6 +143,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [enforceDailyReset]);
 
+  const persistLoginPayload = useCallback(
+    (data: Record<string, unknown>) => {
+      function getValue(obj: unknown, key: string): unknown {
+        if (!obj || typeof obj !== 'object') return undefined;
+        return (obj as Record<string, unknown>)[key];
+      }
+
+      const payload = (data.data as Record<string, unknown> | undefined) ?? data;
+      const ctx = {
+        sub_institute_id: Number(getValue(payload, 'sub_institute_id') ?? getValue(payload, 'subInstituteId') ?? 0),
+        user_id: Number(getValue(payload, 'user_id') ?? getValue(payload, 'userId') ?? getValue(payload, 'id') ?? 0),
+        user_profile_name: String(getValue(payload, 'user_profile_name') ?? getValue(payload, 'userProfileName') ?? getValue(payload, 'user_profile') ?? ''),
+        user_profile_id: Number(getValue(payload, 'user_profile_id') ?? getValue(payload, 'userProfileId') ?? 0),
+        client_id: Number(getValue(payload, 'client_id') ?? getValue(payload, 'clientId') ?? 0),
+      };
+      setMenuContext(ctx);
+      localStorage.setItem(STORAGE_KEY_MENU, JSON.stringify(ctx));
+
+      const fallbackEmail = String(getValue(data, 'email') ?? getValue(payload, 'email') ?? '');
+      const userData = {
+        name: String(getValue(data, 'name') ?? getValue(payload, 'name') ?? (fallbackEmail ? fallbackEmail.split('@')[0] : 'User')),
+        email: String(getValue(data, 'email') ?? getValue(payload, 'email') ?? fallbackEmail),
+        avatar: getValue(data, 'avatar') ?? getValue(payload, 'avatar'),
+      };
+      setUser(userData);
+      setIsAuthenticated(true);
+      localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(userData));
+      localStorage.setItem(STORAGE_SESSION_DATE, getToday());
+
+      const sessionPayload = {
+        ...(payload as Record<string, unknown>),
+        ...(Array.isArray(data.academicTerms) ? { academicTerms: data.academicTerms } : {}),
+        ...(Array.isArray(data.academicYears) ? { academicYears: data.academicYears } : {}),
+      };
+      if (sessionPayload.logo) {
+        (sessionPayload as Record<string, unknown>).logo = `${sessionPayload.host_name || ''}/admin_dep/images/${sessionPayload.logo}`;
+      }
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(sessionPayload));
+      setAcademicTerms(Array.isArray(data.academicTerms) ? (data.academicTerms as Array<Record<string, unknown>>) : []);
+      setAcademicYears(Array.isArray(data.academicYears) ? (data.academicYears as Array<Record<string, unknown>>) : []);
+      resetInactivityTimer();
+    },
+    [resetInactivityTimer]
+  );
+
   const login = useCallback(async (email: string, password: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/api-login`, {
@@ -152,43 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       if (res.ok && data) {
         clearTeachAssistantStorage();
-
-        function getValue(obj: unknown, key: string): unknown {
-          if (!obj || typeof obj !== 'object') return undefined;
-          return (obj as Record<string, unknown>)[key];
-        }
-
-        const payload = data.data || data;
-        const ctx = {
-          sub_institute_id: Number(getValue(payload, 'sub_institute_id') ?? getValue(payload, 'subInstituteId') ?? 0),
-          user_id: Number(getValue(payload, 'user_id') ?? getValue(payload, 'userId') ?? getValue(payload, 'id') ?? 0),
-          user_profile_name: String(getValue(payload, 'user_profile_name') ?? getValue(payload, 'userProfileName') ?? getValue(payload, 'user_profile') ?? ''),
-          user_profile_id: Number(getValue(payload, 'user_profile_id') ?? getValue(payload, 'userProfileId') ?? 0),
-          client_id: Number(getValue(payload, 'client_id') ?? getValue(payload, 'clientId') ?? 0),
-        };
-        setMenuContext(ctx);
-        localStorage.setItem(STORAGE_KEY_MENU, JSON.stringify(ctx));
-
-        const userData = {
-          name: data.name || email.split('@')[0],
-          email: data.email || email,
-          avatar: data.avatar,
-        };
-        setUser(userData);
-        setIsAuthenticated(true);
-        localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(userData));
-        localStorage.setItem(STORAGE_SESSION_DATE, getToday());
-        const sessionPayload = { ...(data.data || data || {}), ...(data.academicTerms ? { academicTerms: data.academicTerms } : {}), ...(data.academicYears ? { academicYears: data.academicYears } : {}) };
-        console.log('AuthContext sessionPayload before logo transform:', sessionPayload);
-        if (sessionPayload.logo) {
-          (sessionPayload as Record<string, unknown>).logo = `${(sessionPayload as Record<string, unknown>).host_name || ''}/admin_dep/images/${sessionPayload.logo}`;
-        }
-        console.log('AuthContext sessionPayload after logo transform:', sessionPayload);
-        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(sessionPayload));
-        console.log('AuthContext saved to localStorage:', localStorage.getItem(STORAGE_KEY_USER));
-        setAcademicTerms(Array.isArray(data.academicTerms) ? data.academicTerms : []);
-        setAcademicYears(Array.isArray(data.academicYears) ? data.academicYears : []);
-        resetInactivityTimer();
+        persistLoginPayload(data as Record<string, unknown>);
         return { success: true };
       }
       return { success: false, error: data?.message || 'Invalid credentials. Please try again.' };
@@ -196,7 +206,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const message = err instanceof Error ? err.message : 'Network error. Please try again.';
       return { success: false, error: message };
     }
-  }, [resetInactivityTimer]);
+  }, [persistLoginPayload]);
+
+  /**
+   * Trade a Google ID token (from Google Identity Services) for an LMS session
+   * by relaying it through our own /api/google-auth proxy, then persist the
+   * same payload shape `login()` does so the post-login flow is identical.
+   */
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    try {
+      const res = await fetch('/api/google-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data) {
+        clearTeachAssistantStorage();
+        persistLoginPayload(data as Record<string, unknown>);
+        return { success: true };
+      }
+      return {
+        success: false,
+        error: data?.message || 'Unable to sign in with Google. Please try again.',
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Network error. Please try again.';
+      return { success: false, error: message };
+    }
+  }, [persistLoginPayload]);
 
   const logout = useCallback(() => {
     setIsAuthenticated(false);
@@ -244,7 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, user, login, logout, menuContext, academicTerms, academicYears, refreshAcademicTerms }}
+      value={{ isAuthenticated, user, login, loginWithGoogle, logout, menuContext, academicTerms, academicYears, refreshAcademicTerms }}
     >
       {children}
     </AuthContext.Provider>
@@ -258,6 +296,7 @@ export function useAuth() {
       isAuthenticated: false,
       user: null,
       login: async (): Promise<{ success: boolean; error?: string }> => ({ success: false }),
+      loginWithGoogle: async (): Promise<{ success: boolean; error?: string }> => ({ success: false }),
       logout: () => {},
       menuContext: null,
       academicTerms: [],
