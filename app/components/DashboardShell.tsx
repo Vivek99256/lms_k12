@@ -606,7 +606,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return best;
   };
 
-  const level3Menu = (() => {
+  const level3Menu: { parentLabel: string; items: Level3Item[]; hideMaster?: boolean } | null = (() => {
     // New PAL brings its own sub-nav. Every other route — including the legacy
     // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
     // menu-driven resolution below and gets whatever its own menu defines.
