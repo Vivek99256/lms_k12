@@ -43,6 +43,8 @@ import {
 export type FeesLevel3Nav = {
   parentLabel: string;
   items: Level3Item[];
+  /** Fees has no LMS master-menu rights, so its sub-header must not show Master. */
+  hideMaster?: boolean;
 };
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
@@ -143,6 +145,7 @@ export function useFeesLevel3Nav({
       return {
         parentLabel: 'Fees',
         items: [inertItem('fees-categories-error', 'Fees navigation unavailable')],
+        hideMaster: true,
       };
     }
 
@@ -153,6 +156,7 @@ export function useFeesLevel3Nav({
       return {
         parentLabel: 'Fees',
         items: [inertItem('fees-categories-loading', 'Loading…')],
+        hideMaster: true,
       };
     }
 
@@ -164,6 +168,7 @@ export function useFeesLevel3Nav({
         // Configured per category row, so the bar links wherever the data says.
         href: category.route || `/fees/${category.key}`,
       })),
+      hideMaster: true,
     };
   }, [active, state, categories]);
 }
