@@ -167,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: String(getValue(data, 'name') ?? getValue(payload, 'name') ?? (fallbackEmail ? fallbackEmail.split('@')[0] : 'User')),
         email: String(getValue(data, 'email') ?? getValue(payload, 'email') ?? fallbackEmail),
         avatar: typeof avatar === 'string' ? avatar : undefined,
+        avatar: (getValue(data, 'avatar') as string | undefined) ?? (getValue(payload, 'avatar') as string | undefined),
       };
       setUser(userData);
       setIsAuthenticated(true);
@@ -178,8 +179,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...(Array.isArray(data.academicTerms) ? { academicTerms: data.academicTerms } : {}),
         ...(Array.isArray(data.academicYears) ? { academicYears: data.academicYears } : {}),
       };
-      if (sessionPayload.logo) {
-        sessionPayload.logo = `${sessionPayload.host_name || ''}/admin_dep/images/${sessionPayload.logo}`;
+      if (sessionPayload['logo']) {
+        sessionPayload['logo'] = `${sessionPayload['host_name'] || ''}/admin_dep/images/${sessionPayload['logo']}`;
       }
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(sessionPayload));
       setAcademicTerms(Array.isArray(data.academicTerms) ? (data.academicTerms as Array<Record<string, unknown>>) : []);
