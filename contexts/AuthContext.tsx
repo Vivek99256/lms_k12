@@ -165,20 +165,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = {
         name: String(getValue(data, 'name') ?? getValue(payload, 'name') ?? (fallbackEmail ? fallbackEmail.split('@')[0] : 'User')),
         email: String(getValue(data, 'email') ?? getValue(payload, 'email') ?? fallbackEmail),
-        avatar: getValue(data, 'avatar') ?? getValue(payload, 'avatar'),
+        // getValue() returns unknown; the user state type is `avatar?: string`.
+        // Narrowed rather than cast, so a non-string simply becomes undefined -
+        // which is what the type already promised callers.
+        avatar: ((): string | undefined => {
+          const raw = getValue(data, 'avatar') ?? getValue(payload, 'avatar');
+          return typeof raw === 'string' ? raw : undefined;
+        })(),
       };
       setUser(userData);
       setIsAuthenticated(true);
       localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(userData));
       localStorage.setItem(STORAGE_SESSION_DATE, getToday());
 
-      const sessionPayload = {
+      // Annotated because spreading a Record<string, unknown> alongside two optional
+      // known keys narrows the inferred type to just those keys, so `logo` / `host_name`
+      // below become type errors even though they exist at runtime.
+      const sessionPayload: Record<string, unknown> = {
         ...(payload as Record<string, unknown>),
         ...(Array.isArray(data.academicTerms) ? { academicTerms: data.academicTerms } : {}),
         ...(Array.isArray(data.academicYears) ? { academicYears: data.academicYears } : {}),
       };
       if (sessionPayload.logo) {
-        (sessionPayload as Record<string, unknown>).logo = `${sessionPayload.host_name || ''}/admin_dep/images/${sessionPayload.logo}`;
+        sessionPayload.logo = `${sessionPayload.host_name || ''}/admin_dep/images/${sessionPayload.logo}`;
       }
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(sessionPayload));
       setAcademicTerms(Array.isArray(data.academicTerms) ? (data.academicTerms as Array<Record<string, unknown>>) : []);
