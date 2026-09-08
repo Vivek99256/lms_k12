@@ -153,6 +153,48 @@ export async function* askUiChunks(
   yield { type: 'finish' };
 }
 
+/**
+ * The same answer, from the JSON route instead of the stream.
+ *
+ * `/ask` and `/ask/stream` return identical payloads — the streaming route's `done`
+ * event carries exactly what the JSON route puts in `data`, which was a deliberate
+ * property of the backend contract. That is what makes this fallback honest rather
+ * than a degraded second implementation: the panel renders the same reply and the same
+ * twelve-stage ladder, it simply gets them in one delivery instead of progressively.
+ *
+ * The stages are emitted before the text so the ladder is already drawn when the
+ * answer appears, which is the order a reader expects even when nothing was gradual.
+ */
+export async function* askUiChunksFromResult(
+  result: AskResult
+): AsyncGenerator<InferUIMessageChunk<AskUIMessage>> {
+  yield { type: 'start' };
+
+  for (const stage of result.trace ?? []) {
+    yield {
+      type: 'data-stage',
+      id: `stage-${stage.key ?? stage.order}`,
+      data: stage,
+    };
+  }
+
+  const reply = toChatShapedReply(result, ANSWER_PART_ID);
+
+  if (reply.message.content) {
+    yield { type: 'text-start', id: ANSWER_PART_ID };
+    yield { type: 'text-delta', id: ANSWER_PART_ID, delta: reply.message.content };
+    yield { type: 'text-end', id: ANSWER_PART_ID };
+  }
+
+  yield {
+    type: 'data-ask',
+    id: 'ask',
+    data: { conversationId: result.conversation?.id ?? null, reply },
+  };
+
+  yield { type: 'finish' };
+}
+
 function parseData(raw: string): unknown {
   try {
     return JSON.parse(raw);
