@@ -1010,7 +1010,16 @@ export default function ChapterListPage() {
   // "not yet known" (loading, or no token), which is deliberately distinct from
   // `false` ("denied") so a gated button does not flash disabled on every load.
   const canCreateContent = usePermission('lms.content', 'create');
-  const contentCreationBlocked = canCreateContent === false;
+  // 2026-09-08 REGRESSION FIX. This flag was wired to `disabled` on three controls.
+  // The server-side gate (`perm:lms.content,create`) runs in WARN-ONLY mode
+  // (LMS_API_AUTH_ENFORCE=false), so it blocks nothing - the disabled state bought no
+  // security while genuinely stopping work. The rights data is not ready for it either:
+  // 59 (profile, tenant) pairs hold rights on menu 270 with NO row on menu 236, and 30
+  // of 148 menu-270 rows carry can_add=0, so create=false resolved for many real users
+  // and Generate Questions went read-only on live.
+  // The hint still shows; the control stays usable. Re-wire `disabled` only once the
+  // server actually enforces AND the rights rows are backfilled.
+  const contentCreationDenied = canCreateContent === false;
   const contentResourceType = searchParams?.get('resourceType') === 'teacher' ? 'teacher' : 'classroom';
   const contentResourceLabel = contentResourceType === 'teacher' ? 'Teacher Workspace' : 'Classroom Resource';
   const availableContentLibraryTabs =
@@ -1897,8 +1906,7 @@ export default function ChapterListPage() {
         <Button
           type="button"
           onClick={() => openGenerateQuestionsModal(chapter, conceptTitle, conceptIndex)}
-          disabled={contentCreationBlocked}
-          title={contentCreationBlocked ? CONTENT_CREATE_DENIED_HINT : undefined}
+          title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
           className="h-9 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
         >
           <Sparkles size={16} className="mr-2" />
@@ -4357,8 +4365,7 @@ export default function ChapterListPage() {
                   <Button
                     type="button"
                     onClick={openGeneratePresentationDrawer}
-                    disabled={contentCreationBlocked}
-                    title={contentCreationBlocked ? CONTENT_CREATE_DENIED_HINT : undefined}
+                    title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
                     className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                   >
                     <Sparkles size={16} className="mr-2" />
@@ -4368,8 +4375,7 @@ export default function ChapterListPage() {
                     type="button"
                     variant="outline"
                     onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
-                    disabled={contentCreationBlocked}
-                    title={contentCreationBlocked ? CONTENT_CREATE_DENIED_HINT : undefined}
+                    title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
                     className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Upload size={16} className="mr-2" />
