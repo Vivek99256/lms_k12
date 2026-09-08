@@ -9,6 +9,47 @@ import HeaderMenuSearch from '@/app/components/HeaderMenuSearch';
 import type { MenuItem } from '@/app/data/menuItems';
 import type { MenuSearchEntry } from '@/app/data/menuSearch';
 
+const platformServicesItems = [
+  'RBAC',
+  'Workflow',
+  'Notification',
+  'Template',
+  'Scheduler',
+  'Document',
+  'Integration',
+  'Audit',
+  'Event Bus',
+] as const;
+
+const aiIntelligenceItems = [
+  'AI Providers',
+  'Model Management',
+  'Prompt Management',
+  'AI Policies',
+  'Agent Management',
+  'Knowledge & RAG',
+  'Recommendation Engine',
+  'Knowledge Graph',
+  'AI Evaluation',
+  'Usage & Cost',
+  'AI Audit',
+] as const;
+
+function LogoImage({ url, fallback }: { url: string; fallback: React.ReactNode }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) return <>{fallback}</>;
+
+  return (
+    <img
+      src={url}
+      alt="Logo"
+      className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
 const profileMenuItems = [
   'Implementation',
   'Onboarding',
@@ -55,6 +96,10 @@ export default function Header({
   const [showTermDropdown, setShowTermDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userPosition, setUserPosition] = useState<{ top: number; right: number } | null>(null);
+  const [showPlatformServicesSubmenu, setShowPlatformServicesSubmenu] = useState(false);
+  const [showAIIntelligenceSubmenu, setShowAIIntelligenceSubmenu] = useState(false);
+  const platformServicesHoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const aiIntelligenceHoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const menuRoutes: Record<string, string> = {
     'Implementation': '/general/implementation_management',
@@ -64,6 +109,32 @@ export default function Header({
     'Group-wise Rights': '/general/groupwise_rights',
     'Individual Rights': '/general/individual_rights',
     'Mobile App Rights': '/general/mobile_app_rights',
+  };
+
+  const platformServicesRoutes: Record<string, string> = {
+    'RBAC': '/organization-management/role-and-permissions',
+    'Workflow': '/general/coming-soon?module=Workflow',
+    'Notification': '/general/coming-soon?module=Notification',
+    'Template': '/general/coming-soon?module=Template',
+    'Scheduler': '/general/coming-soon?module=Scheduler',
+    'Document': '/general/coming-soon?module=Document',
+    'Integration': '/general/coming-soon?module=Integration',
+    'Audit': '/general/coming-soon?module=Audit',
+    'Event Bus': '/general/coming-soon?module=Event Bus',
+  };
+
+  const aiIntelligenceRoutes: Record<string, string> = {
+    'AI Providers': '/general/coming-soon?module=AI Providers',
+    'Model Management': '/general/coming-soon?module=Model Management',
+    'Prompt Management': '/general/coming-soon?module=Prompt Management',
+    'AI Policies': '/general/coming-soon?module=AI Policies',
+    'Agent Management': '/general/coming-soon?module=Agent Management',
+    'Knowledge & RAG': '/general/coming-soon?module=Knowledge & RAG',
+    'Recommendation Engine': '/general/coming-soon?module=Recommendation Engine',
+    'Knowledge Graph': '/general/coming-soon?module=Knowledge Graph',
+    'AI Evaluation': '/general/coming-soon?module=AI Evaluation',
+    'Usage & Cost': '/general/coming-soon?module=Usage & Cost',
+    'AI Audit': '/general/coming-soon?module=AI Audit',
   };
 
   // Seeded only from what this browser last chose. Anything else is adopted from
@@ -140,11 +211,10 @@ export default function Header({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTerm]);
 
-  const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
-  const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);
-  const [hasLogoError, setHasLogoError] = useState(false);
+const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
+const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);
 
-  const logoUrl = (() => {
+const logoUrl = (() => {
     if (typeof window === 'undefined') return null;
     try {
       const stored = localStorage.getItem('userData');
@@ -161,9 +231,6 @@ export default function Header({
     return null;
   })();
 
-  useEffect(() => {
-    setHasLogoError(false);
-  }, [logoUrl]);
   // Only the institute's own values are offered. A stored selection that is no
   // longer in its data stays visible until the effects above replace it, so the
   // switcher never goes blank mid-swap.
@@ -195,6 +262,48 @@ export default function Header({
     setShowUserDropdown(prev => !prev);
   };
 
+  const handlePlatformServicesEnter = () => {
+    if (platformServicesHoverTimeout.current) clearTimeout(platformServicesHoverTimeout.current);
+    setShowPlatformServicesSubmenu(true);
+  };
+
+  const handlePlatformServicesLeave = () => {
+    platformServicesHoverTimeout.current = setTimeout(() => {
+      setShowPlatformServicesSubmenu(false);
+    }, 150);
+  };
+
+  const handlePlatformServicesSubmenuEnter = () => {
+    if (platformServicesHoverTimeout.current) clearTimeout(platformServicesHoverTimeout.current);
+  };
+
+  const handlePlatformServicesSubmenuLeave = () => {
+    platformServicesHoverTimeout.current = setTimeout(() => {
+      setShowPlatformServicesSubmenu(false);
+    }, 150);
+  };
+
+  const handleAIIntelligenceEnter = () => {
+    if (aiIntelligenceHoverTimeout.current) clearTimeout(aiIntelligenceHoverTimeout.current);
+    setShowAIIntelligenceSubmenu(true);
+  };
+
+  const handleAIIntelligenceLeave = () => {
+    aiIntelligenceHoverTimeout.current = setTimeout(() => {
+      setShowAIIntelligenceSubmenu(false);
+    }, 150);
+  };
+
+  const handleAIIntelligenceSubmenuEnter = () => {
+    if (aiIntelligenceHoverTimeout.current) clearTimeout(aiIntelligenceHoverTimeout.current);
+  };
+
+  const handleAIIntelligenceSubmenuLeave = () => {
+    aiIntelligenceHoverTimeout.current = setTimeout(() => {
+      setShowAIIntelligenceSubmenu(false);
+    }, 150);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -207,6 +316,13 @@ export default function Header({
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (platformServicesHoverTimeout.current) clearTimeout(platformServicesHoverTimeout.current);
+      if (aiIntelligenceHoverTimeout.current) clearTimeout(aiIntelligenceHoverTimeout.current);
+    };
   }, []);
 
   // The shell owns menu navigation, because opening a screen also has to move
@@ -312,14 +428,15 @@ export default function Header({
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-3 cursor-pointer" ref={userButtonRef} onClick={handleUserToggle}>
-            {logoUrl && !hasLogoError ? (
-              <img 
-                src={logoUrl} 
-                alt="Logo" 
-                className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain" 
-                onError={() => {
-                  setHasLogoError(true);
-                }}
+            {logoUrl ? (
+              <LogoImage
+                key={logoUrl}
+                url={logoUrl}
+                fallback={
+                  <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
+                    {user?.name?.charAt(0).toUpperCase() || 'S'}
+                  </div>
+                }
               />
             ) : (
               <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
@@ -336,33 +453,108 @@ export default function Header({
         
         {showUserDropdown && userPosition && typeof document !== 'undefined' && createPortal(
           <div
-            className="fixed z-[9999] w-[210px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl"
+            className="fixed z-[9999] rounded-xl border border-gray-200 bg-white shadow-xl"
             style={{ top: userPosition.top, right: userPosition.right }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {profileMenuItems.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => { setShowUserDropdown(false); router.push(menuRoutes[item] || '/'); }}
-                className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
-              >
-                {item}
-              </button>
-            ))}
-            <div className="my-1.5 border-t border-gray-100" />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                logout();
-                setShowUserDropdown(false);
-              }}
-              className="flex w-full items-center gap-2 px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
-            >
-              <LogOut size={16} />
-              Sign Out
-            </button>
+            <div className="flex">
+              <div className="w-[170px] py-1.5">
+                {profileMenuItems.map((item, index) => {
+                  const isLastMenuItem = index === profileMenuItems.length - 1;
+                  return (
+                    <React.Fragment key={item}>
+                      <button
+                        type="button"
+                        onClick={() => { setShowUserDropdown(false); router.push(menuRoutes[item] || '/'); }}
+                        className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        {item}
+                      </button>
+                      {isLastMenuItem && <div className="my-1.5 border-t border-gray-300" />}
+                    </React.Fragment>
+                  );
+                })}
+
+                {/*<div className="my-1.5 border-t border-gray-300" />*/}
+                <div
+                  className="relative"
+                  onMouseEnter={handlePlatformServicesEnter}
+                  onMouseLeave={handlePlatformServicesLeave}
+                >
+                  <button
+                    type="button"
+                    className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between"
+                  >
+                    Platform Services
+                    <ChevronDown size={14} className="text-gray-400" />
+                  </button>
+                  {showPlatformServicesSubmenu && (
+                    <div
+                      className="absolute right-full top-0 w-[170px] border-r border-gray-100 bg-white py-1.5 shadow-xl z-50 rounded-l-xl"
+                      onMouseEnter={handlePlatformServicesSubmenuEnter}
+                      onMouseLeave={handlePlatformServicesSubmenuLeave}
+                    >
+                      {platformServicesItems.map((subItem) => (
+                        <button
+                          key={subItem}
+                          type="button"
+                          onClick={() => { setShowUserDropdown(false); router.push(platformServicesRoutes[subItem] || '/'); }}
+                          className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          {subItem}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="relative"
+                  onMouseEnter={handleAIIntelligenceEnter}
+                  onMouseLeave={handleAIIntelligenceLeave}
+                >
+                  <button
+                    type="button"
+                    className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between"
+                  >
+                    AI & Intelligence
+                    <ChevronDown size={14} className="text-gray-400" />
+                  </button>
+                  {showAIIntelligenceSubmenu && (
+                    <div
+                      className="absolute right-full top-0 w-[170px] border-r border-gray-100 bg-white py-1.5 shadow-xl z-50 rounded-l-xl"
+                      onMouseEnter={handleAIIntelligenceSubmenuEnter}
+                      onMouseLeave={handleAIIntelligenceSubmenuLeave}
+                    >
+                      {aiIntelligenceItems.map((subItem) => (
+                        <button
+                          key={subItem}
+                          type="button"
+                          onClick={() => { setShowUserDropdown(false); router.push(aiIntelligenceRoutes[subItem] || '/'); }}
+                          className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          {subItem}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="my-1.5 border-t border-gray-300" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    logout();
+                    setShowUserDropdown(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
+              </div>
+            </div>
           </div>,
           document.body
         )}
