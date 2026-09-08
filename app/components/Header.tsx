@@ -9,6 +9,32 @@ import HeaderMenuSearch from '@/app/components/HeaderMenuSearch';
 import type { MenuItem } from '@/app/data/menuItems';
 import type { MenuSearchEntry } from '@/app/data/menuSearch';
 
+const platformServicesItems = [
+  'RBAC',
+  'Workflow',
+  'Notification',
+  'Template',
+  'Scheduler',
+  'Document',
+  'Integration',
+  'Audit',
+  'Event Bus',
+] as const;
+
+const aiIntelligenceItems = [
+  'AI Providers',
+  'Model Management',
+  'Prompt Management',
+  'AI Policies',
+  'Agent Management',
+  'Knowledge & RAG',
+  'Recommendation Engine',
+  'Knowledge Graph',
+  'AI Evaluation',
+  'Usage & Cost',
+  'AI Audit',
+] as const;
+
 const profileMenuItems = [
   'Implementation',
   'Onboarding',
@@ -55,6 +81,10 @@ export default function Header({
   const [showTermDropdown, setShowTermDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userPosition, setUserPosition] = useState<{ top: number; right: number } | null>(null);
+  const [showPlatformServicesSubmenu, setShowPlatformServicesSubmenu] = useState(false);
+  const [showAIIntelligenceSubmenu, setShowAIIntelligenceSubmenu] = useState(false);
+  const platformServicesHoverTimeout = useRef<NodeJS.Timeout>();
+  const aiIntelligenceHoverTimeout = useRef<NodeJS.Timeout>();
 
   const menuRoutes: Record<string, string> = {
     'Implementation': '/general/implementation_management',
@@ -64,6 +94,32 @@ export default function Header({
     'Group-wise Rights': '/general/groupwise_rights',
     'Individual Rights': '/general/individual_rights',
     'Mobile App Rights': '/general/mobile_app_rights',
+  };
+
+  const platformServicesRoutes: Record<string, string> = {
+    'RBAC': '/general/coming-soon?module=RBAC',
+    'Workflow': '/general/coming-soon?module=Workflow',
+    'Notification': '/general/coming-soon?module=Notification',
+    'Template': '/general/coming-soon?module=Template',
+    'Scheduler': '/general/coming-soon?module=Scheduler',
+    'Document': '/general/coming-soon?module=Document',
+    'Integration': '/general/coming-soon?module=Integration',
+    'Audit': '/general/coming-soon?module=Audit',
+    'Event Bus': '/general/coming-soon?module=Event Bus',
+  };
+
+  const aiIntelligenceRoutes: Record<string, string> = {
+    'AI Providers': '/general/coming-soon?module=AI Providers',
+    'Model Management': '/general/coming-soon?module=Model Management',
+    'Prompt Management': '/general/coming-soon?module=Prompt Management',
+    'AI Policies': '/general/coming-soon?module=AI Policies',
+    'Agent Management': '/general/coming-soon?module=Agent Management',
+    'Knowledge & RAG': '/general/coming-soon?module=Knowledge & RAG',
+    'Recommendation Engine': '/general/coming-soon?module=Recommendation Engine',
+    'Knowledge Graph': '/general/coming-soon?module=Knowledge Graph',
+    'AI Evaluation': '/general/coming-soon?module=AI Evaluation',
+    'Usage & Cost': '/general/coming-soon?module=Usage & Cost',
+    'AI Audit': '/general/coming-soon?module=AI Audit',
   };
 
   // Seeded only from what this browser last chose. Anything else is adopted from
@@ -195,6 +251,48 @@ export default function Header({
     setShowUserDropdown(prev => !prev);
   };
 
+  const handlePlatformServicesEnter = () => {
+    clearTimeout(platformServicesHoverTimeout.current);
+    setShowPlatformServicesSubmenu(true);
+  };
+
+  const handlePlatformServicesLeave = () => {
+    platformServicesHoverTimeout.current = setTimeout(() => {
+      setShowPlatformServicesSubmenu(false);
+    }, 150);
+  };
+
+  const handlePlatformServicesSubmenuEnter = () => {
+    clearTimeout(platformServicesHoverTimeout.current);
+  };
+
+  const handlePlatformServicesSubmenuLeave = () => {
+    platformServicesHoverTimeout.current = setTimeout(() => {
+      setShowPlatformServicesSubmenu(false);
+    }, 150);
+  };
+
+  const handleAIIntelligenceEnter = () => {
+    clearTimeout(aiIntelligenceHoverTimeout.current);
+    setShowAIIntelligenceSubmenu(true);
+  };
+
+  const handleAIIntelligenceLeave = () => {
+    aiIntelligenceHoverTimeout.current = setTimeout(() => {
+      setShowAIIntelligenceSubmenu(false);
+    }, 150);
+  };
+
+  const handleAIIntelligenceSubmenuEnter = () => {
+    clearTimeout(aiIntelligenceHoverTimeout.current);
+  };
+
+  const handleAIIntelligenceSubmenuLeave = () => {
+    aiIntelligenceHoverTimeout.current = setTimeout(() => {
+      setShowAIIntelligenceSubmenu(false);
+    }, 150);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -207,6 +305,13 @@ export default function Header({
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(platformServicesHoverTimeout.current);
+      clearTimeout(aiIntelligenceHoverTimeout.current);
+    };
   }, []);
 
   // The shell owns menu navigation, because opening a screen also has to move
@@ -336,33 +441,108 @@ export default function Header({
         
         {showUserDropdown && userPosition && typeof document !== 'undefined' && createPortal(
           <div
-            className="fixed z-[9999] w-[210px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl"
+            className="fixed z-[9999] rounded-xl border border-gray-200 bg-white shadow-xl"
             style={{ top: userPosition.top, right: userPosition.right }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {profileMenuItems.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => { setShowUserDropdown(false); router.push(menuRoutes[item] || '/'); }}
-                className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
-              >
-                {item}
-              </button>
-            ))}
-            <div className="my-1.5 border-t border-gray-100" />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                logout();
-                setShowUserDropdown(false);
-              }}
-              className="flex w-full items-center gap-2 px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
-            >
-              <LogOut size={16} />
-              Sign Out
-            </button>
+            <div className="flex">
+              <div className="w-[170px] py-1.5">
+                {profileMenuItems.map((item, index) => {
+                  const isLastMenuItem = index === profileMenuItems.length - 1;
+                  return (
+                    <React.Fragment key={item}>
+                      <button
+                        type="button"
+                        onClick={() => { setShowUserDropdown(false); router.push(menuRoutes[item] || '/'); }}
+                        className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        {item}
+                      </button>
+                      {isLastMenuItem && <div className="my-1.5 border-t border-gray-300" />}
+                    </React.Fragment>
+                  );
+                })}
+
+                {/*<div className="my-1.5 border-t border-gray-300" />*/}
+                <div
+                  className="relative"
+                  onMouseEnter={handlePlatformServicesEnter}
+                  onMouseLeave={handlePlatformServicesLeave}
+                >
+                  <button
+                    type="button"
+                    className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between"
+                  >
+                    Platform Services
+                    <ChevronDown size={14} className="text-gray-400" />
+                  </button>
+                  {showPlatformServicesSubmenu && (
+                    <div
+                      className="absolute right-full top-0 w-[170px] border-r border-gray-100 bg-white py-1.5 shadow-xl z-50 rounded-l-xl"
+                      onMouseEnter={handlePlatformServicesSubmenuEnter}
+                      onMouseLeave={handlePlatformServicesSubmenuLeave}
+                    >
+                      {platformServicesItems.map((subItem) => (
+                        <button
+                          key={subItem}
+                          type="button"
+                          onClick={() => { setShowUserDropdown(false); router.push(platformServicesRoutes[subItem] || '/'); }}
+                          className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          {subItem}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="relative"
+                  onMouseEnter={handleAIIntelligenceEnter}
+                  onMouseLeave={handleAIIntelligenceLeave}
+                >
+                  <button
+                    type="button"
+                    className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between"
+                  >
+                    AI & Intelligence
+                    <ChevronDown size={14} className="text-gray-400" />
+                  </button>
+                  {showAIIntelligenceSubmenu && (
+                    <div
+                      className="absolute right-full top-0 w-[170px] border-r border-gray-100 bg-white py-1.5 shadow-xl z-50 rounded-l-xl"
+                      onMouseEnter={handleAIIntelligenceSubmenuEnter}
+                      onMouseLeave={handleAIIntelligenceSubmenuLeave}
+                    >
+                      {aiIntelligenceItems.map((subItem) => (
+                        <button
+                          key={subItem}
+                          type="button"
+                          onClick={() => { setShowUserDropdown(false); router.push(aiIntelligenceRoutes[subItem] || '/'); }}
+                          className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          {subItem}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="my-1.5 border-t border-gray-300" />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    logout();
+                    setShowUserDropdown(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
+              </div>
+            </div>
           </div>,
           document.body
         )}
