@@ -112,7 +112,7 @@ export default function Header({
   };
 
   const platformServicesRoutes: Record<string, string> = {
-    'RBAC': '/general/coming-soon?module=RBAC',
+    'RBAC': '/organization-management/role-and-permissions',
     'Workflow': '/general/coming-soon?module=Workflow',
     'Notification': '/general/coming-soon?module=Notification',
     'Template': '/general/coming-soon?module=Template',
