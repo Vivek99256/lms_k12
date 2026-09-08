@@ -3,6 +3,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { usePermission } from '@/app/hooks/usePermission';
 import {
   ArrowLeft,
   Download,
@@ -192,8 +193,39 @@ const QUESTION_TYPE_API_CONFIG: Record<
 };
 const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
 const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
-const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity'] as const;
-const TEACHER_CONTENT_LIBRARY_TABS = ['All content', 'Presentations'] as const;
+// 'H5P Interactive' sits on the FORMAT axis, alongside Presentations and Videos -
+// not on the audience axis that Classroom vs Teacher Workspace occupies. That is
+// the whole point of tracker row 2 / Decision #35: an interactive item can belong
+// to either audience, so it must not compete with them as a destination.
+/**
+ * Tracker "Content & LMS Architecture" row 2 / Decision #35.
+ *
+ * H5P stops being a 4th top-level destination beside Classroom Resource / Teacher
+ * Workspace / Question Bank and becomes a format filter inside the first two.
+ *
+ * Flip this to true to put the old button back. It exists because a demo cadence is
+ * live and this is the one visible change in Phase A2 - reverting it is a one-line
+ * edit rather than a rollback.
+ *
+ * Note: removing the button loses no reach. Every H5P item in the estate is attached
+ * to a chapter that does not exist in chapter_master, so the button already led to an
+ * empty page for all 120 chapters the catalogue can show. See
+ * next_lms_erp/docs/decisions/2026-09-07-h5p-format-tag.md.
+ */
+const SHOW_LEGACY_H5P_BUTTON = false;
+
+/**
+ * Shown on a control the user's role does not permit.
+ *
+ * Gated controls are DISABLED rather than hidden. 70-80% of teachers are expected
+ * never to hold creation rights, and a silently absent button reads as a broken
+ * product rather than as a permission boundary.
+ */
+const CONTENT_CREATE_DENIED_HINT =
+  'Your role does not include content creation rights. Ask an administrator to enable them.';
+
+const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity', 'H5P Interactive'] as const;
+const TEACHER_CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'H5P Interactive'] as const;
 
 const UPLOAD_TYPE_CONFIG: Record<
   (typeof UPLOAD_CONTENT_TYPES)[number],
@@ -252,7 +284,7 @@ const UPLOAD_TYPE_CONFIG: Record<
   },
 };
 
-type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity';
+type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity' | 'H5P Interactive';
 type ChapterContentSource = 'Gamma AI' | 'Uploaded';
 
 /**
@@ -299,6 +331,8 @@ interface ChapterContentItem {
   updatedDate: string;
   updatedAt: string;
   contentUrl?: string;
+  /** Route of the existing H5P editor this item opens in. Only set for H5P items. */
+  deepLink?: string;
   slides: {
     id: string;
     number: number;
@@ -318,6 +352,9 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
     if (contentLabel.includes('teacher training')) return 'Teacher training presentation';
     return 'Classroom presentation';
   }
+  // H5P assets are merged in by H5PContentAdapter with format='h5p' and their own
+  // category, so they are identified by that rather than by guessing from a filename.
+  if (asset.format === 'h5p' || contentCategory === 'h5p interactive') return 'H5P Interactive';
   if (contentLabel.includes('classroom activity')) return 'Classroom activity';
   if (contentLabel.includes('pdf')) return 'PDF';
   return 'Revision notes';
@@ -357,6 +394,9 @@ function buildApiChapterContentItems(
         updatedAt: updatedDate === '—' ? 'Date unavailable' : `updated ${updatedDate}`,
         contentUrl,
         slides: [],
+        // Where an H5P card opens. The existing /h5p/* editors keep all the CRUD,
+        // which is what makes removing the top-level H5P button non-destructive.
+        deepLink: asset.deep_link,
       };
     })
   );
@@ -588,6 +628,7 @@ function getChapterContentType(index: number): ChapterContentType {
 }
 
 function getChapterContentPreview(type: ChapterContentType): ChapterContentPreview {
+  if (type === 'H5P Interactive') return 'video';
   if (type === 'Video') return 'video';
   if (type === 'Revision notes') return 'notes';
   if (type === 'PDF') return 'pdf';
@@ -963,6 +1004,13 @@ export default function ChapterListPage() {
   const [intelligenceError, setIntelligenceError] = useState('');
 
   const view = searchParams?.get('view');
+  // Tracker row 5 / Decision #37. ADVISORY ONLY - this decides whether the control
+  // looks available; the server decides whether the action is allowed, via the
+  // `perm:lms.content,create` middleware on the write route. `undefined` means
+  // "not yet known" (loading, or no token), which is deliberately distinct from
+  // `false` ("denied") so a gated button does not flash disabled on every load.
+  const canCreateContent = usePermission('lms.content', 'create');
+  const contentCreationBlocked = canCreateContent === false;
   const contentResourceType = searchParams?.get('resourceType') === 'teacher' ? 'teacher' : 'classroom';
   const contentResourceLabel = contentResourceType === 'teacher' ? 'Teacher Workspace' : 'Classroom Resource';
   const availableContentLibraryTabs =
@@ -1356,23 +1404,32 @@ export default function ChapterListPage() {
           .includes(contentSearch.toLowerCase());
       const matchesSource = contentSourceFilter === 'all' || item.source === contentSourceFilter;
 
+      // H5P carries no audience signal in any h5p_* table, and the tracker asks for it
+      // to be reachable "inside Classroom Resource AND Teacher Resource". So it is shown
+      // on both surfaces rather than being assigned an audience we cannot evidence.
+      const isAudienceNeutral = item.type === 'H5P Interactive';
       const isTeacherTraining = isTeacherTrainingContent(item);
       // Teacher Workspace only ever shows Teacher Training content; Classroom
       // Resources never shows it.
       const matchesResourceType =
-        contentResourceType === 'teacher' ? isTeacherTraining : !isTeacherTraining;
+        isAudienceNeutral || (contentResourceType === 'teacher' ? isTeacherTraining : !isTeacherTraining);
 
+      // One tab predicate for both surfaces.
+      //
+      // Teacher Workspace previously short-circuited to `true`, so its tab strip
+      // rendered but filtered nothing - "All content" and "Presentations" returned
+      // an identical list. That was invisible while both tabs were near-synonyms,
+      // but it silently breaks the H5P tab, which has to actually filter to be worth
+      // anything. Presentations therefore now means presentations on both surfaces.
       const matchesTab =
-        contentResourceType === 'teacher'
-          ? // In Teacher Workspace, both "All content" and "Presentations" surface
-            // every Teacher Training item regardless of its underlying type.
-            true
-          : activeContentLibraryTab === 'All content' ||
-            (activeContentLibraryTab === 'Presentations' && item.type === 'Classroom presentation') ||
-            (activeContentLibraryTab === 'Videos' && item.type === 'Video') ||
-            (activeContentLibraryTab === 'Revision notes' &&
-              (item.type === 'Revision notes' || item.type === 'PDF')) ||
-             (activeContentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity');
+        activeContentLibraryTab === 'All content' ||
+        (activeContentLibraryTab === 'Presentations' &&
+          (item.type === 'Classroom presentation' || item.type === 'Teacher training presentation')) ||
+        (activeContentLibraryTab === 'Videos' && item.type === 'Video') ||
+        (activeContentLibraryTab === 'Revision notes' &&
+          (item.type === 'Revision notes' || item.type === 'PDF')) ||
+        (activeContentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity') ||
+        (activeContentLibraryTab === 'H5P Interactive' && item.type === 'H5P Interactive');
 
       return matchesSearch && matchesSource && matchesResourceType && matchesTab;
     });
@@ -1840,7 +1897,9 @@ export default function ChapterListPage() {
         <Button
           type="button"
           onClick={() => openGenerateQuestionsModal(chapter, conceptTitle, conceptIndex)}
-          className="h-9 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] hover:bg-[#4338ca]"
+          disabled={contentCreationBlocked}
+          title={contentCreationBlocked ? CONTENT_CREATE_DENIED_HINT : undefined}
+          className="h-9 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
         >
           <Sparkles size={16} className="mr-2" />
           Generate Questions
@@ -1850,6 +1909,14 @@ export default function ChapterListPage() {
   );
 
   const handleOpenContent = (item: ChapterContentItem) => {
+    // An H5P item is not a file - it is a route. It opens in its existing editor
+    // in-app, which is what keeps all the H5P CRUD reachable now that H5P is a
+    // filter value rather than a top-level destination (tracker row 2).
+    if (item.deepLink) {
+      router.push(item.deepLink);
+      return;
+    }
+
     if (!item.contentUrl) return;
 
     window.open(item.contentUrl, '_blank', 'noopener,noreferrer');
@@ -4290,7 +4357,9 @@ export default function ChapterListPage() {
                   <Button
                     type="button"
                     onClick={openGeneratePresentationDrawer}
-                    className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
+                    disabled={contentCreationBlocked}
+                    title={contentCreationBlocked ? CONTENT_CREATE_DENIED_HINT : undefined}
+                    className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                   >
                     <Sparkles size={16} className="mr-2" />
                     Generate content
@@ -4299,7 +4368,9 @@ export default function ChapterListPage() {
                     type="button"
                     variant="outline"
                     onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
-                    className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    disabled={contentCreationBlocked}
+                    title={contentCreationBlocked ? CONTENT_CREATE_DENIED_HINT : undefined}
+                    className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Upload size={16} className="mr-2" />
                     Upload content
@@ -4939,26 +5010,28 @@ export default function ChapterListPage() {
                       <Database size={16} className="mr-2" />
                       Question Bank
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        router.push(
-                          `/h5p/html_contents?${new URLSearchParams({
-                            chapter_id: String(chapter.id),
-                            subject_id: String(subjectData?.subject?.subject_id ?? subjectId),
-                            standard_id: String(subjectData?.subject?.standard_id ?? standardId ?? ''),
-                            chapter_name: chapter.title,
-                            subject_name: subjectData?.subject?.subject_name ?? course.subject,
-                            standard_name: subjectData?.subject?.standard_name ?? getCourseGradeLabel(course.classGrade),
-                          }).toString()}`
-                        )
-                      }
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <Layers3 size={16} className="mr-2" />
-                      H5P Content
-                    </Button>
+                    {SHOW_LEGACY_H5P_BUTTON && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          router.push(
+                            `/h5p/html_contents?${new URLSearchParams({
+                              chapter_id: String(chapter.id),
+                              subject_id: String(subjectData?.subject?.subject_id ?? subjectId),
+                              standard_id: String(subjectData?.subject?.standard_id ?? standardId ?? ''),
+                              chapter_name: chapter.title,
+                              subject_name: subjectData?.subject?.subject_name ?? course.subject,
+                              standard_name: subjectData?.subject?.standard_name ?? getCourseGradeLabel(course.classGrade),
+                            }).toString()}`
+                          )
+                        }
+                        className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <Layers3 size={16} className="mr-2" />
+                        H5P Content
+                      </Button>
+                    )}
                   </div>
 
                   {isExpanded && chapterConceptRows.length > 0 && (
