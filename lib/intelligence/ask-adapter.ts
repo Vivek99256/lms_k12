@@ -7,13 +7,20 @@ import type {
 } from "./types";
 
 /**
- * Renders a governed `/ask` answer into the shape the assistant panel already speaks.
+ * Renders a governed `/ask` answer into the shape the assistant panel already speaks —
+ * whether the turn has finished or is still arriving.
  *
- * This exists so the two AI stacks can become one without a flag day. The panel was
- * built against the model-driven `/api/ai/chat` route and knows its response shape
- * intimately — bubbles, follow-up chips, citations, a navigation hand-off. Rewriting
- * all of that at the same time as changing which backend answers would mean two
- * risky changes landing together, with no way to tell which one broke a reply.
+ * Two entry points, one composition. `toChatShapedReply` draws a finished turn from
+ * the backend's whole result; `toStreamingReply` draws the same shape from whatever
+ * has arrived so far, so a turn is watchable while it runs rather than appearing whole
+ * at the end. Everything below the two — how a section becomes text, which tools count
+ * as sources, what a blocked stage means — is shared, because a partial turn drawn by
+ * different rules than a finished one would change appearance at the moment it
+ * completed, and a reader would have no way to tell a re-render from a new fact.
+ *
+ * The panel retains its established reply shape — bubbles, follow-up chips, citations
+ * and a navigation hand-off — while Laravel owns the answer. Rewriting rendering and
+ * transport together would make a regression impossible to attribute.
  *
  * So the transport changes and the render does not. A turn answered by the twelve-stage
  * pipeline arrives at the panel looking like a turn it already knows how to draw, and
@@ -33,7 +40,7 @@ import type {
  *     that makes the sections worth having.
  */
 
-/** What the panel consumes. Mirrors the `/api/ai/chat` response shape. */
+/** What the panel consumes from the Laravel lifecycle transport. */
 export interface ChatShapedReply {
   message: { id: string; content: string };
   response: {
@@ -54,6 +61,30 @@ export interface ChatShapedReply {
       depthReached?: number;
       /** Present so the panel can render the ladder beside the reply. */
       lifecycleTrace?: TraceStage[];
+      /**
+       * The answer's sections, structured, exactly as the backend composed them.
+       *
+       * `message` above is the same content flattened to text, and for a long time it
+       * was the *only* thing that crossed this boundary — which is why the panel could
+       * only ever render a wall of prose. A `records` section arrived as bullet points
+       * and a `key_values` section as "- label: value", so a ranked list of students
+       * could not become a table and a percentage could not become a progress bar: the
+       * structure was destroyed here, one layer before the component that needed it.
+       *
+       * Both now travel. The text remains the fallback and the thing worth storing in
+       * a transcript; these are what the panel draws when it can.
+       */
+      sections?: AnswerSection[];
+      /**
+       * The records this turn touched, keyed by kind — `enquiry_id`, `student_id`,
+       * `case_id`, `recommendation_id`, `workflow_run_id`.
+       *
+       * The backend deliberately does not know this application's routes, so it names
+       * *which record* rather than *which page*. Turning that into a destination is the
+       * panel's job, and keeping the split means renaming a route never becomes a
+       * backend deploy.
+       */
+      links?: Record<string, unknown>;
     };
   };
   /**
@@ -222,11 +253,12 @@ export function toChatShapedReply(result: AskResult, messageId: string): ChatSha
   const trace =
     result.lifecycle_trace?.length ? result.lifecycle_trace : result.trace ?? [];
   const moduleKey = result.module?.key;
+  const content = renderAnswer(result.answer);
 
   return {
-    message: { id: messageId, content: renderAnswer(result.answer) },
+    message: { id: messageId, content },
     response: {
-      message: renderAnswer(result.answer),
+      message: content,
       status: statusFrom(trace),
       conversationType: result.intent?.key ?? "unknown",
       activeTools: executedTools(trace),
@@ -237,8 +269,106 @@ export function toChatShapedReply(result: AskResult, messageId: string): ChatSha
         pipeline: result.pipeline,
         depthReached: result.depth_reached,
         lifecycleTrace: trace,
+        sections: result.answer.sections ?? [],
+        links: result.links ?? {},
       },
     },
     actions: result.answer.actions ?? [],
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* A turn that has not finished yet                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What a turn has produced so far.
+ *
+ * The backend reports each lifecycle stage as it completes and, for a generated
+ * answer, each token as it arrives. Both are partial views of the same turn, and this
+ * is what the panel has to draw from until `done`.
+ */
+export interface StreamingTurn {
+  messageId: string;
+  /** The answer text that has arrived. Empty for a turn still choosing its tools. */
+  text: string;
+  /** The stages that have reported, in ladder order. */
+  stages: TraceStage[];
+}
+
+/** The status of a turn that is still running. Not an outcome — a state. */
+export const STREAMING_STATUS = "streaming";
+
+/**
+ * Render a turn that is still arriving.
+ *
+ * The point of this function is that a lifecycle turn is *watchable*. A cohort scan
+ * reads three detectors across a live database and takes real seconds; showing a
+ * spinner for all of them and then the finished ladder hides the one thing a person
+ * most wants to see, which is the agent working. So the same composition that draws a
+ * finished turn also draws an unfinished one, and the ladder fills in row by row.
+ *
+ * What it deliberately does NOT do is offer anything to act on. Actions and follow-up
+ * chips stay empty until the turn is finished, because an Approve button rendered from
+ * a half-built trace would let somebody approve a recommendation the pipeline has not
+ * finished drafting. Sources, by contrast, appear the moment the MCP stage reports:
+ * they describe what has already happened, so showing them early is honest.
+ */
+export function toStreamingReply(turn: StreamingTurn): ChatShapedReply {
+  const trace = inLadderOrder(turn.stages);
+
+  return {
+    message: { id: turn.messageId, content: turn.text },
+    response: {
+      message: turn.text,
+      // A stage that blocked has already decided the turn, even mid-stream — that is
+      // a refusal the reader should see now rather than at the end.
+      status: trace.some((stage) => stage.status === "blocked")
+        ? statusFrom(trace)
+        : STREAMING_STATUS,
+      conversationType: "unknown",
+      activeTools: executedTools(trace),
+      followUpSuggestions: [],
+      // The module is settled by the backend and travels with the finished answer, so
+      // citations are labelled by tool alone until then.
+      citations: citationsFrom(trace),
+      data: { lifecycleTrace: trace },
+    },
+    actions: [],
+  };
+}
+
+/**
+ * A finished reply, with the streamed ladder kept if the backend sent none.
+ *
+ * The settled trace is the backend's final word and normally wins outright. But a turn
+ * can finish carrying an empty one — the previous pipeline did exactly that — and
+ * discarding rows the reader has been watching fill in, to replace them with nothing,
+ * is the worst of both. So the streamed ladder is the floor, never an override.
+ */
+export function withStreamedTrace(
+  reply: ChatShapedReply,
+  streamed: TraceStage[]
+): ChatShapedReply {
+  if (reply.response.data.lifecycleTrace?.length || streamed.length === 0) {
+    return reply;
+  }
+
+  return {
+    ...reply,
+    response: {
+      ...reply.response,
+      data: { ...reply.response.data, lifecycleTrace: inLadderOrder(streamed) },
+    },
+  };
+}
+
+/**
+ * Stages by their own position in the ladder, not by arrival.
+ *
+ * Stages complete out of order — a stage that reports late must not jump to the bottom
+ * of a ladder somebody is reading by number.
+ */
+function inLadderOrder(stages: TraceStage[]): TraceStage[] {
+  return [...stages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }

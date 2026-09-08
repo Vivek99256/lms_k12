@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
 import { brainFetch, tenantPath, type BrainRow } from '@/lib/brain/api';
 import { useBrainResource } from '../../_components/useBrainResource';
-import { Card, DataTable, ErrorState, LoadingState, Panel, Pill, ScreenHeader } from '../../_components/primitives';
+import { Card, DataTable, ErrorState, LoadingState, Panel, Pill, HeroHeader } from '../../_components/primitives';
 
 interface CapabilityDetail {
   data: BrainRow & {
@@ -103,29 +103,38 @@ export default function CapabilityDetailPage() {
         <ArrowLeft size={14} /> All capabilities
       </button>
 
-      <ScreenHeader
+      <HeroHeader
+        breadcrumb="Enterprise Brain / Foundation / Capabilities"
         title={String(capability.name ?? 'Capability')}
         description={String(capability.description ?? '') || undefined}
-        breadcrumb="Enterprise Brain / Foundation / Capabilities"
-        onRefresh={resource.refresh}
-        refreshing={resource.refreshing}
         actions={
-          <button
-            type="button"
-            onClick={() => {
-              setDraft({
-                name: String(capability.name ?? ''),
-                category: String(capability.category ?? ''),
-                status: String(capability.status ?? ''),
-                criticality: String(capability.criticality ?? ''),
-                description: String(capability.description ?? ''),
-              });
-              setEditing((open) => !open);
-            }}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 hover:text-gray-900"
-          >
-            {editing ? 'Cancel' : 'Edit'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDraft({
+                  name: String(capability.name ?? ''),
+                  category: String(capability.category ?? ''),
+                  status: String(capability.status ?? ''),
+                  criticality: String(capability.criticality ?? ''),
+                  description: String(capability.description ?? ''),
+                });
+                setEditing(true);
+              }}
+              className="rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white"
+            >
+              {editing ? 'Cancel' : 'Edit'}
+            </button>
+            <button
+              type="button"
+              onClick={resource.refresh}
+              disabled={resource.refreshing}
+              className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={resource.refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
         }
       />
 

@@ -29,7 +29,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     setGoogleClientId(
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || ''
+      process.env.NEXT_GOOGLE_CLIENT_ID?.trim() || ''
     );
   }, []);
 
@@ -71,7 +71,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setError('');
     if (!googleClientId) {
-      setError('Google sign-in is not configured. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID and try again.');
+      setError('Google sign-in is not configured. Set NEXT_GOOGLE_CLIENT_ID and try again.');
       return;
     }
 
