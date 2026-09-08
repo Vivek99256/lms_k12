@@ -22,6 +22,7 @@ export type AssignmentSubmissionRow = {
   assignedOn: string;
   submissionDate: string;
   examPdfUrl: string;
+  homeworkFileUrl: string;
   submissionFileUrl: string;
   teacherRemarks: string;
   studentSubmitted: boolean;
@@ -163,6 +164,7 @@ function toSubmission(row: UnknownRecord): AssignmentSubmissionRow {
     assignedOn: readString(row.created_date_fmt),
     submissionDate: readString(row.submission_date_fmt),
     examPdfUrl: readString(row.exam_pdf_url),
+    homeworkFileUrl: readString(row.homework_file_url),
     submissionFileUrl: readString(row.submission_file_url),
     teacherRemarks: readString(row.teacher_remarks),
     studentSubmitted: readString(row.student_submission_status) === "Y",

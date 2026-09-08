@@ -160,9 +160,9 @@ export default function AssignmentSubmissionPage() {
                     <TableCell>{row.assignedOn || "-"}</TableCell>
                     <TableCell>{row.submissionDate || "-"}</TableCell>
                     <TableCell>
-                      {row.examPdfUrl ? (
+                      {(row.examPdfUrl || row.homeworkFileUrl) ? (
                         <a
-                          href={row.examPdfUrl}
+                          href={row.examPdfUrl || row.homeworkFileUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
