@@ -671,7 +671,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     masterLoading={masterMenuLoading}
                     masterMenuGroups={masterMenuGroups}
                     userProfileName={userProfileName}
-                    hideMaster={level3Menu?.hideMaster ?? true}
+                    hideMaster={level3Menu?.hideMaster ?? false}
                   />
                 </div>
               )}
