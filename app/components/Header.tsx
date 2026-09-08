@@ -83,8 +83,8 @@ export default function Header({
   const [userPosition, setUserPosition] = useState<{ top: number; right: number } | null>(null);
   const [showPlatformServicesSubmenu, setShowPlatformServicesSubmenu] = useState(false);
   const [showAIIntelligenceSubmenu, setShowAIIntelligenceSubmenu] = useState(false);
-  const platformServicesHoverTimeout = useRef<NodeJS.Timeout>();
-  const aiIntelligenceHoverTimeout = useRef<NodeJS.Timeout>();
+  const platformServicesHoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const aiIntelligenceHoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const menuRoutes: Record<string, string> = {
     'Implementation': '/general/implementation_management',
