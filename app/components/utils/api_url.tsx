@@ -51,3 +51,24 @@ if (!API_BASE_URL) {
   // Optionally provide a fallback URL or throw an error
   // throw new Error("API_BASE_URL is not configured");
 }
+
+/**
+ * Where the AI backend lives, when that is not where the rest of the ERP lives.
+ *
+ * The assistant, the MCP server and the twelve-stage lifecycle are all served by the
+ * Laravel application in `next_lms_erp`. In a single-host deployment that is the same
+ * origin as every other API call and this resolves to `API_BASE_URL`, which is why it
+ * is a fallback rather than a required variable.
+ *
+ * It exists because those can legitimately be two different hosts, and when they are,
+ * the failure is silent and confusing: the AI host answers every other request
+ * perfectly while returning its own 404 *page* for `/api/ai/*`, so the panel shows a
+ * transport error rather than "this host does not run that backend". Setting this
+ * moves the whole AI surface — panel, reports, MCP tools — to the right origin without
+ * moving anything else.
+ *
+ * `AI_UPSTREAM_BASE_URL` is the server-only counterpart used by the SSE proxy route,
+ * for deployments where the browser-facing and server-to-server URLs differ.
+ */
+export const AI_API_BASE_URL: string =
+  normalizeApiBaseUrl(process.env.NEXT_PUBLIC_AI_BASE_URL) || API_BASE_URL;

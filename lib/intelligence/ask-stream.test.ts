@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { askUiChunks } from "./ask-stream";
+import { askUiChunks, askUiChunksFromResult } from "./ask-stream";
 import type { AskResult, TraceStage } from "./types";
 
 function stage(key: string, order: number): Partial<TraceStage> {
@@ -197,4 +197,63 @@ test("an upstream error is reported once, not twice", async () => {
   ]);
 
   assert.equal(chunks.filter((chunk) => chunk.type === "error").length, 1);
+});
+
+/* -------------------------------------------------------------------------- */
+/* The non-streaming fallback                                                  */
+/* -------------------------------------------------------------------------- */
+/*
+  Exercised because it is the path a deployment takes when the backend predates
+  `/ask/stream` — the live 404 that made the panel render a raw HTML error page. The
+  contract it has to keep is that the panel cannot tell the difference: same ladder,
+  same text, same `data-ask`.
+*/
+
+async function fallbackChunks(result: AskResult) {
+  const chunks: Array<Record<string, unknown>> = [];
+
+  for await (const chunk of askUiChunksFromResult(result)) {
+    chunks.push(chunk as unknown as Record<string, unknown>);
+  }
+
+  return chunks;
+}
+
+test("the JSON fallback yields the same ladder the stream would have", async () => {
+  const chunks = await fallbackChunks(
+    askResult({
+      trace: [stage("conversation", 1), stage("planning", 4)] as TraceStage[],
+    })
+  );
+
+  const stages = chunks.filter((chunk) => chunk.type === "data-stage");
+
+  assert.equal(stages.length, 2);
+  assert.equal(stages[0].id, "stage-conversation");
+  assert.equal(stages[1].id, "stage-planning");
+});
+
+test("the JSON fallback opens, fills and closes exactly one text part", async () => {
+  const chunks = await fallbackChunks(askResult());
+  const types = chunks.map((chunk) => chunk.type);
+
+  assert.equal(types.filter((type) => type === "text-start").length, 1);
+  assert.equal(types.filter((type) => type === "text-end").length, 1);
+  assert.ok(types.indexOf("text-start") < types.indexOf("text-delta"));
+  assert.ok(types.indexOf("text-delta") < types.indexOf("text-end"));
+});
+
+test("the JSON fallback carries the conversation id, so the next turn threads", async () => {
+  const chunks = await fallbackChunks(askResult());
+  const ask = chunks.find((chunk) => chunk.type === "data-ask");
+
+  assert.ok(ask, "the finished reply must be emitted");
+  assert.equal((ask!.data as { conversationId: number }).conversationId, 7);
+});
+
+test("the JSON fallback starts and finishes, so useChat leaves the streaming state", async () => {
+  const chunks = await fallbackChunks(askResult());
+
+  assert.equal(chunks[0].type, "start");
+  assert.equal(chunks[chunks.length - 1].type, "finish");
 });
