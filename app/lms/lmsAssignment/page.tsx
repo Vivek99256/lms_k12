@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import {
   Table,
@@ -31,6 +32,7 @@ import {
   createAssignment,
   listAssignmentStudents,
   listExamPapers,
+  uploadHomeworkFile,
   type AssignmentStudentRow,
   type ExamPaperRow,
 } from "@/app/lms/lmsAssignment/api";
@@ -63,6 +65,9 @@ export default function CreateAssignmentPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [examPapers, setExamPapers] = useState<ExamPaperRow[]>([]);
   const [examPaper, setExamPaper] = useState(""); // packed "<pdfName>####<id>"
+  const [sendHomework, setSendHomework] = useState(false);
+  const [homeworkFile, setHomeworkFile] = useState<File | null>(null);
+  const [homeworkTitle, setHomeworkTitle] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [submissionDate, setSubmissionDate] = useState("");
@@ -150,11 +155,16 @@ export default function CreateAssignmentPage() {
   const validationError = useMemo(() => {
     if (!standard) return "Select a standard.";
     if (!subject) return "Select a subject.";
-    if (!examPaper) return "Select an exam paper.";
-    if (!title.trim()) return "Enter an assignment title.";
+    if (sendHomework) {
+      if (!homeworkFile) return "Upload a homework file.";
+      if (!homeworkTitle.trim()) return "Enter a homework title.";
+    } else {
+      if (!examPaper) return "Select an exam paper.";
+      if (!title.trim()) return "Enter an assignment title.";
+    }
     if (selected.size === 0) return "Select at least one student.";
     return "";
-  }, [standard, subject, examPaper, title, selected.size]);
+  }, [standard, subject, sendHomework, examPaper, homeworkFile, homeworkTitle, title, selected.size]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -164,23 +174,32 @@ export default function CreateAssignmentPage() {
       setError(validationError);
       return;
     }
-    const [pdfName, examId] = examPaper.split("####");
     setSaving(true);
     try {
+      let homeworkFilePath: string | undefined;
+      if (sendHomework && homeworkFile) {
+        homeworkFilePath = await uploadHomeworkFile(homeworkFile);
+      }
+      const [pdfName, examId] = examPaper.split("####");
       const count = await createAssignment({
         studentIds: Array.from(selected),
-        title: title.trim(),
+        title: sendHomework ? homeworkTitle.trim() : title.trim(),
         description: description.trim(),
         submissionDate,
         subjectId: subject,
         examId: examId ?? "",
         examPdf: pdfName ?? "",
+        assignmentSourceType: sendHomework ? "uploaded_homework" : "exam_paper",
+        homeworkFile: homeworkFilePath,
       });
       setSuccess(`Assignment created for ${count} student(s) successfully.`);
       setTitle("");
+      setHomeworkTitle("");
       setDescription("");
       setSubmissionDate("");
       setExamPaper("");
+      setHomeworkFile(null);
+      setSendHomework(false);
       setSelected(new Set());
     } catch (saveError: unknown) {
       setError(
@@ -246,45 +265,77 @@ export default function CreateAssignmentPage() {
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="asg-exam">
-                Exam paper <span className="text-red-500">*</span>
-              </Label>
-              <select
-                id="asg-exam"
-                value={examPaper}
-                onChange={(event) => setExamPaper(event.target.value)}
-                disabled={loadingExams || !subject}
-                className={selectClassName}
-              >
-                <option value="">
-                  {loadingExams
-                    ? "Loading exam papers..."
-                    : !subject
-                      ? "Select a subject first"
-                      : examPapers.length
-                        ? "Select Exam Paper"
-                        : "No offline exam paper found"}
-                </option>
-                {examPapers.map((paper) => (
-                  <option
-                    key={paper.id}
-                    value={`${paper.pdfName}####${paper.id}`}
+              <div className="flex items-center justify-between">
+                <Label htmlFor="asg-source">Send homework from system</Label>
+                <Switch
+                  id="asg-source"
+                  checked={sendHomework}
+                  onChange={(event) => {
+                    setSendHomework(event.target.checked);
+                    if (!event.target.checked) {
+                      setHomeworkFile(null);
+                    }
+                  }}
+                />
+              </div>
+              {sendHomework ? (
+                <div className="space-y-2">
+                  <Label htmlFor="asg-homework-file">
+                    Homework Upload <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="asg-homework-file"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+                    onChange={(event) => setHomeworkFile(event.target.files?.[0] ?? null)}
+                  />
+                  {homeworkFile ? (
+                    <p className="text-xs text-slate-500 truncate">{homeworkFile.name}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="asg-exam">
+                    Exam paper <span className="text-red-500">*</span>
+                  </Label>
+                  <select
+                    id="asg-exam"
+                    value={examPaper}
+                    onChange={(event) => setExamPaper(event.target.value)}
+                    disabled={loadingExams || !subject}
+                    className={selectClassName}
                   >
-                    {paper.paperName}
-                    {paper.totalMarks ? ` (${paper.totalMarks} marks)` : ""}
-                  </option>
-                ))}
-              </select>
+                    <option value="">
+                      {loadingExams
+                        ? "Loading exam papers..."
+                        : !subject
+                          ? "Select a subject first"
+                          : examPapers.length
+                            ? "Select Exam Paper"
+                            : "No offline exam paper found"}
+                    </option>
+                    {examPapers.map((paper) => (
+                      <option
+                        key={paper.id}
+                        value={`${paper.pdfName}####${paper.id}`}
+                      >
+                        {paper.paperName}
+                        {paper.totalMarks ? ` (${paper.totalMarks} marks)` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="asg-title">
-                Title <span className="text-red-500">*</span>
+                {sendHomework ? "Homework Title" : "Title"} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="asg-title"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Assignment title"
+                value={sendHomework ? homeworkTitle : title}
+                onChange={(event) => sendHomework ? setHomeworkTitle(event.target.value) : setTitle(event.target.value)}
+                placeholder={sendHomework ? "Homework title" : "Assignment title"}
                 maxLength={50}
               />
             </div>
@@ -308,9 +359,7 @@ export default function CreateAssignmentPage() {
                   module="lms"
                   page="Assignment"
                   entityType="assignment"
-                  related={{ "Assignment title": title }}
-                  // The field itself caps at 50, so the model is told the same limit
-                  // rather than producing something the form will silently truncate.
+                  related={{ "Assignment title": sendHomework ? homeworkTitle : title }}
                   maxLength={50}
                 />
               </div>

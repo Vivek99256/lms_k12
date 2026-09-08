@@ -115,6 +115,44 @@ async function postJson(path: string, values: UnknownRecord): Promise<UnknownRec
 
 const dataRows = (payload: UnknownRecord): UnknownRecord[] => records(payload.data);
 
+/**
+ * Multipart POST directly to the backend (bypasses the proxy, which serialises
+ * bodies as text and would corrupt binary uploads).
+ */
+async function postMultipart(
+  path: string,
+  build: (form: FormData) => void
+): Promise<UnknownRecord> {
+  const current = session();
+  const { profileName, userName } = profile();
+  const form = new FormData();
+  form.append("type", "API");
+  form.append("sub_institute_id", current.subInstituteId);
+  form.append("syear", current.syear);
+  form.append("user_id", current.userId);
+  form.append("student_id", current.userId);
+  form.append("user_profile_name", profileName);
+  form.append("user_name", userName || "web");
+  build(form);
+  const response = await fetch(`${current.baseUrl}/api/${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      ...(current.token ? { Authorization: `Bearer ${current.token}` } : {}),
+    },
+    body: form,
+  });
+  const payload: unknown = await response.json().catch(() => null);
+  if (
+    !response.ok ||
+    (isRecord(payload) &&
+      ["0", "2"].includes(normalizeApiStatus(payload as ApiEnvelope)))
+  ) {
+    throw new Error(message(payload, `Request failed (${response.status}).`));
+  }
+  return isRecord(payload) ? payload : {};
+}
+
 // ---------------------------------------------------------------------------
 // Mappers
 // ---------------------------------------------------------------------------
@@ -176,6 +214,8 @@ export async function createAssignment(input: {
   subjectId: string;
   examId: string;
   examPdf: string;
+  assignmentSourceType?: "exam_paper" | "uploaded_homework";
+  homeworkFile?: string;
 }): Promise<number> {
   const payload = await postJson("lms-assignment/store", {
     students: input.studentIds.join(","),
@@ -185,6 +225,19 @@ export async function createAssignment(input: {
     subject_id: input.subjectId,
     exam_id: input.examId,
     exam_pdf: input.examPdf,
+    assignment_source_type: input.assignmentSourceType ?? "exam_paper",
+    homework_file: input.homeworkFile ?? null,
   });
   return readNumber(payload.count) || records(payload.assignment_ids).length || input.studentIds.length;
+}
+
+export async function uploadHomeworkFile(file: File): Promise<string> {
+  const payload = await postMultipart("lms-assignment/upload-homework", (form) => {
+    form.append("homework_file", file);
+  });
+  const filePath = readString(payload.file_path);
+  if (!filePath) {
+    throw new Error("Server did not return a file path.");
+  }
+  return filePath;
 }
