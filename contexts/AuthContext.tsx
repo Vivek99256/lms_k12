@@ -167,7 +167,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: String(getValue(data, 'name') ?? getValue(payload, 'name') ?? (fallbackEmail ? fallbackEmail.split('@')[0] : 'User')),
         email: String(getValue(data, 'email') ?? getValue(payload, 'email') ?? fallbackEmail),
         avatar: typeof avatar === 'string' ? avatar : undefined,
-        avatar: (getValue(data, 'avatar') as string | undefined) ?? (getValue(payload, 'avatar') as string | undefined),
       };
       setUser(userData);
       setIsAuthenticated(true);
