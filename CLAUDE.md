@@ -95,6 +95,20 @@ A 2026 pass benchmarked the system against the interaction quality of modern ent
 - **CommandPalette** (`navigation`) — the global **⌘K / Ctrl-K** command + jump-to surface anticipated by the spec ("global command/search entry point," foundation §11; `TopbarNav` future-reuse: "command palette"). Type to filter across 15 modules, ↑/↓ to move, ↵ to run. The single biggest modern-enterprise premium signal; pairs with global search.
 - **AssistantPanel** + **AssistantLauncher** (`communication`) — a docked **AI copilot / agent** surface (right dock) with chat thread, suggestion chips, typing indicator and composer, plus a floating agent rail for the collapsed state. This is a **genuinely new capability** — the source spec predates the product's AI direction and has no assistant/copilot surface — modelled on Gamma / Notion AI / Intercom, rebuilt in the enterprise language (flat surfaces, hairlines, brand indigo, no glass). *Requested by the product team.*
 
+  **These are presentation components — they contain no AI.** The shipped assistant is
+  `app/components/ChatbotPanel.tsx`, and every turn it takes is answered by Laravel's
+  governed twelve-stage lifecycle, not by a model in this app. The panel sends a
+  question to `/api/ai/ask/stream` — a thin proxy that translates Laravel's SSE into
+  the AI SDK's UI message protocol — and renders what comes back: the answer text as
+  it streams, the lifecycle ladder filling in stage by stage, the sources each claim
+  rests on, and any action the turn is asking a person to approve. Approving is a
+  question like any other, carrying the id of the record it applies to, so a button
+  and a typed sentence go down the same audited path.
+
+  What that means when reusing these components: they take content and emit events.
+  Do not give them a model, a tool list, or a key. See
+  `docs/universal-conversational-ai-platform.md` §9.
+
 All five honour keyboard nav, visible focus, and `prefers-reduced-motion`. Live demos: the **Motion → Premium Interactions** card, the three new **Components** cards (Module tab bar, Command palette, Assistant), and the **Admin console** UI kit, which wires the ModuleTabBar under the top bar, the ⌘K palette, and the docked assistant together.
 
 ## Iconography

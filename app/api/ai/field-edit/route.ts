@@ -2,7 +2,7 @@ import { generateText } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { createAiModel } from "@shared/conversational-ai-core/model";
+import { createLocalAiModel } from "@/lib/ai/local-model";
 import { instructionForAction } from "@/lib/ai/field-edit/actions";
 import {
   FIELD_EDIT_SYSTEM_PROMPT,
@@ -23,8 +23,16 @@ import {
  * presses Apply and then Save. That separation is what keeps the feature additive —
  * an AI failure can never corrupt a record on its own.
  *
- * Error shape mirrors `app/api/ai/chat` ({ error, code, detail, retryAfterSeconds })
- * so surfaces already handling chat failures need no new branches.
+ * This is the one intentionally local model call. Laravel owns conversational and
+ * data-aware AI, but field editing is a stateless text transformation: it receives
+ * only the user's draft plus bounded display context, reads no ERP data, invokes no
+ * tools, persists nothing, and requires an immediate one-value response. There is no
+ * Laravel field-edit contract to proxy today; adding an ad-hoc lifecycle turn would
+ * make a form helper appear to have inspected school records when it has not.
+ *
+ * If Laravel gains a dedicated, equally narrow field-edit endpoint, replace this call
+ * with a proxy. Until then, keeping the prompt and output guards beside the UI contract
+ * is the safer, explicitly scoped exception to the single conversational AI path.
  */
 
 export const runtime = "nodejs";
@@ -138,7 +146,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const model = createAiModel();
+  const model = createLocalAiModel();
 
   try {
     const { text } = await generateText({
