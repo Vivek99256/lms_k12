@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Search } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import { fetchScreen } from '@/lib/brain/api';
 import { useBrainResource } from './useBrainResource';
 import {
-  BreakdownBars, Card, DataTable, ErrorState, LoadingState, MetricTiles, Panel, ScreenHeader,
+  BreakdownBars, Card, DataTable, ErrorState, LoadingState, MetricTiles, Panel, HeroHeader,
 } from './primitives';
 
 /**
@@ -43,30 +43,39 @@ export default function ScreenView({ screen, searchable = false }: { screen: str
 
   return (
     <div className="pb-8">
-      <ScreenHeader
+      <HeroHeader
+        breadcrumb={`Enterprise Brain / ${data.sectionLabel}`}
         title={data.title}
         description={data.description}
-        breadcrumb={`Enterprise Brain / ${data.sectionLabel}`}
-        onRefresh={resource.refresh}
-        refreshing={resource.refreshing}
         actions={
-          searchable ? (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                setApplied(search.trim());
-              }}
-              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5"
+          <div className="flex items-center gap-2">
+            {searchable ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setApplied(search.trim());
+                }}
+                className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-1.5"
+              >
+                <Search size={14} className="text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search this screen"
+                  className="w-48 bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-500"
+                />
+              </form>
+            ) : null}
+            <button
+              type="button"
+              onClick={resource.refresh}
+              disabled={resource.refreshing}
+              className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-60"
             >
-              <Search size={14} className="text-gray-400" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search this screen"
-                className="w-48 bg-transparent text-sm outline-none placeholder:text-gray-400"
-              />
-            </form>
-          ) : null
+              <RefreshCw size={14} className={resource.refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
         }
       />
 

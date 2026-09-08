@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, RefreshCw } from 'lucide-react';
 import { fetchSection } from '@/lib/brain/api';
 import { BRAIN_SECTIONS } from '@/lib/brain/navigation';
 import { useBrainResource } from './useBrainResource';
-import { Card, ErrorState, LoadingState, ScreenHeader } from './primitives';
+import { Card, ErrorState, LoadingState, HeroHeader } from './primitives';
 
 /**
  * A section landing page: every screen in the section with its live counts, so
@@ -28,12 +28,21 @@ export default function SectionView({ section }: { section: string }) {
 
   return (
     <div className="pb-8">
-      <ScreenHeader
+      <HeroHeader
+        breadcrumb="Enterprise Brain"
         title={data.label}
         description={nav?.description}
-        breadcrumb="Enterprise Brain"
-        onRefresh={resource.refresh}
-        refreshing={resource.refreshing}
+        actions={
+          <button
+            type="button"
+            onClick={resource.refresh}
+            disabled={resource.refreshing}
+            className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={resource.refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        }
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
