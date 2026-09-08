@@ -16,7 +16,9 @@ export function useBrainResource<T>(load: () => Promise<T>, deps: unknown[]) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // The dependency list is the caller's, so it cannot be an array literal here;
+  // that is the whole point of a shared loader hook.
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/use-memo
   const run = useCallback(load, deps);
 
   const fetchNow = useCallback(
@@ -36,7 +38,11 @@ export function useBrainResource<T>(load: () => Promise<T>, deps: unknown[]) {
     [run],
   );
 
+  // Fetching on mount is exactly the "subscribe to an external system" case the
+  // rule carves out; the setState calls it flags are the loading flag and the
+  // resolved payload, which is what a data hook is for.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchNow(false);
   }, [fetchNow]);
 
