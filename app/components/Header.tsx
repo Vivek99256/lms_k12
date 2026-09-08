@@ -35,6 +35,21 @@ const aiIntelligenceItems = [
   'AI Audit',
 ] as const;
 
+function LogoImage({ url, fallback }: { url: string; fallback: React.ReactNode }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) return <>{fallback}</>;
+
+  return (
+    <img
+      src={url}
+      alt="Logo"
+      className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
 const profileMenuItems = [
   'Implementation',
   'Onboarding',
@@ -196,11 +211,10 @@ export default function Header({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTerm]);
 
-  const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
-  const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);
-  const [hasLogoError, setHasLogoError] = useState(false);
+const [yearPosition, setYearPosition] = useState<{ top: number; left: number } | null>(null);
+const [termPosition, setTermPosition] = useState<{ top: number; left: number } | null>(null);
 
-  const logoUrl = (() => {
+const logoUrl = (() => {
     if (typeof window === 'undefined') return null;
     try {
       const stored = localStorage.getItem('userData');
@@ -217,9 +231,6 @@ export default function Header({
     return null;
   })();
 
-  useEffect(() => {
-    setHasLogoError(false);
-  }, [logoUrl]);
   // Only the institute's own values are offered. A stored selection that is no
   // longer in its data stays visible until the effects above replace it, so the
   // switcher never goes blank mid-swap.
@@ -252,7 +263,7 @@ export default function Header({
   };
 
   const handlePlatformServicesEnter = () => {
-    clearTimeout(platformServicesHoverTimeout.current);
+    if (platformServicesHoverTimeout.current) clearTimeout(platformServicesHoverTimeout.current);
     setShowPlatformServicesSubmenu(true);
   };
 
@@ -263,7 +274,7 @@ export default function Header({
   };
 
   const handlePlatformServicesSubmenuEnter = () => {
-    clearTimeout(platformServicesHoverTimeout.current);
+    if (platformServicesHoverTimeout.current) clearTimeout(platformServicesHoverTimeout.current);
   };
 
   const handlePlatformServicesSubmenuLeave = () => {
@@ -273,7 +284,7 @@ export default function Header({
   };
 
   const handleAIIntelligenceEnter = () => {
-    clearTimeout(aiIntelligenceHoverTimeout.current);
+    if (aiIntelligenceHoverTimeout.current) clearTimeout(aiIntelligenceHoverTimeout.current);
     setShowAIIntelligenceSubmenu(true);
   };
 
@@ -284,7 +295,7 @@ export default function Header({
   };
 
   const handleAIIntelligenceSubmenuEnter = () => {
-    clearTimeout(aiIntelligenceHoverTimeout.current);
+    if (aiIntelligenceHoverTimeout.current) clearTimeout(aiIntelligenceHoverTimeout.current);
   };
 
   const handleAIIntelligenceSubmenuLeave = () => {
@@ -309,8 +320,8 @@ export default function Header({
 
   useEffect(() => {
     return () => {
-      clearTimeout(platformServicesHoverTimeout.current);
-      clearTimeout(aiIntelligenceHoverTimeout.current);
+      if (platformServicesHoverTimeout.current) clearTimeout(platformServicesHoverTimeout.current);
+      if (aiIntelligenceHoverTimeout.current) clearTimeout(aiIntelligenceHoverTimeout.current);
     };
   }, []);
 
@@ -417,14 +428,15 @@ export default function Header({
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-3 cursor-pointer" ref={userButtonRef} onClick={handleUserToggle}>
-            {logoUrl && !hasLogoError ? (
-              <img 
-                src={logoUrl} 
-                alt="Logo" 
-                className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white object-contain" 
-                onError={() => {
-                  setHasLogoError(true);
-                }}
+            {logoUrl ? (
+              <LogoImage
+                key={logoUrl}
+                url={logoUrl}
+                fallback={
+                  <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
+                    {user?.name?.charAt(0).toUpperCase() || 'S'}
+                  </div>
+                }
               />
             ) : (
               <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
