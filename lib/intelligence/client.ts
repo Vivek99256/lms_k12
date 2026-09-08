@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/app/components/utils/api_url";
+import { AI_API_BASE_URL } from "@/app/components/utils/api_url";
 import type {
   AgentRunResult,
   AiEnvelope,
@@ -46,7 +46,7 @@ export interface IntelligenceContext {
 }
 
 function normalizeBaseUrl(baseUrl?: string | null) {
-  return (baseUrl || API_BASE_URL || "").trim().replace(/\/$/, "");
+  return (baseUrl || AI_API_BASE_URL || "").trim().replace(/\/$/, "");
 }
 
 function buildHeaders(context: IntelligenceContext, extra?: HeadersInit): HeadersInit {

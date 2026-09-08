@@ -162,9 +162,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY_MENU, JSON.stringify(ctx));
 
       const fallbackEmail = String(getValue(data, 'email') ?? getValue(payload, 'email') ?? '');
+      const avatar = getValue(data, 'avatar') ?? getValue(payload, 'avatar');
       const userData = {
         name: String(getValue(data, 'name') ?? getValue(payload, 'name') ?? (fallbackEmail ? fallbackEmail.split('@')[0] : 'User')),
         email: String(getValue(data, 'email') ?? getValue(payload, 'email') ?? fallbackEmail),
+        avatar: typeof avatar === 'string' ? avatar : undefined,
         avatar: (getValue(data, 'avatar') as string | undefined) ?? (getValue(payload, 'avatar') as string | undefined),
       };
       setUser(userData);

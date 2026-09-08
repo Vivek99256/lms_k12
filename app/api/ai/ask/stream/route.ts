@@ -1,7 +1,8 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
-import { API_BASE_URL } from '@/app/components/utils/api_url';
-import { askUiChunks } from '@/lib/intelligence/ask-stream';
+import { AI_API_BASE_URL } from '@/app/components/utils/api_url';
+import { askUiChunks, askUiChunksFromResult } from '@/lib/intelligence/ask-stream';
 import type { AskUIMessage } from '@/lib/intelligence/ui-messages';
+import type { AskResult } from '@/lib/intelligence/types';
 
 /**
  * The conversational tab's transport, and nothing else.
@@ -53,10 +54,52 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 function upstreamBaseUrl() {
-  // A server-to-server URL may legitimately differ from the browser-facing one — a
-  // container name, an internal load balancer — so it can be set separately. The
-  // browser-facing base is the fallback because in every simple deployment they match.
-  return (process.env.AI_UPSTREAM_BASE_URL || API_BASE_URL || '').trim().replace(/\/$/, '');
+  // Three levels, narrowest first. A server-to-server URL may legitimately differ from
+  // the browser-facing one — a container name, an internal load balancer — so it can be
+  // set on its own. Failing that, the AI host, which is separately configurable because
+  // the Laravel AI backend is not always deployed alongside the rest of the ERP. Only
+  // then the general API host, which is correct for a single-host deployment.
+  return (process.env.AI_UPSTREAM_BASE_URL || AI_API_BASE_URL || '').trim().replace(/\/$/, '');
+}
+
+/**
+ * An upstream response this route will not forward as-is.
+ *
+ * A misconfigured base URL does not fail as a connection error — it succeeds against
+ * the wrong host, which answers with its own 404 page. Forwarding that verbatim, with
+ * its `text/html` content type, put a full HTML error document into the chat panel.
+ * The status was right and the body was unusable, and nothing on screen said which
+ * host had been asked.
+ *
+ * So a non-JSON error body is replaced with a JSON one that names the host and path
+ * that answered. That sentence is a deployment fact, not a database or provider
+ * detail, and it is the only thing that makes this class of failure diagnosable from
+ * the browser.
+ */
+async function errorResponse(upstream: Response, url: string): Promise<Response> {
+  const detail = (await upstream.text()).trim();
+  const contentType = upstream.headers.get('content-type') ?? '';
+
+  if (detail && contentType.includes('json')) {
+    return new Response(detail, {
+      status: upstream.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  console.error(
+    `The assistant API answered ${upstream.status} with ${contentType || 'no content type'} at ${url}.`
+  );
+
+  return Response.json(
+    {
+      error:
+        upstream.status === 404
+          ? `The assistant API has no /api/ai routes at ${new URL(url).origin}. Point the frontend at the host running the Laravel AI backend.`
+          : `The assistant API answered ${upstream.status}.`,
+    },
+    { status: upstream.status }
+  );
 }
 
 export async function POST(request: Request) {
@@ -73,14 +116,12 @@ export async function POST(request: Request) {
   const authorization = request.headers.get('authorization');
   const institute = request.headers.get('x-mcp-institute-id');
 
-  let upstream: Response;
-
-  try {
-    upstream = await fetch(`${baseUrl}/api/ai/ask/stream`, {
+  const call = (path: string, accept: string) =>
+    fetch(`${baseUrl}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
+        Accept: accept,
         ...(authorization ? { Authorization: authorization } : {}),
         ...(institute ? { 'X-MCP-Institute-Id': institute } : {}),
       },
@@ -90,6 +131,62 @@ export async function POST(request: Request) {
       signal: request.signal,
       cache: 'no-store',
     });
+
+  const streamPath = '/api/ai/ask/stream';
+  let upstream: Response;
+
+  try {
+    upstream = await call(streamPath, 'text/event-stream');
+
+    // A backend that predates the streaming route answers 404 for it while still
+    // serving `/ask` perfectly well — which is the state a deployment is in between
+    // shipping the two. Both routes return the same payload, so falling back keeps the
+    // panel working instead of failing on a route the answer never needed.
+    if (upstream.status === 404 || upstream.status === 405) {
+      const fallback = await call('/api/ai/ask', 'application/json');
+
+      if (!fallback.ok) {
+        // Neither route exists: this is a wrong host, not an old one. Report the
+        // original path, since that is the one the panel is built to call.
+        return errorResponse(fallback, `${baseUrl}${streamPath}`);
+      }
+
+      // Parsed defensively rather than with `.json()`: a proxy or a login redirect can
+      // answer 200 with HTML, and letting that throw would surface as "unreachable",
+      // which points the reader at the network instead of at the response.
+      const raw = await fallback.text();
+      let result: AskResult | null = null;
+
+      try {
+        result = ((JSON.parse(raw) as { data?: AskResult })?.data ?? null) as AskResult | null;
+      } catch {
+        result = null;
+      }
+
+      if (!result) {
+        console.error(`The assistant API returned an unreadable answer at ${baseUrl}/api/ai/ask.`);
+
+        return Response.json(
+          { error: 'The assistant returned an answer this app could not read.' },
+          { status: 502 }
+        );
+      }
+
+      return createUIMessageStreamResponse({
+        stream: createUIMessageStream<AskUIMessage>({
+          onError: (error) => {
+            console.error('The assistant reply could not be rendered.', error);
+
+            return 'The assistant could not finish that answer.';
+          },
+          execute: async ({ writer }) => {
+            for await (const chunk of askUiChunksFromResult(result)) {
+              writer.write(chunk);
+            }
+          },
+        }),
+      });
+    }
   } catch (error) {
     if (request.signal.aborted) {
       // The user cancelled. There is nobody left to answer.
@@ -105,12 +202,7 @@ export async function POST(request: Request) {
   // ordinary JSON. Passing them through with their status keeps `useChat`'s error
   // state honest instead of surfacing a 200 with an error buried in the stream.
   if (!upstream.ok || !upstream.body) {
-    const detail = await upstream.text();
-
-    return new Response(detail || JSON.stringify({ error: 'The question could not be answered.' }), {
-      status: upstream.status,
-      headers: { 'Content-Type': upstream.headers.get('content-type') ?? 'application/json' },
-    });
+    return errorResponse(upstream, `${baseUrl}${streamPath}`);
   }
 
   const stream = createUIMessageStream<AskUIMessage>({
