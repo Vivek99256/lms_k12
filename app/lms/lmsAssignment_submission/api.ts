@@ -29,6 +29,8 @@ export type AssignmentSubmissionRow = {
   teacherReviewed: boolean;
   examId: number;
   studentId: number;
+  /** "Checking" | "Evaluated" | "OCR Failed" | "Evaluation Failed" | "Failed" | "" (not yet submitted) */
+  aiStatus: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -171,6 +173,7 @@ function toSubmission(row: UnknownRecord): AssignmentSubmissionRow {
     teacherReviewed: readString(row.teacher_submission_status) === "Y",
     examId: readNumber(row.exam_id),
     studentId: readNumber(row.student_id),
+    aiStatus: readString(row.ai_status),
   };
 }
 
