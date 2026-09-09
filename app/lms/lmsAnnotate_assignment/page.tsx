@@ -30,17 +30,35 @@ import RequireStaff from "@/app/lms/_shared/RequireStaff";
 const AI_POLL_INTERVAL_MS = 8000;
 
 function aiStatusVariant(
-  status: string
+  status: string,
+  assignmentSourceType?: string
 ): "processing" | "active" | "error" | "default" {
   const normalized = status.toLowerCase();
   if (normalized === "checking") return "processing";
   if (normalized === "evaluated") return "active";
   if (normalized.includes("fail")) return "error";
+  if (
+    assignmentSourceType === "uploaded_homework" &&
+    normalized === "not applicable"
+  ) {
+    return "default";
+  }
   return "default";
 }
 
-function aiStatusLabel(status: string): string {
-  return status.toLowerCase() === "checking" ? "Checking..." : status || "-";
+function aiStatusLabel(
+  status: string,
+  assignmentSourceType?: string
+): string {
+  const normalized = status.toLowerCase();
+  if (normalized === "checking") return "Checking...";
+  if (
+    assignmentSourceType === "uploaded_homework" &&
+    normalized === "not applicable"
+  ) {
+    return "Not Applicable";
+  }
+  return status || "-";
 }
 
 export default function AnnotateAssignmentPage() {
@@ -244,8 +262,8 @@ export default function AnnotateAssignmentPage() {
                     <TableCell>
                       {row.aiStatus ? (
                         <StatusBadge
-                          variant={aiStatusVariant(row.aiStatus)}
-                          label={aiStatusLabel(row.aiStatus)}
+                          variant={aiStatusVariant(row.aiStatus, row.assignmentSourceType)}
+                          label={aiStatusLabel(row.aiStatus, row.assignmentSourceType)}
                           icon={
                             row.aiStatus.toLowerCase() === "checking" ? (
                               <LoaderCircle className="size-3 animate-spin" />

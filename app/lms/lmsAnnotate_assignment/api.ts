@@ -34,6 +34,7 @@ export type AnnotateRow = {
   teacherReviewed: boolean;
   studentId: number;
   examId: number;
+  assignmentSourceType: string;
   /** "Checking" | "Evaluated" | "OCR Failed" | "Evaluation Failed" | "Failed" | "" (not yet submitted) */
   aiStatus: string;
   aiFailureReason: string;
@@ -189,6 +190,7 @@ function toAnnotateRow(row: UnknownRecord): AnnotateRow {
     teacherReviewed: readString(row.teacher_submission_status) === "Y",
     studentId: readNumber(row.student_id),
     examId: readNumber(row.exam_id),
+    assignmentSourceType: readString(row.assignment_source_type),
     aiStatus: readString(row.ai_status),
     aiFailureReason: readString(row.ai_failure_reason),
     aiScore: readNullableNumber(row.ai_score),
