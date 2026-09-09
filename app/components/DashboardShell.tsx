@@ -15,7 +15,8 @@ import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
 import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
-import { BRAIN_MENU_LABEL, BRAIN_ROOT, BRAIN_SECTIONS } from '@/lib/brain/navigation';
+import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
+import { canSeeInternalItems } from '@/lib/roadmap';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useFeesLevel3Nav } from '@/app/fees/_lib/use-fees-level3-nav';
 
@@ -100,11 +101,12 @@ function getFilteredMasterMenuItems(items: SubmenuItem[], selectedMenu: SubmenuI
  * a `/pal` prefix.
  */
 const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
-  {
-    id: 'pal-framework',
-    label: 'Framework',
-    href: '/pal/frameworks',
-  },
+  // Framework is deliberately absent. It moved to Curriculum Planning, because
+  // a framework alignment cannot exist without the curriculum concept it
+  // attaches to, so curriculum owns it and PAL reads it. Listing it here would
+  // still claim `/pal/frameworks` for New PAL below, and the page would wear
+  // New PAL's tab bar while living under Curriculum — see the migration
+  // 2026_09_08_100000_move_framework_menu_under_curriculum.php in next_lms_erp.
   {
     id: 'pal-content-model',
     label: 'Content Model',
@@ -160,9 +162,10 @@ function findNewPalMenuNode(items: MenuItem[]): SubmenuItem | undefined {
  * `/pal`, and Content/Exam/Report/Result/Intelligence hang off it. Those are a
  * different module and must not wear New PAL's navigation.
  *
- * The boundary check matters here — `/pal/framework` (legacy) and
- * `/pal/frameworks` (New PAL) differ by one character, so a plain
- * `startsWith` would drag the legacy page back in.
+ * The boundary check matters here — `/pal/framework` and `/pal/frameworks`
+ * differ by one character, so a plain `startsWith` would drag the legacy page
+ * back in. Both now sit outside New PAL: `/pal/frameworks` moved to Curriculum
+ * Planning and so falls through to the normal menu-driven resolution.
  *
  * NEW_PAL_LEVEL3_ITEMS supplies the display metadata (label, href, order);
  * this only decides which of those items the caller's role is allowed to
@@ -259,7 +262,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         icon: BrainCircuit,
         label: BRAIN_MENU_LABEL,
         href: BRAIN_ROOT,
-        submenus: BRAIN_SECTIONS.map((section) => ({
+        // Filtered, not the raw list: an internal-only section must not be
+        // advertised in the sidebar to the school users who can open the Brain.
+        submenus: visibleBrainSections(canSeeInternalItems()).map((section) => ({
           id: `enterprise-brain-${section.key}`,
           parentId: 'enterprise-brain',
           label: section.label,
@@ -504,8 +509,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     const submenuRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href;
     const isPalRoot = normalizeMenuLabel(submenu.label) === 'new pal' || (submenuRoute || '').toLowerCase() === '/pal';
     if (isPalRoot) {
+      // Lands on New PAL's own overview.
+      //
+      // This used to push `/pal/frameworks`, which stopped being New PAL's to
+      // land on when Framework moved under Curriculum Planning. Clicking
+      // "New PAL" took you to a screen that had left the module, and because
+      // `/pal/frameworks` is no longer claimed by NEW_PAL_LEVEL3_ITEMS the shell
+      // showed New PAL's sub-nav over a page belonging to another branch.
       const query = searchParams?.toString() ?? '';
-      router.push(query ? `/pal/frameworks?${query}` : '/pal/frameworks');
+      router.push(query ? `/pal/new?${query}` : '/pal/new');
       return;
     }
 

@@ -22,8 +22,8 @@
  * top of the same underlying Performance component"), this port reuses the
  * exact same `PerformanceCenter` component (no reimplementation) and
  * surfaces G2G's `COMING_SOON_CONTENT['50']` copy verbatim as a banner at the
- * top of the screen via `PerformanceCenter`'s `comingSoon` prop — see
- * `ComingSoonBanner` in `../performance-reviews-and-appraisals/components/performance-center.tsx`.
+ * top of the screen via `PerformanceCenter`'s `comingSoon` prop, which renders
+ * the shared `ComingSoonPanel` (`components/ui/coming-soon.tsx`).
  * The screen underneath remains fully functional, matching G2G's actual
  * routed behaviour.
  */

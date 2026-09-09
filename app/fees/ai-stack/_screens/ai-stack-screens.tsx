@@ -1,9 +1,10 @@
 'use client';
 
-import { BookMarked, Cpu, Gauge, ShieldAlert, Terminal, Workflow } from 'lucide-react';
+import { BookMarked, Cpu, Gauge, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
 
 import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
 import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-screen';
+import { ComingSoonPanel, ComingSoonToggle } from '@/components/ui/coming-soon';
 
 /**
  * Fees → AI Stack tabs.
@@ -13,8 +14,57 @@ import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-s
  * Intelligence, which is what that plumbing produces. Nothing is wired up yet,
  * and nothing here touches the separate AI Administration module; each tab
  * renders the shared placeholder.
+ *
+ * The Policies tab holds the module-scoped settings the architecture review
+ * approved for a module's AI Stack tab: whether the Recommendation Engine and
+ * the module agent are on, their thresholds, which knowledge sources they read,
+ * and a usage view scoped to this module. Its switches are deliberately shown
+ * locked rather than hidden — a visible, disabled control says the capability is
+ * designed and coming, where a missing row just reads as absent.
+ *
+ * NOTE for whoever wires this up: the Models and Prompts tabs below are
+ * engine-level concerns (model management, prompt management). The same review
+ * ruled those stay central and must not be re-implemented per module, so they
+ * likely want to become links into the central AI console rather than editable
+ * screens here.
  */
 export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
+  {
+    id: 'policies',
+    label: 'Policies',
+    icon: SlidersHorizontal,
+    render: () => (
+      <ComingSoonPanel
+        title="Fees AI policies"
+        summary="What the central AI engines are allowed to do for Fees. The switches are shown locked until each engine is wired to this module — the setting exists, it is just not connected yet."
+      >
+        <div className="space-y-3">
+          <ComingSoonToggle
+            roadmapId="fees.ai-stack.recommendation-engine"
+            label="Recommendation engine"
+            description="Rank collection actions and flag likely defaulters for this module."
+            hint="Will carry a confidence threshold below which a recommendation is not shown."
+          />
+          <ComingSoonToggle
+            roadmapId="fees.ai-stack.agent"
+            label="Fees agent"
+            description="Let an agent carry out fees tasks on a person's behalf."
+            hint="Will carry an approval threshold above which a person must confirm before anything runs."
+          />
+          <ComingSoonToggle
+            roadmapId="fees.ai-stack.knowledge-source"
+            label="Knowledge sources"
+            description="Point the knowledge and retrieval layer at fees policies, circulars and structures."
+          />
+          <ComingSoonToggle
+            roadmapId="fees.ai-stack.usage-audit"
+            label="Usage and audit view"
+            description="See what the AI did in Fees, what it cost, and who approved it."
+          />
+        </div>
+      </ComingSoonPanel>
+    ),
+  },
   {
     id: 'models',
     label: 'Models',

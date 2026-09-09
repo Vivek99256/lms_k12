@@ -40,6 +40,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
+import { extractGeneratedBodyHtml, sanitizeGeneratedHtml } from '@/app/course-master/data/generated-html';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -253,14 +254,14 @@ const UPLOAD_TYPE_CONFIG: Record<
 };
 
 type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity';
-type ChapterContentSource = 'Gamma AI' | 'Uploaded';
+type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded';
 
 /**
  * content_master.source values written by the Generate Content flow. It has used
  * more than one marker over time, so the badge matches against the whole set
  * rather than a single string.
  */
-const GENERATED_CONTENT_SOURCES = ['gamma ai', 'aigenerated'];
+const GENERATED_CONTENT_SOURCES = ['gamma ai', 'aigenerated', 'claude ai'];
 
 /**
  * Where a content row came from.
@@ -270,9 +271,17 @@ const GENERATED_CONTENT_SOURCES = ['gamma ai', 'aigenerated'];
  * being stamped and were created by the upload path.
  */
 function resolveContentSource(source: string | null | undefined): ChapterContentSource {
-  return GENERATED_CONTENT_SOURCES.includes((source ?? '').trim().toLowerCase())
-    ? 'Gamma AI'
-    : 'Uploaded';
+  const normalized = (source ?? '').trim().toLowerCase();
+  if (!GENERATED_CONTENT_SOURCES.includes(normalized)) return 'Uploaded';
+  // Name the provider that actually wrote the row. Anything generated but not
+  // Claude keeps the historical 'Gamma AI' label, including the legacy
+  // 'aiGenerated' marker.
+  return normalized === 'claude ai' ? 'Claude AI' : 'Gamma AI';
+}
+
+/** Was this row written by a generator, whichever one? */
+function isGeneratedContent(source: ChapterContentSource): boolean {
+  return source !== 'Uploaded';
 }
 type ChapterContentPreview = 'presentation' | 'notes' | 'video' | 'pdf' | 'activity';
 
@@ -299,6 +308,12 @@ interface ChapterContentItem {
   updatedDate: string;
   updatedAt: string;
   contentUrl?: string;
+  /**
+   * Sanitised HTML of an AI-generated document, read from
+   * content_master.description. Null for uploads and for the older Gamma/Gemini
+   * rows, whose description holds the originating prompt rather than a document.
+   */
+  bodyHtml: string | null;
   slides: {
     id: string;
     number: number;
@@ -356,6 +371,7 @@ function buildApiChapterContentItems(
         updatedDate,
         updatedAt: updatedDate === '—' ? 'Date unavailable' : `updated ${updatedDate}`,
         contentUrl,
+        bodyHtml: extractGeneratedBodyHtml(asset.description, isGeneratedContent(source)),
         slides: [],
       };
     })
@@ -693,6 +709,8 @@ function buildChapterContentItems(
       statValue,
       updatedDate,
       updatedAt: `updated ${updatedDate}`,
+      // Demo rows have no stored document; only API-backed generated rows do.
+      bodyHtml: null,
       slides: buildContentSlides(conceptTitle, chapter.title, type, slideCount),
     };
   });
@@ -4249,7 +4267,7 @@ export default function ChapterListPage() {
   if (view === 'content' && contentChapter) {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const totalItems = resourceScopedContentItems.length;
-    const gammaItems = resourceScopedContentItems.filter((item) => item.source === 'Gamma AI').length;
+    const gammaItems = resourceScopedContentItems.filter((item) => isGeneratedContent(item.source)).length;
     const uploadedItems = resourceScopedContentItems.filter((item) => item.source === 'Uploaded').length;
     const sourceLabel = contentSourceFilter === 'all' ? 'All sources' : contentSourceFilter;
     const activeChapterTitle = activeLibraryChapter?.title ?? contentChapter.title;
@@ -4508,7 +4526,7 @@ export default function ChapterListPage() {
                                   {truncateToWords(item.subtitle, 150)}
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                                  {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
+                                  {isGeneratedContent(item.source) ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
                                   {item.source}
                                 </span>
                               </div>
@@ -4568,7 +4586,7 @@ export default function ChapterListPage() {
                           {truncateToWords(item.subtitle, 150)}
                         </span>
                         <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                          {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
+                          {isGeneratedContent(item.source) ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
                           {item.source}
                         </span>
                       </div>
@@ -4661,7 +4679,7 @@ export default function ChapterListPage() {
                         {selectedContentItem.type}
                       </Badge>
                       <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
-                        {selectedContentItem.source === 'Gamma AI' ? (
+                        {isGeneratedContent(selectedContentItem.source) ? (
                           <Sparkles size={12} className="mr-1.5" />
                         ) : (
                           <Upload size={12} className="mr-1.5" />
@@ -4714,6 +4732,22 @@ export default function ChapterListPage() {
                             </p>
                           </div>
                         </div>
+                      </section>
+                    ) : selectedContentItem.bodyHtml ? (
+                      <section className="mt-8">
+                        <div className="mb-4 border-b border-slate-200/80 pb-3">
+                          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Content</h3>
+                        </div>
+
+                        {/*
+                          The generated document, stored in content_master.description.
+                          Sanitised server-side when written and again here on read:
+                          a stored row is untrusted input by the time it reaches a browser.
+                        */}
+                        <div
+                          className="lms-generated-body"
+                          dangerouslySetInnerHTML={{ __html: sanitizeGeneratedHtml(selectedContentItem.bodyHtml) }}
+                        />
                       </section>
                     ) : (
                       <section className="mt-8">
