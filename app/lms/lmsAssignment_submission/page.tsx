@@ -10,6 +10,13 @@ import {
   Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Table,
@@ -28,6 +35,8 @@ import { getAssignmentAiStatus } from "@/app/lms/lmsAnnotate_assignment/api";
 import { studentSubmissionStatus } from "@/app/lms/_shared/submission-status";
 
 const AI_POLL_INTERVAL_MS = 8000;
+/** Remarks longer than this are clamped in the table and need "View full summary" to read in full. */
+const REMARKS_PREVIEW_THRESHOLD = 140;
 
 export default function AssignmentSubmissionPage() {
   const [rows, setRows] = useState<AssignmentSubmissionRow[]>([]);
@@ -36,6 +45,7 @@ export default function AssignmentSubmissionPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [summaryRow, setSummaryRow] = useState<AssignmentSubmissionRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -244,8 +254,25 @@ export default function AssignmentSubmissionPage() {
                         />
                       )}
                     </TableCell>
-                    <TableCell className="max-w-xs whitespace-pre-wrap text-sm text-slate-600">
-                      {row.teacherRemarks || "-"}
+                    <TableCell className="max-w-56 min-w-40 whitespace-normal align-top py-2.5">
+                      {row.teacherRemarks ? (
+                        <div className="space-y-1">
+                          <p className="line-clamp-3 whitespace-pre-line break-words text-sm text-slate-600">
+                            {row.teacherRemarks}
+                          </p>
+                          {row.teacherRemarks.length > REMARKS_PREVIEW_THRESHOLD ? (
+                            <button
+                              type="button"
+                              onClick={() => setSummaryRow(row)}
+                              className="text-xs font-medium text-blue-600 hover:underline"
+                            >
+                              View full summary
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {(() => {
@@ -298,6 +325,25 @@ export default function AssignmentSubmissionPage() {
           </Button>
         </div>
       </section>
+
+      <Dialog
+        open={summaryRow !== null}
+        onOpenChange={(open) => {
+          if (!open) setSummaryRow(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>AI evaluation summary</DialogTitle>
+            <DialogDescription>
+              {summaryRow ? summaryRow.title || "Assignment" : null}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="max-h-[60vh] overflow-y-auto whitespace-pre-line break-words text-sm text-slate-700">
+            {summaryRow?.teacherRemarks}
+          </p>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
