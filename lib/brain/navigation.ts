@@ -239,10 +239,10 @@ export const BRAIN_SECTIONS: BrainSectionNav[] = [
     screens: [
       {
         key: 'agents',
-        label: 'Agent Monitor',
+        label: 'Agent Management',
         href: `${BRAIN_ROOT}/automation/agents`,
         icon: Activity,
-        description: 'What the agents are doing, and on whose authority.',
+        description: 'Configure agents per module, and see every run on whose authority it ran.',
       },
       {
         key: 'tasks',
