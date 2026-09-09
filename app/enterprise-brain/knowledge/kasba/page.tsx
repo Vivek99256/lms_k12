@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { brainFetch, tenantPath } from '@/lib/brain/api';
 import { useBrainResource } from '../../_components/useBrainResource';
-import { BreakdownBars, DataTable, ErrorState, LoadingState, MetricTiles, Panel, ScreenHeader } from '../../_components/primitives';
+import { BreakdownBars, DataTable, ErrorState, LoadingState, MetricTiles, Panel, HeroHeader } from '../../_components/primitives';
 
 interface Facet {
   facet: string;
@@ -39,12 +40,21 @@ export default function KasbaExplorerPage() {
 
   return (
     <div className="pb-8">
-      <ScreenHeader
+      <HeroHeader
+        breadcrumb="Enterprise Brain / Knowledge"
         title="KASBA Explorer"
         description="Knowledge, ability, skill, behaviour and attitude, rolled up across this organization's capabilities."
-        breadcrumb="Enterprise Brain / Knowledge"
-        onRefresh={resource.refresh}
-        refreshing={resource.refreshing}
+        actions={
+          <button
+            type="button"
+            onClick={resource.refresh}
+            disabled={resource.refreshing}
+            className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={resource.refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        }
       />
 
       <MetricTiles

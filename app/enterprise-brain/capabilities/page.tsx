@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, X } from 'lucide-react';
+import { Plus, Search, X, RefreshCw } from 'lucide-react';
 import { brainFetch, tenantPath, withQuery, type BrainRow } from '@/lib/brain/api';
 import { useBrainResource } from '../_components/useBrainResource';
-import { Card, DataTable, ErrorState, LoadingState, MetricTiles, Panel, Pill, ScreenHeader } from '../_components/primitives';
+import { Card, DataTable, ErrorState, LoadingState, MetricTiles, Panel, Pill, HeroHeader } from '../_components/primitives';
 
 interface CapabilityList {
   total: number;
@@ -70,21 +70,30 @@ export default function CapabilitiesPage() {
 
   return (
     <div className="pb-8">
-      <ScreenHeader
-        title="Capabilities"
-        description="What people need to be able to do, and who is assigned to each. Sourced from this organization’s own skill and competency records."
+      <HeroHeader
         breadcrumb="Enterprise Brain / Foundation"
-        onRefresh={resource.refresh}
-        refreshing={resource.refreshing}
+        title="Capabilities"
+        description="What people need to be able to do, and who is assigned to each. Sourced from this organization's own skill and competency records."
         actions={
-          <button
-            type="button"
-            onClick={() => setCreating((open) => !open)}
-            className="flex items-center gap-2 rounded-xl bg-[#0D6EFD] px-3 py-2 text-xs font-bold text-white hover:bg-blue-600"
-          >
-            {creating ? <X size={14} /> : <Plus size={14} />}
-            {creating ? 'Cancel' : 'New capability'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCreating((open) => !open)}
+              className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white"
+            >
+              {creating ? <X size={14} /> : <Plus size={14} />}
+              {creating ? 'Cancel' : 'New capability'}
+            </button>
+            <button
+              type="button"
+              onClick={resource.refresh}
+              disabled={resource.refreshing}
+              className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={resource.refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
         }
       />
 

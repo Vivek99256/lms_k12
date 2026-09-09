@@ -9,6 +9,7 @@ import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
+import { useResizablePanel } from '@/hooks/use-resizable-panel';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
@@ -200,6 +201,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(null);
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
+  // How wide the user has decided the assistant should be, remembered across sessions.
+  const assistantPanel = useResizablePanel();
   const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
 
   const [userProfileName, setUserProfileName] = useState('');
@@ -615,7 +618,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return best;
   };
 
-  const level3Menu = (() => {
+  const level3Menu: { parentLabel: string; items: Level3Item[]; hideMaster?: boolean } | null = (() => {
     // New PAL brings its own sub-nav. Every other route — including the legacy
     // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
     // menu-driven resolution below and gets whatever its own menu defines.
@@ -666,9 +669,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         />
         <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main
-            className={`min-w-0 flex-1 overflow-auto scrollbar-hide transition-[width] duration-300 ease-out ${
-              isChatbotOpen ? 'w-[85%]' : 'w-full'
-            }`}
+            className="min-w-0 flex-1 overflow-auto scrollbar-hide"
           >
             <ChatbotLayoutContext.Provider value={{ isChatbotOpen }}>
               {showSubheader && (
@@ -682,6 +683,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     masterLoading={masterMenuLoading}
                     masterMenuGroups={masterMenuGroups}
                     userProfileName={userProfileName}
+                    hideMaster={level3Menu?.hideMaster ?? false}
                   />
                 </div>
               )}
@@ -689,9 +691,37 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </ChatbotLayoutContext.Provider>
           </main>
           {isChatbotOpen && (
-            <div className="min-h-0 w-[15%] min-w-[320px] overflow-hidden">
-              <ChatbotPanel onToggleChatbot={toggleChatbot} />
-            </div>
+            <>
+              {/*
+                Drag to resize, arrow keys to nudge, Home/End for the extremes. Sits
+                between the page and the panel because that is the edge being moved —
+                a handle anywhere else would be a control for a gesture, rather than
+                the thing itself.
+              */}
+              <div
+                {...assistantPanel.handleProps}
+                className={`group relative -mx-1 hidden w-2 flex-none cursor-col-resize items-center justify-center rounded outline-none md:flex ${
+                  assistantPanel.isDragging ? 'bg-[#0D6EFD]/10' : 'hover:bg-[#0D6EFD]/5'
+                } focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40`}
+                title="Drag to resize · arrow keys to nudge"
+              >
+                <span
+                  className={`h-10 w-0.5 rounded-full transition-colors ${
+                    assistantPanel.isDragging
+                      ? 'bg-[#0D6EFD]'
+                      : 'bg-gray-300 group-hover:bg-[#0D6EFD]/60'
+                  }`}
+                  aria-hidden
+                />
+              </div>
+
+              <div
+                className="min-h-0 flex-none overflow-hidden"
+                style={{ width: assistantPanel.width }}
+              >
+                <ChatbotPanel onToggleChatbot={toggleChatbot} />
+              </div>
+            </>
           )}
         </div>
         <RightFloatingToolbar

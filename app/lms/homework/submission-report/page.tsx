@@ -10,6 +10,13 @@ import {
   Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -43,17 +50,35 @@ import RequireStaff from "@/app/lms/_shared/RequireStaff";
 const AI_POLL_INTERVAL_MS = 8000;
 
 function aiStatusVariant(
-  status: string
+  status: string,
+  assignmentSourceType?: string
 ): "processing" | "active" | "error" | "default" {
   const normalized = status.toLowerCase();
   if (normalized === "checking") return "processing";
   if (normalized === "evaluated") return "active";
   if (normalized.includes("fail")) return "error";
+  if (
+    assignmentSourceType === "uploaded_homework" &&
+    normalized === "not applicable"
+  ) {
+    return "default";
+  }
   return "default";
 }
 
-function aiStatusLabel(status: string): string {
-  return status.toLowerCase() === "checking" ? "Checking..." : status || "-";
+function aiStatusLabel(
+  status: string,
+  assignmentSourceType?: string
+): string {
+  const normalized = status.toLowerCase();
+  if (normalized === "checking") return "Checking...";
+  if (
+    assignmentSourceType === "uploaded_homework" &&
+    normalized === "not applicable"
+  ) {
+    return "Not Applicable";
+  }
+  return status || "-";
 }
 
 const academicFields: DropdownField[] = [
@@ -63,6 +88,8 @@ const academicFields: DropdownField[] = [
   "subject",
 ];
 const PAGE_SIZE = 10;
+/** Remarks longer than this are clamped in the table and need "View full summary" to read in full. */
+const REMARKS_PREVIEW_THRESHOLD = 140;
 const controlClass =
   "h-8 w-full rounded-lg border border-input bg-white px-2.5 text-sm outline-none transition focus:border-ring focus:ring-3 focus:ring-ring/50";
 const exportColumns: TableExportColumn[] = [
@@ -103,6 +130,7 @@ export default function StudentHomeworkSubmissionReportPage() {
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [summaryRow, setSummaryRow] = useState<AnnotateRow | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -411,8 +439,25 @@ export default function StudentHomeworkSubmissionReportPage() {
                         )}
                       </TableCell>
                       <TableCell>{row.submissionDate || "-"}</TableCell>
-                      <TableCell className="max-w-48 whitespace-pre-line" title={row.teacherRemarks}>
-                        {row.teacherRemarks || "-"}
+                      <TableCell className="max-w-56 min-w-40 whitespace-normal align-top py-2.5">
+                        {row.teacherRemarks ? (
+                          <div className="space-y-1">
+                            <p className="line-clamp-3 whitespace-pre-line break-words text-sm text-slate-600">
+                              {row.teacherRemarks}
+                            </p>
+                            {row.teacherRemarks.length > REMARKS_PREVIEW_THRESHOLD ? (
+                              <button
+                                type="button"
+                                onClick={() => setSummaryRow(row)}
+                                className="text-xs font-medium text-blue-600 hover:underline"
+                              >
+                                View full summary
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {row.aiScore !== null && row.aiTotalQuestions !== null ? (
@@ -444,10 +489,10 @@ export default function StudentHomeworkSubmissionReportPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {row.aiStatus ? (
-                          <StatusBadge
-                            variant={aiStatusVariant(row.aiStatus)}
-                            label={aiStatusLabel(row.aiStatus)}
+                      {row.aiStatus ? (
+                        <StatusBadge
+                          variant={aiStatusVariant(row.aiStatus, row.assignmentSourceType)}
+                          label={aiStatusLabel(row.aiStatus, row.assignmentSourceType)}
                             icon={
                               row.aiStatus.toLowerCase() === "checking" ? (
                                 <LoaderCircle className="size-3 animate-spin" />
@@ -519,6 +564,27 @@ export default function StudentHomeworkSubmissionReportPage() {
           ) : null}
         </section>
       ) : null}
+
+      <Dialog
+        open={summaryRow !== null}
+        onOpenChange={(open) => {
+          if (!open) setSummaryRow(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>AI evaluation summary</DialogTitle>
+            <DialogDescription>
+              {summaryRow
+                ? `${summaryRow.studentName || "Student"} — ${summaryRow.title || "Assignment"}`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="max-h-[60vh] overflow-y-auto whitespace-pre-line break-words text-sm text-slate-700">
+            {summaryRow?.teacherRemarks}
+          </p>
+        </DialogContent>
+      </Dialog>
     </main>
     </RequireStaff>
   );

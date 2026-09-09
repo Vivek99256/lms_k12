@@ -62,7 +62,7 @@ interface ActiveModal {
 const CATEGORY_STYLES: Record<PalContentCategory, { label: string; badge: string }> = {
   remediation: { label: 'Remediation', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
   practice: { label: 'Practice', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
-  enrichment: { label: 'Enrichment', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  enrichment: { label: 'Extension Activity', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   misconception: { label: 'Misconception', badge: 'bg-sky-50 text-sky-700 border-sky-200' },
 };
 

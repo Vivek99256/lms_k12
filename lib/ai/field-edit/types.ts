@@ -82,7 +82,7 @@ export interface AiFieldEditResult {
   model: string;
 }
 
-/** Failure envelope, matching the shape `app/api/ai/chat` already returns. */
+/** Failure envelope returned by the deliberately local field-edit endpoint. */
 export interface AiFieldEditError {
   error: string;
   code?: string;

@@ -1,6 +1,6 @@
 import {
   Activity, Boxes, Brain, ChartNoAxesColumn, CircleGauge, Database, FileSearch,
-  FolderTree, Gauge, Layers, Library, ListChecks, Network, Notebook, Radio,
+  FolderTree, Gauge, GraduationCap, Layers, Library, ListChecks, Network, Notebook, Radio,
   Scale, Settings, Sparkles, Target, TrendingUp, Upload, Users, Workflow,
 } from 'lucide-react';
 import type { MenuIcon } from '@/app/data/menuItems';
@@ -82,6 +82,13 @@ export const BRAIN_SECTIONS: BrainSectionNav[] = [
         href: `${BRAIN_ROOT}/foundation/people`,
         icon: Users,
         description: 'Everyone recorded in this organization, and whose record is incomplete.',
+      },
+      {
+        key: 'students',
+        label: 'Students',
+        href: `${BRAIN_ROOT}/foundation/students`,
+        icon: GraduationCap,
+        description: 'The student roll the Brain reasons over, and the signals raised about it.',
       },
       {
         key: 'capabilities',
@@ -268,10 +275,10 @@ export const BRAIN_SECTIONS: BrainSectionNav[] = [
     screens: [
       {
         key: 'agents',
-        label: 'Agent Monitor',
+        label: 'Agent Management',
         href: `${BRAIN_ROOT}/automation/agents`,
         icon: Activity,
-        description: 'What the agents are doing, and on whose authority.',
+        description: 'Configure agents per module, and see every run on whose authority it ran.',
       },
       {
         key: 'tasks',

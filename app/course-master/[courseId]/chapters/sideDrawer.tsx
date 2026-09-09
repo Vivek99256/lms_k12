@@ -33,7 +33,7 @@ const CONTENT_TYPE_OPTIONS = [
   { label: 'All content types', value: ALL_CONTENT_TYPES_VALUE, apiValue: ALL_CONTENT_TYPES_VALUE },
 ] as const;
 // Mirrors UPLOAD_PRESENTATION_TYPES in the chapters page: the library reads this
-// string out of content_category to decide the Teacher Resource lane.
+// string out of content_category to decide the Teacher Workspace lane.
 const TEACHER_TRAINING_CONTENT_CATEGORY = 'Teacher training presentation';
 
 /**
@@ -827,6 +827,26 @@ ${groundTruthContent}`;
       const chapter = allChapters.find((ch) => ch.id === presentationChapterId);
       if (!chapter) {
         setGenerationError('Please select a valid chapter.');
+        setIsGenerating(false);
+        return;
+      }
+
+      const normalizedContentType = contentType.trim().toLowerCase();
+      // The Teacher Workspace tab always produces a deck, whatever the Classroom
+      // tab's content type happens to be left on.
+      const isTeacherTraining = presentationMode === 'Teacher training';
+      const isPresentation = isTeacherTraining || normalizedContentType === 'presentation';
+      const exportFormat = isPresentation ? 'pptx' : 'pdf';
+      // content_category is what splits the library into Classroom Resource vs
+      // Teacher Workspace, so teacher-training decks must be filed under their own
+      // category instead of the generic 'presentation'.
+      const apiContentType = isTeacherTraining
+        ? TEACHER_TRAINING_CONTENT_CATEGORY
+        : CONTENT_TYPE_OPTIONS.find((option) => option.value === contentType)?.apiValue ?? contentType;
+
+      if (isTeacherTraining && !presentationConcept) {
+        setGenerationError('Please select a concept for teacher training.');
+        setIsGenerating(false);
         return;
       }
 
@@ -981,7 +1001,7 @@ ${groundTruthContent}`;
                       : 'text-slate-600 hover:text-slate-900'
                   )}
                 >
-                  {mode === 'Classroom' ? 'Classroom Resource' : 'Teacher Resource'}
+                  {mode === 'Classroom' ? 'Classroom Resource' : 'Teacher Workspace'}
                 </button>
               ))}
             </div>

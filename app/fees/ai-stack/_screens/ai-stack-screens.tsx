@@ -5,6 +5,7 @@ import { BookMarked, Cpu, Gauge, ShieldAlert, SlidersHorizontal, Terminal, Workf
 import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
 import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-screen';
 import { ComingSoonPanel, ComingSoonToggle } from '@/components/ui/coming-soon';
+import { FeesAutomationsScreen } from '@/app/fees/ai-stack/_screens/fees-automations-screen';
 
 /**
  * Fees → AI Stack tabs.
@@ -27,6 +28,10 @@ import { ComingSoonPanel, ComingSoonToggle } from '@/components/ui/coming-soon';
  * ruled those stay central and must not be re-implemented per module, so they
  * likely want to become links into the central AI console rather than editable
  * screens here.
+ * Intelligence, which is what that plumbing produces. Automations is live — it
+ * runs on the central Agent Management engine (lib/agents), scoped to Fees.
+ * The other tabs are not wired up yet and render the shared placeholder;
+ * nothing here touches the separate AI Administration module.
  */
 export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
   {
@@ -117,17 +122,9 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
     id: 'automations',
     label: 'Automations',
     icon: Workflow,
-    render: () => (
-      <FeesPlaceholderScreen
-        title="Automations"
-        summary="AI-driven jobs that run against fees data on their own."
-        points={[
-          'Automations with their schedule or trigger.',
-          'What each is permitted to do without a person confirming.',
-          'Recent runs and what they changed.',
-        ]}
-      />
-    ),
+    // The one built tab: the Fee reminder drafter on the central Agent
+    // Management engine, scoped to module="fees". See fees-automations-screen.tsx.
+    render: () => <FeesAutomationsScreen />,
   },
   {
     id: 'usage-cost',

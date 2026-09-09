@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Search } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import { brainFetch, tenantPath, withQuery, type BrainMetric, type BrainRow } from '@/lib/brain/api';
 import { useBrainResource } from '../../_components/useBrainResource';
-import { Card, DataTable, ErrorState, LoadingState, MetricTiles, Panel, Pill, ScreenHeader } from '../../_components/primitives';
+import { Card, DataTable, ErrorState, LoadingState, MetricTiles, Panel, Pill, HeroHeader } from '../../_components/primitives';
 
 interface AssistantPayload {
   tenantId: string;
@@ -55,12 +55,21 @@ export default function AiAssistantPage() {
 
   return (
     <div className="pb-8">
-      <ScreenHeader
+      <HeroHeader
+        breadcrumb="Enterprise Brain / Knowledge"
         title="AI Assistant"
         description="Context-scoped search across this organization, plus the conversation and AI operation history the Brain has recorded."
-        breadcrumb="Enterprise Brain / Knowledge"
-        onRefresh={resource.refresh}
-        refreshing={resource.refreshing}
+        actions={
+          <button
+            type="button"
+            onClick={resource.refresh}
+            disabled={resource.refreshing}
+            className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={resource.refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        }
       />
 
       <MetricTiles metrics={data.metrics} />

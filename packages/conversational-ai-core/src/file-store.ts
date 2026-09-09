@@ -11,7 +11,7 @@ import path from "node:path";
 function getBaseDir() {
   const baseDir =
     process.env.CONVERSATIONAL_AI_STATE_DIR ||
-    path.join(process.cwd(), ".kilo", "conversational-ai");
+    path.join(/*turbopackIgnore: true*/ process.cwd(), ".kilo", "conversational-ai");
   if (!existsSync(baseDir)) {
     mkdirSync(baseDir, { recursive: true });
   }

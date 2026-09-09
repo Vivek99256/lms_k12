@@ -4,9 +4,18 @@ import React from 'react';
 import { AlertTriangle, DatabaseZap, Loader2, RefreshCw } from 'lucide-react';
 
 /** Shared surface for every Brain screen, matching the LMS card language. */
-export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = '',
+  id,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  /** Anchor target, so a summary screen can deep-link to one card. */
+  id?: string;
+}) {
   return (
-    <div className={`rounded-2xl border border-gray-200/70 bg-white/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ${className}`}>
+    <div id={id} className={`rounded-2xl border border-gray-200/70 bg-white/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ${className}`}>
       {children}
     </div>
   );
@@ -136,11 +145,53 @@ export function DataTable({
   );
 }
 
+/**
+ * One cell, as a person reads it.
+ *
+ * A stored JSON column used to be dumped verbatim into the table — a wall of
+ * braces and quoted keys nobody can scan. Structured values are summarised
+ * instead: a list becomes its items, an object becomes its values, and the full
+ * text still reaches the cell's tooltip via the `title` attribute.
+ */
 export function cellText(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (typeof value === 'number') return Number.isFinite(value) ? value.toLocaleString() : '';
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    // Several LMS columns store JSON as text; unwrap it rather than showing it raw.
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        return cellText(JSON.parse(trimmed));
+      } catch {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => cellText(entry)).filter(Boolean).join(', ');
+  }
+
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, entry]) => {
+        const text = cellText(entry);
+        return text ? `${humaniseKey(key)}: ${text}` : '';
+      })
+      .filter(Boolean)
+      .join(' · ');
+  }
+
   return String(value);
+}
+
+/** `head_user_id` -> `Head user`. Column names are schema, not English. */
+export function humaniseKey(key: string): string {
+  const words = key.replace(/[_-]+/g, ' ').replace(/\bids?\b/gi, '').trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : key;
 }
 
 export function Panel({
@@ -153,6 +204,11 @@ export function Panel({
   title: string;
   count?: number;
   available?: boolean;
+  /**
+   * The source table. Kept for the tooltip an administrator may want, never
+   * printed: `hpbrain_recommendation_evidence` under a panel heading tells a
+   * principal nothing and makes the screen read like a database console.
+   */
   table?: string;
   children: React.ReactNode;
 }) {
@@ -160,8 +216,7 @@ export function Panel({
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold text-slate-900">{title}</h2>
-          {table && <p className="truncate text-[11px] text-slate-400">{table}</p>}
+          <h2 className="truncate text-sm font-bold text-slate-900" title={table}>{title}</h2>
         </div>
         {available === false ? (
           <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-600">
@@ -254,4 +309,38 @@ export function Pill({ tone = 'gray', children }: { tone?: 'gray' | 'blue' | 'gr
   } as const;
 
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${tones[tone]}`}>{children}</span>;
+}
+
+export function HeroHeader({
+  breadcrumb,
+  title,
+  description,
+  actions,
+  meta,
+}: {
+  breadcrumb?: string;
+  title: string;
+  description?: string;
+  actions?: React.ReactNode;
+  meta?: React.ReactNode;
+}) {
+  return (
+    <section className="mb-8">
+      <Card className="overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="p-6 sm:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="min-w-0 flex-1">
+              {breadcrumb && (
+                <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{breadcrumb}</p>
+              )}
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{title}</h1>
+              {description && <p className="mt-2 max-w-3xl text-sm text-slate-400">{description}</p>}
+              {meta && <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-400">{meta}</div>}
+            </div>
+            {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}
+          </div>
+        </div>
+      </Card>
+    </section>
+  );
 }

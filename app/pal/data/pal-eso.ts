@@ -104,6 +104,8 @@ export interface DiagnosticItem extends EsoQuestion {
   nodeId: number;
   nodeType: NodeType;
   itemType: string | null;
+  /** Authored diagnostic stage, when the question carries one. */
+  stage?: string | null;
 }
 
 export interface PracticeItem extends EsoQuestion {
@@ -335,18 +337,92 @@ function mapQuestion(raw: unknown): EsoQuestion {
   };
 }
 
-export async function fetchDiagnosticItems(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<DiagnosticItem[]> {
+function mapDiagnosticItem(item: unknown): DiagnosticItem {
+  const r = toRecord(item);
+  return {
+    ...mapQuestion(item),
+    nodeId: num(r.node_id),
+    nodeType: (readString(r.node_type) || 'K') as NodeType,
+    itemType: r.item_type == null ? null : readString(r.item_type),
+    stage: r.stage == null ? null : readString(r.stage),
+  };
+}
+
+/** The three authored diagnostic groups, in the order they are shown. */
+export const DIAGNOSTIC_GROUPS = [
+  {
+    key: 'prerequisite' as const,
+    label: 'Prerequisite',
+    description: 'Questions that verify prerequisite knowledge',
+  },
+  {
+    key: 'adaptive' as const,
+    label: 'Adaptive Diagnostic',
+    description: "Questions used to determine the learner's current level",
+  },
+  {
+    key: 'concept' as const,
+    label: 'Concept Diagnostic',
+    description: 'Questions assessing the current concept',
+  },
+];
+
+export type DiagnosticGroupKey = (typeof DIAGNOSTIC_GROUPS)[number]['key'];
+
+/**
+ * Why a concept has nothing to serve. Mirrors
+ * EsoPolicyService::diagnosticAvailability() — resolved server-side only when
+ * the diagnostic is genuinely empty.
+ */
+export interface DiagnosticAvailability {
+  reason: 'none_authored' | 'awaiting_approval' | 'awaiting_node_mapping' | 'none_servable' | 'available';
+  authored: number;
+  approved: number;
+  nodeMapped: number;
+  servable: number;
+}
+
+export interface DiagnosticPayload {
+  /** Flat list that drives the diagnostic itself — unchanged behaviour. */
+  items: DiagnosticItem[];
+  /** Additive grouped view; empty groups are normal and rendered as such. */
+  groups: Record<DiagnosticGroupKey, DiagnosticItem[]>;
+  groupedTotal: number;
+  availability: DiagnosticAvailability | null;
+}
+
+export async function fetchDiagnostic(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<DiagnosticPayload> {
   const data = toRecord(await esoGet(`api/pal/eso/diagnostic/${learnerId}/${conceptId}`, signal));
-  const items = Array.isArray(data.items) ? data.items : [];
-  return items.map((item) => {
-    const r = toRecord(item);
-    return {
-      ...mapQuestion(item),
-      nodeId: num(r.node_id),
-      nodeType: (readString(r.node_type) || 'K') as NodeType,
-      itemType: r.item_type == null ? null : readString(r.item_type),
-    };
-  });
+  const diagnostic = toRecord(data.diagnostic);
+
+  const groups = DIAGNOSTIC_GROUPS.reduce((acc, { key }) => {
+    const group = toRecord(diagnostic[key]);
+    const questions = Array.isArray(group.questions) ? group.questions : [];
+    acc[key] = questions.map(mapDiagnosticItem);
+    return acc;
+  }, {} as Record<DiagnosticGroupKey, DiagnosticItem[]>);
+
+  const availabilityRaw = data.availability == null ? null : toRecord(data.availability);
+
+  return {
+    items: (Array.isArray(data.items) ? data.items : []).map(mapDiagnosticItem),
+    groups,
+    groupedTotal: num(diagnostic.total),
+    availability: availabilityRaw
+      ? {
+          reason: readString(availabilityRaw.reason) as DiagnosticAvailability['reason'],
+          authored: num(availabilityRaw.authored),
+          approved: num(availabilityRaw.approved),
+          nodeMapped: num(availabilityRaw.node_mapped),
+          servable: num(availabilityRaw.servable),
+        }
+      : null,
+  };
+}
+
+/** Back-compat: the flat list only. */
+export async function fetchDiagnosticItems(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<DiagnosticItem[]> {
+  return (await fetchDiagnostic(learnerId, conceptId, signal)).items;
 }
 
 /**
