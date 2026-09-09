@@ -72,3 +72,42 @@ if (!API_BASE_URL) {
  */
 export const AI_API_BASE_URL: string =
   normalizeApiBaseUrl(process.env.NEXT_PUBLIC_AI_BASE_URL) || API_BASE_URL;
+
+/**
+ * The AI host when it has been named explicitly, and an empty string otherwise.
+ *
+ * Kept separate from `AI_API_BASE_URL` above because the two answer different
+ * questions. That one asks "where should an AI call go?" and always produces an
+ * answer. This one asks "has anybody *said* where the AI backend lives?", and the
+ * difference matters at exactly one point — `resolveAiBaseUrl()` below.
+ */
+export const AI_API_BASE_URL_OVERRIDE: string = normalizeApiBaseUrl(
+  process.env.NEXT_PUBLIC_AI_BASE_URL
+);
+
+/**
+ * Where one AI call should go, given whatever host the login recorded.
+ *
+ * Every AI client reads a `baseUrl` off the session — `userData.host_name`, saved at
+ * login — and used it ahead of anything configured. On a single-host deployment that
+ * is correct and invisible. On a split deployment it is the bug: `host_name` names the
+ * ERP, the ERP does not serve `/api/ai/*`, and its 404 comes back as an HTML page, so
+ * the panel reports "the intelligence API returned a non-JSON response" and renders
+ * nothing. It worked locally for the same reason it failed live — locally the two
+ * hosts happen to be one.
+ *
+ * So an explicitly named AI host wins over the session's. It is the more specific
+ * statement of the two: `host_name` says where this user logged in, while
+ * `NEXT_PUBLIC_AI_BASE_URL` says where the AI backend actually runs, and only the
+ * second is a claim about the AI backend at all.
+ *
+ * With nothing configured the session still wins, so single-host deployments — local
+ * development included — behave exactly as they did before.
+ */
+export function resolveAiBaseUrl(sessionBaseUrl?: string | null): string {
+  return (
+    AI_API_BASE_URL_OVERRIDE ||
+    normalizeApiBaseUrl(sessionBaseUrl ?? undefined) ||
+    API_BASE_URL
+  );
+}
