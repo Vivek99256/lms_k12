@@ -14,6 +14,7 @@ import {
   Tags,
   Workflow,
 } from 'lucide-react';
+import { ComingSoonBadge } from '@/components/ui/coming-soon';
 import type { PalConceptContext, PalModuleView, PalSection } from '@/app/pal/data/pal-content-model';
 
 type PalSurfaceVariant = 'framework' | 'ulu';
@@ -355,8 +356,36 @@ export function PalModuleGrid({
                     <div className="p-5">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                            {module.title}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                              {module.title}
+                            </div>
+                            {/*
+                              Badged per framework, never on the tab as a whole:
+                              the alignment capability itself is live, and only
+                              the frameworks with nowhere to record an alignment
+                              are marked.
+
+                              It says "Alignment coming soon", not "Coming soon",
+                              because the plain wording contradicted the course
+                              catalog. A school with soft-skills subjects saw
+                              "Soft skills — 20 active, Live" on one screen and
+                              "Soft Skills — Coming soon" on this one. Both were
+                              true of different things — the subjects exist, the
+                              framework mapping does not — and neither screen
+                              said which it meant.
+
+                              Tooltip suppressed because the whole card is a
+                              link — hovering to read it would invite a click
+                              that navigates away.
+                            */}
+                            {module.lifecycle === 'coming-soon' && (
+                              <ComingSoonBadge
+                                size="sm"
+                                withTooltip={false}
+                                label="Alignment coming soon"
+                              />
+                            )}
                           </div>
                           <p className="mt-3 text-base font-semibold text-slate-900">{module.summary}</p>
                           <p className="mt-2 text-sm leading-6 text-slate-600">{module.subtitle}</p>

@@ -2,6 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { ArrowRight, Building2 } from 'lucide-react';
+import { brainFetch, tenantPath, type BrainRow } from '@/lib/brain/api';
+import { visibleBrainSections } from '@/lib/brain/navigation';
+import { canSeeInternalItems } from '@/lib/roadmap';
 import {
   AlertTriangle,
   ArrowRight,
@@ -789,6 +793,12 @@ function ClassIntelligenceSection({
         </Link>
       </div>
 
+      <h2 className="mb-2 text-[11px] font-bold uppercase tracking-widest text-gray-400">Sections</h2>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {visibleBrainSections(canSeeInternalItems())
+          .filter((section) => section.key !== 'overview')
+          .map((section) => {
+          const Icon = section.icon;
       <p className="mb-4 text-xs text-slate-500">
         Attendance for every class with enough recorded marks to measure, against a school baseline of {data.baseline}% across{' '}
         {data.marks.toLocaleString()} marks.

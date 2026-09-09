@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, type ReactNode } from 'react';
+import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { fetchScreen } from '@/lib/brain/api';
@@ -17,7 +19,23 @@ import {
  * Capabilities, Ingestion, Settings, KASBA, AI Assistant — have their own page
  * instead of squeezing their behaviour in here.
  */
-export default function ScreenView({ screen, searchable = false }: { screen: string; searchable?: boolean }) {
+export default function ScreenView({
+  screen,
+  searchable = false,
+  notice,
+}: {
+  screen: string;
+  searchable?: boolean;
+  /**
+   * A short line shown under the header, before the data.
+   *
+   * For saying something about the screen itself rather than about its rows —
+   * the Agentic Library uses it to state that agents built there are moving to
+   * a shared service. Kept as a slot so this component stays registry-driven
+   * and screen-agnostic.
+   */
+  notice?: ReactNode;
+}) {
   const [search, setSearch] = useState('');
   const [applied, setApplied] = useState('');
   const resource = useBrainResource(() => fetchScreen(screen, applied), [screen, applied]);
@@ -78,6 +96,8 @@ export default function ScreenView({ screen, searchable = false }: { screen: str
           </div>
         }
       />
+
+      {notice && <div className="mb-4">{notice}</div>}
 
       {resource.error && (
         <div className="mb-4">

@@ -35,6 +35,14 @@ export interface BrainSectionNav {
   icon: MenuIcon;
   description: string;
   screens: BrainScreenNav[];
+  /**
+   * Who this section is for. Omitted means everyone who can reach the Brain.
+   *
+   * 'internal' sections are hidden unless the build opts in — see
+   * `visibleBrainSections`. Marking a row internal in the roadmap registry does
+   * NOT hide it here; the two are separate lists and both need saying.
+   */
+  audience?: 'customer' | 'internal';
 }
 
 export const BRAIN_SECTIONS: BrainSectionNav[] = [
@@ -139,6 +147,34 @@ export const BRAIN_SECTIONS: BrainSectionNav[] = [
         href: `${BRAIN_ROOT}/intelligence-loop/executions`,
         icon: Workflow,
         description: 'What has been done about approved decisions, and the result.',
+      },
+    ],
+  },
+  {
+    // Sits immediately after the Intelligence Loop because it is the control
+    // over it: the loop decides and executes, and this is where a person
+    // approves or overrules that. Decisions are already being approved and
+    // carried out with no visible trail, so the gap is shown rather than left
+    // silent — the placeholder is more honest than an empty space.
+    key: 'governance',
+    // Internal until the approval trail exists. This section's whole message is
+    // that decisions are being approved and executed with no record of it —
+    // true, worth fixing, and not something to hand a school unprompted. The
+    // Brain is visible to 174 school-side profiles (School Admin, Vice
+    // Principal and the like), so "our staff only see this" was never true of
+    // the Brain's own navigation.
+    audience: 'internal',
+    label: 'Governance',
+    href: `${BRAIN_ROOT}/governance`,
+    icon: Scale,
+    description: 'Who approved each automated decision, on what evidence, and what a person can overrule.',
+    screens: [
+      {
+        key: 'governance',
+        label: 'Decision approval trail',
+        href: `${BRAIN_ROOT}/governance`,
+        icon: Scale,
+        description: 'The approval and override record behind every decision the loop executes.',
       },
     ],
   },
@@ -279,6 +315,17 @@ export const BRAIN_SECTIONS: BrainSectionNav[] = [
 ];
 
 /** Every Brain route that resolves to a page, for active-state matching. */
+/**
+ * The sections this build should show.
+ *
+ * Call this rather than reading BRAIN_SECTIONS directly anywhere that renders
+ * navigation, or an internal-only section is advertised to every school user
+ * who can open the Brain.
+ */
+export function visibleBrainSections(canSeeInternal: boolean): BrainSectionNav[] {
+  return BRAIN_SECTIONS.filter((section) => canSeeInternal || section.audience !== 'internal');
+}
+
 export const BRAIN_ROUTES: string[] = BRAIN_SECTIONS.flatMap((section) => [
   section.href,
   ...section.screens.map((screen) => screen.href),

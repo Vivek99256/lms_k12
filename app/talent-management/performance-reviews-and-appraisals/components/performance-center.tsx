@@ -17,9 +17,9 @@
  * derivation is what silently broke the tabs on two sibling screens.
  *
  * Reused by the Compensation sidebar entry (`app/talent-management/compensation/page.tsx`),
- * which renders this same component with `comingSoon` set - see that file and
- * `ComingSoonBanner` below for how G2G's `COMING_SOON_CONTENT` treatment was
- * replicated.
+ * which renders this same component with `comingSoon` set. That banner now uses
+ * the shared `ComingSoonPanel` (`components/ui/coming-soon.tsx`) rather than a
+ * local copy, so it matches every other "coming soon" surface in the product.
  *
  * Import-path / transport changes only (see file header comments in
  * `performance-shared.tsx` / `../../_lib/performance-api.ts` for the reasoning):
@@ -57,6 +57,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { ComingSoonPanel } from '@/components/ui/coming-soon'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -488,9 +489,14 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
   return (
     <div className="flex h-full flex-col overflow-hidden ">
       <div className="flex-1 overflow-y-auto pb-8 pr-2 custom-scrollbar">
+        {/*
+          Sits in front of a screen that genuinely works — the Compensation
+          menu entry routes to this same, fully functional PerformanceCenter.
+          So this states what is still coming without disabling anything.
+        */}
         {comingSoon && (
           <div className="mb-6">
-            <ComingSoonBanner title={comingSoon.title} description={comingSoon.description} />
+            <ComingSoonPanel title={comingSoon.title} summary={comingSoon.description} />
           </div>
         )}
 
@@ -1292,35 +1298,6 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
         team={detailState.team}
         onClose={() => setTeamDetailsOpen(false)}
       />
-    </div>
-  )
-}
-
-/* ================================================================== *
- * Coming soon banner (Compensation sidebar entry)
- * ================================================================== */
-
-/**
- * Replicates G2G's `ComingSoonScreen` copy/visual treatment (see
- * `components/shell/gtg-app-shell.tsx`), driven by the same
- * `COMING_SOON_CONTENT['50']` title/description G2G ships for the
- * Compensation menu entry. G2G's shell only shows that full-screen treatment
- * when no route resolves at all; the Compensation menu item is in fact routed
- * straight to `PerformanceCenter` (`content-map-m3.ts`), so this component
- * renders as a top-of-screen banner in front of the same, fully working
- * screen - reusing the component rather than reimplementing it, per the
- * migration brief.
- */
-function ComingSoonBanner({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-dashed border-border bg-card px-5 py-4">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground" aria-hidden="true">
-        <Gift className="size-4.5 opacity-70" />
-      </div>
-      <div>
-        <h2 className="text-sm font-semibold text-foreground">{title} — coming soon</h2>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
-      </div>
     </div>
   )
 }

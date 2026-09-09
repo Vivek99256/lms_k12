@@ -48,6 +48,7 @@
     "date-fns": "^4.4.0",
     "geist": "^1.7.2",
     "html2canvas-pro": "^2.3.2",
+    "isomorphic-dompurify": "^4.1.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",

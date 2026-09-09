@@ -59,6 +59,14 @@ const profileMenuItems = [
   // 'Group-wise Rights',
   // 'Individual Rights',
   'Mobile App Rights',
+  // One consolidated view of every platform service and AI capability, each
+  // marked live or coming soon. It sits here rather than in the module nav
+  // because it describes the platform, not any one module.
+  'Platform Administration',
+  // The cross-module roadmap, for when a customer asks what else is coming.
+  // Kept next to Platform Administration because the two are siblings: that one
+  // covers the platform's own services, this one covers every module.
+  "What's Coming",
 ] as const;
 
 /**
@@ -110,6 +118,8 @@ export default function Header({
     'Group-wise Rights': '/general/groupwise_rights',
     'Individual Rights': '/general/individual_rights',
     'Mobile App Rights': '/general/mobile_app_rights',
+    'Platform Administration': '/platform-administration',
+    "What's Coming": '/platform-roadmap',
   };
 
   const platformServicesRoutes: Record<string, string> = {
