@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Search, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { publishSelectedAcademicYear } from '@/lib/academic-year';
 import { useRouter } from 'next/navigation';
 
 const profileMenuItems = [
@@ -112,7 +113,10 @@ export default function Header({
   // changes years, otherwise every term select goes empty for any other year.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (effectiveYear) localStorage.setItem('selectedAcademicYear', effectiveYear);
+    // Published rather than written directly, so screens that follow the
+    // switcher inside this tab hear about it — localStorage's own `storage`
+    // event only ever reaches the OTHER tabs. Same key, same value as before.
+    if (effectiveYear) publishSelectedAcademicYear(effectiveYear);
     if (effectiveTerm) localStorage.setItem('selectedAcademicTerm', effectiveTerm);
   }, [effectiveYear, effectiveTerm]);
 
