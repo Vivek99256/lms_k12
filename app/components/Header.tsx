@@ -2,13 +2,21 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, ChevronDown, Menu, LogOut, GraduationCap, BookOpen, Bot } from 'lucide-react';
+import {
+  BadgeCheck, Bell, BookOpen, Bot, Boxes, CalendarClock, ChartLine, ChevronDown,
+  CirclePlus, ClipboardCheck, FileClock, FileText, GraduationCap, LayoutDashboard,
+  LayoutTemplate, Lightbulb, LogOut, Map as MapIcon, Menu, MessageSquareText,
+  MessagesSquare, Plug, Rocket, Server, Share2, Shield, ShieldCheck,
+  SlidersHorizontal, Smartphone, UserPlus, Waypoints, Workflow,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { publishSelectedAcademicYear } from '@/lib/academic-year';
 import { useRouter } from 'next/navigation';
 import HeaderMenuSearch from '@/app/components/HeaderMenuSearch';
 import type { MenuItem } from '@/app/data/menuItems';
 import type { MenuSearchEntry } from '@/app/data/menuSearch';
+import { AI_CAPABILITIES, capabilityHref } from '@shared/ai-intelligence-core';
 
 const platformServicesItems = [
   'RBAC',
@@ -22,20 +30,71 @@ const platformServicesItems = [
   'Event Bus',
 ] as const;
 
-const aiIntelligenceItems = [
-  'AI Providers',
-  'Model Management',
-  'Prompt Management',
-  'AI Policies',
-  'Agent Management',
-  'Conversational AI',
-  'Knowledge & RAG',
-  'Recommendation Engine',
-  'Knowledge Graph',
-  'AI Evaluation',
-  'Usage & Cost',
-  'AI Audit',
-] as const;
+/**
+ * The glyph each entry wears in the dropdown, so its cards read the same way the
+ * sidebar's Level 2 cards do — icon chip, label, one card per destination.
+ *
+ * These lists are hard-coded in this file rather than served from
+ * `tblmenumaster`, so unlike the sidebar there is no `icon` column to resolve;
+ * the mapping lives beside the list it describes. A label with no entry here
+ * falls back to its own initial, which is what the sidebar does for an
+ * unresolvable icon — a missing glyph never costs the row its shape.
+ */
+const platformServicesIcons: Record<string, LucideIcon> = {
+  'RBAC': ShieldCheck,
+  'Workflow': Workflow,
+  'Notification': Bell,
+  'Template': LayoutTemplate,
+  'Scheduler': CalendarClock,
+  'Document': FileText,
+  'Integration': Plug,
+  'Audit': ClipboardCheck,
+  'Event Bus': Waypoints,
+};
+
+/**
+ * AI & Intelligence is no longer a hand-written list.
+ *
+ * It was an array of twelve labels beside a map of twelve routes, ten of which
+ * pointed at `/general/coming-soon?module=<label>` — so the menu knew a name and
+ * nothing more, and the next product to want these entries could only copy them.
+ * Both now come from `packages/ai-intelligence-core`, which G2G and Enterprise
+ * Brain can import. Adding or renaming a capability is a registry edit; this file
+ * does not change.
+ */
+const aiIntelligenceItems = AI_CAPABILITIES.map((capability) => capability.name);
+
+/**
+ * Keyed by slug, not by name: the slug is the registry's stable identifier — it
+ * is what `/ai/<slug>` and the menu rows are built from — so renaming a
+ * capability keeps its icon, while renaming its slug is already a route change
+ * nobody makes silently.
+ *
+ * The glyphs match the ones `2026_09_10_000001_add_ai_intelligence_menu` gives
+ * the same twelve rows in `tblmenumaster`, so a capability looks the same
+ * whether it is reached from here or from the sidebar.
+ */
+const aiCapabilityIcons: Record<string, LucideIcon> = {
+  'providers': Server,
+  'models': Boxes,
+  'prompts': MessageSquareText,
+  'policies': Shield,
+  'agents': Bot,
+  'conversational-ai': MessagesSquare,
+  'knowledge-rag': BookOpen,
+  'recommendations': Lightbulb,
+  'knowledge-graph': Share2,
+  'evaluation': BadgeCheck,
+  'usage-cost': ChartLine,
+  'audit': FileClock,
+};
+
+const aiIntelligenceIcons: Record<string, LucideIcon> = Object.fromEntries(
+  AI_CAPABILITIES.flatMap((capability) => {
+    const icon = aiCapabilityIcons[capability.slug];
+    return icon ? [[capability.name, icon] as const] : [];
+  }),
+);
 
 function LogoImage({ url, fallback }: { url: string; fallback: React.ReactNode }) {
   const [hasError, setHasError] = useState(false);
@@ -52,7 +111,17 @@ function LogoImage({ url, fallback }: { url: string; fallback: React.ReactNode }
   );
 }
 
-const profileMenuItems = [
+/**
+ * Setting the platform up for a tenant, and describing what it is. These used to
+ * sit loose at the top of the profile dropdown; they are grouped here so the
+ * dropdown reads as three peer groups instead of a flat list plus two groups.
+ *
+ * They are deliberately NOT folded into Platform Services or AI & Intelligence:
+ * those two are catalogs of what the running platform *provides* (services and
+ * AI capabilities), while these are the rollout and configuration screens an
+ * admin *operates*, plus two read-only views describing the platform itself.
+ */
+const platformSetupItems = [
   'Implementation',
   'Onboarding',
   'Add Process',
@@ -69,6 +138,18 @@ const profileMenuItems = [
   // covers the platform's own services, this one covers every module.
   "What's Coming",
 ] as const;
+
+const platformSetupIcons: Record<string, LucideIcon> = {
+  'Implementation': Rocket,
+  'Onboarding': UserPlus,
+  'Add Process': CirclePlus,
+  'Fields Configuration': SlidersHorizontal,
+  'Group-wise Rights': ShieldCheck,
+  'Individual Rights': UserPlus,
+  'Mobile App Rights': Smartphone,
+  'Platform Administration': LayoutDashboard,
+  "What's Coming": MapIcon,
+};
 
 /**
  * Academic years and terms both live in one table, `academic_year`, one row per
@@ -106,12 +187,8 @@ export default function Header({
   const [showTermDropdown, setShowTermDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userPosition, setUserPosition] = useState<{ top: number; right: number } | null>(null);
-  const [showPlatformServicesSubmenu, setShowPlatformServicesSubmenu] = useState(false);
-  const [showAIIntelligenceSubmenu, setShowAIIntelligenceSubmenu] = useState(false);
-  const platformServicesHoverTimeout = useRef<NodeJS.Timeout | null>(null);
-  const aiIntelligenceHoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const menuRoutes: Record<string, string> = {
+  const platformSetupRoutes: Record<string, string> = {
     'Implementation': '/general/implementation_management',
     'Onboarding': '/general/onboarding',
     'Add Process': '/general/add_process',
@@ -135,20 +212,55 @@ export default function Header({
     'Event Bus': '/general/coming-soon?module=Event Bus',
   };
 
-  const aiIntelligenceRoutes: Record<string, string> = {
-    'AI Providers': '/general/coming-soon?module=AI Providers',
-    'Model Management': '/general/coming-soon?module=Model Management',
-    'Prompt Management': '/general/coming-soon?module=Prompt Management',
-    'AI Policies': '/general/coming-soon?module=AI Policies',
-    'Agent Management': '/enterprise-brain/automation/agents',
-    'Conversational AI': '/enterprise-brain/automation/conversational-ai',
-    'Knowledge & RAG': '/general/coming-soon?module=Knowledge & RAG',
-    'Recommendation Engine': '/general/coming-soon?module=Recommendation Engine',
-    'Knowledge Graph': '/general/coming-soon?module=Knowledge Graph',
-    'AI Evaluation': '/general/coming-soon?module=AI Evaluation',
-    'Usage & Cost': '/general/coming-soon?module=Usage & Cost',
-    'AI Audit': '/general/coming-soon?module=AI Audit',
-  };
+  // A capability with a working screen keeps its own route; the rest resolve to
+  // the shared console at /ai/<slug>, which explains what the capability is and
+  // which of the three products use it. The two live routes below are unchanged
+  // — they come from the registry rows for Agent Management and Conversational AI.
+  const aiIntelligenceRoutes: Record<string, string> = Object.fromEntries(
+    AI_CAPABILITIES.map((capability) => [capability.name, capabilityHref(capability)]),
+  );
+
+  /**
+   * The profile dropdown's groups, in display order — one column each, the three
+   * side by side with their items listed underneath, so every destination is one
+   * click away instead of three. Every group renders from the same markup below,
+   * so adding one is an entry here rather than another copy of the column.
+   * Platform Setup is listed last, beside the two capability catalogs, because it
+   * is the tenant-facing set rather than a platform one.
+   *
+   * `href` is the group's own overview screen, which makes the heading a
+   * destination rather than a label. Platform Setup has none: it is a set of
+   * configuration screens with nothing that summarises them, and pointing its
+   * heading at one of its own items would make that item look like the group.
+   */
+  const menuGroups: {
+    label: string;
+    href?: string;
+    items: readonly string[];
+    routes: Record<string, string>;
+    icons: Record<string, LucideIcon>;
+  }[] = [
+    {
+      label: 'Platform Services',
+      href: '/platform-administration',
+      items: platformServicesItems,
+      routes: platformServicesRoutes,
+      icons: platformServicesIcons,
+    },
+    {
+      label: 'AI & Intelligence',
+      href: '/ai',
+      items: aiIntelligenceItems,
+      routes: aiIntelligenceRoutes,
+      icons: aiIntelligenceIcons,
+    },
+    {
+      label: 'Platform Setup',
+      items: platformSetupItems,
+      routes: platformSetupRoutes,
+      icons: platformSetupIcons,
+    },
+  ];
 
   // Seeded only from what this browser last chose. Anything else is adopted from
   // the institute's own rows once they resolve, below.
@@ -269,55 +381,22 @@ const logoUrl = (() => {
     setShowTermDropdown(prev => !prev);
   };
 
+  /** Every path that dismisses the dropdown goes through here. */
+  const closeUserDropdown = () => {
+    setShowUserDropdown(false);
+  };
+
   const handleUserToggle = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (showUserDropdown) {
+      closeUserDropdown();
+      return;
+    }
     const rect = e.currentTarget.getBoundingClientRect();
     setUserPosition({
       top: rect.bottom + 8,
       right: Math.max(12, window.innerWidth - rect.right),
     });
-    setShowUserDropdown(prev => !prev);
-  };
-
-  const handlePlatformServicesEnter = () => {
-    if (platformServicesHoverTimeout.current) clearTimeout(platformServicesHoverTimeout.current);
-    setShowPlatformServicesSubmenu(true);
-  };
-
-  const handlePlatformServicesLeave = () => {
-    platformServicesHoverTimeout.current = setTimeout(() => {
-      setShowPlatformServicesSubmenu(false);
-    }, 150);
-  };
-
-  const handlePlatformServicesSubmenuEnter = () => {
-    if (platformServicesHoverTimeout.current) clearTimeout(platformServicesHoverTimeout.current);
-  };
-
-  const handlePlatformServicesSubmenuLeave = () => {
-    platformServicesHoverTimeout.current = setTimeout(() => {
-      setShowPlatformServicesSubmenu(false);
-    }, 150);
-  };
-
-  const handleAIIntelligenceEnter = () => {
-    if (aiIntelligenceHoverTimeout.current) clearTimeout(aiIntelligenceHoverTimeout.current);
-    setShowAIIntelligenceSubmenu(true);
-  };
-
-  const handleAIIntelligenceLeave = () => {
-    aiIntelligenceHoverTimeout.current = setTimeout(() => {
-      setShowAIIntelligenceSubmenu(false);
-    }, 150);
-  };
-
-  const handleAIIntelligenceSubmenuEnter = () => {
-    if (aiIntelligenceHoverTimeout.current) clearTimeout(aiIntelligenceHoverTimeout.current);
-  };
-
-  const handleAIIntelligenceSubmenuLeave = () => {
-    aiIntelligenceHoverTimeout.current = setTimeout(() => {
-      setShowAIIntelligenceSubmenu(false);
-    }, 150);
+    setShowUserDropdown(true);
   };
 
   useEffect(() => {
@@ -328,17 +407,12 @@ const logoUrl = (() => {
       }
       setShowYearDropdown(false);
       setShowTermDropdown(false);
+      // Inlined rather than calling closeUserDropdown, so this listener keeps
+      // its empty dependency list — setters are stable, that helper is not.
       setShowUserDropdown(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (platformServicesHoverTimeout.current) clearTimeout(platformServicesHoverTimeout.current);
-      if (aiIntelligenceHoverTimeout.current) clearTimeout(aiIntelligenceHoverTimeout.current);
-    };
   }, []);
 
   // The shell owns menu navigation, because opening a screen also has to move
@@ -469,107 +543,88 @@ const logoUrl = (() => {
         
         {showUserDropdown && userPosition && typeof document !== 'undefined' && createPortal(
           <div
-            className="fixed z-[9999] rounded-xl border border-gray-200 bg-white shadow-xl"
+            className="fixed z-[9999] max-w-[calc(100vw-24px)] overflow-x-auto rounded-2xl border bg-popover shadow-lg"
             style={{ top: userPosition.top, right: userPosition.right }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="flex">
-              <div className="w-[170px] py-1.5">
-                {profileMenuItems.map((item, index) => {
-                  const isLastMenuItem = index === profileMenuItems.length - 1;
-                  return (
-                    <React.Fragment key={item}>
-                      <button
-                        type="button"
-                        onClick={() => { setShowUserDropdown(false); router.push(menuRoutes[item] || '/'); }}
-                        className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
-                      >
-                        {item}
-                      </button>
-                      {isLastMenuItem && <div className="my-1.5 border-t border-gray-300" />}
-                    </React.Fragment>
-                  );
-                })}
+            {/*
+              One panel, three columns, every item visible. The groups used to be
+              rows that revealed a flyout on hover, which put three interactions
+              between the avatar and a screen; laid out side by side they cost one.
 
-                {/*<div className="my-1.5 border-t border-gray-300" />*/}
-                <div
-                  className="relative"
-                  onMouseEnter={handlePlatformServicesEnter}
-                  onMouseLeave={handlePlatformServicesLeave}
-                >
-                  <button
-                    type="button"
-                    className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between"
-                  >
-                    Platform Services
-                    <ChevronDown size={14} className="text-gray-400" />
-                  </button>
-                  {showPlatformServicesSubmenu && (
-                    <div
-                      className="absolute right-full top-0 w-[170px] border-r border-gray-100 bg-white py-1.5 shadow-xl z-50 rounded-l-xl"
-                      onMouseEnter={handlePlatformServicesSubmenuEnter}
-                      onMouseLeave={handlePlatformServicesSubmenuLeave}
-                    >
-                      {platformServicesItems.map((subItem) => (
+              The cards below are the sidebar's Level 2 cards — same height, radius,
+              border, icon chip and hover treatment — because these entries are peers
+              of the ones in that panel, and a user who learns the shape there should
+              not have to learn a second one here. Columns are a fixed 220px rather
+              than a share of the panel: that is the width at which the longest label
+              in the three lists still fits on one line. Below the sm breakpoint they
+              stack, since three of them do not fit a phone at any useful width.
+            */}
+            <div className="grid max-h-[70vh] grid-cols-1 gap-x-3 gap-y-5 overflow-y-auto p-3 sm:grid-cols-[repeat(3,220px)]">
+              {menuGroups.map((group) => {
+                // Read out of the group before the closures below capture it, so
+                // the optional href narrows to a string for the click handler.
+                const groupHref = group.href;
+
+                return (
+                  <div key={group.label} className="min-w-0">
+                    <div className="px-1 pb-2">
+                      {groupHref ? (
                         <button
-                          key={subItem}
                           type="button"
-                          onClick={() => { setShowUserDropdown(false); router.push(platformServicesRoutes[subItem] || '/'); }}
-                          className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                          onClick={() => { closeUserDropdown(); router.push(groupHref); }}
+                          className="max-w-full truncate rounded-md text-left text-sm font-bold text-popover-foreground transition-colors hover:text-[#0D6EFD]"
                         >
-                          {subItem}
+                          {group.label}
                         </button>
-                      ))}
+                      ) : (
+                        <span className="block truncate text-sm font-bold text-popover-foreground">
+                          {group.label}
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div
-                  className="relative"
-                  onMouseEnter={handleAIIntelligenceEnter}
-                  onMouseLeave={handleAIIntelligenceLeave}
-                >
-                  <button
-                    type="button"
-                    className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between"
-                  >
-                    AI & Intelligence
-                    <ChevronDown size={14} className="text-gray-400" />
-                  </button>
-                  {showAIIntelligenceSubmenu && (
-                    <div
-                      className="absolute right-full top-0 w-[170px] border-r border-gray-100 bg-white py-1.5 shadow-xl z-50 rounded-l-xl"
-                      onMouseEnter={handleAIIntelligenceSubmenuEnter}
-                      onMouseLeave={handleAIIntelligenceSubmenuLeave}
-                    >
-                      {aiIntelligenceItems.map((subItem) => (
-                        <button
-                          key={subItem}
-                          type="button"
-                          onClick={() => { setShowUserDropdown(false); router.push(aiIntelligenceRoutes[subItem] || '/'); }}
-                          className="w-full px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
-                        >
-                          {subItem}
-                        </button>
-                      ))}
+                    <div className="space-y-1 border-t border-border pt-2">
+                      {group.items.map((subItem) => {
+                        const ItemIcon = group.icons[subItem];
+                        const route = group.routes[subItem] || '/';
+
+                        return (
+                          <button
+                            key={subItem}
+                            type="button"
+                            onClick={() => { closeUserDropdown(); router.push(route); }}
+                            title={subItem}
+                            className="h-10 w-full flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1.5 text-left text-sm font-semibold text-muted-foreground shadow-xs transition-all cursor-pointer hover:border-muted-foreground/30 hover:bg-muted/60 hover:text-foreground hover:shadow-sm"
+                          >
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                              {ItemIcon ? <ItemIcon size={15} /> : subItem.charAt(0).toUpperCase()}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate">{subItem}</span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
+                  </div>
+                );
+              })}
+            </div>
 
-                <div className="my-1.5 border-t border-gray-300" />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    logout();
-                    setShowUserDropdown(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-4 py-1.5 text-left text-[13px] leading-5 text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
-                >
-                  <LogOut size={16} />
-                  Sign Out
-                </button>
-              </div>
+            <div className="border-t border-border p-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  logout();
+                  closeUserDropdown();
+                }}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <LogOut size={15} />
+                </span>
+                Sign Out
+              </button>
             </div>
           </div>,
           document.body
