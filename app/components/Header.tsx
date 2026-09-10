@@ -125,10 +125,13 @@ export default function Header({
 
   const platformServicesRoutes: Record<string, string> = {
     'RBAC': '/organization-management/role-and-permissions',
-    'Workflow': '/general/coming-soon?module=Workflow',
-    'Notification': '/general/coming-soon?module=Notification',
+    // The three centralised engines every module configures against rather than
+    // rebuilding. Each reads the same module/component catalogue, served by
+    // Laravel at /api/platform/registry — see config/platform_services.php.
+    'Workflow': '/platform-services/workflow',
+    'Notification': '/platform-services/notification',
     'Template': '/general/coming-soon?module=Template',
-    'Scheduler': '/general/coming-soon?module=Scheduler',
+    'Scheduler': '/platform-services/scheduler',
     'Document': '/general/coming-soon?module=Document',
     'Integration': '/general/coming-soon?module=Integration',
     'Audit': '/general/coming-soon?module=Audit',
