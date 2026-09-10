@@ -208,12 +208,17 @@ const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 
  * live and this is the one visible change in Phase A2 - reverting it is a one-line
  * edit rather than a rollback.
  *
- * Note: removing the button loses no reach. Every H5P item in the estate is attached
- * to a chapter that does not exist in chapter_master, so the button already led to an
- * empty page for all 120 chapters the catalogue can show. See
+ * Currently TRUE: the button was restored on request. Both surfaces are live at once -
+ * the button routes to /h5p/html_contents, and the 'H5P Interactive' filter tab stays
+ * in the content library. Neither disables the other.
+ *
+ * Note: the button's reach is limited server-side. Every H5P item in the estate is
+ * attached to a chapter that does not exist in chapter_master, so /h5p/html_contents
+ * lands on an empty list for all 120 chapters the catalogue can show until the backend
+ * reconciles those chapter ids. See
  * next_lms_erp/docs/decisions/2026-09-07-h5p-format-tag.md.
  */
-const SHOW_LEGACY_H5P_BUTTON = false;
+const SHOW_LEGACY_H5P_BUTTON = true;
 
 /**
  * Shown on a control the user's role does not permit.
@@ -285,10 +290,8 @@ const UPLOAD_TYPE_CONFIG: Record<
   },
 };
 
-type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity';
-type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded';
 type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity' | 'H5P Interactive';
-type ChapterContentSource = 'Gamma AI' | 'Uploaded';
+type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded';
 
 /**
  * content_master.source values written by the Generate Content flow. It has used
