@@ -20,8 +20,11 @@ import {
   getCurriculumLabel,
   getCurriculumSession,
   type CurriculumApiResult,
+  type CurriculumAssessment,
   type OutcomeNode,
+  type UnitChapter,
 } from '../../../data/curriculum';
+import { Tooltip } from '@/components/ui/tooltip';
 
 type ResolvedCurriculumTarget = {
   subjectId: string;
@@ -148,6 +151,194 @@ function buildLiveCourse(
   }
 
   return fallbackCourse;
+}
+
+/** Two-column "label ... value" rows, shared by both marks tooltips. */
+function WeightRows({ rows }: { rows: Array<{ label: React.ReactNode; value: string; key: string }> }) {
+  return (
+    <table className="w-full table-fixed border-collapse">
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.key}>
+            <td className="py-0.5 pr-3 align-top font-normal text-[#475569]">{row.label}</td>
+            {/* w-12 + nowrap: the value column keeps its place whatever the
+                label does. Left to size itself it loses to labels like
+                "Demonstrate Knowledge and Understanding", which alone are wider
+                than the tooltip's own max-w-xs — the number then lands outside
+                the box and the row reads as having no value at all. */}
+            <td className="w-12 whitespace-nowrap py-0.5 text-right align-top font-semibold tabular-nums text-[#0F172A]">
+              {row.value}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * What the internal marks are made of.
+ *
+ * Mined out of the syllabus prose rather than read from a field, so when the
+ * components do not add up to the internal_marks on record that is said out
+ * loud. A silently wrong split is worse than none here — these are the numbers
+ * a coordinator carries into an assessment plan.
+ */
+function InternalMarksTooltip({
+  assessment,
+  internalMarks,
+}: {
+  assessment: CurriculumAssessment | null;
+  internalMarks: number;
+}) {
+  if (!assessment || assessment.internal_breakdown.length === 0) {
+    return (
+      <p className="max-w-[15rem] text-[#64748B]">
+        The extracted syllabus does not record how these {internalMarks} internal marks are split.
+      </p>
+    );
+  }
+
+  return (
+    <div className="w-[17rem]">
+      <p className="mb-1.5 font-semibold text-[#0F172A]">Internal assessment · {internalMarks} marks</p>
+
+      <WeightRows
+        rows={assessment.internal_breakdown.map((row, index) => ({
+          key: `${row.component ?? 'unnamed'}-${index}`,
+          // The syllabus states this allocation without a label the extract
+          // could keep. Saying so beats attributing its marks to the component
+          // above it, which is what the total alone would never reveal.
+          label: row.component ?? (
+            <span className="italic text-[#94A3B8]">Not named in the syllabus extract</span>
+          ),
+          value: String(row.marks),
+        }))}
+      />
+
+      <div className="mt-1 flex justify-between gap-3 border-t border-[#E2E8F0] pt-1 font-semibold text-[#0F172A]">
+        <span>Total</span>
+        <span className="shrink-0 tabular-nums">{assessment.internal_breakdown_total}</span>
+      </div>
+
+      {assessment.internal_reconciles === false ? (
+        <p className="mt-1.5 text-[#B45309]">
+          These add up to {assessment.internal_breakdown_total}, not the {internalMarks} on record.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** How the theory paper is weighted across competencies. */
+function TheoryTooltip({
+  assessment,
+  theoryMarks,
+}: {
+  assessment: CurriculumAssessment | null;
+  theoryMarks: number;
+}) {
+  const competencies = assessment?.competencies ?? [];
+
+  return (
+    <div className="w-[17rem]">
+      <p className="mb-1.5 font-semibold text-[#0F172A]">Theory paper · {theoryMarks} marks</p>
+
+      {competencies.length === 0 ? (
+        <p className="max-w-[15rem] text-[#64748B]">
+          The extracted syllabus does not record a competency weighting for this paper.
+        </p>
+      ) : (
+        <>
+          <WeightRows
+            rows={competencies.map((row, index) => ({
+              key: `${row.competency}-${index}`,
+              label: row.competency,
+              value: `${row.percentage}%`,
+            }))}
+          />
+          <div className="mt-1 flex justify-between gap-3 border-t border-[#E2E8F0] pt-1 font-semibold text-[#0F172A]">
+            <span>Total</span>
+            <span className="shrink-0 tabular-nums">{assessment?.competency_total_percent}%</span>
+          </div>
+        </>
+      )}
+
+      {assessment?.theory_marks_source === 'derived' ? (
+        <p className="mt-1.5 text-[#64748B]">
+          {theoryMarks} is total minus internal — the syllabus does not state it directly.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One chapter, and the concepts beneath it — the third level of the tree.
+ *
+ * Collapsed by default, and it has to be: these chapters carry forty to sixty
+ * concepts each, so a single expanded unit would run to two hundred rows and
+ * bury every other unit on the page.
+ */
+function ChapterRow({ chapter }: { chapter: UnitChapter }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const ToggleIcon = isOpen ? ChevronDown : ChevronRight;
+  const hasConcepts = chapter.concept_count > 0;
+
+  return (
+    <div className="rounded-[12px] border border-[#E2E8F0]">
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+        disabled={!hasConcepts}
+        className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition hover:bg-[#F8FAFC] disabled:cursor-default disabled:hover:bg-transparent"
+      >
+        <span className="mt-0.5 shrink-0 text-[#94A3B8]">
+          {hasConcepts ? <ToggleIcon size={16} /> : <span className="block h-4 w-4" />}
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] leading-6 text-[#0F172A] sm:text-[15px]">
+            {chapter.chapter_name}
+          </span>
+          {/* The longer extracted title for the same chapter, where the two
+              lists could be lined up. Kept visible because that is the name the
+              rest of the LMS shows for it. */}
+          {chapter.extracted_name && chapter.extracted_name !== chapter.chapter_name ? (
+            <span className="mt-0.5 block text-[12px] text-[#94A3B8]">{chapter.extracted_name}</span>
+          ) : null}
+        </span>
+
+        <span className="flex shrink-0 items-center gap-1.5">
+          {chapter.periods != null ? (
+            <span className="rounded-full bg-[#EEF2FF] px-2.5 py-1 text-[11px] font-semibold text-[#4F46E5]">
+              {chapter.periods} {chapter.periods === 1 ? 'period' : 'periods'}
+            </span>
+          ) : null}
+          {hasConcepts ? (
+            <span className="rounded-full bg-[#F1F5F9] px-2.5 py-1 text-[11px] font-semibold text-[#475569]">
+              {chapter.concept_count} concepts
+            </span>
+          ) : null}
+        </span>
+      </button>
+
+      {isOpen && hasConcepts ? (
+        <div className="border-t border-[#E2E8F0] px-3 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">Concepts</p>
+          <ul className="mt-2 max-h-[420px] space-y-1.5 overflow-y-auto border-l-2 border-[#E2E8F0] pl-3">
+            {chapter.concepts.map((name, index) => (
+              <li key={`${name}-${index}`} className="flex items-start gap-2">
+                <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#4F46E5]" />
+                <span className="text-[13px] leading-6 text-[#334155] sm:text-[14px]">{name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function OutcomeTree({
@@ -379,9 +570,36 @@ export default function CurriculumPage() {
 
             <div className="flex flex-wrap items-center gap-2">
               {curriculumData?.internal_marks != null ? (
-                <span className="rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#4F46E5] shadow-[0_1px_6px_rgba(15,23,42,0.06)]">
-                  Internal marks {curriculumData.internal_marks}
-                </span>
+                <Tooltip
+                  side="bottom"
+                  focusable
+                  content={
+                    <InternalMarksTooltip
+                      assessment={curriculumData.assessment}
+                      internalMarks={curriculumData.internal_marks}
+                    />
+                  }
+                >
+                  <span className="cursor-help rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#4F46E5] underline decoration-dotted decoration-[#A5B4FC] underline-offset-4 shadow-[0_1px_6px_rgba(15,23,42,0.06)]">
+                    Internal marks {curriculumData.internal_marks}
+                  </span>
+                </Tooltip>
+              ) : null}
+              {curriculumData?.assessment?.theory_marks != null ? (
+                <Tooltip
+                  side="bottom"
+                  focusable
+                  content={
+                    <TheoryTooltip
+                      assessment={curriculumData.assessment}
+                      theoryMarks={curriculumData.assessment.theory_marks}
+                    />
+                  }
+                >
+                  <span className="cursor-help rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#4F46E5] underline decoration-dotted decoration-[#A5B4FC] underline-offset-4 shadow-[0_1px_6px_rgba(15,23,42,0.06)]">
+                    Theory {curriculumData.assessment.theory_marks}
+                  </span>
+                </Tooltip>
               ) : null}
               {curriculumData?.status ? (
                 <span className="rounded-full border border-[#D8E1F0] bg-white px-4 py-2 text-[13px] font-semibold capitalize text-[#334155] shadow-[0_1px_6px_rgba(15,23,42,0.06)]">
@@ -446,12 +664,23 @@ export default function CurriculumPage() {
                   <div className="space-y-3">
                     {unitData.map((unit) => {
                       const isOpen = openUnitId === unit.unit_number;
-                      const unitChapters = parseUnitChapters(unit.unit_chapters);
+                      // The unit's chapters, named as lms_units names them and
+                      // carrying the concepts read from lms_concept. The raw
+                      // unit_chapters list stays as a fallback for the case
+                      // where the API returns no enriched chapters at all.
+                      const chapters = unit.chapters ?? [];
+                      const fallbackNames = parseUnitChapters(unit.unit_chapters);
+                      const hasChapters = chapters.length > 0;
+                      const chapterCount = hasChapters ? chapters.length : fallbackNames.length;
+                      const unitPeriods = chapters.reduce(
+                        (total, chapter) => total + (chapter.periods ?? 0),
+                        0
+                      );
                       const ToggleIcon = isOpen ? ChevronDown : ChevronRight;
                       const subtitleParts = [
-                        unitChapters.length > 0 ? `${unitChapters.length} chapter${unitChapters.length === 1 ? '' : 's'}` : null,
+                        chapterCount > 0 ? `${chapterCount} chapter${chapterCount === 1 ? '' : 's'}` : null,
                         unit.total_marks != null ? `${unit.total_marks} marks` : null,
-                        unit.planned_periods ? String(unit.planned_periods) : null,
+                        unitPeriods > 0 ? `${unitPeriods} periods` : (unit.planned_periods ? String(unit.planned_periods) : null),
                       ].filter(Boolean);
 
                       return (
@@ -488,11 +717,20 @@ export default function CurriculumPage() {
                               <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">
                                 Chapters
                               </p>
-                              {unitChapters.length === 0 ? (
+                              {chapterCount === 0 ? (
                                 <p className="mt-3 text-[14px] text-[#64748B]">No chapters available.</p>
+                              ) : hasChapters ? (
+                                <div className="mt-3 space-y-2">
+                                  {chapters.map((chapter, index) => (
+                                    <ChapterRow
+                                      key={chapter.chapter_id ?? `${unit.unit_number}-${index}`}
+                                      chapter={chapter}
+                                    />
+                                  ))}
+                                </div>
                               ) : (
                                 <div className="mt-3 space-y-3">
-                                  {unitChapters.map((chapterName, index) => (
+                                  {fallbackNames.map((chapterName, index) => (
                                     <div
                                       key={`${unit.unit_number}-${chapterName}-${index}`}
                                       className="py-2 text-[14px] text-[#0F172A] sm:text-[15px]"
