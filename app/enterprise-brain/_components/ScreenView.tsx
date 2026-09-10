@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { Search } from 'lucide-react';
-import { useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { fetchScreen } from '@/lib/brain/api';
 import { useBrainResource } from './useBrainResource';

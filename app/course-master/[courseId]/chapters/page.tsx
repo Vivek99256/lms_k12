@@ -285,10 +285,8 @@ const UPLOAD_TYPE_CONFIG: Record<
   },
 };
 
-type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity';
 type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded';
 type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity' | 'H5P Interactive';
-type ChapterContentSource = 'Gamma AI' | 'Uploaded';
 
 /**
  * content_master.source values written by the Generate Content flow. It has used
