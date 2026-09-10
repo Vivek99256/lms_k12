@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, ChevronRight, Network, Search } from 'lucide-react';
 import { fetchGraph, type BrainGraphExpansion, type BrainGraphNode } from '@/lib/brain/api';
+import { useSelectedAcademicYear } from '@/lib/academic-year';
 import { Card, ErrorState, LoadingState, HeroHeader } from '../../_components/primitives';
 import { IntelligenceCard } from '../../_components/IntelligenceCard';
 
@@ -26,6 +27,7 @@ import { IntelligenceCard } from '../../_components/IntelligenceCard';
  * beside it.
  */
 export default function GraphExplorerPage() {
+  const syear = useSelectedAcademicYear();
   const [roots, setRoots] = useState<Array<{ type: string; label: string; count: number }>>([]);
   const [type, setType] = useState('');
   const [nodes, setNodes] = useState<BrainGraphNode[]>([]);
@@ -39,6 +41,11 @@ export default function GraphExplorerPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // Anything already on screen belongs to the year that was selected when it
+    // was fetched, so it is dropped rather than left standing under a new one.
+    setNodes([]);
+    setSelected(null);
+    setTrail([]);
     try {
       const payload = await fetchGraph();
       setRoots(payload.roots ?? []);
@@ -49,10 +56,15 @@ export default function GraphExplorerPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+    // This screen drives its own drill-down state instead of going through
+    // useBrainResource, so it is the one place the selected year has to be
+    // named explicitly. `fetchGraph` reads the year from the session; listing
+    // it here is what makes the roots reload when the header switches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syear]);
 
-  // Load the graph roots once on mount — reading an external system, not
-  // synchronising React state with React state.
+  // Load the graph roots on mount, and again whenever the LMS year changes —
+  // reading an external system, not synchronising React state with React state.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();

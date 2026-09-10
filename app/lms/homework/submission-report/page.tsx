@@ -41,10 +41,10 @@ import {
   type TableExportRow,
 } from "@/lib/table-export";
 import {
-  getAssignmentAiStatus,
-  listAnnotateAssignments,
-  type AnnotateRow,
-} from "@/app/lms/lmsAnnotate_assignment/api";
+  getSubmissionAiStatus,
+  listSubmissionReport,
+  type SubmissionReportRow,
+} from "@/app/lms/homework/api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
 
 const AI_POLL_INTERVAL_MS = 8000;
@@ -123,14 +123,14 @@ export default function StudentHomeworkSubmissionReportPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [status, setStatus] = useState<"" | "Y" | "N">("");
-  const [rows, setRows] = useState<AnnotateRow[]>([]);
+  const [rows, setRows] = useState<SubmissionReportRow[]>([]);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [summaryRow, setSummaryRow] = useState<AnnotateRow | null>(null);
+  const [summaryRow, setSummaryRow] = useState<SubmissionReportRow | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -138,11 +138,11 @@ export default function StudentHomeworkSubmissionReportPage() {
     setSearched(true);
     setPage(1);
     try {
-      const data = await listAnnotateAssignments({
+      const data = await listSubmissionReport({
         grade: readValue(filters.section ?? ""),
-        standardId: readValue(filters.standard ?? ""),
-        divisionId: readValue(filters.division ?? ""),
-        subjectId: readValue(filters.subject ?? ""),
+        standard: readValue(filters.standard ?? ""),
+        division: readValue(filters.division ?? ""),
+        subject: readValue(filters.subject ?? ""),
         fromDate,
         toDate,
         status,
@@ -181,7 +181,7 @@ export default function StudentHomeworkSubmissionReportPage() {
       const updates = await Promise.all(
         stillChecking.map(async (row) => {
           try {
-            return await getAssignmentAiStatus(row.id);
+            return await getSubmissionAiStatus(row.id);
           } catch {
             return null;
           }
@@ -198,8 +198,8 @@ export default function StudentHomeworkSubmissionReportPage() {
             aiScore: update.aiScore,
             aiTotalQuestions: update.aiTotalQuestions,
             aiPercentage: update.aiPercentage,
-            reviewedPdfUrl: update.reviewedPdfUrl || row.reviewedPdfUrl,
-            teacherRemarks: update.teacherRemarks || row.teacherRemarks,
+            reviewedPdfUrl: update.reviewedPdfPath || row.reviewedPdfUrl,
+            submissionRemarks: update.teacherRemarks || row.submissionRemarks,
             evaluatedAt: update.evaluatedAt,
           };
         })
@@ -213,7 +213,7 @@ export default function StudentHomeworkSubmissionReportPage() {
     const search = query.trim().toLowerCase();
     if (!search) return rows;
     return rows.filter((row) =>
-      [row.studentName, row.title, row.description, row.standardName, row.divisionName]
+      [row.studentName, row.title, row.description, row.stdDiv]
         .some((value) => value.toLowerCase().includes(search))
     );
   }, [rows, query]);
@@ -229,18 +229,18 @@ export default function StudentHomeworkSubmissionReportPage() {
     serial: String(index + 1),
     grNo: row.enrollmentNo,
     name: row.studentName,
-    stdDiv: [row.standardName, row.divisionName].filter(Boolean).join("-"),
+    stdDiv: row.stdDiv,
     mobile: row.mobile,
-    sentDate: row.assignedOn,
+    sentDate: row.homeworkDate,
     title: row.title,
     description: row.description,
     submissionDate: row.submissionDate,
-    remark: row.teacherRemarks,
+    remark: row.submissionRemarks,
     aiScore:
       row.aiScore !== null && row.aiTotalQuestions !== null
         ? `${row.aiScore}/${row.aiTotalQuestions}`
         : "-",
-    status: row.aiStatus || (row.studentSubmitted ? "Submitted" : "Pending"),
+    status: row.aiStatus || row.completionStatus || (row.submissionDate ? "Submitted" : "Pending"),
   }));
 
   return (
@@ -251,8 +251,7 @@ export default function StudentHomeworkSubmissionReportPage() {
           Student Homework Submission Report
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Track assignment submissions, remarks and AI-checked work
-          (sourced from the LMS Assignment module).
+          Track homework submissions, remarks and AI-checked work.
         </p>
       </header>
 
@@ -415,19 +414,17 @@ export default function StudentHomeworkSubmissionReportPage() {
                       </TableCell>
                       <TableCell>{row.enrollmentNo || "-"}</TableCell>
                       <TableCell>{row.studentName}</TableCell>
-                      <TableCell>
-                        {[row.standardName, row.divisionName].filter(Boolean).join("-") || "-"}
-                      </TableCell>
+                      <TableCell>{row.stdDiv || "-"}</TableCell>
                       <TableCell>{row.mobile || "-"}</TableCell>
-                      <TableCell>{row.assignedOn || "-"}</TableCell>
+                      <TableCell>{row.homeworkDate || "-"}</TableCell>
                       <TableCell>{row.title || "-"}</TableCell>
                       <TableCell className="max-w-48 truncate" title={row.description}>
                         {row.description || "-"}
                       </TableCell>
                       <TableCell>
-                        {row.examPdfUrl ? (
+                        {row.image ? (
                           <a
-                            href={row.examPdfUrl}
+                            href={row.image}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 underline"
@@ -440,12 +437,12 @@ export default function StudentHomeworkSubmissionReportPage() {
                       </TableCell>
                       <TableCell>{row.submissionDate || "-"}</TableCell>
                       <TableCell className="max-w-56 min-w-40 whitespace-normal align-top py-2.5">
-                        {row.teacherRemarks ? (
+                        {row.submissionRemarks ? (
                           <div className="space-y-1">
                             <p className="line-clamp-3 whitespace-pre-line break-words text-sm text-slate-600">
-                              {row.teacherRemarks}
+                              {row.submissionRemarks}
                             </p>
-                            {row.teacherRemarks.length > REMARKS_PREVIEW_THRESHOLD ? (
+                            {row.submissionRemarks.length > REMARKS_PREVIEW_THRESHOLD ? (
                               <button
                                 type="button"
                                 onClick={() => setSummaryRow(row)}
@@ -491,8 +488,8 @@ export default function StudentHomeworkSubmissionReportPage() {
                       <TableCell>
                       {row.aiStatus ? (
                         <StatusBadge
-                          variant={aiStatusVariant(row.aiStatus, row.assignmentSourceType)}
-                          label={aiStatusLabel(row.aiStatus, row.assignmentSourceType)}
+                          variant={aiStatusVariant(row.aiStatus)}
+                          label={aiStatusLabel(row.aiStatus)}
                             icon={
                               row.aiStatus.toLowerCase() === "checking" ? (
                                 <LoaderCircle className="size-3 animate-spin" />
@@ -505,9 +502,9 @@ export default function StudentHomeworkSubmissionReportPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {row.studentSubmitted && row.submissionFileUrl ? (
+                        {row.submissionFile ? (
                           <a
-                            href={row.submissionFileUrl}
+                            href={row.submissionFile}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-blue-600 underline"
@@ -581,7 +578,7 @@ export default function StudentHomeworkSubmissionReportPage() {
             </DialogDescription>
           </DialogHeader>
           <p className="max-h-[60vh] overflow-y-auto whitespace-pre-line break-words text-sm text-slate-700">
-            {summaryRow?.teacherRemarks}
+            {summaryRow?.submissionRemarks}
           </p>
         </DialogContent>
       </Dialog>
