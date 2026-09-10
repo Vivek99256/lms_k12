@@ -1,6 +1,7 @@
 'use client';
 
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { readSelectedAcademicYear } from '@/lib/academic-year';
 
 /**
  * Where the Enterprise Brain API lives.
@@ -21,6 +22,8 @@ export interface BrainSession {
   tenantId: string;
   token: string;
   userId: string;
+  /** The `syear` the LMS header has selected; '' when it has not resolved yet. */
+  syear: string;
 }
 
 export class BrainApiError extends Error {
@@ -37,7 +40,15 @@ export class BrainApiError extends Error {
   }
 }
 
-/** The Brain has no login of its own: it reuses the LMS session verbatim. */
+/**
+ * The Brain has no login of its own: it reuses the LMS session verbatim.
+ *
+ * The academic year comes from the LMS header's own selection, not from
+ * anything the Brain keeps — there is one year switcher in this product and
+ * this is the value it stores. It is a request PARAMETER, never an identity:
+ * the tenant still comes from the signed token, and the API validates the year
+ * against that institute's own `academic_year` rows before using it.
+ */
 export function getBrainSession(): BrainSession | null {
   if (typeof window === 'undefined') return null;
 
@@ -47,9 +58,13 @@ export function getBrainSession(): BrainSession | null {
     const token = String(userData.user_token || userData.token || '');
     const tenantId = String(userData.sub_institute_id ?? menuContext.sub_institute_id ?? '');
     const userId = String(userData.id ?? menuContext.user_id ?? '');
+    // Falls back to the syear the session was issued with, exactly as the fees
+    // and exam clients do, so a first paint before the header has resolved still
+    // asks for a real year rather than none.
+    const syear = String(readSelectedAcademicYear() || userData.syear || menuContext.syear || '');
 
     if (!token || !tenantId) return null;
-    return { token, tenantId, userId };
+    return { token, tenantId, userId, syear };
   } catch {
     return null;
   }
@@ -59,13 +74,35 @@ export function getBrainTenantId(): string {
   return getBrainSession()?.tenantId ?? '';
 }
 
+/**
+ * Add `syear` to a URL that may already carry a query string.
+ *
+ * A caller that has set `syear` itself wins — nothing does today, but a screen
+ * that wants to compare two years should not have to fight the session.
+ */
+function withSyear(url: string, syear: string): string {
+  if (!syear) return url;
+
+  const [base, query = ''] = url.split('?');
+  const params = new URLSearchParams(query);
+  if (!params.get('syear')) params.set('syear', syear);
+
+  return `${base}?${params.toString()}`;
+}
+
 export async function brainFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const session = getBrainSession();
   if (!session) {
     throw new BrainApiError('Brain session is unavailable. Please sign in again.', 401, path, null);
   }
 
-  const url = `${BRAIN_API_BASE_URL}/api/brain${path}`;
+  // The year rides on EVERY Brain request rather than being threaded through
+  // the twenty-odd fetchers by hand. The backend applies it only where the LMS
+  // itself is year-scoped (attendance, homework, fees, marks, the student roll)
+  // and ignores it for master data like departments and people, so sending it
+  // uniformly cannot make a foundation screen go empty — and no year-sensitive
+  // endpoint can be forgotten.
+  const url = withSyear(`${BRAIN_API_BASE_URL}/api/brain${path}`, session.syear);
   let res: Response;
   try {
     res = await fetch(url, {
