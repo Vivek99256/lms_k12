@@ -20,6 +20,7 @@ import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/
 import { canSeeInternalItems } from '@/lib/roadmap';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useFeesLevel3Nav } from '@/app/fees/_lib/use-fees-level3-nav';
+import { useTeachLearnLevel3Nav } from '@/app/teach-learn/_lib/use-teach-learn-level3-nav';
 
 interface SelectedBranch {
   level1Key: string;
@@ -451,6 +452,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         return;
       }
 
+      // Teach/Learn owns its category workspace and opens on the LMS
+      // Dashboard instead of redirecting to its first tblmenumaster child.
+      if (normalizeMenuLabel(selectedLevel2.label) === 'teach/learn') {
+        return;
+      }
+
       // If Level 2 has Level 3 items, navigate to the first one if current path doesn't match any Level 3
       if (selectedLevel2?.submenus?.length) {
         const currentPath = pathname.toLowerCase();
@@ -510,6 +517,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     await fetchMasterMenu(parent.id, submenu);
 
     const submenuRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href;
+    if (normalizeMenuLabel(submenu.label) === 'teach/learn') {
+      router.push('/teach-learn');
+      return;
+    }
     const isPalRoot = normalizeMenuLabel(submenu.label) === 'new pal' || (submenuRoute || '').toLowerCase() === '/pal';
     if (isPalRoot) {
       // Lands on New PAL's own overview.
@@ -594,6 +605,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     pathname,
   });
 
+  const teachLearnLevel3Menu = useTeachLearnLevel3Nav({
+    selectedLevel2Label: selectedL2?.label,
+    pathname,
+  });
+
   const searchLevel3FromMenu = (items: MenuItem[], path: string): { parentLabel: string; items: Level3Item[] } | null => {
     if (!path || !items.length) return null;
 
@@ -634,6 +650,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (feesLevel3Menu) {
       return feesLevel3Menu;
     }
+    // Teach/Learn shows its category tabs here, the same way Fees does above;
+    // the hook returns null for every non-Teach/Learn context, so no other
+    // module's navigation is affected.
+    if (teachLearnLevel3Menu) {
+      return teachLearnLevel3Menu;
+    }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
     }
@@ -657,6 +679,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         loading={loading}
         error={error}
         refetch={refetch}
+        dynamicLevel2Counts={{ 'teach/learn': teachLearnLevel3Menu?.categoryCount }}
         onLevel1Select={handleLevel1Select}
         onLevel2Select={handleLevel2Select}
       />

@@ -172,6 +172,8 @@ const LMS_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lmsactivitystream': '/lms/activity-stream',
   'lmsstudent_report.index': '/lms/student-analysis',
   'lms/lmsstudent_report': '/lms/student-analysis',
+  'palreport.index': '/pal/report',
+  'lms/palreport': '/pal/report',
   'question_wise_report': '/lms/question-wise-report',
   'lms/questionreport': '/lms/question-wise-report',
   'questionreport': '/lms/question-wise-report',

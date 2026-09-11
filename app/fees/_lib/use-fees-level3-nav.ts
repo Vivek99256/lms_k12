@@ -72,9 +72,10 @@ function normalizePath(route: string | null | undefined) {
  * cross-module change this must not make.
  */
 function isFeesContext(selectedLevel2Label: string | null | undefined, pathname: string) {
+  const path = normalizePath(pathname);
+  if (path === '/teach-learn' || path.startsWith('/teach-learn/')) return false;
   if (normalizeLabel(selectedLevel2Label) === 'fees') return true;
 
-  const path = normalizePath(pathname);
   return path === '/fees' || path.startsWith('/fees/');
 }
 
