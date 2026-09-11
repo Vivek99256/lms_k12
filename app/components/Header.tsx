@@ -211,7 +211,7 @@ export default function Header({
     'Scheduler': '/platform-services/scheduler',
     'Document': '/general/coming-soon?module=Document',
     'Integration': '/general/coming-soon?module=Integration',
-    'Audit': '/general/coming-soon?module=Audit',
+    'Audit': '/user_log',
     'Event Bus': '/general/coming-soon?module=Event Bus',
   };
 

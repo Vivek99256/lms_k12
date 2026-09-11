@@ -232,6 +232,11 @@ export function buildMenuTree(
               href: resolveRoute(l3.link),
               link: l3.link,
             }));
+          // Audit module: only /user_log is visible. Strip any Level 3 submenus
+          // so no coming-soon stub or submenu entries surface under Audit — the
+          // module navigates to /user_log and nothing else.
+          const isAuditModule =
+            (sub.name || sub.menu_title || sub.site_map_name || '').trim().replace(/\s+/g, ' ').toLowerCase() === 'audit';
           return {
             id: sub.id,
             parentId: sub.parent_menu_id,
@@ -239,7 +244,7 @@ export function buildMenuTree(
             label: overrideMenuLabel(sub.link, sub.name || sub.menu_title || sub.site_map_name),
             href: resolveRoute(sub.link),
             icon: resolveIcon(sub.icon, 2),
-            submenus: level3Items.length > 0 ? level3Items : undefined,
+            submenus: isAuditModule ? undefined : (level3Items.length > 0 ? level3Items : undefined),
           };
         });
       return {

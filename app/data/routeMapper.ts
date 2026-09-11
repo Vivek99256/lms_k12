@@ -568,6 +568,15 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const aiIntelligenceRoute = AI_INTELLIGENCE_ROUTES[cleanLink.toLowerCase()];
   if (aiIntelligenceRoute) return aiIntelligenceRoute;
 
+  // Platform Services: Audit has graduated off the coming-soon placeholder to
+  // its real screen at /user_log. Intercept the Audit coming-soon link so every
+  // API-driven surface (sidebar, Level 3 sub-header, master menu) lands on the
+  // live page instead of the stub. The other Platform Services stubs (Template,
+  // Document, Integration, Event Bus) still resolve to their coming-soon pages.
+  if (lowerLink.replace(/^\/+/, '') === 'general/coming-soon?module=audit') {
+    return '/user_log';
+   }
+
   const easyCommunicationRoutes: Record<string, string> = {
     'send_sms_parents.index': '/easy_com/send_sms_parents',
     'result/send_sms_parents': '/easy_com/send_sms_parents',
