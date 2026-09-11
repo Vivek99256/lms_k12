@@ -390,9 +390,7 @@ function UnitRow({ unit }: { unit: ApiUnit }) {
                       {openChapterId === chapter.chapter_id ? (
                         <ChapterDetailPanel
                           chapterId={chapter.chapter_id}
-                          chapterName={chapter.chapter_name}
-                          extractionId={chapter.extraction_id}
-                          hasIntelligence={chapter.has_intelligence}
+                          learningOutcomes={chapter.learning_outcomes}
                         />
                       ) : null}
                     </div>
@@ -483,9 +481,7 @@ function UnmappedCard({ group }: { group: ApiUnmappedGroup }) {
               {openChapterId === chapter.chapter_id ? (
                 <ChapterDetailPanel
                   chapterId={chapter.chapter_id}
-                  chapterName={chapter.chapter_name}
-                  extractionId={chapter.extraction_id}
-                  hasIntelligence={chapter.has_intelligence}
+                  learningOutcomes={[]}
                 />
               ) : null}
             </div>

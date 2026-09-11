@@ -282,8 +282,12 @@ function TheoryTooltip({
  */
 function ChapterRow({ chapter }: { chapter: UnitChapter }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'topic' | 'competency'>('topic');
+  const [openTopicId, setOpenTopicId] = useState<number | null>(null);
+  const topics = chapter.topics ?? [];
+  const competencyCodes = chapter.competency_codes ?? [];
   const ToggleIcon = isOpen ? ChevronDown : ChevronRight;
-  const hasConcepts = chapter.concept_count > 0;
+  const hasChapterDetail = chapter.concept_count > 0 || topics.length > 0 || competencyCodes.length > 0;
 
   return (
     <div className="rounded-[12px] border border-[#E2E8F0]">
@@ -291,11 +295,11 @@ function ChapterRow({ chapter }: { chapter: UnitChapter }) {
         type="button"
         onClick={() => setIsOpen((open) => !open)}
         aria-expanded={isOpen}
-        disabled={!hasConcepts}
+        disabled={!hasChapterDetail}
         className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition hover:bg-[#F8FAFC] disabled:cursor-default disabled:hover:bg-transparent"
       >
         <span className="mt-0.5 shrink-0 text-[#94A3B8]">
-          {hasConcepts ? <ToggleIcon size={16} /> : <span className="block h-4 w-4" />}
+          {hasChapterDetail ? <ToggleIcon size={16} /> : <span className="block h-4 w-4" />}
         </span>
 
         <span className="min-w-0 flex-1">
@@ -316,7 +320,12 @@ function ChapterRow({ chapter }: { chapter: UnitChapter }) {
               {chapter.periods} {chapter.periods === 1 ? 'period' : 'periods'}
             </span>
           ) : null}
-          {hasConcepts ? (
+          {topics.length > 0 ? (
+            <span className="rounded-full bg-[#ECFDF3] px-2.5 py-1 text-[11px] font-semibold text-[#15803D]">
+              {topics.length} {topics.length === 1 ? 'topic' : 'topics'}
+            </span>
+          ) : null}
+          {chapter.concept_count > 0 ? (
             <span className="rounded-full bg-[#F1F5F9] px-2.5 py-1 text-[11px] font-semibold text-[#475569]">
               {chapter.concept_count} concepts
             </span>
@@ -324,17 +333,76 @@ function ChapterRow({ chapter }: { chapter: UnitChapter }) {
         </span>
       </button>
 
-      {isOpen && hasConcepts ? (
+      {isOpen && hasChapterDetail ? (
         <div className="border-t border-[#E2E8F0] px-3 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">Concepts</p>
-          <ul className="mt-2 max-h-[420px] space-y-1.5 overflow-y-auto border-l-2 border-[#E2E8F0] pl-3">
-            {chapter.concepts.map((name, index) => (
-              <li key={`${name}-${index}`} className="flex items-start gap-2">
-                <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#4F46E5]" />
-                <span className="text-[13px] leading-6 text-[#334155] sm:text-[14px]">{name}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex gap-1 border-b border-[#D8E1F0]" role="tablist" aria-label={`${chapter.chapter_name} details`}>
+            {(['topic', 'competency'] as const).map((tab) => {
+              const selected = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setActiveTab(tab)}
+                  className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-semibold capitalize ${selected ? 'border-[#4F46E5] text-[#4F46E5]' : 'border-transparent text-[#64748B] hover:text-[#334155]'}`}
+                >
+                  {tab}
+                </button>
+              );
+            })}
+          </div>
+
+          {activeTab === 'topic' ? (
+            <div className="mt-3 space-y-2" role="tabpanel">
+              {topics.map((topic, index) => {
+                const isTopicOpen = openTopicId === topic.topic_id;
+                return (
+                  <div key={topic.topic_id} className="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white">
+                    <button
+                      type="button"
+                      aria-expanded={isTopicOpen}
+                      onClick={() => setOpenTopicId(isTopicOpen ? null : topic.topic_id)}
+                      className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-[#F8FAFC]"
+                    >
+                      {isTopicOpen ? <ChevronDown size={15} className="mt-0.5 shrink-0 text-[#64748B]" /> : <ChevronRight size={15} className="mt-0.5 shrink-0 text-[#64748B]" />}
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-semibold leading-5 text-[#0F172A]">{index + 1}. {topic.name}</span>
+                        {topic.description ? <span className="mt-0.5 block text-[12px] leading-5 text-[#64748B]">{topic.description}</span> : null}
+                      </span>
+                      <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] font-semibold text-[#475569]">{topic.concepts.length} {topic.concepts.length === 1 ? 'concept' : 'concepts'}</span>
+                    </button>
+                    {isTopicOpen ? (
+                      topic.concepts.length === 0 ? (
+                        <p className="border-t border-[#E2E8F0] px-3 py-3 text-[12px] italic text-[#94A3B8]">No concepts are mapped to this topic.</p>
+                      ) : (
+                        <ul className="space-y-1.5 border-t border-[#E2E8F0] px-3 py-3">
+                          {topic.concepts.map((name, conceptIndex) => (
+                            <li key={`${name}-${conceptIndex}`} className="flex items-start gap-2"><span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#4F46E5]" /><span className="text-[13px] leading-6 text-[#334155]">{name}</span></li>
+                          ))}
+                        </ul>
+                      )
+                    ) : null}
+                  </div>
+                );
+              })}
+              {topics.length === 0 && chapter.concepts.length > 0 ? (
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">Unassigned concepts</p>
+                  <ul className="mt-2 space-y-1.5 border-l-2 border-[#E2E8F0] pl-3">
+                    {chapter.concepts.map((name, index) => <li key={`${name}-${index}`} className="flex items-start gap-2"><span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#4F46E5]" /><span className="text-[13px] leading-6 text-[#334155]">{name}</span></li>)}
+                  </ul>
+                </div>
+              ) : null}
+              {topics.length === 0 && chapter.concepts.length === 0 ? <p className="text-[13px] text-[#64748B]">No topics are available for this chapter.</p> : null}
+            </div>
+          ) : (
+            <div className="mt-3" role="tabpanel">
+              {competencyCodes.length === 0 ? <p className="text-[13px] text-[#64748B]">No competency codes are present in this chapter&apos;s extraction.</p> : (
+                <ul className="flex flex-wrap gap-2">{competencyCodes.map((code) => <li key={code} className="rounded-md bg-[#EEF2FF] px-2.5 py-1 font-mono text-[12px] font-semibold text-[#4338CA]">{code}</li>)}</ul>
+              )}
+            </div>
+          )}
         </div>
       ) : null}
     </div>
