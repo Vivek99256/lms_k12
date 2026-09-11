@@ -97,8 +97,8 @@ export default function NewPalNav() {
         <button
           type="button"
           className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${pathname === '/pal/new'
-              ? 'border-indigo-600 bg-indigo-600 text-white'
-              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+            ? 'border-indigo-600 bg-indigo-600 text-white'
+            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
             }`}
         >
           <LayoutGrid className="h-3.5 w-3.5" />
@@ -131,8 +131,8 @@ export default function NewPalNav() {
             <button
               type="button"
               className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${active
-                  ? 'border-indigo-600 bg-indigo-600 text-white'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                ? 'border-indigo-600 bg-indigo-600 text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                 }`}
             >
               <Icon className="h-3.5 w-3.5" />
