@@ -541,7 +541,15 @@ export interface NewChapterMasterRequest {
 }
 
 export interface ChapterContentAsset {
-  id: number;
+  /**
+   * content_master.id for stored content.
+   *
+   * H5P assets are merged into this list by the backend H5PContentAdapter and carry a
+   * NAMESPACED string id ("h5p:scenario:7") instead, so an H5P item can never be
+   * mistaken for a content_master row by anything that writes back. Their real primary
+   * key is exposed separately as h5p_source_id.
+   */
+  id: number | string;
   title: string;
   description: string | null;
   filename: string | null;
@@ -553,6 +561,24 @@ export interface ChapterContentAsset {
   concept_name?: string | null;
   created_at: string | null;
   source?: string | null;
+
+  /**
+   * Ownership overlay (tracker row 4). Added by ContentOwnershipDecorator; absent on
+   * deployments where the provenance backfill has not run.
+   */
+  ownership?: 'platform' | 'school' | 'teacher' | null;
+  layer?: 'platform' | 'school' | 'mine' | 'unclassified';
+
+  /**
+   * Format axis (tracker row 2). 'h5p' marks an interactive item merged in from the
+   * h5p_* tables rather than stored in content_master.
+   */
+  format?: string | null;
+  h5p_source_id?: number;
+  h5p_kind?: string;
+  h5p_type?: string;
+  /** Route of the existing H5P editor this item opens in. */
+  deep_link?: string;
 }
 
 export interface ChapterContentResponse {

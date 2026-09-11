@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,8 +17,10 @@ import {
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+
 import { useVoiceInteraction } from '@/hooks/use-voice-interaction';
-import { useAgentActionHandler } from '@/hooks/use-agent-action-handler';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -29,7 +32,6 @@ import {
 import { cn } from '@/lib/utils';
 import {
   beginChatPageSession,
-  ensureConversationId,
   readLifecycleThreadId,
   readStoredMessages,
   startNewChatSession,
@@ -44,13 +46,22 @@ import { toActionableFollowUps } from '@shared/conversational-ai-core/followup-s
 import { useAiWorkspace } from '@/hooks/use-ai-workspace';
 import { usePageAiContext } from '@/contexts/PageAiContext';
 import type { Capability } from '@/lib/intelligence/workspace';
-// The governed twelve-stage pipeline. Reached through the adapter below, which renders
-// its answer into the shape this panel already speaks, so the transport can change
-// without the render changing at the same time.
-import { ask } from '@/lib/intelligence/client';
-import { toChatShapedReply } from '@/lib/intelligence/ask-adapter';
-import type { AnswerAction, TraceStage } from '@/lib/intelligence/types';
+// The governed twelve-stage pipeline, reached through `/api/ai/ask/stream` — a thin
+// Next route that forwards to Laravel and translates its SSE into the AI SDK's UI
+// message protocol. The SDK owns the transport, the streaming state and the abort; it
+// owns nothing about the answer.
+import {
+  toPanelMessage,
+  usableStoredMessages,
+  textOf,
+  type AskUIMessage,
+  type PanelMessage,
+} from '@/lib/intelligence/ui-messages';
+import type { AnswerAction } from '@/lib/intelligence/types';
 import { LifecycleTrace } from '@/components/intelligence/LifecycleTrace';
+import { AnswerSections } from '@/components/intelligence/AnswerSections';
+import { moduleHandoffFor } from '@/lib/intelligence/module-handoff';
+import { useAgentActionHandler } from '@/hooks/use-agent-action-handler';
 import { ActionsTab } from './ai-workspace/ActionsTab';
 import { AnalyseTab } from './ai-workspace/AnalyseTab';
 import { ConnectionsTab } from './ai-workspace/ConnectionsTab';
@@ -58,153 +69,29 @@ import { CreateTab } from './ai-workspace/CreateTab';
 import { ContextBanner, WorkspaceTabs } from './ai-workspace/WorkspaceChrome';
 import { FlowStrip } from './ai-workspace/FlowStrip';
 
-type ChatMessage = {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  status?: string;
-  conversationType?: string;
-  tools?: string[];
-  variant?: 'default' | 'error';
-  navigation?: {
-    route: string;
-    query?: Record<string, string | number>;
-    label: string;
-  };
-  module?: string;
-  /** Where the assistant thinks the conversation goes next. Rendered as chips. */
-  followUps?: string[];
-  /**
-   * What the answer actually rests on. Only the tools that really ran, with any
-   * data they reported they do not hold.
-   */
-  citations?: Array<{
-    tool: string;
-    module?: string;
-    available: boolean;
-    unavailableSignals?: string[];
-  }>;
-  /**
-   * A consequential action waiting on the user. Present only while unanswered —
-   * cleared once they confirm or cancel, so an old prompt cannot be clicked twice.
-   */
-  confirmation?: {
-    action: string;
-    riskLevel: 'low' | 'medium' | 'high';
-    message: string;
-  };
-  /** The question that produced the confirmation, replayed when they accept. */
-  confirmationFor?: string;
-  /**
-   * Actions the governed pipeline offered — approve, reject, and anything else that
-   * needs a person. Each is the next question with the id of the record it applies to
-   * pinned, so clicking one and typing the sentence go down the same path and produce
-   * the same trace. Distinct from `confirmation`, which authorises a *tool*; these
-   * authorise a *decision*, and the backend records it through the approval gate.
-   */
-  actions?: AnswerAction[];
-  /**
-   * The twelve lifecycle stages that produced this answer.
-   *
-   * Carried on the message rather than held as panel state, because it belongs to the
-   * turn: scrolling back to an older answer should show the stages that produced *it*,
-   * not the stages of whatever was asked most recently.
-   */
-  lifecycleTrace?: TraceStage[];
-};
+/** The ladder's real height, so a partial count does not read as a finished one. */
+const LIFECYCLE_STAGE_COUNT = 12;
 
 /**
- * Which backend answers the conversational tab.
+ * Marks a still-streaming ladder the user has closed by hand.
  *
- * While this is off the panel uses the model-driven chat route it was built against.
- * While it is on, the same panel is answered by the governed twelve-stage pipeline and
- * every reply carries the ladder that produced it. Both write to the same conversation
- * tables, so it can be turned on and off without stranding a thread.
+ * Held in the same slot as the open id, because at most one ladder is ever open and
+ * two pieces of state that can disagree about that is how a panel ends up showing
+ * both.
  */
-const USE_LIFECYCLE_PIPELINE = process.env.NEXT_PUBLIC_AI_LIFECYCLE === '1';
-
-const MODULE_HANDOFF_COPY: Record<string, { title: string; description: string }> = {
-  admissions: {
-    title: 'Admission details are ready',
-    description: 'Continue to the Admission Confirmation module to complete the next step.',
-  },
-  fees: {
-    title: 'Fee collection is ready',
-    description: 'Open the Fees Collection page with this student already selected.',
-  },
-  homework: {
-    title: 'Homework record is ready',
-    description: 'Open the Homework Report with this record already selected.',
-  },
-  students: {
-    title: 'Student record is ready',
-    description: 'Open the student module with this record.',
-  },
-  attendance: {
-    title: 'Attendance report is ready',
-    description: 'Open the daywise attendance report with these filters applied.',
-  },
-  teachers: {
-    title: 'Teacher record is ready',
-    description: 'Open the teacher module with this record.',
-  },
-  departments: {
-    title: 'Department details are ready',
-    description: 'Open the department module with this record.',
-  },
-  subjects: {
-    title: 'Subject details are ready',
-    description: 'Open the subject module with this record.',
-  },
-  courses: {
-    title: 'Course details are ready',
-    description: 'Open the course master with this record.',
-  },
-  classes: {
-    title: 'Class details are ready',
-    description: 'Open academic setup with this class selected.',
-  },
-};
-
-function getHandoffCopy(module?: string) {
-  return (
-    MODULE_HANDOFF_COPY[(module || '').toLowerCase()] || {
-      title: 'The selected record is ready',
-      description: 'Continue to the module to complete the next step.',
-    }
-  );
+function closedTraceKey(messageId: string) {
+  return `closed:${messageId}`;
 }
 
-function createMessageId(prefix: 'user' | 'assistant' | 'assistant-error', value: number) {
-  return `${prefix}-${value}`;
-}
-
-function readMessageCounter(messages: ChatMessage[]) {
-  return messages.reduce((maxValue, message) => {
-    const match = message.id.match(/-(\d+)$/);
-    if (!match) return maxValue;
-    const parsed = Number(match[1]);
-    return Number.isFinite(parsed) ? Math.max(maxValue, parsed) : maxValue;
-  }, 0);
-}
-
-function normalizeStoredMessages(messages: ChatMessage[]) {
-  const seen = new Set<string>();
-  let counter = 0;
-
-  return messages.map((message) => {
-    counter += 1;
-    const nextId =
-      message.id && !seen.has(message.id)
-        ? message.id
-        : createMessageId(message.role === 'user' ? 'user' : 'assistant', counter);
-    seen.add(nextId);
-    return {
-      ...message,
-      id: nextId,
-    };
-  });
-}
+/**
+ * What this panel draws for one turn.
+ *
+ * Derived from an SDK message rather than held as panel state: the answer text, the
+ * offered actions, the citations and the twelve-stage ladder all arrive as parts of
+ * the streaming message, and `toPanelMessage` reads them back out. Keeping the shape
+ * the panel always spoke means the render below did not change when the transport did.
+ */
+type ChatMessage = PanelMessage;
 
 /*
  * Conversation id and message persistence now live in lib/chatbot-storage, because
@@ -270,36 +157,34 @@ const FALLBACK_PROMPTS = [
 export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () => void }) {
   const pathname = usePathname() || '/dashboard';
   const { executeNavigation } = useAgentActionHandler();
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+  const [input, setInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const session = useMemo(() => readStoredSession(), []);
+
+  /**
+   * The thread the SDK is currently driving.
+   *
+   * Both halves change together and only on "New chat". `useChat` rebuilds its Chat
+   * when the id changes and seeds it from `messages` at that moment, so resetting the
+   * id while still handing back the old transcript would restore the conversation the
+   * user just cleared.
+   */
+  const [thread, setThread] = useState<{ id: string; seed: AskUIMessage[] }>(() => {
     // Runs before the first paint. On a genuine page load this wipes the stored
     // thread and returns nothing; on a panel reopen within the same page it returns
     // what was there. Doing it in an effect instead would briefly show the old
     // conversation before clearing it.
     beginChatPageSession();
 
-    return normalizeStoredMessages(readStoredMessages<ChatMessage>());
+    return {
+      id: `teach-assistant-${Date.now()}`,
+      seed: usableStoredMessages(readStoredMessages<unknown>()),
+    };
   });
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesRef = useRef<ChatMessage[]>(messages);
-  const idCounterRef = useRef(readMessageCounter(messages));
-  const session = useMemo(() => readStoredSession(), []);
 
-  // State rather than a memo: "New chat" replaces it. The backend keys follow-up and
-  // workflow state on this id, so a fresh thread must carry a fresh one.
-  const [conversationId, setConversationId] = useState(() => ensureConversationId());
-
-  // Incremented by "New chat". An in-flight reply captures the value it started
-  // under and discards itself if the thread was reset while it was on the wire —
-  // otherwise the previous conversation's answer lands in the empty new one.
-  const chatSessionRef = useRef(0);
-
-  // The governed pipeline's own thread id. Separate from `conversationId` because the
-  // two are different kinds of identifier — that one is a client-minted uuid, this is
-  // the `ai_conversations` row the backend carries referents on, and it is what makes
-  // "why is she at risk?" resolvable. Null until the first turn returns one.
+  // The thread this conversation belongs to: the `ai_conversations` row the backend
+  // carries referents on, and what makes "why is she at risk?" resolvable. Minted by
+  // the backend, so it is null until the first turn returns one.
   //
   // Hydrated from sessionStorage, not initialised to null. The panel is unmounted while
   // collapsed (`{isChatbotOpen && <ChatbotPanel/>}` in DashboardShell), so a plain ref
@@ -346,6 +231,108 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   const [acceptedDraft, setAcceptedDraft] = useState<string | null>(null);
 
   /**
+   * How a question reaches Laravel.
+   *
+   * `prepareSendMessagesRequest` is where the SDK's world ends and this platform's
+   * begins. The SDK wants to POST a message history; the lifecycle wants one question,
+   * a thread id, and the scope headers. Translating here rather than in the route
+   * keeps the route a pure SSE translator, and keeps the tenant headers built the one
+   * way `lib/intelligence/client.ts` builds them.
+   *
+   * Memoised on the session alone. Everything that changes per turn — the thread id,
+   * the module, the route, the record an Approve button was rendered against — arrives
+   * in `body` from the individual `sendMessage` call, so navigating between pages
+   * never rebuilds the transport underneath an in-flight answer.
+   */
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport<AskUIMessage>({
+        api: '/api/ai/ask/stream',
+        prepareSendMessagesRequest: ({ messages, body }) => {
+          const last = messages[messages.length - 1];
+          const turn = (body ?? {}) as {
+            conversationId?: number | null;
+            payload?: AnswerAction['payload'];
+            module?: string | null;
+            route?: string | null;
+          };
+
+          return {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+              // A *selection* within the caller's allowed set, not a grant. The
+              // backend rejects anything outside it.
+              ...(session.subInstituteId
+                ? { 'X-MCP-Institute-Id': String(session.subInstituteId) }
+                : {}),
+            },
+            body: {
+              question: last ? textOf(last) : '',
+              conversation_id: turn.conversationId ?? null,
+              payload: turn.payload ?? {},
+              module: turn.module ?? null,
+              route: turn.route ?? null,
+              meta: {
+                ...(session.subInstituteId
+                  ? { institute_id: Number(session.subInstituteId) }
+                  : {}),
+                ...(session.syear ? { academic_year: Number(session.syear) } : {}),
+                ...(session.termId ? { term_id: Number(session.termId) } : {}),
+              },
+            },
+          };
+        },
+      }),
+    [session]
+  );
+
+  const {
+    messages: uiMessages,
+    sendMessage: sendUiMessage,
+    status,
+    stop,
+    error,
+  } = useChat<AskUIMessage>({
+    id: thread.id,
+    messages: thread.seed,
+    transport,
+    // The thread id arrives with the finished answer and has to survive the panel
+    // being collapsed, which unmounts it. Written the moment it lands rather than on
+    // unmount, because an unmount handler is not guaranteed to run first.
+    onData: (part) => {
+      if (part.type !== 'data-ask') return;
+
+      const conversationId = part.data.conversationId;
+
+      if (conversationId != null) {
+        lifecycleThreadRef.current = conversationId;
+        writeLifecycleThreadId(conversationId);
+      }
+    },
+  });
+
+  /** Busy covers both halves of a turn: waiting for the first byte, and streaming. */
+  const isLoading = status === 'submitted' || status === 'streaming';
+
+  // What the panel draws. The SDK owns the parts; this reads them back into the shape
+  // the render below has always spoken.
+  //
+  // A chip's label is sent verbatim as the next question, so only the suggestions that
+  // read as something a user could actually say survive: "Reply with the numbered
+  // option if shown." is advice, not an utterance — clicking it asked that sentence,
+  // matched nothing, and looped.
+  const messages = useMemo<ChatMessage[]>(
+    () =>
+      uiMessages.map((message) => {
+        const panel = toPanelMessage(message);
+
+        return { ...panel, followUps: toActionableFollowUps(panel.followUps) };
+      }),
+    [uiMessages]
+  );
+
+  /**
    * Moves the user to the tab that owns the next step of the flow.
    *
    * The stage strip decides which one — the panel does not guess. That is what keeps
@@ -362,46 +349,6 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
       setActiveTab('conversational');
     }
   }, [workspace.availableTabs, activeTab]);
-
-  /**
-   * The page snapshot as the conversation schema wants it.
-   *
-   * Sourced from the resolved workspace context rather than from the raw descriptor,
-   * so the assistant reasons over exactly what the suggestion engine reasoned over —
-   * already capped, already normalised, and in agreement with the prompts on screen.
-   * Undefined when the page said nothing, in which case the conversation is unchanged.
-   */
-  const conversationPageContext = useMemo(() => {
-    const page = workspace.context?.page;
-
-    if (!page) {
-      return undefined;
-    }
-
-    const snapshot = {
-      title: page.title ?? undefined,
-      type: page.type ?? undefined,
-      filters: page.filters?.length ? page.filters : undefined,
-      searchQuery: page.search_query ?? undefined,
-      metrics: page.metrics?.length ? page.metrics : undefined,
-      // Flattened: the schema carries attributes on the record itself, so a row reads
-      // as one object rather than a label wrapping a bag.
-      records: page.records?.length
-        ? page.records.map((record) => ({
-            id: (typeof record.id === 'string' || typeof record.id === 'number'
-              ? record.id
-              : undefined),
-            label: record.label ?? undefined,
-            ...record.attributes,
-          }))
-        : undefined,
-      recordCount: page.record_count || undefined,
-      selectedCount: workspace.context?.selected_records?.length || undefined,
-      availableActions: page.available_actions?.length ? page.available_actions : undefined,
-    };
-
-    return Object.values(snapshot).some((value) => value !== undefined) ? snapshot : undefined;
-  }, [workspace.context]);
 
   // Context-aware prompts for this page, with the static list as a safety net.
   const conversationalPrompts = useMemo(() => {
@@ -429,358 +376,92 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
     clearError,
   } = useVoiceInteraction();
 
+  // The SDK messages are what gets persisted, not the rendered view of them: parts
+  // rehydrate into the same panel message, and a stored view model would not.
   useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  useEffect(() => {
-    writeStoredMessages(messages.slice(-50));
-  }, [messages]);
+    writeStoredMessages(uiMessages.slice(-50));
+  }, [uiMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, isLoading, error, voiceError]);
 
   const latestAssistantMessage = useMemo(
-    () =>
-      [...messages].reverse().find(
-        (message) => message.role === 'assistant' && message.variant !== 'error'
-      ),
+    () => [...messages].reverse().find((message) => message.role === 'assistant'),
     [messages]
   );
 
   /**
    * Starts a fresh conversation without touching the page.
    *
-   * Clears the thread and the stored copy, mints a new conversation id so the
-   * backend does not carry follow-up state across, and stops any voice activity —
-   * leaving the mic recording into a conversation the user just abandoned would be
-   * a surprise.
+   * A new chat id is what actually resets the SDK: `useChat` rebuilds its Chat when
+   * the id changes, which drops the transcript, the streaming state and any in-flight
+   * request together. Seeding it with nothing is what stops the cleared conversation
+   * coming back.
    */
   function handleNewChat() {
-    chatSessionRef.current += 1;
-
+    if (isLoading) stop();
     if (isRecording) stopRecording();
     if (isSpeaking) stopSpeaking();
 
-    setConversationId(startNewChatSession());
+    // Called for the clearing it does, not the id it returns: the thread the backend
+    // reasons over is `lifecycleThreadRef`, and it is cleared immediately below.
+    startNewChatSession();
     // A new thread must not inherit the previous one's referents, or "why is she at
     // risk?" would resolve against a student the user has just walked away from.
-    // `startNewChatSession()` above already cleared the stored id; clearing the ref and
-    // the key together keeps the two from disagreeing if that ever stops being true.
     lifecycleThreadRef.current = null;
     writeLifecycleThreadId(null);
-    setMessages([]);
-    messagesRef.current = [];
-    idCounterRef.current = 0;
+    setThread({ id: `teach-assistant-${Date.now()}`, seed: [] });
     setInput('');
     setTranscript('');
-    setError(null);
     clearError();
-    setIsLoading(false);
     setActiveTab('conversational');
   }
 
   /**
-   * Retires a confirmation prompt once it has been answered.
+   * Ask a question.
    *
-   * @param cancelled Appends a line saying nothing was done, so the transcript
-   *   records the decision rather than the prompt simply vanishing.
-   */
-  function clearConfirmation(messageId: string, cancelled = false) {
-    setMessages((current) => {
-      const next = current.map((message) =>
-        message.id === messageId
-          ? { ...message, confirmation: undefined, confirmationFor: undefined }
-          : message
-      );
-
-      if (!cancelled) {
-        return next;
-      }
-
-      idCounterRef.current += 1;
-      return [
-        ...next,
-        {
-          id: createMessageId('assistant', idCounterRef.current),
-          role: 'assistant' as const,
-          content: 'Cancelled — nothing was changed.',
-        },
-      ];
-    });
-  }
-
-  /**
-   * @param confirmedTools Tools the user has just authorised, when this send is a
-   *   confirmation of a consequential action rather than a new question. Cleared
-   *   every turn, so an authorisation never carries into a later message.
    * @param actionPayload The record an offered action was rendered against. Sent so a
    *   decision lands on the row the user was looking at rather than on whatever was
    *   most recently mentioned. The sentence still drives the intent; this only removes
    *   ambiguity about which record it applies to.
+   * @param actionModule The module that offered the action. A decision must stay in
+   *   the module that created its recommendation: the panel can be opened on another
+   *   page before Approve is clicked, and using that page's module would make the
+   *   backend lose the agent and workflow binding.
    */
-  async function sendMessage(
+  function sendMessage(
     raw: string,
-    confirmedTools?: string[],
-    actionPayload?: AnswerAction['payload']
+    actionPayload?: AnswerAction['payload'],
+    actionModule?: string
   ) {
     const trimmed = raw.trim();
+
     if (!trimmed || isLoading) return;
 
-    // Captured now; compared after the await so a reply that arrives after a reset
-    // is dropped instead of appended to the new thread.
-    const chatSession = chatSessionRef.current;
-    idCounterRef.current += 1;
-
-    const userMessage: ChatMessage = {
-      id: createMessageId('user', idCounterRef.current),
-      content: trimmed,
-      role: 'user',
-    };
-
-    // What the model sees always ends with the user's request, so a confirmation
-    // re-drives the same tool call. What the panel shows does not repeat it — a
-    // confirmation is a click, not a second question, and echoing the sentence
-    // again reads as a stutter.
-    const payloadMessages = [...messagesRef.current, userMessage];
-    const nextMessages = confirmedTools?.length
-      ? [...messagesRef.current]
-      : payloadMessages;
-    setMessages(nextMessages);
     setInput('');
     setTranscript('');
-    setError(null);
-    setIsLoading(true);
 
-    try {
-      // ---- the governed pipeline ------------------------------------------
-      //
-      // One call runs all twelve stages and returns the ladder that produced the
-      // answer. The adapter renders it into the same shape the model route returns,
-      // so everything below this branch is untouched.
-      if (USE_LIFECYCLE_PIPELINE) {
-        const result = await ask(
-          {
-            token: session.token ?? null,
-            baseUrl: session.baseUrl ?? null,
-            instituteId: session.subInstituteId ?? null,
-            academicYear: session.syear ?? null,
-            termId: session.termId ?? null,
-          },
-          trimmed,
-          {
-            conversationId: lifecycleThreadRef.current,
-            payload: actionPayload,
-            // The screen the question was asked from. The backend treats a declared
-            // module as authoritative, so a fees question asked on the fees screen
-            // does not have to say the word "fees" to route there.
-            module: workspace.context?.module ?? null,
-            route: pathname,
-          }
-        );
-
-        if (chatSession !== chatSessionRef.current) {
-          return;
-        }
-
-        lifecycleThreadRef.current = result.conversation.id ?? lifecycleThreadRef.current;
-        // Persisted immediately, not on unmount: the panel can be collapsed at any
-        // moment and an unmount handler is not guaranteed to run before it is.
-        writeLifecycleThreadId(lifecycleThreadRef.current);
-
-        const reply = toChatShapedReply(
-          result,
-          createMessageId('assistant', ++idCounterRef.current)
-        );
-
-        setMessages((current) => [
-          ...current,
-          {
-            id: reply.message.id,
-            role: 'assistant',
-            content: reply.message.content,
-            status: reply.response.status,
-            conversationType: reply.response.conversationType,
-            tools: reply.response.activeTools,
-            module: reply.response.data.module,
-            followUps: toActionableFollowUps(reply.response.followUpSuggestions),
-            citations: reply.response.citations,
-            actions: reply.actions,
-            lifecycleTrace: reply.response.data.lifecycleTrace,
-          },
-        ]);
-
-        return;
-      }
-
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+    void sendUiMessage(
+      { text: trimmed },
+      {
+        body: {
+          // Read here rather than inside the transport: this runs in an event
+          // handler, where the thread the user is actually looking at is current.
+          conversationId: lifecycleThreadRef.current,
+          payload: actionPayload ?? {},
+          // The screen the question was asked from. The backend treats a declared
+          // module as authoritative, so a fees question asked on the fees screen does
+          // not have to say the word "fees" to route there.
+          module: actionModule ?? workspace.context?.module ?? null,
+          route: pathname,
         },
-        body: JSON.stringify({
-          responseMode: 'json',
-          messages: payloadMessages.map((message) => ({
-            id: message.id,
-            role: message.role,
-            content: message.content,
-          })),
-          context: {
-            conversationId,
-            // Present only on a confirmation turn. Without it a consequential tool
-            // refuses to execute and asks again.
-            confirmedTools,
-            userId: session.userId,
-            subInstituteId: session.subInstituteId,
-            role: session.profileName,
-            profileName: session.profileName,
-            profileId: session.profileId,
-            clientId: session.clientId,
-            baseUrl: session.baseUrl,
-            syear: session.syear,
-            termId: session.termId,
-            route: pathname,
-            // The record this page is about, resolved server-side from the route.
-            // This is what makes "why is this student at risk?" answerable without
-            // the user naming anyone. Absent on list pages, and harmless when absent.
-            entityType: workspace.context?.entity_type ?? undefined,
-            entityId: workspace.context?.entity_id ?? undefined,
-            entityLabel: workspace.context?.entity_label ?? undefined,
-            // And what is actually on the screen — the module, the filters, the
-            // figures, a window onto the rows. This is what makes "summarise these"
-            // and "which of these need attention?" resolvable.
-            module: workspace.context?.module ?? undefined,
-            moduleLabel: workspace.context?.module_label ?? undefined,
-            page: conversationPageContext,
-          },
-        }),
-      });
-
-      const payload = (await response.json()) as {
-        error?: string;
-        message?: { id?: string; content?: string };
-        response?: {
-          message?: string;
-          messages?: string[];
-          status?: string;
-          conversationType?: string;
-          activeTools?: string[];
-          followUpSuggestions?: string[];
-          confirmation?: {
-            action: string;
-            riskLevel: 'low' | 'medium' | 'high';
-            message: string;
-            parameters?: Record<string, unknown>;
-          };
-          citations?: Array<{
-            tool: string;
-            module?: string;
-            available: boolean;
-            unavailableSignals?: string[];
-          }>;
-          navigation?: {
-            route: string;
-            query?: Record<string, string | number>;
-            label: string;
-          };
-          data?: { module?: string } & Record<string, unknown>;
-        };
-      };
-
-      // The user pressed "New chat" while this was in flight. Their intent was to
-      // start over, so this answer is no longer wanted.
-      if (chatSession !== chatSessionRef.current) {
-        return;
       }
-
-      // 403 carries a real assistant reply explaining what the user may not do.
-      // Rendering it as a normal message keeps a routine refusal from looking like
-      // a breakage; anything else non-OK is a genuine failure.
-      const isRefusal = response.status === 403 && Boolean(payload.message?.content);
-
-      if (!response.ok && !isRefusal) {
-        throw new Error(payload.error || 'The AI assistant request failed.');
-      }
-
-      const assistantMessages = [
-        payload.response?.message?.trim() || payload.message?.content?.trim() || 'No visible response was returned.',
-        ...(payload.response?.messages || []).filter((message): message is string => typeof message === 'string' && message.trim().length > 0),
-      ];
-
-      setMessages((current) => {
-        const nextMessages = [...current];
-        assistantMessages.forEach((content, index) => {
-          nextMessages.push({
-            id:
-              index === 0
-                ? payload.message?.id || createMessageId('assistant', ++idCounterRef.current)
-                : createMessageId('assistant', ++idCounterRef.current),
-            role: 'assistant',
-            content,
-            status: payload.response?.status,
-            conversationType: payload.response?.conversationType,
-            tools: payload.response?.activeTools,
-            navigation: payload.response?.navigation,
-            module:
-              typeof payload.response?.data?.module === 'string'
-                ? payload.response.data.module
-                : undefined,
-            // Only on the last bubble of a reply — repeating the same chips under
-            // every part of a multi-part answer reads as a stutter.
-            // A chip's label is sent verbatim as the next question, so only offer the
-            // ones that read as something a user could actually say. "Reply with the
-            // numbered option if shown." is advice, not an utterance — clicking it
-            // asked that sentence, matched nothing, and looped.
-            followUps:
-              index === assistantMessages.length - 1
-                ? toActionableFollowUps(payload.response?.followUpSuggestions)
-                : undefined,
-            // Same rule as the chips: sources belong under the last bubble only.
-            citations:
-              index === assistantMessages.length - 1
-                ? payload.response?.citations
-                : undefined,
-            confirmation:
-              index === assistantMessages.length - 1
-                ? payload.response?.confirmation
-                : undefined,
-            confirmationFor:
-              index === assistantMessages.length - 1 && payload.response?.confirmation
-                ? trimmed
-                : undefined,
-          });
-        });
-        return nextMessages;
-      });
-    } catch (value: unknown) {
-      // Same guard on the failure path: a stale error is as unwelcome as a stale answer.
-      if (chatSession !== chatSessionRef.current) {
-        return;
-      }
-
-      const message =
-        value instanceof Error ? value.message : 'The AI assistant request failed.';
-      setError(message);
-      setMessages((current) => [
-        ...current,
-        {
-          id: createMessageId('assistant-error', ++idCounterRef.current),
-          role: 'assistant',
-          content: message,
-          variant: 'error',
-        },
-      ]);
-    } finally {
-      if (chatSession === chatSessionRef.current) {
-        setIsLoading(false);
-      }
-    }
+    );
   }
 
   const handleSend = () => {
-    void sendMessage(transcript || input);
+    sendMessage(transcript || input);
   };
 
   return (
@@ -969,9 +650,7 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                       'max-w-[88%] whitespace-pre-wrap break-words rounded-3xl px-4 py-3 text-sm leading-7 shadow-sm',
                       message.role === 'user'
                         ? 'border border-[#0D6EFD]/10 bg-[#0D6EFD] text-white shadow-[0_12px_30px_rgba(13,110,253,0.18)]'
-                        : message.variant === 'error'
-                          ? 'border border-red-200 bg-red-50 text-red-700'
-                          : 'border border-gray-200/80 bg-white text-gray-800 shadow-[0_8px_30px_rgba(15,23,42,0.06)]'
+                        : 'border border-gray-200/80 bg-white text-gray-800 shadow-[0_8px_30px_rgba(15,23,42,0.06)]'
                     )}
                   >
                     {/*
@@ -981,66 +660,22 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                       tool's own name in front of the user. The assistant should
                       read as an assistant, so only the answer is shown.
                     */}
-                    {message.content}
-                    {message.role === 'assistant' && message.navigation ? (
-                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-slate-800">
-                        <h4 className="text-sm font-semibold">
-                          {getHandoffCopy(message.module).title}
-                        </h4>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">
-                          {getHandoffCopy(message.module).description}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            executeNavigation(message.navigation);
-                          }}
-                          className="mt-3 rounded-xl bg-[#0D6EFD] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0D6EFD]/90"
-                        >
-                          {message.navigation.label}
-                        </button>
-                      </div>
-                    ) : null}
-
                     {/*
-                      A real change, held until the user agrees to it. The tool has
-                      already declined to run once; nothing happens until Confirm is
-                      pressed, and the prompt disappears either way so it cannot be
-                      answered twice.
+                      A finished answer is drawn from its sections; a streaming one from
+                      the text arriving. Both are the same words — the sections are the
+                      same content with its structure intact, so the bubble does not
+                      change what it says when the turn lands, only how it is laid out.
                     */}
-                    {message.role === 'assistant' && message.confirmation ? (
-                      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3">
-                        <p className="text-xs font-medium text-amber-900">
-                          Confirm this action
-                        </p>
-                        <p className="mt-1 text-[11px] leading-snug text-amber-800">
-                          {message.confirmation.message}
-                        </p>
-                        <div className="mt-2.5 flex gap-2">
-                          <button
-                            type="button"
-                            disabled={isLoading}
-                            onClick={() => {
-                              const action = message.confirmation!.action;
-                              const question = message.confirmationFor || '';
-                              clearConfirmation(message.id);
-                              void sendMessage(question, [action]);
-                            }}
-                            className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isLoading}
-                            onClick={() => clearConfirmation(message.id, true)}
-                            className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
+                    {message.role === 'assistant' && message.sections.length ? (
+                      <AnswerSections
+                        sections={message.sections}
+                        module={message.module}
+                        onAsk={(question) => sendMessage(question, undefined, message.module)}
+                        className="-mx-1"
+                      />
+                    ) : (
+                      message.content
+                    )}
 
                     {/*
                       What the answer rests on. Kept on every assistant turn rather
@@ -1093,7 +728,7 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                             key={action.key}
                             type="button"
                             onClick={() =>
-                              void sendMessage(action.utterance, undefined, action.payload)
+                              void sendMessage(action.utterance, action.payload, message.module)
                             }
                             disabled={isLoading}
                             className={
@@ -1107,6 +742,45 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                         ))}
                       </div>
                     ) : null}
+
+                    {/*
+                      Where the conversation leaves you.
+
+                      Restored after the model-driven chat route was retired: that route
+                      stamped a `navigation` object on its reply, and when it went, so did
+                      this card. It is rebuilt from `links` — the records the turn actually
+                      touched — so the destination is a specific enrolment or student
+                      rather than a module's front door.
+                    */}
+                    {(() => {
+                      if (message.role !== 'assistant' || !message.isComplete) return null;
+
+                      const handoff = moduleHandoffFor(message.module, message.links, message.actions);
+
+                      if (!handoff) return null;
+
+                      return (
+                        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                          <h4 className="text-sm font-semibold text-emerald-900">{handoff.title}</h4>
+                          <p className="mt-0.5 text-xs leading-5 text-emerald-800/80">
+                            {handoff.description}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              executeNavigation({
+                                route: handoff.route,
+                                query: handoff.query,
+                                label: handoff.label,
+                              })
+                            }
+                            className="mt-2.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                          >
+                            {handoff.label}
+                          </button>
+                        </div>
+                      );
+                    })()}
 
                     {/*
                       Where the conversation can go next, offered only under the most
@@ -1137,52 +811,74 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
 
                       Offered on every assistant turn, not only the latest: scrolling
                       back to an earlier answer should show the stages that produced
-                      *it*. Collapsed by default, because the ladder is twelve rows and
-                      most of the time the answer is the point — but one click away,
-                      because the moment anyone doubts a number, "which stage read
+                      *it*. Collapsed once it is finished, because the ladder is twelve
+                      rows and most of the time the answer is the point — but one click
+                      away, because the moment anyone doubts a number, "which stage read
                       which table" is the only thing that settles it.
-                    */}
-                    {message.role === 'assistant' && message.lifecycleTrace?.length ? (
-                      <div className="mt-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenTraceId((current) => (current === message.id ? null : message.id))
-                          }
-                          aria-expanded={openTraceId === message.id}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:border-[#0D6EFD]/25 hover:text-[#0D6EFD]"
-                        >
-                          {(() => {
-                            const ran = message.lifecycleTrace.filter((s) => s.status === 'ran').length;
-                            const blocked = message.lifecycleTrace.some((s) => s.status === 'blocked');
-                            const waiting = message.lifecycleTrace.some((s) => s.status === 'pending');
 
-                            return (
-                              <>
+                      Open while it is still filling in. A ladder growing row by row is
+                      the one moment the stages are worth more than the answer, and it
+                      is the whole reason the backend streams them.
+                    */}
+                    {message.role === 'assistant' && message.lifecycleTrace?.length
+                      ? (() => {
+                          const live = !message.isComplete && isLoading;
+                          const traceOpen =
+                            openTraceId === message.id
+                            || (live && openTraceId !== closedTraceKey(message.id));
+                          const ran = message.lifecycleTrace.filter((s) => s.status === 'ran').length;
+                          const blocked = message.lifecycleTrace.some((s) => s.status === 'blocked');
+                          const waiting = message.lifecycleTrace.some((s) => s.status === 'pending');
+
+                          return (
+                            <div className="mt-3">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenTraceId(
+                                    traceOpen
+                                      ? // Closing a ladder that is still streaming has
+                                        // to be remembered, or the next stage to arrive
+                                        // would re-open what the user just dismissed.
+                                        (live ? closedTraceKey(message.id) : null)
+                                      : message.id
+                                  )
+                                }
+                                aria-expanded={traceOpen}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:border-[#0D6EFD]/25 hover:text-[#0D6EFD]"
+                              >
                                 <span
-                                  className={
+                                  className={cn(
+                                    'size-1.5 rounded-full',
                                     blocked
-                                      ? 'size-1.5 rounded-full bg-red-500'
-                                      : waiting
-                                        ? 'size-1.5 rounded-full bg-amber-500'
-                                        : 'size-1.5 rounded-full bg-emerald-500'
-                                  }
+                                      ? 'bg-red-500'
+                                      : live
+                                        ? 'animate-pulse bg-[#0D6EFD]'
+                                        : waiting
+                                          ? 'bg-amber-500'
+                                          : 'bg-emerald-500'
+                                  )}
                                   aria-hidden
                                 />
-                                {openTraceId === message.id ? 'Hide' : 'How this was answered'}
+                                {traceOpen ? 'Hide agent activity' : live ? 'Agent working' : 'Agent activity'}
                                 <span className="tabular-nums text-gray-400">
-                                  {ran}/{message.lifecycleTrace.length}
+                                  {/*
+                                    While the turn runs the denominator is only the
+                                    stages that have reported, so it climbs as 1/1, 2/2.
+                                    Twelve is the ladder's real height and saying so
+                                    keeps the count from reading as "already finished".
+                                  */}
+                                  {ran}/{live ? LIFECYCLE_STAGE_COUNT : message.lifecycleTrace.length}
                                 </span>
-                              </>
-                            );
-                          })()}
-                        </button>
+                              </button>
 
-                        {openTraceId === message.id ? (
-                          <LifecycleTrace stages={message.lifecycleTrace} className="mt-2" />
-                        ) : null}
-                      </div>
-                    ) : null}
+                              {traceOpen ? (
+                                <LifecycleTrace stages={message.lifecycleTrace} className="mt-2" />
+                              ) : null}
+                            </div>
+                          );
+                        })()
+                      : null}
                   </div>
 
                   {message.role === 'user' ? (
@@ -1203,7 +899,24 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                   </div>
                   <div className="flex items-center gap-2 rounded-2xl border border-gray-200/80 bg-white px-4 py-3 text-sm text-gray-500 shadow-sm">
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    <span>Thinking through your request...</span>
+                    {/*
+                      Two different waits, and saying which one is honest: before the
+                      first byte the backend is still choosing tools and reading rows;
+                      after it, the answer is arriving and the ladder above is filling
+                      in. Only the first needs a placeholder bubble at all.
+                    */}
+                    <span>
+                      {status === 'submitted'
+                        ? 'Thinking through your request...'
+                        : 'Answering...'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => stop()}
+                      className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                    >
+                      Stop
+                    </button>
                   </div>
                 </div>
               ) : null}
@@ -1211,7 +924,7 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
               {error ? (
                 <div className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  <span>{error}</span>
+                  <span>{error.message || 'The AI assistant request failed.'}</span>
                 </div>
               ) : null}
 

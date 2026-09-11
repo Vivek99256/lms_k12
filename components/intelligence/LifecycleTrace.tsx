@@ -63,6 +63,87 @@ const STATUS: Record<
 
 const ORDER: StageStatus[] = ['ran', 'pending', 'blocked', 'skipped', 'not_reached'];
 
+/**
+ * What each stage is doing, in the words of someone who does not work here.
+ *
+ * The layer names — "Conversational AI", "Laravel MCP", "Real Data" — describe the
+ * architecture, which is the right label for the people who built it and the wrong one
+ * for a teacher trying to work out whether the assistant actually read anything. Both
+ * are shown: the plain name leads, the layer stays beside it, so a developer reading
+ * over a user's shoulder still sees the component they would grep for.
+ */
+const STEP_NAMES: Record<string, string> = {
+  conversation: 'Understand the request',
+  generative_ai: 'Work out what was asked',
+  agent: 'Run the agent',
+  planning: 'Plan the work',
+  mcp_tool_selection: 'Choose the tools',
+  laravel_mcp: 'Call the MCP server',
+  real_data: 'Read the database',
+  evidence: 'Gather the evidence',
+  reasoning: 'Analyse and explain',
+  recommendation: 'Draft a recommendation',
+  human_approval: 'Wait for a person to decide',
+  action: 'Change the record',
+};
+
+/** A tool call as the MCP stage reports it. */
+type ToolCall = { tool?: string; status?: string; error?: string };
+
+/**
+ * The facts worth reading without opening a JSON blob.
+ *
+ * Each stage's `data` is shaped by the stage that wrote it, so this reads the few keys
+ * that recur and leaves the rest to the technical section. The point is that "which
+ * tool ran, against which table, returning how many rows" is the question this panel
+ * exists to answer, and it should never require expanding a payload to find.
+ */
+function plainFacts(stage: TraceStage): Array<{ label: string; value: string }> {
+  const facts: Array<{ label: string; value: string }> = [];
+  const data = (stage.data ?? {}) as Record<string, unknown>;
+  const rows = (stage.records ?? {}) as { table?: string; ids?: Array<number | string> };
+
+  const tools = Array.isArray(data.tools)
+    ? data.tools.filter((t): t is string => typeof t === 'string')
+    : [];
+
+  if (tools.length) {
+    facts.push({ label: tools.length === 1 ? 'Tool' : 'Tools', value: tools.join(', ') });
+  }
+
+  const calls = Array.isArray(data.calls) ? (data.calls as ToolCall[]) : [];
+
+  for (const call of calls) {
+    if (!call?.tool) continue;
+
+    const ok = call.status === 'completed';
+
+    facts.push({
+      label: 'Call',
+      value: `${call.tool} — ${ok ? 'success' : call.status ?? 'refused'}${
+        call.error ? ` (${call.error})` : ''
+      }`,
+    });
+  }
+
+  if (rows.table) {
+    facts.push({ label: 'Table', value: rows.table });
+  }
+
+  if (rows.ids?.length) {
+    facts.push({
+      label: 'Records',
+      // The count is the fact; the ids are the proof, and both matter — "read 8 rows"
+      // is checkable only if you can say which eight.
+      value: `${rows.ids.length} — #${rows.ids.slice(0, 12).join(', #')}${
+        rows.ids.length > 12 ? ` and ${rows.ids.length - 12} more` : ''
+      }`,
+    });
+  }
+
+  return facts;
+}
+
 export function LifecycleTrace({
   stages,
   counts,
@@ -83,10 +164,10 @@ export function LifecycleTrace({
     <div className={cn('rounded-xl border border-slate-200 bg-white', className)}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-slate-100 px-4 py-3">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-          Lifecycle
+          Agent activity
         </p>
         <p className="text-[11px] tabular-nums text-slate-500">
-          {reached} of {stages.length} stages completed
+          {reached} of {stages.length} steps completed
         </p>
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {ORDER.filter((s) => tally[s]).map((s) => (
@@ -123,6 +204,7 @@ function StageRow({ stage }: { stage: TraceStage }) {
 
   const rows = stage.records as { table?: string; ids?: Array<number | string> };
   const verify = stage.verify as { api?: string; sql?: string };
+  const facts = plainFacts(stage);
   const hasDetail =
     Boolean(stage.component) ||
     Boolean(rows?.table) ||
@@ -154,7 +236,15 @@ function StageRow({ stage }: { stage: TraceStage }) {
             <span className="font-mono text-[11px] tabular-nums text-slate-400">
               {String(stage.order).padStart(2, '0')}
             </span>
-            <span className="text-sm font-semibold text-slate-900">{stage.layer}</span>
+            {/*
+              The plain name leads and the layer follows in grey. A reader who does not
+              know what "Laravel MCP" is learns that the step called the MCP server; a
+              reader who does still sees the layer they would search the code for.
+            */}
+            <span className="text-sm font-semibold text-slate-900">
+              {STEP_NAMES[stage.key] ?? stage.layer}
+            </span>
+            <span className="text-[11px] text-slate-400">{stage.layer}</span>
             <span className={cn('text-[10px] font-semibold uppercase tracking-wide', meta.text)}>
               {meta.label}
             </span>
@@ -177,6 +267,24 @@ function StageRow({ stage }: { stage: TraceStage }) {
               This stage reported neither a summary nor a reason.
             </span>
           )}
+
+          {/*
+            Visible without expanding, because "which tool, which table" is the question
+            this panel is most often opened to answer, and making it a click away means
+            most readers never find it.
+          */}
+          {facts.length ? (
+            <span className="mt-1.5 flex flex-wrap gap-1.5">
+              {facts.slice(0, 3).map((fact, index) => (
+                <span
+                  key={`${fact.label}-${index}`}
+                  className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-600"
+                >
+                  {fact.label}: {fact.value.length > 46 ? `${fact.value.slice(0, 46)}…` : fact.value}
+                </span>
+              ))}
+            </span>
+          ) : null}
         </span>
 
         {hasDetail ? (
@@ -189,19 +297,22 @@ function StageRow({ stage }: { stage: TraceStage }) {
 
       {open && hasDetail ? (
         <div className="space-y-3 border-t border-slate-100 bg-slate-50/70 px-4 py-3 pl-12">
-          <Detail label="Component">
-            <code className="break-all font-mono text-[11px] text-slate-700">{stage.component}</code>
-          </Detail>
-
-          {stage.surface ? <Detail label="Where a user sees this">{stage.surface}</Detail> : null}
-
-          {rows?.table ? (
-            <Detail label="Rows touched">
-              <code className="font-mono text-[11px] text-slate-700">
-                {rows.table}
-                {rows.ids?.length ? ` #${rows.ids.join(', #')}` : ''}
-              </code>
-            </Detail>
+          {/*
+            What this step did, in facts rather than in JSON. Which tool, against which
+            table, returning how many rows — the three things somebody checking whether
+            the agent really touched the database is looking for.
+          */}
+          {facts.length ? (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+              {facts.map((fact, index) => (
+                <div key={`${fact.label}-${index}`} className="contents">
+                  <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    {fact.label}
+                  </dt>
+                  <dd className="font-mono text-[11px] break-all text-slate-700">{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
           ) : null}
 
           {verify?.api || verify?.sql ? (
@@ -221,13 +332,36 @@ function StageRow({ stage }: { stage: TraceStage }) {
             </Detail>
           ) : null}
 
-          {Object.keys(stage.data || {}).length > 0 ? (
-            <Detail label="Payload">
-              <pre className="max-h-64 overflow-auto rounded bg-white p-2 font-mono text-[11px] leading-4 text-slate-600 ring-1 ring-slate-200">
-                {JSON.stringify(stage.data, null, 2)}
-              </pre>
-            </Detail>
-          ) : null}
+          {/*
+            Class names and raw payloads are the developer's view, and putting them in
+            front of a teacher is what made this panel read as debug output. They are one
+            click away, not gone: the whole argument for this trace is that a claim can
+            be checked, and the component that made it is part of the claim.
+          */}
+          <details className="group">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-600">
+              <ChevronDown className="size-3 transition-transform group-open:rotate-180" aria-hidden />
+              Technical details
+            </summary>
+
+            <div className="mt-2 space-y-3">
+              <Detail label="Component">
+                <code className="break-all font-mono text-[11px] text-slate-700">
+                  {stage.component}
+                </code>
+              </Detail>
+
+              {stage.surface ? <Detail label="Where a user sees this">{stage.surface}</Detail> : null}
+
+              {Object.keys(stage.data || {}).length > 0 ? (
+                <Detail label="Payload">
+                  <pre className="max-h-64 overflow-auto rounded bg-white p-2 font-mono text-[11px] leading-4 text-slate-600 ring-1 ring-slate-200">
+                    {JSON.stringify(stage.data, null, 2)}
+                  </pre>
+                </Detail>
+              ) : null}
+            </div>
+          </details>
         </div>
       ) : null}
     </li>

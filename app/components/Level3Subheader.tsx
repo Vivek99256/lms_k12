@@ -23,6 +23,8 @@ interface Level3SubheaderProps {
   masterLoading?: boolean;
   masterMenuGroups?: Record<string, unknown>[];
   userProfileName?: string;
+  /** Fees has no LMS master-menu rights, so its sub-header must not show Master. */
+  hideMaster?: boolean;
 }
 
 
@@ -56,7 +58,7 @@ function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null 
   return null;
 }
 
-export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
+export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [], hideMaster = false }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
 
@@ -284,7 +286,8 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
 
         {/*
           Enterprise Brain screens are not backed by the LMS master-menu rights
-          table, so the Master button would open an empty panel there.
+          table, so the Master button would open an empty panel there. Fees
+          resolves its own categories instead and likewise has no master menu.
         */}
         {!pathname.startsWith('/enterprise-brain') &&
           !isFeesContext &&

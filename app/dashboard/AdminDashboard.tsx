@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchAdminDashboard, getDashboardSession, type AdminDashboardSummary } from '@/app/dashboard/_lib/dashboard-api';
 import { DashboardError, DashboardSkeleton, EmptyState, QuickActionLink, SectionPanel, StatCard } from '@/app/dashboard/_components/DashboardPrimitives';
 import { DashboardBarChart } from '@/app/dashboard/_components/DashboardBarChart';
+import { ComingSoonTile } from '@/components/ui/coming-soon';
 
 function formatCurrency(amount: number) {
   return `₹${amount.toLocaleString('en-IN')}`;
@@ -57,6 +58,14 @@ export default function AdminDashboard() {
               value={data.summary.pending_parent_communications}
               icon={MessageCircleWarning}
               tone={data.summary.pending_parent_communications > 0 ? 'warning' : 'default'}
+            />
+
+            {/* Spans the row rather than becoming a ninth stat: it is a roadmap
+                note, not a measurement, and an orphan in a four-column grid
+                reads as a layout bug. */}
+            <ComingSoonTile
+              roadmapId="dashboard.personalization"
+              className="sm:col-span-2 lg:col-span-4"
             />
           </div>
 

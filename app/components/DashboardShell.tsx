@@ -9,15 +9,18 @@ import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
+import { useResizablePanel } from '@/hooks/use-resizable-panel';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
 import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
-import { BRAIN_MENU_LABEL, BRAIN_ROOT, BRAIN_SECTIONS } from '@/lib/brain/navigation';
+import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
+import { canSeeInternalItems } from '@/lib/roadmap';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useFeesLevel3Nav } from '@/app/fees/_lib/use-fees-level3-nav';
+import { useTeachLearnLevel3Nav } from '@/app/teach-learn/_lib/use-teach-learn-level3-nav';
 
 interface SelectedBranch {
   level1Key: string;
@@ -100,11 +103,12 @@ function getFilteredMasterMenuItems(items: SubmenuItem[], selectedMenu: SubmenuI
  * a `/pal` prefix.
  */
 const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
-  {
-    id: 'pal-framework',
-    label: 'Framework',
-    href: '/pal/frameworks',
-  },
+  // Framework is deliberately absent. It moved to Curriculum Planning, because
+  // a framework alignment cannot exist without the curriculum concept it
+  // attaches to, so curriculum owns it and PAL reads it. Listing it here would
+  // still claim `/pal/frameworks` for New PAL below, and the page would wear
+  // New PAL's tab bar while living under Curriculum — see the migration
+  // 2026_09_08_100000_move_framework_menu_under_curriculum.php in next_lms_erp.
   {
     id: 'pal-content-model',
     label: 'Content Model',
@@ -160,9 +164,10 @@ function findNewPalMenuNode(items: MenuItem[]): SubmenuItem | undefined {
  * `/pal`, and Content/Exam/Report/Result/Intelligence hang off it. Those are a
  * different module and must not wear New PAL's navigation.
  *
- * The boundary check matters here — `/pal/framework` (legacy) and
- * `/pal/frameworks` (New PAL) differ by one character, so a plain
- * `startsWith` would drag the legacy page back in.
+ * The boundary check matters here — `/pal/framework` and `/pal/frameworks`
+ * differ by one character, so a plain `startsWith` would drag the legacy page
+ * back in. Both now sit outside New PAL: `/pal/frameworks` moved to Curriculum
+ * Planning and so falls through to the normal menu-driven resolution.
  *
  * NEW_PAL_LEVEL3_ITEMS supplies the display metadata (label, href, order);
  * this only decides which of those items the caller's role is allowed to
@@ -197,6 +202,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(null);
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
+  // How wide the user has decided the assistant should be, remembered across sessions.
+  const assistantPanel = useResizablePanel();
   const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
 
   const [userProfileName, setUserProfileName] = useState('');
@@ -259,7 +266,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         icon: BrainCircuit,
         label: BRAIN_MENU_LABEL,
         href: BRAIN_ROOT,
-        submenus: BRAIN_SECTIONS.map((section) => ({
+        // Filtered, not the raw list: an internal-only section must not be
+        // advertised in the sidebar to the school users who can open the Brain.
+        submenus: visibleBrainSections(canSeeInternalItems()).map((section) => ({
           id: `enterprise-brain-${section.key}`,
           parentId: 'enterprise-brain',
           label: section.label,
@@ -443,6 +452,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         return;
       }
 
+      // Teach/Learn owns its category workspace and opens on the LMS
+      // Dashboard instead of redirecting to its first tblmenumaster child.
+      if (normalizeMenuLabel(selectedLevel2.label) === 'teach/learn') {
+        return;
+      }
+
       // If Level 2 has Level 3 items, navigate to the first one if current path doesn't match any Level 3
       if (selectedLevel2?.submenus?.length) {
         const currentPath = pathname.toLowerCase();
@@ -502,10 +517,21 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     await fetchMasterMenu(parent.id, submenu);
 
     const submenuRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href;
+    if (normalizeMenuLabel(submenu.label) === 'teach/learn') {
+      router.push('/teach-learn');
+      return;
+    }
     const isPalRoot = normalizeMenuLabel(submenu.label) === 'new pal' || (submenuRoute || '').toLowerCase() === '/pal';
     if (isPalRoot) {
+      // Lands on New PAL's own overview.
+      //
+      // This used to push `/pal/frameworks`, which stopped being New PAL's to
+      // land on when Framework moved under Curriculum Planning. Clicking
+      // "New PAL" took you to a screen that had left the module, and because
+      // `/pal/frameworks` is no longer claimed by NEW_PAL_LEVEL3_ITEMS the shell
+      // showed New PAL's sub-nav over a page belonging to another branch.
       const query = searchParams?.toString() ?? '';
-      router.push(query ? `/pal/frameworks?${query}` : '/pal/frameworks');
+      router.push(query ? `/pal/new?${query}` : '/pal/new');
       return;
     }
 
@@ -579,6 +605,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     pathname,
   });
 
+  const teachLearnLevel3Menu = useTeachLearnLevel3Nav({
+    selectedLevel2Label: selectedL2?.label,
+    pathname,
+  });
+
   const searchLevel3FromMenu = (items: MenuItem[], path: string): { parentLabel: string; items: Level3Item[] } | null => {
     if (!path || !items.length) return null;
 
@@ -603,7 +634,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return best;
   };
 
-  const level3Menu = (() => {
+  const level3Menu: { parentLabel: string; items: Level3Item[]; hideMaster?: boolean } | null = (() => {
     // New PAL brings its own sub-nav. Every other route — including the legacy
     // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
     // menu-driven resolution below and gets whatever its own menu defines.
@@ -618,6 +649,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // so the old Fees level-3 list below is unreachable, even for one frame.
     if (feesLevel3Menu) {
       return feesLevel3Menu;
+    }
+    // Teach/Learn shows its category tabs here, the same way Fees does above;
+    // the hook returns null for every non-Teach/Learn context, so no other
+    // module's navigation is affected.
+    if (teachLearnLevel3Menu.navigation) {
+      return teachLearnLevel3Menu.navigation;
     }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
@@ -642,6 +679,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         loading={loading}
         error={error}
         refetch={refetch}
+        dynamicLevel2Counts={{ 'teach/learn': teachLearnLevel3Menu.categoryCount }}
         onLevel1Select={handleLevel1Select}
         onLevel2Select={handleLevel2Select}
       />
@@ -654,9 +692,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         />
         <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main
-            className={`min-w-0 flex-1 overflow-auto scrollbar-hide transition-[width] duration-300 ease-out ${
-              isChatbotOpen ? 'w-[85%]' : 'w-full'
-            }`}
+            className="min-w-0 flex-1 overflow-auto scrollbar-hide"
           >
             <ChatbotLayoutContext.Provider value={{ isChatbotOpen }}>
               {showSubheader && (
@@ -670,6 +706,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     masterLoading={masterMenuLoading}
                     masterMenuGroups={masterMenuGroups}
                     userProfileName={userProfileName}
+                    hideMaster={level3Menu?.hideMaster ?? false}
                   />
                 </div>
               )}
@@ -677,9 +714,37 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </ChatbotLayoutContext.Provider>
           </main>
           {isChatbotOpen && (
-            <div className="min-h-0 w-[15%] min-w-[320px] overflow-hidden">
-              <ChatbotPanel onToggleChatbot={toggleChatbot} />
-            </div>
+            <>
+              {/*
+                Drag to resize, arrow keys to nudge, Home/End for the extremes. Sits
+                between the page and the panel because that is the edge being moved —
+                a handle anywhere else would be a control for a gesture, rather than
+                the thing itself.
+              */}
+              <div
+                {...assistantPanel.handleProps}
+                className={`group relative -mx-1 hidden w-2 flex-none cursor-col-resize items-center justify-center rounded outline-none md:flex ${
+                  assistantPanel.isDragging ? 'bg-[#0D6EFD]/10' : 'hover:bg-[#0D6EFD]/5'
+                } focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40`}
+                title="Drag to resize · arrow keys to nudge"
+              >
+                <span
+                  className={`h-10 w-0.5 rounded-full transition-colors ${
+                    assistantPanel.isDragging
+                      ? 'bg-[#0D6EFD]'
+                      : 'bg-gray-300 group-hover:bg-[#0D6EFD]/60'
+                  }`}
+                  aria-hidden
+                />
+              </div>
+
+              <div
+                className="min-h-0 flex-none overflow-hidden"
+                style={{ width: assistantPanel.width }}
+              >
+                <ChatbotPanel onToggleChatbot={toggleChatbot} />
+              </div>
+            </>
           )}
         </div>
         <RightFloatingToolbar

@@ -1,18 +1,48 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Play } from 'lucide-react';
+import { ArrowRight, Play, RefreshCw } from 'lucide-react';
 import { brainFetch, tenantPath, type BrainRow } from '@/lib/brain/api';
 import { useBrainResource } from '../_components/useBrainResource';
-import { Card, DataTable, ErrorState, LoadingState, Panel, Pill, ScreenHeader } from '../_components/primitives';
+import { Card, DataTable, ErrorState, LoadingState, Panel, Pill, HeroHeader } from '../_components/primitives';
 
 interface InventoryEntry {
   scope: string;
   label: string;
+  /** The LMS table(s) behind this scope. Shown as a tooltip, never as a heading. */
   source: string;
   sourceCount: number;
+  /** The Brain store this scope writes to. Tooltip only, for the same reason. */
   target: string;
   targetCount: number;
+  status: 'processed' | 'partial' | 'not_processed' | 'no_source' | 'unavailable';
+  note: string;
+  pending: number;
+  lastRunAt: string | null;
+  lastRunBy: string | null;
+  lastRunWrote: number | null;
+  error: string | null;
+}
+
+/**
+ * What the store actually holds, said plainly.
+ *
+ * The status is derived on the server from the two counts, so this badge can
+ * never read "processed" for a scope with nothing in it.
+ */
+const STATUS: Record<InventoryEntry['status'], { label: string; tone: 'green' | 'amber' | 'gray' | 'blue' }> = {
+  processed: { label: 'Up to date', tone: 'green' },
+  partial: { label: 'Partly brought in', tone: 'amber' },
+  not_processed: { label: 'Not brought in yet', tone: 'gray' },
+  no_source: { label: 'Nothing to bring in', tone: 'gray' },
+  unavailable: { label: 'Store not provisioned', tone: 'amber' },
+};
+
+function whenText(iso: string | null): string {
+  if (!iso) return 'never run';
+  const at = new Date(iso.replace(' ', 'T'));
+  if (Number.isNaN(at.getTime())) return 'never run';
+  return at.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 interface IngestionPayload {
@@ -63,22 +93,31 @@ export default function IngestionPage() {
 
   return (
     <div className="pb-8">
-      <ScreenHeader
-        title="Ingestion"
-        description="Bring this organization’s LMS records into the Brain store. Nothing is invented: each Brain row is derived from a row this tenant already owns, and re-running updates rather than duplicates."
+      <HeroHeader
         breadcrumb="Enterprise Brain / Foundation"
-        onRefresh={resource.refresh}
-        refreshing={resource.refreshing}
+        title="Ingestion"
+        description="Bring this organization's LMS records into the Brain store. Nothing is invented: each Brain row is derived from a row this tenant already owns, and re-running updates rather than duplicates."
         actions={
-          <button
-            type="button"
-            onClick={run}
-            disabled={running}
-            className="flex items-center gap-2 rounded-xl bg-[#0D6EFD] px-3 py-2 text-xs font-bold text-white hover:bg-blue-600 disabled:opacity-60"
-          >
-            <Play size={14} />
-            {running ? 'Running…' : selected.length ? `Run ${selected.length} selected` : 'Run all'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={run}
+              disabled={running}
+              className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-60"
+            >
+              <Play size={14} />
+              {running ? 'Running…' : selected.length ? `Run ${selected.length} selected` : 'Run all'}
+            </button>
+            <button
+              type="button"
+              onClick={resource.refresh}
+              disabled={resource.refreshing}
+              className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:border-slate-500 hover:text-white disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={resource.refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
         }
       />
 
@@ -127,29 +166,40 @@ export default function IngestionPage() {
                   className="mt-1 h-4 w-4 accent-[#0D6EFD]"
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
+                  <span className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-bold text-slate-900">{entry.label}</span>
-                    {entry.targetCount > 0 && <Pill tone="green">projected</Pill>}
+                    <Pill tone={STATUS[entry.status]?.tone ?? 'gray'}>{STATUS[entry.status]?.label ?? entry.status}</Pill>
                   </span>
                   <span className="mt-3 flex items-center gap-3 text-sm">
-                    <span className="min-w-0 flex-1 rounded-xl bg-gray-50 px-3 py-2">
+                    <span className="min-w-0 flex-1 rounded-xl bg-gray-50 px-3 py-2" title={entry.source}>
                       <span className="block truncate text-[11px] font-bold uppercase tracking-widest text-gray-400">
-                        {entry.source}
+                        Records in the LMS
                       </span>
                       <span className="block text-lg font-semibold tabular-nums text-slate-900">
                         {entry.sourceCount.toLocaleString()}
                       </span>
                     </span>
                     <ArrowRight size={16} className="shrink-0 text-gray-300" />
-                    <span className="min-w-0 flex-1 rounded-xl bg-blue-50/60 px-3 py-2">
+                    <span className="min-w-0 flex-1 rounded-xl bg-blue-50/60 px-3 py-2" title={entry.target}>
                       <span className="block truncate text-[11px] font-bold uppercase tracking-widest text-gray-400">
-                        {entry.target}
+                        Brought into the Brain
                       </span>
                       <span className="block text-lg font-semibold tabular-nums text-[#0D6EFD]">
                         {entry.targetCount.toLocaleString()}
                       </span>
                     </span>
                   </span>
+                  <span className="mt-2 block text-[11px] leading-relaxed text-slate-500">{entry.note}</span>
+                  <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                    <span>Last run: {whenText(entry.lastRunAt)}</span>
+                    {entry.lastRunWrote !== null && <span>{entry.lastRunWrote.toLocaleString()} rows written</span>}
+                    {entry.pending > 0 && <span className="font-semibold text-amber-600">{entry.pending.toLocaleString()} still to bring in</span>}
+                  </span>
+                  {entry.error && (
+                    <span className="mt-2 block rounded-lg bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">
+                      Last run reported: {entry.error}
+                    </span>
+                  )}
                 </span>
               </label>
             </Card>
@@ -162,7 +212,7 @@ export default function IngestionPage() {
           columns={[
             { key: 'created_at', label: 'When' },
             { key: 'actor_id', label: 'Run by' },
-            { key: 'changes', label: 'Result' },
+            { key: 'changes', label: 'What it brought in' },
           ]}
           rows={resource.data.history}
           emptyMessage="This organization has not been ingested yet."

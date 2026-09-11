@@ -109,15 +109,18 @@ export default function NewPalNav() {
         const active = pathname.startsWith(sub.href);
 
         if (!sub.available) {
+          // In a nav strip the pill IS the badge, so this borrows the shared
+          // lock icon and tooltip wording rather than putting a second chip
+          // inside a pill. Everything customer-visible says "coming soon" in
+          // the same words — see lib/roadmap.
           return (
-            <span
-              key={sub.key}
-              title="Not built yet"
-              className="flex cursor-not-allowed items-center gap-1.5 rounded-full border border-dashed border-slate-200 px-3.5 py-1.5 text-sm font-medium text-slate-400"
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {sub.label}
-            </span>
+            <Tooltip key={sub.key} content={roadmapTooltip({ phase: 'Phase 2', status: 'coming-soon' })} focusable>
+              <span className="flex cursor-not-allowed items-center gap-1.5 rounded-full border border-dashed border-slate-200 px-3.5 py-1.5 text-sm font-medium text-slate-400">
+                <Icon className="h-3.5 w-3.5" />
+                {sub.label}
+                <Lock className="h-3 w-3" aria-hidden="true" />
+              </span>
+            </Tooltip>
           );
         }
 

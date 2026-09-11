@@ -137,6 +137,65 @@ export function buildFieldEditPrompt(input: {
 }
 
 /**
+ * The same context, split into the variables the central template binds.
+ *
+ * `k12.field_edit` in `ai_templates` owns the framing and the rules; this supplies
+ * only the parts that vary per call. The split is not cosmetic — SafetyChecker
+ * inspects every variable for prompt injection, so keeping the product's own framing
+ * out of them means it scans what a user actually typed rather than our instructions
+ * to the model.
+ *
+ * `buildFieldEditPrompt` above is kept: it is what the local path used, and it is
+ * still the readable definition of how these pieces fit together.
+ */
+export function buildFieldEditVariables(input: {
+  value: string;
+  instruction: string;
+  context: AiFieldContext;
+}): Record<string, string> {
+  const { value, instruction, context } = input;
+
+  const facts: Array<[string, unknown]> = [
+    ["Field", context.fieldLabel],
+    ["Form / page", context.page],
+    ["Module", context.module],
+    ["Record type", context.entityType],
+    ["Grade / class", context.grade],
+    ["Subject", context.subject],
+    ["Language", context.language],
+  ];
+
+  const contextLines = facts
+    .map(([label, raw]) => [label, raw == null ? "" : String(raw).trim()] as const)
+    .filter(([, text]) => text !== "")
+    .map(([label, text]) => `- ${label}: ${text}`);
+
+  if (context.maxLength) {
+    contextLines.push(`- Maximum length: ${context.maxLength} characters`);
+  }
+
+  const related = Object.entries(context.related ?? {}).filter(([, v]) => String(v ?? "").trim());
+
+  const relatedBlock =
+    related.length > 0
+      ? [
+          "",
+          "Nearby content, for reference only — do not rewrite or return any of it:",
+          ...related.slice(0, 8).map(([label, text]) => `- ${label}: ${truncate(String(text), 500)}`),
+          "",
+        ].join("\n")
+      : "";
+
+  return {
+    field_guidance: FIELD_TYPE_GUIDANCE[context.fieldType] ?? FIELD_TYPE_GUIDANCE.generic,
+    field_context: contextLines.join("\n"),
+    related_content: relatedBlock,
+    field_value: value.trim().length > 0 ? truncate(value, MAX_VALUE_CHARS) : "(the field is empty)",
+    user_instruction: instruction.trim(),
+  };
+}
+
+/**
  * Clean what came back.
  *
  * Even with clear instructions a model sometimes wraps output in a fence or opens with
