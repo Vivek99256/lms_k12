@@ -45,7 +45,6 @@ import {
 export type TeachLearnLevel3Nav = {
   parentLabel: string;
   items: Level3Item[];
-  categoryCount: number;
   /** Teach/Learn has no LMS master-menu rights, so its sub-header must not show Master. */
   hideMaster?: boolean;
 };
@@ -75,7 +74,10 @@ function isTeachLearnContext(selectedLevel2Label: string | null | undefined, pat
   if (path === '/fees' || path.startsWith('/fees/')) return false;
   if (normalizeLabel(selectedLevel2Label) === 'teach/learn') return true;
 
-  return path === '/teach-learn' || path.startsWith('/teach-learn/');
+  return path === '/teach-learn'
+    || path.startsWith('/teach-learn/')
+    || path === '/onboarding/lms'
+    || path === '/general/add_process';
 }
 
 /** A non-navigating tab: getNavigationRoute() returns null for href '#'. */
@@ -89,7 +91,7 @@ export function useTeachLearnLevel3Nav({
 }: {
   selectedLevel2Label: string | null | undefined;
   pathname: string;
-}): TeachLearnLevel3Nav | null {
+}): { navigation: TeachLearnLevel3Nav | null; categoryCount: number } {
   const active = isTeachLearnContext(selectedLevel2Label, pathname);
 
   const [session, setSession] = useState<FeesSession | null>(null);
@@ -98,17 +100,13 @@ export function useTeachLearnLevel3Nav({
 
   // Session lives in browser storage, so it can only be read after mount.
   useEffect(() => {
-    if (!active || session) return;
+    if (session) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession(getFeesSession());
-  }, [active, session]);
+  }, [session]);
 
   useEffect(() => {
-    if (!active) return;
-
     if (!session) {
-      // Still reading storage — hold the bar in its loading state rather than
-      // letting it resolve to anything else.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setState('loading');
       return;
@@ -139,14 +137,16 @@ export function useTeachLearnLevel3Nav({
   }, [active, session]);
 
   return useMemo(() => {
-    if (!active) return null;
+    if (!active) return { navigation: null, categoryCount: categories.length };
 
     if (state === 'error') {
       return {
-        parentLabel: 'Teach/Learn',
-        items: [inertItem('teach-learn-categories-error', 'Teach/Learn navigation unavailable')],
+        navigation: {
+          parentLabel: 'Teach/Learn',
+          items: [inertItem('teach-learn-categories-error', 'Teach/Learn navigation unavailable')],
+          hideMaster: true,
+        },
         categoryCount: 0,
-        hideMaster: true,
       };
     }
 
@@ -154,32 +154,38 @@ export function useTeachLearnLevel3Nav({
     // is a real result and must not look like a request that is still running.
     if (state !== 'ready') {
       return {
-        parentLabel: 'Teach/Learn',
-        items: [inertItem('teach-learn-categories-loading', 'Loading…')],
+        navigation: {
+          parentLabel: 'Teach/Learn',
+          items: [inertItem('teach-learn-categories-loading', 'Loading…')],
+          hideMaster: true,
+        },
         categoryCount: 0,
-        hideMaster: true,
       };
     }
 
     if (categories.length === 0) {
       return {
-        parentLabel: 'Teach/Learn',
-        items: [inertItem('teach-learn-categories-empty', 'No categories available')],
+        navigation: {
+          parentLabel: 'Teach/Learn',
+          items: [inertItem('teach-learn-categories-empty', 'No categories available')],
+          hideMaster: true,
+        },
         categoryCount: 0,
-        hideMaster: true,
       };
     }
 
     return {
-      parentLabel: 'Teach/Learn',
-      items: categories.map<Level3Item>((category) => ({
-        id: `teach-learn-category-${category.key}`,
-        label: category.label,
-        // The dedicated Teach/Learn endpoint returns this module's route.
-        href: category.route || `/teach-learn/${category.key}`,
-      })),
+      navigation: {
+        parentLabel: 'Teach/Learn',
+        items: categories.map<Level3Item>((category) => ({
+          id: `teach-learn-category-${category.key}`,
+          label: category.label,
+          // The dedicated Teach/Learn endpoint returns this module's route.
+          href: category.route || `/teach-learn/${category.key}`,
+        })),
+        hideMaster: true,
+      },
       categoryCount: categories.length,
-      hideMaster: true,
     };
   }, [active, state, categories]);
 }

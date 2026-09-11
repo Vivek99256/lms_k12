@@ -653,8 +653,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // Teach/Learn shows its category tabs here, the same way Fees does above;
     // the hook returns null for every non-Teach/Learn context, so no other
     // module's navigation is affected.
-    if (teachLearnLevel3Menu) {
-      return teachLearnLevel3Menu;
+    if (teachLearnLevel3Menu.navigation) {
+      return teachLearnLevel3Menu.navigation;
     }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
@@ -679,7 +679,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         loading={loading}
         error={error}
         refetch={refetch}
-        dynamicLevel2Counts={{ 'teach/learn': teachLearnLevel3Menu?.categoryCount }}
+        dynamicLevel2Counts={{ 'teach/learn': teachLearnLevel3Menu.categoryCount }}
         onLevel1Select={handleLevel1Select}
         onLevel2Select={handleLevel2Select}
       />
