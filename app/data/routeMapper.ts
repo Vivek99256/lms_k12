@@ -226,6 +226,15 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'new_pal.ulu': '/pal/ulu',
   // Pedagogy Engine — same migration as Framework above.
   'new_pal.pedagogy_engine': '/pal/pedagogy-engine',
+  // ESO (Adaptive Learning Engine) — registered by
+  // 2026_09_08_100000_add_new_pal_eso_submodule_menu. Points outside
+  // /pal/new/* for the same reason Framework and ULU do: these pages shipped
+  // before the New PAL workspace existed and were never moved.
+  'new_pal.eso': '/pal/eso',
+  // Reports — Coverage vs Attainment, registered by
+  // 2026_09_08_140000_add_new_pal_reports_submodule_menu. Staff-only: the
+  // menu row withholds the student grant and the API refuses a student caller.
+  'new_pal.reports': '/pal/reports/attainment',
   // Administration — the second New PAL level-3 sub-module, registered by
   // 2026_08_14_160100_add_administration_submodule_menu. Follows the same
   // `new_pal.<sub_module>` link convention as Content Model above rather than

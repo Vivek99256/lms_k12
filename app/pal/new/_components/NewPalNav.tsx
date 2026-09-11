@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Boxes, LayoutGrid, Share2, type LucideIcon } from 'lucide-react';
+import { Boxes, Brain, LayoutGrid, Share2, type LucideIcon } from 'lucide-react';
 
 /**
  * New PAL's sub-module bar.
@@ -15,6 +15,28 @@ import { Boxes, LayoutGrid, Share2, type LucideIcon } from 'lucide-react';
  * Content Model is the first sub-module. Others are added to SUB_MODULES as
  * they ship; an entry with `available: false` is shown but not linked, so the
  * roadmap is visible without pretending a page exists.
+ *
+ * KNOWN DIVERGENCE — this list is not the source of truth.
+ *
+ * The DashboardShell tab bar is driven by `tblmenumaster` rows under the New
+ * PAL parent (id 531). Queried 2026-09-08, those are seven: Content Model,
+ * Unified Learning Units, Coherence Map, Pedagogy Engine, Administration,
+ * Gamification and ESO.
+ *
+ * Note what is NOT there: Framework. Its row exists (`new_pal.frameworks`) but
+ * hangs off a different parent entirely, so it is not a New PAL sub-module in
+ * the menu even though it is presented as one. Coherence Map, conversely, does
+ * have a row — this component listing it is correct.
+ *
+ * This hardcoded list still holds only three of the seven, so the two
+ * navigations disagree and a sub-module can be reachable from one and not the
+ * other. Two rows also share sort_order 4 (Coherence Map, Pedagogy Engine), so
+ * their relative order is undefined.
+ *
+ * The real fix is for this component to read the same menu rows the tab bar
+ * does, so there is one answer to "what is in New PAL". Until then, anything
+ * added here must also get a `tblmenumaster` row (and a routeMapper entry),
+ * or Access Roles will have nothing to grant `can_view` on for it.
  */
 
 export interface SubModule {
@@ -43,6 +65,18 @@ export const SUB_MODULES: SubModule[] = [
     icon: Share2,
     description:
       'The concept prerequisite graph read out of Neo4j — what each concept needs before it, what it unlocks after it, and what is attached to teach and assess it.',
+    available: true,
+  },
+  {
+    key: 'eso',
+    label: 'ESO',
+    // Outside /pal/new/* — the ESO pages shipped before this workspace existed.
+    // Registered as a menu row by the Laravel migration
+    // 2026_09_08_100000_add_new_pal_eso_submodule_menu.
+    href: '/pal/eso',
+    icon: Brain,
+    description:
+      'Adaptive Learning Engine — the per-concept diagnostic, practice and mastery loop a student actually moves through.',
     available: true,
   },
 ];

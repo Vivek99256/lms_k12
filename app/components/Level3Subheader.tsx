@@ -59,6 +59,15 @@ function getNavigationRoute(item: Level3ItemProps | SubmenuItem): string | null 
 export default function Level3Subheader({ items, parentLabel, masterItems = [], masterLoading = false, masterMenuGroups = [] }: Level3SubheaderProps) {
   const router = useRouter();
   const pathname = (usePathname() || '').toLowerCase();
+
+  /**
+   * Fees keeps its own Master category inside its level-3 bar, so the global
+   * blue Master button is redundant there and is hidden for the whole module.
+   */
+  const isFeesContext =
+    parentLabel.trim().toLowerCase() === 'fees' ||
+    pathname === '/fees' ||
+    pathname.startsWith('/fees/');
   const searchParams = useSearchParams();
   const [showMasterDropdown, setShowMasterDropdown] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -278,6 +287,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
           table, so the Master button would open an empty panel there.
         */}
         {!pathname.startsWith('/enterprise-brain') &&
+          !isFeesContext &&
           (items.length > 0 || masterLoading || masterMenuGroups.length > 0 || masterItems.length > 0) && (
           <div className="relative shrink-0" data-master-dropdown ref={masterPanelRef}>
             <button
