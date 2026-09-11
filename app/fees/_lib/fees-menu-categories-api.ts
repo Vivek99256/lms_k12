@@ -19,8 +19,24 @@ export type FeesCategoryItem = {
   /** tblmenumaster.id of the existing menu — unchanged, never duplicated. */
   id: number;
   label: string;
+  /** tblmenumaster.name */
+  name: string;
   /** The existing menu's `link`, resolved to a route by mapApiLinkToRoute. */
   link: string;
+  /** tblmenumaster.icon — an MDI class string (e.g. "mdi mdi-book"). */
+  icon: string | null;
+  /** tblmenumaster.description */
+  description: string;
+  /** tblmenumaster.text */
+  text: string | null;
+  /** tblmenumaster.youtube_link */
+  youtubeLink: string | null;
+  /** tblmenumaster.pdf_link */
+  pdfLink: string | null;
+  /** tblmenumaster.quick_menu */
+  quickMenu: string | null;
+  /** tblmenumaster.dashboard_menu */
+  dashboardMenu: string | null;
 };
 
 export type FeesCategory = {
@@ -70,11 +86,22 @@ function readCategories(payload: unknown): FeesCategory[] {
           const itemLabel = typeof itemRecord.label === 'string' ? itemRecord.label : '';
           if (!itemLabel) return [];
 
+          const readStr = (val: unknown): string =>
+            typeof val === 'string' ? val : val == null ? '' : String(val);
+
           return [
             {
               id: Number(itemRecord.id) || 0,
               label: itemLabel,
+              name: readStr(itemRecord.name) || itemLabel,
               link: typeof itemRecord.link === 'string' ? itemRecord.link : '',
+              icon: readStr(itemRecord.icon) || null,
+              description: readStr(itemRecord.description),
+              text: readStr(itemRecord.text) || null,
+              youtubeLink: readStr(itemRecord.youtube_link) || null,
+              pdfLink: readStr(itemRecord.pdf_link) || null,
+              quickMenu: readStr(itemRecord.quick_menu) || null,
+              dashboardMenu: readStr(itemRecord.dashboard_menu) || null,
             },
           ];
         })
