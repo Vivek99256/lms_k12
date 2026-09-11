@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -286,9 +286,9 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
           table, so the Master button would open an empty panel there. Fees
           resolves its own categories instead and likewise has no master menu.
         */}
-        {!pathname.startsWith('/enterprise-brain') && !hideMaster &&
-          {!pathname.startsWith('/enterprise-brain') &&
-        !isFeesContext &&
+        {!pathname.startsWith('/enterprise-brain') &&
+          !hideMaster &&
+          !isFeesContext &&
           (items.length > 0 || masterLoading || masterMenuGroups.length > 0 || masterItems.length > 0) && (
         <div className="relative shrink-0" data-master-dropdown ref={masterPanelRef}>
           <button
