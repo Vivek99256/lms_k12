@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Boxes, LayoutGrid, Lock, Share2, type LucideIcon } from 'lucide-react';
+import { Boxes, Brain, LayoutGrid, Lock, Share2, type LucideIcon } from 'lucide-react';
 
 import { Tooltip } from '@/components/ui/tooltip';
 import { roadmapTooltip } from '@/lib/roadmap';
