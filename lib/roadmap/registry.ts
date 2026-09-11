@@ -637,19 +637,26 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     id: 'platform.workflow',
     module: 'Platform services',
     title: 'Approval workflows',
-    blurb: 'Approval chains, escalation and delegation, shared by every module that needs a sign-off.',
+    blurb: 'Approval chains, escalation and delegation, configured per module and component and shared by everything that needs a sign-off.',
     phase: 'Phase 2',
-    status: 'coming-soon',
+    // Configuration is live: every approval point in the product is declared,
+    // and a school defines its own chains against them. The engine that runs a
+    // chain against a live record is the remaining half.
+    status: 'in-progress',
     audience: 'customer',
+    href: '/platform-services/workflow',
   },
   {
     id: 'platform.notification',
     module: 'Platform services',
     title: 'Notifications',
-    blurb: 'SMS, email and WhatsApp delivery with retries, from one service.',
+    blurb: 'Web, email, mobile, SMS and WhatsApp from one service — configured per module and component, with channels a school can switch off centrally.',
     phase: 'Phase 2',
-    status: 'coming-soon',
+    // Configuration is live. Delivery — the sending, the retries, the receipts —
+    // is the remaining half.
+    status: 'in-progress',
     audience: 'customer',
+    href: '/platform-services/notification',
   },
   {
     id: 'platform.template',
@@ -664,10 +671,13 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     id: 'platform.scheduler',
     module: 'Platform services',
     title: 'Scheduler',
-    blurb: 'Recurring jobs such as overdue checks and reminder runs.',
+    blurb: 'Recurring jobs such as overdue checks and reminder runs, scheduled per module and component.',
     phase: 'Phase 2',
-    status: 'coming-soon',
+    // Configuration is live. The dispatcher that ticks and runs them is the
+    // remaining half.
+    status: 'in-progress',
     audience: 'customer',
+    href: '/platform-services/scheduler',
   },
   {
     id: 'platform.document',

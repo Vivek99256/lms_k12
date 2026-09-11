@@ -163,12 +163,16 @@ export function useFeesLevel3Nav({
 
     return {
       parentLabel: 'Fees',
-      items: categories.map<Level3Item>((category) => ({
-        id: `fees-category-${category.key}`,
-        label: category.label,
-        // Configured per category row, so the bar links wherever the data says.
-        href: category.route || `/fees/${category.key}`,
-      })),
+      items: categories.map<Level3Item>((category) => {
+        const href = category.key === 'intelligence'
+          ? '/enterprise-brain/foundation/students'
+          : category.route || `/fees/${category.key}`;
+        return {
+          id: `fees-category-${category.key}`,
+          label: category.label,
+          href,
+        };
+      }),
       hideMaster: true,
     };
   }, [active, state, categories]);

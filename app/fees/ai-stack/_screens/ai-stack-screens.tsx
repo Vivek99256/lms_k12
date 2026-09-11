@@ -34,7 +34,7 @@ import { FeesAutomationsScreen } from '@/app/fees/ai-stack/_screens/fees-automat
  * nothing here touches the separate AI Administration module.
  */
 export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
-  {
+/*{
     id: 'policies',
     label: 'Policies',
     icon: SlidersHorizontal,
@@ -118,6 +118,7 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
       />
     ),
   },
+*/
   {
     id: 'automations',
     label: 'Automations',
@@ -126,6 +127,7 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
     // Management engine, scoped to module="fees". See fees-automations-screen.tsx.
     render: () => <FeesAutomationsScreen />,
   },
+/*
   {
     id: 'usage-cost',
     label: 'Usage & Cost',
@@ -158,4 +160,5 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
       />
     ),
   },
+*/
 ];
