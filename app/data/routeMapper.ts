@@ -3,6 +3,28 @@
  * Uses API link field directly without any modifications
  */
 
+import { AI_CAPABILITIES, capabilityHref } from '@shared/ai-intelligence-core';
+
+/**
+ * AI & Intelligence menu links → routes.
+ *
+ * Built from the shared capability registry rather than typed out, so a sidebar
+ * entry and the avatar dropdown can never open different screens for the same
+ * capability. `2026_09_10_000001_add_ai_intelligence_menu` writes exactly these
+ * links into `tblmenumaster`, using the same slugs.
+ */
+const AI_INTELLIGENCE_ROUTES: Record<string, string> = {
+  // The level-1 row is a container with a `javascript:void(0);` link, so this
+  // entry is only reached if an estate points a menu row at the module itself.
+  ai_intelligence: '/ai',
+  ...Object.fromEntries(
+    AI_CAPABILITIES.map((capability) => [
+      `ai_intelligence.${capability.slug}`,
+      capabilityHref(capability),
+    ]),
+  ),
+};
+
 /**
  * Convert API link to Next.js route
  * Link format: "students/search_student/" -> Route: "/students/search_student"
@@ -150,6 +172,8 @@ const LMS_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lmsactivitystream': '/lms/activity-stream',
   'lmsstudent_report.index': '/lms/student-analysis',
   'lms/lmsstudent_report': '/lms/student-analysis',
+  'palreport.index': '/pal/report',
+  'lms/palreport': '/pal/report',
   'question_wise_report': '/lms/question-wise-report',
   'lms/questionreport': '/lms/question-wise-report',
   'questionreport': '/lms/question-wise-report',
@@ -342,6 +366,10 @@ const STUDENT_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'student_homework_submission_report_index': '/lms/homework/submission-report',
   'student/student_homework_submission_report': '/lms/homework/submission-report',
   'show_student_homework_submission_report': '/lms/homework/submission-report',
+  'student_homework_review.index': '/lms/homework/review',
+  'student_homework_review_index': '/lms/homework/review',
+  'student/student_homework_review': '/lms/homework/review',
+  'show_student_homework_review': '/lms/homework/review',
 };
 
 // Legacy ERP modules now served by the stateless migration API.
@@ -543,6 +571,11 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
 
   // Remove trailing slashes only
   cleanLink = cleanLink.replace(/\/+$/, '');
+
+  // Checked first: these links are registry-owned, so no later heuristic in this
+  // function should get a chance to reinterpret one.
+  const aiIntelligenceRoute = AI_INTELLIGENCE_ROUTES[cleanLink.toLowerCase()];
+  if (aiIntelligenceRoute) return aiIntelligenceRoute;
 
   const easyCommunicationRoutes: Record<string, string> = {
     'send_sms_parents.index': '/easy_com/send_sms_parents',

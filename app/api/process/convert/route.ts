@@ -2,7 +2,7 @@ import { generateObject } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { createAiModel } from "@shared/conversational-ai-core/model";
+import { createLocalAiModel } from "@/lib/ai/local-model";
 import {
   convertSopProcedure,
   findModule,
@@ -173,7 +173,7 @@ export async function POST(request: Request) {
     // Inside the try: with no API key configured this throws, and an
     // unconfigured environment should read as "AI is unavailable, convert it
     // structurally instead" (6.15.8 degraded mode) rather than as a crash.
-    const model = createAiModel();
+    const model = createLocalAiModel();
 
     const { object } = await generateObject({
       model,

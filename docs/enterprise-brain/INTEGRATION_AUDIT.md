@@ -190,7 +190,7 @@ Organization / OrganizationUnit / Person / Position / Student
   Organizational Knowledge (mental models)
 - **Knowledge**: Graph Explorer, KASBA Explorer, Knowledge Library, Memory,
   AI Assistant, ESO Library
-- **Automation**: Agent Monitor, Task Orchestrator, Policy Management
+- **Automation**: Agent Management, Task Orchestrator, Policy Management
 - **Account**: Settings
 
 ## 11. Database comparison

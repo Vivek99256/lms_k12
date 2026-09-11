@@ -2,7 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Boxes, Brain, LayoutGrid, Share2, type LucideIcon } from 'lucide-react';
+import { Boxes, LayoutGrid, Lock, Share2, type LucideIcon } from 'lucide-react';
+
+import { Tooltip } from '@/components/ui/tooltip';
+import { roadmapTooltip } from '@/lib/roadmap';
 
 /**
  * New PAL's sub-module bar.
@@ -93,11 +96,10 @@ export default function NewPalNav() {
       <Link href="/pal/new">
         <button
           type="button"
-          className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
-            pathname === '/pal/new'
+          className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${pathname === '/pal/new'
               ? 'border-indigo-600 bg-indigo-600 text-white'
               : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
-          }`}
+            }`}
         >
           <LayoutGrid className="h-3.5 w-3.5" />
           Overview
@@ -109,15 +111,18 @@ export default function NewPalNav() {
         const active = pathname.startsWith(sub.href);
 
         if (!sub.available) {
+          // In a nav strip the pill IS the badge, so this borrows the shared
+          // lock icon and tooltip wording rather than putting a second chip
+          // inside a pill. Everything customer-visible says "coming soon" in
+          // the same words — see lib/roadmap.
           return (
-            <span
-              key={sub.key}
-              title="Not built yet"
-              className="flex cursor-not-allowed items-center gap-1.5 rounded-full border border-dashed border-slate-200 px-3.5 py-1.5 text-sm font-medium text-slate-400"
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {sub.label}
-            </span>
+            <Tooltip key={sub.key} content={roadmapTooltip({ phase: 'Phase 2', status: 'coming-soon' })} focusable>
+              <span className="flex cursor-not-allowed items-center gap-1.5 rounded-full border border-dashed border-slate-200 px-3.5 py-1.5 text-sm font-medium text-slate-400">
+                <Icon className="h-3.5 w-3.5" />
+                {sub.label}
+                <Lock className="h-3 w-3" aria-hidden="true" />
+              </span>
+            </Tooltip>
           );
         }
 
@@ -125,11 +130,10 @@ export default function NewPalNav() {
           <Link key={sub.key} href={sub.href}>
             <button
               type="button"
-              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                active
+              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${active
                   ? 'border-indigo-600 bg-indigo-600 text-white'
                   : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
-              }`}
+                }`}
             >
               <Icon className="h-3.5 w-3.5" />
               {sub.label}

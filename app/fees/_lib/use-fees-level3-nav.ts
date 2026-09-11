@@ -43,6 +43,8 @@ import {
 export type FeesLevel3Nav = {
   parentLabel: string;
   items: Level3Item[];
+  /** Fees has no LMS master-menu rights, so its sub-header must not show Master. */
+  hideMaster?: boolean;
 };
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
@@ -70,9 +72,10 @@ function normalizePath(route: string | null | undefined) {
  * cross-module change this must not make.
  */
 function isFeesContext(selectedLevel2Label: string | null | undefined, pathname: string) {
+  const path = normalizePath(pathname);
+  if (path === '/teach-learn' || path.startsWith('/teach-learn/')) return false;
   if (normalizeLabel(selectedLevel2Label) === 'fees') return true;
 
-  const path = normalizePath(pathname);
   return path === '/fees' || path.startsWith('/fees/');
 }
 
@@ -143,6 +146,7 @@ export function useFeesLevel3Nav({
       return {
         parentLabel: 'Fees',
         items: [inertItem('fees-categories-error', 'Fees navigation unavailable')],
+        hideMaster: true,
       };
     }
 
@@ -153,17 +157,23 @@ export function useFeesLevel3Nav({
       return {
         parentLabel: 'Fees',
         items: [inertItem('fees-categories-loading', 'Loading…')],
+        hideMaster: true,
       };
     }
 
     return {
       parentLabel: 'Fees',
-      items: categories.map<Level3Item>((category) => ({
-        id: `fees-category-${category.key}`,
-        label: category.label,
-        // Configured per category row, so the bar links wherever the data says.
-        href: category.route || `/fees/${category.key}`,
-      })),
+      items: categories.map<Level3Item>((category) => {
+        const href = category.key === 'intelligence'
+          ? '/enterprise-brain/foundation/students'
+          : category.route || `/fees/${category.key}`;
+        return {
+          id: `fees-category-${category.key}`,
+          label: category.label,
+          href,
+        };
+      }),
+      hideMaster: true,
     };
   }, [active, state, categories]);
 }

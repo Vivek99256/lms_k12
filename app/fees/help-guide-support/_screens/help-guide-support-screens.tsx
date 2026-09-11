@@ -6,11 +6,12 @@ import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page
 import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-screen';
 
 /**
- * Fees → Help Guide / Support tabs.
+ * Fees → Help Guide / Support — former static placeholder tabs.
  *
- * Scaffolding for the module's documentation and support surface. No guides,
- * articles or tickets exist behind these yet, so each tab renders the shared
- * placeholder rather than showing an empty list that looks broken.
+ * DEPRECATED. The Help Guide / Support page now renders a dynamic Grid/Thumbnail
+ * view loaded from tblmenumaster (see HelpGuideGrid at
+ * app/fees/help-guide-support/_components/help-guide-grid.tsx). This file is
+ * retained only for reference and is no longer wired into the page.
  */
 export const FEES_HELP_SUPPORT_SCREENS: FeesStaticScreen[] = [
   {
