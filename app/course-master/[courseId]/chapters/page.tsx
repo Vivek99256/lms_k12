@@ -4029,7 +4029,7 @@ export default function ChapterListPage() {
               {questionCountLabel}
             </p>
 
-            <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[repeat(6,minmax(130px,1fr))_auto]">
+            <div className="flex w-full flex-wrap items-center gap-3 xl:w-auto xl:justify-end [&>*]:shrink-0 [&_button[role=combobox]]:min-w-[140px]">
               <Select
                 value={questionBankChapterFilter}
                 onValueChange={(value) => {
@@ -4235,7 +4235,7 @@ export default function ChapterListPage() {
                 </Select>
               )}
 
-              <div className="relative">
+              <div className="relative w-full sm:w-auto">
                 <Search
                   size={16}
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -4244,7 +4244,7 @@ export default function ChapterListPage() {
                   value={questionBankSearchInput}
                   onChange={(event) => setQuestionBankSearchInput(event.target.value)}
                   placeholder="Search questions..."
-                  className="h-10 w-[220px] rounded-[8px] border-slate-300 bg-white pl-9 text-[15px]"
+                  className="h-10 w-full rounded-[8px] border-slate-300 bg-white pl-9 text-[15px] sm:w-[220px]"
                 />
                 {questionBankSearchInput ? (
                   <button
