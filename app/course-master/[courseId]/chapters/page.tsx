@@ -68,6 +68,10 @@ import {
   updateQuestionBankQuestion,
   fetchQuestionTypeCatalog,
   type QuestionTypeCatalogEntry,
+  fetchQuestionBankFacets,
+  EMPTY_QUESTION_BANK_FACETS,
+  type QuestionBankFacets,
+  type CountedOption,
   uploadChapterContent,
   type ChapterContentAsset,
   type ChapterSemantic,
@@ -85,6 +89,7 @@ import {
   type QuestionBankQuestionType,
 } from '../../data/questionBank';
 import { QuestionBankQuestionCard } from '@/app/components/questionBank/QuestionBankQuestionCard';
+import { QuestionBankFilterBar } from '@/app/components/questionBank/QuestionBankFilterBar';
 import { groupConceptsByTopic, type TopicGroup } from '../../data/chapterTopics';
 import { ConceptIntelligenceTabs } from './ConceptIntelligenceTabs';
 import { getRequestContext, getSyear } from '../../page';
@@ -977,6 +982,9 @@ export default function ChapterListPage() {
   const [questionBankStatusFilter, setQuestionBankStatusFilter] = useState('all');
   const [questionBankSearchInput, setQuestionBankSearchInput] = useState('');
   const [questionBankSearch, setQuestionBankSearch] = useState('');
+  const [questionBankFacets, setQuestionBankFacets] = useState<QuestionBankFacets>(
+    EMPTY_QUESTION_BANK_FACETS
+  );
   const [manualQuestionBankItems, setManualQuestionBankItems] = useState<QuestionBankItem[]>([]);
   const [questionBankItemEdits, setQuestionBankItemEdits] = useState<Record<string, QuestionBankItem>>({});
   const [editingQuestionBankItem, setEditingQuestionBankItem] = useState<QuestionBankItem | null>(null);
@@ -1238,23 +1246,39 @@ export default function ChapterListPage() {
     return () => clearTimeout(timer);
   }, [questionBankSearchInput]);
 
-  // Facets derived from what is actually loaded, so a dropdown never offers a
-  // value that would return nothing.
-  const questionBankFacets = useMemo(() => {
-    const sections = new Set<string>();
-    const doks = new Set<string>();
-    const publishers = new Set<string>();
-    questionBankItems.forEach((question) => {
-      if (question.examSection) sections.add(question.examSection);
-      if (question.dok) doks.add(String(question.dok));
-      if (question.publisher) publishers.add(question.publisher);
-    });
-    return {
-      sections: Array.from(sections).sort(),
-      doks: Array.from(doks).sort(),
-      publishers: Array.from(publishers).sort(),
-    };
-  }, [questionBankItems]);
+  // Facets come from the server for the current scope. Deriving them from the
+  // loaded page is what made the full filter set appear on the one chapter
+  // that had extracted questions and vanish everywhere else.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchQuestionBankFacets(
+      {
+        standard_id: standardId,
+        subject_id: subjectId,
+        chapter_id: questionBankChapterFilter === 'all' ? undefined : questionBankChapterFilter,
+      },
+      controller.signal
+    )
+      .then(setQuestionBankFacets)
+      // Facets are a convenience, not the data: a failure leaves the
+      // dropdowns empty rather than blocking the bank.
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [standardId, subjectId, questionBankChapterFilter]);
+
+  const clearQuestionBankFilters = useCallback(() => {
+    setQuestionBankConceptFilter('all');
+    setQuestionBankTypeFilter('all');
+    setQuestionBankCategoryFilter('all');
+    setQuestionBankBloomFilter('all');
+    setQuestionBankDifficultyFilter('all');
+    setQuestionBankSectionFilter('all');
+    setQuestionBankDokFilter('all');
+    setQuestionBankPublisherFilter('all');
+    setQuestionBankSourceFilter('all');
+    setQuestionBankStatusFilter('all');
+    setQuestionBankSearchInput('');
+  }, []);
 
   const questionBankConceptOptions = useMemo(() => {
     // Concepts come from the chapters loaded off `/lms/new_chapter_master` â€” the
@@ -1281,6 +1305,155 @@ export default function ChapterListPage() {
     questionBankConceptFilter === 'all' || questionBankConceptOptions.includes(questionBankConceptFilter)
       ? questionBankConceptFilter
       : 'all';
+  /**
+   * The filter bar's contents, in the order a teacher narrows down: where the
+   * question sits, then what kind it is, then where it came from.
+   *
+   * Every facet is offered on every chapter. Server counts are appended as a
+   * hint so an option that would return nothing is visibly "(0)" rather than
+   * silently missing -- the previous behaviour of hiding empty facets is what
+   * made the bar look different on each chapter.
+   */
+  const questionBankFilterSpecs = useMemo(() => {
+    const counted = (rows: CountedOption[], idKey: 'id' | 'value', labelKey: 'name' | 'value') =>
+      rows.map((row) => ({
+        value: String(row[idKey] ?? ''),
+        label: String(row[labelKey] ?? row.name ?? row.value ?? ''),
+        hint: row.total != null ? `(${row.total})` : undefined,
+      }));
+
+    return [
+      {
+        key: 'chapter',
+        label: 'Chapter',
+        allLabel: 'All Chapters',
+        value: questionBankChapterFilter,
+        onChange: (next: string) => {
+          setQuestionBankChapterFilter(next);
+          setQuestionBankConceptFilter('all');
+        },
+        options: questionBankChapterOptions.map((chapter) => ({
+          value: chapter.id,
+          label: chapter.title,
+        })),
+      },
+      {
+        key: 'concept',
+        label: 'Concept',
+        allLabel: 'All Concepts',
+        value: effectiveQuestionBankConceptFilter,
+        onChange: setQuestionBankConceptFilter,
+        options: questionBankConceptOptions.map((concept) => ({
+          value: concept,
+          label: concept,
+        })),
+      },
+      {
+        key: 'type',
+        label: 'Question type',
+        allLabel: 'All Types',
+        value: questionBankTypeFilter,
+        onChange: setQuestionBankTypeFilter,
+        options: questionBankTypeOptions.map((option) => ({
+          value: option.label,
+          label: option.label,
+          hint: option.publisher ? `· ${option.publisher} (${option.count})` : `(${option.count})`,
+        })),
+      },
+      {
+        key: 'section',
+        label: 'Exam section',
+        allLabel: 'All Sections',
+        value: questionBankSectionFilter,
+        onChange: setQuestionBankSectionFilter,
+        options: questionBankFacets.exam_sections.map((row) => ({
+          value: String(row.value ?? ''),
+          label: `Section ${row.value}`,
+          hint: row.total != null ? `(${row.total})` : undefined,
+        })),
+      },
+      {
+        key: 'bloom',
+        label: 'Bloom level',
+        allLabel: 'All Bloom',
+        value: questionBankBloomFilter,
+        onChange: setQuestionBankBloomFilter,
+        options: counted(questionBankFacets.bloom_levels, 'value', 'value'),
+      },
+      {
+        key: 'dok',
+        label: 'Depth of knowledge',
+        allLabel: 'All DOK',
+        value: questionBankDokFilter,
+        onChange: setQuestionBankDokFilter,
+        options: questionBankFacets.dok_levels.map((row) => ({
+          value: String(row.value ?? ''),
+          label: `DOK ${row.value}`,
+          hint: row.total != null ? `(${row.total})` : undefined,
+        })),
+      },
+      {
+        key: 'difficulty',
+        label: 'Difficulty',
+        allLabel: 'All Difficulty',
+        value: questionBankDifficultyFilter,
+        onChange: setQuestionBankDifficultyFilter,
+        options: counted(questionBankFacets.difficulty_levels, 'value', 'value'),
+      },
+      {
+        key: 'category',
+        label: 'Learning step',
+        allLabel: 'All Categories',
+        value: questionBankCategoryFilter,
+        onChange: setQuestionBankCategoryFilter,
+        options: QUESTION_BANK_CATEGORIES.map((category) => ({
+          value: category.value,
+          label: `${category.step}. ${category.label}`,
+        })),
+      },
+      {
+        key: 'publisher',
+        label: 'Publisher',
+        allLabel: 'All Publishers',
+        value: questionBankPublisherFilter,
+        onChange: setQuestionBankPublisherFilter,
+        options: questionBankFacets.publishers
+          .filter((row) => (row.total ?? 0) > 0)
+          .map((row) => ({
+            value: String(row.short_name ?? row.name ?? ''),
+            label: String(row.short_name ?? row.name ?? ''),
+            hint: row.total != null ? `(${row.total})` : undefined,
+          })),
+      },
+      {
+        key: 'source',
+        label: 'Origin',
+        allLabel: 'Any Origin',
+        value: questionBankSourceFilter,
+        onChange: setQuestionBankSourceFilter,
+        options: [
+          { value: 'extracted', label: 'From a published book' },
+          { value: 'ai_generated', label: 'AI generated' },
+        ],
+      },
+    ];
+  }, [
+    questionBankChapterFilter,
+    questionBankChapterOptions,
+    effectiveQuestionBankConceptFilter,
+    questionBankConceptOptions,
+    questionBankTypeFilter,
+    questionBankTypeOptions,
+    questionBankSectionFilter,
+    questionBankBloomFilter,
+    questionBankDokFilter,
+    questionBankDifficultyFilter,
+    questionBankCategoryFilter,
+    questionBankPublisherFilter,
+    questionBankSourceFilter,
+    questionBankFacets,
+  ]);
+
   const filteredQuestionBankItems = useMemo(() => {
     return questionBankItems.filter((question) => {
       const matchesChapter =
@@ -4024,276 +4197,27 @@ export default function ChapterListPage() {
             </p>
           </div>
 
-          <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <p className={`text-[16px] font-medium ${questionBankError ? 'text-rose-600' : 'text-slate-700'}`}>
-              {questionCountLabel}
-            </p>
-
-            <div className="flex w-full flex-wrap items-center gap-3 xl:w-auto xl:justify-end [&>*]:shrink-0 [&_button[role=combobox]]:min-w-[140px]">
-              <Select
-                value={questionBankChapterFilter}
-                onValueChange={(value) => {
-                  setQuestionBankChapterFilter(value ?? 'all');
-                  setQuestionBankConceptFilter('all');
-                }}
-              >
-                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                  <SelectValue>
-                    {questionBankChapterFilter === 'all'
-                      ? 'All Chapters'
-                      : questionBankChapterOptions.find((chapter) => chapter.id === questionBankChapterFilter)
-                          ?.title ?? 'All Chapters'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Chapters</SelectItem>
-                  {questionBankChapterOptions.map((chapter) => (
-                    <SelectItem key={chapter.id} value={chapter.id}>
-                      {chapter.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={effectiveQuestionBankConceptFilter}
-                onValueChange={(value) => setQuestionBankConceptFilter(value ?? 'all')}
-              >
-                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                  <SelectValue>
-                    {effectiveQuestionBankConceptFilter === 'all'
-                      ? 'All Concepts'
-                      : questionBankConceptOptions.find((concept) => concept === effectiveQuestionBankConceptFilter)
-                          ?? 'All Concepts'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Concepts</SelectItem>
-                  {questionBankConceptOptions.map((concept) => (
-                    <SelectItem key={concept} value={concept}>
-                      {concept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-
-              <Select value={questionBankBloomFilter} onValueChange={(value) => setQuestionBankBloomFilter(value ?? 'all')}>
-                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                  <SelectValue>{questionBankBloomFilter === 'all' ? 'All Bloom' : questionBankBloomFilter}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Bloom</SelectItem>
-                  <SelectItem value="Knowledge">Knowledge</SelectItem>
-                  <SelectItem value="Comprehension">Comprehension</SelectItem>
-                  <SelectItem value="Application">Application</SelectItem>
-                  <SelectItem value="Analysis">Analysis</SelectItem>
-                  <SelectItem value="Synthesis">Synthesis</SelectItem>
-                  <SelectItem value="Evaluation">Evaluation</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={questionBankDifficultyFilter} onValueChange={(value) => setQuestionBankDifficultyFilter(value ?? 'all')}>
-                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                  <SelectValue>{questionBankDifficultyFilter === 'all' ? 'All Difficulty' : questionBankDifficultyFilter}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Difficulty</SelectItem>
-                  <SelectItem value="Easy">Easy</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Hard">Hard</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={questionBankTypeFilter} onValueChange={(value) => setQuestionBankTypeFilter(value ?? 'all')}>
-                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                  <SelectValue>
-                    {questionBankTypeFilter === 'all' ? 'All Types' : questionBankTypeFilter}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {questionBankTypeOptions.map((option) => (
-                    <SelectItem key={option.label} value={option.label}>
-                      {option.label}
-                      {option.publisher ? ` · ${option.publisher}` : ''} ({option.count})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={questionBankCategoryFilter}
-                onValueChange={(value) => setQuestionBankCategoryFilter(value ?? 'all')}
-              >
-                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                  <SelectValue>
-                    {questionBankCategoryFilter === 'all'
-                      ? 'All Categories'
-                      : questionBankCategoryLabel(questionBankCategoryFilter)}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {QUESTION_BANK_CATEGORIES.map((category) => (
-                    <SelectItem key={category.value} value={category.value}>
-                      {category.step}. {category.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Facets that only extracted questions carry. Hidden entirely
-                  when the loaded chapter has none, so an all-AI bank does not
-                  show four dropdowns that can only ever say "All". */}
-              {questionBankFacets.sections.length > 0 && (
-                <Select
-                  value={questionBankSectionFilter}
-                  onValueChange={(value) => setQuestionBankSectionFilter(value ?? 'all')}
-                >
-                  <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                    <SelectValue>
-                      {questionBankSectionFilter === 'all'
-                        ? 'All Sections'
-                        : `Section ${questionBankSectionFilter}`}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Sections</SelectItem>
-                    {questionBankFacets.sections.map((section) => (
-                      <SelectItem key={section} value={section}>
-                        Section {section}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {questionBankFacets.doks.length > 0 && (
-                <Select
-                  value={questionBankDokFilter}
-                  onValueChange={(value) => setQuestionBankDokFilter(value ?? 'all')}
-                >
-                  <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                    <SelectValue>
-                      {questionBankDokFilter === 'all' ? 'All DOK' : `DOK ${questionBankDokFilter}`}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All DOK</SelectItem>
-                    {questionBankFacets.doks.map((dok) => (
-                      <SelectItem key={dok} value={dok}>
-                        DOK {dok}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {questionBankFacets.publishers.length > 0 && (
-                <Select
-                  value={questionBankPublisherFilter}
-                  onValueChange={(value) => setQuestionBankPublisherFilter(value ?? 'all')}
-                >
-                  <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                    <SelectValue>
-                      {questionBankPublisherFilter === 'all'
-                        ? 'All Publishers'
-                        : questionBankPublisherFilter}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Publishers</SelectItem>
-                    {questionBankFacets.publishers.map((publisher) => (
-                      <SelectItem key={publisher} value={publisher}>
-                        {publisher}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {questionBankFacets.publishers.length > 0 && (
-                <Select
-                  value={questionBankSourceFilter}
-                  onValueChange={(value) => setQuestionBankSourceFilter(value ?? 'all')}
-                >
-                  <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                    <SelectValue>
-                      {questionBankSourceFilter === 'all'
-                        ? 'Any Origin'
-                        : questionBankSourceFilter === 'extracted'
-                          ? 'From a book'
-                          : 'AI generated'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Any Origin</SelectItem>
-                    <SelectItem value="extracted">From a book</SelectItem>
-                    <SelectItem value="ai_generated">AI generated</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-
-              <div className="relative w-full sm:w-auto">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <Input
-                  value={questionBankSearchInput}
-                  onChange={(event) => setQuestionBankSearchInput(event.target.value)}
-                  placeholder="Search questions..."
-                  className="h-10 w-full rounded-[8px] border-slate-300 bg-white pl-9 text-[15px] sm:w-[220px]"
-                />
-                {questionBankSearchInput ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuestionBankSearchInput('')}
-                    aria-label="Clear search"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    <X size={14} />
-                  </button>
-                ) : null}
-              </div>
-
+          <QuestionBankFilterBar
+            countLabel={questionCountLabel}
+            countTone={questionBankError ? 'error' : 'default'}
+            filters={questionBankFilterSpecs}
+            reviewState={questionBankStatusFilter}
+            onReviewStateChange={setQuestionBankStatusFilter}
+            search={questionBankSearchInput}
+            onSearchChange={setQuestionBankSearchInput}
+            onClearAll={clearQuestionBankFilters}
+            action={
               <Button
                 type="button"
                 onClick={openQuestionBankAddQuestion}
                 disabled={allChapters.length === 0 || questionBankLoading}
-                className="h-10 rounded-xl bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
+                className="h-10 rounded-[8px] bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
               >
                 <Plus size={18} className="mr-2" />
                 Add question
               </Button>
-            </div>
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-              Review state
-            </span>
-            {[
-              { value: 'all', label: 'All' },
-              { value: 'published', label: 'Published' },
-              { value: 'held', label: 'Held for review' },
-            ].map((choice) => (
-              <button
-                key={choice.value}
-                type="button"
-                onClick={() => setQuestionBankStatusFilter(choice.value)}
-                className={cn(
-                  'rounded-full px-3 py-1 text-[12px] font-bold transition-colors',
-                  questionBankStatusFilter === choice.value
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                )}
-              >
-                {choice.label}
-              </button>
-            ))}
-          </div>
+            }
+          />
 
           {questionBankDeleteError ? (
             <div className="mb-4 flex items-start justify-between gap-4 rounded-[8px] border border-rose-200 bg-rose-50 px-4 py-3">

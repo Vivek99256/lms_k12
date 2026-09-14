@@ -1096,6 +1096,83 @@ export async function fetchQuestionTypeCatalog(
   return (raw.data as QuestionTypeCatalogEntry[]) ?? [];
 }
 
+/** A dropdown option with how many questions currently carry it. */
+export interface CountedOption {
+  id?: number;
+  code?: string;
+  value?: string | number;
+  name?: string;
+  label?: string;
+  total?: number;
+  publisher?: string | null;
+  short_name?: string | null;
+}
+
+/**
+ * Every facet the bank can filter on, for one scope.
+ *
+ * Sourced from the server rather than from the questions currently on screen:
+ * a chapter whose questions are all AI-generated still needs a Bloom dropdown,
+ * and deriving the options from the loaded page is what made the filter set
+ * appear only on the one chapter that had extracted questions.
+ */
+export interface QuestionBankFacets {
+  standards: CountedOption[];
+  subjects: CountedOption[];
+  chapters: CountedOption[];
+  concepts: CountedOption[];
+  question_types: QuestionTypeCatalogEntry[];
+  publishers: CountedOption[];
+  bloom_levels: CountedOption[];
+  difficulty_levels: CountedOption[];
+  dok_levels: CountedOption[];
+  exam_sections: CountedOption[];
+}
+
+export const EMPTY_QUESTION_BANK_FACETS: QuestionBankFacets = {
+  standards: [],
+  subjects: [],
+  chapters: [],
+  concepts: [],
+  question_types: [],
+  publishers: [],
+  bloom_levels: [],
+  difficulty_levels: [],
+  dok_levels: [],
+  exam_sections: [],
+};
+
+export async function fetchQuestionBankFacets(
+  scope: {
+    sub_institute_id?: number | string;
+    standard_id?: number | string;
+    subject_id?: number | string;
+    chapter_id?: number | string;
+  },
+  signal?: AbortSignal
+): Promise<QuestionBankFacets> {
+  const body: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(scope)) {
+    if (value !== undefined && value !== null && value !== '' && value !== 'all') {
+      body[key] = value;
+    }
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/question-bank/filters`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  const raw = await readApiJson(res, 'Failed to fetch question bank filters');
+  if (!res.ok || raw.status === false) {
+    throw new Error((raw.message as string) || 'Failed to fetch question bank filters');
+  }
+
+  return { ...EMPTY_QUESTION_BANK_FACETS, ...((raw.data as Partial<QuestionBankFacets>) ?? {}) };
+}
+
 export interface QuestionBankApiResponse {
   status: boolean;
   message: string;
