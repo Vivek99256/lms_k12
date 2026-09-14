@@ -1,13 +1,39 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+
+/**
+ * Modules that used to live on this stub and now have a real screen.
+ *
+ * The menu no longer points here for these — Header.tsx and routeMapper.ts both
+ * resolve them to their own routes — but a bookmark, a saved link or a
+ * `tblmenumaster` row that has not been updated still can. Redirecting means
+ * those keep working instead of showing "under construction" for something that
+ * has shipped.
+ *
+ * Keyed lowercase; the query string carries the display name ("Document").
+ */
+const GRADUATED_MODULES: Record<string, string> = {
+  document: '/documents',
+};
 
 export default function ComingSoonPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const moduleName = searchParams.get('module') || 'This Module';
+
+  const graduatedRoute = GRADUATED_MODULES[moduleName.trim().toLowerCase()];
+
+  useEffect(() => {
+    // replace(), not push(): the stub should not sit in history behind the real
+    // screen, or Back from the module lands here and bounces forward again.
+    if (graduatedRoute) router.replace(graduatedRoute);
+  }, [graduatedRoute, router]);
+
+  if (graduatedRoute) return null;
 
   return (
     <div className="flex h-full items-center justify-center">
