@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import katex from 'katex';
+import DOMPurify from 'isomorphic-dompurify';
 import 'katex/dist/katex.min.css';
 
 /**
@@ -11,52 +12,30 @@ import 'katex/dist/katex.min.css';
  *
  * Two things make this non-trivial:
  *
- * 1. Nothing in this app renders math today, so a Maths bank without KaTeX
- *    shows `$\mathsf { p } ( \mathsf { x } )$` verbatim and is unusable.
+ * 1. Nothing in this app rendered maths, so a Maths bank without KaTeX shows
+ *    `$\mathsf { p } ( \mathsf { x } )$` verbatim and is unusable.
  * 2. The HTML is not ours. It came out of a PDF via an extractor, so it is
- *    sanitised here rather than trusted -- the app has no DOMPurify, and
- *    pulling one in for a handful of tags is more dependency than this needs.
+ *    sanitised rather than trusted.
  */
 
 /** Tags an extracted question legitimately needs. Everything else is dropped. */
-const ALLOWED_TAGS = new Set([
-  'B', 'STRONG', 'I', 'EM', 'U', 'SUB', 'SUP', 'BR', 'SPAN', 'P', 'DIV',
-  'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TD', 'TH', 'CAPTION',
-  'UL', 'OL', 'LI', 'CODE', 'PRE', 'SMALL',
-]);
+const ALLOWED_TAGS = [
+  'b', 'strong', 'i', 'em', 'u', 'sub', 'sup', 'br', 'span', 'p', 'div',
+  'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
+  'ul', 'ol', 'li', 'code', 'pre', 'small',
+];
 
 /** Attributes safe to keep. No href/src: extracted content has no business
  *  linking out, and an <img> would be an unreviewed remote fetch. */
-const ALLOWED_ATTRS = new Set(['colspan', 'rowspan', 'align', 'valign']);
+const ALLOWED_ATTRS = ['colspan', 'rowspan', 'align', 'valign'];
 
 function sanitizeHtml(dirty: string): string {
-  // No DOM to parse with during SSR. Escaping loses the table formatting but
-  // keeps every character of the question, which beats rendering nothing.
-  if (typeof window === 'undefined') return escapeHtml(dirty);
-
-  const template = document.createElement('template');
-  template.innerHTML = dirty;
-
-  const walk = (node: Element) => {
-    // Snapshot: removing/unwrapping mutates the live child list.
-    for (const child of Array.from(node.children)) walk(child);
-
-    if (!ALLOWED_TAGS.has(node.tagName)) {
-      // Unwrap rather than delete, so the text inside a stray tag survives.
-      node.replaceWith(...Array.from(node.childNodes));
-      return;
-    }
-
-    for (const attr of Array.from(node.attributes)) {
-      if (!ALLOWED_ATTRS.has(attr.name.toLowerCase())) {
-        node.removeAttribute(attr.name);
-      }
-    }
-  };
-
-  for (const child of Array.from(template.content.children)) walk(child);
-
-  return template.innerHTML;
+  // isomorphic-dompurify carries its own DOM, so this is the same allow-list
+  // on the server as in the browser -- no escaped-text fallback during SSR.
+  return DOMPurify.sanitize(dirty, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR: ALLOWED_ATTRS,
+  });
 }
 
 /** Matches the four delimiter styles the extractor emits, display first so
@@ -127,13 +106,11 @@ export function RichText({
 
   if (!value) return null;
 
-  // Before hydration `sanitizeHtml` has no DOM, so plain text is rendered and
-  // replaced on the client. Math-only strings work in both passes.
   return (
     <Tag
       className={className}
-      // Sanitised above: tags outside ALLOWED_TAGS are unwrapped and every
-      // attribute outside ALLOWED_ATTRS is stripped.
+      // Sanitised above by DOMPurify against ALLOWED_TAGS / ALLOWED_ATTRS.
+      // KaTeX output is spliced in after that pass, so its spans survive.
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
