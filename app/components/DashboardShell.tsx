@@ -427,6 +427,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (!hasLoadedRef.current && selectedBranch && displayedMenuItems.length > 1) {
       const selectedLevel1 = displayedMenuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key);
       const selectedLevel2 = selectedLevel1?.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key);
+      if (selectedLevel2 && normalizeMenuLabel(selectedLevel2.label) === 'audit') {
+        return;
+      }
+
       if (!selectedLevel2?.submenus?.length) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedBranch(null);
@@ -511,6 +515,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // jumping past it into the first screen. It also has no LMS master menu.
     if (String(parent.id ?? '') === 'enterprise-brain') {
       if (submenu.href && submenu.href !== '#') router.push(submenu.href);
+      return;
+    }
+
+    // Audit module: the user log screen at /user_log is the module's only page.
+    // Navigate there directly and return before the master-menu fetch or any
+    // Level 3 redirect so no coming-soon stub or submenu entries can surface.
+    if (normalizeMenuLabel(submenu.label) === 'audit') {
+      router.push('/user_log');
       return;
     }
 
@@ -635,6 +647,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   };
 
   const level3Menu: { parentLabel: string; items: Level3Item[]; hideMaster?: boolean } | null = (() => {
+    // Audit module: /user_log is the module's only screen. Suppress the Level 3
+    // sub-header entirely so OTHER REPORTS and its sibling report tabs
+    // (User Report, Dynamic Report, Complaint Report, Petty Cash Report, etc.)
+    // never surface from the Audit module. The module behaves as a single-screen
+    // surface — only User Log is visible, no other report pages are reachable.
+    if (pathname.toLowerCase().replace(/\/+$/, '') === '/user_log') {
+      return null;
+    }
     // New PAL brings its own sub-nav. Every other route — including the legacy
     // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
     // menu-driven resolution below and gets whatever its own menu defines.

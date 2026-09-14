@@ -69,7 +69,6 @@ export default function OnlineFeesSettingsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   const definition = gatewayDefinitions[gateway];
-  const canAddGateway = rows.length === 0;
   const selectedCredentialFields = useMemo(() => definition.credentials, [definition]);
 
   const loadRows = async () => {
@@ -166,7 +165,7 @@ export default function OnlineFeesSettingsPage() {
       <PageHeader
         title="Online fees settings"
         description="Configure the payment gateway used by the online-fee collection flow."
-        action={canAddGateway ? <Button type="button" onClick={openForm}><Plus className="h-4 w-4" />Add gateway</Button> : undefined}
+        action={<Button type="button" onClick={openForm}><Plus className="h-4 w-4" />Add gateway</Button>}
       />
       {message && <InlineMessage type={message.type} text={message.text} />}
       {isFormOpen && (
