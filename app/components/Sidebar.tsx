@@ -13,6 +13,7 @@ interface SidebarProps {
   loading: boolean;
   error: string | null;
   refetch: () => void;
+  dynamicLevel2Counts?: Record<string, number | undefined>;
   onLevel1Select: (item: MenuItem) => void;
   onLevel2Select: (submenu: SubmenuItem, parent: MenuItem) => void;
 }
@@ -50,7 +51,15 @@ function itemMatchesPath(item: MenuItem, pathname: string) {
   }));
 }
 
-export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Select, onLevel2Select }: SidebarProps) {
+export default function Sidebar({
+  menuItems,
+  loading,
+  error,
+  refetch,
+  dynamicLevel2Counts = {},
+  onLevel1Select,
+  onLevel2Select,
+}: SidebarProps) {
   const pathname = usePathname() || '';
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -411,7 +420,10 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
               <div key={columnIndex} className="w-[200px] shrink-0 space-y-1">
                 {column.map((submenu, itemIndex) => {
                   const SubIcon = submenu.icon;
-                  const hasLevel3 = Boolean(submenu.submenus?.length);
+                  const countKey = submenu.label.trim().replace(/\s+/g, ' ').toLowerCase();
+                  const dynamicCount = dynamicLevel2Counts[countKey];
+                  const level3Count = dynamicCount ?? submenu.submenus?.length ?? 0;
+                  const hasLevel3 = level3Count > 0;
                   const dashboardRoute = resolveModuleDashboardRoute(submenu.label);
                   const lowerPathname = pathname.toLowerCase();
                   const isSubActive =
@@ -436,7 +448,7 @@ export default function Sidebar({ menuItems, loading, error, refetch, onLevel1Se
                       <span className="min-w-0 flex-1 truncate">{submenu.label}</span>
                       {hasLevel3 && (
                         <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          +{submenu.submenus!.length}
+                          +{level3Count}
                         </span>
                       )}
                     </button>

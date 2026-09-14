@@ -83,17 +83,18 @@ export default function ReviewAssignmentPage() {
     setSuccess("");
     if (!context) return;
 
-    // Non-MCQ questions require a mark within [0, points].
-    for (const question of context.questions) {
-      if (!question.isMcq) {
-        const value = marks[question.id];
-        if (value == null || Number.isNaN(value)) {
-          setError("Enter marks for every descriptive question.");
-          return;
-        }
-        if (value < 0 || value > question.points) {
-          setError(`Marks must be between 0 and ${question.points}.`);
-          return;
+    if (!context.isHomework) {
+      for (const question of context.questions) {
+        if (!question.isMcq) {
+          const value = marks[question.id];
+          if (value == null || Number.isNaN(value)) {
+            setError("Enter marks for every descriptive question.");
+            return;
+          }
+          if (value < 0 || value > question.points) {
+            setError(`Marks must be between 0 and ${question.points}.`);
+            return;
+          }
         }
       }
     }
@@ -104,11 +105,13 @@ export default function ReviewAssignmentPage() {
         assignmentId: context.assignmentId,
         studentId: context.studentId,
         questionPaperId: context.questionPaperId,
-        marks,
+        marks: context.isHomework ? {} : marks,
         teacherRemarks: remarks.trim(),
       });
       setSuccess(
-        `Assignment reviewed successfully — ${obtained}/${context.totalMarks} marks awarded.`
+        context.isHomework
+          ? "Assignment reviewed successfully — remarks saved."
+          : `Assignment reviewed successfully — ${obtained}/${context.totalMarks} marks awarded.`
       );
       setTimeout(() => router.push("/lms/lmsAnnotate_assignment"), 1200);
     } catch (saveError: unknown) {
@@ -132,7 +135,9 @@ export default function ReviewAssignmentPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {context
-              ? `${context.title || "Assignment"} — ${context.studentName || "Student"}`
+              ? context.isHomework
+                ? `${context.title || "Assignment"} — ${context.studentName || "Student"} (Homework)`
+                : `${context.title || "Assignment"} — ${context.studentName || "Student"}`
               : "Grade the submission against the assigned exam paper."}
           </p>
         </div>
@@ -199,94 +204,98 @@ export default function ReviewAssignmentPage() {
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span className="text-slate-600">
-                  <span className="font-semibold text-slate-800">
-                    {context.paperName || "Question paper"}
-                  </span>
-                </span>
-                <span className="text-slate-600">
-                  Total marks:{" "}
-                  <span className="font-semibold text-slate-800">
-                    {context.totalMarks}
-                  </span>
-                </span>
-              </div>
+              {!context.isHomework && (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="text-slate-600">
+                      <span className="font-semibold text-slate-800">
+                        {context.paperName || "Question paper"}
+                      </span>
+                    </span>
+                    <span className="text-slate-600">
+                      Total marks:{" "}
+                      <span className="font-semibold text-slate-800">
+                        {context.totalMarks}
+                      </span>
+                    </span>
+                  </div>
 
-              <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <Table>
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead>Question</TableHead>
-                      <TableHead className="w-48">Marks</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {context.questions.length ? (
-                      context.questions.map((question, index) => (
-                        <TableRow key={question.id}>
-                          <TableCell>Question {index + 1}</TableCell>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow>
+                          <TableHead>Question</TableHead>
+                          <TableHead className="w-48">Marks</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {context.questions.length ? (
+                          context.questions.map((question, index) => (
+                            <TableRow key={question.id}>
+                              <TableCell>Question {index + 1}</TableCell>
+                              <TableCell>
+                                {question.isMcq ? (
+                                  <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input
+                                      type="checkbox"
+                                      aria-label={`Mark question ${index + 1} correct`}
+                                      checked={(marks[question.id] ?? 0) > 0}
+                                      onChange={(event) =>
+                                        setQuestionMark(
+                                          question.id,
+                                          event.target.checked ? question.points : 0
+                                        )
+                                      }
+                                    />
+                                    Correct / {question.points}
+                                  </label>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={question.points}
+                                      value={marks[question.id] ?? ""}
+                                      onChange={(event) =>
+                                        setQuestionMark(
+                                          question.id,
+                                          event.target.value === ""
+                                            ? Number.NaN
+                                            : Number(event.target.value)
+                                        )
+                                      }
+                                      required
+                                      className="h-9 w-24 rounded-lg border border-slate-300 px-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                    <span className="text-sm text-slate-500">
+                                      / {question.points}
+                                    </span>
+                                  </div>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell
+                              colSpan={2}
+                              className="h-20 text-center text-slate-500"
+                            >
+                              No questions found on this paper.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        <TableRow className="bg-slate-50 font-semibold">
+                          <TableCell>Total</TableCell>
                           <TableCell>
-                            {question.isMcq ? (
-                              <label className="inline-flex items-center gap-2 text-sm text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  aria-label={`Mark question ${index + 1} correct`}
-                                  checked={(marks[question.id] ?? 0) > 0}
-                                  onChange={(event) =>
-                                    setQuestionMark(
-                                      question.id,
-                                      event.target.checked ? question.points : 0
-                                    )
-                                  }
-                                />
-                                Correct / {question.points}
-                              </label>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={question.points}
-                                  value={marks[question.id] ?? ""}
-                                  onChange={(event) =>
-                                    setQuestionMark(
-                                      question.id,
-                                      event.target.value === ""
-                                        ? Number.NaN
-                                        : Number(event.target.value)
-                                    )
-                                  }
-                                  required
-                                  className="h-9 w-24 rounded-lg border border-slate-300 px-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                                />
-                                <span className="text-sm text-slate-500">
-                                  / {question.points}
-                                </span>
-                              </div>
-                            )}
+                            {totalObtained} / {context.totalMarks}
                           </TableCell>
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell
-                          colSpan={2}
-                          className="h-20 text-center text-slate-500"
-                        >
-                          No questions found on this paper.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    <TableRow className="bg-slate-50 font-semibold">
-                      <TableCell>Total</TableCell>
-                      <TableCell>
-                        {totalObtained} / {context.totalMarks}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="teacher-remarks">Remarks</Label>
@@ -302,7 +311,7 @@ export default function ReviewAssignmentPage() {
               <div className="flex justify-end">
                 <Button
                   type="submit"
-                  disabled={saving || context.questions.length === 0}
+                  disabled={saving || (!context.isHomework && context.questions.length === 0)}
                 >
                   {saving ? (
                     <LoaderCircle className="size-4 animate-spin" />

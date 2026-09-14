@@ -6,6 +6,7 @@
 // components/ui/stat-card.tsx. Swapping back is this one line:
 //   import { StatCard } from "@platform/components-core";
 import { StatCard } from '@/components/ui/stat-card';
+import { ComingSoonTile } from '@/components/ui/coming-soon';
 
 /**
  * Real Fees dashboard — built from confirmed real fields, not invented.
@@ -58,6 +59,14 @@ export function FeesDashboard({
       <StatCard label="Outstanding" value={outstanding} />
       <StatCard label="Collection rate" value={collectionRate} />
       <StatCard label="Defaulters" value={defaulters} />
+
+      {/* Spans the full row rather than sitting as a fifth stat: it is not a
+          measurement, and an orphan tile in a four-column grid reads as a
+          layout mistake instead of a deliberate roadmap note. */}
+      <ComingSoonTile
+        roadmapId="dashboard.personalization"
+        className="sm:col-span-2 xl:col-span-4"
+      />
 
       {/* Real charts (Collection vs target, Head-wise collected vs pending,
           Payment mode mix) confirmed in the live screenshot. The API now

@@ -34,9 +34,72 @@ export type CurriculumData = {
   board: string | null;
   framework: string | null;
   internal_marks: number | null;
+  total_marks: number | null;
+  /** How those two figures are made up, mined out of the extracted syllabus. */
+  assessment: CurriculumAssessment | null;
   status: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/**
+ * The marks structure behind internal_marks and total_marks.
+ *
+ * `lms_curriculum` stores only those two scalars; the split of the internal
+ * marks and the competency weighting of the theory paper exist only as prose
+ * and HTML tables inside the extracted syllabus. Any field here can be absent
+ * for a document that never states it.
+ */
+export type CurriculumAssessment = {
+  theory_marks: number | null;
+  /** 'document' when the syllabus states it, 'derived' when it is total - internal. */
+  theory_marks_source: 'document' | 'derived' | null;
+  /**
+   * component is null where the syllabus states an allocation with no
+   * reecoverable label - the CBSE Science extract loses the "Multiple
+   * Assessment" bullet but keeps its five marks.
+   */
+  internal_breakdown: Array<{ component: string | null; marks: number }>;
+  internal_breakdown_total: number | null;
+  /** Whether the parsed components add up. null means none were found at all. */
+  internal_reconciles: boolean | null;
+  competencies: Array<{ competency: string; percentage: number }>;
+  competency_total_percent: number | null;
+};
+
+/** A topic_master row and the concepts mapped to it for one chapter. */
+export type CurriculumTopic = {
+  topic_id: number;
+  name: string;
+  description: string | null;
+  concepts: string[];
+};
+
+/** A chapter of a unit, with topic_master topics and concepts beneath them. */
+export type UnitChapter = {
+  /**
+   * The chapter_master row the concepts were read from. null when the unit's
+   * declared chapters could not be lined up with the extracted ones, in which
+   * case the chapter has a name and nothing else.
+   */
+  chapter_id: number | null;
+  /** The unit's own name for the chapter, from lms_units.unit_chapters. */
+  chapter_name: string;
+  /**
+   * The longer extracted title for the same chapter - "Cell: The Building Block
+   * of Life" for "Cell" - where the two lists could be lined up.
+   */
+  extracted_name: string | null;
+  /** Topic -> concept hierarchy, sourced from topic_master and lms_concept.topic_id. */
+  topics: CurriculumTopic[];
+  topic_count: number;
+  /** Only the C-* / C=* codes found in this chapter's extracted markdown. */
+  competency_codes: string[];
+  /** Concept names from lms_concept; retained as a safe fallback for old API payloads. */
+  concepts: string[];
+  concept_count: number;
+  /** Periods the syllabus plans for this chapter. */
+  periods: number | null;
 };
 
 export type UnitData = {
@@ -46,6 +109,8 @@ export type UnitData = {
   total_marks: number | null;
   planned_periods: number | string | null;
   chapter_id: number;
+  /** The unit's chapters, each with its concepts. */
+  chapters?: UnitChapter[];
 };
 
 export type OutcomeNode = {

@@ -21,15 +21,36 @@ import { getRequestContext, getSyear } from '../../page';
 
 const DEFAULT_SLIDE_COUNT = 30;
 const GAMMA_GENERATION_TIMEOUT_MS = 10 * 60 * 1000;
+const ALL_CONTENT_TYPES_VALUE = 'All content types';
 const CONTENT_TYPE_OPTIONS = [
   { label: 'Presentation', value: 'Presentation', apiValue: 'presentation' },
   { label: 'Revision Notes', value: 'Revision Notes', apiValue: 'Revision Notes' },
   { label: 'Classroom Activity', value: 'Classroom Activity', apiValue: 'Classroom Activity' },
   { label: 'Remedial Class', value: 'Remedial Class', apiValue: 'remedial_class' },
+  // Runs every type below, one after another, from this same drawer. The loop
+  // is client-side so each type still goes through its own prompt builder here
+  // and the templates are never duplicated server-side.
+  { label: 'All content types', value: ALL_CONTENT_TYPES_VALUE, apiValue: ALL_CONTENT_TYPES_VALUE },
 ] as const;
 // Mirrors UPLOAD_PRESENTATION_TYPES in the chapters page: the library reads this
 // string out of content_category to decide the Teacher Workspace lane.
 const TEACHER_TRAINING_CONTENT_CATEGORY = 'Teacher training presentation';
+
+/**
+ * Order for an "All content types" run.
+ *
+ * Documents first: they are the quickest, so a run interrupted part-way still
+ * leaves usable material and the first result lands early. Teacher training is
+ * last because it is the only type that needs a concept, so it is the only one
+ * that can be skipped.
+ */
+const ALL_CONTENT_TYPES_SEQUENCE: string[] = [
+  'Revision Notes',
+  'Classroom Activity',
+  'Remedial Class',
+  'Presentation',
+  TEACHER_TRAINING_CONTENT_CATEGORY,
+];
 
 /**
  * The concept-intelligence dimensions a generated resource can be grounded in.
@@ -144,6 +165,10 @@ export function GeneratePresentationDrawer({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [generationSuccess, setGenerationSuccess] = useState<string | null>(null);
+  // A full run is minutes long, so the drawer reports which type is in flight
+  // and what each one ended up doing.
+  const [generationProgress, setGenerationProgress] = useState<{ done: number; total: number; current: string } | null>(null);
+  const [typeResults, setTypeResults] = useState<{ type: string; ok: boolean; message: string }[]>([]);
   // Which intelligence dimensions the resource is grounded in. Everything is
   // ticked by default, which is exactly what was sent before this was selectable.
   const [selectedIntelligence, setSelectedIntelligence] = useState<IntelligenceKey[]>(ALL_INTELLIGENCE_KEYS);
@@ -670,10 +695,132 @@ Attached PDF / Ground Truth Chapter Content:
 ${groundTruthContent}`;
   };
 
+  /**
+   * Generate one content type and store it.
+   *
+   * Split out of handleGenerate so the "All content types" run can call it once
+   * per type. It reports failure by returning rather than throwing, so one bad
+   * type never aborts the types queued behind it.
+   */
+  const generateOne = async (
+    typeValue: string,
+    chapter: Chapter,
+    semanticResult: SemanticIntelligenceResult | null,
+    identity: { sub_institute_id: number; user_id: number; user_profile_name: string }
+  ): Promise<{ ok: boolean; message: string }> => {
+    const normalizedContentType = typeValue.trim().toLowerCase();
+    // In a loop run the teacher deck is requested by name from the Classroom
+    // tab, so the type itself has to be able to signal teacher training.
+    const isTeacherTraining =
+      typeValue === TEACHER_TRAINING_CONTENT_CATEGORY || presentationMode === 'Teacher training';
+    const isPresentation = isTeacherTraining || normalizedContentType === 'presentation';
+    const exportFormat = isPresentation ? 'pptx' : 'pdf';
+    // content_category is what splits the library into Classroom Resource vs
+    // Teacher Resource, so teacher-training decks must be filed under their own
+    // category instead of the generic 'presentation'.
+    const apiContentType = isTeacherTraining
+      ? TEACHER_TRAINING_CONTENT_CATEGORY
+      : CONTENT_TYPE_OPTIONS.find((option) => option.value === typeValue)?.apiValue ?? typeValue;
+
+    if (isTeacherTraining && !presentationConcept) {
+      return { ok: false, message: 'Select a concept to generate the teacher training deck.' };
+    }
+
+    const prompt = isPresentation
+      ? isTeacherTraining
+        ? constructTeacherTrainingPrompt(chapter, presentationConcept, semanticResult)
+        : constructPrompt(chapter, semanticResult)
+      : constructDocumentPrompt(chapter, typeValue, semanticResult);
+
+    console.log(`[GeneratePresentation] ${typeValue} prompt:`, prompt);
+
+    console.log('[GeneratePresentation] Data used to generate content:', {
+      presentationMode,
+      courseId,
+      course,
+      chapter: {
+        id: chapter.id,
+        title: chapter.title,
+        semanticResultId: semanticResult?.id,
+        semanticExtractionId: semanticResult?.extraction_id,
+        hasGroundTruthContent: Boolean(semanticResult?.md_content),
+      },
+      presentationChapterId,
+      presentationConcept,
+      exportFormat,
+      slideCount: DEFAULT_SLIDE_COUNT,
+      contentType: typeValue,
+      apiContentType,
+    });
+
+    const payload = {
+      type: 'API',
+      sub_institute_id: identity.sub_institute_id,
+      syear: getSyear(),
+      user_id: identity.user_id,
+      user_profile_name: identity.user_profile_name,
+      chapter_name: chapter.title,
+      // The deck is generated for one concept; sending it lets the stored row
+      // carry the concept mapping instead of only the chapter.
+      concept_id: presentationConcept || undefined,
+      concept_name:
+        presentationConceptOptions.find((c) => c.id === presentationConcept)?.title || undefined,
+      prompt,
+      content_type: apiContentType,
+      format: isPresentation ? 'presentation' : 'document',
+      export_format: exportFormat,
+      slide_count: DEFAULT_SLIDE_COUNT,
+    };
+
+    // Per request, not per run: a single timer started at the top of a five-type
+    // loop would abort the types still queued behind the first slow one.
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), GAMMA_GENERATION_TIMEOUT_MS);
+
+    try {
+      const res = await (async () => {
+        try {
+          return await fetch(`${API_BASE_URL}/api/lms/gamma-content-master`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify(payload),
+          });
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+      })();
+
+      const responseContentType = res.headers.get('content-type') || '';
+      const raw = responseContentType.includes('application/json')
+        ? ((await res.json()) as Record<string, unknown>)
+        : ({ message: await res.text() } as Record<string, unknown>);
+      const isSuccess = raw.success === true || Number(raw.status_code) === 1;
+
+      if (!res.ok || !isSuccess) {
+        return { ok: false, message: readErrorMessage(raw) || `Failed to generate ${typeValue}` };
+      }
+
+      onSuccess?.(raw);
+      return { ok: true, message: readErrorMessage(raw) || `${typeValue} generated` };
+    } catch (err) {
+      console.error(err);
+      const message =
+        err instanceof Error && err.name === 'AbortError'
+          ? `${typeValue} is taking longer than expected.`
+          : err instanceof Error
+            ? err.message
+            : 'Generation failed';
+      return { ok: false, message };
+    }
+  };
+
   const handleGenerate = async () => {
     if (!presentationChapterId) return;
 
     setGenerationError(null);
+    setGenerationSuccess(null);
+    setTypeResults([]);
     setIsGenerating(true);
 
     try {
@@ -704,7 +851,8 @@ ${groundTruthContent}`;
       }
 
       // Already fetched when the chapter was picked, to build the options above.
-      // Only go back to the network if that has not landed yet.
+      // Only go back to the network if that has not landed yet. Fetched once for
+      // the whole run: every type grounds on the same chapter text.
       let semanticResult: SemanticIntelligenceResult | null = chapterIntelligence;
       if (!semanticResult) {
         try {
@@ -713,33 +861,6 @@ ${groundTruthContent}`;
           console.warn('[GeneratePresentation] Falling back to chapter semantic data:', error);
         }
       }
-      const prompt = isPresentation
-        ? isTeacherTraining
-          ? constructTeacherTrainingPrompt(chapter, presentationConcept, semanticResult)
-          : constructPrompt(chapter, semanticResult)
-        : constructDocumentPrompt(chapter, contentType, semanticResult);
-
-      console.log(`[GeneratePresentation] ${contentType} prompt:`, prompt);
-
-      console.log('[GeneratePresentation] Data used to generate content:', {
-        presentationMode,
-        courseId,
-        course,
-        chapter: {
-          id: chapter.id,
-          title: chapter.title,
-          semanticResultId: semanticResult?.id,
-          semanticExtractionId: semanticResult?.extraction_id,
-          hasGroundTruthContent: Boolean(semanticResult?.md_content),
-        },
-        presentationChapterId,
-        presentationConcept,
-        exportFormat,
-        slideCount: DEFAULT_SLIDE_COUNT,
-        contentType,
-        apiContentType,
-        prompt,
-      });
 
       const requestContext = getRequestContext();
       let sub_institute_id = 0;
@@ -752,66 +873,65 @@ ${groundTruthContent}`;
         user_id = Number(requestContext?.user_id ?? userData.user_id ?? menuContext.user_id ?? 0);
         user_profile_name = String(requestContext?.user_profile_name ?? userData.user_profile_name ?? menuContext.user_profile_name ?? '');
       } catch {}
+      const identity = { sub_institute_id, user_id, user_profile_name };
 
-      const payload = {
-        type: 'API',
-        sub_institute_id,
-        syear: getSyear(),
-        user_id,
-        user_profile_name,
-        chapter_name: chapter.title,
-        // The deck is generated for one concept; sending it lets the stored row
-        // carry the concept mapping instead of only the chapter.
-        concept_id: presentationConcept || undefined,
-        concept_name:
-          presentationConceptOptions.find((c) => c.id === presentationConcept)?.title || undefined,
-        prompt,
-        content_type: apiContentType,
-        format: isPresentation ? 'presentation' : 'document',
-        export_format: exportFormat,
-        slide_count: DEFAULT_SLIDE_COUNT,
-      };
-      console.log('[GeneratePresentation] API request payload:', payload);
+      const isLoop = contentType === ALL_CONTENT_TYPES_VALUE && presentationMode !== 'Teacher training';
+      // Teacher training is concept-scoped and the other four are chapter-wide,
+      // so it only joins the run when a concept is actually selected. Skipped
+      // rather than failed, so "all types" stays honest without inventing one.
+      const sequence = isLoop
+        ? ALL_CONTENT_TYPES_SEQUENCE.filter(
+            (type) => type !== TEACHER_TRAINING_CONTENT_CATEGORY || Boolean(presentationConcept)
+          )
+        : [contentType];
 
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), GAMMA_GENERATION_TIMEOUT_MS);
+      const skippedTeacherTraining =
+        isLoop && !presentationConcept
+          ? [{ type: TEACHER_TRAINING_CONTENT_CATEGORY, ok: false, message: 'Skipped - no concept selected.' }]
+          : [];
 
-      const res = await (async () => {
-        try {
-          return await fetch(`${API_BASE_URL}/api/lms/gamma-content-master`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify(payload),
-          });
-        } finally {
-          window.clearTimeout(timeoutId);
-        }
-      })();
+      const results: { type: string; ok: boolean; message: string }[] = [];
 
-      const responseContentType = res.headers.get('content-type') || '';
-      const raw = responseContentType.includes('application/json')
-        ? ((await res.json()) as Record<string, unknown>)
-        : ({ message: await res.text() } as Record<string, unknown>);
-      const isSuccess = raw.success === true || Number(raw.status_code) === 1;
-      if (!res.ok || !isSuccess) {
-        throw new Error(readErrorMessage(raw) || 'Failed to generate presentation');
+      for (let i = 0; i < sequence.length; i += 1) {
+        const type = sequence[i];
+        setGenerationProgress({ done: i, total: sequence.length, current: type });
+
+        // Sequential on purpose: five concurrent long generations would risk the
+        // tenant's provider rate limit, and a failure part-way still leaves the
+        // earlier types stored.
+        const result = await generateOne(type, chapter, semanticResult, identity);
+        results.push({ type, ...result });
+        setTypeResults([...results, ...skippedTeacherTraining]);
       }
 
-      onSuccess?.(raw);
-      setGenerationSuccess(readErrorMessage(raw) || 'Gamma content generated and stored successfully');
+      setGenerationProgress(null);
+
+      const failed = results.filter((r) => !r.ok);
+      const succeeded = results.length - failed.length;
+
+      if (succeeded === 0) {
+        setGenerationError(
+          failed.map((f) => `${f.type}: ${f.message}`).join(' | ') || 'Generation failed'
+        );
+        return;
+      }
+
+      setGenerationSuccess(
+        !isLoop
+          ? results[0].message
+          : failed.length === 0
+            ? `Generated ${succeeded} of ${results.length} content types.`
+            : `Generated ${succeeded} of ${results.length}. Failed: ${failed.map((f) => f.type).join(', ')}.`
+      );
+
+      // Reload once, after the whole run - not once per type.
       setTimeout(() => {
         onClose();
         window.location.reload();
-      }, 2000);
-    } catch (err) {
-      console.error(err);
-      const message = err instanceof Error && err.name === 'AbortError'
-        ? 'Gamma generation is taking longer than expected. Please try again in a few minutes.'
-        : err instanceof Error ? err.message : 'Generation failed';
-      setGenerationError(message);
+      }, failed.length ? 4000 : 2000);
     } finally {
       setIsGenerating(false);
+      setGenerationProgress(null);
     }
   };
 
@@ -1109,6 +1229,20 @@ ${groundTruthContent}`;
             )}
           </div>
 
+          {typeResults.length > 0 && (
+            <ul className="mt-4 space-y-1.5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+              {typeResults.map((result) => (
+                <li key={result.type} className="flex items-start gap-2">
+                  <span className={result.ok ? 'text-emerald-600' : 'text-rose-600'}>
+                    {result.ok ? '✓' : '✗'}
+                  </span>
+                  <span className="font-medium text-slate-700">{result.type}</span>
+                  <span className="text-slate-500">{result.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
           {generationError && (
             <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {generationError}
@@ -1125,7 +1259,8 @@ ${groundTruthContent}`;
           <button
             type="button"
             onClick={onClose}
-            className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900"
+            disabled={isGenerating}
+            className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Cancel
           </button>
@@ -1138,7 +1273,9 @@ ${groundTruthContent}`;
             {isGenerating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
+                {generationProgress
+                  ? `Generating ${generationProgress.done + 1} of ${generationProgress.total}: ${generationProgress.current}...`
+                  : 'Generating...'}
               </>
             ) : (
               <>

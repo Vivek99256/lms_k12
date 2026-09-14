@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -10,6 +10,14 @@ import {
   Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Table,
   TableBody,
@@ -23,6 +31,12 @@ import {
   submitAssignments,
   type AssignmentSubmissionRow,
 } from "@/app/lms/lmsAssignment_submission/api";
+import { getAssignmentAiStatus } from "@/app/lms/lmsAnnotate_assignment/api";
+import { studentSubmissionStatus } from "@/app/lms/_shared/submission-status";
+
+const AI_POLL_INTERVAL_MS = 8000;
+/** Remarks longer than this are clamped in the table and need "View full summary" to read in full. */
+const REMARKS_PREVIEW_THRESHOLD = 140;
 
 export default function AssignmentSubmissionPage() {
   const [rows, setRows] = useState<AssignmentSubmissionRow[]>([]);
@@ -31,6 +45,7 @@ export default function AssignmentSubmissionPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [summaryRow, setSummaryRow] = useState<AssignmentSubmissionRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,6 +67,51 @@ export default function AssignmentSubmissionPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Poll AI evaluation status for rows still "Checking" so the status badge
+  // updates in place (e.g. "AI Evaluating" -> "AI Evaluated - Awaiting
+  // Teacher Review") once EvaluateAssignmentSubmissionJob finishes, without
+  // the student needing to reload the page.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  useEffect(() => {
+    const checkingIds = rows
+      .filter((row) => row.aiStatus.toLowerCase() === "checking")
+      .map((row) => row.id);
+    if (!checkingIds.length) return;
+
+    const interval = setInterval(async () => {
+      const stillChecking = rowsRef.current.filter(
+        (row) => row.aiStatus.toLowerCase() === "checking"
+      );
+      if (!stillChecking.length) {
+        clearInterval(interval);
+        return;
+      }
+      const updates = await Promise.all(
+        stillChecking.map(async (row) => {
+          try {
+            return await getAssignmentAiStatus(row.id);
+          } catch {
+            return null;
+          }
+        })
+      );
+      setRows((current) =>
+        current.map((row) => {
+          const update = updates.find((item) => item && item.id === row.id);
+          if (!update) return row;
+          return {
+            ...row,
+            aiStatus: update.aiStatus,
+            teacherRemarks: update.teacherRemarks || row.teacherRemarks,
+          };
+        })
+      );
+    }, AI_POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [rows]);
 
   const pendingCount = useMemo(
     () => rows.filter((row) => !row.studentSubmitted).length,
@@ -160,9 +220,9 @@ export default function AssignmentSubmissionPage() {
                     <TableCell>{row.assignedOn || "-"}</TableCell>
                     <TableCell>{row.submissionDate || "-"}</TableCell>
                     <TableCell>
-                      {row.examPdfUrl ? (
+                      {(row.examPdfUrl || row.homeworkFileUrl) ? (
                         <a
-                          href={row.examPdfUrl}
+                          href={row.examPdfUrl || row.homeworkFileUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
@@ -194,23 +254,41 @@ export default function AssignmentSubmissionPage() {
                         />
                       )}
                     </TableCell>
-                    <TableCell className="max-w-xs whitespace-pre-wrap text-sm text-slate-600">
-                      {row.teacherRemarks || "-"}
+                    <TableCell className="max-w-56 min-w-40 whitespace-normal align-top py-2.5">
+                      {row.teacherRemarks ? (
+                        <div className="space-y-1">
+                          <p className="line-clamp-3 whitespace-pre-line break-words text-sm text-slate-600">
+                            {row.teacherRemarks}
+                          </p>
+                          {row.teacherRemarks.length > REMARKS_PREVIEW_THRESHOLD ? (
+                            <button
+                              type="button"
+                              onClick={() => setSummaryRow(row)}
+                              className="text-xs font-medium text-blue-600 hover:underline"
+                            >
+                              View full summary
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
-                      {row.teacherReviewed ? (
-                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          Reviewed
-                        </span>
-                      ) : row.studentSubmitted ? (
-                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                          Awaiting review
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                          Not submitted
-                        </span>
-                      )}
+                      {(() => {
+                        const status = studentSubmissionStatus(row);
+                        return (
+                          <StatusBadge
+                            variant={status.variant}
+                            label={status.label}
+                            icon={
+                              status.variant === "processing" ? (
+                                <LoaderCircle className="size-3 animate-spin" />
+                              ) : undefined
+                            }
+                          />
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))
@@ -247,6 +325,25 @@ export default function AssignmentSubmissionPage() {
           </Button>
         </div>
       </section>
+
+      <Dialog
+        open={summaryRow !== null}
+        onOpenChange={(open) => {
+          if (!open) setSummaryRow(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>AI evaluation summary</DialogTitle>
+            <DialogDescription>
+              {summaryRow ? summaryRow.title || "Assignment" : null}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="max-h-[60vh] overflow-y-auto whitespace-pre-line break-words text-sm text-slate-700">
+            {summaryRow?.teacherRemarks}
+          </p>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

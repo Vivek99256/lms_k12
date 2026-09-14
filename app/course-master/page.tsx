@@ -24,6 +24,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { RoadmapRollupStrip, type RoadmapRollupEntry } from '@/components/ui/coming-soon';
+import { CATALOG_CATEGORY_PLAN, catalogCategorySummary, resolveCatalogCategory } from '@/lib/roadmap';
 import { useAuth } from '@/contexts/AuthContext';
 import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import {
@@ -274,6 +276,47 @@ export default function CourseMasterPage() {
 
   const categoryOptions = useMemo(() => {
     return data?.categories ?? [];
+  }, [data]);
+
+  /**
+   * Counters for the catalog rollup strip.
+   *
+   * The active count is derived from the same `lms_subject` list the cards
+   * below are rendered from, so the counter and the cards can never disagree —
+   * there is no second query to fall out of step.
+   *
+   * Planned categories are seeded at zero because, by definition, they have no
+   * subject rows yet: without this they would simply be missing from the strip,
+   * which is the gap the roadmap counters exist to fill.
+   *
+   * Counting goes through `resolveCatalogCategory` because `subject_category` is
+   * free text and the same tier is stored under more than one spelling. Keyed by
+   * the raw value, "Soft Skill" and "Soft Skills" became two tiles for one tier,
+   * one of them reporting zero.
+   */
+  const categoryRollup = useMemo<RoadmapRollupEntry[]>(() => {
+    const activeByCategory = new Map<string, number>();
+
+    for (const subject of data?.lms_subject ?? []) {
+      const stored = subject.category_name || subject.content_category;
+      if (!stored) continue;
+      const category = resolveCatalogCategory(stored);
+      activeByCategory.set(category, (activeByCategory.get(category) ?? 0) + 1);
+    }
+
+    for (const plan of CATALOG_CATEGORY_PLAN) {
+      if (!activeByCategory.has(plan.category)) activeByCategory.set(plan.category, 0);
+    }
+
+    return Array.from(activeByCategory.entries())
+      .map(([category, active]) => ({ key: category, ...catalogCategorySummary(category, active) }))
+      // What is built leads; the roadmap follows. Reading "coming soon" before
+      // the live subjects would undersell a catalog that is largely populated.
+      .sort((a, b) => {
+        const delivered = (entry: RoadmapRollupEntry) =>
+          entry.status === 'live' || entry.status === 'pilot' ? 0 : 1;
+        return delivered(a) - delivered(b) || a.label.localeCompare(b.label);
+      });
   }, [data]);
 
   const studentSubjects = useMemo(() => {
@@ -727,6 +770,22 @@ export default function CourseMasterPage() {
     );
   }
 
+  /**
+   * The catalog rollup strip — staff only, deliberately.
+   *
+   * These counters are a statement about the product's direction, aimed at the
+   * people choosing what the school offers. A student has no use for "0 active ·
+   * 18 planned" against a category their school has not taken; it would just be
+   * a list of subjects they cannot open. So it renders in the teacher/admin
+   * view and not in the student view of this same screen.
+   */
+  const catalogRollupSection = (
+    <div>
+      <p className="mb-2 text-[13px] font-medium text-[#52637A]">Catalog</p>
+      <RoadmapRollupStrip entries={categoryRollup} />
+    </div>
+  );
+
   return (
     <div className="min-h-full px-6 py-5">
       <div className="mx-auto max-w-[1800px]">
@@ -744,6 +803,8 @@ export default function CourseMasterPage() {
 
           {effectiveAudienceMode === 'Teacher' ? (
             <div className="mt-1 flex flex-col gap-4">
+                  {catalogRollupSection}
+
                   {/* <div className="w-full xl:max-w-[360px]">
                     <Label className="mb-2 block text-[13px] font-medium text-[#52637A]">
                       Search Subjects

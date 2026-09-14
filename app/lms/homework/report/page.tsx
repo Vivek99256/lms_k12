@@ -35,10 +35,10 @@ import {
   type TableExportRow,
 } from "@/lib/table-export";
 import {
-  bulkDeleteAssignments,
-  listAssignments,
-  type AnnotateRow,
-} from "@/app/lms/lmsAnnotate_assignment/api";
+  bulkDeleteHomework,
+  listHomework,
+  type HomeworkRecord,
+} from "@/app/lms/homework/api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
 
 const academicFields: DropdownField[] = [
@@ -107,7 +107,7 @@ function StudentHomeworkReport() {
   }));
   const [fromDate, setFromDate] = useState(handoffFilters.fromDate);
   const [toDate, setToDate] = useState(handoffFilters.toDate);
-  const [rows, setRows] = useState<AnnotateRow[]>([]);
+  const [rows, setRows] = useState<HomeworkRecord[]>([]);
   const [selected, setSelected] = useState<Set<number>>(assistantSelection);
   const [query, setQuery] = useState(handoffFilters.query);
   const [page, setPage] = useState(1);
@@ -127,11 +127,11 @@ function StudentHomeworkReport() {
     setSelected(assistantSelection());
     setPage(1);
     try {
-      const data = await listAssignments({
+      const data = await listHomework({
         grade: readValue(filters.section ?? ""),
-        standardId: readValue(filters.standard ?? ""),
-        divisionId: readValue(filters.division ?? ""),
-        subjectId: readValue(filters.subject ?? ""),
+        standard: readValue(filters.standard ?? ""),
+        division: readValue(filters.division ?? ""),
+        subject: readValue(filters.subject ?? ""),
         fromDate,
         toDate,
       });
@@ -185,7 +185,7 @@ function StudentHomeworkReport() {
     description: row.description,
     standard: [row.standardName, row.divisionName].filter(Boolean).join(" - "),
     subject: row.subjectName,
-    date: row.assignedOn,
+    date: row.date,
   }));
 
   function toggle(id: number) {
@@ -224,7 +224,7 @@ function StudentHomeworkReport() {
     setNotice("");
     setDeleting(true);
     try {
-      const count = await bulkDeleteAssignments(Array.from(selected));
+      const count = await bulkDeleteHomework(Array.from(selected));
       setNotice(`${count} homework record(s) deleted successfully.`);
       await load();
     } catch (deleteError: unknown) {
@@ -452,9 +452,9 @@ function StudentHomeworkReport() {
                         {row.description || "-"}
                       </TableCell>
                       <TableCell>
-                        {row.examPdfUrl ? (
+                        {row.image ? (
                           <a
-                            href={row.examPdfUrl}
+                            href={row.image}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 underline"
@@ -469,7 +469,7 @@ function StudentHomeworkReport() {
                         {[row.standardName, row.divisionName].filter(Boolean).join(" - ") || "-"}
                       </TableCell>
                       <TableCell>{row.subjectName || "-"}</TableCell>
-                      <TableCell>{row.assignedOn || "-"}</TableCell>
+                      <TableCell>{row.date || "-"}</TableCell>
                     </TableRow>
                   ))
                 ) : (

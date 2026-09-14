@@ -36,6 +36,7 @@ import {
   suggestionsFor,
 } from "@/lib/ai/field-edit/actions";
 import type { AiFieldContext, AiFieldType } from "@/lib/ai/field-edit/types";
+import { readAiSession } from "@/lib/ai/session";
 
 /**
  * The generative editing assistant that sits beside an editable field.
@@ -248,9 +249,17 @@ export function AiFieldAssistant({
     setNote(undefined);
 
     try {
+      // The route proxies into Laravel's AI runtime, which derives the school and
+      // the user from this token. Nothing about the tenant is sent in the body —
+      // a request that named its own institute could name someone else's.
+      const session = readAiSession();
+
       const response = await fetch("/api/ai/field-edit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
         signal: controller.signal,
         body: JSON.stringify({
           value,

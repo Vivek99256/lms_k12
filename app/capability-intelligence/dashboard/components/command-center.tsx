@@ -32,6 +32,7 @@ import { useRouter } from 'next/navigation'
 import {
   BookOpen, Layers, Briefcase, ClipboardCheck, Award, User, Target,
   Filter, Plus, Clock, Users, ArrowRight, CalendarDays, RotateCcw, Network, type LucideIcon } from 'lucide-react'
+import { ComingSoonTile } from '@/components/ui/coming-soon'
 import { Button } from '@/components/ui/g2g/button'
 import { Select } from '@/components/ui/g2g/select'
 import { Input } from '@/components/ui/g2g/input'
@@ -487,6 +488,15 @@ export function CommandCenter() {
               )
             })}
           </div>
+
+          {/* Personalisation is coming to every dashboard at once, via the shared
+              Dashboard Engine, rather than being rebuilt per screen. Stated here
+              because this is one of the three dashboards that engine replaces.
+
+              Note this is the one call site that is not a grid cell — the parent
+              is a flex column. The tile takes its height from its container, so
+              it needs nothing extra here. */}
+          <ComingSoonTile roadmapId="dashboard.personalization" />
 
           {/* Progress Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

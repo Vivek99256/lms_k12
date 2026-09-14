@@ -1,28 +1,18 @@
 import { redirect } from 'next/navigation';
 
-function queryStringFromSearchParams(searchParams: Record<string, string | string[] | undefined>) {
-  const query = new URLSearchParams();
-  Object.entries(searchParams).forEach(([key, value]) => {
-    if (Array.isArray(value)) {
-      value.forEach((entry) => {
-        if (entry) query.append(key, entry);
-      });
-      return;
-    }
-    if (value) query.set(key, value);
-  });
-  return query.toString();
-}
+import { queryStringFromSearchParams } from '@/app/pal/_lib/searchParams';
 
-export default async function PalContentModelPage({
+/**
+ * Legacy singular path. The canonical route is /pal/frameworks, which is what
+ * the `new_pal.frameworks` menu row and routeMapper point at; this shim keeps
+ * older links working and carries the chapter/concept context across.
+ */
+export default async function LegacyFrameworkPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const resolvedSearchParams = await searchParams;
-  const queryString = queryStringFromSearchParams(resolvedSearchParams);
+  const queryString = queryStringFromSearchParams(await searchParams);
+
   redirect(queryString ? `/pal/frameworks?${queryString}` : '/pal/frameworks');
 }
-
-
-

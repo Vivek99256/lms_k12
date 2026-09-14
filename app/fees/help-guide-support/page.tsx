@@ -1,14 +1,15 @@
 'use client';
 
-import { FeesCategoryPage } from '@/app/fees/_components/fees-category-page';
-import { FEES_HELP_SUPPORT_SCREENS } from '@/app/fees/help-guide-support/_screens/help-guide-support-screens';
+import { HelpGuideGrid } from '@/app/fees/help-guide-support/_components/help-guide-grid';
 
 /**
- * Fees → help-guide-support. Shares FeesCategoryPage with the other Fees categories and
- * supplies its own tabs, which are static placeholders until these screens are
- * built. Any real menu the user has rights to still comes from the database and
- * follows them.
+ * Fees → Help Guide / Support.
+ *
+ * Opens a clean Grid/Thumbnail view of support content loaded dynamically from
+ * tblmenumaster. All tab navigation is hidden — the page renders only the grid
+ * of cards, each with an icon, title and short description. Clicking a card
+ * opens the configured PDF / video / document link in a new tab.
  */
 export default function Page() {
-  return <FeesCategoryPage categoryKey="help-guide-support" staticScreens={FEES_HELP_SUPPORT_SCREENS} />;
+  return <HelpGuideGrid />;
 }

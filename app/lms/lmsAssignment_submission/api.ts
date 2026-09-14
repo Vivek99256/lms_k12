@@ -22,12 +22,15 @@ export type AssignmentSubmissionRow = {
   assignedOn: string;
   submissionDate: string;
   examPdfUrl: string;
+  homeworkFileUrl: string;
   submissionFileUrl: string;
   teacherRemarks: string;
   studentSubmitted: boolean;
   teacherReviewed: boolean;
   examId: number;
   studentId: number;
+  /** "Checking" | "Evaluated" | "OCR Failed" | "Evaluation Failed" | "Failed" | "" (not yet submitted) */
+  aiStatus: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -163,12 +166,14 @@ function toSubmission(row: UnknownRecord): AssignmentSubmissionRow {
     assignedOn: readString(row.created_date_fmt),
     submissionDate: readString(row.submission_date_fmt),
     examPdfUrl: readString(row.exam_pdf_url),
+    homeworkFileUrl: readString(row.homework_file_url),
     submissionFileUrl: readString(row.submission_file_url),
     teacherRemarks: readString(row.teacher_remarks),
     studentSubmitted: readString(row.student_submission_status) === "Y",
     teacherReviewed: readString(row.teacher_submission_status) === "Y",
     examId: readNumber(row.exam_id),
     studentId: readNumber(row.student_id),
+    aiStatus: readString(row.ai_status),
   };
 }
 

@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, User, Banknote, Calendar, FileText,
   BarChart3, MessageSquare, Settings, BookOpen, ClipboardList,
-  UserPlus, FileCheck, Menu
+  UserPlus, FileCheck, Menu, Brain
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { MenuItem, SubmenuItem, Level3Item } from './menuItems';
@@ -53,6 +53,11 @@ const ICON_MAP: Record<string, MenuIcon> = {
   'file-check': FileCheck,
   dashboard: LayoutDashboard,
   menu: Menu,
+  // The AI & Intelligence level-1 module seeded by
+  // 2026_09_10_000001_add_ai_intelligence_menu. Without a key here the rail falls
+  // back to the generic level-1 icon, leaving the module indistinguishable from
+  // every other square in the strip.
+  brain: Brain,
 };
 
 function resolveIcon(iconStr: string | null, level: number): MenuIcon {
