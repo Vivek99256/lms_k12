@@ -243,7 +243,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                 
                 return (
                   <button
-                    key={item.id ?? idx}
+                    key={`${item.id ?? 'item'}-${idx}`}
                     type="button"
                     onClick={handleClick}
                     className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border shrink-0 ${
