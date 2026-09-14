@@ -1,4 +1,4 @@
-import { fetchLmsCourses, type ApiChapter, type LmsSubject } from './lmsCourses';
+﻿import { fetchLmsCourses, type ApiChapter, type LmsSubject } from './lmsCourses';
 import { getRequestContext, getSyear } from '../page';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { buildSessionContext } from '@/lib/erp-client';
@@ -406,7 +406,7 @@ function asText(value: unknown): string {
 
 /**
  * The semantic-intelligence payload is generated per chapter and its list fields
- * are not guaranteed to arrive as arrays — a single entry can come through as a
+ * are not guaranteed to arrive as arrays â€” a single entry can come through as a
  * bare object, and a list can arrive as a JSON string. Everything downstream maps
  * and filters these, so they are normalised to arrays at the boundary.
  */
@@ -792,7 +792,7 @@ export interface UploadChapterContentResult {
  *
  * NOTE: The backend store endpoint is not wired yet (see task decision:
  * "frontend only for now"). This assembles the multipart payload exactly as the
- * API is expected to receive it and is ready to switch on — flip `PERSIST_ENABLED`
+ * API is expected to receive it and is ready to switch on â€” flip `PERSIST_ENABLED`
  * to true (and confirm CHAPTER_CONTENT_STORE_ENDPOINT) once the endpoint exists.
  */
 export async function uploadChapterContent(
@@ -1003,7 +1003,7 @@ export async function fetchNewChapterMaster(
 export interface QuestionBankApiQuestion {
   id: number;
   chapter_id: number;
-  /** topic_master.id — a different id space from concept_id. */
+  /** topic_master.id â€” a different id space from concept_id. */
   topic_id?: number | null;
   /** lms_concept.id the question is filed under. */
   concept_id?: number | null;
@@ -1013,7 +1013,14 @@ export interface QuestionBankApiQuestion {
    *  generated before the category column existed. */
   category?: string | null;
   question: string;
+  /** Collapsed to 'MCQ' | 'Narrative' -- what the grading engine and the
+   *  edit dialog understand. */
   question_type: string;
+  /** Display label from question_type_catalog, e.g. 'Assertion & Reason'. */
+  question_type_raw?: string;
+  /** Stable machine code from question_type_catalog, e.g. 'assertion_reason'.
+   *  Null on AI-generated rows, which have no extraction sidecar. */
+  question_type_code?: string | null;
   options?: Array<{
     label: string;
     text: string;
@@ -1021,6 +1028,72 @@ export interface QuestionBankApiQuestion {
   }>;
   model_answer?: string;
   marks?: number;
+  bloom?: string | null;
+  difficulty?: string | null;
+  dok?: string | null;
+  publisher?: string | null;
+
+  /** Everything below is recorded by the extraction pipeline and is
+   *  null/empty on AI-generated rows. */
+  exam_section?: string | null;
+  item_number?: string | null;
+  attribution?: string | null;
+  licence?: string | null;
+  validation_status?: string | null;
+  figure_required?: boolean;
+  figures?: Array<{
+    url: string | null;
+    sha256: string | null;
+    width: number | null;
+    height: number | null;
+    caption: string | null;
+    ocr_text: string | null;
+    page: number | null;
+  }>;
+  concept_confidence?: number | null;
+  /** 0 = a validator held it: visible to a teacher, not servable to a learner. */
+  status?: number;
+  source?: 'extracted' | 'ai_generated';
+  assertion?: string | null;
+  reason?: string | null;
+  sub_part_labels?: string[];
+  correct_option?: string | null;
+}
+
+/** One row of question_type_catalog -- the question-form vocabulary. */
+export interface QuestionTypeCatalogEntry {
+  code: string;
+  label: string;
+  exam_section?: string | null;
+  default_marks?: number | null;
+  is_standard?: number;
+  /** Set when this form belongs to one publisher rather than the standard set. */
+  publisher?: string | null;
+  total?: number;
+}
+
+/**
+ * The question-form vocabulary, for the bank's type dropdown.
+ *
+ * Served by ApiQuestionBankController rather than derived from the loaded
+ * page, so a form that exists but has no question on screen is still spelled
+ * and ordered the way the catalogue defines it.
+ */
+export async function fetchQuestionTypeCatalog(
+  subInstituteId?: number | string
+): Promise<QuestionTypeCatalogEntry[]> {
+  const res = await fetch(`${API_BASE_URL}/api/question-bank/question-types`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subInstituteId ? { sub_institute_id: subInstituteId } : {}),
+  });
+
+  const raw = await readApiJson(res, 'Failed to fetch question types');
+  if (!res.ok || raw.status === false) {
+    throw new Error((raw.message as string) || 'Failed to fetch question types');
+  }
+
+  return (raw.data as QuestionTypeCatalogEntry[]) ?? [];
 }
 
 export interface QuestionBankApiResponse {
@@ -1086,8 +1159,8 @@ export interface DeleteQuestionBankPayload {
 }
 
 /**
- * Remove a Question Bank question. The API soft-deletes it — the row keeps its
- * id and gets a deleted_at stamp — so papers and exam answers that reference the
+ * Remove a Question Bank question. The API soft-deletes it â€” the row keeps its
+ * id and gets a deleted_at stamp â€” so papers and exam answers that reference the
  * question still resolve, while fetchQuestionBank no longer returns it.
  */
 export async function deleteQuestionBankQuestion(
@@ -1273,3 +1346,7 @@ export async function fetchChapterSemantic(
     return null;
   }
 }
+
+
+
+
