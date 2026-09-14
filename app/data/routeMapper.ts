@@ -577,6 +577,14 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return '/user_log';
    }
 
+  // Document has graduated the same way, to /documents. Intercepted here so
+  // every API-driven surface (sidebar, Level 3 sub-header, master menu) lands on
+  // the live screen rather than the stub. Template and Event Bus still resolve
+  // to their coming-soon pages.
+  if (lowerLink.replace(/^\/+/, '') === 'general/coming-soon?module=document') {
+    return '/documents';
+  }
+
   const easyCommunicationRoutes: Record<string, string> = {
     'send_sms_parents.index': '/easy_com/send_sms_parents',
     'result/send_sms_parents': '/easy_com/send_sms_parents',
