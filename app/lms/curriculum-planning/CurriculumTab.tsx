@@ -4,7 +4,7 @@
 // the page threw away: curriculum header -> goals and competencies -> units ->
 // declared vs extracted chapters -> one chapter opened out.
 //
-// Where the database is empty the gap is named rather than hidden. That is the
+// Where the daatabase is empty the gap is named rather than hidden. That is the
 // point of the screen as much as the data is: a unit that declares fifteen
 // chapters and has none extracted should say so.
 
@@ -390,9 +390,7 @@ function UnitRow({ unit }: { unit: ApiUnit }) {
                       {openChapterId === chapter.chapter_id ? (
                         <ChapterDetailPanel
                           chapterId={chapter.chapter_id}
-                          chapterName={chapter.chapter_name}
-                          extractionId={chapter.extraction_id}
-                          hasIntelligence={chapter.has_intelligence}
+                          learningOutcomes={chapter.learning_outcomes}
                         />
                       ) : null}
                     </div>
@@ -483,9 +481,7 @@ function UnmappedCard({ group }: { group: ApiUnmappedGroup }) {
               {openChapterId === chapter.chapter_id ? (
                 <ChapterDetailPanel
                   chapterId={chapter.chapter_id}
-                  chapterName={chapter.chapter_name}
-                  extractionId={chapter.extraction_id}
-                  hasIntelligence={chapter.has_intelligence}
+                  learningOutcomes={[]}
                 />
               ) : null}
             </div>

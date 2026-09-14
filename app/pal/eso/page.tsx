@@ -33,6 +33,7 @@ import {
   type PracticeItem,
 } from '@/app/pal/data/pal-eso';
 import { useViewAsStudent } from '@/app/pal/data/pal-view-as';
+import AiTutorPanel from '@/app/pal/eso/_components/AiTutorPanel';
 
 /**
  * The Adaptive Learning Engine's guided concept flow — Developer Brief v1,
@@ -187,6 +188,12 @@ function EsoConceptFlow() {
               onNavigateToConcept={(id) => router.push(`/pal/eso?conceptId=${id}${learnerId ? `&learnerId=${learnerId}` : ''}`)}
             />
           )}
+
+          {/* Below the step, for the same reason PlanAndSuggestions sits above
+              it: supporting context, fetched independently, never blocking the
+              task. Keyed on the action so the governance re-reads after an
+              attempt is logged. */}
+          <AiTutorPanel learnerId={learnerId} conceptId={conceptId} actionKey={action.action} />
         </div>
       )}
     </div>

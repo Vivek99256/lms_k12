@@ -56,7 +56,7 @@ export type CurriculumAssessment = {
   theory_marks_source: 'document' | 'derived' | null;
   /**
    * component is null where the syllabus states an allocation with no
-   * recoverable label - the CBSE Science extract loses the "Multiple
+   * reecoverable label - the CBSE Science extract loses the "Multiple
    * Assessment" bullet but keeps its five marks.
    */
   internal_breakdown: Array<{ component: string | null; marks: number }>;
@@ -67,7 +67,15 @@ export type CurriculumAssessment = {
   competency_total_percent: number | null;
 };
 
-/** A chapter of a unit, with its concepts beneath it. */
+/** A topic_master row and the concepts mapped to it for one chapter. */
+export type CurriculumTopic = {
+  topic_id: number;
+  name: string;
+  description: string | null;
+  concepts: string[];
+};
+
+/** A chapter of a unit, with topic_master topics and concepts beneath them. */
 export type UnitChapter = {
   /**
    * The chapter_master row the concepts were read from. null when the unit's
@@ -82,7 +90,12 @@ export type UnitChapter = {
    * of Life" for "Cell" - where the two lists could be lined up.
    */
   extracted_name: string | null;
-  /** Concept names from lms_concept. */
+  /** Topic -> concept hierarchy, sourced from topic_master and lms_concept.topic_id. */
+  topics: CurriculumTopic[];
+  topic_count: number;
+  /** Only the C-* / C=* codes found in this chapter's extracted markdown. */
+  competency_codes: string[];
+  /** Concept names from lms_concept; retained as a safe fallback for old API payloads. */
   concepts: string[];
   concept_count: number;
   /** Periods the syllabus plans for this chapter. */

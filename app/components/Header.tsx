@@ -113,14 +113,23 @@ function LogoImage({ url, fallback }: { url: string; fallback: React.ReactNode }
 }
 
 /**
- * Setting the platform up for a tenant, and describing what it is. These used to
- * sit loose at the top of the profile dropdown; they are grouped here so the
- * dropdown reads as three peer groups instead of a flat list plus two groups.
+ * Setting the platform up for a tenant, and describing what it is.
  *
- * They are deliberately NOT folded into Platform Services or AI & Intelligence:
- * those two are catalogs of what the running platform *provides* (services and
- * AI capabilities), while these are the rollout and configuration screens an
- * admin *operates*, plus two read-only views describing the platform itself.
+ * These were a third peer section until it became clear that a reader does not
+ * experience "what the platform provides" and "how this tenant is set up" as two
+ * different menus — they experience three columns and have to guess which one owns
+ * Mobile App Rights. So the section is gone and its items now sit inside Platform
+ * Services, under their own sub-heading.
+ *
+ * They keep a sub-heading rather than being poured into one 16-item list, because
+ * the distinction is real even when it should not be a top-level choice: everything
+ * above is a service the running platform offers, everything here is a screen an
+ * administrator operates to configure a tenant. Losing that would put "Event Bus"
+ * and "Onboarding" in one undifferentiated column.
+ *
+ * Nothing moved to AI & Intelligence: none of these is an AI capability, and putting
+ * one there to balance the columns would be a layout decision pretending to be a
+ * taxonomy.
  */
 const platformSetupItems = [
   'Implementation',
@@ -242,44 +251,55 @@ export default function Header({
   );
 
   /**
-   * The profile dropdown's groups, in display order — one column each, the three
-   * side by side with their items listed underneath, so every destination is one
-   * click away instead of three. Every group renders from the same markup below,
-   * so adding one is an entry here rather than another copy of the column.
-   * Platform Setup is listed last, beside the two capability catalogs, because it
-   * is the tenant-facing set rather than a platform one.
+   * The profile dropdown's two sections, in display order.
    *
-   * `href` is the group's own overview screen, which makes the heading a
-   * destination rather than a label. Platform Setup has none: it is a set of
-   * configuration screens with nothing that summarises them, and pointing its
-   * heading at one of its own items would make that item look like the group.
+   * TWO SECTIONS, THREE COLUMNS
+   *
+   * There were three sections until Platform Setup was folded into Platform
+   * Services. A section now owns one or more `columns`, which is what lets the
+   * merge happen without either cost it would otherwise carry: Platform Services
+   * keeps its items in two readable lists rather than one 16-card scroll, and the
+   * panel stays the width and height it already was rather than growing a column
+   * taller than the screen.
+   *
+   * A column's own `label` is the sub-heading above it. The first column of a
+   * section leaves it out — its heading is the section's.
+   *
+   * `href` is the section's overview screen, which makes the heading a destination
+   * rather than a label. Both sections have one, so both headings are clickable —
+   * which is why folding Platform Setup in was possible at all: its items now sit
+   * under a heading that leads somewhere, which as a section of its own they never
+   * had.
    */
   const menuGroups: {
     label: string;
     href?: string;
-    items: readonly string[];
+    /** How many 220px columns this section occupies. */
+    span: 1 | 2;
+    columns: { label?: string; items: readonly string[] }[];
     routes: Record<string, string>;
     icons: Record<string, LucideIcon>;
   }[] = [
     {
       label: 'Platform Services',
       href: '/platform-administration',
-      items: platformServicesItems,
-      routes: platformServicesRoutes,
-      icons: platformServicesIcons,
+      span: 2,
+      columns: [
+        { items: platformServicesItems },
+        { label: 'Setup & configuration', items: platformSetupItems },
+      ],
+      // Merged so one lookup serves the whole section. The two maps have no keys in
+      // common — they describe different screens — so neither can shadow the other.
+      routes: { ...platformServicesRoutes, ...platformSetupRoutes },
+      icons: { ...platformServicesIcons, ...platformSetupIcons },
     },
     {
       label: 'AI & Intelligence',
       href: '/ai',
-      items: aiIntelligenceItems,
+      span: 1,
+      columns: [{ items: aiIntelligenceItems }],
       routes: aiIntelligenceRoutes,
       icons: aiIntelligenceIcons,
-    },
-    {
-      label: 'Platform Setup',
-      items: platformSetupItems,
-      routes: platformSetupRoutes,
-      icons: platformSetupIcons,
     },
   ];
 
@@ -569,17 +589,18 @@ const logoUrl = (() => {
             onMouseDown={(e) => e.stopPropagation()}
           >
             {/*
-              One panel, three columns, every item visible. The groups used to be
-              rows that revealed a flyout on hover, which put three interactions
-              between the avatar and a screen; laid out side by side they cost one.
+              One panel, every item visible. The sections used to be rows that
+              revealed a flyout on hover, which put three interactions between the
+              avatar and a screen; laid out side by side they cost one.
 
               The cards below are the sidebar's Level 2 cards — same height, radius,
               border, icon chip and hover treatment — because these entries are peers
               of the ones in that panel, and a user who learns the shape there should
               not have to learn a second one here. Columns are a fixed 220px rather
               than a share of the panel: that is the width at which the longest label
-              in the three lists still fits on one line. Below the sm breakpoint they
-              stack, since three of them do not fit a phone at any useful width.
+              in the three lists still fits on one line. Below the sm breakpoint
+              everything stacks, since three columns do not fit a phone at any useful
+              width — which is also why a section's span is only applied from sm up.
             */}
             <div className="grid max-h-[70vh] grid-cols-1 gap-x-3 gap-y-5 overflow-y-auto p-3 sm:grid-cols-[repeat(3,220px)]">
               {menuGroups.map((group) => {
@@ -588,7 +609,10 @@ const logoUrl = (() => {
                 const groupHref = group.href;
 
                 return (
-                  <div key={group.label} className="min-w-0">
+                  <div
+                    key={group.label}
+                    className={`min-w-0 ${group.span === 2 ? 'sm:col-span-2' : ''}`}
+                  >
                     <div className="px-1 pb-2">
                       {groupHref ? (
                         <button
