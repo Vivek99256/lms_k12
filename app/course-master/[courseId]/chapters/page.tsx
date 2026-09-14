@@ -1,4 +1,4 @@
-//
+﻿//
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -66,6 +66,8 @@ import {
   resolveSubjectDisplayName,
   deleteQuestionBankQuestion,
   updateQuestionBankQuestion,
+  fetchQuestionTypeCatalog,
+  type QuestionTypeCatalogEntry,
   uploadChapterContent,
   type ChapterContentAsset,
   type ChapterSemantic,
@@ -246,7 +248,7 @@ const UPLOAD_TYPE_CONFIG: Record<
   Presentation: {
     accept:
       '.ppt,.pptx,.pdf,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    helperText: 'PPT, PPTX or PDF · up to 100 MB',
+    helperText: 'PPT, PPTX or PDF Â· up to 100 MB',
     maxSize: 100 * 1024 * 1024,
     extensions: ['ppt', 'pptx', 'pdf'],
     mimeTypes: [
@@ -257,7 +259,7 @@ const UPLOAD_TYPE_CONFIG: Record<
   },
   Video: {
     accept: '.mp4,.mov,.webm,video/mp4,video/quicktime,video/webm',
-    helperText: 'MP4, MOV or WEBM · up to 500 MB',
+    helperText: 'MP4, MOV or WEBM Â· up to 500 MB',
     maxSize: 500 * 1024 * 1024,
     extensions: ['mp4', 'mov', 'webm'],
     mimeTypes: ['video/mp4', 'video/quicktime', 'video/webm'],
@@ -265,7 +267,7 @@ const UPLOAD_TYPE_CONFIG: Record<
   'Revision notes': {
     accept:
       '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    helperText: 'PDF, DOC or DOCX · up to 50 MB',
+    helperText: 'PDF, DOC or DOCX Â· up to 50 MB',
     maxSize: 50 * 1024 * 1024,
     extensions: ['pdf', 'doc', 'docx'],
     mimeTypes: [
@@ -277,7 +279,7 @@ const UPLOAD_TYPE_CONFIG: Record<
   'Classroom activity': {
     accept:
       '.pdf,.ppt,.pptx,.docx,application/pdf,application/msword,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    helperText: 'PDF, PPT, PPTX or DOCX · up to 100 MB',
+    helperText: 'PDF, PPT, PPTX or DOCX Â· up to 100 MB',
     maxSize: 100 * 1024 * 1024,
     extensions: ['pdf', 'ppt', 'pptx', 'docx'],
     mimeTypes: [
@@ -304,7 +306,7 @@ const GENERATED_CONTENT_SOURCES = ['gamma ai', 'aigenerated', 'claude ai'];
  * Where a content row came from.
  *
  * Only an explicit generated marker counts as generated. Everything else is an
- * upload — including rows with no source at all, which predate the source column
+ * upload â€” including rows with no source at all, which predate the source column
  * being stamped and were created by the upload path.
  */
 function resolveContentSource(source: string | null | undefined): ChapterContentSource {
@@ -388,7 +390,7 @@ function buildApiChapterContentItems(
     (assets ?? []).map((asset) => {
       const type = getApiContentType(category, asset);
       const contentUrl = resolveViewableContentUrl(asset);
-      const updatedDate = asset.created_at?.split(' ')[0] ?? '—';
+      const updatedDate = asset.created_at?.split(' ')[0] ?? 'â€”';
       const rawConceptId =
         asset.concept_id === null || asset.concept_id === undefined
           ? null
@@ -411,7 +413,7 @@ function buildApiChapterContentItems(
         slideCount: 0,
         statValue: asset.file_type || category,
         updatedDate,
-        updatedAt: updatedDate === '—' ? 'Date unavailable' : `updated ${updatedDate}`,
+        updatedAt: updatedDate === 'â€”' ? 'Date unavailable' : `updated ${updatedDate}`,
         contentUrl,
         bodyHtml: extractGeneratedBodyHtml(asset.description, isGeneratedContent(source)),
         slides: [],
@@ -455,8 +457,8 @@ function getConceptIntelligence(chapter: Chapter, conceptTitle: string): Concept
   const primaryVerb =
     abilitiesForConcept[0]?.verb ?? intel.blooms[0]?.level ?? 'Understand';
   const dokLabel = dokEntry?.level
-    ? `DOK ${asText(dokEntry.level)} — Skills & concepts`
-    : 'DOK 2 — Skills & concepts';
+    ? `DOK ${asText(dokEntry.level)} â€” Skills & concepts`
+    : 'DOK 2 â€” Skills & concepts';
 
   const conceptDescription = (chapter.concepts ?? []).find(
     (item) => item.title === conceptTitle
@@ -478,7 +480,7 @@ function getConceptIntelligence(chapter: Chapter, conceptTitle: string): Concept
     .filter(Boolean);
 
   return {
-    domain: `Bloom · ${primaryVerb}`,
+    domain: `Bloom Â· ${primaryVerb}`,
     dok: dokLabel,
     topic: chapter.title,
     knowledge,
@@ -562,7 +564,7 @@ function resolveChapterKeyConcepts(
   return getChapterKeyConcepts(courseId, chapter.id);
 }
 
-/** Bucket id for concepts that carry no topic_id — never a real topic_master row. */
+/** Bucket id for concepts that carry no topic_id â€” never a real topic_master row. */
 /**
  * A topic row in the chapter list, carrying the concepts that sit under it.
  * `conceptIndex` stays the chapter-wide index into `content_categories`, so
@@ -785,13 +787,13 @@ function isTeacherTrainingContent(item: ChapterContentItem): boolean {
 function truncateToWords(value: string, maxWords = 150): string {
   const words = value.split(/\s+/).filter(Boolean);
   if (words.length <= maxWords) return value;
-  return words.slice(0, maxWords).join(' ') + '…';
+  return words.slice(0, maxWords).join(' ') + 'â€¦';
 }
 
 /**
  * Concepts a question can be filed under. These are the chapter's own concept
- * rows from the chapter master API (`/lms/new_chapter_master`) — the same source
- * the chapter dropdown uses — so the list is the tenant's real curriculum rather
+ * rows from the chapter master API (`/lms/new_chapter_master`) â€” the same source
+ * the chapter dropdown uses â€” so the list is the tenant's real curriculum rather
  * than a sample. `content_categories` covers chapters whose concept rows weren't
  * expanded in the response. The full list is returned: capping it hid most of a
  * chapter's concepts, since chapters carry up to 40-odd.
@@ -846,7 +848,7 @@ export default function ChapterListPage() {
       if (!cancelled) setSubjectLoading(true);
     });
 
-    // Phase 1 — render chapters immediately. resolveDisplayNames:false skips the
+    // Phase 1 â€” render chapters immediately. resolveDisplayNames:false skips the
     // slow (~8s / 1.3MB) course-catalog lookup that only supplies cosmetic names.
     getSubjectAndChapters(subjectId, standardId, { resolveDisplayNames: false })
       .then((data) => {
@@ -856,7 +858,7 @@ export default function ChapterListPage() {
         if (!cancelled) setSubjectLoading(false);
       });
 
-    // Phase 2 — enrich the header's subject/standard names in the background,
+    // Phase 2 â€” enrich the header's subject/standard names in the background,
     // without blocking the chapter list from rendering.
     resolveSubjectDisplayName(subjectId, standardId).then((matched) => {
       if (cancelled || !matched) return;
@@ -907,7 +909,7 @@ export default function ChapterListPage() {
       : undefined;
   }, [courseId, subjectData?.chapters, subjectData?.subject]);
   // Memoised because a fresh [] each render would invalidate every hook that
-  // derives from the chapter list — including the question bank's concept options.
+  // derives from the chapter list â€” including the question bank's concept options.
   const allChapters = useMemo(() => subjectData?.chapters ?? [], [subjectData?.chapters]);
   // Both header stats come from live data: concept rows stored against the chapters,
   // and the board on the tenant's curriculum record.
@@ -960,7 +962,21 @@ export default function ChapterListPage() {
   const [questionBankChapterFilter, setQuestionBankChapterFilter] = useState('all');
   const [questionBankConceptFilter, setQuestionBankConceptFilter] = useState('all');
   const [questionBankTypeFilter, setQuestionBankTypeFilter] = useState('all');
+  // The question-form vocabulary from question_type_catalog. It is the
+  // authority on how a form is spelled and ordered, and it is where a
+  // publisher's own invented form appears -- so the dropdown reads from it
+  // rather than from whatever happens to be on the current page.
+  const [questionTypeCatalog, setQuestionTypeCatalog] = useState<QuestionTypeCatalogEntry[]>([]);
+  const [questionBankBloomFilter, setQuestionBankBloomFilter] = useState('all');
+  const [questionBankDifficultyFilter, setQuestionBankDifficultyFilter] = useState('all');
   const [questionBankCategoryFilter, setQuestionBankCategoryFilter] = useState('all');
+  const [questionBankSectionFilter, setQuestionBankSectionFilter] = useState('all');
+  const [questionBankDokFilter, setQuestionBankDokFilter] = useState('all');
+  const [questionBankPublisherFilter, setQuestionBankPublisherFilter] = useState('all');
+  const [questionBankSourceFilter, setQuestionBankSourceFilter] = useState('all');
+  const [questionBankStatusFilter, setQuestionBankStatusFilter] = useState('all');
+  const [questionBankSearchInput, setQuestionBankSearchInput] = useState('');
+  const [questionBankSearch, setQuestionBankSearch] = useState('');
   const [manualQuestionBankItems, setManualQuestionBankItems] = useState<QuestionBankItem[]>([]);
   const [questionBankItemEdits, setQuestionBankItemEdits] = useState<Record<string, QuestionBankItem>>({});
   const [editingQuestionBankItem, setEditingQuestionBankItem] = useState<QuestionBankItem | null>(null);
@@ -1126,7 +1142,7 @@ export default function ChapterListPage() {
    * The chapter's content narrowed to the resource type currently on screen.
    *
    * Teacher Workspace holds Teacher Training content and Classroom Resources holds
-   * everything else — the same split `filteredChapterContentItems` applies to the
+   * everything else â€” the same split `filteredChapterContentItems` applies to the
    * list below, reusing one classifier so the counts can never disagree with the
    * items. Search, tab and source filters are deliberately not applied: these are
    * the totals for the resource type, not for the current search.
@@ -1172,9 +1188,77 @@ export default function ChapterListPage() {
     () => (manualQuestionChapter ? getQuestionBankConceptTitles(manualQuestionChapter) : []),
     [manualQuestionChapter]
   );
+  useEffect(() => {
+    let cancelled = false;
+    fetchQuestionTypeCatalog()
+      .then((rows) => {
+        if (!cancelled) setQuestionTypeCatalog(rows);
+      })
+      // A missing catalog is not fatal: the dropdown falls back to whatever
+      // labels the loaded questions carry.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const questionBankTypeOptions = useMemo(() => {
+    const present = new Map<string, number>();
+    questionBankItems.forEach((question) => {
+      const label = question.typeLabel;
+      if (label) present.set(label, (present.get(label) ?? 0) + 1);
+    });
+
+    const ordered: Array<{ label: string; count: number; publisher?: string | null }> = [];
+    const seen = new Set<string>();
+
+    // Catalog order first, so related forms stay grouped the way the
+    // blueprint lists them rather than alphabetically by accident.
+    questionTypeCatalog.forEach((entry) => {
+      if (!entry.label || seen.has(entry.label)) return;
+      const count = present.get(entry.label);
+      if (!count) return;
+      seen.add(entry.label);
+      ordered.push({ label: entry.label, count, publisher: entry.publisher });
+    });
+
+    // Anything on the page the catalog has never heard of still gets listed,
+    // otherwise those questions become unreachable through the filter.
+    present.forEach((count, label) => {
+      if (seen.has(label)) return;
+      ordered.push({ label, count });
+    });
+
+    return ordered;
+  }, [questionBankItems, questionTypeCatalog]);
+
+  // Debounced so typing does not re-filter on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setQuestionBankSearch(questionBankSearchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [questionBankSearchInput]);
+
+  // Facets derived from what is actually loaded, so a dropdown never offers a
+  // value that would return nothing.
+  const questionBankFacets = useMemo(() => {
+    const sections = new Set<string>();
+    const doks = new Set<string>();
+    const publishers = new Set<string>();
+    questionBankItems.forEach((question) => {
+      if (question.examSection) sections.add(question.examSection);
+      if (question.dok) doks.add(String(question.dok));
+      if (question.publisher) publishers.add(question.publisher);
+    });
+    return {
+      sections: Array.from(sections).sort(),
+      doks: Array.from(doks).sort(),
+      publishers: Array.from(publishers).sort(),
+    };
+  }, [questionBankItems]);
+
   const questionBankConceptOptions = useMemo(() => {
-    // Concepts come from the chapters loaded off `/lms/new_chapter_master` — the
-    // same source as the chapter dropdown — so every concept of the chapter is
+    // Concepts come from the chapters loaded off `/lms/new_chapter_master` â€” the
+    // same source as the chapter dropdown â€” so every concept of the chapter is
     // selectable even before a question exists for it. Concepts carried by the
     // loaded questions are merged in so nothing already in the bank is unreachable.
     const scopedChapters =
@@ -1205,14 +1289,46 @@ export default function ChapterListPage() {
         effectiveQuestionBankConceptFilter === 'all' ||
         question.conceptTitle === effectiveQuestionBankConceptFilter;
       const matchesType =
-        questionBankTypeFilter === 'all' || question.type === questionBankTypeFilter;
+        questionBankTypeFilter === 'all' || question.typeLabel === questionBankTypeFilter;
+      const matchesBloom = questionBankBloomFilter === 'all' || question.bloom === questionBankBloomFilter;
+      const matchesDifficulty = questionBankDifficultyFilter === 'all' || question.difficulty === questionBankDifficultyFilter;
       // Questions generated before the category column existed carry null, so
       // they are only ever hidden by an explicit category choice, never by 'all'.
       const matchesCategory =
         questionBankCategoryFilter === 'all' ||
         question.palCategory === questionBankCategoryFilter;
 
-      return matchesChapter && matchesConcept && matchesType && matchesCategory;
+      const matchesSection =
+        questionBankSectionFilter === 'all' || question.examSection === questionBankSectionFilter;
+      const matchesDok =
+        questionBankDokFilter === 'all' || String(question.dok ?? '') === questionBankDokFilter;
+      const matchesPublisher =
+        questionBankPublisherFilter === 'all' || question.publisher === questionBankPublisherFilter;
+      const matchesSource =
+        questionBankSourceFilter === 'all' || (question.source ?? 'ai_generated') === questionBankSourceFilter;
+      // Rows written before the status column was meaningful default to
+      // published, so 'held' never hides a question that was never held.
+      const matchesStatus =
+        questionBankStatusFilter === 'all' ||
+        (questionBankStatusFilter === 'held' ? question.status === 0 : question.status !== 0);
+      const matchesSearch =
+        questionBankSearch === '' ||
+        question.question.toLowerCase().includes(questionBankSearch.toLowerCase());
+
+      return (
+        matchesChapter &&
+        matchesConcept &&
+        matchesType &&
+        matchesCategory &&
+        matchesBloom &&
+        matchesDifficulty &&
+        matchesSection &&
+        matchesDok &&
+        matchesPublisher &&
+        matchesSource &&
+        matchesStatus &&
+        matchesSearch
+      );
     });
   }, [
     effectiveQuestionBankConceptFilter,
@@ -1220,6 +1336,12 @@ export default function ChapterListPage() {
     questionBankChapterFilter,
     questionBankItems,
     questionBankTypeFilter,
+    questionBankSectionFilter,
+    questionBankDokFilter,
+    questionBankPublisherFilter,
+    questionBankSourceFilter,
+    questionBankStatusFilter,
+    questionBankSearch,
   ]);
   const questionBankVisibleNumberById = useMemo(
     () => new Map(filteredQuestionBankItems.map((question, index) => [question.id, index + 1])),
@@ -1635,7 +1757,7 @@ export default function ChapterListPage() {
   };
 
   // When the concept-intelligence view is opened directly (deep link, refresh,
-  // browser back), the click handler never ran — fetch the chapter here.
+  // browser back), the click handler never ran â€” fetch the chapter here.
   useEffect(() => {
     if (view !== 'concept-intelligence' || !activeChapterId) return;
     loadChapterIntelligence(activeChapterId);
@@ -1673,7 +1795,7 @@ export default function ChapterListPage() {
     const mimeAllowed = file.type ? config.mimeTypes.includes(file.type) : false;
 
     if (!mimeAllowed && !extensionAllowed) {
-      return `Only ${config.helperText.split(' · ')[0]} files are supported.`;
+      return `Only ${config.helperText.split(' Â· ')[0]} files are supported.`;
     }
 
     if (file.size > config.maxSize) {
@@ -2181,7 +2303,7 @@ export default function ChapterListPage() {
 
       setIsSavingQuestionBankItem(false);
 
-      // Drop any stale local override for this question — the list is about to be
+      // Drop any stale local override for this question â€” the list is about to be
       // re-read from the database, and an override would shadow what was saved.
       setQuestionBankItemEdits((current) => {
         if (!(editingQuestionBankItem!.id in current)) return current;
@@ -2687,7 +2809,7 @@ export default function ChapterListPage() {
 
   /**
    * Delete a Question Bank question. API-backed questions (numeric id) are
-   * soft-deleted server-side — the row keeps its id and gets a deleted_at stamp —
+   * soft-deleted server-side â€” the row keeps its id and gets a deleted_at stamp â€”
    * and the card is dropped from local state straight away so the list updates
    * without a refetch. Questions added in this session only exist locally, so
    * they are just removed from state.
@@ -2766,7 +2888,7 @@ export default function ChapterListPage() {
             className="h-10 rounded-2xl px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Trash2 size={17} className="mr-2" />
-            {deletingQuestionBankItemId === question.id ? 'Deleting…' : 'Delete'}
+            {deletingQuestionBankItemId === question.id ? 'Deletingâ€¦' : 'Delete'}
           </Button>
         </>
       }
@@ -2948,7 +3070,7 @@ export default function ChapterListPage() {
                   <SelectTrigger className="h-[50px] rounded-[7px] border-slate-300 bg-white px-4 text-[17px] text-slate-900 shadow-none">
                     <SelectValue>
                       {manualQuestionOptions[manualCorrectOption].trim()
-                        ? `${manualCorrectOption} · ${manualQuestionOptions[manualCorrectOption].trim()}`
+                        ? `${manualCorrectOption} Â· ${manualQuestionOptions[manualCorrectOption].trim()}`
                         : manualCorrectOption}
                     </SelectValue>
                   </SelectTrigger>
@@ -2956,7 +3078,7 @@ export default function ChapterListPage() {
                     {QUESTION_OPTION_LABELS.map((label) => (
                       <SelectItem key={label} value={label}>
                         {manualQuestionOptions[label].trim()
-                          ? `${label} · ${manualQuestionOptions[label].trim()}`
+                          ? `${label} Â· ${manualQuestionOptions[label].trim()}`
                           : label}
                       </SelectItem>
                     ))}
@@ -3035,7 +3157,7 @@ export default function ChapterListPage() {
             <span className="ds-btn__label">
               <span className="sc-interp">
                 {isSavingQuestionBankItem
-                  ? 'Saving…'
+                  ? 'Savingâ€¦'
                   : isEditingQuestionBankItem
                     ? 'Save changes'
                     : 'Add to bank'}
@@ -3864,7 +3986,7 @@ export default function ChapterListPage() {
     const totalQuestionBankCount = questionBankItems.length;
     const visibleQuestionBankCount = filteredQuestionBankItems.length;
     const questionCountLabel = questionBankLoading
-      ? 'Loading questions…'
+      ? 'Loading questionsâ€¦'
       : questionBankError
         ? 'Error loading questions'
         : visibleQuestionBankCount === totalQuestionBankCount
@@ -3907,7 +4029,7 @@ export default function ChapterListPage() {
               {questionCountLabel}
             </p>
 
-            <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[minmax(170px,200px)_minmax(180px,230px)_minmax(130px,150px)_minmax(190px,215px)_auto]">
+            <div className="flex w-full flex-wrap items-center gap-3 xl:w-auto xl:justify-end [&>*]:shrink-0 [&_button[role=combobox]]:min-w-[140px]">
               <Select
                 value={questionBankChapterFilter}
                 onValueChange={(value) => {
@@ -3955,6 +4077,34 @@ export default function ChapterListPage() {
                 </SelectContent>
               </Select>
 
+
+              <Select value={questionBankBloomFilter} onValueChange={(value) => setQuestionBankBloomFilter(value ?? 'all')}>
+                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                  <SelectValue>{questionBankBloomFilter === 'all' ? 'All Bloom' : questionBankBloomFilter}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Bloom</SelectItem>
+                  <SelectItem value="Knowledge">Knowledge</SelectItem>
+                  <SelectItem value="Comprehension">Comprehension</SelectItem>
+                  <SelectItem value="Application">Application</SelectItem>
+                  <SelectItem value="Analysis">Analysis</SelectItem>
+                  <SelectItem value="Synthesis">Synthesis</SelectItem>
+                  <SelectItem value="Evaluation">Evaluation</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={questionBankDifficultyFilter} onValueChange={(value) => setQuestionBankDifficultyFilter(value ?? 'all')}>
+                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                  <SelectValue>{questionBankDifficultyFilter === 'all' ? 'All Difficulty' : questionBankDifficultyFilter}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Difficulty</SelectItem>
+                  <SelectItem value="Easy">Easy</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+
               <Select value={questionBankTypeFilter} onValueChange={(value) => setQuestionBankTypeFilter(value ?? 'all')}>
                 <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
                   <SelectValue>
@@ -3963,9 +4113,10 @@ export default function ChapterListPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  {QUESTION_TYPE_OPTIONS.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
+                  {questionBankTypeOptions.map((option) => (
+                    <SelectItem key={option.label} value={option.label}>
+                      {option.label}
+                      {option.publisher ? ` · ${option.publisher}` : ''} ({option.count})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -3992,6 +4143,121 @@ export default function ChapterListPage() {
                 </SelectContent>
               </Select>
 
+              {/* Facets that only extracted questions carry. Hidden entirely
+                  when the loaded chapter has none, so an all-AI bank does not
+                  show four dropdowns that can only ever say "All". */}
+              {questionBankFacets.sections.length > 0 && (
+                <Select
+                  value={questionBankSectionFilter}
+                  onValueChange={(value) => setQuestionBankSectionFilter(value ?? 'all')}
+                >
+                  <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                    <SelectValue>
+                      {questionBankSectionFilter === 'all'
+                        ? 'All Sections'
+                        : `Section ${questionBankSectionFilter}`}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sections</SelectItem>
+                    {questionBankFacets.sections.map((section) => (
+                      <SelectItem key={section} value={section}>
+                        Section {section}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {questionBankFacets.doks.length > 0 && (
+                <Select
+                  value={questionBankDokFilter}
+                  onValueChange={(value) => setQuestionBankDokFilter(value ?? 'all')}
+                >
+                  <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                    <SelectValue>
+                      {questionBankDokFilter === 'all' ? 'All DOK' : `DOK ${questionBankDokFilter}`}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All DOK</SelectItem>
+                    {questionBankFacets.doks.map((dok) => (
+                      <SelectItem key={dok} value={dok}>
+                        DOK {dok}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {questionBankFacets.publishers.length > 0 && (
+                <Select
+                  value={questionBankPublisherFilter}
+                  onValueChange={(value) => setQuestionBankPublisherFilter(value ?? 'all')}
+                >
+                  <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                    <SelectValue>
+                      {questionBankPublisherFilter === 'all'
+                        ? 'All Publishers'
+                        : questionBankPublisherFilter}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Publishers</SelectItem>
+                    {questionBankFacets.publishers.map((publisher) => (
+                      <SelectItem key={publisher} value={publisher}>
+                        {publisher}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {questionBankFacets.publishers.length > 0 && (
+                <Select
+                  value={questionBankSourceFilter}
+                  onValueChange={(value) => setQuestionBankSourceFilter(value ?? 'all')}
+                >
+                  <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
+                    <SelectValue>
+                      {questionBankSourceFilter === 'all'
+                        ? 'Any Origin'
+                        : questionBankSourceFilter === 'extracted'
+                          ? 'From a book'
+                          : 'AI generated'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any Origin</SelectItem>
+                    <SelectItem value="extracted">From a book</SelectItem>
+                    <SelectItem value="ai_generated">AI generated</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+
+              <div className="relative w-full sm:w-auto">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <Input
+                  value={questionBankSearchInput}
+                  onChange={(event) => setQuestionBankSearchInput(event.target.value)}
+                  placeholder="Search questions..."
+                  className="h-10 w-full rounded-[8px] border-slate-300 bg-white pl-9 text-[15px] sm:w-[220px]"
+                />
+                {questionBankSearchInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuestionBankSearchInput('')}
+                    aria-label="Clear search"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null}
+              </div>
+
               <Button
                 type="button"
                 onClick={openQuestionBankAddQuestion}
@@ -4002,6 +4268,31 @@ export default function ChapterListPage() {
                 Add question
               </Button>
             </div>
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              Review state
+            </span>
+            {[
+              { value: 'all', label: 'All' },
+              { value: 'published', label: 'Published' },
+              { value: 'held', label: 'Held for review' },
+            ].map((choice) => (
+              <button
+                key={choice.value}
+                type="button"
+                onClick={() => setQuestionBankStatusFilter(choice.value)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-[12px] font-bold transition-colors',
+                  questionBankStatusFilter === choice.value
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                )}
+              >
+                {choice.label}
+              </button>
+            ))}
           </div>
 
           {questionBankDeleteError ? (
@@ -4019,7 +4310,7 @@ export default function ChapterListPage() {
 
           {questionBankLoading ? (
             <div className="rounded-[8px] border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
-              <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapter…</p>
+              <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapterâ€¦</p>
             </div>
           ) : questionBankError ? (
             <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-5 py-12 text-center shadow-sm">
@@ -4213,7 +4504,7 @@ export default function ChapterListPage() {
           </div>
 
           {/* Fixed-height card: clamped to the viewport so switching tabs never
-              resizes the layout — content scrolls inside instead. The card itself
+              resizes the layout â€” content scrolls inside instead. The card itself
               carries no padding; each region (tab band / body / footer) manages
               its own, matching the app's card pattern. */}
           <div className="flex h-[max(420px,calc(100vh_-_260px))] flex-col overflow-hidden rounded-[18px] border border-slate-200/80 bg-white shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
@@ -4236,7 +4527,7 @@ export default function ChapterListPage() {
             ) : isIntelligenceLoading ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#4f46e5]" />
-                <p className="text-sm font-medium text-slate-500">Loading concept intelligence…</p>
+                <p className="text-sm font-medium text-slate-500">Loading concept intelligenceâ€¦</p>
               </div>
             ) : hasIntelligenceError ? (
               <div className="m-5 flex flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center sm:m-6">
@@ -4550,7 +4841,7 @@ export default function ChapterListPage() {
           </div>
 
           <p className="mb-5 text-sm text-slate-500">
-            {contentLoading ? 'Loading content…' : `${filteredChapterContentItems.length} items in ${activeChapterTitle}`}
+            {contentLoading ? 'Loading contentâ€¦' : `${filteredChapterContentItems.length} items in ${activeChapterTitle}`}
           </p>
 
           {contentError ? (
@@ -5462,3 +5753,5 @@ export default function ChapterListPage() {
     </div>
   );
 }
+
+

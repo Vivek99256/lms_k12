@@ -70,11 +70,48 @@ export interface QuestionBankItem {
   /** PAL learning-flow category from lms_question_master.category. Distinct from
    *  `category` above, which is the caller's subject-area label. */
   palCategory: string | null;
+  /** MCQ | Narrative -- how the question is graded and edited. */
   type: QuestionBankQuestionType;
+  /** How the question is *described*: 'Assertion & Reason', 'Case-Based
+   *  (stem)', or a publisher's own form. Falls back to `type`. */
+  typeLabel?: string;
+  /** The code behind that label. Filters bind to this, not to the label,
+   *  because a label can be reworded without breaking saved filters. */
+  typeCode?: string | null;
   marks: number;
   question: string;
   options?: QuestionBankOption[];
   modelAnswer?: string;
+  bloom?: string | null;
+  difficulty?: string | null;
+  dok?: string | null;
+  publisher?: string | null;
+
+  /** Recorded by the extraction pipeline; absent on AI-generated rows. */
+  examSection?: string | null;
+  itemNumber?: string | null;
+  attribution?: string | null;
+  validationStatus?: string | null;
+  figureRequired?: boolean;
+  figures?: QuestionBankFigure[];
+  conceptConfidence?: number | null;
+  /** 0 = held by a validator, shown to a teacher but not servable. */
+  status?: number;
+  source?: 'extracted' | 'ai_generated';
+  assertion?: string | null;
+  reason?: string | null;
+  subPartLabels?: string[];
+}
+
+export interface QuestionBankFigure {
+  url: string | null;
+  sha256: string | null;
+  width: number | null;
+  height: number | null;
+  caption: string | null;
+  /** Text read out of the figure, shown when the image itself will not load. */
+  ocr_text: string | null;
+  page: number | null;
 }
 
 export interface QuestionBankGroup {
@@ -208,6 +245,26 @@ export async function fetchMappedQuestionBank(
       question: q.question,
       options,
       modelAnswer,
+      // Enrichment from the extraction pipeline. Null on AI-generated rows,
+      // which the cards render as "AI generated" rather than blank.
+      typeLabel: q.question_type_raw?.trim() || type,
+      typeCode: q.question_type_code ?? null,
+      bloom: q.bloom ?? null,
+      difficulty: q.difficulty ?? null,
+      dok: q.dok ?? null,
+      publisher: q.publisher ?? null,
+      examSection: q.exam_section ?? null,
+      itemNumber: q.item_number ?? null,
+      attribution: q.attribution ?? null,
+      validationStatus: q.validation_status ?? null,
+      figureRequired: Boolean(q.figure_required),
+      figures: q.figures ?? [],
+      conceptConfidence: q.concept_confidence ?? null,
+      status: q.status ?? 1,
+      source: q.source ?? 'ai_generated',
+      assertion: q.assertion ?? null,
+      reason: q.reason ?? null,
+      subPartLabels: q.sub_part_labels ?? [],
     };
   });
 }

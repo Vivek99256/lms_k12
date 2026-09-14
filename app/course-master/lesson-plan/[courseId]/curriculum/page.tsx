@@ -207,7 +207,7 @@ function InternalMarksTooltip({
         rows={assessment.internal_breakdown.map((row, index) => ({
           key: `${row.component ?? 'unnamed'}-${index}`,
           // The syllabus states this allocation without a label the extract
-          // could keep. Saying so beats attributing its marks to the component
+          // could keep. Saying so bea5ts attributing its marks to the component
           // above it, which is what the total alone would never reveal.
           label: row.component ?? (
             <span className="italic text-[#94A3B8]">Not named in the syllabus extract</span>
@@ -277,7 +277,7 @@ function TheoryTooltip({
  * One chapter, and the concepts beneath it — the third level of the tree.
  *
  * Collapsed by default, and it has to be: these chapters carry forty to sixty
- * concepts each, so a single expanded unit would run to two hundred rows and
+ * concepts eacch, so a single expanded unit would run to two hundred rows and
  * bury every other unit on the page.
  */
 function ChapterRow({ chapter }: { chapter: UnitChapter }) {
