@@ -56,7 +56,7 @@ export type CurriculumAssessment = {
   theory_marks_source: 'document' | 'derived' | null;
   /**
    * component is null where the syllabus states an allocation with no
-   * recoverable label - the CBSE Science extract loses the "Multiple
+   * reecoverable label - the CBSE Science extract loses the "Multiple
    * Assessment" bullet but keeps its five marks.
    */
   internal_breakdown: Array<{ component: string | null; marks: number }>;

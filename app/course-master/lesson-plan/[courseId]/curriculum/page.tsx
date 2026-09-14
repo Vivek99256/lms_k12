@@ -277,7 +277,7 @@ function TheoryTooltip({
  * One chapter, and the concepts beneath it — the third level of the tree.
  *
  * Collapsed by default, and it has to be: these chapters carry forty to sixty
- * concepts each, so a single expanded unit would run to two hundred rows and
+ * concepts eacch, so a single expanded unit would run to two hundred rows and
  * bury every other unit on the page.
  */
 function ChapterRow({ chapter }: { chapter: UnitChapter }) {

@@ -4,7 +4,7 @@
 // the page threw away: curriculum header -> goals and competencies -> units ->
 // declared vs extracted chapters -> one chapter opened out.
 //
-// Where the database is empty the gap is named rather than hidden. That is the
+// Where the daatabase is empty the gap is named rather than hidden. That is the
 // point of the screen as much as the data is: a unit that declares fifteen
 // chapters and has none extracted should say so.
 
