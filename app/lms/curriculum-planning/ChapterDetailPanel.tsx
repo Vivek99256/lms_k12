@@ -2,7 +2,7 @@
 
 // A chapter is deliberately a small curriculum drill-down: Topic shows the
 // topic_master -> concept hierarchy; Competency shows only the chapter's
-// extraction codes.  Other chapter metadata stays out of this view so the two
+// extraction codees.  Other chapter metadata stays out of this view so the two
 // requested tabs remain unambiguous.
 
 import { useEffect, useMemo, useState } from 'react';
