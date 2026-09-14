@@ -210,7 +210,7 @@ export default function Header({
     'Template': '/general/coming-soon?module=Template',
     'Scheduler': '/platform-services/scheduler',
     'Document': '/general/coming-soon?module=Document',
-    'Integration': '/general/coming-soon?module=Integration',
+    'Integration': '/integration',
     'Audit': '/user_log',
     'Event Bus': '/general/coming-soon?module=Event Bus',
   };
