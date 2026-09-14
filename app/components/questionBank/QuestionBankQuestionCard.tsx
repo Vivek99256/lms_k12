@@ -12,20 +12,18 @@
  * the bank now holds questions extracted from published books, which carry
  * LaTeX (`$x^2$`) and the occasional HTML table. Raw innerHTML would print the
  * LaTeX verbatim and trust markup that came out of a PDF.
+ *
+ * Only AI-generated questions wear their Bloom and difficulty tags on the
+ * card. For a question taken from a published book those are inferred rather
+ * than authored, so they sit behind the info button next to the question type
+ * instead of competing with the question itself for attention.
  */
-import { CheckCircle2, ImageOff, AlertTriangle, Sparkles, BookMarked } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, ImageOff, AlertTriangle, Sparkles, Info } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { isLikelyJson, type QuestionBankItem } from '@/app/course-master/data/questionBank';
 import RichText from './RichText';
-
-const SECTION_TONE: Record<string, string> = {
-  A: 'bg-sky-50 text-sky-700 border-sky-200',
-  B: 'bg-violet-50 text-violet-700 border-violet-200',
-  C: 'bg-amber-50 text-amber-700 border-amber-200',
-  D: 'bg-rose-50 text-rose-700 border-rose-200',
-  E: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-};
 
 function Pill({
   children,
@@ -50,6 +48,58 @@ function Pill({
   );
 }
 
+/** The metadata that no longer sits on the card face, revealed on hover. */
+function DetailsButton({ question }: { question: QuestionBankItem }) {
+  const [open, setOpen] = useState(false);
+
+  const rows: Array<[string, string]> = [];
+  if (question.bloom) rows.push(['Bloom', question.bloom]);
+  if (question.dok) rows.push(['Depth of knowledge', `DOK ${question.dok}`]);
+  if (question.difficulty) rows.push(['Difficulty', question.difficulty]);
+  if (question.examSection) rows.push(['Exam section', `Section ${question.examSection}`]);
+  if (question.publisher) rows.push(['Publisher', question.publisher]);
+  if (question.conceptTitle) rows.push(['Concept', question.conceptTitle]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <span
+      className="relative inline-flex"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        aria-label="Show question details"
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
+      >
+        <Info size={13} />
+      </button>
+
+      {open ? (
+        <span
+          role="tooltip"
+          className="absolute right-0 top-full z-30 mt-1.5 w-max min-w-[190px] max-w-[300px] rounded-[8px] border border-slate-200 bg-white p-2.5 text-left shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+        >
+          {rows.map(([label, value]) => (
+            <span key={label} className="flex justify-between gap-4 py-0.5 text-[11px]">
+              <span className="font-medium text-slate-500">{label}</span>
+              <span className="font-bold text-slate-800">{value}</span>
+            </span>
+          ))}
+          {question.attribution ? (
+            <span className="mt-1.5 block border-t border-slate-100 pt-1.5 text-[10px] leading-snug text-slate-400">
+              {question.attribution}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export function QuestionBankQuestionCard({
   question,
   visibleNumber,
@@ -61,6 +111,7 @@ export function QuestionBankQuestionCard({
 }) {
   const held = question.status === 0;
   const isAssertionReason = Boolean(question.assertion || question.reason);
+  const isAiGenerated = question.source !== 'extracted';
 
   return (
     <article
@@ -86,49 +137,33 @@ export function QuestionBankQuestionCard({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-start">
-          <Pill className="border-indigo-200 bg-[#eef2ff] text-[#3157ff]">
-            {question.typeLabel ?? question.type}
-          </Pill>
+          <span className="inline-flex items-center gap-1.5">
+            <Pill className="border-indigo-200 bg-[#eef2ff] text-[#3157ff]">
+              {question.typeLabel ?? question.type}
+            </Pill>
+            <DetailsButton question={question} />
+          </span>
 
-          {question.examSection && (
-            <Pill
-              className={SECTION_TONE[question.examSection]}
-              title="Section of the exam blueprint this question belongs to"
-            >
-              Section {question.examSection}
-            </Pill>
-          )}
-
-          {question.publisher && (
-            <Pill
-              className="border-slate-800 bg-slate-800 text-white shadow-sm"
-              title={question.attribution ?? undefined}
-            >
-              <BookMarked size={11} />
-              {question.publisher}
-            </Pill>
-          )}
-
-          {question.source === 'ai_generated' && !question.publisher && (
-            <Pill title="Generated by AI; no published source">
-              <Sparkles size={11} />
-              AI generated
-            </Pill>
-          )}
-
-          {question.bloom && (
-            <Pill className="border-blue-200 bg-blue-50 text-blue-700">Bloom: {question.bloom}</Pill>
-          )}
-          {question.difficulty && (
-            <Pill className="border-orange-200 bg-orange-50 text-orange-700">
-              Diff: {question.difficulty}
-            </Pill>
-          )}
-          {question.dok && (
-            <Pill className="border-purple-200 bg-purple-50 text-purple-700">
-              DOK: {question.dok}
-            </Pill>
-          )}
+          {/* Generated questions wear their tags; a question from a book keeps
+              them behind the info button above. */}
+          {isAiGenerated ? (
+            <>
+              <Pill title="Generated by AI; no published source">
+                <Sparkles size={11} />
+                AI generated
+              </Pill>
+              {question.bloom && (
+                <Pill className="border-blue-200 bg-blue-50 text-blue-700">
+                  Bloom: {question.bloom}
+                </Pill>
+              )}
+              {question.difficulty && (
+                <Pill className="border-orange-200 bg-orange-50 text-orange-700">
+                  Diff: {question.difficulty}
+                </Pill>
+              )}
+            </>
+          ) : null}
 
           <Pill>
             {question.marks} mark{question.marks === 1 ? '' : 's'}
@@ -224,19 +259,6 @@ export function QuestionBankQuestionCard({
           />
         </div>
       ) : null}
-
-      {(question.attribution || question.conceptConfidence != null) && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-400">
-          {question.conceptConfidence != null && question.conceptConfidence < 0.5 && (
-            <span className="text-amber-600" title="The concept mapping is a weak match">
-              Low-confidence concept mapping
-            </span>
-          )}
-          {/* The KVS licence permits reuse only with prominent attribution, so
-              this line is a licence condition rather than decoration. */}
-          {question.attribution && <span>Source: {question.attribution}</span>}
-        </div>
-      )}
 
       {actions ? (
         <div className="mt-4 flex justify-end gap-3 border-t border-slate-200/80 pt-3">{actions}</div>
