@@ -174,30 +174,35 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
 
   {
     id: 'ai.prompts',
+    // The slug stays `prompts` while the name reads "Template Management". It is the
+    // identifier `/ai/prompts`, `routeMapper` and the `ai_intelligence.prompts` menu
+    // row are all built from, and roughly 7,600 rights rows point at that menu row.
+    // Renaming the label costs one UPDATE; renaming the slug costs a route change and
+    // everyone's bookmarks.
     slug: 'prompts',
-    name: 'Prompt Management',
+    name: 'Template Management',
     purpose:
-      'Versioned prompt templates and their variables, owned centrally rather than pasted into each caller.',
+      'Versioned AI templates for every module — Fees, Attendance, Admissions and the rest — written and managed in one place.',
     whyCentral:
-      'The same architecture review that centralised models centralised prompts. A prompt copied into three codebases is three prompts the moment one is improved, and the improvement never reaches the other two.',
+      'The same architecture review that centralised models centralised prompts. A prompt copied into three codebases is three prompts the moment one is improved, and the improvement never reaches the other two. Per-module template screens would be the same mistake one level down.',
     todayInK12:
-      'Prompts live inline in the code and in the Laravel lifecycle. There is no place to see them all, diff them, or roll one back.',
+      'Live at /ai/prompts. Templates are rows in ai_templates with a module, a version and a status; the screen is the same for every module and the module list comes from ai_modules, so a new module needs no new screen. Publishing a template against a module also writes its ai_suggestions binding, so that module offers it without a migration.',
     toCentralise: [
-      'A template store with named variables, versions and an active pointer per capability.',
-      'Render-time variable binding, so a caller supplies data and never prompt text.',
-      'A rollback path, because a bad prompt reaches every product at once once this is shared.',
+      'A template store with named variables, versions and an active pointer per capability. Done — ai_templates, with module_key and a published/draft/archived status.',
+      'Render-time variable binding, so a caller supplies data and never prompt text. Done — TemplateRegistry substitutes {{variables}} literally and executes nothing.',
+      'A shared endpoint, so G2G and Enterprise Brain render the same templates rather than keeping their own.',
     ],
     afterCentralisation: [
       'Improve a prompt once and all three products get the better answer.',
       'A regression is rolled back in one place instead of three deploys.',
       'Prompts become reviewable content rather than string literals buried in handlers.',
     ],
-    status: 'coming-soon',
+    status: 'live',
     roadmapId: 'ai.gateway',
     solutions: {
       lms_k12: {
-        today: 'partial',
-        use: 'Owns its prompts inline; would keep authoring them but store them centrally.',
+        today: 'yes',
+        use: 'Every module’s AI templates are authored, versioned and bound to their module from one screen under AI & Intelligence.',
       },
       g2g: {
         today: 'no',

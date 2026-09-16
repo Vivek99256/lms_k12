@@ -18,6 +18,7 @@ import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
 import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
 import { canSeeInternalItems } from '@/lib/roadmap';
+import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useFeesLevel3Nav } from '@/app/fees/_lib/use-fees-level3-nav';
 import { useTeachLearnLevel3Nav } from '@/app/teach-learn/_lib/use-teach-learn-level3-nav';
@@ -76,6 +77,35 @@ function isBrainVisibleByLmsSession() {
       profileName.includes('admin') ||
       profileName.includes('principal') ||
       profileName.includes('management')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The blue Master button on the level-3 sub-header opens institute SETUP
+ * screens — masters and configuration — which are staff work. A student must
+ * never see it, whatever level-3 bar they are standing on.
+ *
+ * Matched on profile NAME, not id: `user_profile_id` for "Student" differs per
+ * institute (3684 at one school, another number at the next), so an id check
+ * would silently stop working for every other tenant. This is the same reason
+ * isBrainVisibleByLmsSession() above matches admin tiers by name.
+ *
+ * Read from storage rather than taken from the `userProfileName` state below,
+ * because that state is populated in an effect and is '' on first paint — the
+ * button would flash into view for a student before being removed.
+ */
+function isStudentSession() {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}');
+
+    return isStudentProfile(
+      String(menuContext.user_profile_name ?? userData.user_profile ?? userData.user_profile_name ?? ''),
     );
   } catch {
     return false;
@@ -208,13 +238,19 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const [userProfileName, setUserProfileName] = useState('');
   const [hasBrainAccess, setHasBrainAccess] = useState(() => isBrainVisibleByLmsSession());
+  const [isStudent, setIsStudent] = useState(() => isStudentSession());
 
   useEffect(() => {
+    const ctx = getStoredMenuContext();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUserProfileName((prev) => {
-      const ctx = getStoredMenuContext();
-      return ctx?.user_profile_name ? ctx.user_profile_name.toString().trim() : prev;
-    });
+    setUserProfileName((prev) => (ctx?.user_profile_name ? ctx.user_profile_name.toString().trim() : prev));
+    // Re-checked here as well as in the initialiser: on a first load the menu
+    // context can land in storage after this component mounts, and a student
+    // who slipped through the initial check would keep the Master button.
+    if (ctx?.user_profile_name) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsStudent(isStudentProfile(ctx.user_profile_name.toString()));
+    }
   }, []);
 
   useEffect(() => {
@@ -726,7 +762,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     masterLoading={masterMenuLoading}
                     masterMenuGroups={masterMenuGroups}
                     userProfileName={userProfileName}
-                    hideMaster={level3Menu?.hideMaster ?? false}
+                    hideMaster={(level3Menu?.hideMaster ?? false) || isStudent}
                   />
                 </div>
               )}
