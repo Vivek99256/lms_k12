@@ -180,11 +180,12 @@ export function CycleTrend({ cycles }: { cycles: FeesCycle[] }) {
       caption={caption}
       figures={
         <FigureTable
-          columns={['Cycle', 'Billed', 'Collected', 'Rate']}
+          columns={['Cycle', 'Demand', 'Collected', 'Outstanding', 'Rate']}
           rows={billed.map((cycle) => [
             cycle.label,
             moneyExact(cycle.demandAmount),
             moneyExact(cycle.collectedAmount),
+            moneyExact(cycle.outstandingAmount),
             percent(cycle.collectionRate),
           ])}
         />

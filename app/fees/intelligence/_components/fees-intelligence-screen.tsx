@@ -172,6 +172,7 @@ export function FeesIntelligenceScreen() {
           />
 
           <PriorityAttention data={data} />
+          <CancellationAndRefund data={data} />
           <Recommendations data={data} onDecided={refresh} />
           <DecisionAndOutcome data={data} onRecorded={refresh} />
           <DataQuality data={data} />
@@ -275,21 +276,57 @@ function HeroFact({ label, value, note }: { label: string; value: string; note?:
  * assistant would imply a model wrote it and invite the reader to discount it.
  */
 function ManagementSummary({ data }: { data: FeesIntelligencePayload }) {
-  const { summary } = data;
+  const { summary, position, coverage, adjustments } = data;
 
   if (!summary.available) {
     return null;
   }
 
+  const cancelRefundTotal = adjustments?.available
+    ? adjustments.cancelledAmount + adjustments.refundedAmount
+    : 0;
+
   return (
-    <section className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#5846EA]">What is happening</p>
+    <section className="rounded-xl border border-slate-200 bg-white px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#5846EA]">Management Summary</p>
       {summary.headline ? (
         <h2 className="mt-1.5 text-[19px] font-bold leading-snug tracking-tight text-slate-950">
           {summary.headline}
         </h2>
       ) : null}
-      <ul className="mt-3 space-y-1.5">
+
+      {position ? (
+        <div className="mt-4 grid grid-cols-2 gap-3 border-y border-slate-100 py-3.5 sm:grid-cols-3 lg:grid-cols-6">
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total Fee Demand</span>
+            <p className="mt-0.5 text-[15px] font-bold text-slate-900">{money(position.demandAmount)}</p>
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Collected</span>
+            <p className="mt-0.5 text-[15px] font-bold text-emerald-600">{money(position.collectedAmount)}</p>
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Outstanding</span>
+            <p className="mt-0.5 text-[15px] font-bold text-amber-600">{money(position.outstandingAmount)}</p>
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Collection Rate</span>
+            <p className="mt-0.5 text-[15px] font-bold text-slate-900">{percent(position.collectionRate)}</p>
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Accounts / Students</span>
+            <p className="mt-0.5 text-[15px] font-bold text-slate-900">
+              {count(position.feeAccounts)} <span className="text-[12px] font-normal text-slate-500">/ {count(coverage.enrolledStudents)}</span>
+            </p>
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cancellation / Refund</span>
+            <p className="mt-0.5 text-[15px] font-bold text-slate-700">{money(cancelRefundTotal)}</p>
+          </div>
+        </div>
+      ) : null}
+
+      <ul className="mt-3.5 space-y-1.5">
         {summary.sentences.map((sentence, index) => (
           <li key={index} className="flex gap-2.5 text-[13.5px] leading-6 text-slate-700">
             <span aria-hidden className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-slate-400" />
@@ -664,6 +701,92 @@ function PriorityAttention({ data }: { data: FeesIntelligencePayload }) {
           );
         })}
       </ol>
+    </Section>
+  );
+}
+
+/* ======================================= cancellation / refund intelligence */
+
+function CancellationAndRefund({ data }: { data: FeesIntelligencePayload }) {
+  const { adjustments } = data;
+  if (!adjustments) return null;
+
+  const hasActivity =
+    adjustments.cancelledAmount > 0 ||
+    adjustments.refundedAmount > 0 ||
+    adjustments.cancelledReceipts > 0 ||
+    adjustments.refunds > 0;
+
+  return (
+    <Section
+      eyebrow="Adjustments"
+      title="Cancellation & refund intelligence"
+      description="Receipt reversals, fee cancellations and refunds recorded in the fee ledger for this academic year."
+    >
+      {!adjustments.available ? (
+        <Unavailable
+          title="Cancellation and refund records unavailable"
+          reason={adjustments.reason ?? 'No cancellation or refund records found for this year.'}
+        />
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <MetricTile
+              label="Cancelled amount"
+              value={money(adjustments.cancelledAmount)}
+              hint={`${count(adjustments.cancelledReceipts)} ${adjustments.cancelledReceipts === 1 ? 'receipt' : 'receipts'} cancelled`}
+              tone={adjustments.cancelledAmount > 0 ? 'medium' : 'positive'}
+            />
+            <MetricTile
+              label="Cancelled receipts"
+              value={count(adjustments.cancelledReceipts)}
+              hint={
+                adjustments.cancelledShareOfCollection !== null
+                  ? `${percent(adjustments.cancelledShareOfCollection)} of collection reversed`
+                  : 'No collections to compare'
+              }
+              tone={adjustments.cancelledReceipts > 0 ? 'medium' : 'positive'}
+            />
+            <MetricTile
+              label="Refund amount"
+              value={money(adjustments.refundedAmount)}
+              hint={`${count(adjustments.refunds)} ${adjustments.refunds === 1 ? 'refund' : 'refunds'} issued`}
+              tone={adjustments.refundedAmount > 0 ? 'high' : 'positive'}
+            />
+            <MetricTile
+              label="Refunded accounts / items"
+              value={count(adjustments.refunds)}
+              hint={adjustments.refunds > 0 ? 'Audited against fees_refund table' : 'No refund transactions recorded'}
+              tone={adjustments.refunds > 0 ? 'medium' : 'positive'}
+            />
+          </div>
+
+          <Surface className="px-4 py-3.5">
+            {hasActivity ? (
+              <div className="flex items-start gap-2.5 text-[13px] leading-5 text-slate-700">
+                <span className="font-semibold text-slate-900">Reversal analysis:</span>
+                <span>
+                  {adjustments.cancelledAmount > 0 && adjustments.refundedAmount > 0
+                    ? `${money(adjustments.cancelledAmount)} cancelled across ${count(adjustments.cancelledReceipts)} receipts, and ${money(adjustments.refundedAmount)} refunded across ${count(adjustments.refunds)} transactions.`
+                    : adjustments.cancelledAmount > 0
+                    ? `${money(adjustments.cancelledAmount)} cancelled across ${count(adjustments.cancelledReceipts)} receipts.`
+                    : `${money(adjustments.refundedAmount)} refunded across ${count(adjustments.refunds)} transactions.`}
+                  {adjustments.cancelledShareOfCollection !== null
+                    ? ` Cancellations represent ${percent(adjustments.cancelledShareOfCollection)} of recorded fee collections.`
+                    : ''}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-[13px] text-slate-600">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+                <span>
+                  No fee cancellations or refunds recorded for this academic year. All collection records remain intact without reversals.
+                </span>
+              </div>
+            )}
+          </Surface>
+        </div>
+      )}
     </Section>
   );
 }
