@@ -8,6 +8,8 @@
 
 export * from './types'
 export * from './sop-catalog'
+export * from './fees-catalog'
+export * from './module-registry'
 export * from './sop-source'
 export * from './intake'
 export * from './parser'
