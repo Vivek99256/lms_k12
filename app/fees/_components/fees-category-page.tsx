@@ -33,6 +33,11 @@ import { FeesScreenOutlet, isEmbeddableFeesScreen } from '@/app/fees/_lib/fees-s
  * yet. Static tabs come first and database menus follow, so a static scaffold
  * can never hide a real screen the user has rights to.
  *
+ * `staticScreensPlacement: 'after'` puts them last instead. A category that
+ * already has database menus needs that: the first renderable tab is the one
+ * the page opens on, so a static tab placed first would quietly take over the
+ * category's landing screen. Fees → Reports uses it for its Audit trail tab.
+ *
  * The selection lives in `?tab=<id>` so it survives a refresh, can be linked,
  * and responds to the browser's back button.
  *
@@ -109,9 +114,12 @@ function menuTab(item: FeesCategoryItem): Tab {
 export function FeesCategoryPage({
   categoryKey,
   staticScreens = [],
+  staticScreensPlacement = 'before',
 }: {
   categoryKey: string;
   staticScreens?: FeesStaticScreen[];
+  /** Where static tabs sit relative to the database menus. */
+  staticScreensPlacement?: 'before' | 'after';
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -162,8 +170,11 @@ export function FeesCategoryPage({
 
   const tabs = useMemo<Tab[]>(() => {
     const staticTabs = staticScreens.map<Tab>((entry) => ({ kind: 'static', ...entry }));
-    return [...staticTabs, ...(category?.items ?? []).map(menuTab)];
-  }, [staticScreens, category]);
+    const menuTabs = (category?.items ?? []).map(menuTab);
+    return staticScreensPlacement === 'after'
+      ? [...menuTabs, ...staticTabs]
+      : [...staticTabs, ...menuTabs];
+  }, [staticScreens, staticScreensPlacement, category]);
 
   /**
    * The open tab: the one named in the URL when it is still on this page,
