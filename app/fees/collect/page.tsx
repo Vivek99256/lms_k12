@@ -22,11 +22,8 @@ import { fetchFeesDashboardSummary } from '@/app/fees/_lib/fees-dashboard-api';
 import { getFeesSession } from '@/app/fees/_lib/fees-api';
 import {
   SearchDropdown,
-  type Division,
-  type DropdownField,
   type DropdownValue,
   type SearchDropdownValues,
-  type Standard,
 } from '@/components/search-dropdown';
 
 type SessionContext = {
@@ -106,8 +103,6 @@ type StudentFetchFilters = {
   selectedSection?: string;
   selectedStandard?: string;
   selectedDivision?: string;
-  fromDate?: string;
-  toDate?: string;
   status?: string;
 };
 
@@ -142,11 +137,7 @@ export default function FeesCollectPage() {
     standard: '',
     division: '',
   });
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
   const [statusFilter, setStatusFilter] = useState(ALL_FILTER_VALUE);
-  const [selectedStandardName, setSelectedStandardName] = useState('');
-  const [selectedDivisionName, setSelectedDivisionName] = useState('');
   const [feeHeadFilter] = useState(ALL_FILTER_VALUE);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -234,8 +225,6 @@ export default function FeesCollectPage() {
           sub_institute_id: dashboardSession.subInstituteId,
           syear: dashboardSession.academicYearId,
           user_id: dashboardSession.userId,
-          from_date: filters.fromDate || null,
-          to_date: filters.toDate || null,
           grade_id: filters.selectedSection || null,
           standard_id: filters.selectedStandard || null,
           section_id: filters.selectedDivision || null,
@@ -456,33 +445,28 @@ export default function FeesCollectPage() {
     }
   }, [router, session.academicYearId]);
 
-  const selectedStandardId = getSingleDropdownValue(academicFilters.standard);
-  const selectedDivisionId = getSingleDropdownValue(academicFilters.division);
 
+  /**
+   * Only the filters the ERP does NOT apply server-side.
+   *
+   * Search, standard and division used to be re-applied here on top of the
+   * server's own filtering, and that second pass is what made search and the
+   * filters look broken: show_student already restricts rows by stu_name /
+   * grno / mobile / grade / standard / division, but the local pass compared a
+   * student's standard NAME against the selected standard ID (matching only if
+   * a separately-tracked name state happened to be populated) and re-tested the
+   * query against a concatenated text blob that does not always contain the
+   * field actually searched on. Either mismatch silently emptied the table.
+   * The server result is authoritative, so it is no longer second-guessed.
+   */
   const applyLocalFilters = useCallback((rows: StudentFeeRow[]) => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-
     return rows.filter((student) => {
-      const searchableText = [
-        student.name,
-        student.admissionNo,
-        student.grNo,
-        student.mobile,
-        getClassLabel(student),
-        student.feeHead,
-      ].filter(Boolean).join(' ').toLowerCase();
-
-      const matchesSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
-      const matchesStandard = !selectedStandardId || matchesStudentStandard(student, selectedStandardId, selectedStandardName);
-      const matchesDivision = !selectedDivisionId || matchesStudentDivision(student, selectedDivisionId, selectedDivisionName);
       const matchesFeeHead = feeHeadFilter === ALL_FILTER_VALUE || student.feeHead === feeHeadFilter;
       const matchesStatus = statusFilter === ALL_FILTER_VALUE || student.status === statusFilter;
-      const date = parseFeeDate(student.collectionDateRaw || student.dueDateRaw || student.dueDate);
-      const matchesDateRange = isWithinDateRange(date, fromDate, toDate);
 
-      return matchesSearch && matchesStandard && matchesDivision && matchesFeeHead && matchesStatus && matchesDateRange;
+      return matchesFeeHead && matchesStatus;
     });
-  }, [feeHeadFilter, fromDate, searchTerm, selectedDivisionId, selectedDivisionName, selectedStandardId, selectedStandardName, statusFilter, toDate]);
+  }, [feeHeadFilter, statusFilter]);
 
   const filteredStudents = useMemo(() => applyLocalFilters(students), [applyLocalFilters, students]);
   const dashboardSourceRows = useMemo(() => {
@@ -553,30 +537,13 @@ export default function FeesCollectPage() {
     },
   ];
 
-  const handleAcademicDropdownChange = (values: SearchDropdownValues, changedField: DropdownField) => {
+  const handleAcademicDropdownChange = (values: SearchDropdownValues) => {
     setAcademicFilters({
       section: values.section,
       standard: values.standard,
       division: values.division,
     });
     setCurrentPage(1);
-
-    if (changedField === 'section') {
-      setSelectedStandardName('');
-      setSelectedDivisionName('');
-    }
-
-    if (changedField === 'standard') {
-      setSelectedDivisionName('');
-    }
-  };
-
-  const handleStandardChange = (value: DropdownValue, selectedData: Standard[]) => {
-    setSelectedStandardName(getSingleDropdownValue(value) ? selectedData[0]?.name ?? '' : '');
-  };
-
-  const handleDivisionChange = (value: DropdownValue, selectedData: Division[]) => {
-    setSelectedDivisionName(getSingleDropdownValue(value) ? selectedData[0]?.name ?? '' : '');
   };
 
   const toggleCurrentPageSelection = (checked: boolean) => {
@@ -621,8 +588,6 @@ export default function FeesCollectPage() {
                   selectedSection: getSingleDropdownValue(academicFilters.section),
                   selectedStandard: getSingleDropdownValue(academicFilters.standard),
                   selectedDivision: getSingleDropdownValue(academicFilters.division),
-                  fromDate,
-                  toDate,
                   status: statusFilter === ALL_FILTER_VALUE ? '' : statusFilter,
                 });
               }}
@@ -659,38 +624,10 @@ export default function FeesCollectPage() {
                   }}
                   className="w-130 grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-3 [&>div]:min-w-0 [&_label]:text-xs [&_label]:font-semibold [&_label]:text-slate-600 [&_select]:h-11 [&_select]:min-w-0 [&_select]:w-full [&_select]:rounded-xl [&_select]:border-slate-200 [&_select]:bg-slate-50/70 [&_select]:pr-10 [&_select]:text-sm"
                   onChange={handleAcademicDropdownChange}
-                  onStandardChange={handleStandardChange}
-                  onDivisionChange={handleDivisionChange}
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_minmax(160px,0.7fr)_auto_auto]">
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">From date</label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(event) => {
-                      setFromDate(event.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">To date</label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(event) => {
-                      setToDate(event.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-sm text-slate-900 outline-none focus:border-[var(--primary-blue)] focus:bg-white focus:ring-2 focus:ring-blue-500/15"
-                  />
-                </div>
-
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(160px,0.7fr)_auto_auto]">
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-slate-600">Status</label>
                   <select
@@ -1475,8 +1412,6 @@ function appendStudentSearchFilters(form: URLSearchParams, filters: StudentFetch
   if (filters.selectedSection) form.append('grade', filters.selectedSection);
   if (filters.selectedStandard) form.append('standard', filters.selectedStandard);
   if (filters.selectedDivision) form.append('division', filters.selectedDivision);
-  if (filters.fromDate) form.append('from_date', filters.fromDate);
-  if (filters.toDate) form.append('to_date', filters.toDate);
   if (filters.status) form.append('status', filters.status);
 }
 
@@ -2190,27 +2125,6 @@ function getChartPointLabel(record: Record<string, unknown>, index: number): str
   return rawLabel.length > 12 ? rawLabel.slice(0, 12) : rawLabel;
 }
 
-function isWithinDateRange(date: Date | null, fromDate: string, toDate: string): boolean {
-  if (!fromDate && !toDate) return true;
-  if (!date) return false;
-
-  const value = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const start = fromDate ? parseFeeDate(fromDate) : null;
-  const end = toDate ? parseFeeDate(toDate) : null;
-
-  if (start) {
-    const startValue = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
-    if (value < startValue) return false;
-  }
-
-  if (end) {
-    const endValue = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
-    if (value > endValue) return false;
-  }
-
-  return true;
-}
-
 function toHeadBreakdown(items: unknown[]): HeadBreakdown[] {
   return items.map((item, index) => {
     const record = asRecord(item);
@@ -2396,32 +2310,6 @@ function getClassLabel(student: StudentFeeRow): string {
 function getSingleDropdownValue(value: DropdownValue | undefined): string {
   if (Array.isArray(value)) return value[0] || '';
   return value || '';
-}
-
-function matchesStudentStandard(student: StudentFeeRow, selectedStandardId: string, selectedStandardName: string): boolean {
-  const studentStandard = normalizeDropdownCompareValue(student.standard);
-  const selectedId = normalizeDropdownCompareValue(selectedStandardId);
-  const selectedName = normalizeDropdownCompareValue(selectedStandardName);
-
-  return studentStandard === selectedId || (!!selectedName && studentStandard === selectedName);
-}
-
-function matchesStudentDivision(student: StudentFeeRow, selectedDivisionId: string, selectedDivisionName: string): boolean {
-  const studentDivision = normalizeDropdownCompareValue(student.section);
-  const selectedId = normalizeDropdownCompareValue(selectedDivisionId);
-  const selectedName = normalizeDropdownCompareValue(selectedDivisionName);
-
-  return studentDivision === selectedId || (!!selectedName && studentDivision === selectedName);
-}
-
-function normalizeDropdownCompareValue(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/^grade\s+/i, '')
-    .replace(/^standard\s+/i, '')
-    .replace(/^section\s+/i, '')
-    .replace(/\s+/g, '');
 }
 
 function getHeadBreakdown(students: StudentFeeRow[]): HeadBreakdown[] {

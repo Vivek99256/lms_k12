@@ -48,6 +48,8 @@ const FEES_SCREENS: Record<string, ScreenComponent> = {
   '/fees/master/new-fees-title-master': screen(() => import('@/app/fees/master/new-fees-title-master/page')),
   '/fees/master/fees-breakoff': screen(() => import('@/app/fees/master/fees-breakoff/page')),
   '/fees/master/fees-receipt-book-master': screen(() => import('@/app/fees/master/fees-receipt-book-master/page')),
+  '/fees/master/fees-late-master': screen(() => import('@/app/fees/master/fees-late-master/page')),
+  '/fees/master/fees-circular-master': screen(() => import('@/app/fees/master/fees-circular-master/page')),
 
   // Transactional Data
   '/fees/collect': screen(() => import('@/app/fees/collect/page')),
