@@ -235,11 +235,15 @@ export default function Header({
     'Scheduler': '/platform-services/scheduler',
     // Document has graduated off the coming-soon placeholder to its real screen
     // at /documents — a read-only aggregation over the document sources every
-    // other module already owns. Template and Event Bus remain stubs.
+    // other module already owns. Template remains a stub.
     'Document': '/documents',
     'Integration': '/integration',
     'Audit': '/user_log',
-    'Event Bus': '/general/coming-soon?module=Event Bus',
+    // Event Bus has graduated the same way, to a read-only monitoring plane over
+    // the sync_log outbox, the audit tables and the outbound send-logs. It is not
+    // an event bus: this product has none, and the standing decision is not to
+    // build a second one beside the working outbox.
+    'Event Bus': '/platform-services/event-bus',
   };
 
   // A capability with a working screen keeps its own route; the rest resolve to
