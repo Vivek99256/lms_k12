@@ -164,9 +164,11 @@ export function useFeesLevel3Nav({
     return {
       parentLabel: 'Fees',
       items: categories.map<Level3Item>((category) => {
-        const href = category.key === 'intelligence'
-          ? '/enterprise-brain/foundation/students'
-          : category.route || `/fees/${category.key}`;
+        const href = category.key === 'onboarding'
+          ? '/fees/onboarding'
+          : category.key === 'intelligence'
+            ? '/enterprise-brain/foundation/students'
+            : category.route || `/fees/${category.key}`;
         return {
           id: `fees-category-${category.key}`,
           label: category.label,

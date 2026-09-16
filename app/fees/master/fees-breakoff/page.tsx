@@ -540,6 +540,10 @@ export default function FeesBreakoffPage() {
       setStepTwoPayload(null);
       setNewValues({});
       setOldValues({});
+      setSelectedGrades([]);
+      setSelectedStandards([]);
+      setSelectedMonths([]);
+      setStandards([]);
       await loadList();
     } catch (saveError) {
       console.error('Save structure error:', saveError);
