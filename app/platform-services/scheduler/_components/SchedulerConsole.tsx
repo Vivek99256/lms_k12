@@ -46,11 +46,30 @@ import {
 
 const RBAC_KEY = 'platform.scheduler';
 
-export function SchedulerConsole() {
+export interface SchedulerConsoleProps {
+  /**
+   * Pin the console to one module (`'fees'`), for a module that wants its own
+   * scheduled-activity screen rather than sending its administrators to
+   * Platform services.
+   *
+   * THE SCOPE IS A REQUEST PARAMETER, NOT A FILTER OVER A FETCHED LIST. The key
+   * travels to GET /api/platform/scheduler as `module=`, the same way the module
+   * rail's selection does, so the browser is never handed another module's tasks
+   * in the first place. Left undefined, the operator picks the module from the
+   * rail — which is what Platform services does, unchanged.
+   */
+  module?: string;
+  /** The trail above the title, for a console mounted inside another module. */
+  breadcrumb?: React.ReactNode[];
+  title?: string;
+  description?: string;
+}
+
+export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, description }: SchedulerConsoleProps = {}) {
   const { registry, problems, loading: registryLoading, error: registryError, reload } = usePlatformRegistry();
   const rights = usePermissions([RBAC_KEY]);
 
-  const [moduleKey, setModuleKey] = useState<string | null>(null);
+  const [moduleKey, setModuleKey] = useState<string | null>(pinnedModule ?? null);
   const [componentKey, setComponentKey] = useState<string | null>(null);
 
   const [payload, setPayload] = useState<SchedulerPayload | null>(null);
@@ -143,13 +162,19 @@ export function SchedulerConsole() {
 
   return (
     <PlatformShell
-      title="Scheduler"
-      description="Every recurring activity the ERP runs, module by module and component by component: when it runs, whether it is switched on, and when it last did."
+      title={title ?? 'Scheduler'}
+      description={
+        description ??
+        'Every recurring activity the ERP runs, module by module and component by component: when it runs, whether it is switched on, and when it last did.'
+      }
       countKey="tasks"
       registry={registry}
       problems={problems}
+      breadcrumb={breadcrumb}
+      modulePinned={Boolean(pinnedModule)}
       selectedModule={moduleKey}
       onSelectModule={(next) => {
+        if (pinnedModule) return;
         setModuleKey(next);
         setComponentKey(null);
         setEditing(null);
