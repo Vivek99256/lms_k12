@@ -629,33 +629,53 @@ const logoUrl = (() => {
                       )}
                     </div>
 
-                    <div className="space-y-1 border-t border-border pt-2">
-                      {group.items.map((subItem) => {
-                        // Document lists every student and staff document in the
-                        // institute, so it is offered only to the administrative
-                        // roles its API will actually serve. Hiding the entry is
-                        // courtesy, not control — Laravel refuses the endpoints
-                        // independently (see document-access.ts).
-                        if (subItem === 'Document' && !documentsVisible) return null;
+                    {/* The rule sits above the whole section, so a two-column
+                        section reads as one heading over two lists rather than as
+                        two headings that happen to be adjacent. */}
+                    <div
+                      className={`grid gap-x-3 gap-y-4 border-t border-border pt-2 ${
+                        group.span === 2 ? 'sm:grid-cols-2' : ''
+                      }`}
+                    >
+                      {group.columns.map((column, columnIndex) => (
+                        <div key={column.label ?? columnIndex} className="min-w-0">
+                          {column.label && (
+                            <p className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              {column.label}
+                            </p>
+                          )}
 
-                        const ItemIcon = group.icons[subItem];
-                        const route = group.routes[subItem] || '/';
+                          <div className="space-y-1">
+                            {column.items.map((subItem) => {
+                              // Document lists every student and staff document in
+                              // the institute, so it is offered only to the
+                              // administrative roles its API will actually serve.
+                              // Hiding the entry is courtesy, not control — Laravel
+                              // refuses the endpoints independently (see
+                              // document-access.ts).
+                              if (subItem === 'Document' && !documentsVisible) return null;
 
-                        return (
-                          <button
-                            key={subItem}
-                            type="button"
-                            onClick={() => { closeUserDropdown(); router.push(route); }}
-                            title={subItem}
-                            className="h-10 w-full flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1.5 text-left text-sm font-semibold text-muted-foreground shadow-xs transition-all cursor-pointer hover:border-muted-foreground/30 hover:bg-muted/60 hover:text-foreground hover:shadow-sm"
-                          >
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                              {ItemIcon ? <ItemIcon size={15} /> : subItem.charAt(0).toUpperCase()}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate">{subItem}</span>
-                          </button>
-                        );
-                      })}
+                              const ItemIcon = group.icons[subItem];
+                              const route = group.routes[subItem] || '/';
+
+                              return (
+                                <button
+                                  key={subItem}
+                                  type="button"
+                                  onClick={() => { closeUserDropdown(); router.push(route); }}
+                                  title={subItem}
+                                  className="h-10 w-full flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1.5 text-left text-sm font-semibold text-muted-foreground shadow-xs transition-all cursor-pointer hover:border-muted-foreground/30 hover:bg-muted/60 hover:text-foreground hover:shadow-sm"
+                                >
+                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                    {ItemIcon ? <ItemIcon size={15} /> : subItem.charAt(0).toUpperCase()}
+                                  </span>
+                                  <span className="min-w-0 flex-1 truncate">{subItem}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );
