@@ -423,6 +423,8 @@ export function PlatformShell({
   onSelectModule,
   actions,
   children,
+  breadcrumb,
+  modulePinned = false,
 }: {
   title: string;
   description: string;
@@ -433,14 +435,36 @@ export function PlatformShell({
   onSelectModule: (moduleKey: string | null) => void;
   actions?: React.ReactNode;
   children: React.ReactNode;
+  /**
+   * The trail above the title. Defaults to the platform-services one, so the
+   * three central consoles are unchanged; a module that mounts one of these
+   * consoles inside its own module (Fees → Workflow) passes its own trail so
+   * the operator is not told they left the module they are standing in.
+   */
+  breadcrumb?: React.ReactNode[];
+  /**
+   * The module is fixed by the page, not chosen by the operator.
+   *
+   * The left rail then has nothing to offer — a picker that can only pick what
+   * is already picked is a control that does nothing — so it is dropped and the
+   * body takes the full width. The scope still travels to the API as `module=`,
+   * exactly as when the rail chose it; nothing is filtered in the browser.
+   */
+  modulePinned?: boolean;
 }) {
   const activeModule = selectedModule ? registry.modules.find((row) => row.key === selectedModule) ?? null : null;
+  const trail = breadcrumb ?? ['Platform services', title];
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <header className="mb-5">
-        <p className="flex items-center gap-1 text-xs font-medium text-slate-500">
-          Platform services <ChevronRight size={12} /> {title}
+        <p className="flex flex-wrap items-center gap-1 text-xs font-medium text-slate-500">
+          {trail.map((crumb, index) => (
+            <React.Fragment key={index}>
+              {index > 0 && <ChevronRight size={12} />}
+              {crumb}
+            </React.Fragment>
+          ))}
         </p>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -468,13 +492,15 @@ export function PlatformShell({
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
-          <ModulePicker modules={registry.modules} countKey={countKey} selected={selectedModule} onSelect={onSelectModule} />
-        </aside>
+      <div className={`grid gap-4 ${modulePinned ? '' : 'lg:grid-cols-[260px_minmax(0,1fr)]'}`}>
+        {!modulePinned && (
+          <aside className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
+            <ModulePicker modules={registry.modules} countKey={countKey} selected={selectedModule} onSelect={onSelectModule} />
+          </aside>
+        )}
 
         <main className="min-w-0 space-y-4">
-          {activeModule && (
+          {activeModule && !modulePinned && (
             <div>
               <h2 className="text-base font-semibold text-slate-900">{activeModule.label}</h2>
               <p className="text-sm text-slate-600">{activeModule.description}</p>
