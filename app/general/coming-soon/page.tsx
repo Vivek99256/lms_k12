@@ -18,6 +18,10 @@ import { useRouter } from 'next/navigation';
  */
 const GRADUATED_MODULES: Record<string, string> = {
   document: '/documents',
+  // Event Bus is a monitoring plane over the outbox, audit tables and send-logs
+  // that already run — not an event bus, which this product does not have. It
+  // lives beside the other Platform Services consoles.
+  'event bus': '/platform-services/event-bus',
 };
 
 export default function ComingSoonPage() {
