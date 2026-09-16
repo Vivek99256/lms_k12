@@ -14,6 +14,7 @@ import {
   GraduationCap,
   Hourglass,
   Info,
+  Layers,
   Lock,
   Monitor,
   Plus,
@@ -37,6 +38,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import ExamResultDashboard from '@/app/lms/exam/_result-dashboard/ExamResultDashboard';
+import QuestionPaperTemplates from '@/app/lms/exam/_question-paper-templates/QuestionPaperTemplates';
+import {
+  ExamPdfButton,
+  ExamPdfNotice,
+  QuestionPaperTemplateSelect,
+  useExamPaperPdf,
+} from '@/app/lms/exam/_question-paper-templates/ExamPaperPdf';
 
 type ExamStatus = 'Scheduled' | 'Open' | 'Draft' | 'Closed';
 type AudienceMode = 'Teacher' | 'Student';
@@ -98,6 +106,8 @@ type StudentPracticeAssessment = {
 
 type ExamRecord = {
   id: string;
+  /** The question_paper row id, for APIs that need it beyond the EXM- label. */
+  paperId: number;
   name: string;
   classLabel: string;
   type: string;
@@ -344,11 +354,12 @@ const examTypeOptions = [
 ];
 const attemptsAllowedOptions = ['1 attempt', '2 attempts', '3 attempts'];
 
-type ExamInnerTab = 'Exams' | 'Results dashboard';
+type ExamInnerTab = 'Exams' | 'Results dashboard' | 'Question paper templates';
 
 const innerTabs: Array<{ label: ExamInnerTab; icon: LucideIcon }> = [
   { label: 'Exams', icon: FileText },
   { label: 'Results dashboard', icon: GraduationCap },
+  { label: 'Question paper templates', icon: Layers },
 ];
 
 const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon; hidden?: boolean }> = [
@@ -446,6 +457,7 @@ function mapQuestionPaperToExam(row: ApiQuestionPaperRecord): ExamRecord {
 
   return {
     id: `EXM-${row.id}`,
+    paperId: toNumber(row.id),
     name: examName || 'Untitled exam',
     classLabel: `Grade ${standardName} - ${subjectName}`.trim(),
     type: row.exam_type?.trim() || '-',
@@ -1019,6 +1031,8 @@ export default function StudentHomeworkIndexPage() {
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [typeFilter, setTypeFilter] = useState('All types');
   const [examInnerTab, setExamInnerTab] = useState<ExamInnerTab>('Exams');
+  // Drives the template dropdown in the toolbar and the PDF action on each row.
+  const examPaperPdf = useExamPaperPdf();
   const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>(defaultStudentLearningTab);
   const [examFilters, setExamFilters] = useState({
     grade_id: '',
@@ -2544,6 +2558,8 @@ export default function StudentHomeworkIndexPage() {
 
                 {examInnerTab === 'Results dashboard' ? (
                   <ExamResultDashboard />
+                ) : examInnerTab === 'Question paper templates' ? (
+                  <QuestionPaperTemplates />
                 ) : (
                   <>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -2594,6 +2610,7 @@ export default function StudentHomeworkIndexPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 self-start">
+                    <QuestionPaperTemplateSelect controller={examPaperPdf} />
                     <Link
                       href="/exam/exam-creation"
                       className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[#5846EA] bg-white px-4 text-[14px] font-semibold text-[#5846EA] transition hover:bg-[#EEEBFF]"
@@ -2616,6 +2633,8 @@ export default function StudentHomeworkIndexPage() {
                   {filteredExams.length} of {exams.length} exams
                 </p>
 
+                <ExamPdfNotice controller={examPaperPdf} />
+
                 {publishSuccessMessage ? (
                   <div className="rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-[14px] font-medium text-[#166534]">
                     {publishSuccessMessage}
@@ -2624,10 +2643,10 @@ export default function StudentHomeworkIndexPage() {
 
                 <div className="overflow-hidden rounded-[18px] border border-[#D9E3F0] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1040px] border-separate border-spacing-0">
+                    <table className="w-full min-w-[1140px] border-separate border-spacing-0">
                       <thead>
                         <tr className="bg-[#F6F8FC]">
-                          {['Exam', 'Class', 'Type', 'Window', 'Attempts', 'Questions', 'Marks', 'Status'].map((heading) => (
+                          {['Exam', 'Class', 'Type', 'Window', 'Attempts', 'Questions', 'Marks', 'Status', 'Paper'].map((heading) => (
                             <th
                               key={heading}
                               className="border-b border-[#D9E3F0] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5F7087]"
@@ -2671,6 +2690,13 @@ export default function StudentHomeworkIndexPage() {
                               <span className={`h-2 w-2 rounded-full ${statusDotClasses[exam.status]}`} />
                               {exam.status}
                             </span>
+                          </td>
+                          <td className="border-b border-[#E6EDF5] px-4 py-3">
+                            <ExamPdfButton
+                              controller={examPaperPdf}
+                              paperId={exam.paperId}
+                              examName={exam.name}
+                            />
                           </td>
                         </tr>
                       ))}

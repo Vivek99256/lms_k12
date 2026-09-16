@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { Authorizer } from './acting-user';
-import { executeTool } from './executors';
+import { executeTool, type ToolSession } from './executors';
 import { findTool, isKnownModule, rbacModuleKey, validateToolsForModule } from './registry';
 import type { AgentStore } from './store';
 import type { ActingUser, Agent, AgentRun, AgentStatus, CreateAgentInput, RunAgentInput } from './types';
@@ -47,6 +47,15 @@ export interface EngineContext {
   store: AgentStore;
   actor: ActingUser;
   authorize: Authorizer;
+  /**
+   * The caller's authority, for tools that read live records.
+   *
+   * Separate from `actor` because the two are different things: `actor` is the
+   * identity written to the run log, and this is the credential used to make one
+   * backend call and then discarded. A context without it still creates, pauses and
+   * runs draft-only agents — a read tool refuses instead of reading unscoped data.
+   */
+  toolSession?: ToolSession;
   /** Injected for tests; defaults to the wall clock. */
   now?: () => Date;
 }
@@ -200,7 +209,7 @@ export async function runAgent(context: EngineContext, agentId: string, input: R
   }
 
   try {
-    const { output } = executeTool(toolKey, args);
+    const { output } = await executeTool(toolKey, args, { session: context.toolSession });
     const run = await context.store.appendRun(finish({ status: 'success', output, tools_used: [toolKey], error: null }));
     return { run };
   } catch (error) {

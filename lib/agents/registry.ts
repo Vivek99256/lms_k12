@@ -69,12 +69,25 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     key: 'fees.list_defaulters',
     label: 'List fee defaulters',
-    description: 'Reads the defaulter report for a class or the whole school.',
+    description:
+      'Reads the live fee records and reports who owes anything, with how many students it checked. Changes nothing.',
     module: 'fees',
     risk: 'read',
     kind: 'mcp',
-    available: false,
-    exampleInput: { class_id: null, as_of: '2026-07-01' },
+    available: true,
+    // The arguments `fees.arrears` accepts. All optional — an empty run sweeps the
+    // default cohort, which is the safe default for a read.
+    exampleInput: { standard_id: null, section_id: null, min_amount: null, limit: 25 },
+  },
+  {
+    key: 'fees.collection_report',
+    label: 'Read the fee collection report',
+    description: 'Reads what was actually collected over a date range, from the receipts. Changes nothing.',
+    module: 'fees',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    exampleInput: { from_date: '', to_date: '', payment_mode: '', limit: 25 },
   },
   {
     key: 'fees.fee_structure',
