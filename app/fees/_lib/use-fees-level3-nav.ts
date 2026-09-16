@@ -167,7 +167,7 @@ export function useFeesLevel3Nav({
         const href = category.key === 'onboarding'
           ? '/fees/onboarding'
           : category.key === 'intelligence'
-            ? '/enterprise-brain/foundation/students'
+            ? '/fees/intelligence'
             : category.route || `/fees/${category.key}`;
         return {
           id: `fees-category-${category.key}`,
