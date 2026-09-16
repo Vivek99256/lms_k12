@@ -17,7 +17,7 @@ import {
 import { ComingSoonBadge } from '@/components/ui/coming-soon';
 import type { PalConceptContext, PalModuleView, PalSection } from '@/app/pal/data/pal-content-model';
 
-type PalSurfaceVariant = 'framework' | 'ulu';
+export type PalSurfaceVariant = 'framework' | 'ulu';
 
 function buildHref(path: string, queryString: string) {
   return queryString ? `${path}?${queryString}` : path;

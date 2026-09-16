@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, Loader2 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { buildSessionContext } from '@/lib/erp-client';
@@ -96,13 +97,29 @@ export default function StudentDashboard() {
       )}
 
       {!loading && !error && !noContent && data && (
-        <ChapterDashboardView
-          studentName={user?.name}
-          data={data}
-          learnerId={defaultLearnerId()}
-          onGoToSubject={(subjectId) => router.push(`/pal?subjectId=${subjectId}`)}
-          onOpenConcept={(conceptId) => router.push(`/pal/eso?conceptId=${conceptId}&learnerId=${defaultLearnerId()}`)}
-        />
+        <>
+          <ChapterDashboardView
+            studentName={user?.name}
+            data={data}
+            learnerId={defaultLearnerId()}
+            onGoToSubject={(subjectId) => router.push(`/pal?subjectId=${subjectId}`)}
+            onOpenConcept={(conceptId) => router.push(`/pal/eso?conceptId=${conceptId}&learnerId=${defaultLearnerId()}`)}
+          />
+
+          {/* This dashboard shows the chapter the student is on. The plan it
+              sits inside — every chapter in order — had no entry point until
+              now, which is why the Learning Path page existed but was
+              unreachable. */}
+          <div className="mt-6">
+            <Link
+              href="/pal/eso/learning-path"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              View your full learning path
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </>
       )}
     </div>
   );

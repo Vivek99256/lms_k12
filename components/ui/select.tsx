@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import { Select as SelectPrimitive } from "@base-ui/react/select"
@@ -106,7 +106,7 @@ function SelectContent({
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
   >) {
   return (
-    <SelectPrimitive.Portal>
+    
       <SelectPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}
@@ -135,7 +135,7 @@ function SelectContent({
           <SelectScrollDownButton />
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
-    </SelectPrimitive.Portal>
+    
   )
 }
 
@@ -247,3 +247,4 @@ export {
   SelectTrigger,
   SelectValue,
 }
+

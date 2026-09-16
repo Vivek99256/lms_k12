@@ -1,11 +1,12 @@
 'use client';
 
-import { BookMarked, Cpu, Gauge, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
+import { BookMarked, Cpu, FileText, Gauge, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
 
 import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
 import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-screen';
 import { ComingSoonPanel, ComingSoonToggle } from '@/components/ui/coming-soon';
 import { FeesAutomationsScreen } from '@/app/fees/ai-stack/_screens/fees-automations-screen';
+import { FeesTemplatesScreen } from '@/app/fees/ai-stack/_screens/fees-templates-screen';
 
 /**
  * Fees → AI Stack tabs.
@@ -34,7 +35,7 @@ import { FeesAutomationsScreen } from '@/app/fees/ai-stack/_screens/fees-automat
  * nothing here touches the separate AI Administration module.
  */
 export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
-/*{
+  {
     id: 'policies',
     label: 'Policies',
     icon: SlidersHorizontal,
@@ -103,6 +104,19 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
     ),
   },
   {
+    // Live. The Fees module's own report templates — the designs the assistant fills
+    // with real fee records when somebody asks a fee question from a Fees page.
+    //
+    // Sits beside Prompts rather than inside it because the two are different things:
+    // a prompt is text sent to a model, a template is a report layout filled by
+    // substitution. Prompts remain central, as the architecture review ruled; templates
+    // are managed here because they are Fees documents.
+    id: 'templates',
+    label: 'Templates',
+    icon: FileText,
+    render: () => <FeesTemplatesScreen />,
+  },
+  {
     id: 'knowledge-base',
     label: 'Knowledge Base',
     icon: BookMarked,
@@ -118,7 +132,6 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
       />
     ),
   },
-*/
   {
     id: 'automations',
     label: 'Automations',
@@ -127,7 +140,6 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
     // Management engine, scoped to module="fees". See fees-automations-screen.tsx.
     render: () => <FeesAutomationsScreen />,
   },
-/*
   {
     id: 'usage-cost',
     label: 'Usage & Cost',
@@ -160,5 +172,4 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
       />
     ),
   },
-*/
 ];

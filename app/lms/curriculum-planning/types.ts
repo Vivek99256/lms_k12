@@ -133,6 +133,8 @@ export type ApiTopic = {
 export type ApiLearningOutcome = {
   id: number;
   chapter_id?: number;
+  /** null on a curricular goal (CG-n); the goal's id on a competency (C-n.m). */
+  parent_id?: number | null;
   code: string | null;
   type: string | null;
   description: string | null;
