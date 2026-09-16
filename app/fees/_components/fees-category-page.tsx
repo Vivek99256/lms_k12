@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Loader2, type LucideIcon } from 'lucide-react';
 
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
@@ -60,6 +60,40 @@ type LoadState = 'loading' | 'ready' | 'error';
 
 const TAB_PARAM = 'tab';
 
+function normalizePath(route: string | null | undefined) {
+  const value = (route ?? '').trim().toLowerCase();
+  if (!value) return '';
+  const [path] = value.split('?');
+  return path.replace(/\/+$/, '') || '/';
+}
+
+/**
+ * The category this page is showing: the one whose key matches, or failing
+ * that, the one the level-3 bar points at this very route.
+ *
+ * WHY THE SECOND LOOKUP EXISTS. A category's key is a database value and its
+ * label is written by hand, so the two can disagree with the route — Fees ships
+ * a "Schedular" tab that navigates to /fees/scheduler. Matching the route as
+ * well means the page shows that category's real label and description instead
+ * of falling back to a bare "Fees" heading over a spelling difference nobody can
+ * see. The key is still tried first, so nothing about the existing pages moves.
+ */
+function findCategory(
+  categories: FeesCategory[],
+  categoryKey: string,
+  pathname: string | null,
+): FeesCategory | null {
+  const byKey = categories.find((entry) => entry.key === categoryKey);
+  if (byKey) return byKey;
+
+  const here = normalizePath(pathname);
+  if (!here) return null;
+
+  return (
+    categories.find((entry) => normalizePath(entry.route || `/fees/${entry.key}`) === here) ?? null
+  );
+}
+
 function menuTab(item: FeesCategoryItem): Tab {
   const route = mapApiLinkToRoute(item.link);
 
@@ -81,6 +115,7 @@ export function FeesCategoryPage({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const requestedTab = searchParams?.get(TAB_PARAM) ?? null;
 
   const [session, setSession] = useState<FeesSession | null>(null);
@@ -113,7 +148,7 @@ export function FeesCategoryPage({
         const categories = await fetchFeesMenuCategories(session, controller.signal);
         if (controller.signal.aborted) return;
 
-        setCategory(categories.find((entry) => entry.key === categoryKey) ?? null);
+        setCategory(findCategory(categories, categoryKey, pathname));
         setState('ready');
       } catch (caught) {
         if (controller.signal.aborted) return;
@@ -123,7 +158,7 @@ export function FeesCategoryPage({
     })();
 
     return () => controller.abort();
-  }, [session, categoryKey]);
+  }, [session, categoryKey, pathname]);
 
   const tabs = useMemo<Tab[]>(() => {
     const staticTabs = staticScreens.map<Tab>((entry) => ({ kind: 'static', ...entry }));
