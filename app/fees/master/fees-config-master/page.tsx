@@ -345,9 +345,9 @@ function validateForm(form: FeeConfigForm): FormErrors {
     errors.late_fees_amount = 'Enter a valid late fees amount';
   }
 
-  if (!form.send_sms.trim()) {
-    errors.send_sms = 'Fees paid SMS preference is required';
-  }
+  // Fees Paid Send SMS is deliberately optional: the Laravel controller stores
+  // it without validating it, and a school that does not send fee SMS should
+  // not be blocked from saving the rest of its config.
 
   if (!form.send_email.trim()) {
     errors.send_email = 'Fees paid email preference is required';
@@ -1327,7 +1327,6 @@ export default function FeesConfigMasterPage() {
 
                     <DrawerField
                       label="Fees Paid Send SMS"
-                      required
                       error={formErrors.send_sms}
                     >
                       <Select

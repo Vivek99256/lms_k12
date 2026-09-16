@@ -185,6 +185,7 @@ export function ModuleJourney({
           <StepDrawer
             step={selectedStep}
             stepNumber={selectedIndex}
+            moduleKey={moduleKey}
             saving={saving}
             users={journey.resources.users}
             currentUserName={journey.context.currentUserName}
