@@ -1,8 +1,9 @@
-//
+﻿//
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { usePermission } from '@/app/hooks/usePermission';
 import {
   ArrowLeft,
   Download,
@@ -19,6 +20,7 @@ import {
   GraduationCap,
   Sparkles,
   CheckCircle2,
+  AlertTriangle,
   Search,
   Upload,
   FileText,
@@ -40,6 +42,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
+import { extractGeneratedBodyHtml, sanitizeGeneratedHtml } from '@/app/course-master/data/generated-html';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,6 +67,13 @@ import {
   resolveSubjectDisplayName,
   deleteQuestionBankQuestion,
   updateQuestionBankQuestion,
+  reviewQuestionBankQuestion,
+  fetchQuestionTypeCatalog,
+  type QuestionTypeCatalogEntry,
+  fetchQuestionBankFacets,
+  EMPTY_QUESTION_BANK_FACETS,
+  type QuestionBankFacets,
+  type CountedOption,
   uploadChapterContent,
   type ChapterContentAsset,
   type ChapterSemantic,
@@ -74,11 +84,14 @@ import {
 import {
   fetchMappedQuestionBank,
   groupQuestionBankItems,
+  questionBankCategoryLabel,
+  QUESTION_BANK_CATEGORIES,
   type QuestionBankItem,
   type QuestionBankChapterRef,
   type QuestionBankQuestionType,
 } from '../../data/questionBank';
 import { QuestionBankQuestionCard } from '@/app/components/questionBank/QuestionBankQuestionCard';
+import { QuestionBankFilterBar } from '@/app/components/questionBank/QuestionBankFilterBar';
 import { groupConceptsByTopic, type TopicGroup } from '../../data/chapterTopics';
 import { ConceptIntelligenceTabs } from './ConceptIntelligenceTabs';
 import { getRequestContext, getSyear } from '../../page';
@@ -190,8 +203,44 @@ const QUESTION_TYPE_API_CONFIG: Record<
 };
 const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
 const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
-const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity'] as const;
-const TEACHER_CONTENT_LIBRARY_TABS = ['All content', 'Presentations'] as const;
+// 'H5P Interactive' sits on the FORMAT axis, alongside Presentations and Videos -
+// not on the audience axis that Classroom vs Teacher Workspace occupies. That is
+// the whole point of tracker row 2 / Decision #35: an interactive item can belong
+// to either audience, so it must not compete with them as a destination.
+/**
+ * Tracker "Content & LMS Architecture" row 2 / Decision #35.
+ *
+ * H5P stops being a 4th top-level destination beside Classroom Resource / Teacher
+ * Workspace / Question Bank and becomes a format filter inside the first two.
+ *
+ * Flip this to true to put the old button back. It exists because a demo cadence is
+ * live and this is the one visible change in Phase A2 - reverting it is a one-line
+ * edit rather than a rollback.
+ *
+ * Currently TRUE: the button was restored on request. Both surfaces are live at once -
+ * the button routes to /h5p/html_contents, and the 'H5P Interactive' filter tab stays
+ * in the content library. Neither disables the other.
+ *
+ * Note: the button's reach is limited server-side. Every H5P item in the estate is
+ * attached to a chapter that does not exist in chapter_master, so /h5p/html_contents
+ * lands on an empty list for all 120 chapters the catalogue can show until the backend
+ * reconciles those chapter ids. See
+ * next_lms_erp/docs/decisions/2026-09-07-h5p-format-tag.md.
+ */
+const SHOW_LEGACY_H5P_BUTTON = true;
+
+/**
+ * Shown on a control the user's role does not permit.
+ *
+ * Gated controls are DISABLED rather than hidden. 70-80% of teachers are expected
+ * never to hold creation rights, and a silently absent button reads as a broken
+ * product rather than as a permission boundary.
+ */
+const CONTENT_CREATE_DENIED_HINT =
+  'Your role does not include content creation rights. Ask an administrator to enable them.';
+
+const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity', 'H5P Interactive'] as const;
+const TEACHER_CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'H5P Interactive'] as const;
 
 const UPLOAD_TYPE_CONFIG: Record<
   (typeof UPLOAD_CONTENT_TYPES)[number],
@@ -206,7 +255,7 @@ const UPLOAD_TYPE_CONFIG: Record<
   Presentation: {
     accept:
       '.ppt,.pptx,.pdf,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    helperText: 'PPT, PPTX or PDF · up to 100 MB',
+    helperText: 'PPT, PPTX or PDF Â· up to 100 MB',
     maxSize: 100 * 1024 * 1024,
     extensions: ['ppt', 'pptx', 'pdf'],
     mimeTypes: [
@@ -217,7 +266,7 @@ const UPLOAD_TYPE_CONFIG: Record<
   },
   Video: {
     accept: '.mp4,.mov,.webm,video/mp4,video/quicktime,video/webm',
-    helperText: 'MP4, MOV or WEBM · up to 500 MB',
+    helperText: 'MP4, MOV or WEBM Â· up to 500 MB',
     maxSize: 500 * 1024 * 1024,
     extensions: ['mp4', 'mov', 'webm'],
     mimeTypes: ['video/mp4', 'video/quicktime', 'video/webm'],
@@ -225,7 +274,7 @@ const UPLOAD_TYPE_CONFIG: Record<
   'Revision notes': {
     accept:
       '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    helperText: 'PDF, DOC or DOCX · up to 50 MB',
+    helperText: 'PDF, DOC or DOCX Â· up to 50 MB',
     maxSize: 50 * 1024 * 1024,
     extensions: ['pdf', 'doc', 'docx'],
     mimeTypes: [
@@ -237,7 +286,7 @@ const UPLOAD_TYPE_CONFIG: Record<
   'Classroom activity': {
     accept:
       '.pdf,.ppt,.pptx,.docx,application/pdf,application/msword,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    helperText: 'PDF, PPT, PPTX or DOCX · up to 100 MB',
+    helperText: 'PDF, PPT, PPTX or DOCX Â· up to 100 MB',
     maxSize: 100 * 1024 * 1024,
     extensions: ['pdf', 'ppt', 'pptx', 'docx'],
     mimeTypes: [
@@ -250,27 +299,35 @@ const UPLOAD_TYPE_CONFIG: Record<
   },
 };
 
-type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity';
-type ChapterContentSource = 'Gamma AI' | 'Uploaded';
+type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity' | 'H5P Interactive';
+type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded';
 
 /**
  * content_master.source values written by the Generate Content flow. It has used
  * more than one marker over time, so the badge matches against the whole set
  * rather than a single string.
  */
-const GENERATED_CONTENT_SOURCES = ['gamma ai', 'aigenerated'];
+const GENERATED_CONTENT_SOURCES = ['gamma ai', 'aigenerated', 'claude ai'];
 
 /**
  * Where a content row came from.
  *
  * Only an explicit generated marker counts as generated. Everything else is an
- * upload — including rows with no source at all, which predate the source column
+ * upload â€” including rows with no source at all, which predate the source column
  * being stamped and were created by the upload path.
  */
 function resolveContentSource(source: string | null | undefined): ChapterContentSource {
-  return GENERATED_CONTENT_SOURCES.includes((source ?? '').trim().toLowerCase())
-    ? 'Gamma AI'
-    : 'Uploaded';
+  const normalized = (source ?? '').trim().toLowerCase();
+  if (!GENERATED_CONTENT_SOURCES.includes(normalized)) return 'Uploaded';
+  // Name the provider that actually wrote the row. Anything generated but not
+  // Claude keeps the historical 'Gamma AI' label, including the legacy
+  // 'aiGenerated' marker.
+  return normalized === 'claude ai' ? 'Claude AI' : 'Gamma AI';
+}
+
+/** Was this row written by a generator, whichever one? */
+function isGeneratedContent(source: ChapterContentSource): boolean {
+  return source !== 'Uploaded';
 }
 type ChapterContentPreview = 'presentation' | 'notes' | 'video' | 'pdf' | 'activity';
 
@@ -297,6 +354,14 @@ interface ChapterContentItem {
   updatedDate: string;
   updatedAt: string;
   contentUrl?: string;
+  /**
+   * Sanitised HTML of an AI-generated document, read from
+   * content_master.description. Null for uploads and for the older Gamma/Gemini
+   * rows, whose description holds the originating prompt rather than a document.
+   */
+  bodyHtml: string | null;
+  /** Route of the existing H5P editor this item opens in. Only set for H5P items. */
+  deepLink?: string;
   slides: {
     id: string;
     number: number;
@@ -316,6 +381,9 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
     if (contentLabel.includes('teacher training')) return 'Teacher training presentation';
     return 'Classroom presentation';
   }
+  // H5P assets are merged in by H5PContentAdapter with format='h5p' and their own
+  // category, so they are identified by that rather than by guessing from a filename.
+  if (asset.format === 'h5p' || contentCategory === 'h5p interactive') return 'H5P Interactive';
   if (contentLabel.includes('classroom activity')) return 'Classroom activity';
   if (contentLabel.includes('pdf')) return 'PDF';
   return 'Revision notes';
@@ -329,7 +397,7 @@ function buildApiChapterContentItems(
     (assets ?? []).map((asset) => {
       const type = getApiContentType(category, asset);
       const contentUrl = resolveViewableContentUrl(asset);
-      const updatedDate = asset.created_at?.split(' ')[0] ?? '—';
+      const updatedDate = asset.created_at?.split(' ')[0] ?? 'â€”';
       const rawConceptId =
         asset.concept_id === null || asset.concept_id === undefined
           ? null
@@ -352,9 +420,13 @@ function buildApiChapterContentItems(
         slideCount: 0,
         statValue: asset.file_type || category,
         updatedDate,
-        updatedAt: updatedDate === '—' ? 'Date unavailable' : `updated ${updatedDate}`,
+        updatedAt: updatedDate === 'â€”' ? 'Date unavailable' : `updated ${updatedDate}`,
         contentUrl,
+        bodyHtml: extractGeneratedBodyHtml(asset.description, isGeneratedContent(source)),
         slides: [],
+        // Where an H5P card opens. The existing /h5p/* editors keep all the CRUD,
+        // which is what makes removing the top-level H5P button non-destructive.
+        deepLink: asset.deep_link,
       };
     })
   );
@@ -392,8 +464,8 @@ function getConceptIntelligence(chapter: Chapter, conceptTitle: string): Concept
   const primaryVerb =
     abilitiesForConcept[0]?.verb ?? intel.blooms[0]?.level ?? 'Understand';
   const dokLabel = dokEntry?.level
-    ? `DOK ${asText(dokEntry.level)} — Skills & concepts`
-    : 'DOK 2 — Skills & concepts';
+    ? `DOK ${asText(dokEntry.level)} â€” Skills & concepts`
+    : 'DOK 2 â€” Skills & concepts';
 
   const conceptDescription = (chapter.concepts ?? []).find(
     (item) => item.title === conceptTitle
@@ -415,7 +487,7 @@ function getConceptIntelligence(chapter: Chapter, conceptTitle: string): Concept
     .filter(Boolean);
 
   return {
-    domain: `Bloom · ${primaryVerb}`,
+    domain: `Bloom Â· ${primaryVerb}`,
     dok: dokLabel,
     topic: chapter.title,
     knowledge,
@@ -499,7 +571,7 @@ function resolveChapterKeyConcepts(
   return getChapterKeyConcepts(courseId, chapter.id);
 }
 
-/** Bucket id for concepts that carry no topic_id — never a real topic_master row. */
+/** Bucket id for concepts that carry no topic_id â€” never a real topic_master row. */
 /**
  * A topic row in the chapter list, carrying the concepts that sit under it.
  * `conceptIndex` stays the chapter-wide index into `content_categories`, so
@@ -586,6 +658,7 @@ function getChapterContentType(index: number): ChapterContentType {
 }
 
 function getChapterContentPreview(type: ChapterContentType): ChapterContentPreview {
+  if (type === 'H5P Interactive') return 'video';
   if (type === 'Video') return 'video';
   if (type === 'Revision notes') return 'notes';
   if (type === 'PDF') return 'pdf';
@@ -691,6 +764,8 @@ function buildChapterContentItems(
       statValue,
       updatedDate,
       updatedAt: `updated ${updatedDate}`,
+      // Demo rows have no stored document; only API-backed generated rows do.
+      bodyHtml: null,
       slides: buildContentSlides(conceptTitle, chapter.title, type, slideCount),
     };
   });
@@ -719,13 +794,13 @@ function isTeacherTrainingContent(item: ChapterContentItem): boolean {
 function truncateToWords(value: string, maxWords = 150): string {
   const words = value.split(/\s+/).filter(Boolean);
   if (words.length <= maxWords) return value;
-  return words.slice(0, maxWords).join(' ') + '…';
+  return words.slice(0, maxWords).join(' ') + 'â€¦';
 }
 
 /**
  * Concepts a question can be filed under. These are the chapter's own concept
- * rows from the chapter master API (`/lms/new_chapter_master`) — the same source
- * the chapter dropdown uses — so the list is the tenant's real curriculum rather
+ * rows from the chapter master API (`/lms/new_chapter_master`) â€” the same source
+ * the chapter dropdown uses â€” so the list is the tenant's real curriculum rather
  * than a sample. `content_categories` covers chapters whose concept rows weren't
  * expanded in the response. The full list is returned: capping it hid most of a
  * chapter's concepts, since chapters carry up to 40-odd.
@@ -780,7 +855,7 @@ export default function ChapterListPage() {
       if (!cancelled) setSubjectLoading(true);
     });
 
-    // Phase 1 — render chapters immediately. resolveDisplayNames:false skips the
+    // Phase 1 â€” render chapters immediately. resolveDisplayNames:false skips the
     // slow (~8s / 1.3MB) course-catalog lookup that only supplies cosmetic names.
     getSubjectAndChapters(subjectId, standardId, { resolveDisplayNames: false })
       .then((data) => {
@@ -790,7 +865,7 @@ export default function ChapterListPage() {
         if (!cancelled) setSubjectLoading(false);
       });
 
-    // Phase 2 — enrich the header's subject/standard names in the background,
+    // Phase 2 â€” enrich the header's subject/standard names in the background,
     // without blocking the chapter list from rendering.
     resolveSubjectDisplayName(subjectId, standardId).then((matched) => {
       if (cancelled || !matched) return;
@@ -841,7 +916,7 @@ export default function ChapterListPage() {
       : undefined;
   }, [courseId, subjectData?.chapters, subjectData?.subject]);
   // Memoised because a fresh [] each render would invalidate every hook that
-  // derives from the chapter list — including the question bank's concept options.
+  // derives from the chapter list â€” including the question bank's concept options.
   const allChapters = useMemo(() => subjectData?.chapters ?? [], [subjectData?.chapters]);
   // Both header stats come from live data: concept rows stored against the chapters,
   // and the board on the tenant's curriculum record.
@@ -894,6 +969,21 @@ export default function ChapterListPage() {
   const [questionBankChapterFilter, setQuestionBankChapterFilter] = useState('all');
   const [questionBankConceptFilter, setQuestionBankConceptFilter] = useState('all');
   const [questionBankTypeFilter, setQuestionBankTypeFilter] = useState('all');
+  // The question-form vocabulary from question_type_catalog. It is the
+  // authority on how a form is spelled and ordered, and it is where a
+  // publisher's own invented form appears -- so the dropdown reads from it
+  // rather than from whatever happens to be on the current page.
+  const [questionTypeCatalog, setQuestionTypeCatalog] = useState<QuestionTypeCatalogEntry[]>([]);
+  const [questionBankBloomFilter, setQuestionBankBloomFilter] = useState('all');
+  const [questionBankDifficultyFilter, setQuestionBankDifficultyFilter] = useState('all');
+  const [questionBankCategoryFilter, setQuestionBankCategoryFilter] = useState('all');
+  const [questionBankSourceFilter, setQuestionBankSourceFilter] = useState('all');
+  const [questionBankStatusFilter, setQuestionBankStatusFilter] = useState('all');
+  const [questionBankSearchInput, setQuestionBankSearchInput] = useState('');
+  const [questionBankSearch, setQuestionBankSearch] = useState('');
+  const [questionBankFacets, setQuestionBankFacets] = useState<QuestionBankFacets>(
+    EMPTY_QUESTION_BANK_FACETS
+  );
   const [manualQuestionBankItems, setManualQuestionBankItems] = useState<QuestionBankItem[]>([]);
   const [questionBankItemEdits, setQuestionBankItemEdits] = useState<Record<string, QuestionBankItem>>({});
   const [editingQuestionBankItem, setEditingQuestionBankItem] = useState<QuestionBankItem | null>(null);
@@ -904,6 +994,7 @@ export default function ChapterListPage() {
   const [isSavingQuestionBankItem, setIsSavingQuestionBankItem] = useState(false);
   const [deletingQuestionBankItemId, setDeletingQuestionBankItemId] = useState<string | null>(null);
   const [questionBankDeleteError, setQuestionBankDeleteError] = useState('');
+  const [reviewingQuestionBankItemId, setReviewingQuestionBankItemId] = useState<string | null>(null);
   const [manualQuestionChapterId, setManualQuestionChapterId] = useState('');
   const [manualQuestionConcept, setManualQuestionConcept] = useState('');
   const [manualQuestionType, setManualQuestionType] = useState<QuestionBankQuestionType>('MCQ');
@@ -922,7 +1013,7 @@ export default function ChapterListPage() {
   const [contentLibraryTab, setContentLibraryTab] =
     useState<(typeof CONTENT_LIBRARY_TABS)[number]>('All content');
   // Grouping follows the resource type: Classroom Resources is chapter-wise,
-  // Teacher Resources is concept-wise. Derived instead of stored, so the two can
+  // Teacher Workspace is concept-wise. Derived instead of stored, so the two can
   // never drift out of step and there is no toggle to leave in the wrong state.
   const contentGroupBy: 'Chapter wise' | 'Concept wise' =
     searchParams?.get('resourceType') === 'teacher' ? 'Concept wise' : 'Chapter wise';
@@ -960,8 +1051,24 @@ export default function ChapterListPage() {
   const [intelligenceError, setIntelligenceError] = useState('');
 
   const view = searchParams?.get('view');
+  // Tracker row 5 / Decision #37. ADVISORY ONLY - this decides whether the control
+  // looks available; the server decides whether the action is allowed, via the
+  // `perm:lms.content,create` middleware on the write route. `undefined` means
+  // "not yet known" (loading, or no token), which is deliberately distinct from
+  // `false` ("denied") so a gated button does not flash disabled on every load.
+  const canCreateContent = usePermission('lms.content', 'create');
+  // 2026-09-08 REGRESSION FIX. This flag was wired to `disabled` on three controls.
+  // The server-side gate (`perm:lms.content,create`) runs in WARN-ONLY mode
+  // (LMS_API_AUTH_ENFORCE=false), so it blocks nothing - the disabled state bought no
+  // security while genuinely stopping work. The rights data is not ready for it either:
+  // 59 (profile, tenant) pairs hold rights on menu 270 with NO row on menu 236, and 30
+  // of 148 menu-270 rows carry can_add=0, so create=false resolved for many real users
+  // and Generate Questions went read-only on live.
+  // The hint still shows; the control stays usable. Re-wire `disabled` only once the
+  // server actually enforces AND the rights rows are backfilled.
+  const contentCreationDenied = canCreateContent === false;
   const contentResourceType = searchParams?.get('resourceType') === 'teacher' ? 'teacher' : 'classroom';
-  const contentResourceLabel = contentResourceType === 'teacher' ? 'Teacher Resource' : 'Classroom Resource';
+  const contentResourceLabel = contentResourceType === 'teacher' ? 'Teacher Workspace' : 'Classroom Resource';
   const availableContentLibraryTabs =
     contentResourceType === 'teacher' ? TEACHER_CONTENT_LIBRARY_TABS : CONTENT_LIBRARY_TABS;
   // A resource view can be opened while a type selected in the other view is still
@@ -1042,8 +1149,8 @@ export default function ChapterListPage() {
   /**
    * The chapter's content narrowed to the resource type currently on screen.
    *
-   * Teacher Resources holds Teacher Training content and Classroom Resources holds
-   * everything else — the same split `filteredChapterContentItems` applies to the
+   * Teacher Workspace holds Teacher Training content and Classroom Resources holds
+   * everything else â€” the same split `filteredChapterContentItems` applies to the
    * list below, reusing one classifier so the counts can never disagree with the
    * items. Search, tab and source filters are deliberately not applied: these are
    * the totals for the resource type, not for the current search.
@@ -1089,9 +1196,90 @@ export default function ChapterListPage() {
     () => (manualQuestionChapter ? getQuestionBankConceptTitles(manualQuestionChapter) : []),
     [manualQuestionChapter]
   );
+  useEffect(() => {
+    let cancelled = false;
+    fetchQuestionTypeCatalog()
+      .then((rows) => {
+        if (!cancelled) setQuestionTypeCatalog(rows);
+      })
+      // A missing catalog is not fatal: the dropdown falls back to whatever
+      // labels the loaded questions carry.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const questionBankTypeOptions = useMemo(() => {
+    const present = new Map<string, number>();
+    questionBankItems.forEach((question) => {
+      const label = question.typeLabel;
+      if (label) present.set(label, (present.get(label) ?? 0) + 1);
+    });
+
+    const ordered: Array<{ label: string; count: number; publisher?: string | null }> = [];
+    const seen = new Set<string>();
+
+    // Catalog order first, so related forms stay grouped the way the
+    // blueprint lists them rather than alphabetically by accident.
+    questionTypeCatalog.forEach((entry) => {
+      if (!entry.label || seen.has(entry.label)) return;
+      const count = present.get(entry.label);
+      if (!count) return;
+      seen.add(entry.label);
+      ordered.push({ label: entry.label, count, publisher: entry.publisher });
+    });
+
+    // Anything on the page the catalog has never heard of still gets listed,
+    // otherwise those questions become unreachable through the filter.
+    present.forEach((count, label) => {
+      if (seen.has(label)) return;
+      ordered.push({ label, count });
+    });
+
+    return ordered;
+  }, [questionBankItems, questionTypeCatalog]);
+
+  // Debounced so typing does not re-filter on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setQuestionBankSearch(questionBankSearchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [questionBankSearchInput]);
+
+  // Facets come from the server for the current scope. Deriving them from the
+  // loaded page is what made the full filter set appear on the one chapter
+  // that had extracted questions and vanish everywhere else.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchQuestionBankFacets(
+      {
+        standard_id: standardId,
+        subject_id: subjectId,
+        chapter_id: questionBankChapterFilter === 'all' ? undefined : questionBankChapterFilter,
+      },
+      controller.signal
+    )
+      .then(setQuestionBankFacets)
+      // Facets are a convenience, not the data: a failure leaves the
+      // dropdowns empty rather than blocking the bank.
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [standardId, subjectId, questionBankChapterFilter]);
+
+  const clearQuestionBankFilters = useCallback(() => {
+    setQuestionBankConceptFilter('all');
+    setQuestionBankTypeFilter('all');
+    setQuestionBankCategoryFilter('all');
+    setQuestionBankBloomFilter('all');
+    setQuestionBankDifficultyFilter('all');
+    setQuestionBankSourceFilter('all');
+    setQuestionBankStatusFilter('all');
+    setQuestionBankSearchInput('');
+  }, []);
+
   const questionBankConceptOptions = useMemo(() => {
-    // Concepts come from the chapters loaded off `/lms/new_chapter_master` — the
-    // same source as the chapter dropdown — so every concept of the chapter is
+    // Concepts come from the chapters loaded off `/lms/new_chapter_master` â€” the
+    // same source as the chapter dropdown â€” so every concept of the chapter is
     // selectable even before a question exists for it. Concepts carried by the
     // loaded questions are merged in so nothing already in the bank is unreachable.
     const scopedChapters =
@@ -1114,6 +1302,114 @@ export default function ChapterListPage() {
     questionBankConceptFilter === 'all' || questionBankConceptOptions.includes(questionBankConceptFilter)
       ? questionBankConceptFilter
       : 'all';
+  /**
+   * The filter bar's contents, in the order a teacher narrows down: where the
+   * question sits, then what kind it is, then where it came from.
+   *
+   * Every facet is offered on every chapter. Server counts are appended as a
+   * hint so an option that would return nothing is visibly "(0)" rather than
+   * silently missing -- the previous behaviour of hiding empty facets is what
+   * made the bar look different on each chapter.
+   */
+  const questionBankFilterSpecs = useMemo(() => {
+    const counted = (rows: CountedOption[], idKey: 'id' | 'value', labelKey: 'name' | 'value') =>
+      rows.map((row) => ({
+        value: String(row[idKey] ?? ''),
+        label: String(row[labelKey] ?? row.name ?? row.value ?? ''),
+        hint: row.total != null ? `(${row.total})` : undefined,
+      }));
+
+    return [
+      {
+        key: 'chapter',
+        label: 'Chapter',
+        allLabel: 'All Chapters',
+        value: questionBankChapterFilter,
+        onChange: (next: string) => {
+          setQuestionBankChapterFilter(next);
+          setQuestionBankConceptFilter('all');
+        },
+        options: questionBankChapterOptions.map((chapter) => ({
+          value: chapter.id,
+          label: chapter.title,
+        })),
+      },
+      {
+        key: 'concept',
+        label: 'Concept',
+        allLabel: 'All Concepts',
+        value: effectiveQuestionBankConceptFilter,
+        onChange: setQuestionBankConceptFilter,
+        options: questionBankConceptOptions.map((concept) => ({
+          value: concept,
+          label: concept,
+        })),
+      },
+      {
+        key: 'type',
+        label: 'Question type',
+        allLabel: 'All Types',
+        value: questionBankTypeFilter,
+        onChange: setQuestionBankTypeFilter,
+        options: questionBankTypeOptions.map((option) => ({
+          value: option.label,
+          label: option.label,
+          hint: option.publisher ? `· ${option.publisher} (${option.count})` : `(${option.count})`,
+        })),
+      },
+      {
+        key: 'bloom',
+        label: 'Bloom level',
+        allLabel: 'All Bloom',
+        value: questionBankBloomFilter,
+        onChange: setQuestionBankBloomFilter,
+        options: counted(questionBankFacets.bloom_levels, 'value', 'value'),
+      },
+      {
+        key: 'difficulty',
+        label: 'Difficulty',
+        allLabel: 'All Difficulty',
+        value: questionBankDifficultyFilter,
+        onChange: setQuestionBankDifficultyFilter,
+        options: counted(questionBankFacets.difficulty_levels, 'value', 'value'),
+      },
+      {
+        key: 'category',
+        label: 'Learning step',
+        allLabel: 'All Categories',
+        value: questionBankCategoryFilter,
+        onChange: setQuestionBankCategoryFilter,
+        options: QUESTION_BANK_CATEGORIES.map((category) => ({
+          value: category.value,
+          label: `${category.step}. ${category.label}`,
+        })),
+      },
+      {
+        key: 'source',
+        label: 'Origin',
+        allLabel: 'Any Origin',
+        value: questionBankSourceFilter,
+        onChange: setQuestionBankSourceFilter,
+        options: [
+          { value: 'extracted', label: 'From a published book' },
+          { value: 'ai_generated', label: 'AI generated' },
+        ],
+      },
+    ];
+  }, [
+    questionBankChapterFilter,
+    questionBankChapterOptions,
+    effectiveQuestionBankConceptFilter,
+    questionBankConceptOptions,
+    questionBankTypeFilter,
+    questionBankTypeOptions,
+    questionBankBloomFilter,
+    questionBankDifficultyFilter,
+    questionBankCategoryFilter,
+    questionBankSourceFilter,
+    questionBankFacets,
+  ]);
+
   const filteredQuestionBankItems = useMemo(() => {
     return questionBankItems.filter((question) => {
       const matchesChapter =
@@ -1122,15 +1418,47 @@ export default function ChapterListPage() {
         effectiveQuestionBankConceptFilter === 'all' ||
         question.conceptTitle === effectiveQuestionBankConceptFilter;
       const matchesType =
-        questionBankTypeFilter === 'all' || question.type === questionBankTypeFilter;
+        questionBankTypeFilter === 'all' || question.typeLabel === questionBankTypeFilter;
+      const matchesBloom = questionBankBloomFilter === 'all' || question.bloom === questionBankBloomFilter;
+      const matchesDifficulty = questionBankDifficultyFilter === 'all' || question.difficulty === questionBankDifficultyFilter;
+      // Questions generated before the category column existed carry null, so
+      // they are only ever hidden by an explicit category choice, never by 'all'.
+      const matchesCategory =
+        questionBankCategoryFilter === 'all' ||
+        question.palCategory === questionBankCategoryFilter;
 
-      return matchesChapter && matchesConcept && matchesType;
+      const matchesSource =
+        questionBankSourceFilter === 'all' || (question.source ?? 'ai_generated') === questionBankSourceFilter;
+      // Rows written before the status column was meaningful default to
+      // published, so 'held' never hides a question that was never held.
+      const matchesStatus =
+        questionBankStatusFilter === 'all' ||
+        (questionBankStatusFilter === 'held' ? question.status === 0 : question.status !== 0);
+      const matchesSearch =
+        questionBankSearch === '' ||
+        question.question.toLowerCase().includes(questionBankSearch.toLowerCase());
+
+      return (
+        matchesChapter &&
+        matchesConcept &&
+        matchesType &&
+        matchesCategory &&
+        matchesBloom &&
+        matchesDifficulty &&
+        matchesSource &&
+        matchesStatus &&
+        matchesSearch
+      );
     });
   }, [
     effectiveQuestionBankConceptFilter,
+    questionBankCategoryFilter,
     questionBankChapterFilter,
     questionBankItems,
     questionBankTypeFilter,
+    questionBankSourceFilter,
+    questionBankStatusFilter,
+    questionBankSearch,
   ]);
   const questionBankVisibleNumberById = useMemo(
     () => new Map(filteredQuestionBankItems.map((question, index) => [question.id, index + 1])),
@@ -1347,23 +1675,32 @@ export default function ChapterListPage() {
           .includes(contentSearch.toLowerCase());
       const matchesSource = contentSourceFilter === 'all' || item.source === contentSourceFilter;
 
+      // H5P carries no audience signal in any h5p_* table, and the tracker asks for it
+      // to be reachable "inside Classroom Resource AND Teacher Resource". So it is shown
+      // on both surfaces rather than being assigned an audience we cannot evidence.
+      const isAudienceNeutral = item.type === 'H5P Interactive';
       const isTeacherTraining = isTeacherTrainingContent(item);
-      // Teacher Resources only ever shows Teacher Training content; Classroom
+      // Teacher Workspace only ever shows Teacher Training content; Classroom
       // Resources never shows it.
       const matchesResourceType =
-        contentResourceType === 'teacher' ? isTeacherTraining : !isTeacherTraining;
+        isAudienceNeutral || (contentResourceType === 'teacher' ? isTeacherTraining : !isTeacherTraining);
 
+      // One tab predicate for both surfaces.
+      //
+      // Teacher Workspace previously short-circuited to `true`, so its tab strip
+      // rendered but filtered nothing - "All content" and "Presentations" returned
+      // an identical list. That was invisible while both tabs were near-synonyms,
+      // but it silently breaks the H5P tab, which has to actually filter to be worth
+      // anything. Presentations therefore now means presentations on both surfaces.
       const matchesTab =
-        contentResourceType === 'teacher'
-          ? // In Teacher Resources, both "All content" and "Presentations" surface
-            // every Teacher Training item regardless of its underlying type.
-            true
-          : activeContentLibraryTab === 'All content' ||
-            (activeContentLibraryTab === 'Presentations' && item.type === 'Classroom presentation') ||
-            (activeContentLibraryTab === 'Videos' && item.type === 'Video') ||
-            (activeContentLibraryTab === 'Revision notes' &&
-              (item.type === 'Revision notes' || item.type === 'PDF')) ||
-             (activeContentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity');
+        activeContentLibraryTab === 'All content' ||
+        (activeContentLibraryTab === 'Presentations' &&
+          (item.type === 'Classroom presentation' || item.type === 'Teacher training presentation')) ||
+        (activeContentLibraryTab === 'Videos' && item.type === 'Video') ||
+        (activeContentLibraryTab === 'Revision notes' &&
+          (item.type === 'Revision notes' || item.type === 'PDF')) ||
+        (activeContentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity') ||
+        (activeContentLibraryTab === 'H5P Interactive' && item.type === 'H5P Interactive');
 
       return matchesSearch && matchesSource && matchesResourceType && matchesTab;
     });
@@ -1537,7 +1874,7 @@ export default function ChapterListPage() {
   };
 
   // When the concept-intelligence view is opened directly (deep link, refresh,
-  // browser back), the click handler never ran — fetch the chapter here.
+  // browser back), the click handler never ran â€” fetch the chapter here.
   useEffect(() => {
     if (view !== 'concept-intelligence' || !activeChapterId) return;
     loadChapterIntelligence(activeChapterId);
@@ -1575,7 +1912,7 @@ export default function ChapterListPage() {
     const mimeAllowed = file.type ? config.mimeTypes.includes(file.type) : false;
 
     if (!mimeAllowed && !extensionAllowed) {
-      return `Only ${config.helperText.split(' · ')[0]} files are supported.`;
+      return `Only ${config.helperText.split(' Â· ')[0]} files are supported.`;
     }
 
     if (file.size > config.maxSize) {
@@ -1763,6 +2100,9 @@ export default function ChapterListPage() {
     setQuestionBankChapterFilter(chapter.id);
     setQuestionBankConceptFilter('all');
     setQuestionBankTypeFilter('all');
+    // Categories differ from chapter to chapter, so a selection carried over
+    // from the last one can leave the bank looking empty rather than filtered.
+    setQuestionBankCategoryFilter('all');
     router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
   };
 
@@ -1828,7 +2168,8 @@ export default function ChapterListPage() {
         <Button
           type="button"
           onClick={() => openGenerateQuestionsModal(chapter, conceptTitle, conceptIndex)}
-          className="h-9 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] hover:bg-[#4338ca]"
+          title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
+          className="h-9 rounded-xl bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.2)] hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
         >
           <Sparkles size={16} className="mr-2" />
           Generate Questions
@@ -1838,6 +2179,14 @@ export default function ChapterListPage() {
   );
 
   const handleOpenContent = (item: ChapterContentItem) => {
+    // An H5P item is not a file - it is a route. It opens in its existing editor
+    // in-app, which is what keeps all the H5P CRUD reachable now that H5P is a
+    // filter value rather than a top-level destination (tracker row 2).
+    if (item.deepLink) {
+      router.push(item.deepLink);
+      return;
+    }
+
     if (!item.contentUrl) return;
 
     window.open(item.contentUrl, '_blank', 'noopener,noreferrer');
@@ -2000,6 +2349,9 @@ export default function ChapterListPage() {
       chapterTitle: chapter.title,
       conceptTitle: manualQuestionConcept,
       category: getQuestionBankCategory(course, chapter.title, manualQuestionConcept),
+      // A hand-written question has no learning-flow category: those are assigned
+      // by question generation. Preserve it on edit rather than dropping it.
+      palCategory: editingQuestionBankItem?.palCategory ?? null,
       type: manualQuestionType,
       marks,
       question: manualQuestionText.trim(),
@@ -2068,7 +2420,7 @@ export default function ChapterListPage() {
 
       setIsSavingQuestionBankItem(false);
 
-      // Drop any stale local override for this question — the list is about to be
+      // Drop any stale local override for this question â€” the list is about to be
       // re-read from the database, and an override would shadow what was saved.
       setQuestionBankItemEdits((current) => {
         if (!(editingQuestionBankItem!.id in current)) return current;
@@ -2574,7 +2926,7 @@ export default function ChapterListPage() {
 
   /**
    * Delete a Question Bank question. API-backed questions (numeric id) are
-   * soft-deleted server-side — the row keeps its id and gets a deleted_at stamp —
+   * soft-deleted server-side â€” the row keeps its id and gets a deleted_at stamp â€”
    * and the card is dropped from local state straight away so the list updates
    * without a refetch. Questions added in this session only exist locally, so
    * they are just removed from state.
@@ -2629,6 +2981,54 @@ export default function ChapterListPage() {
 
   // Presentation is shared with the student bank; only these actions are the
   // teacher's, so a student never gets an Edit or Delete control rendered at all.
+  /**
+   * Release a held question, or put a published one back under review.
+   *
+   * A validator failure writes status = 0, which keeps the question out of
+   * every paper. Without this the bank could show held items but never clear
+   * them, so a false positive stranded a good question permanently.
+   */
+  const handleReviewQuestionBankItem = useCallback(
+    async (question: QuestionBankItem, action: 'approve' | 'hold') => {
+      const context = getRequestContext();
+      if (!context) {
+        setQuestionBankDeleteError('Course master session data is missing.');
+        return;
+      }
+
+      const numericId = Number(question.id);
+      if (!Number.isInteger(numericId)) return;
+
+      setReviewingQuestionBankItemId(question.id);
+      setQuestionBankDeleteError('');
+      try {
+        await reviewQuestionBankQuestion({
+          id: numericId,
+          sub_institute_id: context.sub_institute_id,
+          action,
+          user_id: context.user_id,
+        });
+        // Patch in place rather than refetching: the list is already filtered
+        // and a reload would jump the reviewer back to the top.
+        const nextStatus = action === 'approve' ? 1 : 0;
+        setApiQuestionBankItems((current) =>
+          current.map((item) => (item.id === question.id ? { ...item, status: nextStatus } : item))
+        );
+        setQuestionBankItemEdits((current) => {
+          const existing = current[question.id];
+          return existing ? { ...current, [question.id]: { ...existing, status: nextStatus } } : current;
+        });
+      } catch (error) {
+        setQuestionBankDeleteError(
+          error instanceof Error ? error.message : 'Failed to update the question.'
+        );
+      } finally {
+        setReviewingQuestionBankItemId(null);
+      }
+    },
+    []
+  );
+
   const renderQuestionBankQuestion = (question: QuestionBankItem) => (
     <QuestionBankQuestionCard
       key={question.id}
@@ -2636,6 +3036,28 @@ export default function ChapterListPage() {
       visibleNumber={questionBankVisibleNumberById.get(question.id) ?? 1}
       actions={
         <>
+          {question.status === 0 ? (
+            <Button
+              type="button"
+              onClick={() => handleReviewQuestionBankItem(question, 'approve')}
+              disabled={reviewingQuestionBankItemId !== null}
+              className="h-10 rounded-2xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <CheckCircle2 size={17} className="mr-2" />
+              {reviewingQuestionBankItemId === question.id ? 'Approving...' : 'Approve'}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => handleReviewQuestionBankItem(question, 'hold')}
+              disabled={reviewingQuestionBankItemId !== null}
+              className="h-10 rounded-2xl px-3 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <AlertTriangle size={17} className="mr-2" />
+              {reviewingQuestionBankItemId === question.id ? 'Holding...' : 'Hold'}
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -2653,7 +3075,7 @@ export default function ChapterListPage() {
             className="h-10 rounded-2xl px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Trash2 size={17} className="mr-2" />
-            {deletingQuestionBankItemId === question.id ? 'Deleting…' : 'Delete'}
+            {deletingQuestionBankItemId === question.id ? 'Deletingâ€¦' : 'Delete'}
           </Button>
         </>
       }
@@ -2835,7 +3257,7 @@ export default function ChapterListPage() {
                   <SelectTrigger className="h-[50px] rounded-[7px] border-slate-300 bg-white px-4 text-[17px] text-slate-900 shadow-none">
                     <SelectValue>
                       {manualQuestionOptions[manualCorrectOption].trim()
-                        ? `${manualCorrectOption} · ${manualQuestionOptions[manualCorrectOption].trim()}`
+                        ? `${manualCorrectOption} Â· ${manualQuestionOptions[manualCorrectOption].trim()}`
                         : manualCorrectOption}
                     </SelectValue>
                   </SelectTrigger>
@@ -2843,7 +3265,7 @@ export default function ChapterListPage() {
                     {QUESTION_OPTION_LABELS.map((label) => (
                       <SelectItem key={label} value={label}>
                         {manualQuestionOptions[label].trim()
-                          ? `${label} · ${manualQuestionOptions[label].trim()}`
+                          ? `${label} Â· ${manualQuestionOptions[label].trim()}`
                           : label}
                       </SelectItem>
                     ))}
@@ -2922,7 +3344,7 @@ export default function ChapterListPage() {
             <span className="ds-btn__label">
               <span className="sc-interp">
                 {isSavingQuestionBankItem
-                  ? 'Saving…'
+                  ? 'Savingâ€¦'
                   : isEditingQuestionBankItem
                     ? 'Save changes'
                     : 'Add to bank'}
@@ -3420,7 +3842,7 @@ export default function ChapterListPage() {
               <ChevronRight size={14} className="text-slate-400" />
               <span className="font-medium text-slate-500">{resourceChapter.title}</span>
               <ChevronRight size={14} className="text-slate-400" />
-              <span className="font-semibold text-blue-600">Teacher Resources</span>
+              <span className="font-semibold text-blue-600">Teacher Workspace</span>
             </div>
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -3429,7 +3851,7 @@ export default function ChapterListPage() {
                   <Sparkles size={13} />
                   Resource Studio
                 </div>
-                <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">Teacher Resources</h1>
+                <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">Teacher Workspace</h1>
                 <p className="mt-2 text-slate-600">
                   Curate supporting assets for <span className="font-semibold text-slate-900">{resourceChapter.title}</span> with a cleaner upload flow and a professional resource library.
                 </p>
@@ -3505,7 +3927,7 @@ export default function ChapterListPage() {
 
           <div className="mb-8 rounded-[28px] border border-slate-200/70 bg-white shadow-sm">
             <div className="border-b border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.05),_transparent_45%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] px-6 py-5 sm:px-8">
-              <h2 className="text-xl font-bold text-slate-900">Add Teacher Resource</h2>
+              <h2 className="text-xl font-bold text-slate-900">Add Teacher Workspace Item</h2>
               <p className="mt-1 text-sm text-slate-500">Upload files, tag them to the right pedagogy, and keep instructor materials easy to discover.</p>
             </div>
 
@@ -3605,7 +4027,7 @@ export default function ChapterListPage() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Teacher Resource Target</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Teacher Workspace Target</p>
                     <p className="mt-1 text-sm text-slate-600">
                       Aim to keep at least {resourceChapter.resources.teacherResource} curated assets available for instructors in this chapter.
                     </p>
@@ -3751,7 +4173,7 @@ export default function ChapterListPage() {
     const totalQuestionBankCount = questionBankItems.length;
     const visibleQuestionBankCount = filteredQuestionBankItems.length;
     const questionCountLabel = questionBankLoading
-      ? 'Loading questions…'
+      ? 'Loading questionsâ€¦'
       : questionBankError
         ? 'Error loading questions'
         : visibleQuestionBankCount === totalQuestionBankCount
@@ -3789,86 +4211,27 @@ export default function ChapterListPage() {
             </p>
           </div>
 
-          <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <p className={`text-[16px] font-medium ${questionBankError ? 'text-rose-600' : 'text-slate-700'}`}>
-              {questionCountLabel}
-            </p>
-
-            <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[225px_275px_215px_auto]">
-              <Select
-                value={questionBankChapterFilter}
-                onValueChange={(value) => {
-                  setQuestionBankChapterFilter(value ?? 'all');
-                  setQuestionBankConceptFilter('all');
-                }}
-              >
-                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                  <SelectValue>
-                    {questionBankChapterFilter === 'all'
-                      ? 'All Chapters'
-                      : questionBankChapterOptions.find((chapter) => chapter.id === questionBankChapterFilter)
-                          ?.title ?? 'All Chapters'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Chapters</SelectItem>
-                  {questionBankChapterOptions.map((chapter) => (
-                    <SelectItem key={chapter.id} value={chapter.id}>
-                      {chapter.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={effectiveQuestionBankConceptFilter}
-                onValueChange={(value) => setQuestionBankConceptFilter(value ?? 'all')}
-              >
-                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                  <SelectValue>
-                    {effectiveQuestionBankConceptFilter === 'all'
-                      ? 'All Concepts'
-                      : questionBankConceptOptions.find((concept) => concept === effectiveQuestionBankConceptFilter)
-                          ?? 'All Concepts'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Concepts</SelectItem>
-                  {questionBankConceptOptions.map((concept) => (
-                    <SelectItem key={concept} value={concept}>
-                      {concept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={questionBankTypeFilter} onValueChange={(value) => setQuestionBankTypeFilter(value ?? 'all')}>
-                <SelectTrigger className="h-10 rounded-[8px] border-slate-300 bg-white px-4 text-[16px] text-slate-900 shadow-sm">
-                  <SelectValue>
-                    {questionBankTypeFilter === 'all' ? 'All Types' : questionBankTypeFilter}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {QUESTION_TYPE_OPTIONS.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+          <QuestionBankFilterBar
+            countLabel={questionCountLabel}
+            countTone={questionBankError ? 'error' : 'default'}
+            filters={questionBankFilterSpecs}
+            reviewState={questionBankStatusFilter}
+            onReviewStateChange={setQuestionBankStatusFilter}
+            search={questionBankSearchInput}
+            onSearchChange={setQuestionBankSearchInput}
+            onClearAll={clearQuestionBankFilters}
+            action={
               <Button
                 type="button"
                 onClick={openQuestionBankAddQuestion}
                 disabled={allChapters.length === 0 || questionBankLoading}
-                className="h-10 rounded-xl bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
+                className="h-10 rounded-[8px] bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
               >
                 <Plus size={18} className="mr-2" />
                 Add question
               </Button>
-            </div>
-          </div>
+            }
+          />
 
           {questionBankDeleteError ? (
             <div className="mb-4 flex items-start justify-between gap-4 rounded-[8px] border border-rose-200 bg-rose-50 px-4 py-3">
@@ -3885,7 +4248,7 @@ export default function ChapterListPage() {
 
           {questionBankLoading ? (
             <div className="rounded-[8px] border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
-              <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapter…</p>
+              <p className="text-sm font-medium text-slate-600">Loading questions for the selected chapterâ€¦</p>
             </div>
           ) : questionBankError ? (
             <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-5 py-12 text-center shadow-sm">
@@ -4079,7 +4442,7 @@ export default function ChapterListPage() {
           </div>
 
           {/* Fixed-height card: clamped to the viewport so switching tabs never
-              resizes the layout — content scrolls inside instead. The card itself
+              resizes the layout â€” content scrolls inside instead. The card itself
               carries no padding; each region (tab band / body / footer) manages
               its own, matching the app's card pattern. */}
           <div className="flex h-[max(420px,calc(100vh_-_260px))] flex-col overflow-hidden rounded-[18px] border border-slate-200/80 bg-white shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
@@ -4102,7 +4465,7 @@ export default function ChapterListPage() {
             ) : isIntelligenceLoading ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#4f46e5]" />
-                <p className="text-sm font-medium text-slate-500">Loading concept intelligence…</p>
+                <p className="text-sm font-medium text-slate-500">Loading concept intelligenceâ€¦</p>
               </div>
             ) : hasIntelligenceError ? (
               <div className="m-5 flex flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center sm:m-6">
@@ -4213,7 +4576,7 @@ export default function ChapterListPage() {
   if (view === 'content' && contentChapter) {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const totalItems = resourceScopedContentItems.length;
-    const gammaItems = resourceScopedContentItems.filter((item) => item.source === 'Gamma AI').length;
+    const gammaItems = resourceScopedContentItems.filter((item) => isGeneratedContent(item.source)).length;
     const uploadedItems = resourceScopedContentItems.filter((item) => item.source === 'Uploaded').length;
     const sourceLabel = contentSourceFilter === 'all' ? 'All sources' : contentSourceFilter;
     const activeChapterTitle = activeLibraryChapter?.title ?? contentChapter.title;
@@ -4254,7 +4617,8 @@ export default function ChapterListPage() {
                   <Button
                     type="button"
                     onClick={openGeneratePresentationDrawer}
-                    className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca]"
+                    title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
+                    className="h-11 rounded-2xl bg-[#4f46e5] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                   >
                     <Sparkles size={16} className="mr-2" />
                     Generate content
@@ -4263,7 +4627,8 @@ export default function ChapterListPage() {
                     type="button"
                     variant="outline"
                     onClick={() => openUploadContentModal(activeLibraryChapter ?? contentChapter)}
-                    className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    title={contentCreationDenied ? CONTENT_CREATE_DENIED_HINT : undefined}
+                    className="h-11 rounded-2xl border-slate-200 bg-white px-5 font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Upload size={16} className="mr-2" />
                     Upload content
@@ -4414,7 +4779,7 @@ export default function ChapterListPage() {
           </div>
 
           <p className="mb-5 text-sm text-slate-500">
-            {contentLoading ? 'Loading content…' : `${filteredChapterContentItems.length} items in ${activeChapterTitle}`}
+            {contentLoading ? 'Loading contentâ€¦' : `${filteredChapterContentItems.length} items in ${activeChapterTitle}`}
           </p>
 
           {contentError ? (
@@ -4472,7 +4837,7 @@ export default function ChapterListPage() {
                                   {truncateToWords(item.subtitle, 150)}
                                 </span>
                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                                  {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
+                                  {isGeneratedContent(item.source) ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
                                   {item.source}
                                 </span>
                               </div>
@@ -4532,7 +4897,7 @@ export default function ChapterListPage() {
                           {truncateToWords(item.subtitle, 150)}
                         </span>
                         <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                          {item.source === 'Gamma AI' ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
+                          {isGeneratedContent(item.source) ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
                           {item.source}
                         </span>
                       </div>
@@ -4625,7 +4990,7 @@ export default function ChapterListPage() {
                         {selectedContentItem.type}
                       </Badge>
                       <Badge className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-medium text-[#3157ff] hover:bg-[#eef2ff]">
-                        {selectedContentItem.source === 'Gamma AI' ? (
+                        {isGeneratedContent(selectedContentItem.source) ? (
                           <Sparkles size={12} className="mr-1.5" />
                         ) : (
                           <Upload size={12} className="mr-1.5" />
@@ -4678,6 +5043,22 @@ export default function ChapterListPage() {
                             </p>
                           </div>
                         </div>
+                      </section>
+                    ) : selectedContentItem.bodyHtml ? (
+                      <section className="mt-8">
+                        <div className="mb-4 border-b border-slate-200/80 pb-3">
+                          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Content</h3>
+                        </div>
+
+                        {/*
+                          The generated document, stored in content_master.description.
+                          Sanitised server-side when written and again here on read:
+                          a stored row is untrusted input by the time it reaches a browser.
+                        */}
+                        <div
+                          className="lms-generated-body"
+                          dangerouslySetInnerHTML={{ __html: sanitizeGeneratedHtml(selectedContentItem.bodyHtml) }}
+                        />
                       </section>
                     ) : (
                       <section className="mt-8">
@@ -4892,7 +5273,7 @@ export default function ChapterListPage() {
                       className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                     >
                       <FolderOpen size={16} className="mr-2" />
-                      Teacher Resource
+                      Teacher Workspace
                     </Button>
                     <Button
                       type="button"
@@ -4903,26 +5284,28 @@ export default function ChapterListPage() {
                       <Database size={16} className="mr-2" />
                       Question Bank
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        router.push(
-                          `/h5p/html_contents?${new URLSearchParams({
-                            chapter_id: String(chapter.id),
-                            subject_id: String(subjectData?.subject?.subject_id ?? subjectId),
-                            standard_id: String(subjectData?.subject?.standard_id ?? standardId ?? ''),
-                            chapter_name: chapter.title,
-                            subject_name: subjectData?.subject?.subject_name ?? course.subject,
-                            standard_name: subjectData?.subject?.standard_name ?? getCourseGradeLabel(course.classGrade),
-                          }).toString()}`
-                        )
-                      }
-                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <Layers3 size={16} className="mr-2" />
-                      H5P Content
-                    </Button>
+                    {SHOW_LEGACY_H5P_BUTTON && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          router.push(
+                            `/h5p/html_contents?${new URLSearchParams({
+                              chapter_id: String(chapter.id),
+                              subject_id: String(subjectData?.subject?.subject_id ?? subjectId),
+                              standard_id: String(subjectData?.subject?.standard_id ?? standardId ?? ''),
+                              chapter_name: chapter.title,
+                              subject_name: subjectData?.subject?.subject_name ?? course.subject,
+                              standard_name: subjectData?.subject?.standard_name ?? getCourseGradeLabel(course.classGrade),
+                            }).toString()}`
+                          )
+                        }
+                        className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                      >
+                        <Layers3 size={16} className="mr-2" />
+                        H5P Content
+                      </Button>
+                    )}
                   </div>
 
                   {isExpanded && chapterConceptRows.length > 0 && (
@@ -5308,3 +5691,5 @@ export default function ChapterListPage() {
     </div>
   );
 }
+
+

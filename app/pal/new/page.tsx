@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { ComingSoonBadge } from '@/components/ui/coming-soon';
 import { SUB_MODULES } from '@/app/pal/new/_components/NewPalNav';
 import {
   fetchEstateCoverage,
@@ -200,11 +201,7 @@ export default function NewPalPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <h3 className="text-[15px] font-semibold text-[#1F2A44]">{sub.label}</h3>
-                          {!sub.available ? (
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                              Not built yet
-                            </span>
-                          ) : null}
+                          {!sub.available ? <ComingSoonBadge size="sm" /> : null}
                         </div>
                         <p className="mt-1 text-sm text-slate-500">{sub.description}</p>
                       </div>

@@ -28,6 +28,16 @@ import type {
   StepUpdate,
 } from "../_lib/onboarding-api";
 
+const FEES_VALIDATION_REPORTS = [
+  { label: "Fees collection report", href: "/fees/reports/fees-collection" },
+  { label: "Other fees report", href: "/fees/reports/other-fees" },
+  { label: "Datewise summary", href: "/fees/reports/datewise-summary" },
+  { label: "Fees structure report", href: "/fees/reports/fees-structure" },
+  { label: "Fees cancellation report", href: "/fees/reports/fees-cancel" },
+  { label: "Fees defaulter report", href: "/fees/reports/fees-defaulter" },
+  { label: "Student break-off report", href: "/fees/reports/student-breakoff" },
+] as const;
+
 /**
  * Detail surface for one journey step.
  *
@@ -43,6 +53,7 @@ import type {
 export function StepDrawer({
   step,
   stepNumber,
+  moduleKey,
   saving,
   users,
   currentUserName,
@@ -51,6 +62,7 @@ export function StepDrawer({
 }: {
   step: OnboardingStep | null;
   stepNumber: number;
+  moduleKey: string;
   saving: boolean;
   /** Live staff list for this institute — never a static list. */
   users: OnboardingUser[];
@@ -59,9 +71,11 @@ export function StepDrawer({
   onSave: (stepId: number, update: StepUpdate) => Promise<void>;
 }) {
   const [notes, setNotes] = useState("");
+  const [checkedReports, setCheckedReports] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setNotes(step?.state.notes ?? "");
+    setCheckedReports(new Set());
   }, [step?.id, step?.state.notes]);
 
   useEffect(() => {
@@ -78,8 +92,18 @@ export function StepDrawer({
   if (!step) return null;
 
   const derived = step.proof.type === "table_rows";
-  const target = step.action.route ? mapApiLinkToRoute(step.action.route) : "";
+  const feesSetupRoute = moduleKey === "fees"
+    ? {
+        master_setup: "/fees/master-setup",
+        validation: "/fees/operations",
+        communication: "/fees/communication",
+      }[step.stepKey]
+    : undefined;
+  const target = feesSetupRoute || (step.action.route ? mapApiLinkToRoute(step.action.route) : "");
+  const opensSetupScreen = Boolean(feesSetupRoute) || Boolean(step.proof.table);
   const canNavigate = Boolean(target) && target !== "#";
+  const showFeesValidationChecklist = moduleKey === "fees" && step.stepKey === "validation";
+  const showFeesCommunicationPlan = moduleKey === "fees" && step.stepKey === "communication";
   const notesChanged = notes.trim() !== (step.state.notes ?? "").trim();
 
   const setStatus = (status: StepStatus) =>
@@ -175,6 +199,72 @@ export function StepDrawer({
             </div>
           ) : null}
 
+          {showFeesValidationChecklist ? (
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-slate-900">Verify Fees data</h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Review the relevant reports and confirm that the Fees records match the agreed test cases.
+                </p>
+              </div>
+              <div className="space-y-2">
+                {FEES_VALIDATION_REPORTS.map((report) => {
+                  const checked = checkedReports.has(report.href);
+
+                  return (
+                    <div key={report.href} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setCheckedReports((current) => {
+                            const next = new Set(current);
+                            if (next.has(report.href)) next.delete(report.href);
+                            else next.add(report.href);
+                            return next;
+                          });
+                        }}
+                        className="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        aria-label={`Mark ${report.label} as reviewed`}
+                      />
+                      <Link
+                        href={report.href}
+                        className={`text-indigo-700 underline-offset-2 hover:underline ${checked ? "text-slate-400 line-through" : ""}`}
+                      >
+                        {report.label}
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          {showFeesCommunicationPlan ? (
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-slate-900">Fees communication plan</h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  Configure the channels and recipients for these automatic Fees messages.
+                </p>
+              </div>
+              <div className="space-y-2.5">
+                <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                  <p className="text-sm font-medium text-slate-800">Weekly fees collection report</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Send automatically to Admin, Trustee and Principal.</p>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                  <p className="text-sm font-medium text-slate-800">Fee due date reminder</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Send an automatic reminder before the due date.</p>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                  <p className="text-sm font-medium text-slate-800">Pending fee statement</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Send an automatic statement for outstanding fees.</p>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
 
 
           <div>
@@ -214,7 +304,7 @@ export function StepDrawer({
         <footer className="space-y-2 border-t border-slate-200 p-5">
           {canNavigate ? (
             <Link href={target} className={buttonVariants({ size: "lg", className: "w-full" })}>
-              Open {step.proof.table ? "setup screen" : "module"}
+              Open {opensSetupScreen ? "setup screen" : "module"}
               <ArrowUpRight className="size-4" />
             </Link>
           ) : null}

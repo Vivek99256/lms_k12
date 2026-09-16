@@ -191,7 +191,7 @@ export function LessonPlanDetailDialog({
                     {plan.differentiation.enrichment_activity ? (
                       <div className="rounded-[10px] border border-[#A7F3D0] bg-white/70 p-3">
                         <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#047857]">
-                          Enrichment activity
+                          Extension Activity
                         </span>
                         <p className="text-[14px] text-[#334155]">
                           {plan.differentiation.enrichment_activity}

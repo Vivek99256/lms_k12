@@ -9,14 +9,19 @@ import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
 import { type Level3Item, type MenuItem, type SubmenuItem } from '@/app/data/menuItems';
 import { useMenuRights, getStoredMenuContext } from '@/app/hooks/useMenuRights';
+import { useResizablePanel } from '@/hooks/use-resizable-panel';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { resolveModuleDashboardRoute } from '@/app/data/moduleDashboards';
+import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
-import { BRAIN_MENU_LABEL, BRAIN_ROOT, BRAIN_SECTIONS } from '@/lib/brain/navigation';
+import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
+import { canSeeInternalItems } from '@/lib/roadmap';
+import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useFeesLevel3Nav } from '@/app/fees/_lib/use-fees-level3-nav';
+import { useTeachLearnLevel3Nav } from '@/app/teach-learn/_lib/use-teach-learn-level3-nav';
 
 interface SelectedBranch {
   level1Key: string;
@@ -78,6 +83,35 @@ function isBrainVisibleByLmsSession() {
   }
 }
 
+/**
+ * The blue Master button on the level-3 sub-header opens institute SETUP
+ * screens — masters and configuration — which are staff work. A student must
+ * never see it, whatever level-3 bar they are standing on.
+ *
+ * Matched on profile NAME, not id: `user_profile_id` for "Student" differs per
+ * institute (3684 at one school, another number at the next), so an id check
+ * would silently stop working for every other tenant. This is the same reason
+ * isBrainVisibleByLmsSession() above matches admin tiers by name.
+ *
+ * Read from storage rather than taken from the `userProfileName` state below,
+ * because that state is populated in an effect and is '' on first paint — the
+ * button would flash into view for a student before being removed.
+ */
+function isStudentSession() {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}');
+
+    return isStudentProfile(
+      String(menuContext.user_profile_name ?? userData.user_profile ?? userData.user_profile_name ?? ''),
+    );
+  } catch {
+    return false;
+  }
+}
+
 function getFilteredMasterMenuItems(items: SubmenuItem[], selectedMenu: SubmenuItem) {
   if (normalizeMenuLabel(selectedMenu.label) !== 'fees setup') return items;
 
@@ -99,11 +133,12 @@ function getFilteredMasterMenuItems(items: SubmenuItem[], selectedMenu: SubmenuI
  * a `/pal` prefix.
  */
 const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
-  {
-    id: 'pal-framework',
-    label: 'Framework',
-    href: '/pal/frameworks',
-  },
+  // Framework is deliberately absent. It moved to Curriculum Planning, because
+  // a framework alignment cannot exist without the curriculum concept it
+  // attaches to, so curriculum owns it and PAL reads it. Listing it here would
+  // still claim `/pal/frameworks` for New PAL below, and the page would wear
+  // New PAL's tab bar while living under Curriculum — see the migration
+  // 2026_09_08_100000_move_framework_menu_under_curriculum.php in next_lms_erp.
   {
     id: 'pal-content-model',
     label: 'Content Model',
@@ -159,9 +194,10 @@ function findNewPalMenuNode(items: MenuItem[]): SubmenuItem | undefined {
  * `/pal`, and Content/Exam/Report/Result/Intelligence hang off it. Those are a
  * different module and must not wear New PAL's navigation.
  *
- * The boundary check matters here — `/pal/framework` (legacy) and
- * `/pal/frameworks` (New PAL) differ by one character, so a plain
- * `startsWith` would drag the legacy page back in.
+ * The boundary check matters here — `/pal/framework` and `/pal/frameworks`
+ * differ by one character, so a plain `startsWith` would drag the legacy page
+ * back in. Both now sit outside New PAL: `/pal/frameworks` moved to Curriculum
+ * Planning and so falls through to the normal menu-driven resolution.
  *
  * NEW_PAL_LEVEL3_ITEMS supplies the display metadata (label, href, order);
  * this only decides which of those items the caller's role is allowed to
@@ -196,17 +232,25 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [selectedBranch, setSelectedBranch] = useState<SelectedBranch | null>(null);
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isRightToolbarOpen, setIsRightToolbarOpen] = useState(false);
+  // How wide the user has decided the assistant should be, remembered across sessions.
+  const assistantPanel = useResizablePanel();
   const rightToolbarToggleRef = useRef<HTMLButtonElement>(null);
 
   const [userProfileName, setUserProfileName] = useState('');
   const [hasBrainAccess, setHasBrainAccess] = useState(() => isBrainVisibleByLmsSession());
+  const [isStudent, setIsStudent] = useState(() => isStudentSession());
 
   useEffect(() => {
+    const ctx = getStoredMenuContext();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUserProfileName((prev) => {
-      const ctx = getStoredMenuContext();
-      return ctx?.user_profile_name ? ctx.user_profile_name.toString().trim() : prev;
-    });
+    setUserProfileName((prev) => (ctx?.user_profile_name ? ctx.user_profile_name.toString().trim() : prev));
+    // Re-checked here as well as in the initialiser: on a first load the menu
+    // context can land in storage after this component mounts, and a student
+    // who slipped through the initial check would keep the Master button.
+    if (ctx?.user_profile_name) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsStudent(isStudentProfile(ctx.user_profile_name.toString()));
+    }
   }, []);
 
   useEffect(() => {
@@ -258,7 +302,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         icon: BrainCircuit,
         label: BRAIN_MENU_LABEL,
         href: BRAIN_ROOT,
-        submenus: BRAIN_SECTIONS.map((section) => ({
+        // Filtered, not the raw list: an internal-only section must not be
+        // advertised in the sidebar to the school users who can open the Brain.
+        submenus: visibleBrainSections(canSeeInternalItems()).map((section) => ({
           id: `enterprise-brain-${section.key}`,
           parentId: 'enterprise-brain',
           label: section.label,
@@ -417,6 +463,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (!hasLoadedRef.current && selectedBranch && displayedMenuItems.length > 1) {
       const selectedLevel1 = displayedMenuItems.find((item) => getMenuKey(item) === selectedBranch.level1Key);
       const selectedLevel2 = selectedLevel1?.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key);
+      if (selectedLevel2 && normalizeMenuLabel(selectedLevel2.label) === 'audit') {
+        return;
+      }
+
       if (!selectedLevel2?.submenus?.length) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedBranch(null);
@@ -439,6 +489,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       // of its own, and applying it here would bounce a deep link back to the
       // first sibling.
       if (pathname.toLowerCase().startsWith(BRAIN_ROOT)) {
+        return;
+      }
+
+      // Teach/Learn owns its category workspace and opens on the LMS
+      // Dashboard instead of redirecting to its first tblmenumaster child.
+      if (normalizeMenuLabel(selectedLevel2.label) === 'teach/learn') {
         return;
       }
 
@@ -498,13 +554,32 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       return;
     }
 
+    // Audit module: the user log screen at /user_log is the module's only page.
+    // Navigate there directly and return before the master-menu fetch or any
+    // Level 3 redirect so no coming-soon stub or submenu entries can surface.
+    if (normalizeMenuLabel(submenu.label) === 'audit') {
+      router.push('/user_log');
+      return;
+    }
+
     await fetchMasterMenu(parent.id, submenu);
 
     const submenuRoute = submenu.link ? mapApiLinkToRoute(submenu.link) : submenu.href;
+    if (normalizeMenuLabel(submenu.label) === 'teach/learn') {
+      router.push('/teach-learn');
+      return;
+    }
     const isPalRoot = normalizeMenuLabel(submenu.label) === 'new pal' || (submenuRoute || '').toLowerCase() === '/pal';
     if (isPalRoot) {
+      // Lands on New PAL's own overview.
+      //
+      // This used to push `/pal/frameworks`, which stopped being New PAL's to
+      // land on when Framework moved under Curriculum Planning. Clicking
+      // "New PAL" took you to a screen that had left the module, and because
+      // `/pal/frameworks` is no longer claimed by NEW_PAL_LEVEL3_ITEMS the shell
+      // showed New PAL's sub-nav over a page belonging to another branch.
       const query = searchParams?.toString() ?? '';
-      router.push(query ? `/pal/frameworks?${query}` : '/pal/frameworks');
+      router.push(query ? `/pal/new?${query}` : '/pal/new');
       return;
     }
 
@@ -527,6 +602,27 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         router.push(navigateRoute);
       }
     }
+  };
+
+  /**
+   * A hit from the top-bar menu search. Level 2 reuses the sidebar's own
+   * selection flow verbatim (module dashboard / New PAL / first Level 3), so a
+   * searched module behaves exactly like a clicked one. Level 3 opens its screen
+   * with the owning branch selected, which is what drives the sub-header.
+   */
+  const handleMenuSearchNavigate = async (entry: MenuSearchEntry) => {
+    if (entry.level === 2 && entry.level1 && entry.level2) {
+      await handleLevel2Select(entry.level2, entry.level1);
+      return;
+    }
+
+    if (entry.level === 3) {
+      setSelectedBranch({ level1Key: entry.level1Key, level2Key: entry.level2Key });
+      setMasterMenuFetchedFor(null);
+      if (entry.level1 && entry.level2) await fetchMasterMenu(entry.level1.id, entry.level2);
+    }
+
+    if (entry.route) router.push(entry.route);
   };
 
   const selectedL1 = useMemo(() => {
@@ -557,6 +653,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     pathname,
   });
 
+  const teachLearnLevel3Menu = useTeachLearnLevel3Nav({
+    selectedLevel2Label: selectedL2?.label,
+    pathname,
+  });
+
   const searchLevel3FromMenu = (items: MenuItem[], path: string): { parentLabel: string; items: Level3Item[] } | null => {
     if (!path || !items.length) return null;
 
@@ -581,7 +682,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return best;
   };
 
-  const level3Menu = (() => {
+  const level3Menu: { parentLabel: string; items: Level3Item[]; hideMaster?: boolean } | null = (() => {
+    // Audit module: /user_log is the module's only screen. Suppress the Level 3
+    // sub-header entirely so OTHER REPORTS and its sibling report tabs
+    // (User Report, Dynamic Report, Complaint Report, Petty Cash Report, etc.)
+    // never surface from the Audit module. The module behaves as a single-screen
+    // surface — only User Log is visible, no other report pages are reachable.
+    if (pathname.toLowerCase().replace(/\/+$/, '') === '/user_log') {
+      return null;
+    }
     // New PAL brings its own sub-nav. Every other route — including the legacy
     // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
     // menu-driven resolution below and gets whatever its own menu defines.
@@ -596,6 +705,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // so the old Fees level-3 list below is unreachable, even for one frame.
     if (feesLevel3Menu) {
       return feesLevel3Menu;
+    }
+    // Teach/Learn shows its category tabs here, the same way Fees does above;
+    // the hook returns null for every non-Teach/Learn context, so no other
+    // module's navigation is affected.
+    if (teachLearnLevel3Menu.navigation) {
+      return teachLearnLevel3Menu.navigation;
     }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
@@ -620,6 +735,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         loading={loading}
         error={error}
         refetch={refetch}
+        dynamicLevel2Counts={{ 'teach/learn': teachLearnLevel3Menu.categoryCount }}
         onLevel1Select={handleLevel1Select}
         onLevel2Select={handleLevel2Select}
       />
@@ -627,12 +743,12 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <Header
           onToggleChatbot={toggleChatbot}
           isChatbotOpen={isChatbotOpen}
+          menuItems={menuItems}
+          onMenuSearchNavigate={handleMenuSearchNavigate}
         />
         <div className="mt-4 flex min-h-0 flex-1 gap-4 overflow-hidden">
           <main
-            className={`min-w-0 flex-1 overflow-auto scrollbar-hide transition-[width] duration-300 ease-out ${
-              isChatbotOpen ? 'w-[85%]' : 'w-full'
-            }`}
+            className="min-w-0 flex-1 overflow-auto scrollbar-hide"
           >
             <ChatbotLayoutContext.Provider value={{ isChatbotOpen }}>
               {showSubheader && (
@@ -646,6 +762,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     masterLoading={masterMenuLoading}
                     masterMenuGroups={masterMenuGroups}
                     userProfileName={userProfileName}
+                    hideMaster={(level3Menu?.hideMaster ?? false) || isStudent}
                   />
                 </div>
               )}
@@ -653,9 +770,37 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </ChatbotLayoutContext.Provider>
           </main>
           {isChatbotOpen && (
-            <div className="min-h-0 w-[15%] min-w-[320px] overflow-hidden">
-              <ChatbotPanel onToggleChatbot={toggleChatbot} />
-            </div>
+            <>
+              {/*
+                Drag to resize, arrow keys to nudge, Home/End for the extremes. Sits
+                between the page and the panel because that is the edge being moved —
+                a handle anywhere else would be a control for a gesture, rather than
+                the thing itself.
+              */}
+              <div
+                {...assistantPanel.handleProps}
+                className={`group relative -mx-1 hidden w-2 flex-none cursor-col-resize items-center justify-center rounded outline-none md:flex ${
+                  assistantPanel.isDragging ? 'bg-[#0D6EFD]/10' : 'hover:bg-[#0D6EFD]/5'
+                } focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40`}
+                title="Drag to resize · arrow keys to nudge"
+              >
+                <span
+                  className={`h-10 w-0.5 rounded-full transition-colors ${
+                    assistantPanel.isDragging
+                      ? 'bg-[#0D6EFD]'
+                      : 'bg-gray-300 group-hover:bg-[#0D6EFD]/60'
+                  }`}
+                  aria-hidden
+                />
+              </div>
+
+              <div
+                className="min-h-0 flex-none overflow-hidden"
+                style={{ width: assistantPanel.width }}
+              >
+                <ChatbotPanel onToggleChatbot={toggleChatbot} />
+              </div>
+            </>
           )}
         </div>
         <RightFloatingToolbar

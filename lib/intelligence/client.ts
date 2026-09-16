@@ -1,7 +1,11 @@
-import { API_BASE_URL } from "@/app/components/utils/api_url";
+import { resolveAiBaseUrl } from "@/app/components/utils/api_url";
 import type {
   AgentRunResult,
   AiEnvelope,
+  AiReport,
+  AiReportFigures,
+  AiReportRecipient,
+  AiReportSendPreview,
   AskIntent,
   AskResult,
   CaseDetail,
@@ -42,7 +46,7 @@ export interface IntelligenceContext {
 }
 
 function normalizeBaseUrl(baseUrl?: string | null) {
-  return (baseUrl || API_BASE_URL || "").trim().replace(/\/$/, "");
+  return resolveAiBaseUrl(baseUrl);
 }
 
 function buildHeaders(context: IntelligenceContext, extra?: HeadersInit): HeadersInit {
@@ -498,6 +502,79 @@ export function reviewGeneratedOutput(
   note?: string
 ) {
   return post<null>(context, `/generated-outputs/${outputId}/review`, { status, note });
+}
+
+// ---- Saved reports ---------------------------------------------------------
+
+/** One report and its document — what `/ai-reports/{id}` opens. */
+export function getAiReport(context: IntelligenceContext, reportId: number) {
+  return get<{ report: AiReport }>(context, `/reports/${reportId}`);
+}
+
+/** Save an edited report. The title and the document travel together. */
+export function saveAiReport(
+  context: IntelligenceContext,
+  reportId: number,
+  input: { title: string; html: string }
+) {
+  return post<{ report: { id: number; title: string; figures: AiReportFigures | null } }>(
+    context,
+    `/reports/${reportId}`,
+    input
+  );
+}
+
+/**
+ * Re-read the live rows and replace only the generated table.
+ *
+ * Not a re-generate: the prose written around the figures is preserved, because by
+ * the time anyone refreshes a report it usually carries a covering note. Backend
+ * refuses rather than blanking the table when the query now matches nothing, so an
+ * empty result arrives here as an error with the reason.
+ */
+export function regenerateAiReport(context: IntelligenceContext, reportId: number) {
+  return post<{
+    template_id: number;
+    module: string;
+    row_count: number;
+    columns: string[];
+    source_tool: string;
+    html: string;
+  }>(context, `/reports/${reportId}/regenerate`);
+}
+
+/**
+ * Who this report would reach, and what one of them would receive.
+ *
+ * Sends nothing. Each person is composed their own figures rather than the report, so
+ * a consolidated arrears table is never mailed to the families it names.
+ */
+export function getReportRecipients(context: IntelligenceContext, reportId: number) {
+  return get<AiReportSendPreview>(context, `/reports/${reportId}/recipients`);
+}
+
+/**
+ * Send each person in the report their own figures.
+ *
+ * `expectedRecipients` is the count `getReportRecipients` returned. The backend refuses
+ * the send if the list has changed since — somebody paid, a record moved — rather than
+ * delivering to a list nobody approved.
+ */
+export function sendAiReport(
+  context: IntelligenceContext,
+  reportId: number,
+  expectedRecipients: number
+) {
+  return post<{
+    template_id: number;
+    queued: number;
+    failed_count: number;
+    sent: AiReportRecipient[];
+    failed: AiReportRecipient[];
+  }>(context, `/reports/${reportId}/send`, {
+    expected_recipients: expectedRecipients,
+    confirm: true,
+  });
 }
 
 // ---- Outcomes and audit ----------------------------------------------------

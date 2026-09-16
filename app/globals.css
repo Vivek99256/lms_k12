@@ -226,3 +226,223 @@ html {
     @apply font-sans;
   }
 }
+
+/*
+ * AI-generated chapter content rendered inline in the content library drawer.
+ *
+ * The markup comes from content_master.description via sanitizeGeneratedHtml.
+ * It carries only `class` attributes (never inline styles), so the entire
+ * visual design lives here and mirrors the print stylesheet in
+ * App\Services\Content\RendersGeneratedContent::generatedContentCss().
+ *
+ * `list-style: revert` matters: Tailwind's preflight strips list markers, so
+ * without it every generated <ul> renders as unmarked paragraphs.
+ */
+.lms-generated-body {
+  color: #334155;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.lms-generated-body h1,
+.lms-generated-body h2 {
+  margin: 1.75rem 0 0.625rem;
+  padding-bottom: 0.375rem;
+  border-bottom: 2px solid #c7d2fe;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: #3730a3;
+}
+.lms-generated-body h3 {
+  margin: 1.125rem 0 0.375rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+.lms-generated-body h4 {
+  margin: 0.875rem 0 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+}
+.lms-generated-body p { margin: 0 0 0.75rem; }
+.lms-generated-body ul,
+.lms-generated-body ol {
+  margin: 0 0 0.875rem 1.25rem;
+  list-style: revert;
+}
+.lms-generated-body li { margin: 0 0 0.375rem; }
+.lms-generated-body hr {
+  margin: 1.5rem 0;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+}
+.lms-generated-body blockquote {
+  margin: 0.875rem 0;
+  padding: 0.625rem 1rem;
+  border-left: 4px solid #c7d2fe;
+  background: #f8fafc;
+  color: #475569;
+}
+
+/* Wide tables scroll inside the drawer instead of widening it. */
+.lms-generated-body table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0.875rem 0;
+  font-size: 0.875rem;
+}
+.lms-generated-body th,
+.lms-generated-body td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.625rem;
+  text-align: left;
+  vertical-align: top;
+}
+.lms-generated-body th { background: #eef2ff; font-weight: 600; color: #3730a3; }
+
+/* Cover panel */
+.lms-generated-body .cover {
+  background: linear-gradient(180deg, #eef2ff 0%, #f5f7ff 100%);
+  border: 1px solid #c7d2fe;
+  border-radius: 0.875rem;
+  padding: 1.25rem 1.375rem;
+  margin-bottom: 1.25rem;
+}
+.lms-generated-body .cover h2 {
+  border: 0;
+  padding: 0;
+  margin: 0 0 0.375rem;
+  font-size: 1.25rem;
+}
+.lms-generated-body .eyebrow {
+  display: block;
+  color: #6366f1;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0.375rem;
+}
+.lms-generated-body .lede { color: #475569; margin: 0; }
+
+/* Figures */
+.lms-generated-body figure { margin: 1.125rem 0; text-align: center; }
+.lms-generated-body figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.625rem;
+  border: 1px solid #e2e8f0;
+}
+.lms-generated-body figcaption {
+  color: #64748b;
+  font-size: 0.8125rem;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+.lms-generated-body .fig-sm img { max-width: 200px; }
+.lms-generated-body .fig-md img { max-width: 360px; }
+.lms-generated-body .fig-lg img { max-width: 100%; }
+
+/* Callout cards */
+.lms-generated-body .callout {
+  border-left: 4px solid #4f46e5;
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+.lms-generated-body .callout-label {
+  display: block;
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+  color: #4f46e5;
+}
+.lms-generated-body .callout p:last-child { margin-bottom: 0; }
+.lms-generated-body .callout-key { border-left-color: #4f46e5; background: #eef2ff; }
+.lms-generated-body .callout-key .callout-label { color: #4338ca; }
+.lms-generated-body .callout-warn { border-left-color: #d97706; background: #fffbeb; }
+.lms-generated-body .callout-warn .callout-label { color: #b45309; }
+.lms-generated-body .callout-example { border-left-color: #059669; background: #ecfdf5; }
+.lms-generated-body .callout-example .callout-label { color: #047857; }
+.lms-generated-body .callout-try { border-left-color: #0284c7; background: #f0f9ff; }
+.lms-generated-body .callout-try .callout-label { color: #0369a1; }
+
+/* Stat tiles. Authored as a table so the same markup prints in Dompdf, which
+   supports neither flexbox nor grid; on screen it becomes a responsive grid. */
+.lms-generated-body .tiles { display: block; border: 0; margin: 1rem 0; overflow: visible; }
+.lms-generated-body .tiles tbody,
+.lms-generated-body .tiles tr {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.5rem;
+}
+.lms-generated-body .tiles td {
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  border-radius: 0.625rem;
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+}
+.lms-generated-body .tile-num {
+  display: block;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #3730a3;
+}
+.lms-generated-body .tile-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #475569;
+  margin-top: 0.125rem;
+}
+
+/* Slide blocks */
+.lms-generated-body .slide {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  margin: 1rem 0;
+  background: #ffffff;
+}
+.lms-generated-body .slide-head {
+  background: #4f46e5;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+.lms-generated-body .slide-head h3 {
+  color: #ffffff;
+  margin: 0;
+  font-size: 0.9375rem;
+  border: 0;
+}
+.lms-generated-body .slide-num {
+  display: block;
+  color: #c7d2fe;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+}
+.lms-generated-body .meta {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0.625rem 0;
+  font-size: 0.8125rem;
+}
+.lms-generated-body .meta strong { color: #3730a3; }
+.lms-generated-body .pill {
+  display: inline-block;
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 0.0625rem 0.5rem;
+  font-size: 0.75rem;
+}

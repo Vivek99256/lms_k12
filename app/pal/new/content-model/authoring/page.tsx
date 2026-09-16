@@ -273,7 +273,7 @@ function AuthoringContent() {
       );
       if (apply) await load();
     } catch (err) {
-      setError((err as Error).message || 'Enrichment failed.');
+      setError((err as Error).message || 'Extension Activity failed.');
     } finally {
       setBusyAction('');
     }

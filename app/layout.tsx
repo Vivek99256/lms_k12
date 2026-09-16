@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ConditionalApp from "./components/ConditionalApp";
@@ -34,7 +34,7 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" />
       </head>
-      <body className="app-shell-background min-h-full flex flex-col">
+      <body className="app-shell-background min-h-full flex flex-col" suppressHydrationWarning>
         <AuthProvider>
           <ConditionalApp>{children}</ConditionalApp>
         </AuthProvider>
@@ -43,3 +43,4 @@ export default function RootLayout({
     </html>
   );
 }
+

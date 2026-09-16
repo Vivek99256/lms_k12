@@ -10,9 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
   defaultLearnerId,
-  fetchDiagnosticItems,
+  fetchDiagnostic,
+  DIAGNOSTIC_GROUPS,
   fetchNextAction,
   fetchPracticeItem,
+  fetchConceptMasteryDetails,
+  SAMPLE_SUGGESTED_CONTENT,
   fetchCheckUnderstandingItems,
   submitCheckUnderstanding,
   fetchRetrievalItems,
@@ -21,11 +24,16 @@ import {
   submitDiagnostic,
   submitRetrievalCheck,
   type DiagnosticItem,
+  type DiagnosticPayload,
+  type DiagnosticAvailability,
   type EsoAction,
   type EsoQuestion,
+  type ConceptMasteryDetails,
+  type MasteryGate,
   type PracticeItem,
 } from '@/app/pal/data/pal-eso';
 import { useViewAsStudent } from '@/app/pal/data/pal-view-as';
+import AiTutorPanel from '@/app/pal/eso/_components/AiTutorPanel';
 
 /**
  * The Adaptive Learning Engine's guided concept flow — Developer Brief v1,
@@ -80,12 +88,28 @@ function EsoConceptFlow() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The Plan step. It has no engine action — the engine decides what to teach,
+  // and Plan is where the learner is shown what it decided and what remains.
+  // Held in UI state so no D1-D5 rule had to change to make room for it, and
+  // so it can never be mistaken for learner evidence.
+  const [planPending, setPlanPending] = useState(false);
+
   const refresh = useCallback(async () => {
     if (!conceptId || !learnerId) return;
     setRefreshing(true);
     setError(null);
     try {
-      setAction(await fetchNextAction(learnerId, conceptId));
+      const next = await fetchNextAction(learnerId, conceptId);
+      setAction((previous) => {
+        // Diagnostic just finished: show the Plan before the first teaching
+        // step, so the learner sees where they stand before being taught.
+        // Never skipped by the UI — only the engine skips steps, and only when
+        // its own policy says the step does not apply.
+        if (previous?.action === 'diagnostic' && next.action !== 'diagnostic') {
+          setPlanPending(true);
+        }
+        return next;
+      });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to load the next learning step.');
     } finally {
@@ -144,16 +168,379 @@ function EsoConceptFlow() {
               Working out your next step...
             </div>
           )}
-          <LearningFlowRail action={action.action} />
-          <FlowStep
-            key={`${action.action}-${action.nodeId ?? ''}-${action.conceptId ?? conceptId}`}
-            action={action}
-            learnerId={learnerId}
-            conceptId={conceptId}
-            onAdvance={refresh}
-            onNavigateToConcept={(id) => router.push(`/pal/eso?conceptId=${id}${learnerId ? `&learnerId=${learnerId}` : ''}`)}
-          />
+          <LearningFlowRail action={action.action} stageKey={planPending ? 'plan' : undefined} />
+
+          {/* Sits at the top of the learning section, directly under the
+              progression rail: plan first, then the step it explains. Its data
+              is fetched independently and never blocks the step below — the
+              backend is remote, and this is supporting context, not the task. */}
+          <PlanAndSuggestions learnerId={learnerId} conceptId={conceptId} actionKey={action.action} />
+
+          {planPending ? (
+            <PlanStep action={action} onContinue={() => setPlanPending(false)} />
+          ) : (
+            <FlowStep
+              key={`${action.action}-${action.nodeId ?? ''}-${action.conceptId ?? conceptId}`}
+              action={action}
+              learnerId={learnerId}
+              conceptId={conceptId}
+              onAdvance={refresh}
+              onNavigateToConcept={(id) => router.push(`/pal/eso?conceptId=${id}${learnerId ? `&learnerId=${learnerId}` : ''}`)}
+            />
+          )}
+
+          {/* Below the step, for the same reason PlanAndSuggestions sits above
+              it: supporting context, fetched independently, never blocking the
+              task. Keyed on the action so the governance re-reads after an
+              attempt is logged. */}
+          <AiTutorPanel learnerId={learnerId} conceptId={conceptId} actionKey={action.action} />
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A step the engine wanted to serve but has no authored content for.
+ *
+ * Deliberately reassuring rather than apologetic about the learner: D2
+ * guarantees `mastery_retained`, so nothing they earned is at risk. The
+ * authoring gap is already logged server-side for whoever maintains content.
+ */
+function ContentUnavailableStep({ action }: { action: EsoAction }) {
+  const router = useRouter();
+
+  return (
+    <Card className="border-amber-200 bg-amber-50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-amber-900">
+          <AlertTriangle className="h-4 w-4" />
+          Nothing to show here yet
+        </CardTitle>
+        <CardDescription className="text-amber-800">
+          This step is ready for you, but the material for it hasn&apos;t been added yet.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-amber-900">
+          Your progress is safe — nothing you&apos;ve earned is affected, and this will pick up
+          again as soon as the content is available.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => router.push('/pal')}>
+            Back to subjects
+          </Button>
+          {action.conceptId != null && (
+            <Button variant="outline" onClick={() => router.push(`/pal/eso/mastery/${action.conceptId}`)}>
+              See your progress
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * The Plan step: the pause between finding out where the learner stands and
+ * starting to teach them.
+ *
+ * It deliberately renders no content of its own — the plan and the suggestions
+ * are already on screen in the tabs directly above, which is the point. This
+ * card names the step, says what the engine decided to do next, and hands
+ * control back. Duplicating the plan here would put two copies of the same
+ * numbers on one screen.
+ */
+function PlanStep({ action, onContinue }: { action: EsoAction; onContinue: () => void }) {
+  const nextLabel =
+    FLOW_STAGES.find((stage) => stage.actions.includes(action.action))?.label ?? 'the next step';
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-violet-500" />
+          Your plan
+        </CardTitle>
+        <CardDescription>
+          Here&apos;s where you stand and what&apos;s left. Have a look above, then carry on.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-slate-600">
+          Based on your diagnostic, the next step is <span className="font-medium text-slate-900">{nextLabel}</span>.
+        </p>
+        <div className="flex justify-end">
+          <Button data-eso-plan-continue onClick={onContinue}>
+            Continue to {nextLabel.toLowerCase()}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * "Plan" and "Suggested content" — the two supporting panels under the step.
+ *
+ * Both are evidence-derived. The plan counts DEMONSTRATIONS REMAINING straight
+ * from the D1 verdict, so the number a student reads and the rule that grants
+ * mastery are the same number; there is no separate progress figure to drift.
+ * Suggested content comes from the existing PAL pedagogy pipeline, with the
+ * bucket chosen server-side from the learner's actual concept state.
+ *
+ * Neither panel invents anything. Where nothing is authored, they say so.
+ */
+function PlanAndSuggestions({ learnerId, conceptId, actionKey }: { learnerId: string; conceptId: number; actionKey: string }) {
+  const [details, setDetails] = useState<ConceptMasteryDetails | null | 'loading'>('loading');
+
+  useEffect(() => {
+    let cancelled = false;
+    // Deferred to a microtask so setDetails doesn't fire synchronously within
+    // the effect body — same convention as refresh() above.
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setDetails('loading');
+      fetchConceptMasteryDetails(learnerId, conceptId)
+        .then((d) => {
+          if (!cancelled) setDetails(d);
+        })
+        .catch(() => {
+          // Supporting context must never break the learning step.
+          if (!cancelled) setDetails(null);
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Re-read after each step so the remaining count stays truthful.
+  }, [learnerId, conceptId, actionKey]);
+
+  const [tab, setTab] = useState<'plan' | 'suggested'>('plan');
+
+  if (details === 'loading') {
+    return (
+      <div className="my-6">
+        <PanelTabs tab={tab} onChange={setTab} suggestedCount={null} />
+        <Card className="mt-3">
+          <CardContent className="space-y-2 pt-6">
+            <div className="h-3 w-3/4 animate-pulse rounded bg-slate-100" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (details === null) return null;
+
+  return (
+    <div className="my-6" data-eso-support-tab={tab}>
+      <PanelTabs tab={tab} onChange={setTab} suggestedCount={details.suggestedContent.length} />
+      <Card className="mt-3">
+        <CardContent className="pt-6">
+          {tab === 'plan' ? <PlanBody details={details} /> : <SuggestedContentBody details={details} />}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * Tab strip for the two supporting panels.
+ *
+ * Same shape as GamificationTabs — a pill row on a bordered rail — but these
+ * switch local state rather than navigating, because both views belong to the
+ * concept already on screen and a route change would lose the learner's step.
+ */
+function PanelTabs({
+  tab,
+  onChange,
+  suggestedCount,
+}: {
+  tab: 'plan' | 'suggested';
+  onChange: (t: 'plan' | 'suggested') => void;
+  suggestedCount: number | null;
+}) {
+  const tabs: Array<{ key: 'plan' | 'suggested'; label: string; icon: typeof Target; count?: number | null }> = [
+    { key: 'plan', label: 'Your plan', icon: Target },
+    { key: 'suggested', label: 'Suggested content', icon: Sparkles, count: suggestedCount },
+  ];
+
+  return (
+    <nav className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-1.5" role="tablist">
+      {tabs.map(({ key, label, icon: Icon, count }) => {
+        const active = tab === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            data-eso-tab={key}
+            onClick={() => onChange(key)}
+            className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition ${
+              active ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+            {/* Only shown when there is something to count — an empty badge
+                would imply content exists where none is authored. */}
+            {count != null && count > 0 && (
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+                  active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** One gated node type's distance to mastery, in demonstrations. */
+function PlanRow({ label, gate }: { label: string; gate: MasteryGate | null }) {
+  if (!gate || !gate.applicable) {
+    return (
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="text-slate-500">{label}</span>
+        <span className="text-xs text-slate-400">Not part of this concept</span>
+      </div>
+    );
+  }
+
+  if (gate.notAssessed) {
+    return (
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="font-medium text-slate-800">{label}</span>
+        <span className="text-xs text-slate-500">Not assessed yet</span>
+      </div>
+    );
+  }
+
+  const done = gate.requiredEvents - gate.remainingEvents;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="font-medium text-slate-800">{label}</span>
+        <span className={`text-xs ${gate.meetsFloor ? 'text-emerald-700' : 'text-slate-500'}`}>
+          {gate.meetsFloor
+            ? 'Enough demonstrations'
+            : `${gate.remainingEvents} more demonstration${gate.remainingEvents === 1 ? '' : 's'}`}
+        </span>
+      </div>
+      <div className="flex gap-1" aria-hidden="true">
+        {Array.from({ length: gate.requiredEvents }).map((_, i) => (
+          <span
+            key={i}
+            className={`h-1.5 flex-1 rounded-full ${i < done ? 'bg-violet-500' : 'bg-slate-200'}`}
+          />
+        ))}
+      </div>
+      {gate.independentRemaining > 0 && (
+        <p className="text-xs text-slate-500">
+          Including {gate.independentRemaining} without a hint, on your own.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PlanBody({ details }: { details: ConceptMasteryDetails }) {
+  const plan = details.plan;
+
+  return (
+    <div role="tabpanel" className="space-y-4">
+      <p className="text-sm text-slate-500">What&apos;s left before this concept counts as mastered.</p>
+
+      {plan === null ? (
+        <p className="text-sm text-slate-500">
+          This concept is locked until its prerequisite is in place — that comes first.
+        </p>
+      ) : (
+        <>
+          <PlanRow label="Knowledge" gate={plan.knowledge} />
+          <PlanRow label="Application" gate={plan.application} />
+
+          {plan.misconceptionBlocks && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+              There&apos;s a mix-up to clear up first — that has to be sorted before mastery counts.
+            </div>
+          )}
+
+          {!plan.misconceptionBlocks && plan.remainingEvents === 0 && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              Everything needed is in place.
+            </div>
+          )}
+
+          {plan.remainingEvents > 0 && !plan.misconceptionBlocks && (
+            <p className="text-sm font-medium text-slate-900">
+              {plan.remainingEvents} demonstration{plan.remainingEvents === 1 ? '' : 's'} to go.
+            </p>
+          )}
+
+          {plan.stale && (
+            <p className="text-xs text-sky-700">It&apos;s been a while — a quick review will confirm this is still solid.</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SuggestedContentBody({ details }: { details: ConceptMasteryDetails }) {
+  // Real content when the pipeline has any; the development placeholder set
+  // otherwise, so the tab is never a dead card during a demo. Swapping in real
+  // `content_master` rows removes the placeholders with no code change.
+  const real = details.suggestedContent;
+  const items = real.length > 0 ? real : SAMPLE_SUGGESTED_CONTENT;
+  const showingSamples = real.length === 0;
+
+  return (
+    <div role="tabpanel" className="space-y-3">
+      <p className="text-sm text-slate-500">Optional — nothing here is graded.</p>
+
+      {showingSamples && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Sample content — nothing has been authored for this concept yet, so these are
+          placeholders to show the shape of the feature.
+        </p>
+      )}
+
+      {items.length === 0 ? (
+        <p className="text-sm text-slate-500">
+          {details.status === 'not_started'
+            ? 'Once the diagnostic shows where you are, suggestions will appear here.'
+            : 'No suggested content available yet.'}
+        </p>
+      ) : (
+        <ul className="space-y-2.5">
+          {items.map((item, index) => (
+            <li key={`${item.title}-${index}`} className="text-sm">
+              {item.url ? (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 font-medium text-violet-700 underline hover:text-violet-900"
+                >
+                  {item.title}
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+              ) : (
+                <span className="font-medium text-slate-800">{item.title}</span>
+              )}
+              {item.description && <div className="text-xs text-slate-500">{item.description}</div>}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -169,11 +556,22 @@ function EsoConceptFlow() {
  */
 const FLOW_STAGES: Array<{ key: string; label: string; actions: string[] }> = [
   { key: 'diagnostic', label: 'Diagnostic', actions: ['diagnostic'] },
+  // Plan has no engine action of its own, and deliberately so: the engine
+  // decides WHAT to teach, and Plan is where the learner is shown what it
+  // decided and what remains. It is driven by `planPending` in the page rather
+  // than by a policy branch, so no D1-D5 rule changes to accommodate it.
+  { key: 'plan', label: 'Plan', actions: [] },
   { key: 'learn', label: 'Learn', actions: ['teach', 'reteach'] },
   { key: 'check', label: 'Check', actions: ['check_understanding'] },
   { key: 'practice', label: 'Practice', actions: ['practice', 'continue_practice'] },
   { key: 'mastery', label: 'Mastery', actions: ['mastered_stop_practice'] },
-  { key: 'review', label: 'Review', actions: ['retrieval_due', 'retained', 'reloop_node'] },
+  // Recall is the whole D2 retention exchange, not a new retention mechanism:
+  // `retrieval_due` is the check being served, and `retained` / `reloop_node`
+  // are its outcome. They were briefly two pills, but a learner passing a check
+  // moves through both in a single action and never rests on the first — so
+  // one stage tells the truth about what they experience. The retention ladder
+  // and retrieval-check behaviour are untouched either way.
+  { key: 'recall', label: 'Recall', actions: ['retrieval_due', 'retained', 'reloop_node'] },
 ];
 
 /**
@@ -202,8 +600,13 @@ function StepSkeleton() {
   );
 }
 
-function LearningFlowRail({ action }: { action: string }) {
-  const activeIndex = FLOW_STAGES.findIndex((stage) => stage.actions.includes(action));
+function LearningFlowRail({ action, stageKey }: { action: string; stageKey?: string }) {
+  // `stageKey` marks a stage the UI owns rather than the engine — currently
+  // only Plan, which has no action of its own. Everything else still derives
+  // from the resolved action, so the rail can never drift from the engine.
+  const activeIndex = stageKey
+    ? FLOW_STAGES.findIndex((stage) => stage.key === stageKey)
+    : FLOW_STAGES.findIndex((stage) => stage.actions.includes(action));
 
   return (
     <div data-eso-flow-stage={activeIndex >= 0 ? FLOW_STAGES[activeIndex].key : 'off-path'} className="mb-4 flex flex-wrap items-center gap-1.5">
@@ -234,7 +637,9 @@ function LearningFlowRail({ action }: { action: string }) {
             ? 'Clearing up a mix-up first'
             : action === 'remediate_prerequisite' || action === 'prerequisite_quick_probe'
               ? 'Checking a prerequisite first'
-              : 'Getting you set up'}
+              : action === 'content_unavailable'
+                ? 'Waiting on content'
+                : 'Getting you set up'}
         </span>
       )}
     </div>
@@ -292,6 +697,12 @@ function FlowStep({
       return <MasteredStep action={action} />;
     case 'retrieval_due':
       return <RetrievalDueStep action={action} learnerId={learnerId} conceptId={conceptId} onAdvance={onAdvance} />;
+    // D2 can resolve a due review that has no authored item behind it. The
+    // learner keeps their mastery — this is our content gap, not their failure
+    // — so this says so plainly instead of falling through to the raw action
+    // string, which is what it did before.
+    case 'content_unavailable':
+      return <ContentUnavailableStep action={action} />;
     case 'no_nodes_defined':
       return (
         <Alert>
@@ -305,17 +716,101 @@ function FlowStep({
 
 // ── D1: diagnostic ───────────────────────────────────────────────────────
 
+/**
+ * One diagnostic question. Extracted so the grouped and flat renderings share
+ * exactly one markup path — the flat list is still how every chapter whose
+ * questions carry no authored stage serves its diagnostic.
+ */
+function DiagnosticQuestion({
+  item,
+  index,
+  selected,
+  onSelect,
+}: {
+  item: DiagnosticItem;
+  index: number;
+  selected: number | undefined;
+  onSelect: (optionId: number) => void;
+}) {
+  return (
+    <div data-eso-question-id={item.questionId} data-eso-node-id={item.nodeId} className="rounded-lg border border-slate-200 p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
+          {index + 1}
+        </span>
+        <Badge variant="secondary">{item.nodeType}</Badge>
+      </div>
+      <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+      <div className="mt-2 space-y-1.5">
+        {item.options.map((option) => (
+          <label
+            key={option.id}
+            data-eso-option-id={option.id}
+            className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+              selected === option.id ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <input
+              type="radio"
+              name={`diagnostic-${item.questionId}`}
+              checked={selected === option.id}
+              onChange={() => onSelect(option.id)}
+              className="h-4 w-4 accent-violet-600"
+            />
+            <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The empty state, told truthfully.
+ *
+ * The old copy blamed "Phase 0 tagging" whatever the actual reason, which was
+ * misleading whenever questions existed but were draft or unmapped. The
+ * student-facing line stays plain in every case; the specific cause is shown
+ * only to staff, who are the ones who can act on it.
+ */
+function DiagnosticUnavailable({ availability }: { availability: DiagnosticAvailability | null }) {
+  const viewAsStudent = useViewAsStudent();
+  const isStaff = viewAsStudent !== null;
+
+  const staffDetail = (() => {
+    if (!availability || availability.reason === 'none_authored') {
+      return 'No diagnostic questions have been authored for this concept yet.';
+    }
+    if (availability.reason === 'awaiting_approval') {
+      return `${availability.authored} diagnostic question(s) exist, but none are approved yet.`;
+    }
+    if (availability.reason === 'awaiting_node_mapping') {
+      return `${availability.approved} approved question(s) exist, but none are mapped to a K/A/S node yet.`;
+    }
+    return `${availability.authored} question(s) exist; none are currently both approved and node-mapped.`;
+  })();
+
+  return (
+    <Alert>
+      <div className="space-y-1">
+        <p>No diagnostic questions are currently available for this concept.</p>
+        {isStaff && <p className="text-xs text-slate-500">{staffDetail}</p>}
+      </div>
+    </Alert>
+  );
+}
+
 function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string; conceptId: number; onAdvance: () => void }) {
-  const [items, setItems] = useState<DiagnosticItem[] | null>(null);
+  const [payload, setPayload] = useState<DiagnosticPayload | null>(null);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchDiagnosticItems(learnerId, conceptId)
+    fetchDiagnostic(learnerId, conceptId)
       .then((data) => {
-        if (!cancelled) setItems(data);
+        if (!cancelled) setPayload(data);
       })
       .catch((reason) => {
         if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load the diagnostic.');
@@ -326,11 +821,22 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
   }, [learnerId, conceptId]);
 
   if (error) return <Alert tone="error">{error}</Alert>;
-  if (items === null) return <CenteredSpinner label="Building your diagnostic..." />;
-  if (items.length === 0) {
-    return <Alert>No diagnostic questions are tagged for this concept yet — Phase 0 tagging is still in progress.</Alert>;
+  if (payload === null) return <CenteredSpinner label="Building your diagnostic..." />;
+
+  const items = payload.items;
+
+  // Global empty state only when nothing is servable at all — never because a
+  // single group happens to be empty.
+  if (items.length === 0 && payload.groupedTotal === 0) {
+    return <DiagnosticUnavailable availability={payload.availability} />;
   }
 
+  // Grouped view when the content is authored with stages; otherwise the flat
+  // list, which is how every currently-tagged chapter serves its diagnostic.
+  const grouped = payload.groupedTotal > 0;
+
+  // Whichever set is on screen is the set that can be answered and submitted.
+  const answerable = grouped ? DIAGNOSTIC_GROUPS.flatMap(({ key }) => payload.groups[key]) : items;
   const answeredCount = Object.keys(answers).length;
 
   const submit = async () => {
@@ -340,7 +846,12 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
       await submitDiagnostic(
         learnerId,
         conceptId,
-        items.map((item) => ({ nodeId: item.nodeId, answerMasterId: answers[item.questionId] })).filter((r) => r.answerMasterId != null)
+        // Grouped and flat renderings answer into the same `answers` map, so
+        // submission walks whichever set was actually shown. Scoring is
+        // untouched: every response still carries its own node_id.
+        answerable
+          .map((item) => ({ nodeId: item.nodeId, answerMasterId: answers[item.questionId] }))
+          .filter((r) => r.answerMasterId != null)
       );
       onAdvance();
     } catch (reason) {
@@ -357,7 +868,45 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
         <CardDescription>A few questions to find out what you already know, so we can skip it.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {items.map((item, index) => (
+        {grouped &&
+          DIAGNOSTIC_GROUPS.map(({ key, label, description }) => {
+            const groupItems = payload.groups[key];
+            return (
+              <section key={key} data-eso-diagnostic-group={key} className="rounded-lg border border-slate-200 p-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-slate-900">{label}</h3>
+                  <span className="text-xs text-slate-500">
+                    {groupItems.length === 0
+                      ? 'No questions'
+                      : `${groupItems.length} question${groupItems.length === 1 ? '' : 's'}`}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+
+                {/* Each group handles its own empty result — one empty group
+                    never hides the others. */}
+                {groupItems.length === 0 ? (
+                  <p className="mt-3 text-sm text-slate-400">
+                    No {label.toLowerCase()} questions available for this concept.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {groupItems.map((item, index) => (
+                      <DiagnosticQuestion
+                        key={item.questionId}
+                        item={item}
+                        index={index}
+                        selected={answers[item.questionId]}
+                        onSelect={(optionId) => setAnswers((prev) => ({ ...prev, [item.questionId]: optionId }))}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+
+        {!grouped && items.map((item, index) => (
           <div key={item.questionId} data-eso-question-id={item.questionId} data-eso-node-id={item.nodeId} className="rounded-lg border border-slate-200 p-4">
             <div className="mb-2 flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
@@ -1105,12 +1654,12 @@ function MasteredStep({ action }: { action: EsoAction }) {
           {action.applicationMastery != null && <div>Application: {Math.round(action.applicationMastery * 100)}%</div>}
         </div>
 
-        {/* Enrichment, when the existing PAL content pipeline has something for
+        {/* Extension Activity, when the existing PAL content pipeline has something for
             this chapter. Explicitly optional: nothing here is scored, and
             skipping it costs the student nothing. Absent entirely when no
-            enrichment is authored — never a placeholder. */}
+            extension activity is authored — never a placeholder. */}
         {action.enrichment != null && action.enrichment.length > 0 && (
-          <div data-eso-enrichment className="space-y-2 rounded-lg border border-emerald-200 bg-white p-4">
+          <div data-eso-extension-activity className="space-y-2 rounded-lg border border-emerald-200 bg-white p-4">
             <div className="text-sm font-medium text-emerald-900">Want to go deeper? (optional)</div>
             <p className="text-xs text-emerald-700">
               Nothing here is graded — it won&apos;t change your mastery either way.

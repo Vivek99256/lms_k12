@@ -27,12 +27,14 @@ export type AnnotateRow = {
   assignedOn: string;
   submissionDate: string;
   examPdfUrl: string;
+  homeworkFileUrl: string;
   submissionFileUrl: string;
   teacherRemarks: string;
   studentSubmitted: boolean;
   teacherReviewed: boolean;
   studentId: number;
   examId: number;
+  assignmentSourceType: string;
   /** "Checking" | "Evaluated" | "OCR Failed" | "Evaluation Failed" | "Failed" | "" (not yet submitted) */
   aiStatus: string;
   aiFailureReason: string;
@@ -64,14 +66,15 @@ export type ReviewQuestion = {
 export type ReviewContext = {
   assignmentId: number;
   studentId: number;
-  questionPaperId: number;
-  paperName: string;
+  questionPaperId: number | null;
+  paperName: string | null;
   totalMarks: number;
   title: string;
   studentName: string;
   submissionFileUrl: string;
   teacherReviewed: boolean;
   questions: ReviewQuestion[];
+  isHomework: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -180,12 +183,14 @@ function toAnnotateRow(row: UnknownRecord): AnnotateRow {
     assignedOn: readString(row.created_date_fmt),
     submissionDate: readString(row.submission_date_fmt),
     examPdfUrl: readString(row.exam_pdf_url),
+    homeworkFileUrl: readString(row.homework_file_url),
     submissionFileUrl: readString(row.submission_file_url),
     teacherRemarks: readString(row.teacher_remarks),
     studentSubmitted: readString(row.student_submission_status) === "Y",
     teacherReviewed: readString(row.teacher_submission_status) === "Y",
     studentId: readNumber(row.student_id),
     examId: readNumber(row.exam_id),
+    assignmentSourceType: readString(row.assignment_source_type),
     aiStatus: readString(row.ai_status),
     aiFailureReason: readString(row.ai_failure_reason),
     aiScore: readNullableNumber(row.ai_score),
@@ -288,17 +293,20 @@ export async function getReviewContext(
     isMcq: readNumber(q.question_type_id) === 1,
   }));
 
+  const isHomework = readString(assignment.assignment_source_type) === 'uploaded_homework';
+
   return {
     assignmentId: readNumber(assignment.id) || assignmentId,
     studentId: readNumber(assignment.student_id),
-    questionPaperId: readNumber(paper.id),
-    paperName: readString(paper.paper_name),
-    totalMarks: readNumber(paper.total_marks),
+    questionPaperId: isHomework ? null : readNumber(paper.id),
+    paperName: isHomework ? null : readString(paper.paper_name),
+    totalMarks: isHomework ? 0 : readNumber(paper.total_marks),
     title: readString(assignment.title),
     studentName: readString(assignment.student_name).trim(),
     submissionFileUrl: readString(assignment.submission_file_url),
     teacherReviewed: readString(assignment.teacher_submission_status) === "Y",
     questions,
+    isHomework,
   };
 }
 
@@ -306,14 +314,14 @@ export async function getReviewContext(
 export async function submitAnnotation(input: {
   assignmentId: number;
   studentId: number;
-  questionPaperId: number;
+  questionPaperId: number | null;
   marks: Record<number, number>;
   teacherRemarks: string;
 }): Promise<number> {
   const payload = await postJson("lms-assignment/annotate-store", {
     hid_assignment_id: input.assignmentId,
     hid_student_id: input.studentId,
-    hid_question_paper_id: input.questionPaperId,
+    hid_question_paper_id: input.questionPaperId ?? null,
     questions: input.marks,
     teacher_remarks: input.teacherRemarks,
   });

@@ -3,6 +3,28 @@
  * Uses API link field directly without any modifications
  */
 
+import { AI_CAPABILITIES, capabilityHref } from '@shared/ai-intelligence-core';
+
+/**
+ * AI & Intelligence menu links → routes.
+ *
+ * Built from the shared capability registry rather than typed out, so a sidebar
+ * entry and the avatar dropdown can never open different screens for the same
+ * capability. `2026_09_10_000001_add_ai_intelligence_menu` writes exactly these
+ * links into `tblmenumaster`, using the same slugs.
+ */
+const AI_INTELLIGENCE_ROUTES: Record<string, string> = {
+  // The level-1 row is a container with a `javascript:void(0);` link, so this
+  // entry is only reached if an estate points a menu row at the module itself.
+  ai_intelligence: '/ai',
+  ...Object.fromEntries(
+    AI_CAPABILITIES.map((capability) => [
+      `ai_intelligence.${capability.slug}`,
+      capabilityHref(capability),
+    ]),
+  ),
+};
+
 /**
  * Convert API link to Next.js route
  * Link format: "students/search_student/" -> Route: "/students/search_student"
@@ -150,6 +172,8 @@ const LMS_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lmsactivitystream': '/lms/activity-stream',
   'lmsstudent_report.index': '/lms/student-analysis',
   'lms/lmsstudent_report': '/lms/student-analysis',
+  'palreport.index': '/pal/report',
+  'lms/palreport': '/pal/report',
   'question_wise_report': '/lms/question-wise-report',
   'lms/questionreport': '/lms/question-wise-report',
   'questionreport': '/lms/question-wise-report',
@@ -226,6 +250,15 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'new_pal.ulu': '/pal/ulu',
   // Pedagogy Engine — same migration as Framework above.
   'new_pal.pedagogy_engine': '/pal/pedagogy-engine',
+  // ESO (Adaptive Learning Engine) — registered by
+  // 2026_09_08_100000_add_new_pal_eso_submodule_menu. Points outside
+  // /pal/new/* for the same reason Framework and ULU do: these pages shipped
+  // before the New PAL workspace existed and were never moved.
+  'new_pal.eso': '/pal/eso',
+  // Reports — Coverage vs Attainment, registered by
+  // 2026_09_08_140000_add_new_pal_reports_submodule_menu. Staff-only: the
+  // menu row withholds the student grant and the API refuses a student caller.
+  'new_pal.reports': '/pal/reports/attainment',
   // Administration — the second New PAL level-3 sub-module, registered by
   // 2026_08_14_160100_add_administration_submodule_menu. Follows the same
   // `new_pal.<sub_module>` link convention as Content Model above rather than
@@ -333,6 +366,10 @@ const STUDENT_REPORT_ROUTE_NAME_MAP: Record<string, string> = {
   'student_homework_submission_report_index': '/lms/homework/submission-report',
   'student/student_homework_submission_report': '/lms/homework/submission-report',
   'show_student_homework_submission_report': '/lms/homework/submission-report',
+  'student_homework_review.index': '/lms/homework/review',
+  'student_homework_review_index': '/lms/homework/review',
+  'student/student_homework_review': '/lms/homework/review',
+  'show_student_homework_review': '/lms/homework/review',
 };
 
 // Legacy ERP modules now served by the stateless migration API.
@@ -486,6 +523,32 @@ const CAPABILITY_INTELLIGENCE_ROUTE_NAME_MAP: Record<string, string> = {
   'capability_intelligence.capability_explorer': '/capability-intelligence/capability-explorer',
 };
 
+/**
+ * LMS (People & Competency) → Learning Dashboard, Learning Catalog, My
+ * Learning, Assignments, Sessions & Calendar, Certifications & Records,
+ * Course Builder, Administration & Governance, Assessments under
+ * /people-competency/lms. PACKAGE 0 (shared scaffolding) of a G2G → LMS-K12
+ * migration — see app/people-competency/lms/** (layout only so far; the 9
+ * screens themselves land in packages 1-4) and next_lms_erp's
+ * database/migrations/<...>_add_g2g_lms_menu.php for the matching backend
+ * menu-master rows (link values kept identical to these keys). Same pattern
+ * as TALENT_ROUTE_NAME_MAP / ORGANIZATION_MANAGEMENT_ROUTE_NAME_MAP: this
+ * module is NOT the existing native LMS (app/lms, app/g2g-lms — untouched,
+ * unrelated) — it is a fresh Next.js-only surface under a new `g2g_lms.*`
+ * key namespace, so it cannot collide with any legacy LMS route name.
+ */
+const G2G_LMS_ROUTE_NAME_MAP: Record<string, string> = {
+  'g2g_lms.learning_dashboard': '/people-competency/lms/learning-dashboard',
+  'g2g_lms.learning_catalog': '/people-competency/lms/learning-catalog',
+  'g2g_lms.my_learning': '/people-competency/lms/my-learning',
+  'g2g_lms.assignments': '/people-competency/lms/assignments',
+  'g2g_lms.sessions_calendar': '/people-competency/lms/sessions-calendar',
+  'g2g_lms.certifications_records': '/people-competency/lms/certifications-records',
+  'g2g_lms.course_builder': '/people-competency/lms/course-builder',
+  'g2g_lms.administration_governance': '/people-competency/lms/administration-governance',
+  'g2g_lms.assessments': '/people-competency/lms/assessments',
+};
+
 const ENTERPRISE_BRAIN_ROUTE_NAME_MAP: Record<string, string> = {
   'enterprise_brain.index': '/enterprise-brain',
   'enterprise-brain.index': '/enterprise-brain',
@@ -508,6 +571,43 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
 
   // Remove trailing slashes only
   cleanLink = cleanLink.replace(/\/+$/, '');
+
+  // Checked first: these links are registry-owned, so no later heuristic in this
+  // function should get a chance to reinterpret one.
+  const aiIntelligenceRoute = AI_INTELLIGENCE_ROUTES[cleanLink.toLowerCase()];
+  if (aiIntelligenceRoute) return aiIntelligenceRoute;
+
+  // Platform Services: Audit has graduated off the coming-soon placeholder to
+  // its real screen at /user_log. Intercept the Audit coming-soon link so every
+  // API-driven surface (sidebar, Level 3 sub-header, master menu) lands on the
+  // live page instead of the stub. Of the Platform Services stubs, only Template
+  // still resolves to a coming-soon page.
+  if (lowerLink.replace(/^\/+/, '') === 'general/coming-soon?module=audit') {
+    return '/user_log';
+   }
+
+  // Document has graduated the same way, to /documents. Intercepted here so
+  // every API-driven surface (sidebar, Level 3 sub-header, master menu) lands on
+  // the live screen rather than the stub. Template still resolves to its
+  // coming-soon page.
+  if (lowerLink.replace(/^\/+/, '') === 'general/coming-soon?module=document') {
+    return '/documents';
+  }
+
+  // Event Bus has graduated to /platform-services/event-bus — a read-only
+  // monitoring plane over the sync_log outbox, the audit tables and the outbound
+  // send-logs. The space in the module name arrives both literally and
+  // percent-encoded depending on which surface built the link, so both spellings
+  // are matched rather than relying on whichever one tblmenumaster happens to
+  // hold.
+  const eventBusLink = lowerLink.replace(/^\/+/, '');
+  if (
+    eventBusLink === 'general/coming-soon?module=event bus' ||
+    eventBusLink === 'general/coming-soon?module=event%20bus' ||
+    eventBusLink === 'general/coming-soon?module=event+bus'
+  ) {
+    return '/platform-services/event-bus';
+  }
 
   const easyCommunicationRoutes: Record<string, string> = {
     'send_sms_parents.index': '/easy_com/send_sms_parents',
@@ -696,6 +796,14 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return enterpriseBrainRoute;
   }
 
+  // LMS (People & Competency) → Learning Dashboard, Learning Catalog, My
+  // Learning, Assignments, Sessions & Calendar, Certifications & Records,
+  // Course Builder, Administration & Governance, Assessments.
+  const g2gLmsRoute = G2G_LMS_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
+  if (g2gLmsRoute) {
+    return g2gLmsRoute;
+  }
+
   if (cleanLink.toLowerCase() === 'fees_config_master.index') {
     return '/fees/master/fees-config-master';
   }
@@ -766,6 +874,26 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     frontDeskRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
   if (frontDeskRoute) return frontDeskRoute;
 
+  // Level-2 "Career Counselling" section — a standalone module (not nested
+  // under career-intelligence) with Interest Profile and Knowing Yourself as
+  // its two Level-3 pages. Checked ahead of careerIntelligenceRoutes below so
+  // these two specific route names resolve here instead of falling through
+  // to the generic career_counselling.* aliases that still point at the
+  // (separately renamed) career-intelligence module.
+  const careerCounsellingRoutes: Record<string, string> = {
+    'career_counselling/interest-profile': '/career-counselling/interest-profile',
+    'career-counselling/interest-profile': '/career-counselling/interest-profile',
+    'career_counselling_interest_profile': '/career-counselling/interest-profile',
+    'interest-profile': '/career-counselling/interest-profile',
+    'career_counselling/knowing-yourself': '/career-counselling/knowing-yourself',
+    'career-counselling/knowing-yourself': '/career-counselling/knowing-yourself',
+    'career_counselling_knowing-yourself': '/career-counselling/knowing-yourself',
+    'knowing-yourself': '/career-counselling/knowing-yourself',
+  };
+  const careerCounsellingRoute =
+    careerCounsellingRoutes[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (careerCounsellingRoute) return careerCounsellingRoute;
+
   const careerIntelligenceRoutes: Record<string, string> = {
     'career_counselling.index': '/career-intelligence',
     'career-counselling.index': '/career-intelligence',
@@ -778,15 +906,12 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     'career_counselling/plan': '/career-intelligence',
     'career_counselling/education': '/career-intelligence',
     'career_counselling/explore': '/career-intelligence',
-    'career_counselling/knowing-yourself': '/career-intelligence',
-    'career_counselling/interest-profile': '/career-intelligence',
     'career_counselling/college': '/career-intelligence',
     'career_counselling/courses': '/career-intelligence',
     'career_counselling/profile': '/career-intelligence',
     'career_counselling/expert-advice': '/career-intelligence',
     'career_counselling/explore-sectors': '/career-intelligence',
     'career_counselling/match-profile': '/career-intelligence?section=match',
-    'knowing-yourself': '/career-intelligence',
     'match-profile': '/career-intelligence?section=match',
     'expert-advice': '/career-intelligence',
     'explore-sectors': '/career-intelligence',

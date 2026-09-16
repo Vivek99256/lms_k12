@@ -1,14 +1,16 @@
 'use client';
 
-import { FeesCategoryPage } from '@/app/fees/_components/fees-category-page';
-import { FEES_PROCESS_BUILDER_SCREENS } from '@/app/fees/process-builder/_screens/process-builder-screens';
+import { AddProcessPage } from '@/app/general/add_process/AddProcessPage';
 
 /**
- * Fees → process-builder. Shares FeesCategoryPage with the other Fees categories and
- * supplies its own tabs, which are static placeholders until these screens are
- * built. Any real menu the user has rights to still comes from the database and
- * follows them.
+ * Fees → Process Builder.
+ *
+ * Not a tab strip over Fees menus: building a process is the same SOP → Process,
+ * Workflow and Tasks converter everywhere, already built and backed by real data
+ * under /general/add_process. This route renders that same screen rather than
+ * the placeholder tabs it used to show. The Fees category bar above is where
+ * the user came from, so the screen needs no Back button of its own.
  */
 export default function Page() {
-  return <FeesCategoryPage categoryKey="process-builder" staticScreens={FEES_PROCESS_BUILDER_SCREENS} />;
+  return <AddProcessPage />;
 }

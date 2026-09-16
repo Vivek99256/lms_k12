@@ -12,7 +12,34 @@ export type FrameworkSlug =
   | 'pedagogy-types'
   | 'music-framework'
   | 'sports-framework'
-  | 'finance-framework';
+  | 'finance-framework'
+  // Declared but not yet backed by any framework registry — see
+  // UNBACKED_FRAMEWORKS below. They appear in the grid so the roadmap is
+  // visible, each carrying a "coming soon" badge.
+  | 'vocational-training'
+  | 'soft-skills';
+
+/**
+ * Frameworks with nowhere to store a per-concept alignment.
+ *
+ * The test is a metadata column, not a vocabulary. Every other framework here
+ * has one on the PAL metadata tables — `casel_domain`, `ngss_practice`,
+ * `ncdg_goal`, `music_domain`, `sports_domain`, `finance_domain` — so an
+ * alignment can be recorded against a concept and read back. Vocational
+ * training and soft skills have no such column, so there is no way to say that
+ * a given concept develops them, and no amount of content changes that.
+ *
+ * Worth stating precisely, because an earlier version of this comment claimed
+ * the two had "no vocabulary in the backend registry" and that is simply false:
+ * `config/pal_content.php` defines both `soft_skill_signals` and
+ * `nep_vocational_streams` in next_lms_erp. Someone acting on the old comment
+ * would have gone looking for vocabulary that already exists. What is missing
+ * is the column to record it against, and the wiring to read it.
+ */
+const UNBACKED_FRAMEWORKS: ReadonlySet<string> = new Set<FrameworkSlug>([
+  'vocational-training',
+  'soft-skills',
+]);
 
 export type UluSlug =
   | 'five-layer-structure'
@@ -40,6 +67,16 @@ export interface PalModuleView {
   badges: string[];
   sections: PalSection[];
   emptyMessage: string;
+  /**
+   * Whether the framework itself is available yet — NOT whether the current
+   * concept happens to have content for it.
+   *
+   * Set by `withDerivedLifecycle` from UNBACKED_FRAMEWORKS. A framework that
+   * finds no signals in one concept is still live; that case is reported by
+   * `emptyMessage`, not by this field. Marking a working framework "coming
+   * soon" would understate what is already built.
+   */
+  lifecycle?: 'live' | 'coming-soon';
 }
 
 export interface PalConceptContext {
@@ -110,6 +147,14 @@ export const FRAMEWORK_META: Record<FrameworkSlug, { title: string; subtitle: st
   'finance-framework': {
     title: 'Finance Framework',
     subtitle: 'Financial literacy, banking, pricing, saving, and market-related signals found in the concept data.',
+  },
+  'vocational-training': {
+    title: 'Vocational Training',
+    subtitle: 'Trade and vocational competencies mapped to the concepts that develop them.',
+  },
+  'soft-skills': {
+    title: 'Soft Skills',
+    subtitle: 'Communication, collaboration, and self-management capabilities mapped to curriculum concepts.',
   },
 };
 
@@ -359,11 +404,33 @@ function buildListItems(values: string[], label?: string, limit = 8): PalSourceI
   );
 }
 
+/**
+ * How a framework keyword is allowed to match.
+ *
+ * Short tokens are acronyms — SEL, STEM, NGSS — and must match as whole words.
+ * A plain substring test, which this used to do, finds "sel" inside "self" and
+ * "stem" inside "system", and both of those words are near-universal in
+ * teaching material. The effect was that every framework claimed a match on
+ * every concept: an English chapter listed "STEM signal matches" whose only
+ * STEM content was the word "system".
+ *
+ * Longer keywords keep a word-start match so ordinary inflections still count —
+ * "model" finds "models" and "modelling" but not "remodel".
+ */
+function keywordPattern(keyword: string): RegExp {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Note the doubled backslashes: `\b` inside a template literal is a backspace
+  // character, not a word boundary, and would match nothing at all.
+  return keyword.length <= 4
+    ? new RegExp(`\\b${escaped}\\b`, 'i')
+    : new RegExp(`\\b${escaped}`, 'i');
+}
+
 function findKeywordMatches(values: string[], keywords: string[], limit = 8): PalSourceItem[] {
-  const lowered = keywords.map((keyword) => keyword.toLowerCase());
+  const patterns = keywords.map(keywordPattern);
   return take(
     unique(values)
-      .filter((value) => lowered.some((keyword) => value.toLowerCase().includes(keyword)))
+      .filter((value) => patterns.some((pattern) => pattern.test(value)))
       .map((value) => ({ title: decodeText(value) })),
     limit
   );
@@ -479,7 +546,7 @@ function buildFrameworkModules(
   const outcomes = conceptList(entry, record, 'learning_outcomes', 'learning_outcomes');
   const evidence = conceptList(entry, record, 'evidence', 'full_intelegance_json');
 
-  return {
+  const modules: Record<FrameworkSlug, PalModuleView> = {
     'casel-sel-integration': {
       slug: 'casel-sel-integration',
       title: FRAMEWORK_META['casel-sel-integration'].title,
@@ -708,7 +775,57 @@ function buildFrameworkModules(
         ),
       ].filter((section): section is PalSection => Boolean(section)),
     },
+    'vocational-training': {
+      slug: 'vocational-training',
+      title: FRAMEWORK_META['vocational-training'].title,
+      subtitle: FRAMEWORK_META['vocational-training'].subtitle,
+      summary: 'Trade and vocational competency alignment. The framework vocabulary is not defined yet, so nothing is extracted for it.',
+      badges: ['vocational'],
+      emptyMessage: 'Vocational training alignment is not available yet — the framework vocabulary has still to be defined.',
+      sections: [],
+    },
+    'soft-skills': {
+      slug: 'soft-skills',
+      title: FRAMEWORK_META['soft-skills'].title,
+      subtitle: FRAMEWORK_META['soft-skills'].subtitle,
+      summary: 'Communication, collaboration, and self-management alignment. The framework vocabulary is not defined yet, so nothing is extracted for it.',
+      badges: ['soft skills'],
+      emptyMessage: 'Soft skills alignment is not available yet — the framework vocabulary has still to be defined.',
+      sections: [],
+    },
   };
+
+  return withDerivedLifecycle(modules);
+}
+
+/**
+ * Tags each framework view as live or coming soon.
+ *
+ * The test is whether the FRAMEWORK exists, not whether the current concept
+ * happens to touch it. An early version of this counted sections instead, which
+ * was wrong in a way worth recording: open a Hindi concept and NGSS/STEM finds
+ * no science signals, so a section count of zero would have labelled the whole
+ * NGSS framework "coming soon" — when the truth is only that this particular
+ * concept has no STEM content. "Nothing for this concept" is already said by
+ * `emptyMessage`; the badge answers a different question.
+ *
+ * So the badge is driven purely by UNBACKED_FRAMEWORKS. If the team decides a
+ * framework should be presented as not-yet-available, add its slug there — that
+ * set is the single switch, and this is the only place it is read.
+ */
+function withDerivedLifecycle(
+  modules: Record<FrameworkSlug, PalModuleView>
+): Record<FrameworkSlug, PalModuleView> {
+  const tagged = {} as Record<FrameworkSlug, PalModuleView>;
+
+  for (const [slug, view] of Object.entries(modules) as [FrameworkSlug, PalModuleView][]) {
+    tagged[slug] = {
+      ...view,
+      lifecycle: UNBACKED_FRAMEWORKS.has(slug) ? 'coming-soon' : 'live',
+    };
+  }
+
+  return tagged;
 }
 
 function buildUluExamples(

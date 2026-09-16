@@ -1,7 +1,6 @@
 'use client';
 
-import { FeesCategoryPage } from '@/app/fees/_components/fees-category-page';
-import { FEES_INTELLIGENCE_SCREENS } from '@/app/fees/intelligence/_screens/intelligence-screens';
+import { redirect } from 'next/navigation';
 
 /**
  * Fees → Intelligence.
@@ -15,5 +14,5 @@ import { FEES_INTELLIGENCE_SCREENS } from '@/app/fees/intelligence/_screens/inte
  * from the database and follows it, so nothing that worked before is hidden.
  */
 export default function Page() {
-  return <FeesCategoryPage categoryKey="intelligence" staticScreens={FEES_INTELLIGENCE_SCREENS} />;
+  redirect('/enterprise-brain/foundation/students');
 }

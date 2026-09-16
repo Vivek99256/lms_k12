@@ -21,7 +21,7 @@ untouched.
  Prompt builder                        lib/ai/field-edit/prompt.ts
    │  system rules + field-type guidance + context
    ▼
- createAiModel()                       packages/conversational-ai-core/src/model.ts
+ createLocalAiModel()                  lib/ai/local-model.ts
    │  gemini-2.5-flash
    ▼
  Clean + inspect output                lib/ai/field-edit/prompt.ts
@@ -33,6 +33,20 @@ untouched.
 **Nothing is written by the AI.** The route reads a value and returns a suggestion. The
 form's own save path persists it, and only after a human presses Apply and then Save. An
 AI failure cannot corrupt a record on its own.
+
+### Why field edit is the one local-model exception
+
+Conversational AI is served by Laravel's governed lifecycle through
+`/api/ai/ask/stream`; the retired Next.js chat route must not return. Field edit is not a
+conversation or an ERP query. It sends only the text in one form field and bounded,
+caller-supplied display context to produce one replacement value. It reads no Laravel
+data, selects no MCP tool, creates no audit-worthy business action, and never persists a
+record. There is currently no Laravel endpoint with that narrow contract.
+
+For those reasons, `app/api/ai/field-edit/route.ts` deliberately keeps its local
+`generateText` call and its prompt/output validation. If Laravel adds a dedicated
+stateless field-edit endpoint, this route should become a thin proxy and retain the same
+browser contract.
 
 ---
 
@@ -244,7 +258,7 @@ Success `200`:
 }
 ```
 
-Failures — same envelope as `app/api/ai/chat`:
+Failures — the field-edit endpoint's envelope:
 
 | Status | `code` | When |
 |---|---|---|
@@ -291,7 +305,7 @@ GEMINI_API_KEY=...          # or GOOGLE_GENERATIVE_AI_API_KEY
 GEMINI_MODEL=gemini-2.5-flash   # optional override
 ```
 
-Same `createAiModel()` factory as `app/api/ai/chat`.
+Uses the field edit route's deliberately local `createLocalAiModel()` call.
 
 ---
 

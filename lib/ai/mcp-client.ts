@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/app/components/utils/api_url";
+import { resolveAiBaseUrl } from "@/app/components/utils/api_url";
 
 type McpMeta = {
   instituteId?: string | number | null;
@@ -13,7 +13,7 @@ type McpClientContext = {
 };
 
 function normalizeBaseUrl(baseUrl?: string | null) {
-  return (baseUrl || API_BASE_URL || "").trim().replace(/\/$/, "");
+  return resolveAiBaseUrl(baseUrl);
 }
 
 function buildHeaders(token?: string | null, extra?: HeadersInit) {

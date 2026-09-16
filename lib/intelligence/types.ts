@@ -535,6 +535,61 @@ export interface ConversationTurn {
   asked_at: string | null;
 }
 
+/**
+ * What the generated figures inside a saved report say about themselves.
+ *
+ * Read back out of the document's own HTML, because `template_master` has no
+ * metadata column. Null on a report whose table has since been deleted — which is
+ * how the page knows not to offer a refresh that could only fail.
+ */
+export interface AiReportFigures {
+  /** The module whose service produced the rows: fees, admissions or attendance. */
+  module: string;
+  /** The tool that was actually called, e.g. `admissions.listEnquiries`. */
+  source: string;
+  /** When the rows were last read, ISO 8601. */
+  generated_at: string;
+}
+
+export interface AiReportSummary {
+  id: number;
+  title: string;
+  created_on: string | null;
+}
+
+export interface AiReport extends AiReportSummary {
+  /** The document. Rendered inside a sandboxed frame, never injected into the app DOM. */
+  html: string;
+  figures: AiReportFigures | null;
+}
+
+/** One person a report would be sent to. */
+export interface AiReportRecipient {
+  name: string;
+  email: string;
+}
+
+/**
+ * Who a report would reach, and what one of them would receive.
+ *
+ * A read — nothing is queued by asking for this. `recipient_count` is the number the
+ * send call has to be given back: a send is refused if the list has moved since it was
+ * previewed, so approving a list and dispatching a different one is not possible.
+ */
+export interface AiReportSendPreview {
+  template_id: number;
+  module: string;
+  subject: string;
+  recipient_count: number;
+  recipients: AiReportRecipient[];
+  /** People in the report with no address on record — named, not silently dropped. */
+  unreachable: { name: string; reason: string }[];
+  /** The first recipient's real notice, so the wording is approved rather than described. */
+  sample: { to: string; html: string } | null;
+  over_limit: boolean;
+  limit: number;
+}
+
 export interface ConversationTranscript {
   conversation: {
     id: number;

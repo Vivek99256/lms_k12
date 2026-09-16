@@ -104,6 +104,8 @@ export interface DiagnosticItem extends EsoQuestion {
   nodeId: number;
   nodeType: NodeType;
   itemType: string | null;
+  /** Authored diagnostic stage, when the question carries one. */
+  stage?: string | null;
 }
 
 export interface PracticeItem extends EsoQuestion {
@@ -335,18 +337,92 @@ function mapQuestion(raw: unknown): EsoQuestion {
   };
 }
 
-export async function fetchDiagnosticItems(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<DiagnosticItem[]> {
+function mapDiagnosticItem(item: unknown): DiagnosticItem {
+  const r = toRecord(item);
+  return {
+    ...mapQuestion(item),
+    nodeId: num(r.node_id),
+    nodeType: (readString(r.node_type) || 'K') as NodeType,
+    itemType: r.item_type == null ? null : readString(r.item_type),
+    stage: r.stage == null ? null : readString(r.stage),
+  };
+}
+
+/** The three authored diagnostic groups, in the order they are shown. */
+export const DIAGNOSTIC_GROUPS = [
+  {
+    key: 'prerequisite' as const,
+    label: 'Prerequisite',
+    description: 'Questions that verify prerequisite knowledge',
+  },
+  {
+    key: 'adaptive' as const,
+    label: 'Adaptive Diagnostic',
+    description: "Questions used to determine the learner's current level",
+  },
+  {
+    key: 'concept' as const,
+    label: 'Concept Diagnostic',
+    description: 'Questions assessing the current concept',
+  },
+];
+
+export type DiagnosticGroupKey = (typeof DIAGNOSTIC_GROUPS)[number]['key'];
+
+/**
+ * Why a concept has nothing to serve. Mirrors
+ * EsoPolicyService::diagnosticAvailability() — resolved server-side only when
+ * the diagnostic is genuinely empty.
+ */
+export interface DiagnosticAvailability {
+  reason: 'none_authored' | 'awaiting_approval' | 'awaiting_node_mapping' | 'none_servable' | 'available';
+  authored: number;
+  approved: number;
+  nodeMapped: number;
+  servable: number;
+}
+
+export interface DiagnosticPayload {
+  /** Flat list that drives the diagnostic itself — unchanged behaviour. */
+  items: DiagnosticItem[];
+  /** Additive grouped view; empty groups are normal and rendered as such. */
+  groups: Record<DiagnosticGroupKey, DiagnosticItem[]>;
+  groupedTotal: number;
+  availability: DiagnosticAvailability | null;
+}
+
+export async function fetchDiagnostic(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<DiagnosticPayload> {
   const data = toRecord(await esoGet(`api/pal/eso/diagnostic/${learnerId}/${conceptId}`, signal));
-  const items = Array.isArray(data.items) ? data.items : [];
-  return items.map((item) => {
-    const r = toRecord(item);
-    return {
-      ...mapQuestion(item),
-      nodeId: num(r.node_id),
-      nodeType: (readString(r.node_type) || 'K') as NodeType,
-      itemType: r.item_type == null ? null : readString(r.item_type),
-    };
-  });
+  const diagnostic = toRecord(data.diagnostic);
+
+  const groups = DIAGNOSTIC_GROUPS.reduce((acc, { key }) => {
+    const group = toRecord(diagnostic[key]);
+    const questions = Array.isArray(group.questions) ? group.questions : [];
+    acc[key] = questions.map(mapDiagnosticItem);
+    return acc;
+  }, {} as Record<DiagnosticGroupKey, DiagnosticItem[]>);
+
+  const availabilityRaw = data.availability == null ? null : toRecord(data.availability);
+
+  return {
+    items: (Array.isArray(data.items) ? data.items : []).map(mapDiagnosticItem),
+    groups,
+    groupedTotal: num(diagnostic.total),
+    availability: availabilityRaw
+      ? {
+          reason: readString(availabilityRaw.reason) as DiagnosticAvailability['reason'],
+          authored: num(availabilityRaw.authored),
+          approved: num(availabilityRaw.approved),
+          nodeMapped: num(availabilityRaw.node_mapped),
+          servable: num(availabilityRaw.servable),
+        }
+      : null,
+  };
+}
+
+/** Back-compat: the flat list only. */
+export async function fetchDiagnosticItems(learnerId: string, conceptId: number, signal?: AbortSignal): Promise<DiagnosticItem[]> {
+  return (await fetchDiagnostic(learnerId, conceptId, signal)).items;
 }
 
 /**
@@ -732,6 +808,95 @@ export interface RecentResponse {
   at: string | null;
 }
 
+export interface SuggestedContentItem {
+  title: string;
+  description: string | null;
+  url: string | null;
+  category: string;
+  /** True only for the development placeholder set below. */
+  isSample?: boolean;
+}
+
+/**
+ * Development placeholder for the Suggested content tab.
+ *
+ * The real source is PedagogySuggestedContentService, reached through
+ * EsoEnrichmentResolver and returned on `concept-mastery-details` as
+ * `suggested_content`. That pipeline is fully wired — Chapter 1014 simply has
+ * nothing authored yet (all four of its content buckets return zero rows), so
+ * a demo would otherwise show an empty tab.
+ *
+ * These rows are shaped EXACTLY like the API's, and are only substituted when
+ * the API returns an empty list. Authoring real `content_master` rows makes
+ * them disappear with no code change. Each is flagged `isSample` so the UI can
+ * say what it is rather than passing placeholders off as authored material.
+ */
+export const SAMPLE_SUGGESTED_CONTENT: SuggestedContentItem[] = [
+  {
+    title: 'Concept explanation — how metals conduct',
+    description: 'A short read on why metals carry heat and electricity, and what makes them different from non-metals.',
+    url: null,
+    category: 'explanation',
+    isSample: true,
+  },
+  {
+    title: 'Worked example — identifying an unknown sample',
+    description: 'Step through classifying a material from its lustre, malleability and conductivity.',
+    url: null,
+    category: 'example',
+    isSample: true,
+  },
+  {
+    title: 'Practice activity — sort the materials',
+    description: 'Ten quick items sorting everyday materials into metal and non-metal.',
+    url: null,
+    category: 'practice',
+    isSample: true,
+  },
+  {
+    title: 'Quick review — properties at a glance',
+    description: 'A one-page summary to skim before your next review check.',
+    url: null,
+    category: 'review',
+    isSample: true,
+  },
+];
+
+/** One gated node type's evidence position, straight from the D1 verdict. */
+export interface MasteryGate {
+  applicable: boolean;
+  requiredEvents: number;
+  validEvents: number;
+  remainingEvents: number;
+  independentRemaining: number;
+  meetsFloor: boolean;
+  notAssessed: boolean;
+}
+
+export interface MasteryPlan {
+  knowledge: MasteryGate | null;
+  application: MasteryGate | null;
+  remainingEvents: number;
+  misconceptionBlocks: boolean;
+  stale: boolean;
+}
+
+function mapMasteryGate(raw: unknown): MasteryGate | null {
+  const g = toRecord(raw);
+  if (g.applicable !== true) {
+    return { applicable: false, requiredEvents: 0, validEvents: 0, remainingEvents: 0, independentRemaining: 0, meetsFloor: false, notAssessed: false };
+  }
+  return {
+    applicable: true,
+    requiredEvents: num(g.required_events),
+    validEvents: num(g.valid_events),
+    remainingEvents: num(g.remaining_events),
+    independentRemaining: num(g.independent_remaining),
+    meetsFloor: g.meets_floor === true,
+    notAssessed: g.not_assessed === true,
+  };
+}
+
 export interface ConceptMasteryDetails {
   conceptId: number;
   conceptName: string;
@@ -755,6 +920,14 @@ export interface ConceptMasteryDetails {
   /** Only once mastered: where the student may go next, and what to explore. */
   nextConcept: { conceptId: number; name: string | null } | null;
   enrichment: Array<{ title: string; description: string | null; url: string | null }>;
+  /**
+   * Distance to mastery, counted in demonstrations — the same numbers the D1
+   * verdict grants mastery on. Null when the concept is locked and no verdict
+   * was computed.
+   */
+  plan: MasteryPlan | null;
+  /** From the existing PAL pedagogy pipeline; empty when nothing is authored. */
+  suggestedContent: SuggestedContentItem[];
   responsesOnConcept: number;
   confidenceNote: string;
   masterySignals: MasterySignal[];
@@ -815,6 +988,28 @@ export async function fetchConceptMasteryDetails(learnerId: string, conceptId: n
         title: readString(e.title),
         description: e.description == null ? null : readString(e.description),
         url: e.url == null ? null : readString(e.url),
+      };
+    }),
+    plan:
+      data.plan == null
+        ? null
+        : (() => {
+            const p = toRecord(data.plan);
+            return {
+              knowledge: mapMasteryGate(p.knowledge),
+              application: mapMasteryGate(p.application),
+              remainingEvents: num(p.remaining_events),
+              misconceptionBlocks: p.misconception_blocks === true,
+              stale: p.stale === true,
+            };
+          })(),
+    suggestedContent: (Array.isArray(data.suggested_content) ? data.suggested_content : []).map((raw) => {
+      const s = toRecord(raw);
+      return {
+        title: readString(s.title),
+        description: s.description == null ? null : readString(s.description),
+        url: s.url == null ? null : readString(s.url),
+        category: readString(s.category),
       };
     }),
     responsesOnConcept: num(data.responses_on_concept),
@@ -949,5 +1144,270 @@ export async function fetchKnowledgeMap(learnerId: string, conceptId: number, si
       related: num(stats.related),
       misconceptions: num(stats.misconceptions),
     },
+  };
+}
+
+// ── Learning path — PAL loop step 4, the Personal Learning Plan ─────────
+
+export interface LearningPathConcept {
+  conceptId: number;
+  name: string;
+  status: string;
+  mastered: boolean;
+  stale: boolean;
+}
+
+export interface LearningPathChapter {
+  chapterId: number;
+  chapterName: string;
+  subjectId: number;
+  subjectName: string | null;
+  status: 'not_started' | 'in_progress' | 'complete';
+  conceptCount: number;
+  masteredCount: number;
+  concepts: LearningPathConcept[];
+}
+
+export interface LearningPathCurrent {
+  chapterId: number;
+  conceptId: number;
+  action: string;
+  /** The rule that chose this step — shown so the plan explains itself. */
+  ruleFired: string | null;
+}
+
+export interface LearningPath {
+  /** True when the student is enrolled but nothing is ESO-ready yet. */
+  noContent: boolean;
+  chapters: LearningPathChapter[];
+  chapterCount: number;
+  completedChapters: number;
+  current: LearningPathCurrent | null;
+  pathComplete: boolean;
+}
+
+/**
+ * The whole sequence the student is working through, rather than only the
+ * chapter they are on. See EsoPolicyService::learningPath().
+ */
+export async function fetchLearningPath(
+  learnerId: string,
+  syear: string,
+  signal?: AbortSignal
+): Promise<LearningPath> {
+  const data = toRecord(
+    await esoGet(`api/pal/eso/learning-path/${learnerId}?syear=${encodeURIComponent(syear)}`, signal)
+  );
+
+  const chapters = Array.isArray(data.chapters) ? data.chapters : [];
+  const current = data.current ? toRecord(data.current) : null;
+
+  return {
+    noContent: Boolean(data.no_content),
+    chapterCount: Number(data.chapter_count ?? chapters.length),
+    completedChapters: Number(data.completed_chapters ?? 0),
+    pathComplete: Boolean(data.path_complete),
+    chapters: chapters.map((raw) => {
+      const chapter = toRecord(raw);
+      const concepts = Array.isArray(chapter.concepts) ? chapter.concepts : [];
+
+      return {
+        chapterId: Number(chapter.chapter_id),
+        chapterName: String(chapter.chapter_name ?? ''),
+        subjectId: Number(chapter.subject_id),
+        subjectName: chapter.subject_name ? String(chapter.subject_name) : null,
+        status: (chapter.status as LearningPathChapter['status']) ?? 'not_started',
+        conceptCount: Number(chapter.concept_count ?? 0),
+        masteredCount: Number(chapter.mastered_count ?? 0),
+        concepts: concepts.map((rawConcept) => {
+          const concept = toRecord(rawConcept);
+          return {
+            conceptId: Number(concept.concept_id),
+            name: String(concept.name ?? ''),
+            status: String(concept.status ?? ''),
+            mastered: Boolean(concept.mastered),
+            stale: Boolean(concept.stale),
+          };
+        }),
+      };
+    }),
+    current: current
+      ? {
+          chapterId: Number(current.chapter_id),
+          conceptId: Number(current.concept_id),
+          action: String(current.action ?? ''),
+          ruleFired: current.rule_fired ? String(current.rule_fired) : null,
+        }
+      : null,
+  };
+}
+
+// ── AI Tutor context — grounding and governance (see AiTutorContextService) ──
+
+export interface TutorMisconception {
+  id: number;
+  tag: string | null;
+  description: string | null;
+  errorPattern: string | null;
+  /** The authored remedy. Shown as-is rather than paraphrased. */
+  correctiveAction: string | null;
+}
+
+export interface TutorGovernance {
+  mode: 'socratic_only' | 'direct_explanation_allowed';
+  genuineAttempts: number;
+  attemptsRequired: number;
+  attemptsRemaining: number;
+  /** Always 'never'. Not unlockable by any number of attempts. */
+  assessmentAnswers: string;
+  rules: string[];
+}
+
+export interface TutorContext {
+  conceptId: number;
+  conceptName: string;
+  bktEstimate: number | null;
+  misconceptions: TutorMisconception[];
+  /** Authored material the tutor may explain from. Empty means it may not. */
+  groundingCount: number;
+  governance: TutorGovernance;
+}
+
+/**
+ * What the tutor may say to this learner about this concept, and what it may
+ * say it from. Returns null when the concept has nothing to ground a tutor on
+ * (the endpoint 404s), which is a real state rather than an error.
+ */
+export async function fetchTutorContext(
+  learnerId: string,
+  conceptId: number,
+  signal?: AbortSignal
+): Promise<TutorContext | null> {
+  let data: Record<string, unknown>;
+
+  try {
+    data = toRecord(await esoGet(`api/pal/eso/tutor-context/${learnerId}/${conceptId}`, signal));
+  } catch {
+    // A concept with no ESO nodes has no tutor. The panel hides rather than
+    // showing an error for something that is simply not applicable here.
+    return null;
+  }
+
+  const concept = toRecord(data.concept);
+  const governance = toRecord(data.governance);
+  const misconceptions = Array.isArray(data.misconceptions) ? data.misconceptions : [];
+  const grounding = Array.isArray(data.grounding) ? data.grounding : [];
+
+  return {
+    conceptId: Number(concept.id ?? conceptId),
+    conceptName: String(concept.name ?? ''),
+    bktEstimate:
+      toRecord(data.mastery).bkt_estimate === null || toRecord(data.mastery).bkt_estimate === undefined
+        ? null
+        : Number(toRecord(data.mastery).bkt_estimate),
+    groundingCount: grounding.length,
+    misconceptions: misconceptions.map((raw) => {
+      const m = toRecord(raw);
+      return {
+        id: Number(m.id),
+        tag: m.tag ? String(m.tag) : null,
+        description: m.description ? String(m.description) : null,
+        errorPattern: m.error_pattern ? String(m.error_pattern) : null,
+        correctiveAction: m.corrective_action ? String(m.corrective_action) : null,
+      };
+    }),
+    governance: {
+      mode: (governance.mode as TutorGovernance['mode']) ?? 'socratic_only',
+      genuineAttempts: Number(governance.genuine_attempts ?? 0),
+      attemptsRequired: Number(governance.attempts_required ?? 0),
+      attemptsRemaining: Number(governance.attempts_remaining ?? 0),
+      assessmentAnswers: String(governance.assessment_answers ?? 'never'),
+      rules: Array.isArray(governance.rules) ? governance.rules.map((r) => String(r)) : [],
+    },
+  };
+}
+
+// ── Coverage vs Attainment — the staff/principal report (see #7) ────────────
+
+export interface AttainmentConcept {
+  conceptId: number;
+  name: string;
+  chapterId: number;
+  chapterName: string | null;
+  /** Whether the curriculum has teachable material for this concept at all. */
+  taught: boolean;
+  studentsAttempted: number;
+  studentsMastered: number;
+  /** Null — not zero — when the concept was never taught. */
+  attainmentPct: number | null;
+}
+
+export interface AttainmentReport {
+  studentCount: number;
+  coverage: {
+    conceptsTotal: number;
+    conceptsTaught: number;
+    coveragePct: number;
+    chaptersTotal: number;
+  };
+  attainment: {
+    conceptsMeasured: number;
+    conceptsWithAnyEvidence: number;
+    meanAttainmentPct: number | null;
+    taughtButUnevidenced: Array<{ conceptId: number; name: string }>;
+  };
+  concepts: AttainmentConcept[];
+}
+
+/** Curriculum Coverage and Student Attainment for one class, one year. */
+export async function fetchAttainmentReport(
+  standardId: string,
+  syear: string,
+  subjectId?: string,
+  signal?: AbortSignal
+): Promise<AttainmentReport> {
+  const params = new URLSearchParams({ standardId, syear });
+  if (subjectId) params.set('subjectId', subjectId);
+
+  const data = toRecord(await esoGet(`api/pal/eso/reports/attainment?${params.toString()}`, signal));
+  const coverage = toRecord(data.coverage);
+  const attainment = toRecord(data.attainment);
+  const concepts = Array.isArray(data.concepts) ? data.concepts : [];
+  const unevidenced = Array.isArray(attainment.taught_but_unevidenced) ? attainment.taught_but_unevidenced : [];
+
+  return {
+    studentCount: Number(toRecord(data.scope).student_count ?? 0),
+    coverage: {
+      conceptsTotal: Number(coverage.concepts_total ?? 0),
+      conceptsTaught: Number(coverage.concepts_taught ?? 0),
+      coveragePct: Number(coverage.coverage_pct ?? 0),
+      chaptersTotal: Number(coverage.chapters_total ?? 0),
+    },
+    attainment: {
+      conceptsMeasured: Number(attainment.concepts_measured ?? 0),
+      conceptsWithAnyEvidence: Number(attainment.concepts_with_any_evidence ?? 0),
+      meanAttainmentPct:
+        attainment.mean_attainment_pct === null || attainment.mean_attainment_pct === undefined
+          ? null
+          : Number(attainment.mean_attainment_pct),
+      taughtButUnevidenced: unevidenced.map((raw) => {
+        const u = toRecord(raw);
+        return { conceptId: Number(u.concept_id), name: String(u.name ?? '') };
+      }),
+    },
+    concepts: concepts.map((raw) => {
+      const c = toRecord(raw);
+      return {
+        conceptId: Number(c.concept_id),
+        name: String(c.name ?? ''),
+        chapterId: Number(c.chapter_id),
+        chapterName: c.chapter_name ? String(c.chapter_name) : null,
+        taught: Boolean(c.taught),
+        studentsAttempted: Number(c.students_attempted ?? 0),
+        studentsMastered: Number(c.students_mastered ?? 0),
+        attainmentPct:
+          c.attainment_pct === null || c.attainment_pct === undefined ? null : Number(c.attainment_pct),
+      };
+    }),
   };
 }

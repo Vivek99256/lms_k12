@@ -10,6 +10,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+import { ComingSoonBadge } from '@/components/ui/coming-soon';
+
 type ToolbarOption = {
   title: string;
   description: string;
@@ -79,11 +81,20 @@ const toolbarMenus: ToolbarMenu[] = [
   },
 ];
 
+/**
+ * One capability in the floating stack.
+ *
+ * Presentational, deliberately. This was a `<button>` with hover lift, hover
+ * border and hover shadow — every affordance of a control — and no `onClick` at
+ * all, so all four cards took a click and did nothing. A dead control that looks
+ * live reads as broken; the panel says instead that opening a capability from
+ * here is not built yet, which is what is actually true.
+ */
 function OptionCard({ option }: { option: ToolbarOption }) {
   return (
-    <button className="group w-full rounded-2xl border border-gray-200/80 bg-white p-4 text-left shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-all hover:-translate-y-0.5 hover:border-[#0D6EFD]/20 hover:bg-blue-50/40 hover:shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
+    <div className="w-full rounded-2xl border border-gray-200/80 bg-white p-4 text-left shadow-[0_1px_0_rgba(15,23,42,0.03)]">
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-600 ring-1 ring-gray-200 transition-colors group-hover:bg-blue-50 group-hover:text-[#0D6EFD] group-hover:ring-[#0D6EFD]/15">
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-600 ring-1 ring-gray-200">
           <Sparkles className="h-4 w-4" />
         </div>
         <div className="min-w-0">
@@ -91,7 +102,7 @@ function OptionCard({ option }: { option: ToolbarOption }) {
           <div className="mt-1 text-xs leading-5 text-gray-500">{option.description}</div>
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -187,6 +198,19 @@ export default function RightFloatingToolbar({
             </div>
 
             <div className="max-h-[min(70vh,34rem)] overflow-y-auto p-4 md:max-h-[min(72vh,38rem)]">
+              {/* The status is about this launcher, not about the capabilities.
+                  Some of these are live and reached elsewhere — the Assistant
+                  most of all — so a per-capability "Coming soon" would mark
+                  working features as unbuilt. What is not built is opening them
+                  from here, and that is what the badge says. */}
+              <div className="mb-3 flex items-start gap-2">
+                <ComingSoonBadge status="coming-soon" size="sm" label="Not connected yet" />
+                <p className="text-xs leading-5 text-gray-500">
+                  These are the AI capabilities the platform runs on. Opening one from this panel is
+                  on the roadmap.
+                </p>
+              </div>
+
               <div className="grid gap-3">
                 {activeMenu.options.map((option) => (
                   <OptionCard key={option.title} option={option} />

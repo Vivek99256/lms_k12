@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/app/components/utils/api_url";
+import { resolveAiBaseUrl } from "@/app/components/utils/api_url";
 import type { AiEnvelope, GenerationOutcome, GraphNodeRecord } from "./types";
 
 /**
@@ -217,7 +217,7 @@ export interface AgentRunOutcome {
 }
 
 function normalizeBaseUrl(baseUrl?: string | null) {
-  return (baseUrl || API_BASE_URL || "").trim().replace(/\/$/, "");
+  return resolveAiBaseUrl(baseUrl);
 }
 
 async function post<T>(

@@ -678,7 +678,12 @@ export default function FeesReceiptBookMasterPage() {
 
     if (!form.receipt_line_1.trim()) nextErrors.receipt_line_1 = 'Receipt line 1 is required';
     if (!form.receipt_line_2.trim()) nextErrors.receipt_line_2 = 'Receipt line 2 is required';
-    if (!form.sort_order.trim()) nextErrors.sort_order = 'Sort order is required';
+    // Only on create. Sort order is readOnly while editing, so a blank one on an
+    // existing row could never be filled in - and 191 legacy rows have exactly
+    // that, which this rule would otherwise make permanently un-saveable.
+    if (!editingRecord && !form.sort_order.trim()) {
+      nextErrors.sort_order = 'Sort order is required';
+    }
     if (form.grade.length === 0) nextErrors.grade = 'Select at least one grade';
     if (form.standard.length === 0) nextErrors.standard = 'Select at least one standard';
     if (form.fees_head_id.length === 0) nextErrors.fees_head_id = 'Select at least one fee head';
@@ -1171,6 +1176,9 @@ export default function FeesReceiptBookMasterPage() {
                     <div className="space-y-1.5">
                       <Label className="text-[11px] font-medium text-slate-700">
                         Sort order
+                        {editingRecord ? null : (
+                          <span className="ml-0.5 text-red-600">*</span>
+                        )}
                       </Label>
                       <Input
                         value={form.sort_order}
@@ -1183,6 +1191,11 @@ export default function FeesReceiptBookMasterPage() {
                           formErrors.sort_order && 'border-red-300'
                         )}
                       />
+                      {formErrors.sort_order ? (
+                        <p className="text-[11px] text-red-600">
+                          {formErrors.sort_order}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="space-y-1.5">

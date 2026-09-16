@@ -128,6 +128,16 @@ const statusVariantMap: Record<string, VariantProps<typeof statusBadgeVariants>[
   'Early Going': 'warning',
   Live: 'active',
   live: 'active',
+  // Roadmap lifecycle, to match the shared ComingSoon component. Mapped to
+  // 'inactive'/'processing' rather than 'pending' because the warning and
+  // success colour tokens are not registered in the Tailwind theme
+  // (app/globals.css) and render unstyled.
+  'Coming Soon': 'inactive',
+  'coming-soon': 'inactive',
+  Planned: 'inactive',
+  planned: 'inactive',
+  Pilot: 'processing',
+  pilot: 'processing',
   'sent-back': 'processing',
   'Verbal Warning': 'default',
   'Written Warning': 'warning',
