@@ -49,8 +49,12 @@ function FilterField({ spec }: { spec: FilterSpec }) {
   const active = spec.value !== 'all';
   const selected = spec.options.find((option) => option.value === spec.value);
 
+  // Deliberately a div, not a label. A <label> forwards its own click to the
+  // first labelable control inside it, so wrapping the Select trigger (a
+  // button) made every click fire twice -- open, then immediately closed
+  // again, which reads as "the dropdown won't stay open".
   return (
-    <label className="flex min-w-0 flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <span className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
         {spec.label}
       </span>
@@ -79,7 +83,7 @@ function FilterField({ spec }: { spec: FilterSpec }) {
             ))}
         </SelectContent>
       </Select>
-    </label>
+    </div>
   );
 }
 

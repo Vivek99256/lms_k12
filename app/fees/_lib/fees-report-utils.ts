@@ -368,6 +368,38 @@ export async function fetchFeesCancelReportPost<T extends ReportApiPayload>(
   return { session, payload };
 }
 
+export async function fetchOnlinePaymentsReportGet<T extends ReportApiPayload>(
+  params: URLSearchParams
+): Promise<{ session: FeesSession; payload: T }> {
+  const session = getFeesSession();
+  const payload = await fetchReportProxyJson<T>(session, '/api/fees/online-payments', params);
+  return { session, payload };
+}
+
+export async function fetchReconciliationStatusReportGet<T extends ReportApiPayload>(
+  params: URLSearchParams
+): Promise<{ session: FeesSession; payload: T }> {
+  const session = getFeesSession();
+  const payload = await fetchReportProxyJson<T>(session, '/api/fees/reconciliation-status', params);
+  return { session, payload };
+}
+
+export async function fetchFeesAuditLogsReportGet<T extends ReportApiPayload>(
+  params: URLSearchParams
+): Promise<{ session: FeesSession; payload: T }> {
+  const session = getFeesSession();
+  const payload = await fetchReportProxyJson<T>(session, '/api/fees/audit-logs', params);
+  return { session, payload };
+}
+
+export async function fetchReceiptReprintGet<T extends ReportApiPayload>(
+  params: URLSearchParams
+): Promise<{ session: FeesSession; payload: T }> {
+  const session = getFeesSession();
+  const payload = await fetchReportProxyJson<T>(session, '/api/fees/receipt-reprint', params);
+  return { session, payload };
+}
+
 export function getSingleFilterValue(value: string | string[] | undefined): string {
   if (Array.isArray(value)) {
     return value[0] || '';

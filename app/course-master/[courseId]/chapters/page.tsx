@@ -20,6 +20,7 @@ import {
   GraduationCap,
   Sparkles,
   CheckCircle2,
+  AlertTriangle,
   Search,
   Upload,
   FileText,
@@ -66,6 +67,7 @@ import {
   resolveSubjectDisplayName,
   deleteQuestionBankQuestion,
   updateQuestionBankQuestion,
+  reviewQuestionBankQuestion,
   fetchQuestionTypeCatalog,
   type QuestionTypeCatalogEntry,
   fetchQuestionBankFacets,
@@ -975,9 +977,6 @@ export default function ChapterListPage() {
   const [questionBankBloomFilter, setQuestionBankBloomFilter] = useState('all');
   const [questionBankDifficultyFilter, setQuestionBankDifficultyFilter] = useState('all');
   const [questionBankCategoryFilter, setQuestionBankCategoryFilter] = useState('all');
-  const [questionBankSectionFilter, setQuestionBankSectionFilter] = useState('all');
-  const [questionBankDokFilter, setQuestionBankDokFilter] = useState('all');
-  const [questionBankPublisherFilter, setQuestionBankPublisherFilter] = useState('all');
   const [questionBankSourceFilter, setQuestionBankSourceFilter] = useState('all');
   const [questionBankStatusFilter, setQuestionBankStatusFilter] = useState('all');
   const [questionBankSearchInput, setQuestionBankSearchInput] = useState('');
@@ -995,6 +994,7 @@ export default function ChapterListPage() {
   const [isSavingQuestionBankItem, setIsSavingQuestionBankItem] = useState(false);
   const [deletingQuestionBankItemId, setDeletingQuestionBankItemId] = useState<string | null>(null);
   const [questionBankDeleteError, setQuestionBankDeleteError] = useState('');
+  const [reviewingQuestionBankItemId, setReviewingQuestionBankItemId] = useState<string | null>(null);
   const [manualQuestionChapterId, setManualQuestionChapterId] = useState('');
   const [manualQuestionConcept, setManualQuestionConcept] = useState('');
   const [manualQuestionType, setManualQuestionType] = useState<QuestionBankQuestionType>('MCQ');
@@ -1272,9 +1272,6 @@ export default function ChapterListPage() {
     setQuestionBankCategoryFilter('all');
     setQuestionBankBloomFilter('all');
     setQuestionBankDifficultyFilter('all');
-    setQuestionBankSectionFilter('all');
-    setQuestionBankDokFilter('all');
-    setQuestionBankPublisherFilter('all');
     setQuestionBankSourceFilter('all');
     setQuestionBankStatusFilter('all');
     setQuestionBankSearchInput('');
@@ -1361,36 +1358,12 @@ export default function ChapterListPage() {
         })),
       },
       {
-        key: 'section',
-        label: 'Exam section',
-        allLabel: 'All Sections',
-        value: questionBankSectionFilter,
-        onChange: setQuestionBankSectionFilter,
-        options: questionBankFacets.exam_sections.map((row) => ({
-          value: String(row.value ?? ''),
-          label: `Section ${row.value}`,
-          hint: row.total != null ? `(${row.total})` : undefined,
-        })),
-      },
-      {
         key: 'bloom',
         label: 'Bloom level',
         allLabel: 'All Bloom',
         value: questionBankBloomFilter,
         onChange: setQuestionBankBloomFilter,
         options: counted(questionBankFacets.bloom_levels, 'value', 'value'),
-      },
-      {
-        key: 'dok',
-        label: 'Depth of knowledge',
-        allLabel: 'All DOK',
-        value: questionBankDokFilter,
-        onChange: setQuestionBankDokFilter,
-        options: questionBankFacets.dok_levels.map((row) => ({
-          value: String(row.value ?? ''),
-          label: `DOK ${row.value}`,
-          hint: row.total != null ? `(${row.total})` : undefined,
-        })),
       },
       {
         key: 'difficulty',
@@ -1412,20 +1385,6 @@ export default function ChapterListPage() {
         })),
       },
       {
-        key: 'publisher',
-        label: 'Publisher',
-        allLabel: 'All Publishers',
-        value: questionBankPublisherFilter,
-        onChange: setQuestionBankPublisherFilter,
-        options: questionBankFacets.publishers
-          .filter((row) => (row.total ?? 0) > 0)
-          .map((row) => ({
-            value: String(row.short_name ?? row.name ?? ''),
-            label: String(row.short_name ?? row.name ?? ''),
-            hint: row.total != null ? `(${row.total})` : undefined,
-          })),
-      },
-      {
         key: 'source',
         label: 'Origin',
         allLabel: 'Any Origin',
@@ -1444,12 +1403,9 @@ export default function ChapterListPage() {
     questionBankConceptOptions,
     questionBankTypeFilter,
     questionBankTypeOptions,
-    questionBankSectionFilter,
     questionBankBloomFilter,
-    questionBankDokFilter,
     questionBankDifficultyFilter,
     questionBankCategoryFilter,
-    questionBankPublisherFilter,
     questionBankSourceFilter,
     questionBankFacets,
   ]);
@@ -1471,12 +1427,6 @@ export default function ChapterListPage() {
         questionBankCategoryFilter === 'all' ||
         question.palCategory === questionBankCategoryFilter;
 
-      const matchesSection =
-        questionBankSectionFilter === 'all' || question.examSection === questionBankSectionFilter;
-      const matchesDok =
-        questionBankDokFilter === 'all' || String(question.dok ?? '') === questionBankDokFilter;
-      const matchesPublisher =
-        questionBankPublisherFilter === 'all' || question.publisher === questionBankPublisherFilter;
       const matchesSource =
         questionBankSourceFilter === 'all' || (question.source ?? 'ai_generated') === questionBankSourceFilter;
       // Rows written before the status column was meaningful default to
@@ -1495,9 +1445,6 @@ export default function ChapterListPage() {
         matchesCategory &&
         matchesBloom &&
         matchesDifficulty &&
-        matchesSection &&
-        matchesDok &&
-        matchesPublisher &&
         matchesSource &&
         matchesStatus &&
         matchesSearch
@@ -1509,9 +1456,6 @@ export default function ChapterListPage() {
     questionBankChapterFilter,
     questionBankItems,
     questionBankTypeFilter,
-    questionBankSectionFilter,
-    questionBankDokFilter,
-    questionBankPublisherFilter,
     questionBankSourceFilter,
     questionBankStatusFilter,
     questionBankSearch,
@@ -3037,6 +2981,54 @@ export default function ChapterListPage() {
 
   // Presentation is shared with the student bank; only these actions are the
   // teacher's, so a student never gets an Edit or Delete control rendered at all.
+  /**
+   * Release a held question, or put a published one back under review.
+   *
+   * A validator failure writes status = 0, which keeps the question out of
+   * every paper. Without this the bank could show held items but never clear
+   * them, so a false positive stranded a good question permanently.
+   */
+  const handleReviewQuestionBankItem = useCallback(
+    async (question: QuestionBankItem, action: 'approve' | 'hold') => {
+      const context = getRequestContext();
+      if (!context) {
+        setQuestionBankDeleteError('Course master session data is missing.');
+        return;
+      }
+
+      const numericId = Number(question.id);
+      if (!Number.isInteger(numericId)) return;
+
+      setReviewingQuestionBankItemId(question.id);
+      setQuestionBankDeleteError('');
+      try {
+        await reviewQuestionBankQuestion({
+          id: numericId,
+          sub_institute_id: context.sub_institute_id,
+          action,
+          user_id: context.user_id,
+        });
+        // Patch in place rather than refetching: the list is already filtered
+        // and a reload would jump the reviewer back to the top.
+        const nextStatus = action === 'approve' ? 1 : 0;
+        setApiQuestionBankItems((current) =>
+          current.map((item) => (item.id === question.id ? { ...item, status: nextStatus } : item))
+        );
+        setQuestionBankItemEdits((current) => {
+          const existing = current[question.id];
+          return existing ? { ...current, [question.id]: { ...existing, status: nextStatus } } : current;
+        });
+      } catch (error) {
+        setQuestionBankDeleteError(
+          error instanceof Error ? error.message : 'Failed to update the question.'
+        );
+      } finally {
+        setReviewingQuestionBankItemId(null);
+      }
+    },
+    []
+  );
+
   const renderQuestionBankQuestion = (question: QuestionBankItem) => (
     <QuestionBankQuestionCard
       key={question.id}
@@ -3044,6 +3036,28 @@ export default function ChapterListPage() {
       visibleNumber={questionBankVisibleNumberById.get(question.id) ?? 1}
       actions={
         <>
+          {question.status === 0 ? (
+            <Button
+              type="button"
+              onClick={() => handleReviewQuestionBankItem(question, 'approve')}
+              disabled={reviewingQuestionBankItemId !== null}
+              className="h-10 rounded-2xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <CheckCircle2 size={17} className="mr-2" />
+              {reviewingQuestionBankItemId === question.id ? 'Approving...' : 'Approve'}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => handleReviewQuestionBankItem(question, 'hold')}
+              disabled={reviewingQuestionBankItemId !== null}
+              className="h-10 rounded-2xl px-3 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <AlertTriangle size={17} className="mr-2" />
+              {reviewingQuestionBankItemId === question.id ? 'Holding...' : 'Hold'}
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"

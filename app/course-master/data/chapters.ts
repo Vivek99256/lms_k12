@@ -1230,6 +1230,36 @@ export async function updateQuestionBankQuestion(
   }
 }
 
+export interface ReviewQuestionBankPayload {
+  id: number;
+  sub_institute_id: number;
+  /** approve publishes the question; hold puts it back in the review queue. */
+  action: 'approve' | 'hold';
+  user_id?: number;
+}
+
+/**
+ * Clear or re-raise the hold on a question a validator flagged.
+ *
+ * Held questions are visible to a teacher but not servable, and before this
+ * there was no way to release one -- a validator false positive stranded the
+ * question permanently.
+ */
+export async function reviewQuestionBankQuestion(
+  payload: ReviewQuestionBankPayload
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-question-bank/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await readApiJson(res, 'Failed to update the question');
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to update the question'));
+  }
+}
+
 export interface DeleteQuestionBankPayload {
   id: number;
   sub_institute_id: number;
