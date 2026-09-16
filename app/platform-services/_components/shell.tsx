@@ -425,6 +425,7 @@ export function PlatformShell({
   children,
   breadcrumb,
   modulePinned = false,
+  embedded = false,
 }: {
   title: string;
   description: string;
@@ -451,9 +452,38 @@ export function PlatformShell({
    * exactly as when the rail chose it; nothing is filtered in the browser.
    */
   modulePinned?: boolean;
+  /**
+   * Render as a section inside somebody else's page instead of as a page.
+   *
+   * WHY THIS IS A MODE AND NOT A SECOND COMPONENT. Fees mounts these consoles as
+   * tabs on its own category pages, which already supply the frame: the Fees
+   * level-3 bar, the title card, the canvas. A console that brought its own
+   * `min-h-screen` background, breadcrumb and page title would stack a second
+   * page inside the first — two headings, two backgrounds, doubled padding.
+   * So the chrome is dropped and only the working content is emitted, which is
+   * exactly what FeesNotificationSettings does by hand on Fees → Communication.
+   * The heading stays, because the section still has to name itself under the
+   * category's own title, the way "Fees notification settings" does.
+   */
+  embedded?: boolean;
 }) {
   const activeModule = selectedModule ? registry.modules.find((row) => row.key === selectedModule) ?? null : null;
   const trail = breadcrumb ?? ['Platform services', title];
+
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            <p className="mt-1 text-sm text-slate-600">{description}</p>
+          </div>
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
+        </div>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">

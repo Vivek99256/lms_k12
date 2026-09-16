@@ -61,11 +61,13 @@ export interface SchedulerConsoleProps {
   module?: string;
   /** The trail above the title, for a console mounted inside another module. */
   breadcrumb?: React.ReactNode[];
+  /** Render as a section inside a Fees category page rather than as a page. */
+  embedded?: boolean;
   title?: string;
   description?: string;
 }
 
-export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, description }: SchedulerConsoleProps = {}) {
+export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, description, embedded }: SchedulerConsoleProps = {}) {
   const { registry, problems, loading: registryLoading, error: registryError, reload } = usePlatformRegistry();
   const rights = usePermissions([RBAC_KEY]);
 
@@ -172,6 +174,7 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
       problems={problems}
       breadcrumb={breadcrumb}
       modulePinned={Boolean(pinnedModule)}
+      embedded={embedded}
       selectedModule={moduleKey}
       onSelectModule={(next) => {
         if (pinnedModule) return;
