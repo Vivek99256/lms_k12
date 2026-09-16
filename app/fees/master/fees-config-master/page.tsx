@@ -362,10 +362,6 @@ function validateForm(form: FeeConfigForm): FormErrors {
       'Fees bank challan template is required';
   }
 
-  if (!form.fees_receipt_note.trim()) {
-    errors.fees_receipt_note = 'Fees receipt note is required';
-  }
-
   if (!form.institute_name.trim()) {
     errors.institute_name = 'Institute name is required';
   }
@@ -1330,6 +1326,7 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.send_sms}
                     >
                       <Select
+                        items={yesNoOptions}
                         value={form.send_sms}
                         onValueChange={(value) =>
                           updateField('send_sms', value ?? '')
@@ -1358,6 +1355,7 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.send_email}
                     >
                       <Select
+                        items={yesNoOptions}
                         value={form.send_email}
                         onValueChange={(value) =>
                           updateField('send_email', value ?? '')
@@ -1386,6 +1384,7 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.fees_receipt_template}
                     >
                       <Select
+                        items={receiptTemplateOptions}
                         value={form.fees_receipt_template}
                         onValueChange={(value) =>
                           updateField('fees_receipt_template', value ?? '')
@@ -1414,6 +1413,7 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.fees_bank_challan_template}
                     >
                       <Select
+                        items={bankChallanTemplateOptions}
                         value={form.fees_bank_challan_template}
                         onValueChange={(value) =>
                           updateField(
@@ -1442,7 +1442,6 @@ export default function FeesConfigMasterPage() {
                     <div className="sm:col-span-2">
                       <DrawerField
                         label="Fees Receipt Note"
-                        required
                         error={formErrors.fees_receipt_note}
                       >
                         <Textarea
@@ -1516,6 +1515,7 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.auto_head_counting}
                     >
                       <Select
+                        items={yesNoOptions}
                         value={form.auto_head_counting}
                         onValueChange={(value) =>
                           updateField('auto_head_counting', value ?? '')
@@ -1540,6 +1540,7 @@ export default function FeesConfigMasterPage() {
 
                     <DrawerField label="NACH Account Type" required error={formErrors.nach_account_type}>
                       <Select
+                        items={nachAccountTypeOptions}
                         value={form.nach_account_type}
                         onValueChange={(value) =>
                           updateField('nach_account_type', value ?? '')
