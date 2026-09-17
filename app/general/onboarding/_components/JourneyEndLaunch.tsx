@@ -78,7 +78,7 @@ export function JourneyEndLaunch({
         {unlocked ? <Rocket className="journey-launch-rocket size-4" /> : <Lock className="size-4" />}
       </span>
 
-      <span className="journey-launch-label">Launch day</span>
+      <span className="journey-launch-label">Go Live</span>
 
       {/* Dropped below lg: the lanes get tight at two columns, and the node's
           accessible name already says where it goes. */}
