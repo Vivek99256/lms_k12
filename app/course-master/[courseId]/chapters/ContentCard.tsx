@@ -74,84 +74,84 @@ const TYPE_STYLES: Record<
   { band: string; chip: string; text: string; ring: string; icon: React.ElementType }
 > = {
   'Classroom presentation': {
-    band: 'from-violet-50 to-violet-100/70',
+    band: 'from-violet-100 via-violet-50/60 to-transparent',
     chip: 'bg-violet-100 text-violet-700',
     text: 'text-violet-600',
     ring: 'ring-violet-200',
     icon: Presentation,
   },
   'Teacher training presentation': {
-    band: 'from-indigo-50 to-indigo-100/70',
+    band: 'from-indigo-100 via-indigo-50/60 to-transparent',
     chip: 'bg-indigo-100 text-indigo-700',
     text: 'text-indigo-600',
     ring: 'ring-indigo-200',
     icon: GraduationCap,
   },
   'Teacher training': {
-    band: 'from-indigo-50 to-indigo-100/70',
+    band: 'from-indigo-100 via-indigo-50/60 to-transparent',
     chip: 'bg-indigo-100 text-indigo-700',
     text: 'text-indigo-600',
     ring: 'ring-indigo-200',
     icon: GraduationCap,
   },
   Video: {
-    band: 'from-rose-50 to-rose-100/70',
+    band: 'from-rose-100 via-rose-50/60 to-transparent',
     chip: 'bg-rose-100 text-rose-700',
     text: 'text-rose-600',
     ring: 'ring-rose-200',
     icon: Video,
   },
   'Revision notes': {
-    band: 'from-amber-50 to-amber-100/70',
+    band: 'from-amber-100 via-amber-50/60 to-transparent',
     chip: 'bg-amber-100 text-amber-800',
     text: 'text-amber-600',
     ring: 'ring-amber-200',
     icon: FileText,
   },
   'Classroom activity': {
-    band: 'from-emerald-50 to-emerald-100/70',
+    band: 'from-emerald-100 via-emerald-50/60 to-transparent',
     chip: 'bg-emerald-100 text-emerald-700',
     text: 'text-emerald-600',
     ring: 'ring-emerald-200',
     icon: ClipboardList,
   },
   'Remedial class': {
-    band: 'from-orange-50 to-orange-100/70',
+    band: 'from-orange-100 via-orange-50/60 to-transparent',
     chip: 'bg-orange-100 text-orange-700',
     text: 'text-orange-600',
     ring: 'ring-orange-200',
     icon: LifeBuoy,
   },
   Worksheet: {
-    band: 'from-sky-50 to-sky-100/70',
+    band: 'from-sky-100 via-sky-50/60 to-transparent',
     chip: 'bg-sky-100 text-sky-700',
     text: 'text-sky-600',
     ring: 'ring-sky-200',
     icon: Wrench,
   },
   'Lesson plan': {
-    band: 'from-slate-100 to-slate-200/70',
+    band: 'from-slate-200 via-slate-100/60 to-transparent',
     chip: 'bg-slate-200 text-slate-700',
     text: 'text-slate-600',
     ring: 'ring-slate-300',
     icon: Layers3,
   },
   PDF: {
-    band: 'from-stone-50 to-stone-100/70',
+    band: 'from-stone-200 via-stone-100/60 to-transparent',
     chip: 'bg-stone-200 text-stone-700',
     text: 'text-stone-600',
     ring: 'ring-stone-300',
     icon: FileText,
   },
   'H5P Interactive': {
-    band: 'from-cyan-50 to-cyan-100/70',
+    band: 'from-cyan-100 via-cyan-50/60 to-transparent',
     chip: 'bg-cyan-100 text-cyan-700',
     text: 'text-cyan-700',
     ring: 'ring-cyan-200',
     icon: MonitorPlay,
   },
   'My course': {
-    band: 'from-teal-50 to-teal-100/70',
+    band: 'from-teal-100 via-teal-50/60 to-transparent',
     chip: 'bg-teal-100 text-teal-700',
     text: 'text-teal-600',
     ring: 'ring-teal-200',
@@ -160,7 +160,7 @@ const TYPE_STYLES: Record<
 };
 
 const FALLBACK_STYLE = {
-  band: 'from-slate-50 to-slate-100/70',
+  band: 'from-slate-200 via-slate-100/60 to-transparent',
   chip: 'bg-slate-200 text-slate-700',
   text: 'text-slate-600',
   ring: 'ring-slate-300',
@@ -204,9 +204,14 @@ export function ContentCard({ item, onOpen, hideChapter = false }: ContentCardPr
       className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_10px_30px_rgba(15,23,42,0.10)]"
     >
       {/* Header band, tinted by type. The tint is the scanning cue - one grey
-          gradient for every type is what made the grid unreadable. */}
+          gradient for every type is what made the grid unreadable.
+          The gradient runs strong at the top and fades to transparent by the
+          bottom, so there is no hard colour edge cutting across the icon that
+          overlaps it. It previously ran the other way, which put the densest
+          colour exactly where the icon sits. `pb-12` leaves room for the icon
+          to hang into the faded tail rather than into solid colour. */}
       <div
-        className={`relative flex items-start justify-between bg-gradient-to-b ${style.band} px-4 pb-10 pt-3`}
+        className={`flex items-start justify-between bg-gradient-to-b ${style.band} px-4 pb-12 pt-3`}
       >
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${style.chip}`}
@@ -224,9 +229,13 @@ export function ContentCard({ item, onOpen, hideChapter = false }: ContentCardPr
         </span>
       </div>
 
-      <div className="-mt-8 flex justify-center px-4">
+      {/* `relative z-10` is load-bearing. The band above is an earlier sibling,
+          and a positioned element paints over a static one regardless of DOM
+          order - so while the band carried `relative` and this did not, the band
+          painted across the icon. The icon must sit forward of the tint. */}
+      <div className="relative z-10 -mt-10 flex justify-center px-4">
         <div
-          className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ${style.ring} ${style.text}`}
+          className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-[0_4px_14px_rgba(15,23,42,0.10)] ring-1 ${style.ring} ${style.text}`}
         >
           <TypeIcon size={26} />
         </div>
