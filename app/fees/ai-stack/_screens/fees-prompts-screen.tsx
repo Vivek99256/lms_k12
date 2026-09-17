@@ -35,6 +35,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Copy, Eye, Loader2, Pencil, Plus, Save, Terminal, Trash2, X } from 'lucide-react';
 
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
+
 import {
   createTemplate,
   fetchTemplateOptions,
@@ -448,14 +450,31 @@ export function FeesPromptsScreen() {
             </label>
           </div>
 
-          <label className="block">
-            <span className="text-sm font-medium text-slate-900">What it is for</span>
+          {/* A real <label htmlFor> rather than a wrapper: the assistant's trigger is a
+              button, and a button inside a <label> also toggles the label's control. */}
+          <div className="block">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="fees-prompt-description" className="text-sm font-medium text-slate-900">
+                What it is for
+              </label>
+              <AiFieldAssistant
+                value={form.description}
+                onApply={(next) => patch({ description: next })}
+                fieldType="description"
+                label="What it is for"
+                module="fees"
+                page="AI Stack — Prompts"
+                entityType="fees_ai_prompt"
+                related={{ Prompt: form.name }}
+              />
+            </div>
             <input
+              id="fees-prompt-description"
               value={form.description}
               onChange={(event) => patch({ description: event.target.value })}
               className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
-          </label>
+          </div>
 
           <label className="block">
             <span className="text-sm font-medium text-slate-900">System prompt</span>

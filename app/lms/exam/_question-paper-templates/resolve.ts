@@ -8,65 +8,24 @@
 // marks the template actually laid out.
 // ---------------------------------------------------------------------------
 
+import { matchesQuestionType } from '@/lib/question-paper/question-types';
+import { numberLabel, planSectionNumbers, toRoman } from '@/lib/question-paper/numbering';
 import type {
   Blueprint,
   BlueprintSection,
   MetaField,
-  NumberingStyle,
   PaperContext,
   PaperQuestion,
   PlacedQuestion,
   ResolvedPaper,
   ResolvedSection,
   SchoolBranding,
-  SubNumberingStyle,
 } from './types';
 
-const ROMAN: Array<[number, string]> = [
-  [10, 'X'],
-  [9, 'IX'],
-  [5, 'V'],
-  [4, 'IV'],
-  [1, 'I'],
-];
-
-export function toRoman(value: number): string {
-  let remaining = Math.max(1, Math.floor(value));
-  let out = '';
-
-  while (remaining > 0) {
-    // 10 is as far as the table goes; papers never number past a handful of
-    // sections, and repeating X covers the rest.
-    const entry = ROMAN.find(([weight]) => weight <= remaining);
-    if (!entry) break;
-    out += entry[1];
-    remaining -= entry[0];
-  }
-
-  return out || 'I';
-}
-
-/** `index` is 0-based; `start` is the number the section begins at. */
-export function numberLabel(
-  index: number,
-  start: number,
-  style: NumberingStyle | SubNumberingStyle
-): string {
-  const ordinal = start + index;
-
-  switch (style) {
-    case 'upper-alpha':
-      return String.fromCharCode(64 + ((ordinal - 1) % 26) + 1);
-    case 'lower-alpha':
-      return String.fromCharCode(96 + ((ordinal - 1) % 26) + 1);
-    case 'roman':
-      return toRoman(ordinal);
-    case 'none':
-      return '';
-    default:
-      return String(ordinal);
-  }
-}
+// Numbering lives in lib/ so it can be unit tested on its own; the sheet
+// already imports `numberLabel` from here, so it is re-exported rather than
+// moved out from under it.
+export { numberLabel, toRoman };
 
 /** 135 -> "2 Hours 15 Minutes". Blank when the paper sets no time limit. */
 export function formatDuration(minutes: number): string {
@@ -110,12 +69,6 @@ function fillPlaceholders(text: string, values: Record<string, string>): string 
   });
 }
 
-function matchesType(question: PaperQuestion, wanted: string[]): boolean {
-  if (wanted.length === 0) return false;
-  const type = (question.question_type || '').trim().toLowerCase();
-  return wanted.some((name) => name.trim().toLowerCase() === type);
-}
-
 /**
  * Pick this section's questions out of what earlier sections left behind.
  *
@@ -134,7 +87,10 @@ function selectQuestions(
 
   switch (source.mode) {
     case 'types':
-      chosen = available.filter((question) => matchesType(question, source.questionTypes));
+      // The section stores whatever the catalogue-backed dropdown handed it --
+      // a `question_type_catalog` code today, a grading name in a template
+      // saved before that -- and the matcher accepts either.
+      chosen = available.filter((question) => matchesQuestionType(question, source.questionTypes));
       break;
     case 'points':
       chosen = available.filter((question) => source.points.includes(Number(question.points)));
@@ -196,46 +152,36 @@ export function resolvePaper(
   const { paper, questions } = context;
 
   // --- Pass 1: place the questions --------------------------------------
+  // Placement first, then numbering across the whole paper at once: a section
+  // that does not restart carries on from the one before it, and a section
+  // that matched nothing is left off the paper and so must spend no number.
   const taken = new Set<number>();
-  const placements: Array<{
-    section: BlueprintSection;
-    questions: PlacedQuestion[];
-    groupLabel: string;
-  }> = [];
-  let runningNumber = 0;
-
-  blueprint.sections.forEach((section) => {
+  const picks = blueprint.sections.map((section) => {
     const picked = selectQuestions(section, questions, taken);
     picked.forEach((question) => taken.add(question.id));
 
-    const { numbering } = section;
-    const start = numbering.restart ? numbering.start : runningNumber + 1;
+    return { section, picked };
+  });
 
-    // Grouped sections spend a single question number on the whole section and
-    // letter the questions inside it; ungrouped sections number each question.
-    const grouped = numbering.groupAsParts && picked.length > 0;
+  const numberPlan = planSectionNumbers(
+    picks.map(({ section, picked }) => ({
+      numbering: section.numbering,
+      count: picked.length,
+    }))
+  );
 
-    const placed: PlacedQuestion[] = picked.map((question, index) => {
-      const label = grouped
-        ? numbering.subStyle === 'none'
-          ? ''
-          : `(${numberLabel(index, 1, numbering.subStyle)})`
-        : `${numbering.prefix}${numberLabel(index, start, numbering.style)}`;
+  const placements = picks.map(({ section, picked }, index) => {
+    const plan = numberPlan[index] ?? { groupLabel: '', labels: [] };
 
-      return {
-        question,
-        label,
-        marks: Number(question.points) || 0,
-      };
-    });
-
-    runningNumber = grouped ? start : start + picked.length - 1;
-
-    placements.push({
+    return {
       section,
-      questions: placed,
-      groupLabel: grouped ? `${numbering.prefix}${numberLabel(0, start, numbering.style)}` : '',
-    });
+      groupLabel: plan.groupLabel,
+      questions: picked.map((question, position) => ({
+        question,
+        label: plan.labels[position] ?? '',
+        marks: Number(question.points) || 0,
+      })) satisfies PlacedQuestion[],
+    };
   });
 
   const placedCount = placements.reduce((sum, entry) => sum + entry.questions.length, 0);

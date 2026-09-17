@@ -63,10 +63,34 @@ export function SectionPanel({
   );
 }
 
-export function Field({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * A labelled form control, optionally with something sitting at the end of its label row.
+ *
+ * `assist` exists for the generative-AI trigger, and is deliberately a plain slot rather
+ * than anything AI-aware: this file is the Fees form furniture and should not know that
+ * `AiFieldAssistant` exists. It renders the label row as a flex row only when something
+ * was passed, so every existing `<Field label=… >` call renders exactly the markup it
+ * did before — the same `<Label>` with the same classes, in the same place.
+ */
+export function Field({
+  label,
+  children,
+  assist,
+}: {
+  label: string;
+  children: ReactNode;
+  assist?: ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-semibold text-slate-700">{label}</Label>
+      {assist ? (
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-xs font-semibold text-slate-700">{label}</Label>
+          {assist}
+        </div>
+      ) : (
+        <Label className="text-xs font-semibold text-slate-700">{label}</Label>
+      )}
       {children}
     </div>
   );

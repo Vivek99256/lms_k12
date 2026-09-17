@@ -11,8 +11,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, FileDown, Loader2 } from 'lucide-react';
+import { splitSectionsByContent } from '@/lib/question-paper/sections';
 import { fetchPaperContext, fetchTemplateIndex, readSchoolBranding } from './api';
 import { generateQuestionPaperPdf } from './pdf';
+import { resolvePaper } from './resolve';
 import type { QuestionPaperTemplate } from './types';
 
 function templateKey(template: QuestionPaperTemplate): string {
@@ -83,6 +85,18 @@ export function useExamPaperPdf() {
         if (context.questions.length === 0) {
           throw new Error(
             'This exam has no questions on file, so there is nothing to put on a question paper.'
+          );
+        }
+
+        // Sections that match nothing are left off the paper, so a template
+        // whose sections all come up empty would export a letterhead and
+        // nothing else. Say so instead, and name the template at fault.
+        const placed = resolvePaper(selectedTemplate.blueprint, context, readSchoolBranding());
+
+        if (splitSectionsByContent(placed.sections).printable.length === 0) {
+          throw new Error(
+            `No section of “${selectedTemplate.name}” matched a question in this exam, so the paper `
+              + 'would print empty. Choose another template, or widen its sections.'
           );
         }
 
