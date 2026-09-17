@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -20,6 +20,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { erpSelectClass } from "@/components/erp/erp-ui";
 import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import { mapApiLinkToRoute } from "@/app/data/routeMapper";
+import {
+  getVerificationStatus,
+  PRIMARY_VERIFICATION_ROUTE,
+  type FeesVerificationStatus,
+} from "@/app/fees/_lib/fees-verification";
+import { FeesVerificationChecklist } from "./FeesVerificationChecklist";
 import { OwnerMarker, StatusBadge } from "./onboarding-ui";
 import type {
   OnboardingStep,
@@ -72,6 +78,9 @@ export function StepDrawer({
 }) {
   const [notes, setNotes] = useState("");
   const [checkedReports, setCheckedReports] = useState<Set<string>>(new Set());
+  const [verification, setVerification] = useState<FeesVerificationStatus | null>(null);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationError, setVerificationError] = useState("");
 
   useEffect(() => {
     setNotes(step?.state.notes ?? "");
@@ -89,18 +98,83 @@ export function StepDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [step, onClose]);
 
+  // The Fees data-verification step resolves its checklist against live report
+  // data. A probe runs all seven reports unfiltered, so it is scoped to the one
+  // step that shows the checklist and only fires while that drawer is open.
+  const isFeesDataVerification =
+    moduleKey === "fees" && step?.stepKey === "data_verification";
+
+  /**
+   * `isActive` lets a probe that outlives the open step be discarded: seven
+   * reports can take a while, and the user may have moved on by the time they
+   * answer.
+   */
+  const loadVerification = useCallback(
+    async (isActive: () => boolean = () => true) => {
+      setVerificationLoading(true);
+      setVerificationError("");
+
+      try {
+        const next = await getVerificationStatus();
+        if (isActive()) setVerification(next);
+      } catch (caught) {
+        if (isActive()) {
+          setVerificationError(
+            caught instanceof Error ? caught.message : "Could not check the Fees reports."
+          );
+        }
+      } finally {
+        if (isActive()) setVerificationLoading(false);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    // Only the verification step probes, and the checklist only renders for it,
+    // so a previous result left in state is never shown — it simply acts as
+    // stale-while-revalidate when the step is reopened.
+    if (!isFeesDataVerification) return;
+
+    let active = true;
+    // Deferred by a microtask so the first state update lands after this effect
+    // has committed rather than cascading a render from inside it.
+    void Promise.resolve().then(() => {
+      if (active) void loadVerification(() => active);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isFeesDataVerification, loadVerification]);
+
   if (!step) return null;
 
   const derived = step.proof.type === "table_rows";
+  // Setup screens for the Fees steps the API cannot point at on its own: a step
+  // only carries an `action_route` when it has a proof table to derive its menu
+  // from, so the manual steps of the spine would otherwise offer no way in.
+  // `integrations` lands on the payment-gateway settings, which is where the
+  // gateway/SMS connections that step asks for are actually made.
   const feesSetupRoute = moduleKey === "fees"
     ? {
         master_setup: "/fees/master-setup",
+        integrations: "/integration/online-fees-settings",
         validation: "/fees/operations",
         communication: "/fees/communication",
       }[step.stepKey]
     : undefined;
-  const target = feesSetupRoute || (step.action.route ? mapApiLinkToRoute(step.action.route) : "");
-  const opensSetupScreen = Boolean(feesSetupRoute) || Boolean(step.proof.table);
+  // Data verification aims the button at work rather than at a landing page:
+  // the first still-pending report, or the primary one once all are verified.
+  const verificationRoute = isFeesDataVerification
+    ? verification?.nextPendingRoute ?? PRIMARY_VERIFICATION_ROUTE
+    : undefined;
+  const target =
+    verificationRoute
+    || feesSetupRoute
+    || (step.action.route ? mapApiLinkToRoute(step.action.route) : "");
+  const opensSetupScreen =
+    Boolean(verificationRoute) || Boolean(feesSetupRoute) || Boolean(step.proof.table);
   const canNavigate = Boolean(target) && target !== "#";
   const showFeesValidationChecklist = moduleKey === "fees" && step.stepKey === "validation";
   const showFeesCommunicationPlan = moduleKey === "fees" && step.stepKey === "communication";
@@ -238,6 +312,15 @@ export function StepDrawer({
                 })}
               </div>
             </section>
+          ) : null}
+
+          {isFeesDataVerification ? (
+            <FeesVerificationChecklist
+              status={verification}
+              loading={verificationLoading}
+              error={verificationError}
+              onRefresh={() => void loadVerification()}
+            />
           ) : null}
 
           {showFeesCommunicationPlan ? (
