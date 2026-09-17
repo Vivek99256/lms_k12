@@ -1,4 +1,4 @@
-import { TeachLearnCategoryPage } from '@/app/teach-learn/_components/teach-learn-category-page';
+import { ModuleCategoryPage } from '@/app/_components/module-category-page';
 
 export default async function Page({
   params,
@@ -6,5 +6,5 @@ export default async function Page({
   params: Promise<{ categoryKey: string }>;
 }) {
   const { categoryKey } = await params;
-  return <TeachLearnCategoryPage categoryKey={categoryKey} />;
+  return <ModuleCategoryPage moduleName="teach_learn" categoryKey={categoryKey} />;
 }

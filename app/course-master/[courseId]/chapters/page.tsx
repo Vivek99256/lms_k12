@@ -3,10 +3,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { usePermission } from '@/app/hooks/usePermission';
 import {
   ArrowLeft,
   Download,
+  Network,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
@@ -33,13 +35,13 @@ import {
   ClipboardList,
   Orbit,
   WandSparkles,
-  Eye,
   Play,
   FolderOpen,
   Database,
   Layers3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ContentCard } from './ContentCard';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
 import { extractGeneratedBodyHtml, sanitizeGeneratedHtml } from '@/app/course-master/data/generated-html';
@@ -102,6 +104,24 @@ import type { Chapter } from '../../data/chapters';
 import type { LmsSubject } from '../../data/lmsCourses';
 import { GeneratePresentationDrawer } from './sideDrawer';
 import { persistPalConceptContext } from '@/app/pal/_components/PalContextBootstrap';
+
+/**
+ * Loaded on demand: the map pulls in @xyflow/react, which no other view on this
+ * page needs. `ssr: false` because the canvas measures the DOM on mount and this
+ * page is client-rendered anyway.
+ *
+ * The folder is underscore-prefixed so the App Router treats it as colocated files
+ * rather than a `/coherence-map` route segment — without that, its `graphLayout`
+ * module was being validated as a route layout.
+ */
+const CoherenceMapView = dynamic(() => import('./_coherence-map/CoherenceMapView'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[480px] items-center justify-center rounded-[14px] border border-slate-200 bg-white text-sm text-slate-500">
+      Loading the coherence map…
+    </div>
+  ),
+});
 
 const EMPTY_CHAPTER_FORM = {
   chapterName: '',
@@ -239,8 +259,48 @@ const SHOW_LEGACY_H5P_BUTTON = true;
 const CONTENT_CREATE_DENIED_HINT =
   'Your role does not include content creation rights. Ask an administrator to enable them.';
 
-const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity', 'H5P Interactive'] as const;
-const TEACHER_CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'H5P Interactive'] as const;
+/**
+ * Tabs for the two library lanes.
+ *
+ * Both lanes were narrower than the data: Classroom had six tabs and Teacher
+ * three, while content_master holds Remedial Class, Worksheet, Lesson Plan and
+ * My Course rows with no tab to appear under - and Teacher Training alone is
+ * 2,450 rows. Tabs whose count is zero for the chapter in view are hidden, so a
+ * longer list does not mean more dead ends.
+ */
+const CONTENT_LIBRARY_TABS = [
+  'All content',
+  'Presentations',
+  'Videos',
+  'Revision notes',
+  'Classroom activity',
+  'Remedial class',
+  'Worksheet',
+  'Lesson plan',
+  'My course',
+  'H5P Interactive',
+] as const;
+/**
+ * Teacher Workspace tabs.
+ *
+ * Shorter than the Classroom list on purpose. This lane only ever shows
+ * teacher-training content, so of the eleven content types only 'Teacher
+ * training' (2,450 rows), 'Teacher training presentation' (5) and the
+ * audience-neutral H5P items can reach it. A Worksheet or Lesson plan tab here
+ * would be permanently empty, so the missing tab this lane actually needed is
+ * 'Teacher training' - 2,450 rows that previously had no tab of their own.
+ */
+const TEACHER_CONTENT_LIBRARY_TABS = [
+  'All content',
+  'Presentations',
+  'Teacher training',
+  'H5P Interactive',
+] as const;
+
+/** Any tab either lane can show. */
+type ContentLibraryTab =
+  | (typeof CONTENT_LIBRARY_TABS)[number]
+  | (typeof TEACHER_CONTENT_LIBRARY_TABS)[number];
 
 const UPLOAD_TYPE_CONFIG: Record<
   (typeof UPLOAD_CONTENT_TYPES)[number],
@@ -299,7 +359,19 @@ const UPLOAD_TYPE_CONFIG: Record<
   },
 };
 
-type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity' | 'H5P Interactive';
+type ChapterContentType =
+  | 'Classroom presentation'
+  | 'Teacher training presentation'
+  | 'Teacher training'
+  | 'Revision notes'
+  | 'Video'
+  | 'PDF'
+  | 'Classroom activity'
+  | 'Remedial class'
+  | 'Worksheet'
+  | 'Lesson plan'
+  | 'My course'
+  | 'H5P Interactive';
 type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded';
 
 /**
@@ -376,6 +448,21 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   const contentCategory = (asset.content_category ?? '').toLowerCase().replace(/[_\s]+/g, ' ').trim();
   const contentLabel = `${normalizedCategory} ${contentCategory} ${asset.file_type ?? ''} ${asset.title}`.toLowerCase();
 
+  // The category is authoritative when it names a type outright, so it is tested
+  // before anything that sniffs a filename or a title. These four categories had
+  // no case at all and fell through to the 'Revision notes' default, which
+  // mislabelled 12,965 rows - every Remedial Class, Worksheet, Lesson Plan and
+  // My Course row in the table - and left them with no tab to appear under.
+  if (contentCategory === 'remedial class') return 'Remedial class';
+  if (contentCategory === 'worksheet') return 'Worksheet';
+  if (contentCategory === 'lesson plan') return 'Lesson plan';
+  if (contentCategory === 'my course') return 'My course';
+  // 'Teacher Training' is the bulk category (2,450 rows) and is distinct from
+  // 'Teacher training presentation' (4 rows). Matched here rather than inside the
+  // presentation branch below, because most of these rows are PDFs, not decks,
+  // and would otherwise be classified as revision notes.
+  if (contentCategory === 'teacher training') return 'Teacher training';
+
   if (contentLabel.includes('video') || /\.(mp4|mov|webm)(?:$|\?)/.test(asset.filename ?? '')) return 'Video';
   if (contentLabel.includes('presentation') || /\.(ppt|pptx)(?:$|\?)/.test(asset.filename ?? '')) {
     if (contentLabel.includes('teacher training')) return 'Teacher training presentation';
@@ -385,6 +472,9 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   // category, so they are identified by that rather than by guessing from a filename.
   if (asset.format === 'h5p' || contentCategory === 'h5p interactive') return 'H5P Interactive';
   if (contentLabel.includes('classroom activity')) return 'Classroom activity';
+  if (contentLabel.includes('remedial')) return 'Remedial class';
+  if (contentLabel.includes('worksheet')) return 'Worksheet';
+  if (contentLabel.includes('lesson plan')) return 'Lesson plan';
   if (contentLabel.includes('pdf')) return 'PDF';
   return 'Revision notes';
 }
@@ -663,6 +753,10 @@ function getChapterContentPreview(type: ChapterContentType): ChapterContentPrevi
   if (type === 'Revision notes') return 'notes';
   if (type === 'PDF') return 'pdf';
   if (type === 'Classroom activity') return 'activity';
+  // Worksheets and remedial packs are things a class works through, so they
+  // preview as activities; a lesson plan is a document.
+  if (type === 'Worksheet' || type === 'Remedial class') return 'activity';
+  if (type === 'Lesson plan' || type === 'Teacher training') return 'notes';
   return 'presentation';
 }
 
@@ -771,31 +865,62 @@ function buildChapterContentItems(
   });
 }
 
-function getContentPreviewIcon(preview: ChapterContentPreview) {
-  if (preview === 'video') {
-    return Upload;
-  }
-
-  if (preview === 'notes' || preview === 'pdf') {
-    return FileText;
-  }
-
-  if (preview === 'activity') {
-    return ClipboardList;
-  }
-
-  return BookOpen;
-}
+// getContentPreviewIcon lived here. The card now picks its icon from the content
+// type rather than from the coarse `preview` bucket, so five content types no
+// longer share one icon - which was half of why the cards looked identical.
 
 function isTeacherTrainingContent(item: ChapterContentItem): boolean {
   return `${item.contentCategory ?? ''} ${item.type}`.toLowerCase().includes('teacher');
 }
 
-function truncateToWords(value: string, maxWords = 150): string {
-  const words = value.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return value;
-  return words.slice(0, maxWords).join(' ') + 'â€¦';
+/**
+ * Does an item belong under a library tab?
+ *
+ * Module-level and exported to the count logic so the tab strip's numbers and
+ * the grid below it cannot disagree. Previously this lived inline in the filter
+ * callback, which meant a tab count could only be had by duplicating the rules.
+ *
+ * Teacher Workspace once short-circuited this to `true`, so its tab strip
+ * rendered but filtered nothing - "All content" and "Presentations" returned an
+ * identical list. Presentations means presentations on both surfaces.
+ */
+function contentMatchesTab(item: ChapterContentItem, tab: string): boolean {
+  switch (tab) {
+    case 'All content':
+      return true;
+    case 'Presentations':
+      return (
+        item.type === 'Classroom presentation' || item.type === 'Teacher training presentation'
+      );
+    case 'Videos':
+      return item.type === 'Video';
+    case 'Revision notes':
+      return item.type === 'Revision notes' || item.type === 'PDF';
+    case 'Classroom activity':
+      return item.type === 'Classroom activity';
+    case 'Remedial class':
+      return item.type === 'Remedial class';
+    case 'Worksheet':
+      return item.type === 'Worksheet';
+    case 'Lesson plan':
+      return item.type === 'Lesson plan';
+    case 'My course':
+      return item.type === 'My course';
+    // The Teacher Workspace tab for the bulk 'Teacher Training' category. It
+    // deliberately also catches the 4 'Teacher training presentation' rows, so
+    // no teacher-training row is unreachable from this lane.
+    case 'Teacher training':
+      return item.type === 'Teacher training' || item.type === 'Teacher training presentation';
+    case 'H5P Interactive':
+      return item.type === 'H5P Interactive';
+    default:
+      return true;
+  }
 }
+
+// truncateToWords lived here, used only to cap the header pill at 150 words. A
+// pill allowed to hold 150 words is what let the header stretch unpredictably;
+// the pill now holds the content type, which is a short fixed label.
 
 /**
  * Concepts a question can be filed under. These are the chapter's own concept
@@ -1010,8 +1135,10 @@ export default function ChapterListPage() {
   const [manualModelAnswer, setManualModelAnswer] = useState('');
   const [manualQuestionError, setManualQuestionError] = useState('');
   const [selectedLibraryChapterId, setSelectedLibraryChapterId] = useState('');
-  const [contentLibraryTab, setContentLibraryTab] =
-    useState<(typeof CONTENT_LIBRARY_TABS)[number]>('All content');
+  // Typed as the union of BOTH tab lists. The two lanes no longer offer the same
+  // tabs - 'Teacher training' exists only on the Teacher lane - so typing this
+  // off the Classroom list alone makes the Teacher lane's own tabs unassignable.
+  const [contentLibraryTab, setContentLibraryTab] = useState<ContentLibraryTab>('All content');
   // Grouping follows the resource type: Classroom Resources is chapter-wise,
   // Teacher Workspace is concept-wise. Derived instead of stored, so the two can
   // never drift out of step and there is no toggle to leave in the wrong state.
@@ -1665,7 +1792,13 @@ export default function ChapterListPage() {
     };
   }, [activeContentLibraryTab, activeLibraryChapter, contentGroupBy, contentResourceType, view, chapterContentCategories]);
 
-  const filteredChapterContentItems = useMemo(() => {
+  /**
+   * Everything the current search, source and lane allow - before the tab
+   * filter. Split out from the filter below so the tab counts are computed from
+   * exactly the rows the grid would show, and so the counts and the grid cannot
+   * drift apart.
+   */
+  const contentItemsForActiveLane = useMemo(() => {
     return chapterContentItems.filter((item) => {
       const matchesSearch =
         !contentSearch ||
@@ -1685,32 +1818,44 @@ export default function ChapterListPage() {
       const matchesResourceType =
         isAudienceNeutral || (contentResourceType === 'teacher' ? isTeacherTraining : !isTeacherTraining);
 
-      // One tab predicate for both surfaces.
-      //
-      // Teacher Workspace previously short-circuited to `true`, so its tab strip
-      // rendered but filtered nothing - "All content" and "Presentations" returned
-      // an identical list. That was invisible while both tabs were near-synonyms,
-      // but it silently breaks the H5P tab, which has to actually filter to be worth
-      // anything. Presentations therefore now means presentations on both surfaces.
-      const matchesTab =
-        activeContentLibraryTab === 'All content' ||
-        (activeContentLibraryTab === 'Presentations' &&
-          (item.type === 'Classroom presentation' || item.type === 'Teacher training presentation')) ||
-        (activeContentLibraryTab === 'Videos' && item.type === 'Video') ||
-        (activeContentLibraryTab === 'Revision notes' &&
-          (item.type === 'Revision notes' || item.type === 'PDF')) ||
-        (activeContentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity') ||
-        (activeContentLibraryTab === 'H5P Interactive' && item.type === 'H5P Interactive');
-
-      return matchesSearch && matchesSource && matchesResourceType && matchesTab;
+      return matchesSearch && matchesSource && matchesResourceType;
     });
-  }, [
-    chapterContentItems,
-    activeContentLibraryTab,
-    contentResourceType,
-    contentSearch,
-    contentSourceFilter,
-  ]);
+  }, [chapterContentItems, contentResourceType, contentSearch, contentSourceFilter]);
+
+  const filteredChapterContentItems = useMemo(
+    () =>
+      contentItemsForActiveLane.filter((item) =>
+        contentMatchesTab(item, activeContentLibraryTab)
+      ),
+    [contentItemsForActiveLane, activeContentLibraryTab]
+  );
+
+  /**
+   * How many items each tab would show for the chapter in view.
+   *
+   * Drives both the count on the tab and whether the tab appears at all: a tab
+   * leading to an empty grid is worse than no tab, and with eleven possible
+   * types most chapters only hold a few. The active tab is always kept, so the
+   * strip cannot remove the tab the user is standing on and strand them.
+   */
+  const contentLibraryTabCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    availableContentLibraryTabs.forEach((tab) => {
+      counts[tab] = contentItemsForActiveLane.filter((item) => contentMatchesTab(item, tab)).length;
+    });
+    return counts;
+  }, [availableContentLibraryTabs, contentItemsForActiveLane]);
+
+  const visibleContentLibraryTabs = useMemo(
+    () =>
+      availableContentLibraryTabs.filter(
+        (tab) =>
+          tab === 'All content' ||
+          tab === activeContentLibraryTab ||
+          (contentLibraryTabCounts[tab] ?? 0) > 0
+      ),
+    [availableContentLibraryTabs, activeContentLibraryTab, contentLibraryTabCounts]
+  );
 
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const presentationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2908,21 +3053,6 @@ export default function ChapterListPage() {
       </article>
     );
   };
-
-  /**
-   * Chapter and concept line on a content card. The concept comes from the
-   * lms_concept mapping on the content row; content that has not been mapped to a
-   * concept shows the chapter alone rather than an empty pill.
-   */
-  const renderContentChapterConcept = (item: ChapterContentItem) => (
-    <div className="mb-3 flex flex-wrap items-center gap-1.5">
-      <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
-        <BookOpen size={11} className="shrink-0" />
-        {item.chapterTitle}
-      </span>
-    
-    </div>
-  );
 
   /**
    * Delete a Question Bank question. API-backed questions (numeric id) are
@@ -4304,6 +4434,41 @@ export default function ChapterListPage() {
     );
   }
 
+  if (view === 'coherence-map') {
+    return (
+      <div className="min-h-screen rounded-t-3xl">
+        <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8">
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <button
+              type="button"
+              onClick={() => router.push('/course-master')}
+              className="font-medium transition-colors hover:text-slate-900"
+            >
+              Teach / learn
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <button
+              type="button"
+              onClick={() => router.push(`/course-master/${courseId}/chapters`)}
+              className="font-medium transition-colors hover:text-slate-900"
+            >
+              {course.subject} - {getCourseGradeLabel(course.classGrade)}
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <span className="font-semibold text-slate-900">Coherence map</span>
+          </div>
+
+          <CoherenceMapView
+            subjectId={subjectId}
+            standardId={standardId}
+            title={`${course.subject} - ${getCourseGradeLabel(course.classGrade)}`}
+            onClose={() => router.push(`/course-master/${courseId}/chapters`)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'concept-intelligence') {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const intelChapter = allChapters.find((chapter) => chapter.id === activeChapterId) ?? null;
@@ -4732,20 +4897,31 @@ export default function ChapterListPage() {
 
           <div className="mb-4 border-b border-slate-200/80">
             <div className="flex flex-wrap items-center gap-6 text-[15px]">
-              {availableContentLibraryTabs.map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setContentLibraryTab(tab)}
-                  className={`inline-flex items-center border-b-2 px-1 py-3 font-medium transition-colors ${
-                    activeContentLibraryTab === tab
-                      ? 'border-[#4f46e5] text-[#4f46e5]'
-                      : 'border-transparent text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
+              {visibleContentLibraryTabs.map((tab) => {
+                const count = contentLibraryTabCounts[tab] ?? 0;
+                const isActive = activeContentLibraryTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setContentLibraryTab(tab)}
+                    className={`inline-flex items-center gap-2 border-b-2 px-1 py-3 font-medium transition-colors ${
+                      isActive
+                        ? 'border-[#4f46e5] text-[#4f46e5]'
+                        : 'border-transparent text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab}
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+                        isActive ? 'bg-[#eef2ff] text-[#4f46e5]' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -4825,58 +5001,16 @@ export default function ChapterListPage() {
                         </span>
                       </div>
                       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        {group.items.map((item) => {
-                          const PreviewIcon = getContentPreviewIcon(item.preview);
-                          return (
-                            <article
-                              key={item.id}
-                              className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
-                            >
-                              <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
-                                <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
-                                  {truncateToWords(item.subtitle, 150)}
-                                </span>
-                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                                  {isGeneratedContent(item.source) ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
-                                  {item.source}
-                                </span>
-                              </div>
-                              <div className="-mt-[74px] flex justify-center px-4">
-                                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
-                                  <PreviewIcon size={28} />
-                                </div>
-                              </div>
-                              <div className="px-4 pb-4 pt-3">
-                                {renderContentChapterConcept(item)}
-                                <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-                                <div>{item.conceptName ? (
-        <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#f1f5f9] px-3 py-1 text-[11px] font-medium text-slate-600">
-          <Brain size={11} className="shrink-0 text-[#4f46e5]" />
-          {item.conceptName}
-        </span>
-      ) : null}</div>
-                                <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      handleOpenContent(item);
-                                    }}
-                                    className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
-                                  >
-                                    {item.actionLabel === 'Play' ? (
-                                      <Play size={14} className="mr-2" />
-                                    ) : (
-                                      <Eye size={14} className="mr-2" />
-                                    )}
-                                    {item.actionLabel}
-                                  </Button>
-                                </div>
-                              </div>
-                            </article>
-                          );
-                        })}
+                        {group.items.map((item) => (
+                          // hideChapter: the group heading above this grid already
+                          // names it, so a chapter pill on each card is noise.
+                          <ContentCard
+                            key={item.id}
+                            item={item}
+                            onOpen={() => handleOpenContent(item)}
+                            hideChapter
+                          />
+                        ))}
                       </div>
                     </section>
                   ))}
@@ -4884,57 +5018,13 @@ export default function ChapterListPage() {
               );
             })() : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {filteredChapterContentItems.map((item) => {
-                  const PreviewIcon = getContentPreviewIcon(item.preview);
-
-                  return (
-                    <article
-                      key={item.id}
-                      className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
-                    >
-                      <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
-                        <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
-                          {truncateToWords(item.subtitle, 150)}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                          {isGeneratedContent(item.source) ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
-                          {item.source}
-                        </span>
-                      </div>
-
-                      <div className="-mt-[74px] flex justify-center px-4">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
-                          <PreviewIcon size={28} />
-                        </div>
-                      </div>
-
-                      <div className="px-4 pb-4 pt-3">
-                        {renderContentChapterConcept(item)}
-                        <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-
-                        <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
-                          
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleOpenContent(item);
-                            }}
-                            className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
-                          >
-                            {item.actionLabel === 'Play' ? (
-                              <Play size={14} className="mr-2" />
-                            ) : (
-                              <Eye size={14} className="mr-2" />
-                            )}
-                            {item.actionLabel}
-                          </Button>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                {filteredChapterContentItems.map((item) => (
+                  <ContentCard
+                    key={item.id}
+                    item={item}
+                    onOpen={() => handleOpenContent(item)}
+                  />
+                ))}
               </div>
             )}
 
@@ -5167,6 +5257,15 @@ export default function ChapterListPage() {
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+            className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-[#c7d2fe] bg-white px-3.5 py-2 text-[14px] font-medium text-[#4338ca] shadow-sm transition-colors hover:bg-[#eef2ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+          >
+            <Network size={16} strokeWidth={1.9} />
+            Coherence map
+          </button>
         </div>
 
         <div className="mb-6 border-b border-slate-200/80">
@@ -5193,6 +5292,14 @@ export default function ChapterListPage() {
             >
               <BookOpen size={16} />
               Chapters
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+              className="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 font-medium text-slate-600 transition-colors hover:text-slate-900"
+            >
+              <Network size={16} />
+              Coherence map
             </button>
           </div>
         </div>

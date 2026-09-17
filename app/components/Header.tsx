@@ -17,6 +17,7 @@ import HeaderMenuSearch from '@/app/components/HeaderMenuSearch';
 import type { MenuItem } from '@/app/data/menuItems';
 import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { AI_CAPABILITIES, capabilityHref } from '@shared/ai-intelligence-core';
+import { canAccessDocuments } from '@/app/documents/_lib/document-access';
 
 const platformServicesItems = [
   'RBAC',
@@ -197,6 +198,20 @@ export default function Header({
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userPosition, setUserPosition] = useState<{ top: number; right: number } | null>(null);
 
+  /**
+   * Resolved after mount, never during render: the answer comes from
+   * localStorage, which does not exist on the server, and computing it inline
+   * would make the first client render disagree with the server's.
+   *
+   * Starts false so the entry is hidden until proven otherwise — a flash of a
+   * menu item the user may not use is worse than it appearing a tick late.
+   */
+  const [documentsVisible, setDocumentsVisible] = useState(false);
+
+  useEffect(() => {
+    setDocumentsVisible(canAccessDocuments());
+  }, [user]);
+
   const platformSetupRoutes: Record<string, string> = {
     'Implementation': '/general/implementation_management',
     'Onboarding': '/general/onboarding',
@@ -218,10 +233,17 @@ export default function Header({
     'Notification': '/platform-services/notification',
     'Template': '/general/coming-soon?module=Template',
     'Scheduler': '/platform-services/scheduler',
-    'Document': '/general/coming-soon?module=Document',
+    // Document has graduated off the coming-soon placeholder to its real screen
+    // at /documents — a read-only aggregation over the document sources every
+    // other module already owns. Template remains a stub.
+    'Document': '/documents',
     'Integration': '/integration',
     'Audit': '/user_log',
-    'Event Bus': '/general/coming-soon?module=Event Bus',
+    // Event Bus has graduated the same way, to a read-only monitoring plane over
+    // the sync_log outbox, the audit tables and the outbound send-logs. It is not
+    // an event bus: this product has none, and the standing decision is not to
+    // build a second one beside the working outbox.
+    'Event Bus': '/platform-services/event-bus',
   };
 
   // A capability with a working screen keeps its own route; the rest resolve to
@@ -629,6 +651,14 @@ const logoUrl = (() => {
 
                           <div className="space-y-1">
                             {column.items.map((subItem) => {
+                              // Document lists every student and staff document in
+                              // the institute, so it is offered only to the
+                              // administrative roles its API will actually serve.
+                              // Hiding the entry is courtesy, not control — Laravel
+                              // refuses the endpoints independently (see
+                              // document-access.ts).
+                              if (subItem === 'Document' && !documentsVisible) return null;
+
                               const ItemIcon = group.icons[subItem];
                               const route = group.routes[subItem] || '/';
 

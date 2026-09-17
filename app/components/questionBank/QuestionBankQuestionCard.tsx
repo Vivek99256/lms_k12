@@ -54,10 +54,7 @@ function DetailsButton({ question }: { question: QuestionBankItem }) {
 
   const rows: Array<[string, string]> = [];
   if (question.bloom) rows.push(['Bloom', question.bloom]);
-  if (question.dok) rows.push(['Depth of knowledge', `DOK ${question.dok}`]);
   if (question.difficulty) rows.push(['Difficulty', question.difficulty]);
-  if (question.examSection) rows.push(['Exam section', `Section ${question.examSection}`]);
-  if (question.publisher) rows.push(['Publisher', question.publisher]);
   if (question.conceptTitle) rows.push(['Concept', question.conceptTitle]);
 
   if (rows.length === 0) return null;
@@ -283,31 +280,69 @@ function QuestionFigures({ question }: { question: QuestionBankItem }) {
   return (
     <div className="mt-3 flex flex-wrap gap-3">
       {figures.map((figure, i) => (
-        <figure
-          key={figure.sha256 ?? i}
-          className="overflow-hidden rounded-[6px] border border-slate-200 bg-white"
-        >
-          {figure.url && (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={figure.url}
-              alt={figure.caption || `Figure for question ${question.displayId}`}
-              loading="lazy"
-              className="max-h-56 w-auto max-w-full object-contain"
-            />
-          )}
-          {(figure.caption || figure.ocr_text) && (
-            <figcaption className="max-w-[280px] space-y-0.5 px-2 py-1 text-[11px] leading-snug text-slate-500">
-              {figure.caption && <span className="block">{figure.caption}</span>}
-              {figure.ocr_text && (
-                <span className="block line-clamp-3 text-slate-400" title={figure.ocr_text}>
-                  Read from image: {figure.ocr_text}
-                </span>
-              )}
-            </figcaption>
-          )}
-        </figure>
+        <QuestionFigure key={figure.sha256 ?? i} figure={figure} question={question} />
       ))}
     </div>
+  );
+}
+
+/**
+ * One figure, which may not load.
+ *
+ * Some rows still carry a URL from the machine that produced them, and a few
+ * point at files that no longer exist. Rendering those as a broken-image icon
+ * tells the reader nothing; the caption and the text OCR'd out of the figure
+ * usually carry the data the question needs, so they are shown instead.
+ */
+function QuestionFigure({
+  figure,
+  question,
+}: {
+  figure: NonNullable<QuestionBankItem['figures']>[number];
+  question: QuestionBankItem;
+}) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(figure.url) && !failed;
+
+  if (!showImage && !figure.caption && !figure.ocr_text) {
+    return (
+      <div className="flex items-center gap-2 rounded-[6px] border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500">
+        <ImageOff size={14} />
+        Figure unavailable.
+      </div>
+    );
+  }
+
+  return (
+    <figure className="overflow-hidden rounded-[6px] border border-slate-200 bg-white">
+      {showImage ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={figure.url as string}
+          alt={figure.caption || `Figure for question ${question.displayId}`}
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="max-h-56 w-auto max-w-full object-contain"
+        />
+      ) : (
+        <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-500">
+          <ImageOff size={13} />
+          Figure could not be loaded
+        </div>
+      )}
+      {(figure.caption || figure.ocr_text) && (
+        <figcaption className="max-w-[280px] space-y-0.5 px-2 py-1 text-[11px] leading-snug text-slate-500">
+          {figure.caption && <span className="block">{figure.caption}</span>}
+          {figure.ocr_text && (
+            <span
+              className={failed ? 'block text-slate-600' : 'block line-clamp-3 text-slate-400'}
+              title={figure.ocr_text}
+            >
+              Read from image: {figure.ocr_text}
+            </span>
+          )}
+        </figcaption>
+      )}
+    </figure>
   );
 }

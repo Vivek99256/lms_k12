@@ -24,6 +24,8 @@ export const MODULE_DASHBOARD_ROUTES: Record<string, string> = {
   hostel: '/hostel/dashboard',
   transportation: '/Transportation/dashboard',
   transport: '/Transportation/dashboard',
+  document: '/documents',
+  documents: '/documents',
 };
 
 export function resolveModuleDashboardRoute(label: string | null | undefined): string | undefined {

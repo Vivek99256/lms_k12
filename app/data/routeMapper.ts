@@ -580,11 +580,34 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   // Platform Services: Audit has graduated off the coming-soon placeholder to
   // its real screen at /user_log. Intercept the Audit coming-soon link so every
   // API-driven surface (sidebar, Level 3 sub-header, master menu) lands on the
-  // live page instead of the stub. The other Platform Services stubs (Template,
-  // Document, Integration, Event Bus) still resolve to their coming-soon pages.
+  // live page instead of the stub. Of the Platform Services stubs, only Template
+  // still resolves to a coming-soon page.
   if (lowerLink.replace(/^\/+/, '') === 'general/coming-soon?module=audit') {
     return '/user_log';
    }
+
+  // Document has graduated the same way, to /documents. Intercepted here so
+  // every API-driven surface (sidebar, Level 3 sub-header, master menu) lands on
+  // the live screen rather than the stub. Template still resolves to its
+  // coming-soon page.
+  if (lowerLink.replace(/^\/+/, '') === 'general/coming-soon?module=document') {
+    return '/documents';
+  }
+
+  // Event Bus has graduated to /platform-services/event-bus — a read-only
+  // monitoring plane over the sync_log outbox, the audit tables and the outbound
+  // send-logs. The space in the module name arrives both literally and
+  // percent-encoded depending on which surface built the link, so both spellings
+  // are matched rather than relying on whichever one tblmenumaster happens to
+  // hold.
+  const eventBusLink = lowerLink.replace(/^\/+/, '');
+  if (
+    eventBusLink === 'general/coming-soon?module=event bus' ||
+    eventBusLink === 'general/coming-soon?module=event%20bus' ||
+    eventBusLink === 'general/coming-soon?module=event+bus'
+  ) {
+    return '/platform-services/event-bus';
+  }
 
   const easyCommunicationRoutes: Record<string, string> = {
     'send_sms_parents.index': '/easy_com/send_sms_parents',

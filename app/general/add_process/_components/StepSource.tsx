@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ErpSection, erpSelectClass } from "@/components/erp/erp-ui";
-import { SOP_MODULES, type SopModule } from "@/lib/process";
+import { SOP_MODULES, vocabularyFor, type SopModule } from "@/lib/process";
 import { IssueList } from "./process-ui";
 import type { ParseIssue } from "@/lib/process";
 
@@ -26,6 +26,13 @@ import type { ParseIssue } from "@/lib/process";
  * a person choose from hundreds of unrelated titles to answer a question the
  * procedure number already answers. Storage now keys itself off the module and
  * the reference, so the question is not asked.
+ *
+ * All three lists come from the module registry and nowhere else: the Module
+ * select is `SOP_MODULES`, Process group is the chosen module's `groups`, and
+ * Procedure is the chosen group's `procedures`. Registering a module is
+ * therefore the whole of adding it to this screen - there is no list here to
+ * keep in step. Each option is annotated with what the module actually
+ * carries, so "configured" is visible rather than assumed.
  */
 
 export interface SourceState {
@@ -70,6 +77,15 @@ export function StepSource({
     [group, state.procedureRef]
   );
 
+  /** What the chosen module carries, so the caption states it rather than implies it. */
+  const catalogued = useMemo(() => {
+    const groups = sopModule?.groups ?? [];
+    return {
+      groups: groups.length,
+      procedures: groups.reduce((total, entry) => total + entry.procedures.length, 0),
+    };
+  }, [sopModule]);
+
   return (
     <ErpSection
       title="1. Source"
@@ -109,7 +125,8 @@ export function StepSource({
           {sopModule ? (
             <p className="text-xs text-slate-500">
               {sopModule.sop.document} v{sopModule.sop.version} &middot; {sopModule.sop.organization} &middot; effective{" "}
-              {sopModule.sop.effectiveDate}
+              {sopModule.sop.effectiveDate} &middot; {catalogued.groups} process groups, {catalogued.procedures}{" "}
+              procedures
             </p>
           ) : null}
         </div>
@@ -126,7 +143,7 @@ export function StepSource({
             <option value="">Select a process group</option>
             {sopModule?.groups.map((entry) => (
               <option key={entry.ref} value={entry.ref}>
-                {entry.ref} {entry.title}
+                {entry.ref} {entry.title} ({entry.procedures.length})
               </option>
             ))}
           </select>
@@ -150,9 +167,9 @@ export function StepSource({
               </option>
             ))}
           </select>
-          {procedure ? (
+          {procedure && sopModule ? (
             <p className="text-xs text-slate-500">
-              Primary actor per the SOP index: {procedure.primaryActor.replace("_", " + ")}
+              Primary actor per the SOP index: {vocabularyFor(sopModule).actorLabels[procedure.primaryActor]}
             </p>
           ) : null}
         </div>

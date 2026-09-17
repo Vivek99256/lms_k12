@@ -423,6 +423,9 @@ export function PlatformShell({
   onSelectModule,
   actions,
   children,
+  breadcrumb,
+  modulePinned = false,
+  embedded = false,
 }: {
   title: string;
   description: string;
@@ -433,14 +436,65 @@ export function PlatformShell({
   onSelectModule: (moduleKey: string | null) => void;
   actions?: React.ReactNode;
   children: React.ReactNode;
+  /**
+   * The trail above the title. Defaults to the platform-services one, so the
+   * three central consoles are unchanged; a module that mounts one of these
+   * consoles inside its own module (Fees → Workflow) passes its own trail so
+   * the operator is not told they left the module they are standing in.
+   */
+  breadcrumb?: React.ReactNode[];
+  /**
+   * The module is fixed by the page, not chosen by the operator.
+   *
+   * The left rail then has nothing to offer — a picker that can only pick what
+   * is already picked is a control that does nothing — so it is dropped and the
+   * body takes the full width. The scope still travels to the API as `module=`,
+   * exactly as when the rail chose it; nothing is filtered in the browser.
+   */
+  modulePinned?: boolean;
+  /**
+   * Render as a section inside somebody else's page instead of as a page.
+   *
+   * WHY THIS IS A MODE AND NOT A SECOND COMPONENT. Fees mounts these consoles as
+   * tabs on its own category pages, which already supply the frame: the Fees
+   * level-3 bar, the title card, the canvas. A console that brought its own
+   * `min-h-screen` background, breadcrumb and page title would stack a second
+   * page inside the first — two headings, two backgrounds, doubled padding.
+   * So the chrome is dropped and only the working content is emitted, which is
+   * exactly what FeesNotificationSettings does by hand on Fees → Communication.
+   * The heading stays, because the section still has to name itself under the
+   * category's own title, the way "Fees notification settings" does.
+   */
+  embedded?: boolean;
 }) {
   const activeModule = selectedModule ? registry.modules.find((row) => row.key === selectedModule) ?? null : null;
+  const trail = breadcrumb ?? ['Platform services', title];
+
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            <p className="mt-1 text-sm text-slate-600">{description}</p>
+          </div>
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
+        </div>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <header className="mb-5">
-        <p className="flex items-center gap-1 text-xs font-medium text-slate-500">
-          Platform services <ChevronRight size={12} /> {title}
+        <p className="flex flex-wrap items-center gap-1 text-xs font-medium text-slate-500">
+          {trail.map((crumb, index) => (
+            <React.Fragment key={index}>
+              {index > 0 && <ChevronRight size={12} />}
+              {crumb}
+            </React.Fragment>
+          ))}
         </p>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -468,13 +522,15 @@ export function PlatformShell({
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
-          <ModulePicker modules={registry.modules} countKey={countKey} selected={selectedModule} onSelect={onSelectModule} />
-        </aside>
+      <div className={`grid gap-4 ${modulePinned ? '' : 'lg:grid-cols-[260px_minmax(0,1fr)]'}`}>
+        {!modulePinned && (
+          <aside className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
+            <ModulePicker modules={registry.modules} countKey={countKey} selected={selectedModule} onSelect={onSelectModule} />
+          </aside>
+        )}
 
         <main className="min-w-0 space-y-4">
-          {activeModule && (
+          {activeModule && !modulePinned && (
             <div>
               <h2 className="text-base font-semibold text-slate-900">{activeModule.label}</h2>
               <p className="text-sm text-slate-600">{activeModule.description}</p>

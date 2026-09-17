@@ -231,9 +231,33 @@ export const ACTOR_LABELS: Record<ActorMode, string> = {
   student_ai: 'Student + AI',
 }
 
-/** Parse an SOP actor label ('Teacher + AI', 'Student+AI', 'AI') into an `ActorMode`. */
-export function parseActor(raw: string): ActorMode | null {
-  const normalized = raw.toLowerCase().replace(/[\s_]+/g, '').replace(/&/g, '+')
+/** Case, spacing and '&' folded away, so 'Teacher + AI' and 'teacher&ai' match. */
+function normalizeActor(raw: string): string {
+  return raw.toLowerCase().replace(/[\s_]+/g, '').replace(/&/g, '+')
+}
+
+/**
+ * Parse an SOP actor label ('Teacher + AI', 'Student+AI', 'AI') into an
+ * `ActorMode`.
+ *
+ * `aliases` are a module's own names for its people - 'Accountant', 'Parent' -
+ * taken from its `ModuleVocabulary`. They are consulted only after the five
+ * canonical labels, so no module can redefine what 'AI' means, and a module
+ * that declares none behaves exactly as before.
+ */
+export function parseActor(raw: string, aliases: Record<string, ActorMode> = {}): ActorMode | null {
+  const normalized = normalizeActor(raw)
+  const canonical = parseCanonicalActor(normalized)
+  if (canonical) return canonical
+
+  for (const [alias, actor] of Object.entries(aliases)) {
+    if (normalizeActor(alias) === normalized) return actor
+  }
+
+  return null
+}
+
+function parseCanonicalActor(normalized: string): ActorMode | null {
   switch (normalized) {
     case 'teacher':
       return 'teacher'

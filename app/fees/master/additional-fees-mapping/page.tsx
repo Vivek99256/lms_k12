@@ -652,9 +652,14 @@ export default function AdditionalFeesMappingPage() {
         throw new Error(payload.message || 'Failed to save additional fee mapping.');
       }
 
-      setSuccessMessage(
-        payload.message || 'Other fees breakoff saved successfully.'
-      );
+      // Re-run the search so the grid shows what was actually persisted rather
+      // than the local form state - without this the screen looked unchanged
+      // after a save and only a browser refresh revealed the stored values.
+      // handleSearch clears successMessage, so the message is set after it.
+      const savedMessage =
+        payload.message || 'Other fees breakoff saved successfully.';
+      await handleSearch();
+      setSuccessMessage(savedMessage);
     } catch (saveError) {
       setError(
         saveError instanceof Error

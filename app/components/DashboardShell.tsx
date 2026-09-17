@@ -18,9 +18,9 @@ import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
 import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
 import { canSeeInternalItems } from '@/lib/roadmap';
+import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
-import { useFeesLevel3Nav } from '@/app/fees/_lib/use-fees-level3-nav';
-import { useTeachLearnLevel3Nav } from '@/app/teach-learn/_lib/use-teach-learn-level3-nav';
+import { useModuleLevel3Nav } from '@/app/_lib/use-module-level3-nav';
 
 interface SelectedBranch {
   level1Key: string;
@@ -76,6 +76,35 @@ function isBrainVisibleByLmsSession() {
       profileName.includes('admin') ||
       profileName.includes('principal') ||
       profileName.includes('management')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The blue Master button on the level-3 sub-header opens institute SETUP
+ * screens — masters and configuration — which are staff work. A student must
+ * never see it, whatever level-3 bar they are standing on.
+ *
+ * Matched on profile NAME, not id: `user_profile_id` for "Student" differs per
+ * institute (3684 at one school, another number at the next), so an id check
+ * would silently stop working for every other tenant. This is the same reason
+ * isBrainVisibleByLmsSession() above matches admin tiers by name.
+ *
+ * Read from storage rather than taken from the `userProfileName` state below,
+ * because that state is populated in an effect and is '' on first paint — the
+ * button would flash into view for a student before being removed.
+ */
+function isStudentSession() {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}');
+
+    return isStudentProfile(
+      String(menuContext.user_profile_name ?? userData.user_profile ?? userData.user_profile_name ?? ''),
     );
   } catch {
     return false;
@@ -208,13 +237,19 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const [userProfileName, setUserProfileName] = useState('');
   const [hasBrainAccess, setHasBrainAccess] = useState(() => isBrainVisibleByLmsSession());
+  const [isStudent, setIsStudent] = useState(() => isStudentSession());
 
   useEffect(() => {
+    const ctx = getStoredMenuContext();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUserProfileName((prev) => {
-      const ctx = getStoredMenuContext();
-      return ctx?.user_profile_name ? ctx.user_profile_name.toString().trim() : prev;
-    });
+    setUserProfileName((prev) => (ctx?.user_profile_name ? ctx.user_profile_name.toString().trim() : prev));
+    // Re-checked here as well as in the initialiser: on a first load the menu
+    // context can land in storage after this component mounts, and a student
+    // who slipped through the initial check would keep the Master button.
+    if (ctx?.user_profile_name) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsStudent(isStudentProfile(ctx.user_profile_name.toString()));
+    }
   }, []);
 
   useEffect(() => {
@@ -612,13 +647,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key) ?? null;
   }, [selectedBranch, selectedL1]);
 
-  const feesLevel3Menu = useFeesLevel3Nav({
-    selectedLevel2Label: selectedL2?.label,
-    pathname,
-  });
-
-  const teachLearnLevel3Menu = useTeachLearnLevel3Nav({
-    selectedLevel2Label: selectedL2?.label,
+  /**
+   * Every module's category bar comes from here — Fees and Teach/Learn
+   * included, which used to have a hook each. The module is resolved from the
+   * selected level-2 menu's id rather than its label, because two active
+   * level-2 menus are both named "Task Management".
+   */
+  const moduleLevel3Menu = useModuleLevel3Nav({
+    selectedLevel2Id: selectedL2?.id,
     pathname,
   });
 
@@ -662,19 +698,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (newPalItems) {
       return { parentLabel: 'New PAL', items: newPalItems };
     }
-    // Fees shows its seven categories here; each links to its own page, which
-    // carries that category's menus as its own tab bar. The hook returns null
-    // for every non-Fees context, so no other module's navigation is affected.
-    // For Fees it never returns null — it holds a loading placeholder instead —
-    // so the old Fees level-3 list below is unreachable, even for one frame.
-    if (feesLevel3Menu) {
-      return feesLevel3Menu;
-    }
-    // Teach/Learn shows its category tabs here, the same way Fees does above;
-    // the hook returns null for every non-Teach/Learn context, so no other
-    // module's navigation is affected.
-    if (teachLearnLevel3Menu.navigation) {
-      return teachLearnLevel3Menu.navigation;
+    // A module with a seeded category bar shows its categories here; each
+    // links to its own page, which carries that category's menus as its own
+    // tab bar. The hook returns null for every module without a bar, so those
+    // fall through to the menu-driven resolution below and are unaffected. For
+    // a module that has one it never returns null — it holds a loading
+    // placeholder instead — so that module's old flat level-3 list is
+    // unreachable, even for one frame.
+    if (moduleLevel3Menu.navigation) {
+      return moduleLevel3Menu.navigation;
     }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
@@ -699,7 +731,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         loading={loading}
         error={error}
         refetch={refetch}
-        dynamicLevel2Counts={{ 'teach/learn': teachLearnLevel3Menu.categoryCount }}
+        dynamicLevel2Counts={moduleLevel3Menu.level2Counts}
         onLevel1Select={handleLevel1Select}
         onLevel2Select={handleLevel2Select}
       />
@@ -726,7 +758,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     masterLoading={masterMenuLoading}
                     masterMenuGroups={masterMenuGroups}
                     userProfileName={userProfileName}
-                    hideMaster={level3Menu?.hideMaster ?? false}
+                    hideMaster={(level3Menu?.hideMaster ?? false) || isStudent}
                   />
                 </div>
               )}

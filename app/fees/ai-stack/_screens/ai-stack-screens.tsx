@@ -2,7 +2,7 @@
 
 import { BookMarked, Cpu, FileText, Gauge, History, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
 
-import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
+import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
 import { FeesActivityScreen } from '@/app/fees/ai-stack/_screens/fees-activity-screen';
 import { FeesAutomationsScreen } from '@/app/fees/ai-stack/_screens/fees-automations-screen';
 import { FeesGuardrailsScreen } from '@/app/fees/ai-stack/_screens/fees-guardrails-screen';
@@ -52,7 +52,7 @@ import { FeesUsageCostScreen } from '@/app/fees/ai-stack/_screens/fees-usage-cos
  * filled from fee records. Guardrails reads what the other tabs configure and offers no
  * second place to change it.
  */
-export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
+export const FEES_AI_STACK_SCREENS: ModuleStaticScreen[] = [
   {
     // Live. `ai_policies` rows carrying a `module` assignment for Fees, through the
     // same client and endpoints as the central console. See fees-policies-screen.tsx.

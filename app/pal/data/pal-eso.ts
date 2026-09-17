@@ -88,6 +88,17 @@ export function defaultLearnerId(): string {
 
 export type NodeType = 'K' | 'A' | 'S';
 
+/** Where a piece of learning content came from. See EsoAction.learningContent. */
+export type EsoLearningSource = 'authored' | 'derived' | 'institute_video' | 'curated_video';
+
+const LEARNING_SOURCES: readonly string[] = ['authored', 'derived', 'institute_video', 'curated_video'];
+
+function readLearningSource(value: unknown): EsoLearningSource {
+  return typeof value === 'string' && LEARNING_SOURCES.includes(value)
+    ? (value as EsoLearningSource)
+    : 'derived';
+}
+
 export interface QuestionOption {
   id: number;
   answer: string;
@@ -197,10 +208,18 @@ export interface EsoAction {
    */
   expects?: 'acknowledge' | 'check_understanding' | 'answer' | null;
   /**
-   * The concept's learning object from the PAL content model, when one
-   * genuinely exists. `mediaUrl` is only ever non-null for an AUTHORED asset —
-   * a `derived` variant is an authoring specification whose format describes
-   * what should be built, so it carries rich text and no media.
+   * The concept's learning object, when one genuinely exists.
+   *
+   * `source` says where it came from, and they behave differently:
+   *   'authored'        — a reviewed asset a human attached to this node.
+   *   'derived'         — an authoring SPECIFICATION backed by extracted
+   *                       curriculum text. Its `format` describes what should
+   *                       be built, so it never carries media.
+   *   'institute_video' — an approved video from the school's own library.
+   *   'curated_video'   — an approved video from outside it, hence `attribution`.
+   *
+   * The two video sources only ever appear on a reteach, and only once a human
+   * has approved them.
    */
   learningContent?: {
     variant: number;
@@ -210,7 +229,13 @@ export interface EsoAction {
     title: string | null;
     body: string | null;
     mediaUrl: string | null;
-    source: 'authored' | 'derived';
+    source: EsoLearningSource;
+    /** 'upload' | 'youtube' | 'vimeo' — video sources only. */
+    provider?: string | null;
+    /** Channel or uploader, shown to the student beneath the player. */
+    attribution?: string | null;
+    /** How well this matched the concept. Diagnostic; never shown to students. */
+    matchScore?: number | null;
   } | null;
   /** CFU only: how many questions the gate will serve. */
   cfuItemCount?: number | null;
@@ -314,7 +339,13 @@ function mapAction(raw: unknown): EsoAction {
         title: c.title == null ? null : readString(c.title),
         body: c.body == null ? null : readString(c.body),
         mediaUrl: c.media_url == null ? null : readString(c.media_url),
-        source: c.source === 'authored' ? ('authored' as const) : ('derived' as const),
+        // A whitelist rather than a binary ternary: an unrecognised future
+        // source should fall back to the conservative 'derived' handling, not
+        // be silently relabelled as a reviewed 'authored' asset.
+        source: readLearningSource(c.source),
+        provider: c.provider == null ? null : readString(c.provider),
+        attribution: c.attribution == null ? null : readString(c.attribution),
+        matchScore: numOrNull(c.match_score),
       };
     })(),
     cfuItemCount: numOrNull(r.cfu_item_count),

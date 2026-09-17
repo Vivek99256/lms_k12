@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
+import { JourneyEndLaunch } from "./JourneyEndLaunch";
 import { RIBBON_FILL, RIBBON_TURN_COLOR, STATUS_META } from "./onboarding-ui";
 import type { OnboardingStep, StepOwner } from "../_lib/onboarding-api";
+
+/**
+ * The launch pad is packed into the lanes alongside the steps, so this sentinel
+ * stands in for it wherever a cell can be either.
+ */
+const LAUNCH = "launch" as const;
+type Cell = OnboardingStep | typeof LAUNCH;
 
 /**
  * The serpentine journey ribbon from the reference design.
@@ -25,8 +33,14 @@ import type { OnboardingStep, StepOwner } from "../_lib/onboarding-api";
  *  - The turn is an SVG semicircle stroked at the band's own thickness, which is
  *    the only way to get a true constant-width 180 degree bend.
  *
+ * The journey ends on a launch pad rather than on a step: `JourneyEndLaunch` is
+ * packed as one more cell after the last step, so it lands at the end of the
+ * final lane and the last chevron points straight into it. It is always laid
+ * out — locked until every required step is done — because a destination you
+ * cannot see from the start of the road is not a destination.
+ *
  * Below `sm` the ribbon cannot stay legible, so it degrades to a vertical
- * stepper — same data, same interactions, no clip-path.
+ * stepper — same data, same interactions, no clip-path, launch pad last.
  */
 
 const RIBBON_H = 56; // band thickness
@@ -195,11 +209,19 @@ function VerticalStepper({
   selectedId,
   currentUserName,
   onSelect,
+  launchUnlocked,
+  launchDestination,
+  remainingSteps,
+  onLaunch,
 }: {
   steps: OnboardingStep[];
   selectedId: number | null;
   currentUserName: string;
   onSelect: (step: OnboardingStep) => void;
+  launchUnlocked: boolean;
+  launchDestination: string;
+  remainingSteps: number;
+  onLaunch: () => void;
 }) {
   return (
     <ol className="space-y-2 sm:hidden">
@@ -237,6 +259,19 @@ function VerticalStepper({
           </li>
         );
       })}
+
+      {/* Last item on the list for the same reason it is the last cell of the
+          ribbon: the journey ends here. */}
+      <li className="pt-1">
+        <JourneyEndLaunch
+          unlocked={launchUnlocked}
+          pointsLeft={false}
+          height={RIBBON_H}
+          destinationLabel={launchDestination}
+          remaining={remainingSteps}
+          onLaunch={onLaunch}
+        />
+      </li>
     </ol>
   );
 }
@@ -246,33 +281,63 @@ export function JourneyRibbon({
   selectedId,
   currentUserName,
   onSelect,
+  launchUnlocked,
+  launchDestination,
+  remainingSteps,
+  onLaunch,
 }: {
   steps: OnboardingStep[];
   selectedId: number | null;
   currentUserName: string;
   onSelect: (step: OnboardingStep) => void;
+  /** True once the API reports every required step complete. */
+  launchUnlocked: boolean;
+  /** Where the pad says it is going, e.g. "Fees dashboard". */
+  launchDestination: string;
+  /** Required steps still outstanding, shown on the locked pad. */
+  remainingSteps: number;
+  onLaunch: () => void;
 }) {
   const columns = useColumns();
 
   if (steps.length === 0) return null;
 
+  // The launch pad is packed as one more cell, so it always lands at the end of
+  // the final lane — and starts a lane of its own when the last row is full,
+  // which reads as the road arriving somewhere rather than stopping.
+  const cells: Cell[] = [...steps, LAUNCH];
+
   // A middle row loses width to a turn on BOTH sides, so it carries one segment
   // fewer than the first and last rows. With 8 steps at 3 columns this yields the
   // reference layout: 3, 2, 3.
-  const rows: OnboardingStep[][] = [];
-  for (let index = 0; index < steps.length;) {
+  // Capacity is carried alongside the cells, not recomputed from how many landed
+  // in the row: a row that did not fill up still divides into that many slots, so
+  // its segments stay the width of a segment instead of stretching to fill the
+  // lane. The last lane is nearly always short one, because the launch pill takes
+  // a slot but only its own compact width.
+  const rows: { cells: Cell[]; capacity: number }[] = [];
+  for (let index = 0; index < cells.length;) {
     const isFirstRow = rows.length === 0;
-    const remaining = steps.length - index;
+    const remaining = cells.length - index;
     const capacity =
       isFirstRow || remaining <= columns ? columns : Math.max(1, columns - 1);
 
-    rows.push(steps.slice(index, index + capacity));
+    rows.push({ cells: cells.slice(index, index + capacity), capacity });
     index += capacity;
   }
 
   return (
     <div>
-      <VerticalStepper steps={steps} selectedId={selectedId} currentUserName={currentUserName} onSelect={onSelect} />
+      <VerticalStepper
+        steps={steps}
+        selectedId={selectedId}
+        currentUserName={currentUserName}
+        onSelect={onSelect}
+        launchUnlocked={launchUnlocked}
+        launchDestination={launchDestination}
+        remainingSteps={remainingSteps}
+        onLaunch={onLaunch}
+      />
 
       <div className="relative hidden sm:block" aria-label="Onboarding journey">
         {rows.map((row, rowIndex) => {
@@ -281,7 +346,19 @@ export function JourneyRibbon({
           // `flex-row-reverse` already lays DOM order out right-to-left, so the
           // array must stay in flow order — reversing it too would run the row
           // backwards.
-          const cells = row;
+          const rowCells = row.cells;
+
+          // A full row's segments each end up this wide: the lane's width, plus
+          // back the NOTCH that every interlocking margin pulled out of it, over
+          // the number of slots. Pinning short rows to the same figure is what
+          // keeps the last segment the size of a segment.
+          const slotBasis = `calc((100% + ${(row.capacity - 1) * NOTCH}px) / ${row.capacity})`;
+          // Rows that fill up can keep growing into any rounding slack. Rows that
+          // do not — which is every row holding the launch pill, since the pill
+          // takes a slot but only its own compact width — must not, or the spare
+          // lane width lands in the segments.
+          const fixedWidth =
+            rowCells.length < row.capacity || rowCells.includes(LAUNCH);
 
           // A row must clear space on BOTH sides that a turn attaches to: the
           // one it arrives from and the one it leaves by. Turns alternate sides,
@@ -306,31 +383,64 @@ export function JourneyRibbon({
               }}
             >
               <div className={`flex h-full ${reversed ? "flex-row-reverse" : ""}`}>
-                {cells.map((step, cellIndex) => {
+                {rowCells.map((cell, cellIndex) => {
                   const first = cellIndex === 0;
-                  const last = cellIndex === cells.length - 1;
+                  const last = cellIndex === rowCells.length - 1;
+
+                  if (cell === LAUNCH) {
+                    return (
+                      <div
+                        key={LAUNCH}
+                        /* `flex-none`, so the node stays its own compact width
+                           rather than stretching across whatever the lane has
+                           left — the spare width goes back to the chevrons. No
+                           interlocking margin either: it has no notch to fill,
+                           and the chevron before it is flattened to meet it
+                           flush (see `tail` below). Centred on the band, which
+                           is the row's own centreline. */
+                        className="flex flex-none items-center"
+                        style={{ marginLeft: reversed ? 0 : 10, marginRight: reversed ? 10 : 0 }}
+                      >
+                        <JourneyEndLaunch
+                          unlocked={launchUnlocked}
+                          pointsLeft={reversed}
+                          height={RIBBON_H}
+                          destinationLabel={launchDestination}
+                          remaining={remainingSteps}
+                          onLaunch={onLaunch}
+                        />
+                      </div>
+                    );
+                  }
 
                   return (
                     <div
-                      key={step.id}
-                      className="flex min-w-0 flex-1"
-                      style={
-                        first
+                      key={cell.id}
+                      className="flex min-w-0"
+                      style={{
+                        flexGrow: fixedWidth ? 0 : 1,
+                        flexShrink: 1,
+                        flexBasis: fixedWidth ? slotBasis : 0,
+                        // Non-first cells are pulled back so the previous
+                        // chevron's point fills their notch.
+                        ...(first
                           ? undefined
                           : reversed
                             ? { marginRight: -NOTCH }
-                            : { marginLeft: -NOTCH }
-                      }
+                            : { marginLeft: -NOTCH }),
+                      }}
                     >
                       <StepSegment
-                        step={step}
-                        index={steps.indexOf(step)}
+                        step={cell}
+                        index={steps.indexOf(cell)}
                         pointsLeft={reversed}
                         // Flatten the edge where the band enters from a turn…
                         head={first && rowIndex > 0}
-                        // …and the edge where it leaves into one.
-                        tail={last && !isLastRow}
-                        selected={selectedId === step.id}
+                        // …and the edge where it leaves into one, or runs into
+                        // the launch pad, which is flat-sided and would otherwise
+                        // leave the chevron's point sticking out over nothing.
+                        tail={(last && !isLastRow) || rowCells[cellIndex + 1] === LAUNCH}
+                        selected={selectedId === cell.id}
                         currentUserName={currentUserName}
                         onSelect={onSelect}
                       />

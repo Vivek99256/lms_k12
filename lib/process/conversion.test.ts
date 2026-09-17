@@ -14,8 +14,10 @@ import {
 } from './envelope'
 import { specToIntakeText } from './intake'
 import { parseSopProcedure, validateSpec } from './parser'
-import { LMS_PAL_MODULE } from './sop-catalog'
-import { LMS_PAL_6_9_4_SOURCE } from './sop-source'
+import { FEES_MODULE } from './fees-catalog'
+import { findModule, findModuleByName, sampleProcedureFor, SOP_MODULES } from './module-registry'
+import { LMS_PAL_MODULE, vocabularyFor } from './sop-catalog'
+import { FEES_6_4_2_SOURCE, LMS_PAL_6_9_4_SOURCE, shippedSourceFor } from './sop-source'
 import type { ProcessSpec } from './types'
 
 const NOW = '2026-08-27T00:00:00.000Z'
@@ -350,4 +352,190 @@ test('one converted procedure fits the TEXT column with room to spare', () => {
   const size = checkSize(envelope)
 
   assert.ok(size.withinBudget, `envelope is ${size.bytes} bytes, over the ${size.budget} budget`)
+})
+
+/* -------------------------------------------------------------------- *
+ * The module registry, and the second module on it
+ * -------------------------------------------------------------------- */
+
+test('both modules are registered, and each is reachable by key and by name', () => {
+  assert.deepEqual(SOP_MODULES.map((module) => module.key), ['lms-pal', 'fees'])
+
+  // The Module dropdown is this list; the other two dropdowns are the chosen
+  // entry's groups and procedures. A module with a broken index would show an
+  // empty picker rather than an error, so the shape is asserted, not the name.
+  for (const sopModule of SOP_MODULES) {
+    assert.equal(findModule(sopModule.key), sopModule)
+    assert.equal(findModuleByName(sopModule.name), sopModule)
+    assert.ok(sopModule.groups.length, `${sopModule.key} has no process groups`)
+    assert.ok(
+      sopModule.groups.every((group) => group.procedures.length),
+      `${sopModule.key} has an empty process group`
+    )
+    // A group's stage has to be one the module declares, or a converted Process
+    // inherits a lifecycle stage its own SOP never defined.
+    assert.ok(
+      sopModule.groups.every((group) => sopModule.lifecycleStages.includes(group.lifecycleStage)),
+      `${sopModule.key} has a group in an undeclared lifecycle stage`
+    )
+    // Procedure references are what storage keys itself on, within a module.
+    const refs = sopModule.groups.flatMap((group) => group.procedures.map((entry) => entry.ref))
+    assert.equal(new Set(refs).size, refs.length, `${sopModule.key} repeats a procedure reference`)
+    // The sample offered on a first visit has to be a procedure that ships text.
+    const sample = sampleProcedureFor(sopModule.key)
+    assert.ok(sample, `${sopModule.key} offers no sample procedure`)
+    assert.ok(
+      shippedSourceFor(sopModule.key, sample.procedureRef),
+      `${sopModule.key} indexes ${sample.procedureRef} as digitized but ships no text for it`
+    )
+  }
+})
+
+test('each module keeps its own rule set, so a BR reference never crosses modules', () => {
+  const feesRule = FEES_MODULE.businessRules.find((rule) => rule.id === 'BR-04')?.rule
+  const lmsRule = LMS_PAL_MODULE.businessRules.find((rule) => rule.id === 'BR-04')?.rule
+
+  assert.match(feesRule ?? '', /oldest outstanding instalment/)
+  assert.match(lmsRule ?? '', /Concept mastery is banded/)
+
+  // BR-07 and BR-08 are the pair `rulesFor` adds to any procedure with an AI
+  // actor, whatever its steps cite. A module that renumbered them would
+  // silently inherit two unrelated rules.
+  for (const sopModule of SOP_MODULES) {
+    const governance = sopModule.businessRules.filter((rule) => ['BR-07', 'BR-08'].includes(rule.id))
+    assert.equal(governance.length, 2, `${sopModule.key} is missing the AI-governance rules`)
+    assert.ok(governance.every((rule) => rule.appliesAt === 'Every AI interaction'))
+  }
+})
+
+/* -------------------------------------------------------------------- *
+ * Fees: the same conversion, in the module's own words
+ * -------------------------------------------------------------------- */
+
+function feesSpec(): ProcessSpec {
+  const result = convertSopProcedure(FEES_6_4_2_SOURCE, FEES_MODULE, { now: NOW })
+  assert.deepEqual(result.issues, [], 'the shipped 6.4.2 source must convert cleanly')
+  assert.ok(result.spec)
+  return result.spec
+}
+
+test('converts the shipped Fees procedure against the Fees catalogue', () => {
+  const converted = feesSpec()
+
+  assert.equal(converted.ref, '6.4.2')
+  assert.equal(converted.module, 'Fees')
+  assert.equal(converted.lifecycleStage, 'Collect')
+  assert.equal(converted.source.processGroup, '6.4 Counter collection')
+  assert.equal(converted.source.document, 'Fees SOP')
+  assert.equal(converted.source.method, 'structured')
+  assert.deepEqual(
+    converted.workflow.steps.map((step) => step.actor),
+    ['teacher', 'teacher', 'teacher', 'ai', 'teacher', 'ai', 'teacher_ai']
+  )
+  // Handovers resolve against the Fees index, not the LMS one.
+  assert.deepEqual(converted.workflow.handoffs, ['6.8', '6.3'])
+})
+
+test("a module's own role names parse onto the five acting modes", () => {
+  // 'Cashier', 'Accountant' and 'Parent' are not canonical actors. The module's
+  // vocabulary is what lets its SOP write them.
+  const { spec: parsed, issues } = parseSopProcedure(
+    [
+      'Procedure: 6.4.9 Accept a walk-in payment',
+      'Primary actor: Cashier',
+      'Steps',
+      '1 | Accountant | Takes the cash | Records it | - | Recorded',
+      '2 | Parent | Collects the receipt | Prints it | - | Handed over',
+    ].join('\n'),
+    FEES_MODULE,
+    { now: NOW }
+  )
+
+  assert.ok(parsed)
+  assert.equal(parsed.primaryActor, 'teacher')
+  assert.deepEqual(parsed.workflow.steps.map((step) => step.actor), ['teacher', 'student'])
+  assert.ok(!issues.some((issue) => issue.level === 'error'))
+
+  // The same word means nothing to a module that has not declared it.
+  const lms = parseSopProcedure(
+    ['Procedure: 6.1.1 Something', 'Steps', '1 | Accountant | Does it | Records it | - | Done'].join('\n'),
+    LMS_PAL_MODULE
+  )
+  assert.equal(lms.spec, null)
+  assert.ok(lms.issues.some((issue) => issue.message.includes('not one of the five SOP actors')))
+})
+
+test('Fees tasks are owned and worded by the Fees vocabulary', () => {
+  const tasks = feesSpec().tasks
+  const owners = [...new Set(tasks.map((task) => task.owner))].sort()
+
+  // No task on a Fees process may be owned by a teacher or an LMS administrator.
+  assert.deepEqual(owners, ['Fees administrator', 'Fees officer'])
+  assert.ok(tasks.every((task) => task.kra === 'Fees - Collect'))
+
+  // The receipt-book series and the academic year are the administrator's
+  // masters; the assigned break-off is the officer's own work.
+  const readiness = Object.fromEntries(
+    tasks.filter((task) => task.origin === 'precondition').map((task) => [task.key, task.owner])
+  )
+  assert.equal(readiness['6.4.2-P1'], 'Fees officer')
+  assert.equal(readiness['6.4.2-P2'], 'Fees administrator')
+  assert.equal(readiness['6.4.2-P4'], 'Fees administrator')
+
+  // Gates are found by the Fees `gatedResult` pattern - the two unattended
+  // steps that move money, not the ones that would move marks.
+  const gates = tasks.filter((task) => task.origin === 'gate')
+  assert.deepEqual(gates.map((task) => task.stepNos.join()), ['4', '6'])
+  assert.ok(gates.every((task) => task.description.includes('6.11.5')))
+  assert.ok(gates.every((task) => task.ruleRefs.includes('BR-07')))
+
+  // And no LMS wording leaks into a Fees description.
+  const prose = tasks.map((task) => `${task.title} ${task.description}`).join(' ')
+  assert.ok(!/learner|PAL workspace|6\.15\.6/i.test(prose), 'Fees tasks carry LMS wording')
+})
+
+test('LMS + PAL keeps the default vocabulary it had before Fees existed', () => {
+  const vocabulary = vocabularyFor(LMS_PAL_MODULE)
+
+  assert.equal(vocabulary.owners.staff, 'Teacher')
+  assert.equal(vocabulary.owners.admin, 'LMS Administrator')
+  assert.equal(vocabulary.selfService.owner, 'Student')
+  assert.equal(vocabulary.selfService.surface, 'the PAL workspace')
+  assert.equal(vocabulary.actorLabels.teacher, 'Teacher')
+  assert.deepEqual(vocabulary.actorAliases, {})
+
+  // An override merges over the default rather than replacing it: Fees never
+  // restates 'AI' or the manual execution label, and both must survive.
+  const fees = vocabularyFor(FEES_MODULE)
+  assert.equal(fees.actorLabels.ai, 'AI')
+  assert.equal(fees.actorLabels.teacher, 'Fees officer')
+  assert.equal(fees.executionLabels.manual, 'Performed by a person')
+  assert.equal(fees.executionLabels.learner, 'Performed by the parent')
+})
+
+test('a Fees process round-trips through the intake format unchanged', () => {
+  const converted = feesSpec()
+  const reconverted = convertSopProcedure(specToIntakeText(converted), FEES_MODULE, { now: NOW })
+
+  // The intake format writes the canonical actor names, whatever a module calls
+  // them on screen - so a round trip must not depend on the aliases.
+  assert.deepEqual(reconverted.spec, converted)
+})
+
+test('a Fees process is stored under its own module key', () => {
+  const converted = feesSpec()
+
+  assert.equal(storageKeyFor(converted).menuName, 'Fees 6.4.2')
+  // The same reference in another module is a different row.
+  assert.notEqual(
+    storageKeyFor(converted).menuName,
+    storageKeyFor({ module: 'LMS + PAL', ref: '6.4.2' }).menuName
+  )
+
+  const envelope = upsertProcess(
+    createEnvelope({ module: FEES_MODULE.name, sop: FEES_MODULE.sop, now: NOW }),
+    converted,
+    NOW
+  )
+  assert.ok(checkSize(envelope).withinBudget)
 })

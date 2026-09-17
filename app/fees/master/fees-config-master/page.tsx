@@ -346,9 +346,9 @@ function validateForm(form: FeeConfigForm): FormErrors {
     errors.late_fees_amount = 'Enter a valid late fees amount';
   }
 
-  if (!form.send_sms.trim()) {
-    errors.send_sms = 'Fees paid SMS preference is required';
-  }
+  // Fees Paid Send SMS is deliberately optional: the Laravel controller stores
+  // it without validating it, and a school that does not send fee SMS should
+  // not be blocked from saving the rest of its config.
 
   if (!form.send_email.trim()) {
     errors.send_email = 'Fees paid email preference is required';
@@ -361,10 +361,6 @@ function validateForm(form: FeeConfigForm): FormErrors {
   if (!form.fees_bank_challan_template.trim()) {
     errors.fees_bank_challan_template =
       'Fees bank challan template is required';
-  }
-
-  if (!form.fees_receipt_note.trim()) {
-    errors.fees_receipt_note = 'Fees receipt note is required';
   }
 
   if (!form.institute_name.trim()) {
@@ -1348,10 +1344,10 @@ export default function FeesConfigMasterPage() {
 
                     <DrawerField
                       label="Fees Paid Send SMS"
-                      required
                       error={formErrors.send_sms}
                     >
                       <Select
+                        items={yesNoOptions}
                         value={form.send_sms}
                         onValueChange={(value) =>
                           updateField('send_sms', value ?? '')
@@ -1380,6 +1376,7 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.send_email}
                     >
                       <Select
+                        items={yesNoOptions}
                         value={form.send_email}
                         onValueChange={(value) =>
                           updateField('send_email', value ?? '')
@@ -1408,6 +1405,7 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.fees_receipt_template}
                     >
                       <Select
+                        items={receiptTemplateOptions}
                         value={form.fees_receipt_template}
                         onValueChange={(value) =>
                           updateField('fees_receipt_template', value ?? '')
@@ -1436,6 +1434,7 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.fees_bank_challan_template}
                     >
                       <Select
+                        items={bankChallanTemplateOptions}
                         value={form.fees_bank_challan_template}
                         onValueChange={(value) =>
                           updateField(
@@ -1464,7 +1463,6 @@ export default function FeesConfigMasterPage() {
                     <div className="sm:col-span-2">
                       <DrawerField
                         label="Fees Receipt Note"
-                        required
                         error={formErrors.fees_receipt_note}
                         assist={
                           <AiFieldAssistant
@@ -1549,6 +1547,7 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.auto_head_counting}
                     >
                       <Select
+                        items={yesNoOptions}
                         value={form.auto_head_counting}
                         onValueChange={(value) =>
                           updateField('auto_head_counting', value ?? '')
@@ -1573,6 +1572,7 @@ export default function FeesConfigMasterPage() {
 
                     <DrawerField label="NACH Account Type" required error={formErrors.nach_account_type}>
                       <Select
+                        items={nachAccountTypeOptions}
                         value={form.nach_account_type}
                         onValueChange={(value) =>
                           updateField('nach_account_type', value ?? '')
