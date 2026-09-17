@@ -2,7 +2,7 @@
 
 import { GitBranch } from 'lucide-react';
 
-import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
+import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
 import { FEES_PLATFORM_MODULE } from '@/app/fees/_lib/fees-platform-scope';
 import { WorkflowConsole } from '@/app/platform-services/workflow/_components/WorkflowConsole';
 
@@ -18,7 +18,7 @@ import { WorkflowConsole } from '@/app/platform-services/workflow/_components/Wo
  * `embedded` drops the console's own page chrome, because the category page has
  * already drawn it.
  */
-export const FEES_WORKFLOW_SCREENS: FeesStaticScreen[] = [
+export const FEES_WORKFLOW_SCREENS: ModuleStaticScreen[] = [
   {
     id: 'workflow-approvals',
     label: 'Approvals',

@@ -2,7 +2,7 @@
 
 import { CalendarClock } from 'lucide-react';
 
-import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
+import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
 import { FEES_PLATFORM_MODULE } from '@/app/fees/_lib/fees-platform-scope';
 import { SchedulerConsole } from '@/app/platform-services/scheduler/_components/SchedulerConsole';
 
@@ -17,7 +17,7 @@ import { SchedulerConsole } from '@/app/platform-services/scheduler/_components/
  * `embedded` drops the console's own page chrome, because the category page has
  * already drawn it.
  */
-export const FEES_SCHEDULER_SCREENS: FeesStaticScreen[] = [
+export const FEES_SCHEDULER_SCREENS: ModuleStaticScreen[] = [
   {
     id: 'scheduler-tasks',
     label: 'Scheduled tasks',

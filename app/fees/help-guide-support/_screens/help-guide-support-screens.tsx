@@ -2,7 +2,7 @@
 
 import { BookOpen, LifeBuoy, MessageSquareWarning, PlayCircle, Rocket, ScrollText } from 'lucide-react';
 
-import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
+import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
 import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-screen';
 
 /**
@@ -13,7 +13,7 @@ import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-s
  * app/fees/help-guide-support/_components/help-guide-grid.tsx). This file is
  * retained only for reference and is no longer wired into the page.
  */
-export const FEES_HELP_SUPPORT_SCREENS: FeesStaticScreen[] = [
+export const FEES_HELP_SUPPORT_SCREENS: ModuleStaticScreen[] = [
   {
     id: 'getting-started',
     label: 'Getting Started',
