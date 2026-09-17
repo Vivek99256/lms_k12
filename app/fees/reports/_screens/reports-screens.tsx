@@ -2,7 +2,7 @@
 
 import { History } from 'lucide-react';
 
-import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
+import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
 import FeesAuditTrailPage from '@/app/fees/audit-trail/page';
 
 /**
@@ -17,7 +17,7 @@ import FeesAuditTrailPage from '@/app/fees/audit-trail/page';
  * the route is already in fees-screen-registry, so the database menu will
  * render the identical tab and carry the menu rights a static tab cannot.
  */
-export const FEES_REPORTS_SCREENS: FeesStaticScreen[] = [
+export const FEES_REPORTS_SCREENS: ModuleStaticScreen[] = [
   {
     id: 'audit-trail',
     label: 'Audit Trail',
