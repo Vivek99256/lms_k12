@@ -34,6 +34,7 @@ import {
 } from '@/app/pal/data/pal-eso';
 import { useViewAsStudent } from '@/app/pal/data/pal-view-as';
 import AiTutorPanel from '@/app/pal/eso/_components/AiTutorPanel';
+import { isDirectMediaFile, looksLikeFile, toEmbedUrl } from '@/lib/video-embed';
 
 /**
  * The Adaptive Learning Engine's guided concept flow — Developer Brief v1,
@@ -912,7 +913,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
                 {index + 1}
               </span>
-              <Badge variant="secondary">{item.nodeType}</Badge>
+              {/* <Badge variant="secondary">{item.nodeType}</Badge> */}
             </div>
             <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
             <div className="mt-2 space-y-1.5">
@@ -1136,12 +1137,30 @@ function usePalMotivation(learnerId: string, instruction: string | null, fallbac
  *     text. Its `format` says what *should* be built. It is rendered as the
  *     text it actually is — never as a video placeholder, which would promise
  *     the student something that does not exist.
+ *   - `institute_video` / `curated_video`: an approved video for this concept,
+ *     served on a reteach. These carry provenance, which is shown: a student
+ *     being handed a third-party video mid-remediation should be able to see
+ *     where it came from, and a teacher checking a poor recommendation needs
+ *     that on screen rather than in a database.
  */
 function LearningContentPanel({ content }: { content: NonNullable<EsoAction['learningContent']> }) {
   const hasMedia = content.mediaUrl != null && content.mediaUrl !== '';
 
+  const provenance =
+    content.source === 'institute_video'
+      ? "From your school's library"
+      : content.source === 'curated_video'
+        ? content.attribution
+          ? `${content.attribution} on YouTube`
+          : 'Recommended for this concept'
+        : null;
+
   return (
-    <div data-eso-learning-content={content.format} className="space-y-3 rounded-lg border border-sky-200 bg-sky-50 p-4">
+    <div
+      data-eso-learning-content={content.format}
+      data-eso-content-source={content.source}
+      className="space-y-3 rounded-lg border border-sky-200 bg-sky-50 p-4"
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-sky-900">{content.title || 'Learning material'}</span>
         {/* Only claim a format when there is an asset behind it. */}
@@ -1149,6 +1168,8 @@ function LearningContentPanel({ content }: { content: NonNullable<EsoAction['lea
       </div>
 
       {hasMedia && <CorrectiveResource url={content.mediaUrl as string} format={content.format} title={content.title} />}
+
+      {hasMedia && provenance && <p className="text-xs text-sky-700">{provenance}</p>}
 
       {content.body && <div className="whitespace-pre-line text-sm text-sky-900">{content.body}</div>}
     </div>
@@ -1586,20 +1607,68 @@ function ContrastPairStep({
 }
 
 /**
- * A corrective's richer resource, launched directly rather than described.
+ * A richer resource, launched directly rather than described.
  *
- * Video gets an inline player (the common case, and the one worth not making
- * the student leave the flow for). Anything else — a simulation, an
- * externally-hosted activity, a document — opens in a new tab rather than an
- * iframe: third-party content routinely refuses to be framed, and a blocked
- * blank box is a worse experience than an honest link.
+ * Three branches, in this order, because picking the wrong element gives the
+ * student a black box rather than a lesson:
+ *
+ *   1. Something we can frame (YouTube, Vimeo) — an iframe. The reteach step
+ *      can now serve an external video for concepts the school has none for,
+ *      and those arrive as watch URLs. They previously fell into the <video>
+ *      branch below on the strength of `format` alone and rendered as an empty
+ *      black player.
+ *   2. A real media file — the inline <video> player, which is what the
+ *      school's own uploads are.
+ *   3. Anything else — an honest link in a new tab. Third-party pages
+ *      routinely refuse to be framed, and a blocked blank box is worse than a
+ *      link the student can actually follow.
  */
 function CorrectiveResource({ url, format, title }: { url: string; format: string | null; title: string | null }) {
-  const isVideo = /\.(mp4|webm|ogg)(\?|$)/i.test(url) || (format ?? '').toLowerCase().includes('video');
+  const embed = toEmbedUrl(url);
 
-  if (isVideo) {
+  if (embed) {
     return (
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-black">
+      // Capped rather than full-bleed: at card width a 16:9 frame is taller
+      // than the viewport, so the questions underneath fall off the screen and
+      // the step stops looking like a step. Still fluid below the cap.
+      <div data-eso-media-kind="iframe" className="w-full max-w-2xl space-y-1.5">
+        <div className="aspect-video w-full overflow-hidden rounded-lg border border-slate-200 bg-black">
+          <iframe
+            src={embed.src}
+            title={title || embed.title}
+            loading="lazy"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            className="h-full w-full border-0"
+          />
+        </div>
+        {/* An owner can withdraw embedding permission after we harvested the
+            video, which turns the frame into a refusal notice. This is the way
+            out when that happens. */}
+        <a
+          href={embed.externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700"
+        >
+          Open in a new tab
+          <ExternalLink className="h-3 w-3 shrink-0" />
+        </a>
+      </div>
+    );
+  }
+
+  const declaredVideo = (format ?? '').toLowerCase().includes('video');
+
+  if (isDirectMediaFile(url) || (declaredVideo && looksLikeFile(url))) {
+    return (
+      // Same cap as the embed branch, so an uploaded mp4 and a YouTube video
+      // sit at the same size on the page.
+      <div
+        data-eso-media-kind="file"
+        className="w-full max-w-2xl overflow-hidden rounded-lg border border-slate-200 bg-black"
+      >
         <video src={url} controls className="h-auto w-full" />
       </div>
     );
@@ -1607,6 +1676,7 @@ function CorrectiveResource({ url, format, title }: { url: string; format: strin
 
   return (
     <a
+      data-eso-media-kind="link"
       href={url}
       target="_blank"
       rel="noopener noreferrer"

@@ -3,10 +3,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { usePermission } from '@/app/hooks/usePermission';
 import {
   ArrowLeft,
   Download,
+  Network,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
@@ -100,6 +102,24 @@ import type { Chapter } from '../../data/chapters';
 import type { LmsSubject } from '../../data/lmsCourses';
 import { GeneratePresentationDrawer } from './sideDrawer';
 import { persistPalConceptContext } from '@/app/pal/_components/PalContextBootstrap';
+
+/**
+ * Loaded on demand: the map pulls in @xyflow/react, which no other view on this
+ * page needs. `ssr: false` because the canvas measures the DOM on mount and this
+ * page is client-rendered anyway.
+ *
+ * The folder is underscore-prefixed so the App Router treats it as colocated files
+ * rather than a `/coherence-map` route segment — without that, its `graphLayout`
+ * module was being validated as a route layout.
+ */
+const CoherenceMapView = dynamic(() => import('./_coherence-map/CoherenceMapView'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[480px] items-center justify-center rounded-[14px] border border-slate-200 bg-white text-sm text-slate-500">
+      Loading the coherence map…
+    </div>
+  ),
+});
 
 const EMPTY_CHAPTER_FORM = {
   chapterName: '',
@@ -4290,6 +4310,41 @@ export default function ChapterListPage() {
     );
   }
 
+  if (view === 'coherence-map') {
+    return (
+      <div className="min-h-screen rounded-t-3xl">
+        <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8">
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <button
+              type="button"
+              onClick={() => router.push('/course-master')}
+              className="font-medium transition-colors hover:text-slate-900"
+            >
+              Teach / learn
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <button
+              type="button"
+              onClick={() => router.push(`/course-master/${courseId}/chapters`)}
+              className="font-medium transition-colors hover:text-slate-900"
+            >
+              {course.subject} - {getCourseGradeLabel(course.classGrade)}
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <span className="font-semibold text-slate-900">Coherence map</span>
+          </div>
+
+          <CoherenceMapView
+            subjectId={subjectId}
+            standardId={standardId}
+            title={`${course.subject} - ${getCourseGradeLabel(course.classGrade)}`}
+            onClose={() => router.push(`/course-master/${courseId}/chapters`)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'concept-intelligence') {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const intelChapter = allChapters.find((chapter) => chapter.id === activeChapterId) ?? null;
@@ -5153,6 +5208,15 @@ export default function ChapterListPage() {
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+            className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-[#c7d2fe] bg-white px-3.5 py-2 text-[14px] font-medium text-[#4338ca] shadow-sm transition-colors hover:bg-[#eef2ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+          >
+            <Network size={16} strokeWidth={1.9} />
+            Coherence map
+          </button>
         </div>
 
         <div className="mb-6 border-b border-slate-200/80">
@@ -5179,6 +5243,14 @@ export default function ChapterListPage() {
             >
               <BookOpen size={16} />
               Chapters
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+              className="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 font-medium text-slate-600 transition-colors hover:text-slate-900"
+            >
+              <Network size={16} />
+              Coherence map
             </button>
           </div>
         </div>
