@@ -11,6 +11,7 @@
 
 import { useMemo } from 'react';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
+import { fallbackTypeLabel, foldTypeToken } from '@/lib/question-paper/question-types';
 import type {
   Blueprint,
   BlueprintSection,
@@ -71,6 +72,60 @@ function Toggle({
       {label}
     </label>
   );
+}
+
+/** One Question type the editor offers, and the value it stores when chosen. */
+type QuestionTypeChoice = {
+  key: string;
+  /** Written into the blueprint — a `question_type_catalog.code`. */
+  value: string;
+  /** Shown on the chip — the label the catalogue configures for that code. */
+  label: string;
+};
+
+/**
+ * The Question type choices for one section: every row the
+ * `question_type_catalog` offers, plus anything the section already asks for
+ * that the catalogue does not list.
+ *
+ * That second group matters. A template saved before this dropdown was fed
+ * from the catalogue stores a grading name ("multiple"), and a catalogue row
+ * can be retired after a template has been saved against it. Either way the
+ * value still selects questions when the paper is rendered, so it has to stay
+ * visible here -- otherwise a teacher opening the template cannot see what it
+ * asks for, and the first save would silently drop it.
+ */
+function questionTypeChoices(
+  catalogue: TemplateOptions['question_types'],
+  selected: readonly string[]
+): QuestionTypeChoice[] {
+  const choices: QuestionTypeChoice[] = [];
+  const seen = new Set<string>();
+
+  (catalogue ?? []).forEach((type) => {
+    const value = (type.code ?? '').trim();
+    const token = foldTypeToken(value);
+
+    if (token === '' || seen.has(token)) return;
+
+    seen.add(token);
+    choices.push({
+      key: `catalog-${type.id}-${value}`,
+      value,
+      label: (type.label ?? '').trim() || fallbackTypeLabel(value),
+    });
+  });
+
+  (selected ?? []).forEach((value) => {
+    const token = foldTypeToken(value);
+
+    if (token === '' || seen.has(token)) return;
+
+    seen.add(token);
+    choices.push({ key: `saved-${token}`, value, label: fallbackTypeLabel(value) });
+  });
+
+  return choices;
 }
 
 function linesToList(value: string): string[] {
@@ -162,6 +217,11 @@ function SectionCard({
   onRemove: () => void;
 }) {
   const patch = (changes: Partial<BlueprintSection>) => onChange({ ...section, ...changes });
+
+  const typeChoices = useMemo(
+    () => questionTypeChoices(options.question_types, section.source.questionTypes),
+    [options.question_types, section.source.questionTypes]
+  );
 
   return (
     <div className="rounded-[14px] border border-[#E4E9F2] bg-[#FBFCFE] p-4">
@@ -273,39 +333,43 @@ function SectionCard({
           <div className="sm:col-span-2">
             <span className={LABEL_CLASS}>Question types</span>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {options.question_types.length === 0 ? (
+              {typeChoices.length === 0 ? (
                 <p className="text-[12px] text-[#7A889D]">
-                  No question types are configured for this school yet.
+                  No question types are configured in the question type catalogue yet.
                 </p>
               ) : (
-                options.question_types.map((type) => {
+                typeChoices.map((choice) => {
+                  const token = foldTypeToken(choice.value);
                   const active = section.source.questionTypes.some(
-                    (name) => name.toLowerCase() === type.name.toLowerCase()
+                    (name) => foldTypeToken(name) === token
                   );
 
                   return (
                     <button
-                      key={type.id}
+                      key={choice.key}
                       type="button"
                       onClick={() =>
                         patch({
                           source: {
                             ...section.source,
+                            // The catalogue's own `code` is what gets stored,
+                            // so the blueprint stays keyed to the table rather
+                            // than to a label a school may later reword.
                             questionTypes: active
                               ? section.source.questionTypes.filter(
-                                  (name) => name.toLowerCase() !== type.name.toLowerCase()
+                                  (name) => foldTypeToken(name) !== token
                                 )
-                              : [...section.source.questionTypes, type.name],
+                              : [...section.source.questionTypes, choice.value],
                           },
                         })
                       }
-                      className={`rounded-full border px-3 py-1 text-[12px] capitalize transition ${
+                      className={`rounded-full border px-3 py-1 text-[12px] transition ${
                         active
                           ? 'border-[#5846EA] bg-[#EEF0FF] font-semibold text-[#5846EA]'
                           : 'border-[#D9E3F0] bg-white text-[#5F7087] hover:border-[#B9C6DC]'
                       }`}
                     >
-                      {type.name}
+                      {choice.label}
                     </button>
                   );
                 })

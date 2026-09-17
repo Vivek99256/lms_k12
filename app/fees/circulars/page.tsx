@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -653,13 +654,33 @@ export default function FeesCircularsPage() {
                                 />
                               </TableCell>
                               <TableCell className="min-w-56">
-                                <Textarea
-                                  value={circularInput.remarks}
-                                  onChange={(event) => updateStudentInput(student.studentId, 'remarks', event.target.value)}
-                                  disabled={!selected}
-                                  placeholder="Remarks"
-                                  className="min-h-8"
-                                />
+                                <div className="space-y-1">
+                                  <Textarea
+                                    value={circularInput.remarks}
+                                    onChange={(event) => updateStudentInput(student.studentId, 'remarks', event.target.value)}
+                                    disabled={!selected}
+                                    placeholder="Remarks"
+                                    className="min-h-8"
+                                  />
+                                  <div className="flex justify-end">
+                                    <AiFieldAssistant
+                                      value={circularInput.remarks}
+                                      onApply={(next) => updateStudentInput(student.studentId, 'remarks', next)}
+                                      fieldType="announcement"
+                                      label="Fees circular remarks"
+                                      module="fees"
+                                      page="Fees circular"
+                                      entityType="fees_circular"
+                                      disabled={!selected}
+                                      triggerLabel={`Draft the circular remark for ${student.studentName}`}
+                                      related={{
+                                        Student: student.studentName,
+                                        Class: student.standardDivision,
+                                        'Pending amount': currencyFormatter.format(student.pendingAmount),
+                                      }}
+                                    />
+                                  </div>
+                                </div>
                               </TableCell>
                             </>
                           )}

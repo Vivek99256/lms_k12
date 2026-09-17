@@ -16,20 +16,35 @@
 import { createRoot } from 'react-dom/client';
 import QuestionPaperSheet from './QuestionPaperSheet';
 import { PAGE_SIZES_MM, PX_PER_MM, computePageCuts, marginToMm } from '@/lib/question-paper/pagination';
+import {
+  extractImageSrcs,
+  isInlineableUrl,
+  isPrintableImageDataUri,
+  rewriteImageSrcs,
+} from '@/lib/question-paper/images';
 import { resolvePaper } from './resolve';
-import type { Blueprint, PaperContext, SchoolBranding } from './types';
+import type { Blueprint, PaperContext, ResolvedPaper, SchoolBranding } from './types';
 
 /**
- * The school logo is served from the ERP host, which would taint the canvas
- * and make the whole export throw. Inline it first; if that fails the paper
- * prints without the logo rather than not printing at all.
+ * One remote image as a `data:` URI, or null if it cannot be had.
+ *
+ * Two attempts, in order. A direct CORS fetch is tried first because it is one
+ * round trip and needs nothing configured. When the asset host serves no CORS
+ * headers the browser refuses to let the page read those bytes at all, and the
+ * same-origin proxy is the only way to get them onto a clean canvas — so that
+ * is the fallback, not the default.
+ *
+ * Returning null rather than throwing is deliberate: a paper that prints
+ * without one diagram is a problem, and a paper that does not print at all is
+ * a worse one.
  */
-async function inlineLogo(url: string | null): Promise<string | null> {
-  if (!url) return null;
+async function fetchAsDataUri(url: string): Promise<string | null> {
+  // Already local — a school that stores its logo inline, or an image the
+  // extractor embedded rather than linked.
   if (url.startsWith('data:')) return url;
 
-  try {
-    const response = await fetch(url, { mode: 'cors', cache: 'force-cache' });
+  const read = async (target: string, mode: RequestMode) => {
+    const response = await fetch(target, { mode, cache: 'force-cache' });
 
     if (!response.ok) return null;
 
@@ -41,9 +56,93 @@ async function inlineLogo(url: string | null): Promise<string | null> {
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(blob);
     });
+  };
+
+  try {
+    const direct = await read(url, 'cors');
+    if (direct) return direct;
+  } catch {
+    /* falls through to the proxy */
+  }
+
+  try {
+    return await read(`/api/question-paper/asset?url=${encodeURIComponent(url)}`, 'same-origin');
   } catch {
     return null;
   }
+}
+
+/** Fetch each url once, however many questions use it. */
+async function inlineMany(urls: readonly string[]): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(urls.filter(isInlineableUrl)));
+
+  if (unique.length === 0) return {};
+
+  const results = await Promise.all(
+    unique.map(async (url) => [url, await fetchAsDataUri(url)] as const)
+  );
+
+  const map: Record<string, string> = {};
+
+  for (const [url, dataUri] of results) {
+    // A data URI the sheet's sanitiser would strip is worse than the original
+    // url, so only the printable ones replace anything.
+    if (dataUri && isPrintableImageDataUri(dataUri)) {
+      map[url] = dataUri;
+    }
+  }
+
+  return map;
+}
+
+/**
+ * The same paper with every remote image held locally.
+ *
+ * Both places a picture can live are covered: the `figures` rows attached to a
+ * question, and any `<img>` inside the question's own stored HTML or an
+ * option's. Whatever could not be fetched keeps its original url, so the
+ * preview-identical layout is preserved and only that one image is missing
+ * from the raster.
+ */
+async function inlinePaperImages(paper: ResolvedPaper): Promise<ResolvedPaper> {
+  const urls: string[] = [];
+
+  for (const section of paper.sections) {
+    for (const placed of section.questions) {
+      urls.push(...(placed.question.figures ?? []).map((figure) => figure.url));
+      urls.push(...extractImageSrcs(placed.question.question_title));
+
+      for (const option of placed.question.options) {
+        urls.push(...extractImageSrcs(option.text));
+      }
+    }
+  }
+
+  const inlined = await inlineMany(urls);
+
+  if (Object.keys(inlined).length === 0) return paper;
+
+  return {
+    ...paper,
+    sections: paper.sections.map((section) => ({
+      ...section,
+      questions: section.questions.map((placed) => ({
+        ...placed,
+        question: {
+          ...placed.question,
+          question_title: rewriteImageSrcs(placed.question.question_title, inlined),
+          figures: (placed.question.figures ?? []).map((figure) => ({
+            ...figure,
+            url: inlined[figure.url] ?? figure.url,
+          })),
+          options: placed.question.options.map((option) => ({
+            ...option,
+            text: rewriteImageSrcs(option.text, inlined),
+          })),
+        },
+      })),
+    })),
+  };
 }
 
 async function waitForPaint(host: HTMLElement): Promise<void> {
@@ -120,10 +219,17 @@ export async function generateQuestionPaperPdf({
   const contentWidthPx = contentWidthMm * PX_PER_MM;
   const pageHeightPx = contentHeightMm * PX_PER_MM;
 
-  const resolved = resolvePaper(blueprint, context, {
-    ...branding,
-    logoUrl: await inlineLogo(branding.logoUrl),
-  });
+  // Every picture on the paper is pulled local before anything is rendered:
+  // the letterhead, each question's figures, and any image inside the stored
+  // question or option HTML. html2canvas can only read back a canvas whose
+  // pixels all came from somewhere this page may read, so a remote image left
+  // remote is a blank gap in the PDF -- or an export that throws outright.
+  const resolved = await inlinePaperImages(
+    resolvePaper(blueprint, context, {
+      ...branding,
+      logoUrl: branding.logoUrl ? await fetchAsDataUri(branding.logoUrl) : null,
+    })
+  );
 
   const host = document.createElement('div');
   host.setAttribute('aria-hidden', 'true');

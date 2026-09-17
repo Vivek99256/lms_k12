@@ -153,25 +153,54 @@ export type QuestionPaperTemplate = {
 
 // --- Live exam data -------------------------------------------------------
 
+/**
+ * A diagram, map or figure that belongs to a question.
+ *
+ * `url` is absolute and served by the extraction service, so it is not
+ * necessarily same-origin with the ERP — which is why the PDF path inlines it
+ * before rasterising rather than letting html2canvas fetch it.
+ */
+export type PaperQuestionFigure = {
+  url: string;
+  /** Intrinsic pixel size when the extraction recorded it, else null. */
+  width: number | null;
+  height: number | null;
+  /** Alt text — for the image's `alt`, not printed as a caption. */
+  caption: string;
+};
+
 export type PaperQuestionOption = {
   id: number;
   text: string;
   is_correct: boolean;
 };
 
+/**
+ * One question as it goes on a paper.
+ *
+ * Only what a student is meant to read: the question, its options, its marks
+ * and the form it takes. The authoring side of `lms_question_master` --
+ * `description` (the generator writes a teacher-facing rationale there: Bloom
+ * level, ability reference, the misconception each distractor targets),
+ * `concept`, `hint_text`, `learning_outcome` -- is deliberately absent, so
+ * none of it can reach a printed exam paper.
+ */
 export type PaperQuestion = {
   id: number;
   question_type_id: number;
+  /** question_type_master.question_type — the grading engine's spelling. */
   question_type: string;
+  /** question_type_catalog.code, when the question was ingested under one. */
+  question_type_code: string;
+  /** question_type_catalog.label for that code — what the paper prints. */
+  question_type_label: string;
   question_title: string;
-  description: string;
   points: number;
   multiple_answer: number;
   chapter_id: number | null;
   chapter_name: string;
-  concept: string;
-  hint_text: string;
-  learning_outcome: string;
+  /** Diagrams that belong to the question; empty when it has none. */
+  figures: PaperQuestionFigure[];
   options: PaperQuestionOption[];
 };
 
@@ -206,10 +235,21 @@ export type SchoolBranding = {
   logoUrl: string | null;
 };
 
+/**
+ * One row of `question_type_catalog`, as the editor's Question type choice.
+ * `code` is what a blueprint stores; `label` is what the school configured and
+ * therefore what the dropdown shows.
+ */
+export type QuestionTypeOption = {
+  id: number;
+  code: string;
+  label: string;
+};
+
 export type TemplateOptions = {
   placeholders: Array<{ token: string; description: string }>;
   source_modes: SectionSourceMode[];
-  question_types: Array<{ id: number; name: string }>;
+  question_types: QuestionTypeOption[];
   defaults: Blueprint;
 };
 

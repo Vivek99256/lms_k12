@@ -49,6 +49,7 @@ import {
   X,
 } from 'lucide-react';
 
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { TemplateHtmlEditor } from '@/app/general/_components/TemplateHtmlEditor';
 import {
   createTemplate,
@@ -458,14 +459,32 @@ export function FeesTemplatesScreen() {
             </label>
           </div>
 
-          <label className="block">
-            <span className="text-sm font-medium text-slate-900">What it is for</span>
+          {/* The label is a real <label htmlFor> rather than a wrapper, because the
+              assistant's trigger is a button and a button inside a <label> also toggles
+              the label's control. Same association, no double activation. */}
+          <div className="block">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="fees-template-description" className="text-sm font-medium text-slate-900">
+                What it is for
+              </label>
+              <AiFieldAssistant
+                value={form.description}
+                onApply={(next) => patch({ description: next })}
+                fieldType="description"
+                label="What it is for"
+                module="fees"
+                page="AI Stack — Reports & templates"
+                entityType="fees_ai_template"
+                related={{ Template: form.name }}
+              />
+            </div>
             <input
+              id="fees-template-description"
               value={form.description}
               onChange={(event) => patch({ description: event.target.value })}
               className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
-          </label>
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">

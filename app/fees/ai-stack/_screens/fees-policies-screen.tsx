@@ -33,6 +33,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Save, ShieldCheck, SlidersHorizontal, Trash2, X, Loader2 } from 'lucide-react';
 
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
+
 import {
   createAiPolicy,
   fetchAiPolicies,
@@ -476,16 +478,34 @@ export function FeesPoliciesScreen() {
             </label>
           </div>
 
-          <label className="block">
-            <span className="text-sm font-medium text-slate-900">What it permits, in plain words</span>
+          {/* A real <label htmlFor> rather than a wrapper: the assistant's trigger is a
+              button, and a button inside a <label> also toggles the label's control. */}
+          <div className="block">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="fees-policy-description" className="text-sm font-medium text-slate-900">
+                What it permits, in plain words
+              </label>
+              <AiFieldAssistant
+                value={form.description}
+                onApply={(next) => patch({ description: next })}
+                fieldType="policy"
+                label="What it permits, in plain words"
+                module="fees"
+                page="AI Stack — Policies"
+                entityType="fees_ai_policy"
+                maxLength={2000}
+                related={{ Policy: form.name }}
+              />
+            </div>
             <textarea
+              id="fees-policy-description"
               value={form.description}
               onChange={(event) => patch({ description: event.target.value })}
               rows={3}
               maxLength={2000}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
-          </label>
+          </div>
 
           <fieldset className="rounded-xl border border-slate-200 p-4">
             <legend className="px-1 text-sm font-semibold text-slate-900">Disclosure</legend>

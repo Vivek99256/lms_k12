@@ -8,20 +8,39 @@
 // no invented question: if a field is empty it is because the school left it
 // empty, and it simply does not print.
 //
+// This is a school exam paper, so it carries only what a student is meant to
+// read -- number, question, options, marks, and the section it sits in. The
+// authoring notes a question also holds (the generator's rationale: Bloom
+// level, ability reference, which misconception each distractor targets, plus
+// concept, hint and learning outcome) are teacher-facing and never printed.
+// `PaperQuestion` does not even carry them, so there is nothing here to leak.
+//
 // The outer element carries `question-paper-sheet`, which the Exam page's
 // print stylesheet isolates so Ctrl+P prints the paper alone.
 // ---------------------------------------------------------------------------
 
 import RichText from '@/app/components/questionBank/RichText';
 import { optionColumnCount } from '@/lib/question-paper/options';
+import { figureDisplaySrc } from '@/lib/question-paper/images';
+import { questionTypeDisplayLabel } from '@/lib/question-paper/question-types';
 import { splitSectionsByContent } from '@/lib/question-paper/sections';
 import { formatMarks, instructionMarker, numberLabel } from './resolve';
 import type {
   BlueprintPage,
+  PaperQuestionFigure,
   PlacedQuestion,
   ResolvedPaper,
   ResolvedSection,
 } from './types';
+
+/**
+ * Question text written in the rich-text editor stores its images at whatever
+ * size they were uploaded -- often around 1000px, which is wider than the
+ * printable area of an A4 sheet. DOMPurify drops the inline `style` that held
+ * those dimensions, so without this the intrinsic width wins and the image
+ * runs off the page. Scaled down to fit and never up, aspect ratio kept.
+ */
+const RICH_IMAGE_CLASS = '[&_img]:h-auto [&_img]:max-w-full [&_img]:object-contain';
 
 const RULE_CLASS: Record<string, string> = {
   none: '',
@@ -47,8 +66,47 @@ function QuestionOptions({ placed }: { placed: PlacedQuestion }) {
       {options.map((option, index) => (
         <div key={option.id} className="flex gap-1.5 leading-snug">
           <span className="shrink-0">({numberLabel(index, 1, 'lower-alpha')})</span>
-          <RichText value={option.text} as="span" allowImages />
+          <RichText value={option.text} as="span" allowImages className={RICH_IMAGE_CLASS} />
         </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The question's diagrams.
+ *
+ * A figure on a printed paper has to be readable but must not push the
+ * question it belongs to onto the next page, so each image is capped in height
+ * and left to find its own width from its aspect ratio. `width`/`height` are
+ * set as attributes when the extraction recorded them, which reserves the box
+ * before the image decodes and stops the paper reflowing mid-render — the
+ * difference between a PDF whose page breaks match the preview and one whose
+ * do not.
+ *
+ * Nothing renders when there are no figures: no frame, no caption, no
+ * reserved space. An empty box on a real exam paper reads as a printing fault.
+ */
+function QuestionFigures({ figures }: { figures: PaperQuestionFigure[] }) {
+  // Defended rather than trusted: an ERP build that predates figures answers
+  // without the key at all, and a paper that throws is worse than one that
+  // prints the words.
+  const printable = (figures ?? []).filter((figure) => figure?.url);
+
+  if (printable.length === 0) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap items-start gap-4">
+      {printable.map((figure, index) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={`${figure.url}-${index}`}
+          src={figureDisplaySrc(figure.url)}
+          alt={figure.caption || ''}
+          width={figure.width ?? undefined}
+          height={figure.height ?? undefined}
+          className="h-auto max-h-[70mm] w-auto max-w-full object-contain"
+        />
       ))}
     </div>
   );
@@ -93,13 +151,12 @@ function AnswerSpace({ section }: { section: ResolvedSection['section'] }) {
 function QuestionBlock({
   placed,
   section,
-  compact,
 }: {
   placed: PlacedQuestion;
   section: ResolvedSection['section'];
-  compact: boolean;
 }) {
   const { question } = placed;
+  const typeLabel = questionTypeDisplayLabel(question);
 
   return (
     <article data-pdf-block className="question-block break-inside-avoid">
@@ -109,21 +166,19 @@ function QuestionBlock({
         ) : null}
 
         <div className="min-w-0 flex-1">
-          <RichText value={question.question_title} allowImages className="leading-relaxed" />
+          <RichText
+            value={question.question_title}
+            allowImages
+            className={`leading-relaxed ${RICH_IMAGE_CLASS}`}
+          />
 
-          {question.description && !compact ? (
-            <RichText
-              value={question.description}
-              allowImages
-              className="mt-1 text-[0.92em] italic text-slate-600"
-            />
-          ) : null}
+          <QuestionFigures figures={question.figures} />
 
           <QuestionOptions placed={placed} />
 
-          {section.showQuestionType && question.question_type ? (
+          {section.showQuestionType && typeLabel ? (
             <p className="mt-1 text-[0.8em] uppercase tracking-wide text-slate-500">
-              {question.question_type}
+              {typeLabel}
             </p>
           ) : null}
 
@@ -195,7 +250,12 @@ function SectionBlock({ resolved }: { resolved: ResolvedSection }) {
                   {placed.label}
                 </td>
                 <td className="border border-black px-2 py-1.5">
-                  <RichText value={placed.question.question_title} allowImages />
+                  <RichText
+                    value={placed.question.question_title}
+                    allowImages
+                    className={RICH_IMAGE_CLASS}
+                  />
+                  <QuestionFigures figures={placed.question.figures} />
                   <QuestionOptions placed={placed} />
                 </td>
                 {section.showMarks ? (
@@ -213,12 +273,7 @@ function SectionBlock({ resolved }: { resolved: ResolvedSection }) {
         // back up the other, which is unusable on a printed paper.
         <div className={spacing}>
           {resolved.questions.map((placed) => (
-            <QuestionBlock
-              key={placed.question.id}
-              placed={placed}
-              section={section}
-              compact={section.layout === 'compact'}
-            />
+            <QuestionBlock key={placed.question.id} placed={placed} section={section} />
           ))}
         </div>
       )}
