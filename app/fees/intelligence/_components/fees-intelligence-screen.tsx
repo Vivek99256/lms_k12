@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { useBrainResource } from '@/app/enterprise-brain/_components/useBrainResource';
 import { decideRecommendation } from '@/lib/brain/api';
 import {
@@ -1024,9 +1025,31 @@ function DecisionDialog({
           </fieldset>
 
           <div>
-            <label htmlFor="decision-rationale" className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-              Rationale
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="decision-rationale" className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                Rationale
+              </label>
+              {/*
+                Improves what the decider wrote; it does not decide for them. On an empty
+                field the assistant offers only to draft from the surrounding context, and
+                what it drafts still has to be read and accepted before it is saved — this
+                is a record of why a person decided, and it stays theirs.
+              */}
+              <AiFieldAssistant
+                value={rationale}
+                onApply={setRationale}
+                fieldType="notes"
+                label="Decision rationale"
+                module="fees"
+                page="Intelligence — decision"
+                entityType="fees_recommendation"
+                related={{
+                  Recommendation: recommendation.title,
+                  Evidence: recommendation.finding.title,
+                  Decision: status,
+                }}
+              />
+            </div>
             <textarea
               id="decision-rationale"
               value={rationale}
@@ -1311,9 +1334,24 @@ function OutcomeDialog({
           </fieldset>
 
           <div>
-            <label htmlFor="outcome-feedback" className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-              What happened
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="outcome-feedback" className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                What happened
+              </label>
+              <AiFieldAssistant
+                value={feedback}
+                onApply={setFeedback}
+                fieldType="summary"
+                label="What happened"
+                module="fees"
+                page="Intelligence — outcome"
+                entityType="fees_outcome"
+                related={{
+                  Recommendation: entry.recommendation.title,
+                  Result: result,
+                }}
+              />
+            </div>
             <textarea
               id="outcome-feedback"
               value={feedback}
