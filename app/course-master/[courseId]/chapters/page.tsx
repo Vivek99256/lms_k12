@@ -39,6 +39,7 @@ import {
   FolderOpen,
   Database,
   Layers3,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ContentCard } from './ContentCard';
@@ -96,6 +97,15 @@ import { QuestionBankQuestionCard } from '@/app/components/questionBank/Question
 import { QuestionBankFilterBar } from '@/app/components/questionBank/QuestionBankFilterBar';
 import { groupConceptsByTopic, type TopicGroup } from '../../data/chapterTopics';
 import { ConceptIntelligenceTabs } from './ConceptIntelligenceTabs';
+import {
+  GroundingPanel,
+  PipelineStream,
+  RunTelemetryStrip,
+  useStaggeredReveal,
+  type GroundingSource,
+  type RunTelemetry,
+  type StreamPhase,
+} from './GenerationPipeline';
 import { getRequestContext, getSyear } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
@@ -214,6 +224,15 @@ function suggestedBloomCounts(total: number): BloomCounts {
   return counts;
 }
 const QUESTION_OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
+/** One-line explanation of what each type produces, shown on the type cards. */
+const QUESTION_TYPE_BLURBS: Record<(typeof QUESTION_TYPE_OPTIONS)[number], string> = {
+  MCQ: 'Four options with one correct answer. Distractors are built from the concept’s recorded misconceptions.',
+  Narrative: 'Open-response items with a model answer and marking points, weighted per Bloom level.',
+};
+
+/** Common run sizes, offered as chips beside the free-text total. */
+const QUESTION_COUNT_PRESETS = [5, 10, 15, 20] as const;
+
 const QUESTION_TYPE_API_CONFIG: Record<
   (typeof QUESTION_TYPE_OPTIONS)[number],
   { question_type: 'mcq' | 'narrative'; question_type_id: number }
@@ -541,6 +560,12 @@ interface ConceptIntelligenceDetails {
 function asText(value: unknown): string {
   if (value === null || value === undefined) return '';
   return String(value).trim();
+}
+
+/** Narrow a loosely-typed API field to a number, or drop it. */
+function asOptionalNumber(value: unknown): number | undefined {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
 }
 
 function getConceptIntelligence(chapter: Chapter, conceptTitle: string): ConceptIntelligenceDetails {
@@ -1170,6 +1195,14 @@ export default function ChapterListPage() {
   const [questionGenerationError, setQuestionGenerationError] = useState('');
   const [questionGenerationSuccess, setQuestionGenerationSuccess] = useState('');
   const [generatedQuestionPreviews, setGeneratedQuestionPreviews] = useState<GeneratedQuestionPreview[]>([]);
+  // Real per-run numbers off the generation response (model, batches, tokens,
+  // duplicates dropped). The API already returned these; they were being
+  // discarded before the pipeline panel had somewhere to show them.
+  const [questionRunTelemetry, setQuestionRunTelemetry] = useState<RunTelemetry | null>(null);
+  // Bumped once per generation. Remounts the stage stream so a second run starts
+  // from the top, and keys the result reveal so a previous run's progress is
+  // never reused.
+  const [questionRunId, setQuestionRunId] = useState(0);
   // Lazy-loaded, per-chapter semantic intelligence (the heavy full_intelegance_json
   // blob). Fetched on first Concept Intelligence click and cached by chapter id so a
   // chapter is only ever fetched once.
@@ -1650,6 +1683,198 @@ export default function ChapterListPage() {
   const isQuotaValid = useAutoQuota || (isTotalQuestionsValid && bloomCountTotal === totalQuestionsNumber);
   const canGenerateQuestions =
     questionType !== '' && isTotalQuestionsValid && isQuotaValid && !isGeneratingQuestions;
+
+  /* ------------------------------------------------------------------ *
+   * Generator transparency
+   *
+   * The grounding panel reads the SAME concept intelligence the server slices
+   * for the prompt (`QuestionGenerationService::buildConceptSlice`), so what the
+   * teacher sees listed is what the model is actually handed. Signals the server
+   * does not send - skills, pedagogy - are deliberately left out.
+   * ------------------------------------------------------------------ */
+
+  const questionModalChapter = useMemo(() => {
+    if (!questionModalConcept) return null;
+    const fetched = chapterIntelligence[questionModalConcept.chapter.id];
+    return fetched
+      ? { ...questionModalConcept.chapter, semantic: fetched }
+      : questionModalConcept.chapter;
+  }, [chapterIntelligence, questionModalConcept]);
+
+  const isQuestionIntelLoading =
+    questionModalConcept !== null &&
+    intelligenceLoadingId === questionModalConcept.chapter.id &&
+    !chapterIntelligence[questionModalConcept.chapter.id];
+
+  const questionGroundingSources = useMemo<GroundingSource[]>(() => {
+    if (!questionModalChapter || !questionModalConcept) return [];
+
+    const details = getConceptIntelligence(
+      questionModalChapter,
+      questionModalConcept.conceptTitle
+    );
+    // getConceptIntelligence() defaults the DOK label to "DOK 2" when nothing was
+    // extracted, so read the raw rows instead - an absent ladder has to read as
+    // absent here, not as a level the extraction never produced.
+    const rawIntel = getConceptIntelligenceData(
+      questionModalChapter,
+      questionModalConcept.conceptTitle
+    );
+    const dokItems = Array.from(
+      new Set(
+        (rawIntel.dok ?? [])
+          .map((entry) =>
+            [asText(entry?.level) && `DOK ${asText(entry.level)}`, asText(entry?.description)]
+              .filter(Boolean)
+              .join(' - ')
+          )
+          .filter(Boolean)
+      )
+    );
+
+    /** 3+ signals is enough to write a spread of items against; 1-2 is thin. */
+    const gauge = (items: string[]): GroundingSource['state'] =>
+      items.length >= 3 ? 'rich' : items.length > 0 ? 'thin' : 'missing';
+
+    const objectives = Array.from(
+      new Set([...details.learningOutcomes, ...details.learningObjectives])
+    );
+    const capabilities = Array.from(new Set([...details.abilities, ...details.competencies]));
+
+    const measured: Array<Omit<GroundingSource, 'state'>> = [
+      {
+        id: 'knowledge',
+        label: 'Knowledge items',
+        role: 'The factual spine every stem is written from.',
+        icon: BookOpen,
+        items: details.knowledge,
+      },
+      {
+        id: 'capabilities',
+        label: 'Abilities & competencies',
+        role: 'What a learner must be able to do - drives the Apply and Analyze items.',
+        icon: Lightbulb,
+        items: capabilities,
+      },
+      {
+        id: 'outcomes',
+        label: 'Learning outcomes & objectives',
+        role: 'Each generated item is tagged back to one of these.',
+        icon: Target,
+        items: objectives,
+      },
+      {
+        id: 'misconceptions',
+        label: 'Misconceptions',
+        role: 'Become the plausible wrong options, each with its own rationale.',
+        icon: TriangleAlert,
+        items: details.misconceptions,
+      },
+      {
+        id: 'prerequisites',
+        label: 'Prerequisites',
+        role: 'Keeps items inside the prior knowledge the concept assumes.',
+        icon: Orbit,
+        items: details.prerequisites,
+      },
+      {
+        id: 'applications',
+        label: 'Real-world applications',
+        role: 'Grounds context, scenario and case-study stems.',
+        icon: GraduationCap,
+        items: details.realWorldApplications,
+      },
+      {
+        id: 'dok',
+        label: 'Depth-of-knowledge ladder',
+        role: 'Caps how deep an item may be pitched; the Bloom spread is clamped to it.',
+        icon: Layers3,
+        items: dokItems,
+      },
+    ];
+
+    const sources: GroundingSource[] = measured.map((source) => ({
+      ...source,
+      state: gauge(source.items),
+    }));
+
+    sources.push(
+      {
+        id: 'curriculum',
+        label: 'Curriculum anchor',
+        role: 'Concept is pinned to its chapter, subject and standard before anything is written.',
+        icon: Database,
+        items: [
+          `${subjectData?.subject?.subject_name ?? 'Subject'} / Class ${
+            subjectData?.subject?.standard_name ?? '-'
+          }`,
+          questionModalChapter.title,
+          questionModalConcept.conceptTitle,
+        ].filter(Boolean),
+        state: 'rich',
+      },
+      {
+        id: 'dedup',
+        label: 'Duplicate guard',
+        role: 'Existing stems for this concept are sent along so new items must be distinct.',
+        icon: ClipboardList,
+        items: [],
+        state: 'server',
+        note: 'checked on save',
+      }
+    );
+
+    return sources;
+  }, [questionModalChapter, questionModalConcept, subjectData?.subject]);
+
+  /** The Bloom spread this run will ask for - auto split, or the teacher's own. */
+  const questionBlueprint = useMemo(() => {
+    const counts = useAutoQuota
+      ? suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
+      : bloomCounts;
+
+    return BLOOM_LEVEL_META.map((meta) => ({
+      level: meta.level,
+      count: counts[meta.level] ?? 0,
+      difficulty: useAutoQuota ? meta.difficulty : bloomDifficulties[meta.level],
+    }));
+  }, [bloomCounts, bloomDifficulties, isTotalQuestionsValid, totalQuestionsNumber, useAutoQuota]);
+
+  const questionStreamPhase: StreamPhase = isGeneratingQuestions
+    ? 'running'
+    : questionGenerationError
+      ? 'error'
+      : generatedQuestionPreviews.length > 0 || questionGenerationSuccess
+        ? 'success'
+        : 'idle';
+
+  const revealedQuestionCount = useStaggeredReveal(
+    generatedQuestionPreviews.length,
+    questionStreamPhase === 'success',
+    questionRunId
+  );
+
+  const generationBatchLabel = `${isTotalQuestionsValid ? totalQuestionsNumber : 0} ${
+    questionType || 'item'
+  } item${totalQuestionsNumber === 1 ? '' : 's'}`;
+
+  const generationSummaryLabel = !questionType
+    ? 'Pick a question type to begin.'
+    : !isTotalQuestionsValid
+      ? 'Enter how many questions to generate (1-50).'
+      : `${totalQuestionsNumber} ${questionType} question${
+          totalQuestionsNumber === 1 ? '' : 's'
+        } · ${useAutoQuota ? 'auto' : 'custom'} Bloom mix · saved to this concept’s bank`;
+
+  const groundingCoverageLabel = useMemo(() => {
+    const measurable = questionGroundingSources.filter((source) => source.state !== 'server');
+    const present = measurable.filter((source) => source.state !== 'missing');
+    if (measurable.length === 0) return 'No intelligence signals available yet.';
+    if (present.length === 0) {
+      return 'No intelligence extracted for this concept - the model will work best-effort from its name.';
+    }
+    return `${present.length} of ${measurable.length} intelligence signals available for this concept.`;
+  }, [questionGroundingSources]);
 
   /** Seed the table from the server's own default split the first time it is shown. */
   const handleToggleAutoQuota = (nextAuto: boolean) => {
@@ -2264,6 +2489,11 @@ export default function ChapterListPage() {
   };
 
   const openGenerateQuestionsModal = (chapter: Chapter, conceptTitle: string, conceptIndex: number) => {
+    // Same lazy fetch Concept Intelligence uses. The generator's grounding panel
+    // reads the identical blob the server slices for the prompt, so without this
+    // the panel would report "not extracted" for a chapter that simply had not
+    // been opened yet.
+    loadChapterIntelligence(chapter.id);
     setQuestionModalConcept({
       chapter,
       conceptTitle,
@@ -2274,6 +2504,7 @@ export default function ChapterListPage() {
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setQuestionRunTelemetry(null);
     resetQuestionMix();
   };
 
@@ -2344,6 +2575,7 @@ export default function ChapterListPage() {
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setQuestionRunTelemetry(null);
     resetQuestionMix();
   };
 
@@ -2623,6 +2855,8 @@ export default function ChapterListPage() {
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setQuestionRunTelemetry(null);
+    setQuestionRunId((current) => current + 1);
 
     try {
       const response = await generateIntelligenceQuestions({
@@ -2653,13 +2887,27 @@ export default function ChapterListPage() {
             }),
       });
 
-      const inserted = response.data?.inserted;
+      const data = response.data;
+      const inserted = data?.inserted;
       setQuestionGenerationSuccess(
         inserted != null
           ? `${response.message} ${inserted} question${inserted === 1 ? '' : 's'} saved.`
           : response.message
       );
-      setGeneratedQuestionPreviews(response.data?.questions ?? []);
+      setGeneratedQuestionPreviews(data?.questions ?? []);
+      // Straight passthrough of what the service reports for this run - nothing
+      // here is estimated on the client.
+      setQuestionRunTelemetry({
+        requested: asOptionalNumber(data?.requested),
+        generated: asOptionalNumber(data?.generated),
+        inserted: asOptionalNumber(inserted),
+        skippedDuplicate: asOptionalNumber(data?.skipped_duplicate),
+        skippedInvalid: asOptionalNumber(data?.skipped_invalid),
+        model: typeof data?.model === 'string' ? data.model : undefined,
+        batches: asOptionalNumber(data?.batches),
+        inputTokens: asOptionalNumber(data?.input_tokens),
+        outputTokens: asOptionalNumber(data?.output_tokens),
+      });
     } catch (error: unknown) {
       setQuestionGenerationError(
         error instanceof Error ? error.message : 'Failed to generate questions.'
@@ -3488,254 +3736,377 @@ export default function ChapterListPage() {
 
   const generateQuestionsModal = questionModalConcept ? (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-[3px]"
       onClick={closeGenerateQuestionsModal}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="generate-ai-questions-title"
-        className="relative max-h-[90vh] w-full max-w-[800px] overflow-hidden rounded-[20px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
+        className="relative flex max-h-[92vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-[20px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.32)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="max-h-[90vh] overflow-y-auto px-6 pb-6 pt-6 sm:px-8">
+        {/* ---------------------------------------------------------- Header */}
+        <header className="relative shrink-0 overflow-hidden border-b border-slate-200 bg-gradient-to-r from-[#eef2ff] via-white to-[#faf5ff] px-6 py-5 sm:px-8">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-1.5 text-[12px] font-medium text-slate-500">
+                <span className="truncate">{questionModalConcept.chapter.title}</span>
+                <ChevronRight size={13} className="shrink-0 text-slate-400" />
+                <span className="truncate font-semibold text-slate-700">
+                  {questionModalConcept.conceptTitle}
+                </span>
+              </p>
               <h2
                 id="generate-ai-questions-title"
-                className="text-[24px] font-bold tracking-tight text-slate-950"
+                className="mt-1.5 text-[23px] font-bold tracking-tight text-slate-950"
               >
                 Generate AI questions
               </h2>
-              <p className="mt-1 text-[15px] text-slate-600">
-                Concept: {questionModalConcept.conceptTitle}
+              <p className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-600">
+                <Brain size={14} className="text-[#4f46e5]" />
+                Written against this concept&apos;s intelligence and saved straight to the question
+                bank.
               </p>
             </div>
+
             <button
               type="button"
               onClick={closeGenerateQuestionsModal}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
               aria-label="Close dialog"
             >
               <X size={20} />
             </button>
           </div>
+        </header>
 
-          <div className="mt-6 space-y-5">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Question Type <span className="text-rose-500">*</span>
-              </Label>
-              <Select value={questionType} onValueChange={(value) => setQuestionType(value ?? '')}>
-                <SelectTrigger className="h-12 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                  <SelectValue placeholder="Select question type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {QUESTION_TYPE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="total-questions" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Total Questions <span className="text-rose-500">*</span>
-              </Label>
-              <Input
-                id="total-questions"
-                inputMode="numeric"
-                value={totalQuestions}
-                onChange={(event) => setTotalQuestions(event.target.value.replace(/[^\d]/g, ''))}
-                placeholder="Enter a number"
-                className="h-12 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none"
-              />
-              <p className="text-sm text-slate-500">Between 1 and 50</p>
-            </div>
-
-            <div className="space-y-3 rounded-[12px] border border-slate-200 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Question mix
-                  </Label>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {useAutoQuota
-                      ? 'The generator chooses the spread across Bloom levels.'
-                      : 'You decide how many questions sit at each Bloom level.'}
-                  </p>
-                </div>
-                <div className="inline-flex overflow-hidden rounded-full border border-slate-300 text-sm font-semibold">
-                  {[
-                    { label: 'Auto', value: true },
-                    { label: 'Custom', value: false },
-                  ].map((option) => (
-                    <button
-                      key={option.label}
-                      type="button"
-                      onClick={() => handleToggleAutoQuota(option.value)}
-                      className={
-                        useAutoQuota === option.value
-                          ? 'bg-[#aea8ff] px-4 py-1.5 text-white'
-                          : 'bg-white px-4 py-1.5 text-slate-600 hover:bg-slate-50'
-                      }
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+        {/* ------------------------------------------------- Body: two panes */}
+        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_378px] lg:overflow-hidden">
+          {/* ------------------------------------------------ Left: setup */}
+          <section className="px-6 py-6 sm:px-8 lg:min-h-0 lg:overflow-y-auto">
+            <div className="space-y-6">
+              <div className="space-y-2.5">
+                <Label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Question type <span className="text-rose-500">*</span>
+                </Label>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  {QUESTION_TYPE_OPTIONS.map((option) => {
+                    const selected = questionType === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setQuestionType(option)}
+                        aria-pressed={selected}
+                        className={cn(
+                          'rounded-[12px] border px-4 py-3 text-left transition-all',
+                          selected
+                            ? 'border-[#4f46e5] bg-[#eef2ff] shadow-[0_4px_14px_rgba(79,70,229,0.14)]'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        )}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-[14px] font-semibold text-slate-900">{option}</span>
+                          {selected ? (
+                            <CheckCircle2 size={16} className="shrink-0 text-[#4f46e5]" />
+                          ) : null}
+                        </span>
+                        <span className="mt-1 block text-[12px] leading-[18px] text-slate-500">
+                          {QUESTION_TYPE_BLURBS[option]}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {useAutoQuota ? null : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[440px] text-sm">
-                      <thead>
-                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          <th className="pb-2 pr-3">Bloom level</th>
-                          <th className="pb-2 pr-3">Difficulty</th>
-                          <th className="pb-2 pr-3 text-right">Questions</th>
-                          {questionType === 'Narrative' ? (
-                            <th className="pb-2 text-right">Marks each</th>
-                          ) : null}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {BLOOM_LEVEL_META.map((meta) => (
-                          <tr key={meta.level}>
-                            <td className="py-2 pr-3 font-medium text-slate-900">{meta.level}</td>
-                            <td className="py-2 pr-3">
-                              <select
-                                aria-label={`Difficulty for ${meta.level}`}
-                                value={bloomDifficulties[meta.level]}
-                                onChange={(event) =>
-                                  setBloomDifficulties((current) => ({
-                                    ...current,
-                                    [meta.level]: event.target.value,
-                                  }))
-                                }
-                                className="h-9 w-full rounded-[8px] border border-slate-300 bg-white px-2 text-sm text-slate-700 outline-none focus:border-[#aea8ff]"
-                              >
-                                {DIFFICULTY_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 pr-3 text-right">
-                              <input
-                                aria-label={`Number of ${meta.level} questions`}
-                                inputMode="numeric"
-                                value={String(bloomCounts[meta.level] ?? 0)}
-                                onChange={(event) => handleBloomCountChange(meta.level, event.target.value)}
-                                className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#aea8ff]"
-                              />
-                            </td>
+              <div className="space-y-2.5">
+                <Label
+                  htmlFor="total-questions"
+                  className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"
+                >
+                  Total questions <span className="text-rose-500">*</span>
+                </Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    id="total-questions"
+                    inputMode="numeric"
+                    value={totalQuestions}
+                    onChange={(event) =>
+                      setTotalQuestions(event.target.value.replace(/[^\d]/g, ''))
+                    }
+                    placeholder="Enter a number"
+                    className="h-11 w-[150px] rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {QUESTION_COUNT_PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setTotalQuestions(String(preset))}
+                        className={cn(
+                          'h-8 rounded-full border px-3 text-[13px] font-semibold transition-colors',
+                          totalQuestions === String(preset)
+                            ? 'border-[#4f46e5] bg-[#eef2ff] text-[#4338ca]'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        )}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[12px] text-slate-500">Between 1 and 50 per run.</p>
+              </div>
+
+              <div className="space-y-3 rounded-[14px] border border-slate-200 bg-slate-50/50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <Label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Question mix
+                    </Label>
+                    <p className="mt-1 text-[12px] leading-[18px] text-slate-500">
+                      {useAutoQuota
+                        ? 'The generator weights Bloom levels from the concept intelligence.'
+                        : 'You decide how many questions sit at each Bloom level.'}
+                    </p>
+                  </div>
+                  <div className="inline-flex overflow-hidden rounded-full border border-slate-300 bg-white text-[13px] font-semibold">
+                    {[
+                      { label: 'Auto', value: true },
+                      { label: 'Custom', value: false },
+                    ].map((option) => (
+                      <button
+                        key={option.label}
+                        type="button"
+                        onClick={() => handleToggleAutoQuota(option.value)}
+                        className={
+                          useAutoQuota === option.value
+                            ? 'bg-[#4f46e5] px-4 py-1.5 text-white'
+                            : 'bg-white px-4 py-1.5 text-slate-600 hover:bg-slate-50'
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {useAutoQuota ? null : (
+                  <>
+                    <div className="overflow-x-auto rounded-[10px] border border-slate-200 bg-white">
+                      <table className="w-full min-w-[440px] text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <th className="px-3 py-2">Bloom level</th>
+                            <th className="px-3 py-2">Difficulty</th>
+                            <th className="px-3 py-2 text-right">Questions</th>
                             {questionType === 'Narrative' ? (
-                              <td className="py-2 text-right">
-                                <input
-                                  aria-label={`Marks per ${meta.level} question`}
-                                  inputMode="numeric"
-                                  value={String(bloomPoints[meta.level] ?? 0)}
-                                  onChange={(event) =>
-                                    setBloomPoints((current) => ({
-                                      ...current,
-                                      [meta.level]: Number(event.target.value.replace(/[^\d]/g, '') || 0),
-                                    }))
-                                  }
-                                  className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#aea8ff]"
-                                />
-                              </td>
+                              <th className="px-3 py-2 text-right">Marks each</th>
                             ) : null}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {BLOOM_LEVEL_META.map((meta) => (
+                            <tr key={meta.level}>
+                              <td className="px-3 py-2 font-medium text-slate-900">{meta.level}</td>
+                              <td className="px-3 py-2">
+                                <select
+                                  aria-label={`Difficulty for ${meta.level}`}
+                                  value={bloomDifficulties[meta.level]}
+                                  onChange={(event) =>
+                                    setBloomDifficulties((current) => ({
+                                      ...current,
+                                      [meta.level]: event.target.value,
+                                    }))
+                                  }
+                                  className="h-9 w-full rounded-[8px] border border-slate-300 bg-white px-2 text-sm text-slate-700 outline-none focus:border-[#4f46e5]"
+                                >
+                                  {DIFFICULTY_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <input
+                                  aria-label={`Number of ${meta.level} questions`}
+                                  inputMode="numeric"
+                                  value={String(bloomCounts[meta.level] ?? 0)}
+                                  onChange={(event) =>
+                                    handleBloomCountChange(meta.level, event.target.value)
+                                  }
+                                  className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#4f46e5]"
+                                />
+                              </td>
+                              {questionType === 'Narrative' ? (
+                                <td className="px-3 py-2 text-right">
+                                  <input
+                                    aria-label={`Marks per ${meta.level} question`}
+                                    inputMode="numeric"
+                                    value={String(bloomPoints[meta.level] ?? 0)}
+                                    onChange={(event) =>
+                                      setBloomPoints((current) => ({
+                                        ...current,
+                                        [meta.level]: Number(
+                                          event.target.value.replace(/[^\d]/g, '') || 0
+                                        ),
+                                      }))
+                                    }
+                                    className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#4f46e5]"
+                                  />
+                                </td>
+                              ) : null}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p
-                      className={
-                        isQuotaValid
-                          ? 'text-sm font-medium text-emerald-700'
-                          : 'text-sm font-medium text-rose-700'
-                      }
-                    >
-                      {bloomCountTotal} of {isTotalQuestionsValid ? totalQuestionsNumber : 0} questions
-                      allocated
-                      {isQuotaValid ? '' : ' - the mix must add up to the total before you can generate.'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setBloomCounts(
-                          suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
-                        )
-                      }
-                      className="text-sm font-semibold text-[#6c63ff] hover:text-[#554dd6]"
-                    >
-                      Reset to suggested split
-                    </button>
-                  </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p
+                        className={cn(
+                          'text-[13px] font-medium',
+                          isQuotaValid ? 'text-emerald-700' : 'text-rose-700'
+                        )}
+                      >
+                        {bloomCountTotal} of {isTotalQuestionsValid ? totalQuestionsNumber : 0}{' '}
+                        questions allocated
+                        {isQuotaValid
+                          ? ''
+                          : ' - the mix must add up to the total before you can generate.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBloomCounts(
+                            suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
+                          )
+                        }
+                        className="text-[13px] font-semibold text-[#4f46e5] hover:text-[#4338ca]"
+                      >
+                        Reset to suggested split
+                      </button>
+                    </div>
 
-                  {questionType === 'MCQ' ? (
-                    <p className="text-xs text-slate-500">
-                      MCQs are always scored at 1 mark each, so marks are not editable for this type.
+                    {questionType === 'MCQ' ? (
+                      <p className="text-[11px] text-slate-500">
+                        MCQs are always scored at 1 mark each, so marks are not editable for this
+                        type.
+                      </p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+
+              {questionGenerationError && questionStreamPhase !== 'error' ? (
+                <p className="rounded-[10px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-medium text-rose-700">
+                  {questionGenerationError}
+                </p>
+              ) : null}
+
+              {questionGenerationSuccess ? (
+                <p className="flex items-start gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] font-medium text-emerald-700">
+                  <CheckCircle2 size={15} className="mt-px shrink-0" />
+                  <span>{questionGenerationSuccess}</span>
+                </p>
+              ) : null}
+
+              {generatedQuestionPreviews.length > 0 ? (
+                <div className="rounded-[14px] border border-slate-200 bg-slate-50/60 p-3">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Generated questions
                     </p>
-                  ) : null}
-                </>
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
+                      {revealedQuestionCount} of {generatedQuestionPreviews.length} shown
+                    </span>
+                  </div>
+                  <div className="max-h-[440px] space-y-3 overflow-y-auto pr-1">
+                    {generatedQuestionPreviews
+                      .slice(0, revealedQuestionCount)
+                      .map((question, index) => (
+                        <div
+                          key={`${question.id}-${index}`}
+                          className="animate-in fade-in slide-in-from-bottom-2 duration-300"
+                        >
+                          {renderGeneratedQuestionPreview(question, index)}
+                        </div>
+                      ))}
+                    {revealedQuestionCount < generatedQuestionPreviews.length ? (
+                      <div className="flex items-center gap-2 px-1 py-2 text-[12px] font-medium text-slate-400">
+                        <Loader2 size={13} className="animate-spin" />
+                        Loading the rest...
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </section>
+
+          {/* -------------------------------- Right: pipeline transparency */}
+          <aside className="border-slate-200 bg-slate-50/70 px-5 py-6 max-lg:border-t lg:min-h-0 lg:overflow-y-auto lg:border-l">
+            <div className="space-y-4">
+              {questionStreamPhase !== 'idle' ? (
+                <PipelineStream
+                  key={questionRunId}
+                  phase={questionStreamPhase}
+                  errorMessage={questionGenerationError}
+                  batchLabel={generationBatchLabel}
+                />
+              ) : null}
+
+              {questionRunTelemetry ? (
+                <RunTelemetryStrip telemetry={questionRunTelemetry} />
+              ) : null}
+
+              {isQuestionIntelLoading ? (
+                <div className="flex items-center gap-2 rounded-[12px] border border-slate-200 bg-white px-4 py-6 text-[13px] font-medium text-slate-500">
+                  <Loader2 size={15} className="animate-spin text-[#4f46e5]" />
+                  Reading this concept&apos;s intelligence...
+                </div>
+              ) : (
+                <GroundingPanel
+                  sources={questionGroundingSources}
+                  coverageLabel={groundingCoverageLabel}
+                  blueprint={questionBlueprint}
+                  footnote="DeepSeek writes the items; the concept slice, Bloom x DOK blueprint and duplicate guard are built by the server before the model is called."
+                />
               )}
             </div>
-            {questionGenerationError ? (
-              <p className="rounded-[10px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                {questionGenerationError}
-              </p>
-            ) : null}
-            {questionGenerationSuccess ? (
-              <p className="rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                {questionGenerationSuccess}
-              </p>
-            ) : null}
-            {generatedQuestionPreviews.length > 0 ? (
-              <div className="rounded-[12px] border border-slate-200 bg-slate-50 p-3">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Generated questions
-                  </p>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                    {generatedQuestionPreviews.length} saved
-                  </span>
-                </div>
-                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
-                  {generatedQuestionPreviews.map(renderGeneratedQuestionPreview)}
-                </div>
-              </div>
-            ) : null}
-          </div>
+          </aside>
+        </div>
 
-          <div className="mt-6 flex items-center justify-end gap-4 border-t border-slate-200/80 pt-4">
+        {/* ---------------------------------------------------------- Footer */}
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-6 py-4 sm:px-8">
+          <p className="text-[12px] font-medium text-slate-500">{generationSummaryLabel}</p>
+          <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={closeGenerateQuestionsModal}
-              className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900"
+              className="text-[14px] font-medium text-slate-600 transition-colors hover:text-slate-900"
             >
-              Cancel
+              {generatedQuestionPreviews.length > 0 ? 'Done' : 'Cancel'}
             </button>
             <Button
               type="button"
               onClick={submitGenerateQuestions}
               disabled={!canGenerateQuestions}
               aria-busy={isGeneratingQuestions}
-              className="h-10 rounded-xl bg-[#aea8ff] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(99,91,255,0.28)] hover:bg-[#978fff] disabled:bg-[#d7d2ff] disabled:text-white/85 disabled:shadow-none"
+              className="h-10 rounded-xl bg-[#4f46e5] px-5 text-[14px] font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.24)] transition-colors hover:bg-[#4338ca] disabled:bg-[#c7d2fe] disabled:text-white/90 disabled:shadow-none"
             >
-              <Sparkles size={16} className="mr-2" />
+              {isGeneratingQuestions ? (
+                <Loader2 size={16} className="mr-2 animate-spin" />
+              ) : (
+                <Sparkles size={16} className="mr-2" />
+              )}
               {isGeneratingQuestions ? 'Generating...' : 'Generate questions'}
             </Button>
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   ) : null;
