@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Loader2, type LucideIcon } from 'lucide-react';
 
+import Link from 'next/link';
+
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
+import { ModuleJourney } from '@/app/general/onboarding/_components/ModuleJourney';
 import { PageFrame, PageHeader } from '@/app/fees/_components/fees-shared';
 import { getFeesSession, type FeesSession } from '@/app/fees/_lib/fees-api';
 import {
@@ -63,6 +66,22 @@ type Tab =
 type LoadState = 'loading' | 'ready' | 'error';
 
 const TAB_PARAM = 'tab';
+
+/**
+ * The one category that is a screen rather than a group of menus.
+ *
+ * Every module's bar carries an Onboarding category and every one of them is
+ * empty, because onboarding is not a set of menus — it is the journey that
+ * already lives in the onboarding module. Fees solved this by hand with a page
+ * that renders one hardcoded journey key; this is the general form of that, so
+ * Onboarding opens the same screen in every module's bar and which journey it
+ * shows is the category row's `onboarding_module_key` rather than a route
+ * somebody has to write.
+ */
+const ONBOARDING_CATEGORY_KEY = 'onboarding';
+
+/** Where Onboarding sends a bar that owns no single journey. */
+const ONBOARDING_INDEX_ROUTE = '/general/onboarding';
 
 type MenuTab = Extract<Tab, { kind: 'menu' }>;
 
@@ -138,6 +157,7 @@ export function ModuleCategoryPage({
   categoryKey,
   staticScreens = [],
   staticScreensPlacement = 'before',
+  onboardingModuleKey = '',
 }: {
   moduleName: string;
   categoryKey: string;
@@ -152,6 +172,17 @@ export function ModuleCategoryPage({
    * category's landing screen.
    */
   staticScreensPlacement?: 'before' | 'after';
+  /**
+   * The onboarding journey to fall back on when the category row carries no
+   * `onboarding_module_key`.
+   *
+   * Only the two routes that predate that column pass it — Fees and
+   * Teach/Learn each shipped a page hardcoding their journey — so an
+   * installation that has not yet run the mapping migration keeps the screen it
+   * has today instead of losing it. Every other module reads the key from the
+   * row and passes nothing here.
+   */
+  onboardingModuleKey?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -265,6 +296,66 @@ export function ModuleCategoryPage({
   );
 
   const Outlet = screenRegistry.Outlet;
+
+  // Onboarding is a screen, not a tab strip, so it answers before any of the
+  // tab rendering below. No PageHeader: the journey brings its own heading and
+  // the category bar above is where the user came from.
+  if (categoryKey === ONBOARDING_CATEGORY_KEY || category?.key === ONBOARDING_CATEGORY_KEY) {
+    const journeyKey = category?.onboardingModuleKey || onboardingModuleKey;
+
+    if (state === 'error') {
+      return (
+        <PageFrame>
+          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error || 'Unable to load this category.'}</span>
+          </div>
+        </PageFrame>
+      );
+    }
+
+    if (state === 'loading') {
+      return (
+        <PageFrame>
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading onboarding…
+          </div>
+        </PageFrame>
+      );
+    }
+
+    if (journeyKey) {
+      return (
+        <PageFrame>
+          <ModuleJourney moduleKey={journeyKey} />
+        </PageFrame>
+      );
+    }
+
+    // A bar that groups screens from several modules owns no journey of its
+    // own. Saying so and offering the index beats showing one of the others.
+    return (
+      <PageFrame>
+        <PageHeader
+          title={category?.label || 'Onboarding'}
+          description={category?.description || undefined}
+        />
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-slate-700">No onboarding journey for this menu</p>
+          <p className="mt-1 text-sm text-slate-500">
+            This menu collects screens from more than one module, so it has no journey of its own.
+          </p>
+          <Link
+            href={ONBOARDING_INDEX_ROUTE}
+            className="mt-3 inline-flex items-center text-sm font-semibold text-[#5846EA] hover:underline"
+          >
+            Open onboarding
+          </Link>
+        </div>
+      </PageFrame>
+    );
+  }
 
   return (
     <PageFrame>

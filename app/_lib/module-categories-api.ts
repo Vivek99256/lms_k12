@@ -34,6 +34,18 @@ export type ModuleCategory = {
   description: string;
   /** The category's own page, e.g. /modules/inventory/reports. Configured per row. */
   route: string;
+  /**
+   * Set on the Onboarding category only: the onboarding journey this module
+   * shows, from `onboarding_module.module_key`.
+   *
+   * Onboarding is not a set of menus to group — it is the journey that already
+   * lives in the onboarding module — so the Onboarding category is empty
+   * everywhere and this key is what tells the category page which journey to
+   * render. Empty means the bar has no single journey (a bar that collects
+   * screens from several modules), and the page points at the onboarding index
+   * instead of guessing one.
+   */
+  onboardingModuleKey: string;
   items: ModuleCategoryItem[];
 };
 
@@ -144,6 +156,7 @@ function readCategories(payload: unknown): ModuleCategory[] {
         label,
         description: readString(record.description),
         route: readString(record.route),
+        onboardingModuleKey: readString(record.onboarding_module_key),
         items,
       },
     ];
