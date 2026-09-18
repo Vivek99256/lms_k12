@@ -15,7 +15,7 @@ function screen(loader: () => Promise<{ default: ScreenComponent }>): ScreenComp
 
 /**
  * Route -> page component, for every page in this app that can be mounted
- * inside a category tab. 492 entries.
+ * inside a category tab. 494 entries.
  */
 export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/academic_setup/create_batch': screen(() => import('@/app/academic_setup/create_batch/page')),
@@ -327,6 +327,7 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/lms/lmsassignment_submission': screen(() => import('@/app/lms/lmsAssignment_submission/page')),
   '/lms/message': screen(() => import('@/app/lms/message/page')),
   '/lms/monthly-plan': screen(() => import('@/app/lms/monthly-plan/page')),
+  '/lms/project': screen(() => import('@/app/lms/project/page')),
   '/lms/question-wise-report': screen(() => import('@/app/lms/question-wise-report/page')),
   '/lms/reports': screen(() => import('@/app/lms/reports/page')),
   '/lms/social-collaborative': screen(() => import('@/app/lms/social-collaborative/page')),
@@ -335,6 +336,7 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/lms/teacher-dashboard': screen(() => import('@/app/lms/teacher-dashboard/page')),
   '/lms/teacher-diary': screen(() => import('@/app/lms/teacher-diary/page')),
   '/lms/teacher-timetable': screen(() => import('@/app/lms/teacher-timetable/page')),
+  '/lms/worksheet': screen(() => import('@/app/lms/worksheet/page')),
   '/login': screen(() => import('@/app/login/page')),
   '/onboarding/lms': screen(() => import('@/app/onboarding/lms/page')),
   '/organization_managment/department': screen(() => import('@/app/organization_managment/Department/page')),

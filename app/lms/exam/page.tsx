@@ -1,7 +1,6 @@
 ﻿'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Award,
@@ -938,34 +937,15 @@ export default function StudentHomeworkIndexPage() {
     getCreateExamSession().userProfileName.trim().toUpperCase() === 'STUDENT'
       ? 'Student'
       : 'Teacher';
-  /*
-   * `?type=<exam_type>` scopes this screen to one kind of paper.
-   *
-   * This is what the Worksheet and Project menus open — they point at this
-   * same screen inside Operations
-   * (/modules/test/operations?tab=<exam menu id>&type=worksheet) rather than at
-   * pages of their own, because the only thing that differs is which exam_type
-   * the list is restricted to. With no `type` the screen behaves exactly as it
-   * always has and shows every type.
-   *
-   * The value is only honoured if it is one the dropdown offers, so a hand-typed
-   * URL cannot push an arbitrary string into the API query.
-   */
-  const searchParams = useSearchParams();
-  const scopedExamType = useMemo(() => {
-    const requested = (searchParams?.get('type') ?? '').trim().toLowerCase();
-
-    return examTypeOptions.some((option) => option.value === requested) ? requested : undefined;
-  }, [searchParams]);
-  const scopedNoun = scopedExamType ? `${examTypeLabel(scopedExamType).toLowerCase()} papers` : 'exams';
-
-  // Bumping `examReloadToken` re-runs the fetch after a publish.
+  // No exam_type is pinned here, so the grid shows every type — Worksheet and
+  // Project are their own screens. Bumping `examReloadToken` re-runs the fetch
+  // after a publish.
   const [examReloadToken, setExamReloadToken] = useState(0);
   const {
     rows: apiExams,
     isLoading: isLoadingExams,
     loadError: examLoadError,
-  } = useQuestionPaperRows(scopedExamType, examReloadToken);
+  } = useQuestionPaperRows(undefined, examReloadToken);
   const [publishSuccessMessage, setPublishSuccessMessage] = useState('');
   const [lmsCourses, setLmsCourses] = useState<LmsCoursesSubjectRecord[]>([]);
   const [isLoadingLmsCourses, setIsLoadingLmsCourses] = useState(false);
@@ -2423,12 +2403,6 @@ export default function StudentHomeworkIndexPage() {
                     loadError={examLoadError}
                     columns={ALL_QUESTION_PAPER_COLUMNS}
                     pdfController={examPaperPdf}
-                    noun={scopedNoun}
-                    searchPlaceholder={`Search ${scopedNoun}...`}
-                    // The API query already restricts the list, so offering a
-                    // type dropdown here would only let the user filter to
-                    // nothing.
-                    showTypeFilter={!scopedExamType}
                     toolbarActions={
                       <>
                         <QuestionPaperTemplateSelect controller={examPaperPdf} />
