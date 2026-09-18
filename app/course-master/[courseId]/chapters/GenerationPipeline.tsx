@@ -486,6 +486,14 @@ export function PipelineStream({
  * Run telemetry - every number below comes back in the API response.
  * ------------------------------------------------------------------ */
 
+/**
+ * In-product name for the generation engine, shown instead of the provider's raw
+ * model id. The slice building, Bloom x DOK blueprint, prompt pack, validation and
+ * duplicate guard are all ours; only the text generation is bought in. Rename here
+ * and every surface follows.
+ */
+export const GENERATION_ENGINE_LABEL = 'Concept Intelligence';
+
 export interface RunTelemetry {
   requested?: number;
   generated?: number;
@@ -531,7 +539,7 @@ export function RunTelemetryStrip({ telemetry }: { telemetry: RunTelemetry }) {
 
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {tiles.map((tile) => (
+      {[{ label: 'Engine', value: GENERATION_ENGINE_LABEL }, ...tiles].map((tile) => (
         <div key={tile.label} className="rounded-[9px] border border-slate-200 bg-white px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">
             {tile.label}
