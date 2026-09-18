@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LifecycleTrace } from '@/components/intelligence/LifecycleTrace';
 import { useAuth } from '@/contexts/AuthContext';
+import { readAiSession } from '@/lib/ai/session';
 import { ask, type IntelligenceContext } from '@/lib/intelligence/client';
 import type {
   AnswerAction,
@@ -48,11 +49,15 @@ export default function AiJourneyPage() {
   const threadEnd = useRef<HTMLDivElement>(null);
 
   const context = useMemo<IntelligenceContext>(() => {
-    const token = typeof window === 'undefined' ? null : localStorage.getItem('token');
+    // Same correction as the report page: there is no bare `token` key in localStorage.
+    // The bearer lives at `userData.user_token`, and `readAiSession()` is the one place
+    // that knows it.
+    const session = readAiSession();
 
     return {
-      token,
-      instituteId: auth?.menuContext?.sub_institute_id ?? null,
+      token: session?.token ?? null,
+      baseUrl: session?.baseUrl ?? null,
+      instituteId: session?.instituteId || auth?.menuContext?.sub_institute_id || null,
       academicYear:
         (auth?.academicYears?.[0] as { syear?: string | number } | undefined)?.syear ?? null,
     };

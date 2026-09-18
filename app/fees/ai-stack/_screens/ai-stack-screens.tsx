@@ -1,14 +1,12 @@
 'use client';
 
-import { BookMarked, Cpu, FileText, Gauge, History, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
+import { BookMarked, FileText, Gauge, History, ShieldAlert, Terminal, Workflow } from 'lucide-react';
 
 import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
 import { FeesActivityScreen } from '@/app/fees/ai-stack/_screens/fees-activity-screen';
 import { FeesAutomationsScreen } from '@/app/fees/ai-stack/_screens/fees-automations-screen';
 import { FeesGuardrailsScreen } from '@/app/fees/ai-stack/_screens/fees-guardrails-screen';
 import { FeesKnowledgeBaseScreen } from '@/app/fees/ai-stack/_screens/fees-knowledge-base-screen';
-import { FeesModelsScreen } from '@/app/fees/ai-stack/_screens/fees-models-screen';
-import { FeesPoliciesScreen } from '@/app/fees/ai-stack/_screens/fees-policies-screen';
 import { FeesPromptsScreen } from '@/app/fees/ai-stack/_screens/fees-prompts-screen';
 import { FeesTemplatesScreen } from '@/app/fees/ai-stack/_screens/fees-templates-screen';
 import { FeesUsageCostScreen } from '@/app/fees/ai-stack/_screens/fees-usage-cost-screen';
@@ -32,8 +30,6 @@ import { FeesUsageCostScreen } from '@/app/fees/ai-stack/_screens/fees-usage-cos
  * There is no second AI stack under Fees. Every screen calls the same client, the same
  * endpoint and the same table as the central AI console, scoped to Fees:
  *
- *   Policies       → ai_policies with a `module` assignment for Fees
- *   Models         → ai_api_keys with `ai_module = 'fees'`, priced from ai_models
  *   Prompts        → ai_templates, module_key = fees, kind = prompt
  *   Templates      → ai_templates, module_key = fees, kind = report
  *   Knowledge Base → the read-only Fees MCP tools, from the backend tool registry
@@ -53,22 +49,21 @@ import { FeesUsageCostScreen } from '@/app/fees/ai-stack/_screens/fees-usage-cos
  * second place to change it.
  */
 export const FEES_AI_STACK_SCREENS: ModuleStaticScreen[] = [
-  {
-    // Live. `ai_policies` rows carrying a `module` assignment for Fees, through the
-    // same client and endpoints as the central console. See fees-policies-screen.tsx.
-    id: 'policies',
-    label: 'Policies',
-    icon: SlidersHorizontal,
-    render: () => <FeesPoliciesScreen />,
-  },
-  {
-    // Live. The module → provider → model → key binding for Fees, which is an
-    // `ai_api_keys` row with `ai_module = 'fees'`. See fees-models-screen.tsx.
-    id: 'models',
-    label: 'Models',
-    icon: Cpu,
-    render: () => <FeesModelsScreen />,
-  },
+  /*
+   * Policies and Models are deliberately absent.
+   *
+   * Both are estate-wide settings with one central console — AI & Intelligence →
+   * Policies and → Models — and both wrote to the very same tables this module would
+   * have shown: `ai_policies`, and `ai_models` / `ai_api_keys`. Two screens onto one
+   * row is not configurability, it is two places to look when the answer disagrees,
+   * and a per-module model binding invites a school to run Fees on a model nobody
+   * else is using without meaning to.
+   *
+   * Removing the tabs changes no data and no behaviour: Fees resolves its provider,
+   * model and policy through `AiConfigurationResolver` and `AiPolicyResolver`, which
+   * read the central tables and never consulted this screen. The screen components
+   * remain in the tree, unrouted, so restoring a tab is one entry here.
+   */
   {
     // Live. `ai_templates` rows for Fees with `kind = 'prompt'` — the other half of
     // the store Templates reads. See fees-prompts-screen.tsx.

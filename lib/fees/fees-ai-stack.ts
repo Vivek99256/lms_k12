@@ -133,21 +133,30 @@ export const FEES_OPERATIONS: Record<FeesOperationKey, FeesOperationSpec> = {
     label: 'Collection remarks drafted',
     capability: 'generative',
     uses: 'prompt',
-    prefers: ['pending', 'summary'],
+    // 'remark' first, and it matters. These hints are matched against published prompt
+    // keys in order, so while no remark prompt existed the first match was
+    // `k12.fees.pending_summary` — a cohort summary whose grounding variables are
+    // `records` and `metrics`. The collection screen sends a student and some amounts,
+    // never those, so every draft was refused for want of grounding and the operator
+    // saw a 422. A remark is not a summary; it now asks for the prompt that writes one.
+    prefers: ['remark', 'pending', 'summary'],
   },
   circular_drafted: {
     key: 'circular_drafted',
     label: 'Fee circular drafted',
     capability: 'generative',
     uses: 'prompt',
-    prefers: ['circular', 'pending', 'summary'],
+    // `circular_notice` matches 'circular' ahead of the summary fallback.
+    prefers: ['circular', 'notice', 'pending', 'summary'],
   },
   communication_drafted: {
     key: 'communication_drafted',
     label: 'Fee communication drafted',
     capability: 'generative',
     uses: 'prompt',
-    prefers: ['reminder', 'pending', 'summary'],
+    // `parent_message` matches 'message'; 'reminder' stays first for estates that
+    // published a reminder prompt of their own.
+    prefers: ['reminder', 'message', 'pending', 'summary'],
   },
   reminder_drafted: {
     key: 'reminder_drafted',
