@@ -2903,7 +2903,6 @@ export default function ChapterListPage() {
         inserted: asOptionalNumber(inserted),
         skippedDuplicate: asOptionalNumber(data?.skipped_duplicate),
         skippedInvalid: asOptionalNumber(data?.skipped_invalid),
-        model: typeof data?.model === 'string' ? data.model : undefined,
         batches: asOptionalNumber(data?.batches),
         inputTokens: asOptionalNumber(data?.input_tokens),
         outputTokens: asOptionalNumber(data?.output_tokens),
@@ -4073,7 +4072,7 @@ export default function ChapterListPage() {
                   sources={questionGroundingSources}
                   coverageLabel={groundingCoverageLabel}
                   blueprint={questionBlueprint}
-                  footnote="DeepSeek writes the items; the concept slice, Bloom x DOK blueprint and duplicate guard are built by the server before the model is called."
+                  footnote="The AI writes the items; the concept slice, Bloom x DOK blueprint and duplicate guard are all built by the server before the model is called."
                 />
               )}
             </div>

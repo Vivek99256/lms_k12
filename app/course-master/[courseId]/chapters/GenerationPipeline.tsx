@@ -6,12 +6,12 @@
  * The generation API (`POST /api/intelligence/questions/generate`) is a single
  * request/response call - it does not stream. What this file does is make the
  * pipeline behind that call *legible*: which grounding signals the server
- * actually feeds DeepSeek, in what order the stages run, and what the run really
+ * actually feeds the model, in what order the stages run, and what the run really
  * cost once it returns. Nothing here changes the request payload.
  *
  * Stage list mirrors `App\Services\QuestionGenerationService::generate()`:
  *   loadConceptSlice -> buildConceptSlice -> buildQuota -> buildDedupCorpus
- *   -> callDeepSeek (batched) -> validateRows -> persist
+ *   -> the batched model call -> validateRows -> persist
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -262,7 +262,7 @@ const PRE_STAGES: Stage[] = [
   },
   {
     id: 'author',
-    label: 'DeepSeek authoring items',
+    label: 'AI authoring items',
     detail: 'Column-shaped rows written against the slice, one batch at a time.',
     hold: Number.POSITIVE_INFINITY,
   },
@@ -492,7 +492,6 @@ export interface RunTelemetry {
   inserted?: number;
   skippedDuplicate?: number;
   skippedInvalid?: number;
-  model?: string;
   batches?: number;
   inputTokens?: number;
   outputTokens?: number;
@@ -511,7 +510,6 @@ export function RunTelemetryStrip({ telemetry }: { telemetry: RunTelemetry }) {
             : String(telemetry.inserted),
       });
     }
-    if (telemetry.model) out.push({ label: 'Model', value: telemetry.model });
     if (telemetry.batches != null) out.push({ label: 'Batches', value: String(telemetry.batches) });
     if (telemetry.inputTokens != null || telemetry.outputTokens != null) {
       out.push({
