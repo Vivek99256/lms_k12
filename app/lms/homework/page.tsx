@@ -66,7 +66,7 @@ const SOURCE_OPTIONS: Array<{ value: HomeworkSource; label: string; hint: string
   },
   {
     value: "exam_paper",
-    label: "Exam paper",
+    label: "Homework paper",
     hint: "Assign an existing homework paper — its questions come with it.",
   },
 ];
@@ -461,12 +461,12 @@ export default function StudentHomeworkPage() {
       return "Select at least one question.";
     }
     if (fromExamPaper) {
-      if (!selectedExamPaperId) return "Select an exam paper.";
+      if (!selectedExamPaperId) return "Select a homework paper.";
       if (examPaperQuestionsLoading) {
-        return "Wait for the exam paper's questions to load.";
+        return "Wait for the homework paper's questions to load.";
       }
       if (examPaperQuestions.length === 0) {
-        return "The selected exam paper has no questions.";
+        return "The selected homework paper has no questions.";
       }
     }
     if (selected.size === 0) return "Select at least one student.";
@@ -946,7 +946,7 @@ export default function StudentHomeworkPage() {
             <div className="space-y-5 md:col-span-2 xl:col-span-3">
               <div className="space-y-2">
                 <Label htmlFor="hw-exam-paper">
-                  Exam paper <span className="text-red-500">*</span>
+                  Homework paper <span className="text-red-500">*</span>
                 </Label>
                 {examPapersError ? (
                   <p className="text-sm text-red-600">{examPapersError}</p>
@@ -960,10 +960,10 @@ export default function StudentHomeworkPage() {
                   >
                     <option value="">
                       {examPapersLoading
-                        ? "Loading exam papers…"
+                        ? "Loading homework papers…"
                         : examPapers.length === 0
-                          ? "No homework exam papers available"
-                          : "Select an exam paper"}
+                          ? "No homework papers available"
+                          : "Select a homework paper"}
                     </option>
                     {examPapers.map((paper) => (
                       <option key={paper.id} value={paper.id}>

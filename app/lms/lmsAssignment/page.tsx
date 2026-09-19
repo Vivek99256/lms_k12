@@ -159,7 +159,7 @@ export default function CreateAssignmentPage() {
       if (!homeworkFile) return "Upload a homework file.";
       if (!homeworkTitle.trim()) return "Enter a homework title.";
     } else {
-      if (!examPaper) return "Select an exam paper.";
+      if (!examPaper) return "Select an assignment paper.";
       if (!title.trim()) return "Enter an assignment title.";
     }
     if (selected.size === 0) return "Select at least one student.";
@@ -218,7 +218,7 @@ export default function CreateAssignmentPage() {
       <header>
         <h1 className="text-2xl font-bold text-slate-900">Create Assignment</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Search students by class, attach an offline exam paper, and assign it.
+          Search students by class, attach an offline Assignment paper, and assign it.
         </p>
       </header>
 
@@ -266,7 +266,7 @@ export default function CreateAssignmentPage() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="asg-source">Send homework from system</Label>
+                <Label htmlFor="asg-source">Send Assignment from system</Label>
                 <Switch
                   id="asg-source"
                   checked={sendHomework}
@@ -296,7 +296,7 @@ export default function CreateAssignmentPage() {
               ) : (
                 <div className="space-y-2">
                   <Label htmlFor="asg-exam">
-                    Exam paper <span className="text-red-500">*</span>
+                    Assignment paper <span className="text-red-500">*</span>
                   </Label>
                   <select
                     id="asg-exam"
@@ -307,12 +307,12 @@ export default function CreateAssignmentPage() {
                   >
                     <option value="">
                       {loadingExams
-                        ? "Loading exam papers..."
+                        ? "Loading assignment papers..."
                         : !subject
                           ? "Select a subject first"
                           : examPapers.length
-                            ? "Select Exam Paper"
-                            : "No offline exam paper found"}
+                            ? "Select Assignment Paper"
+                            : "No offline assignment paper found"}
                     </option>
                     {examPapers.map((paper) => (
                       <option
