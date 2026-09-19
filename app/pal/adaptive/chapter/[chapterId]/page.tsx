@@ -3,10 +3,9 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Brain, Loader2 } from 'lucide-react';
+import { ArrowRight, Brain, Loader2 } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
@@ -16,6 +15,7 @@ import {
 } from '@/app/pal/data/pal-diagnostic';
 import { BandChip, LevelBadge, bandLabel } from '@/app/pal/_components/BandMeter';
 import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
  * Stage 3 - which concept to practise, and at what level.
@@ -85,7 +85,7 @@ function AdaptiveConceptsView() {
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-rose-800">{error ?? 'Nothing could be loaded.'}</p>
@@ -103,29 +103,33 @@ function AdaptiveConceptsView() {
   const unavailable = data.concepts.filter((concept) => !concept.servable);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href="/pal" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          Back to subjects
-        </Link>
-      </div>
-
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900">Adaptive learning</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {data.chapterName || 'This chapter'} — five questions per round, chosen from how you did.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+    <PalWorkspace
+      eyebrow={data.chapterName || 'This chapter'}
+      title="Adaptive learning"
+      description="Five questions per round, chosen from how you did."
+      backHref="/pal"
+      backLabel="Back to subjects"
+      actions={
+        <>
           {data.hasDiagnostic && <LevelBadge level={data.diagnosticLevel} />}
-          <Link href={`/pal/plan/chapter/${chapterId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>View plan</Link>
-        </div>
-      </header>
-
-      <JourneyRail current="adaptive" completed={data.hasDiagnostic ? ['diagnostic'] : []} className="mb-5" />
+          <Link
+            href={`/pal/plan/chapter/${chapterId}`}
+            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+          >
+            View plan
+          </Link>
+        </>
+      }
+      rail={
+        <PalRailSection title="Your journey">
+          <JourneyRail
+            current="adaptive"
+            completed={data.hasDiagnostic ? ['diagnostic'] : []}
+            orientation="vertical"
+          />
+        </PalRailSection>
+      }
+    >
 
       {!data.hasDiagnostic && (
         <Card className="mb-4 border-amber-200 bg-amber-50">
@@ -181,7 +185,7 @@ function AdaptiveConceptsView() {
           </CardContent>
         </Card>
       )}
-    </div>
+    </PalWorkspace>
   );
 }
 

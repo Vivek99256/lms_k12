@@ -83,6 +83,13 @@ export interface JourneyRailProps {
   className?: string;
   /** Compact drops the connectors and tightens spacing, for dense rows. */
   compact?: boolean;
+  /**
+   * 'vertical' stacks the stages as a left-aligned list, for the workspace side
+   * rail. Same stages, same states, same accessible labels - only the axis
+   * changes, so the rail and the in-page stepper can never disagree about where
+   * a learner is.
+   */
+  orientation?: 'horizontal' | 'vertical';
 }
 
 export function JourneyRail({
@@ -92,7 +99,9 @@ export function JourneyRail({
   onSelect,
   className,
   compact = false,
+  orientation = 'horizontal',
 }: JourneyRailProps) {
+  const vertical = orientation === 'vertical';
   const currentIndex = JOURNEY_STAGES.findIndex((stage) => stage.key === current);
   const doneSet = new Set(completed);
   const lockedSet = new Set(locked);
@@ -112,14 +121,58 @@ export function JourneyRail({
         Stage {reached} of {total}: {JOURNEY_STAGES[currentIndex]?.label ?? current}
       </p>
 
-      <ol className={cn('flex flex-wrap items-center', compact ? 'gap-1' : 'gap-x-1 gap-y-2')}>
+      <ol
+        className={cn(
+          'flex',
+          vertical
+            ? 'flex-col items-stretch gap-0'
+            : cn('flex-wrap items-center', compact ? 'gap-1' : 'gap-x-1 gap-y-2')
+        )}
+      >
         {JOURNEY_STAGES.map((stage, index) => {
           const isCurrent = stage.key === current;
           const isLocked = lockedSet.has(stage.key);
           const isDone = !isCurrent && (doneSet.has(stage.key) || (index < currentIndex && !isLocked));
           const selectable = Boolean(onSelect) && !isLocked && (isDone || isCurrent);
 
-          const content = (
+          const content = vertical ? (
+            // A row, not a pill: in a 320px rail the same rounded chrome
+            // repeated eight times is noise, and a left-aligned list scans as
+            // the ordered sequence it actually is.
+            <span
+              className={cn(
+                'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors',
+                isCurrent && 'bg-indigo-50 font-semibold text-indigo-900',
+                isDone && 'text-emerald-700',
+                !isCurrent && !isDone && !isLocked && 'text-slate-600',
+                isLocked && 'text-slate-400',
+                selectable && !isCurrent && 'hover:bg-slate-50'
+              )}
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold',
+                  isCurrent && 'border-indigo-600 bg-indigo-600 text-white',
+                  isDone && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                  !isCurrent && !isDone && !isLocked && 'border-slate-200 bg-white text-slate-400',
+                  isLocked && 'border-slate-200 bg-slate-50 text-slate-300'
+                )}
+              >
+                {isDone ? (
+                  <Check className="h-3 w-3" />
+                ) : isLocked ? (
+                  <Lock className="h-2.5 w-2.5" />
+                ) : (
+                  index + 1
+                )}
+              </span>
+              <span className="truncate">{stage.label}</span>
+              {isCurrent && (
+                <span className="ml-auto text-[11px] font-medium text-indigo-600">Now</span>
+              )}
+            </span>
+          ) : (
             <span
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full border font-medium transition-colors',
@@ -138,31 +191,51 @@ export function JourneyRail({
           );
 
           return (
-            <li key={stage.key} className="flex items-center">
+            <li key={stage.key} className={cn(vertical ? 'flex flex-col' : 'flex items-center')}>
               {selectable ? (
                 <button
                   type="button"
                   onClick={() => onSelect?.(stage.key)}
                   aria-current={isCurrent ? 'step' : undefined}
-                  className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                  className={cn(
+                    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600',
+                    vertical ? 'w-full rounded-lg text-left' : 'rounded-full'
+                  )}
                 >
                   {content}
                 </button>
               ) : (
-                <span aria-current={isCurrent ? 'step' : undefined} aria-disabled={isLocked || undefined}>
+                <span
+                  aria-current={isCurrent ? 'step' : undefined}
+                  aria-disabled={isLocked || undefined}
+                  className={cn(vertical && 'block w-full')}
+                >
                   {content}
                 </span>
               )}
 
-              {!compact && index < total - 1 && (
-                <span
-                  aria-hidden
-                  className={cn(
-                    'mx-1 h-px w-3 shrink-0',
-                    index < currentIndex ? 'bg-emerald-300' : 'bg-slate-200'
-                  )}
-                />
-              )}
+              {index < total - 1 &&
+                (vertical ? (
+                  // Sits under the numbered marker so the sequence reads as one
+                  // connected column rather than eight loose rows.
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'ml-[1.4rem] h-2 w-px shrink-0',
+                      index < currentIndex ? 'bg-emerald-300' : 'bg-slate-200'
+                    )}
+                  />
+                ) : (
+                  !compact && (
+                    <span
+                      aria-hidden
+                      className={cn(
+                        'mx-1 h-px w-3 shrink-0',
+                        index < currentIndex ? 'bg-emerald-300' : 'bg-slate-200'
+                      )}
+                    />
+                  )
+                ))}
             </li>
           );
         })}

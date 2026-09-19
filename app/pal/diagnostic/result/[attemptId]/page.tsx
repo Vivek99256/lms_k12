@@ -3,10 +3,9 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Loader2, Target, TrendingUp } from 'lucide-react';
+import { ArrowRight, Loader2, Target, TrendingUp } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   fetchChapterDiagnosticResult,
@@ -15,6 +14,7 @@ import {
 } from '@/app/pal/data/pal-diagnostic';
 import { BandRow, LevelBadge, StrengthBadge, bandLabel } from '@/app/pal/_components/BandMeter';
 import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
  * Stage 2 - the diagnostic result.
@@ -82,7 +82,7 @@ function DiagnosticResultView() {
 
   if (error || !result) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-rose-800">{error ?? 'This result could not be found.'}</p>
@@ -99,22 +99,39 @@ function DiagnosticResultView() {
   const answered = result.correct + result.incorrect;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href="/pal" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          Back to subjects
-        </Link>
-      </div>
+    <PalWorkspace
+      title="Diagnostic result"
+      description="This is your starting point for this chapter, not a grade."
+      backHref="/pal"
+      backLabel="Back to subjects"
+      rail={
+        <>
+          <PalRailSection title="How it went">
+            <PalRailStat label="Correct" value={result.correct} tone="positive" />
+            <PalRailStat label="Incorrect" value={result.incorrect} />
+            {result.unanswered > 0 && (
+              <PalRailStat label="Unanswered" value={result.unanswered} tone="warning" />
+            )}
+            <PalRailStat label="Questions" value={result.totalQuestions} />
+          </PalRailSection>
 
-      <header className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900">Diagnostic result</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          This is your starting point for this chapter, not a grade.
-        </p>
-      </header>
+          {(result.strengths.length > 0 || result.weaknesses.length > 0) && (
+            <PalRailSection title="Concepts">
+              <PalRailStat label="Strong" value={result.strengths.length} tone="positive" />
+              <PalRailStat
+                label="Need work"
+                value={result.weaknesses.length}
+                tone={result.weaknesses.length > 0 ? 'warning' : 'default'}
+              />
+            </PalRailSection>
+          )}
 
-      <JourneyRail current="adaptive" completed={['diagnostic']} className="mb-5" />
+          <PalRailSection title="Your journey">
+            <JourneyRail current="adaptive" completed={['diagnostic']} orientation="vertical" />
+          </PalRailSection>
+        </>
+      }
+    >
 
       {/* Headline. The percentage and the level say the same thing two ways,
           because a level alone is vague and a percentage alone invites it to be
@@ -258,7 +275,7 @@ function DiagnosticResultView() {
           No questions were answered on this attempt, so there is nothing to build a plan from yet.
         </p>
       )}
-    </div>
+    </PalWorkspace>
   );
 }
 

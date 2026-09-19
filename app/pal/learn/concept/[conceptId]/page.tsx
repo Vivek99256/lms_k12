@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   ExternalLink,
@@ -27,7 +26,7 @@ import {
   type LearnResourceSection,
 } from '@/app/pal/data/pal-diagnostic';
 import { JourneyRail } from '@/app/pal/_components/JourneyRail';
-import { isDirectMediaFile, looksLikeFile, toEmbedUrl } from '@/lib/video-embed';
+import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
  * Stage 6 - Learn.
@@ -119,13 +118,13 @@ function ConceptLearnView() {
       router.push(
         outcome.reason === 'no_eso_nodes'
           ? `/pal/adaptive/concept/${conceptId}`
-          : `/pal/eso?conceptId=${conceptId}`
+          : `/pal/eso?conceptId=${conceptId}`,
       );
     } catch (reason: unknown) {
       // Left on the page with the reason, rather than pushed into a screen that
       // would show the lesson again because the acknowledgement never landed.
       setContinueError(
-        reason instanceof Error ? reason.message : 'That could not be recorded. Try again.'
+        reason instanceof Error ? reason.message : 'That could not be recorded. Try again.',
       );
       setContinuing(false);
     }
@@ -135,13 +134,17 @@ function ConceptLearnView() {
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-rose-800">{error ?? 'The lesson could not be loaded.'}</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={load}>Try again</Button>
-              <Link href="/pal" className={buttonVariants({ size: 'sm' })}>Back to subjects</Link>
+              <Button variant="outline" size="sm" onClick={load}>
+                Try again
+              </Button>
+              <Link href="/pal" className={buttonVariants({ size: 'sm' })}>
+                Back to subjects
+              </Link>
             </div>
           </CardContent>
         </Card>
@@ -156,80 +159,99 @@ function ConceptLearnView() {
   // saying nothing at all.
   const hasResources = data.resources.sections.length > 0;
 
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href={backHref} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          {chapterId ? 'Back to my plan' : 'Back to subjects'}
-        </Link>
-      </div>
+  // What the learner has available, summarised beside the lesson rather than
+  // only discoverable by scrolling the list.
+  const rail = (
+    <>
+      <PalRailSection title="Your journey">
+        <JourneyRail
+          current="learn"
+          completed={['diagnostic', 'adaptive', 'plan']}
+          orientation="vertical"
+        />
+      </PalRailSection>
 
-      <header className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900">{data.conceptName || 'Learn'}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {data.attempt > 0
-            ? 'A different explanation of the same idea — the last one did not quite land.'
-            : 'Work through this, then practise it.'}
-        </p>
-      </header>
-
-      <JourneyRail current="learn" completed={['diagnostic', 'adaptive', 'plan']} className="mb-5" />
-
-      {data.reason === 'no_eso_nodes' ? (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardHeader>
-            <CardTitle className="text-base text-amber-900">
-              {hasResources ? 'No step-by-step lesson for this one' : 'Guided learning is not set up yet'}
-            </CardTitle>
-            <CardDescription className="text-amber-800">
-              {hasResources
-                ? 'There is no guided lesson prepared, but the material below covers this topic. Work through it, then practise.'
-                : 'This concept has no guided-learning material prepared. You can still practise the questions for it.'}
-            </CardDescription>
-          </CardHeader>
-          {!hasResources && (
-            <CardContent>
-              <Link href={`/pal/adaptive/concept/${conceptId}`} className={buttonVariants()}>
-                Practise this concept
-                <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
-              </Link>
-            </CardContent>
+      {hasResources && (
+        <PalRailSection title="Material">
+          {data.resources.sections.map((section) => (
+            <PalRailStat key={section.key} label={section.label} value={section.count} />
+          ))}
+          {data.resources.totals.conceptScoped > 0 && (
+            <p className="mt-2 text-xs text-slate-500">
+              {data.resources.totals.conceptScoped} matched to this concept; the rest cover the
+              whole chapter.
+            </p>
           )}
-        </Card>
-      ) : data.content === null ? (
-        // Ordinary on this estate - most concepts have nothing authored. Said
-        // plainly rather than dressed up as an error, and never invented.
+        </PalRailSection>
+      )}
+
+      <PalRailSection title="Go to">
+        <div className="space-y-2">
+          <Link
+            href={`/pal/adaptive/concept/${conceptId}`}
+            className={cn(
+              buttonVariants({ variant: 'outline', size: 'sm' }),
+              'w-full justify-start',
+            )}
+          >
+            Extra practice questions
+          </Link>
+          {chapterId > 0 && (
+            <Link
+              href={`/pal/mastery/chapter/${chapterId}`}
+              className={cn(
+                buttonVariants({ variant: 'outline', size: 'sm' }),
+                'w-full justify-start',
+              )}
+            >
+              My mastery
+            </Link>
+          )}
+        </div>
+      </PalRailSection>
+    </>
+  );
+
+  return (
+    <PalWorkspace
+      eyebrow="Learn"
+      title={data.conceptName || 'Learn'}
+      description={
+        data.attempt > 0
+          ? 'A different explanation of the same idea — the last one did not quite land.'
+          : 'Work through this, then practise it.'
+      }
+      backHref={backHref}
+      backLabel={chapterId ? 'Back to my plan' : 'Back to subjects'}
+      rail={rail}
+    >
+      {!hasResources && (
+        // Only when there is nothing at all. Ordinary on this estate - most
+        // concepts have no material authored - so it is said plainly rather
+        // than dressed up as an error, and nothing is invented to fill it.
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <BookOpen aria-hidden className="h-4 w-4 text-slate-500" />
-              {hasResources
-                ? 'No step-by-step lesson for this one'
-                : 'No lesson written for this concept yet'}
+              Nothing prepared for this one yet
             </CardTitle>
             <CardDescription>
-              {hasResources
-                ? 'Nobody has written a guided lesson for this concept, but the material below covers it.'
-                : 'Nothing has been prepared for this one. Practising the questions is the best way in — each answer tells you where you stand.'}
+              No material has been written for this concept. Practising the questions is the best
+              way in — each answer tells you where you stand.
             </CardDescription>
           </CardHeader>
-          {!hasResources && (
-            <CardContent>
-              <Link href={`/pal/adaptive/concept/${conceptId}`} className={buttonVariants()}>
-                Practise this concept
-                <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
-              </Link>
-            </CardContent>
-          )}
+          <CardContent>
+            <Link href={`/pal/adaptive/concept/${conceptId}`} className={buttonVariants()}>
+              Practise this concept
+              <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
+            </Link>
+          </CardContent>
         </Card>
-      ) : (
-        <LessonCard content={data.content} />
       )}
 
       {data.resources.sections.length > 0 && (
-        <div className="mt-6 space-y-5">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-slate-200 pt-5">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-base font-semibold text-slate-900">Everything for this topic</h2>
             <p className="text-xs text-slate-500">
               {data.resources.totals.items}{' '}
@@ -245,102 +267,37 @@ function ConceptLearnView() {
         </div>
       )}
 
-      {(data.content !== null || data.reason === null || hasResources) && (
-        <div className="mt-6 border-t border-slate-200 pt-5">
-          {continueError && (
-            <div className="mb-3">
-              <p className="text-sm text-rose-700">{continueError}</p>
-            </div>
-          )}
+      {/* Always shown. It used to be gated on there being a lesson card above
+          it, which is gone - and "I have read this" is what records the lesson
+          as read and moves the learner to practice, so it must not disappear
+          just because a concept has nothing authored. */}
+      <div className="mt-6 border-t border-slate-200 pt-5">
+        {continueError && (
+          <div className="mb-3">
+            <p className="text-sm text-rose-700">{continueError}</p>
+          </div>
+        )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href={`/pal/adaptive/concept/${conceptId}`}
-              className={buttonVariants({ variant: 'outline' })}
-            >
-              Extra practice questions
-            </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href={`/pal/adaptive/concept/${conceptId}`}
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            Extra practice questions
+          </Link>
 
-            {/* Records that the lesson was read, THEN hands over to the engine.
+          {/* Records that the lesson was read, THEN hands over to the engine.
                 Without the first step taught_at stays null, the engine serves
                 `teach` again, and the learner gets a second lesson screen
                 showing one video they have just worked through. */}
-            <Button onClick={() => void continueToNextStep()} disabled={continuing}>
-              {continuing && <Loader2 aria-hidden className="mr-1.5 h-4 w-4 animate-spin" />}
-              I have read this — continue
-              {!continuing && <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />}
-            </Button>
-          </div>
+          <Button onClick={() => void continueToNextStep()} disabled={continuing}>
+            {continuing && <Loader2 aria-hidden className="mr-1.5 h-4 w-4 animate-spin" />}I have
+            read this — continue
+            {!continuing && <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />}
+          </Button>
         </div>
-      )}
-    </div>
-  );
-}
-
-function LessonCard({ content }: { content: NonNullable<ConceptLearn['content']> }) {
-  const url = content.mediaUrl;
-  const embed = url ? toEmbedUrl(url) : null;
-  const isFile = url ? isDirectMediaFile(url) || looksLikeFile(url) : false;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{content.title || 'Your lesson'}</CardTitle>
-        <CardDescription>
-          {content.formatLabel}
-          {content.attribution && ` · ${content.attribution}`}
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {url && embed && !isFile && (
-          <div className="aspect-video w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
-            <iframe
-              src={embed.src}
-              title={content.title || embed.title}
-              className="h-full w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-        )}
-
-        {url && isFile && (
-          <video controls className="w-full rounded-lg border border-slate-200 bg-slate-950">
-            <source src={url} />
-            Your browser cannot play this video.
-          </video>
-        )}
-
-        {url && !embed && !isFile && (
-          <Link
-            href={url}
-            // Not an embeddable provider and not a media file - hand it over
-            // rather than framing something that will not play.
-            target="_blank"
-            rel="noreferrer"
-            className={buttonVariants({ variant: 'outline' })}
-          >
-            Open the material
-            <ExternalLink aria-hidden className="ml-1.5 h-3.5 w-3.5" />
-          </Link>
-        )}
-
-        {/* Supporting text under the player, when the content model has any.
-            Split on its own blank lines so it reads as prose rather than a wall. */}
-        {content.body && (
-          <div className="space-y-2.5 text-[15px] leading-relaxed text-slate-800">
-            {content.body
-              .split(/\n\s*\n/)
-              .map((part) => part.trim())
-              .filter(Boolean)
-              .map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </PalWorkspace>
   );
 }
 
@@ -386,7 +343,7 @@ function ResourceSection({ section }: { section: LearnResourceSection }) {
 
   return (
     <section>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+      <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <Icon aria-hidden className="h-4 w-4 text-slate-500" />
         <h3 className="text-sm font-semibold text-slate-900">{section.label}</h3>
         <span className="text-xs text-slate-500">{section.count}</span>
@@ -402,10 +359,14 @@ function ResourceSection({ section }: { section: LearnResourceSection }) {
         )}
       </div>
 
-      <ul className="space-y-2">
+      {/* A grid rather than a list. The workspace gave the main column real
+          width, and a card carries what a row could not: the video still, the
+          description, and the tagging - all of which were being fetched and
+          then thrown away by a single truncated line. */}
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {section.items.map((item) => (
-          <li key={item.id}>
-            <ResourceRow item={item} />
+          <li key={item.id} className="flex">
+            <ResourceCard item={item} sectionKey={section.key} />
           </li>
         ))}
       </ul>
@@ -413,10 +374,13 @@ function ResourceSection({ section }: { section: LearnResourceSection }) {
   );
 }
 
-function ResourceRow({ item }: { item: LearnResourceItem }) {
+function ResourceCard({ item, sectionKey }: { item: LearnResourceItem; sectionKey: string }) {
+  const Icon = SECTION_ICON[sectionKey] ?? BookOpen;
+  const typeLabel = item.fileType
+    ? (FILE_TYPE_LABEL[item.fileType] ?? item.fileType.toUpperCase())
+    : null;
+
   const meta = [
-    item.fileType ? (FILE_TYPE_LABEL[item.fileType] ?? item.fileType.toUpperCase()) : null,
-    item.category,
     item.tags.difficulty === 'advance'
       ? 'Advanced'
       : item.tags.difficulty === 'basic'
@@ -427,41 +391,99 @@ function ResourceRow({ item }: { item: LearnResourceItem }) {
     item.h5pType ? item.h5pType.replace(/_/g, ' ') : null,
   ].filter(Boolean) as string[];
 
-  const body = (
+  const inner = (
     <>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-slate-900">{item.title}</p>
+      {item.thumbnailUrl ? (
+        // 105 of 109 approved videos carry a still. Decorative alt: the title
+        // sits directly beneath, so announcing it twice helps nobody.
+        <div className="aspect-video w-full overflow-hidden rounded-t-lg border-b border-slate-200 bg-slate-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.thumbnailUrl}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ) : (
+        // A flat band, not a placeholder image: inventing a picture for a PDF
+        // would be ornament, and the icon already says what kind of thing it is.
+        <div className="flex h-16 w-full items-center justify-center rounded-t-lg border-b border-slate-200 bg-slate-50">
+          <Icon aria-hidden className="h-5 w-5 text-slate-400" />
+        </div>
+      )}
+
+      <div className="flex flex-1 flex-col p-3.5">
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <span className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-500">
+            {item.category}
+          </span>
+          {typeLabel && (
+            <span className="ml-auto shrink-0 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+              {typeLabel}
+            </span>
+          )}
+        </div>
+
+        <p className="line-clamp-2 text-sm font-medium text-slate-900">{item.title}</p>
+
         {item.description && (
-          <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">{item.description}</p>
+          <p className="mt-1 line-clamp-2 text-xs text-slate-600">{item.description}</p>
         )}
+
         {meta.length > 0 && (
-          <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{meta.join(' · ')}</p>
+          <p className="mt-1.5 text-[11px] text-slate-500">{meta.join(' \u00b7 ')}</p>
         )}
+
         {item.tags.metaTags && item.tags.metaTags.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {item.tags.metaTags.map((tag) => (
-              <span key={tag} className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">
+          <div className="mt-2 flex flex-wrap gap-1">
+            {item.tags.metaTags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
+              >
                 {tag}
               </span>
             ))}
           </div>
         )}
-        {item.attribution && <p className="mt-1 text-[11px] text-slate-400">{item.attribution}</p>}
+
+        {item.attribution && (
+          <p className="mt-1.5 truncate text-[11px] text-slate-400">{item.attribution}</p>
+        )}
+
+        {/* mt-auto pins the footer to the bottom so cards in a row line up
+            however much description each one happens to have. */}
+        <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+          <span
+            className={cn(
+              'text-[11px] font-medium',
+              item.scope === 'concept' ? 'text-indigo-700' : 'text-slate-500',
+            )}
+          >
+            {item.scope === 'concept' ? 'This concept' : 'Whole chapter'}
+          </span>
+
+          {item.url ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700">
+              Open
+              <ExternalLink aria-hidden className="h-3 w-3" />
+            </span>
+          ) : (
+            <span className="text-[11px] text-slate-400">Not openable yet</span>
+          )}
+        </div>
       </div>
-      {item.url && (
-        <ExternalLink aria-hidden className="ml-3 mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-      )}
     </>
   );
 
-  // No url means H5P, which has no file to open yet. Rendered as a plain row
+  const shell =
+    'flex h-full w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-sm';
+
+  // No url means H5P, which has nothing to open yet. Rendered as a plain card
   // rather than a dead link - a control that goes nowhere is worse than none.
   if (!item.url) {
-    return (
-      <div className="flex items-start justify-between rounded-lg border border-slate-200 px-3 py-2.5">
-        {body}
-      </div>
-    );
+    return <div className={shell}>{inner}</div>;
   }
 
   return (
@@ -469,9 +491,14 @@ function ResourceRow({ item }: { item: LearnResourceItem }) {
       href={item.url}
       target="_blank"
       rel="noreferrer"
-      className="flex items-start justify-between rounded-lg border border-slate-200 px-3 py-2.5 transition-colors hover:border-indigo-300 hover:bg-indigo-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+      className={cn(
+        shell,
+        'transition-colors duration-200 hover:border-indigo-300 hover:bg-indigo-50/30',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+        'motion-reduce:transition-none',
+      )}
     >
-      {body}
+      {inner}
     </Link>
   );
 }
