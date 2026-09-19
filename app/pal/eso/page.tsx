@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Lock, Sparkles, Target } from 'lucide-react';
 
@@ -35,6 +35,14 @@ import {
 import { useViewAsStudent } from '@/app/pal/data/pal-view-as';
 import AiTutorPanel from '@/app/pal/eso/_components/AiTutorPanel';
 import { isDirectMediaFile, looksLikeFile, toEmbedUrl } from '@/lib/video-embed';
+
+/**
+ * Whether to show the "Your plan / Suggested content" panel above the step.
+ *
+ * Turned off: it duplicated what /pal/plan/chapter/[chapterId] now says, and
+ * its raw evidence counts read as jargon mid-lesson. Set to true to restore.
+ */
+const SHOW_SUPPORTING_PANELS = false;
 
 /**
  * The Adaptive Learning Engine's guided concept flow — Developer Brief v1,
@@ -79,6 +87,16 @@ function EsoConceptFlow() {
   const learnerId = searchParams.get('learnerId') || viewAsStudent?.studentId || defaultLearnerId();
 
   const [action, setAction] = useState<EsoAction | null>(null);
+  // Bumped every time a freshly RESOLVED action is applied, and mixed into the
+  // FlowStep key below.
+  //
+  // Without it a repeated stage is invisible. The engine legitimately answers
+  // `practice` again for the 2nd and 3rd question of a practice phase - same
+  // action, same node, same concept - so a key built from those three alone is
+  // byte-identical, React reuses the step instance, its question-fetch effect
+  // does not re-run, and the student is looking at the question they just
+  // answered with their own answer still selected. It reads as a frozen screen.
+  const [stepSeq, setStepSeq] = useState(0);
   // Two different states, deliberately. `loading` is the genuine cold start,
   // when there is nothing on screen yet. `refreshing` is resolving the NEXT
   // step while the student is still looking at the current one — that must not
@@ -95,38 +113,97 @@ function EsoConceptFlow() {
   // so it can never be mistaken for learner evidence.
   const [planPending, setPlanPending] = useState(false);
 
+  /**
+   * Put a newly resolved action on screen.
+   *
+   * The single place `action` is set, so the step-sequence bump can never be
+   * forgotten on one path and not another. Still no interpretation of the
+   * engine's decision here - the action is applied exactly as received.
+   */
+  const applyAction = useCallback((next: EsoAction) => {
+    setAction((previous) => {
+      // Diagnostic just finished: show the Plan before the first teaching
+      // step, so the learner sees where they stand before being taught.
+      // Never skipped by the UI — only the engine skips steps, and only when
+      // its own policy says the step does not apply.
+      if (previous?.action === 'diagnostic' && next.action !== 'diagnostic') {
+        setPlanPending(true);
+      }
+      return next;
+    });
+    setStepSeq((n) => n + 1);
+  }, []);
+
+  /**
+   * Is a resolve already in flight?
+   *
+   * nextAction() is not a read. It stamps `taught_at`, it writes an
+   * eso_decision_log row, and — because the first call has already moved state
+   * — a second concurrent call can resolve to a DIFFERENT step than the first.
+   * Two overlapping resolves therefore do not merely waste a round trip; they
+   * produce two different answers and the slower one wins, which is what put a
+   * practice question on screen a second or two after the Learn card appeared.
+   */
+  const resolving = useRef(false);
+
   const refresh = useCallback(async () => {
-    if (!conceptId || !learnerId) return;
+    if (!conceptId || !learnerId || resolving.current) return;
+    resolving.current = true;
     setRefreshing(true);
     setError(null);
     try {
-      const next = await fetchNextAction(learnerId, conceptId);
-      setAction((previous) => {
-        // Diagnostic just finished: show the Plan before the first teaching
-        // step, so the learner sees where they stand before being taught.
-        // Never skipped by the UI — only the engine skips steps, and only when
-        // its own policy says the step does not apply.
-        if (previous?.action === 'diagnostic' && next.action !== 'diagnostic') {
-          setPlanPending(true);
-        }
-        return next;
-      });
+      applyAction(await fetchNextAction(learnerId, conceptId));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to load the next learning step.');
     } finally {
+      resolving.current = false;
       setLoading(false);
       setRefreshing(false);
     }
-  }, [learnerId, conceptId]);
+  }, [learnerId, conceptId, applyAction]);
+
+  /**
+   * Adopt the action a submit already returned, instead of asking again.
+   *
+   * Every ESO submit endpoint answers with the resolved next action (the
+   * practice attempt ends at EsoPolicyService::evaluateProgress(), which IS
+   * nextAction()). Discarding it and re-fetching was not merely a wasted round
+   * trip: nextAction() writes an eso_decision_log row per call, so each answer
+   * logged two decisions, and because the first call has already mutated state
+   * the second could resolve DIFFERENTLY - showing the student a decision the
+   * engine never made for their attempt.
+   */
+  const resolved = useCallback(
+    (next: EsoAction) => {
+      setError(null);
+      applyAction(next);
+    },
+    [applyAction]
+  );
+
+  /**
+   * The learner/concept pair the opening resolve has already been started for.
+   *
+   * React runs this effect twice on mount in development, and `learnerId`
+   * legitimately changes once after mount when a staff "view as student"
+   * selection resolves. Without a key, the first of those asked the engine for
+   * a second decision it had not earned; with it, the opening resolve happens
+   * exactly once per pair, and a genuine change of learner still re-resolves.
+   */
+  const opened = useRef<string | null>(null);
 
   useEffect(() => {
+    const key = `${learnerId}:${conceptId}`;
+    if (opened.current === key) return;
+    opened.current = key;
+
     // Deferred to a microtask so the setLoading/setError calls inside
     // refresh() don't fire synchronously within the effect body — same
     // convention as pal-view-as.ts's useViewAsStudent().
     queueMicrotask(() => {
       void refresh();
     });
-  }, [refresh]);
+  }, [refresh, learnerId, conceptId]);
 
   if (!conceptId) {
     return (
@@ -137,9 +214,9 @@ function EsoConceptFlow() {
   }
 
   return (
-    <div className="mx-auto  px-4 py-6 sm:px-6">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
       <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
-        <Sparkles className="h-4 w-4 text-violet-500" />
+        <Sparkles className="h-4 w-4 text-indigo-500" />
         Adaptive learning
       </div>
 
@@ -151,7 +228,16 @@ function EsoConceptFlow() {
           <StepSkeleton />
         </>
       )}
-      {!loading && error && <Alert tone="error">{error}</Alert>}
+      {!loading && error && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3">
+          <p className="text-sm text-rose-800">{error}</p>
+          {/* Without this the screen is a dead end - the only recovery was a
+              manual page reload. */}
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => void refresh()}>
+            Try again
+          </Button>
+        </div>
+      )}
 
       {!loading && !error && action && (
         <div
@@ -164,28 +250,41 @@ function EsoConceptFlow() {
           className={refreshing ? 'pointer-events-none opacity-60 transition-opacity' : 'transition-opacity'}
         >
           {refreshing && (
-            <div className="mb-3 flex items-center gap-2 text-xs text-violet-600">
+            <div className="mb-3 flex items-center gap-2 text-xs text-indigo-600">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Working out your next step...
             </div>
           )}
           <LearningFlowRail action={action.action} stageKey={planPending ? 'plan' : undefined} />
 
-          {/* Sits at the top of the learning section, directly under the
-              progression rail: plan first, then the step it explains. Its data
-              is fetched independently and never blocks the step below — the
-              backend is remote, and this is supporting context, not the task. */}
-          <PlanAndSuggestions learnerId={learnerId} conceptId={conceptId} actionKey={action.action} />
+          {/* Hidden by request: the "Your plan / Suggested content" panel and
+              its evidence-count breakdown ("3 more demonstrations", "Not part
+              of this concept") are noise on the learning screen. The learner
+              gets the same information, better framed, on the dedicated plan
+              page at /pal/plan/chapter/[chapterId].
+
+              Kept behind a flag rather than deleted: PlanAndSuggestions,
+              PlanRow and the mastery-plan fetch are all still here and intact,
+              so flipping this to true restores it exactly as it was. */}
+          {SHOW_SUPPORTING_PANELS && (
+            <PlanAndSuggestions learnerId={learnerId} conceptId={conceptId} actionKey={action.action} />
+          )}
 
           {planPending ? (
             <PlanStep action={action} onContinue={() => setPlanPending(false)} />
           ) : (
             <FlowStep
-              key={`${action.action}-${action.nodeId ?? ''}-${action.conceptId ?? conceptId}`}
+              // stepSeq is what makes a REPEATED stage remount. practice ->
+              // practice on the same node is a different question, so the step
+              // must be rebuilt: remounting resets item, selected, error and
+              // submitting together, which no per-field reset can be trusted to
+              // keep in step with.
+              key={`${action.action}-${action.nodeId ?? ''}-${action.conceptId ?? conceptId}-${stepSeq}`}
               action={action}
               learnerId={learnerId}
               conceptId={conceptId}
               onAdvance={refresh}
+              onResolved={resolved}
               onNavigateToConcept={(id) => router.push(`/pal/eso?conceptId=${id}${learnerId ? `&learnerId=${learnerId}` : ''}`)}
             />
           )}
@@ -260,7 +359,7 @@ function PlanStep({ action, onContinue }: { action: EsoAction; onContinue: () =>
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Target className="h-4 w-4 text-violet-500" />
+          <Target className="h-4 w-4 text-indigo-500" />
           Your plan
         </CardTitle>
         <CardDescription>
@@ -440,7 +539,7 @@ function PlanRow({ label, gate }: { label: string; gate: MasteryGate | null }) {
         {Array.from({ length: gate.requiredEvents }).map((_, i) => (
           <span
             key={i}
-            className={`h-1.5 flex-1 rounded-full ${i < done ? 'bg-violet-500' : 'bg-slate-200'}`}
+            className={`h-1.5 flex-1 rounded-full ${i < done ? 'bg-indigo-500' : 'bg-slate-200'}`}
           />
         ))}
       </div>
@@ -530,7 +629,7 @@ function SuggestedContentBody({ details }: { details: ConceptMasteryDetails }) {
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 font-medium text-violet-700 underline hover:text-violet-900"
+                  className="inline-flex items-center gap-1.5 font-medium text-indigo-700 underline hover:text-indigo-900"
                 >
                   {item.title}
                   <ExternalLink className="h-3 w-3 shrink-0" />
@@ -557,14 +656,25 @@ function SuggestedContentBody({ details }: { details: ConceptMasteryDetails }) {
  */
 const FLOW_STAGES: Array<{ key: string; label: string; actions: string[] }> = [
   { key: 'diagnostic', label: 'Diagnostic', actions: ['diagnostic'] },
+  // Adaptive has no engine action either — it is the chapter-level practice
+  // stage that runs on its own screens (/pal/adaptive/*), before a learner
+  // ever reaches this one. Listed so this rail reads the same as the shared
+  // JourneyRail every other PAL screen shows; leaving it out made the journey
+  // look like two different journeys depending on which screen you were on.
+  { key: 'adaptive', label: 'Adaptive', actions: [] },
   // Plan has no engine action of its own, and deliberately so: the engine
   // decides WHAT to teach, and Plan is where the learner is shown what it
   // decided and what remains. It is driven by `planPending` in the page rather
   // than by a policy branch, so no D1-D5 rule changes to accommodate it.
   { key: 'plan', label: 'Plan', actions: [] },
   { key: 'learn', label: 'Learn', actions: ['teach', 'reteach'] },
-  { key: 'check', label: 'Check', actions: ['check_understanding'] },
+  // Practice BEFORE check, matching the engine's own phaseFor() order
+  // (Learn -> Practice -> Check). These two were the wrong way round, so the
+  // rail ticked Check off as already passed while the student was still
+  // practising - and since the rail is the only progress indicator on the
+  // screen, it never moved across the three practice questions either.
   { key: 'practice', label: 'Practice', actions: ['practice', 'continue_practice'] },
+  { key: 'check', label: 'Check', actions: ['check_understanding'] },
   { key: 'mastery', label: 'Mastery', actions: ['mastered_stop_practice'] },
   // Recall is the whole D2 retention exchange, not a new retention mechanism:
   // `retrieval_due` is the check being served, and `retained` / `reloop_node`
@@ -619,7 +729,7 @@ function LearningFlowRail({ action, stageKey }: { action: string; stageKey?: str
             <span
               className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                 current
-                  ? 'border-violet-400 bg-violet-100 text-violet-800'
+                  ? 'border-indigo-400 bg-indigo-100 text-indigo-800'
                   : done
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                     : 'border-slate-200 bg-white text-slate-400'
@@ -664,12 +774,19 @@ function FlowStep({
   learnerId,
   conceptId,
   onAdvance,
+  onResolved,
   onNavigateToConcept,
 }: {
   action: EsoAction;
   learnerId: string;
   conceptId: number;
   onAdvance: () => void;
+  /**
+   * Hand back the action a submit returned, for the steps whose endpoint
+   * already resolves the next one. Steps with nothing to record (teach's
+   * acknowledge, "keep practising") still use onAdvance.
+   */
+  onResolved: (next: EsoAction) => void;
   onNavigateToConcept: (conceptId: number) => void;
 }) {
   switch (action.action) {
@@ -678,24 +795,37 @@ function FlowStep({
     case 'remediate_prerequisite':
       return <PrerequisiteStep action={action} onNavigateToConcept={onNavigateToConcept} />;
     case 'prerequisite_quick_probe':
-      return <PrerequisiteProbeStep action={action} learnerId={learnerId} conceptId={conceptId} onAdvance={onAdvance} />;
-    // Teaching is deliberately NOT the same screen as practice any more: it
-    // carries no scored question, and the check of understanding sits between
-    // the two. `reteach` is the same explanation screen after a failed check.
+      return <PrerequisiteProbeStep action={action} learnerId={learnerId} conceptId={conceptId} onResolved={onResolved} />;
+    // Teaching is deliberately NOT the same screen as practice: it carries no
+    // scored question. `reteach` is the same screen after a failed check — the
+    // engine swaps in an "explain it a different way" instruction and re-opens
+    // Learn, so it is an explanation to read, not a form to fill in.
+    //
+    // `reteach` used to be rendered by CheckUnderstandingStep, which put the
+    // check questions directly under the re-explanation. That defeated the
+    // engine's own ordering: a failed check nulls `taught_at` precisely so the
+    // learner goes Learn -> Practice -> Check again rather than bouncing
+    // Learn -> Check, and the engine says as much by returning
+    // `expects: 'acknowledge'` on reteach. The client was answering a question
+    // the engine had not asked.
     case 'teach':
-      return <TeachStep action={action} learnerId={learnerId} onAdvance={onAdvance} />;
-    // `reteach` is the same gate after a failed check — the engine swaps in a
-    // "explain it a different way" instruction, and the check follows on the
-    // same screen rather than making the student click through twice.
-    case 'check_understanding':
     case 'reteach':
-      return <CheckUnderstandingStep action={action} learnerId={learnerId} conceptId={conceptId} onAdvance={onAdvance} />;
+      return <TeachStep action={action} learnerId={learnerId} onAdvance={onAdvance} />;
+    case 'check_understanding':
+      return <CheckUnderstandingStep action={action} learnerId={learnerId} conceptId={conceptId} onResolved={onResolved} onAdvance={onAdvance} />;
     case 'practice':
-      return <TeachOrPracticeStep action={action} learnerId={learnerId} conceptId={conceptId} onAdvance={onAdvance} />;
+      return <TeachOrPracticeStep action={action} learnerId={learnerId} conceptId={conceptId} onResolved={onResolved} onAdvance={onAdvance} />;
     case 'serve_contrast_pair':
-      return <ContrastPairStep action={action} learnerId={learnerId} conceptId={conceptId} onAdvance={onAdvance} />;
+      return <ContrastPairStep action={action} learnerId={learnerId} conceptId={conceptId} onResolved={onResolved} />;
     case 'mastered_stop_practice':
       return <MasteredStep action={action} />;
+    // D4 can withhold mastery while leaving NO node to practise - every node is
+    // past its own threshold, but the concept's evidence floor is not met yet.
+    // nextAction() returns masteryVerdict() directly, so this reaches the top
+    // level, and before this case it fell through to `default` and printed the
+    // literal string "continue_practice" at the learner in a grey box.
+    case 'continue_practice':
+      return <KeepPractisingStep action={action} onAdvance={onAdvance} />;
     case 'retrieval_due':
       return <RetrievalDueStep action={action} learnerId={learnerId} conceptId={conceptId} onAdvance={onAdvance} />;
     // D2 can resolve a due review that has no authored item behind it. The
@@ -710,9 +840,111 @@ function FlowStep({
           This concept has no Knowledge/Ability/Skill nodes tagged yet — Phase 0 content tagging has not reached it.
         </Alert>
       );
+    // An action this build does not render yet. The raw machine string used to
+    // be printed here, which reads as a crash to a learner; this says what is
+    // true and leaves a way forward.
     default:
-      return <Alert>{action.action}</Alert>;
+      return (
+        <Alert>
+          This step is not available in this version yet. Nothing you have done is lost - your
+          progress is saved.
+        </Alert>
+      );
   }
+}
+
+/**
+ * D4 withheld mastery, and there is nothing left to practise on this concept.
+ *
+ * `masteryEvidence.remainingEvents` is an evidence count, so it is stated as
+ * one. When the engine reports no count, this says nothing about distance
+ * rather than inventing a number or a percentage.
+ */
+function KeepPractisingStep({ action, onAdvance }: { action: EsoAction; onAdvance: () => void }) {
+  const remaining = action.masteryEvidence?.remainingEvents ?? null;
+  const blocked = action.masteryEvidence?.misconceptionBlocks === true;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Target className="h-5 w-5 text-indigo-600" />
+          Nearly there
+        </CardTitle>
+        <CardDescription>
+          {remaining != null && remaining > 0
+            ? `This concept needs ${remaining} more demonstration${remaining === 1 ? '' : 's'} before it counts as mastered.`
+            : 'This concept needs a little more evidence before it counts as mastered.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-3 text-sm">
+          {action.knowledgeMastery != null && (
+            <MasteryFigure label="Knowledge" value={action.knowledgeMastery} />
+          )}
+          {action.applicationMastery != null && (
+            <MasteryFigure label="Application" value={action.applicationMastery} />
+          )}
+        </div>
+
+        {blocked && (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            There is still a misconception flagged on this concept. Clearing it up comes before
+            mastery.
+          </p>
+        )}
+
+        <div className="flex justify-end">
+          <Button onClick={onAdvance}>Keep going</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MasteryFigure({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: 'positive';
+}) {
+  const pct = Math.round(value * 100);
+  const positive = tone === 'positive';
+
+  return (
+    <div
+      className={`min-w-[120px] flex-1 rounded-lg border px-3 py-2 ${
+        positive ? 'border-emerald-200 bg-white' : 'border-slate-200'
+      }`}
+    >
+      <p className={`text-xs ${positive ? 'text-emerald-700' : 'text-slate-500'}`}>{label}</p>
+      <p
+        className={`text-lg font-semibold tabular-nums ${
+          positive ? 'text-emerald-900' : 'text-slate-900'
+        }`}
+      >
+        {pct}%
+      </p>
+      <div
+        className={`mt-1.5 h-1.5 w-full overflow-hidden rounded-full ${
+          positive ? 'bg-emerald-100' : 'bg-slate-100'
+        }`}
+      >
+        <div
+          className={`h-full rounded-full ${positive ? 'bg-emerald-600' : 'bg-indigo-600'}`}
+          style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${label} mastery`}
+        />
+      </div>
+    </div>
+  );
 }
 
 // ── D1: diagnostic ───────────────────────────────────────────────────────
@@ -736,7 +968,7 @@ function DiagnosticQuestion({
   return (
     <div data-eso-question-id={item.questionId} data-eso-node-id={item.nodeId} className="rounded-lg border border-slate-200 p-4">
       <div className="mb-2 flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-600">
           {index + 1}
         </span>
         <Badge variant="secondary">{item.nodeType}</Badge>
@@ -748,7 +980,7 @@ function DiagnosticQuestion({
             key={option.id}
             data-eso-option-id={option.id}
             className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-              selected === option.id ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:bg-slate-50'
+              selected === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
             }`}
           >
             <input
@@ -756,7 +988,7 @@ function DiagnosticQuestion({
               name={`diagnostic-${item.questionId}`}
               checked={selected === option.id}
               onChange={() => onSelect(option.id)}
-              className="h-4 w-4 accent-violet-600"
+              className="h-4 w-4 accent-indigo-600"
             />
             <span dangerouslySetInnerHTML={{ __html: option.answer }} />
           </label>
@@ -910,7 +1142,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
         {!grouped && items.map((item, index) => (
           <div key={item.questionId} data-eso-question-id={item.questionId} data-eso-node-id={item.nodeId} className="rounded-lg border border-slate-200 p-4">
             <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-600">
                 {index + 1}
               </span>
               {/* <Badge variant="secondary">{item.nodeType}</Badge> */}
@@ -922,7 +1154,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
                   key={option.id}
                   data-eso-option-id={option.id}
                   className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                    answers[item.questionId] === option.id ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:bg-slate-50'
+                    answers[item.questionId] === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   <input
@@ -930,7 +1162,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
                     name={`diagnostic-${item.questionId}`}
                     checked={answers[item.questionId] === option.id}
                     onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
-                    className="h-4 w-4 accent-violet-600"
+                    className="h-4 w-4 accent-indigo-600"
                   />
                   <span dangerouslySetInnerHTML={{ __html: option.answer }} />
                 </label>
@@ -993,12 +1225,12 @@ function PrerequisiteProbeStep({
   action,
   learnerId,
   conceptId,
-  onAdvance,
+  onResolved,
 }: {
   action: EsoAction;
   learnerId: string;
   conceptId: number;
-  onAdvance: () => void;
+  onResolved: (next: EsoAction) => void;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -1006,12 +1238,18 @@ function PrerequisiteProbeStep({
   const item = action.item ?? null;
 
   const submit = async () => {
-    if (!action.nodeId || selected == null) return;
+    // Guarded on `submitting` as well as the disabled button — see the same
+    // guard on the check step. A second POST here is worse than a wasted round
+    // trip: recordAttempt() writes a response row and resolves the next action
+    // from state the first call already moved, so the student could be handed a
+    // step that belongs to neither attempt.
+    if (!action.nodeId || selected == null || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      await recordAttempt(learnerId, action.nodeId, { conceptId, answerMasterId: selected });
-      onAdvance();
+      // Same contract as the practice step: the attempt POST returns the
+      // resolved next action, so it is adopted rather than re-requested.
+      onResolved(await recordAttempt(learnerId, action.nodeId, { conceptId, answerMasterId: selected }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to submit your answer.');
     } finally {
@@ -1184,6 +1422,39 @@ function LearningContentPanel({ content }: { content: NonNullable<EsoAction['lea
  * being taught is no longer practice attempt #1. The student reads, then asks
  * to be checked, which resolves to the CFU gate.
  */
+/**
+ * The engine's explanation, set to be read rather than skimmed past.
+ *
+ * ---------------------------------------------------------------------------
+ * PRESENTATION ONLY
+ * ---------------------------------------------------------------------------
+ * This changes nothing about WHAT is said. The engine owns the words and this
+ * layer is not permitted to interpret or rewrite them, so the only thing done
+ * here is to break the string on its own blank lines and set it at a readable
+ * size and measure. Previously the whole explanation arrived as one `text-sm`
+ * paragraph in a tinted box however long it was, which is what made the teach
+ * step read as a wall.
+ *
+ * If the text carries no blank lines it renders as one paragraph, exactly as
+ * before, just larger and with more line height.
+ */
+function EngineProse({ text }: { text: string }) {
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3.5">
+      <div className="space-y-2.5 text-[15px] leading-relaxed text-indigo-950">
+        {(paragraphs.length > 0 ? paragraphs : [text]).map((paragraph, index) => (
+          <p key={index}>{paragraph}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TeachStep({
   action,
   learnerId,
@@ -1194,15 +1465,21 @@ function TeachStep({
   onAdvance: () => void;
 }) {
   const message = usePalRendering(learnerId, action.llmInstruction);
+  const isRetry = action.action === 'reteach';
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Let&apos;s learn this</CardTitle>
+        <CardTitle>{isRetry ? "Let's look at this another way" : "Let's learn this"}</CardTitle>
+        {isRetry && (
+          <CardDescription>
+            The same idea explained differently. Practice follows, then the check again.
+          </CardDescription>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {message ? (
-          <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">{message}</div>
+          <EngineProse text={message} />
         ) : (
           <CenteredSpinner label="Preparing the explanation..." />
         )}
@@ -1212,8 +1489,13 @@ function TeachStep({
         {action.learningContent && <LearningContentPanel content={action.learningContent} />}
 
         <div className="flex justify-end">
+          {/* Practice is what comes next, not the check — the engine runs
+              Learn -> Practice -> Check (EsoPolicyService::phaseFor()). This
+              button used to promise the check and then open a practice
+              question, which is the kind of mismatch that makes a flow feel
+              broken even when every step of it is correct. */}
           <Button data-eso-acknowledge onClick={onAdvance} disabled={!message}>
-            I&apos;ve read this — check my understanding
+            I&apos;ve read this — start practising
           </Button>
         </div>
       </CardContent>
@@ -1224,20 +1506,33 @@ function TeachStep({
 // ── D1-CFU: check for understanding ──────────────────────────────────────
 
 /**
- * The gate between being taught and starting scored practice. Answers here are
- * graded but are NOT mastery evidence — the engine records them separately and
- * never applies a mastery update — so the copy says so plainly rather than
- * letting it read as a test the student can fail out of the concept on.
+ * The check that closes a node out, served AFTER the learner has practised it
+ * (EsoPolicyService::phaseFor() runs Learn -> Practice -> Check). Answers here
+ * are graded but are not mastery evidence — the engine records them with
+ * mode='cfu' and never applies a mastery update — and a failed check re-opens
+ * Learn rather than costing the learner anything they have earned.
+ *
+ * The screen no longer explains any of that to the learner. It used to open
+ * with a Pal-rendered "this is just a quick check, not a graded test" preamble
+ * and repeat the point underneath; both were removed, because telling someone
+ * a step does not count is an invitation to coast through the one step that
+ * decides whether they are re-taught. The mechanism is unchanged.
  */
 function CheckUnderstandingStep({
   action,
   learnerId,
   conceptId,
+  onResolved,
   onAdvance,
 }: {
   action: EsoAction;
   learnerId: string;
   conceptId: number;
+  onResolved: (next: EsoAction) => void;
+  /**
+   * Only for the "nothing is authored for this node" escape hatch below, which
+   * records no attempt and so has no returned action to adopt.
+   */
   onAdvance: () => void;
 }) {
   const message = usePalRendering(learnerId, action.llmInstruction);
@@ -1245,30 +1540,65 @@ function CheckUnderstandingStep({
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const isRetry = action.action === 'reteach';
+  // A repeat pass, marked by the engine's own cycle count. This used to test
+  // `action.action === 'reteach'`, which this component no longer receives —
+  // reteach is a Learn screen and is routed to TeachStep.
+  const isRetry = (action.cfuAttempts ?? 0) > 0;
 
   useEffect(() => {
-    if (!action.nodeId) return;
-    // Keyed on cfuAttempts too, so a reteach cycle genuinely re-fetches rather
+    if (!action.nodeId) {
+      queueMicrotask(() => setItems(null));
+      return;
+    }
+    // Cancellable, and a late response is dropped rather than applied. React
+    // re-runs this effect in development, and any second response landing on a
+    // check the student had already started answering would swap the questions
+    // out from under them — the same defect as the practice step below. The
+    // server now answers identically within one check cycle, so the two
+    // together make the questions fixed for the life of the step.
+    const controller = new AbortController();
+    let cancelled = false;
+
+    // Keyed on cfuAttempts too, so a second cycle genuinely re-fetches rather
     // than showing the pair the student just failed.
-    fetchCheckUnderstandingItems(learnerId, action.nodeId).then((rows) => setItems(rows.length > 0 ? rows : null));
+    fetchCheckUnderstandingItems(learnerId, action.nodeId, controller.signal)
+      .then((rows) => {
+        if (!cancelled) setItems(rows.length > 0 ? rows : null);
+      })
+      .catch(() => {
+        if (!cancelled) setItems(null);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [learnerId, action.nodeId, action.cfuAttempts]);
 
   const loaded = items !== 'loading' && items !== null ? items : [];
   const allAnswered = loaded.length > 0 && loaded.every((item) => answers[item.questionId] != null);
 
   const submit = async () => {
-    if (!action.nodeId || !allAnswered) return;
+    // `submitting` is part of the guard, not only a spinner flag: the button is
+    // disabled while a submit is in flight, but a double click, an Enter key
+    // repeat or a re-render between the two can still land a second call, and
+    // each one writes its own response rows and resolves its own next action.
+    if (!action.nodeId || !allAnswered || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      await submitCheckUnderstanding(
-        learnerId,
-        action.nodeId,
-        conceptId,
-        loaded.map((item) => ({ answerMasterId: answers[item.questionId] }))
+      // Load-bearing here specifically: a FAILED check nulls taught_at to
+      // re-open Learn, so this response is `reteach`. Asking the engine again
+      // instead would re-resolve against the state the check just changed and
+      // could answer something else entirely.
+      onResolved(
+        await submitCheckUnderstanding(
+          learnerId,
+          action.nodeId,
+          conceptId,
+          loaded.map((item) => ({ answerMasterId: answers[item.questionId] }))
+        )
       );
-      onAdvance();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to submit your answers.');
     } finally {
@@ -1279,25 +1609,40 @@ function CheckUnderstandingStep({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{isRetry ? "Let's try that a different way" : 'Quick check'}</CardTitle>
-        <Badge variant="outline">not graded</Badge>
+        <CardTitle>{isRetry ? 'Check, second time round' : 'Check what stuck'}</CardTitle>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline">not graded</Badge>
+          {/* cfuItemCount and cfuAttempts are already fetched and mapped on
+              every CFU action and were being dropped. The engine bounds this
+              loop at CFU_MAX_CYCLES, so a learner on their last cycle is
+              entitled to know that before they answer rather than after. */}
+          {action.cfuItemCount != null && action.cfuItemCount > 0 && (
+            <span className="text-xs text-slate-500">
+              {action.cfuItemCount} question{action.cfuItemCount === 1 ? '' : 's'}
+            </span>
+          )}
+          {action.cfuAttempts != null && action.cfuAttempts > 0 && (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+              Check {action.cfuAttempts + 1} — we&apos;ll go over it again if this one doesn&apos;t land
+            </span>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {message && (
-          <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">{message}</div>
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">{message}</div>
         )}
-
-        {/* On a reteach the engine walks the content model's re-route ladder,
-            so this is a genuinely different format where one is authored. */}
-        {action.learningContent && <LearningContentPanel content={action.learningContent} />}
-
-        <p className="text-sm text-slate-600">
-          This is just to see whether that explanation landed — it doesn&apos;t count towards your mastery either way.
-        </p>
 
         {items === 'loading' && <CenteredSpinner label="Finding a couple of questions..." />}
         {items === null && (
-          <Alert>No tagged question is available for this node yet — Phase 0 content tagging is still in progress.</Alert>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm text-amber-900">
+              There is no check question ready for this part yet. That is a gap on our side.
+            </p>
+            <div className="mt-3">
+              <Button variant="outline" size="sm" onClick={onAdvance}>Continue</Button>
+            </div>
+          </div>
         )}
 
         {loaded.map((item) => (
@@ -1309,7 +1654,7 @@ function CheckUnderstandingStep({
                   key={option.id}
                   data-eso-option-id={option.id}
                   className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                    answers[item.questionId] === option.id ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:bg-slate-50'
+                    answers[item.questionId] === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   <input
@@ -1317,7 +1662,7 @@ function CheckUnderstandingStep({
                     name={`cfu-${item.questionId}`}
                     checked={answers[item.questionId] === option.id}
                     onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
-                    className="h-4 w-4 accent-violet-600"
+                    className="h-4 w-4 accent-indigo-600"
                   />
                   <span dangerouslySetInnerHTML={{ __html: option.answer }} />
                 </label>
@@ -1347,11 +1692,17 @@ function TeachOrPracticeStep({
   action,
   learnerId,
   conceptId,
+  onResolved,
   onAdvance,
 }: {
   action: EsoAction;
   learnerId: string;
   conceptId: number;
+  onResolved: (next: EsoAction) => void;
+  /**
+   * Only for the "nothing is authored for this node" escape hatch below, which
+   * records no attempt and so has no returned action to adopt.
+   */
   onAdvance: () => void;
 }) {
   const message = usePalRendering(learnerId, action.llmInstruction);
@@ -1368,23 +1719,68 @@ function TeachOrPracticeStep({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // `item` already initializes to 'loading'; this effect only needs to
-    // resolve it via the async .then() callback, never synchronously.
-    if (!action.nodeId) return;
-    fetchPracticeItem(learnerId, action.nodeId).then(setItem);
+    // Resolve to null rather than returning early: leaving `item` on
+    // 'loading' rendered a full-height spinner with no control on the card,
+    // and nothing ever cleared it.
+    if (!action.nodeId) {
+      // Deferred like every other setState in this file: calling it in the
+      // effect body triggers a cascading render (react-hooks/set-state-in-effect).
+      queueMicrotask(() => setItem(null));
+      return;
+    }
+    // ───────────────────────────────────────────────────────────────────
+    // A LATE RESPONSE MUST NOT REPLACE THE QUESTION ON SCREEN
+    // ───────────────────────────────────────────────────────────────────
+    // This used to fetch with no cancellation at all. React re-runs effects in
+    // development, so two requests went out; the server picked its item with a
+    // fresh shuffle() per call, so the two came back DIFFERENT; and the slower
+    // one won. The student watched the question change by itself a second or
+    // two after the step appeared — sometimes after they had already chosen an
+    // answer, which then referred to a question no longer on screen.
+    //
+    // The server side of that is fixed (EsoPolicyService::practiceItem() is now
+    // stable within a practice phase), and this is the client half of the same
+    // guarantee: at most one response is ever applied per mounted step.
+    //
+    // .catch is load-bearing. Without it a rejected fetch never called
+    // setItem, so the spinner ran for ever.
+    const controller = new AbortController();
+    let cancelled = false;
+
+    fetchPracticeItem(learnerId, action.nodeId, controller.signal)
+      .then((next) => {
+        if (!cancelled) setItem(next);
+      })
+      .catch(() => {
+        if (!cancelled) setItem(null);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [learnerId, action.nodeId]);
 
   const submit = async () => {
-    if (!action.nodeId || selected == null) return;
+    // Guarded on `submitting` as well as the disabled button — see the same
+    // guard on the check step. A second POST here is worse than a wasted round
+    // trip: recordAttempt() writes a response row and resolves the next action
+    // from state the first call already moved, so the student could be handed a
+    // step that belongs to neither attempt.
+    if (!action.nodeId || selected == null || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      await recordAttempt(learnerId, action.nodeId, {
-        conceptId,
-        answerMasterId: selected,
-        mode: action.practiceMode,
-      });
-      onAdvance();
+      // The POST answers with the resolved next action, so this is the engine's
+      // decision for THIS attempt. Re-fetching it would log a second decision
+      // and could come back different, since recording has already moved state.
+      onResolved(
+        await recordAttempt(learnerId, action.nodeId, {
+          conceptId,
+          answerMasterId: selected,
+          mode: action.practiceMode,
+        })
+      );
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to submit your answer.');
     } finally {
@@ -1392,15 +1788,46 @@ function TeachOrPracticeStep({
     }
   };
 
+  // Straight off the engine - `done` is the same count it gates the phase on and
+  // `needed` is its own requirement. Nothing is computed here: the client does
+  // not own the threshold and must not look as though it does.
+  const progress = action.practiceProgress ?? null;
+  const remaining = progress ? Math.max(progress.needed - progress.done, 0) : 0;
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{action.action === 'teach' ? "Let's learn this" : 'Practice'}</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Only ever `practice` now — `teach` and `reteach` are TeachStep. */}
+          <CardTitle>Practice</CardTitle>
+          {/* Without this, three practice questions in a row are
+              indistinguishable and answering one looks like it did nothing. */}
+          {progress && progress.needed > 0 && (
+            <span className="text-xs font-semibold tabular-nums text-slate-600">
+              Question {Math.min(progress.done + 1, progress.needed)} of {progress.needed}
+            </span>
+          )}
+        </div>
         {action.practiceMode && <Badge variant="outline">{action.practiceMode} practice</Badge>}
+        {progress && progress.needed > 0 && (
+          <div
+            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
+            role="progressbar"
+            aria-valuenow={progress.done}
+            aria-valuemin={0}
+            aria-valuemax={progress.needed}
+            aria-label="Practice questions answered"
+          >
+            <div
+              className="h-full rounded-full bg-indigo-600 transition-all"
+              style={{ width: `${(progress.done / progress.needed) * 100}%` }}
+            />
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {message && (
-          <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">{message}</div>
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">{message}</div>
         )}
 
         {/* The one-time "why is this worth practising" nudge, shown when the
@@ -1416,7 +1843,17 @@ function TeachOrPracticeStep({
 
         {item === 'loading' && <CenteredSpinner label="Finding a question..." />}
         {item === null && (
-          <Alert>No tagged practice question is available for this node yet — Phase 0 content tagging is still in progress.</Alert>
+          // Was a bare Alert with no control of any kind — the submit button
+          // lives inside the opposite branch, so this was a dead end.
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm text-amber-900">
+              There is no practice question ready for this part yet. That is a gap on our side, not
+              yours — nothing you have earned is affected.
+            </p>
+            <div className="mt-3">
+              <Button variant="outline" size="sm" onClick={onAdvance}>Try the next step</Button>
+            </div>
+          </div>
         )}
         {item && item !== 'loading' && (
           <div data-eso-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
@@ -1427,7 +1864,7 @@ function TeachOrPracticeStep({
                   key={option.id}
                   data-eso-option-id={option.id}
                   className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                    selected === option.id ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:bg-slate-50'
+                    selected === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   <input
@@ -1435,14 +1872,29 @@ function TeachOrPracticeStep({
                     name="practice-option"
                     checked={selected === option.id}
                     onChange={() => setSelected(option.id)}
-                    className="h-4 w-4 accent-violet-600"
+                    className="h-4 w-4 accent-indigo-600"
                   />
                   <span dangerouslySetInnerHTML={{ __html: option.answer }} />
                 </label>
               ))}
             </div>
             {error && <div className="mt-2"><Alert tone="error">{error}</Alert></div>}
-            <div className="mt-3 flex justify-end">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              {/* Says what submitting will do, so it is obvious that it moved.
+                  `remaining` counts what is still needed BEFORE this answer is
+                  recorded, so 1 means "this is the last one". */}
+              {/* Silent when the engine sends no progress, which it does once
+                  the practice phase requirement is met and practice continues
+                  for mastery reasons — there is no countdown to narrate then,
+                  and inventing one is what had this line promising a check
+                  that did not come. */}
+              <span className="text-xs text-slate-500">
+                {progress === null
+                  ? ''
+                  : remaining > 1
+                    ? `${remaining} more after this one`
+                    : 'Last one, then we check what stuck'}
+              </span>
               <Button data-eso-submit onClick={submit} disabled={selected == null || submitting}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Submit
@@ -1461,12 +1913,12 @@ function ContrastPairStep({
   action,
   learnerId,
   conceptId,
-  onAdvance,
+  onResolved,
 }: {
   action: EsoAction;
   learnerId: string;
   conceptId: number;
-  onAdvance: () => void;
+  onResolved: (next: EsoAction) => void;
 }) {
   const message = usePalRendering(learnerId, action.llmInstruction);
   const [explanation, setExplanation] = useState('');
@@ -1484,12 +1936,18 @@ function ContrastPairStep({
   }, [readyToRetest, learnerId, action.nodeId]);
 
   const submit = async () => {
-    if (!action.nodeId || selected == null) return;
+    // Guarded on `submitting` as well as the disabled button — see the same
+    // guard on the check step. A second POST here is worse than a wasted round
+    // trip: recordAttempt() writes a response row and resolves the next action
+    // from state the first call already moved, so the student could be handed a
+    // step that belongs to neither attempt.
+    if (!action.nodeId || selected == null || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      await recordAttempt(learnerId, action.nodeId, { conceptId, answerMasterId: selected });
-      onAdvance();
+      // Same contract as the practice step: the attempt POST returns the
+      // resolved next action, so it is adopted rather than re-requested.
+      onResolved(await recordAttempt(learnerId, action.nodeId, { conceptId, answerMasterId: selected }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to submit your answer.');
     } finally {
@@ -1578,7 +2036,7 @@ function ContrastPairStep({
                   key={option.id}
                   data-eso-option-id={option.id}
                   className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                    selected === option.id ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:bg-slate-50'
+                    selected === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   <input
@@ -1586,7 +2044,7 @@ function ContrastPairStep({
                     name="retest-option"
                     checked={selected === option.id}
                     onChange={() => setSelected(option.id)}
-                    className="h-4 w-4 accent-violet-600"
+                    className="h-4 w-4 accent-indigo-600"
                   />
                   <span dangerouslySetInnerHTML={{ __html: option.answer }} />
                 </label>
@@ -1680,7 +2138,7 @@ function CorrectiveResource({ url, format, title }: { url: string; format: strin
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center justify-between gap-3 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-800 transition-colors hover:bg-violet-100"
+      className="flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-800 transition-colors hover:bg-indigo-100"
     >
       <span className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 shrink-0" />
@@ -1719,9 +2177,16 @@ function MasteredStep({ action }: { action: EsoAction }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-4 text-sm text-emerald-800">
-          {action.knowledgeMastery != null && <div>Knowledge: {Math.round(action.knowledgeMastery * 100)}%</div>}
-          {action.applicationMastery != null && <div>Application: {Math.round(action.applicationMastery * 100)}%</div>}
+        {/* The payoff moment. These two numbers were a bare flex row of text;
+            a learner who has just cleared a concept deserves to SEE what they
+            cleared it on. Same figures, same source, shown as evidence. */}
+        <div className="flex flex-wrap gap-3">
+          {action.knowledgeMastery != null && (
+            <MasteryFigure label="Knowledge" value={action.knowledgeMastery} tone="positive" />
+          )}
+          {action.applicationMastery != null && (
+            <MasteryFigure label="Application" value={action.applicationMastery} tone="positive" />
+          )}
         </div>
 
         {/* Extension Activity, when the existing PAL content pipeline has something for
@@ -1864,8 +2329,17 @@ function RetrievalDueStep({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-violet-500" />
+          <Sparkles className="h-4 w-4 text-indigo-500" />
           Quick review
+          {/* retentionStage is mapped on every D5 action and was never shown.
+              The ladder is 2/7/30/60/180 days, so the rung is the difference
+              between "another quiz" and visible evidence that this is sticking
+              for longer each time. */}
+          {action.retentionStage != null && (
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+              Review {action.retentionStage + 1}
+            </span>
+          )}
         </CardTitle>
         <CardDescription>
           {action.daysSinceLastEvidence != null && action.daysSinceLastEvidence > 0
@@ -1893,7 +2367,7 @@ function RetrievalDueStep({
                   key={option.id}
                   data-eso-option-id={option.id}
                   className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                    answers[item.questionId] === option.id ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:bg-slate-50'
+                    answers[item.questionId] === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   <input
@@ -1901,7 +2375,7 @@ function RetrievalDueStep({
                     name={`retrieval-${item.questionId}`}
                     checked={answers[item.questionId] === option.id}
                     onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
-                    className="h-4 w-4 accent-violet-600"
+                    className="h-4 w-4 accent-indigo-600"
                   />
                   <span dangerouslySetInnerHTML={{ __html: option.answer }} />
                 </label>

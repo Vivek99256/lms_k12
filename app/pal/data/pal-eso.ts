@@ -21,6 +21,18 @@ function toRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
+/**
+ * Was this a 404 - i.e. "nothing is authored" - rather than a real fault?
+ *
+ * esoFetch throws an Error carrying the status text, so the check is on the
+ * message. Deliberately narrow: anything it does not recognise is treated as a
+ * fault and re-thrown, because the failure mode worth avoiding is telling a
+ * student about content tagging when the server is actually down.
+ */
+function isNotFound(reason: unknown): boolean {
+  return reason instanceof Error && /404|not found/i.test(reason.message);
+}
+
 async function esoFetch(path: string, init: RequestInit = {}): Promise<unknown> {
   const session = buildSessionContext();
   if (!session.baseUrl) {
@@ -162,6 +174,25 @@ export interface EsoAction {
     previousOccurrences: number;
   } | null;
   /**
+   * D4 only: how far the concept still is from its mastery verdict.
+   *
+   * The engine returns this under the SAME `evidence` key as the D3
+   * misconception payload above, but it is a different shape entirely -
+   * masteryVerdict() sends `{knowledge, application, remaining_events,
+   * misconception_blocks, stale}`. Mapping both onto one field would make
+   * whichever arrived second overwrite the other, so the D4 form is carried
+   * separately here and the D3 form keeps `evidence`.
+   *
+   * `remainingEvents` is an evidence COUNT, not a percentage - the engine is
+   * explicit that a consumer may say "2 demonstrations away" and must say
+   * nothing at all when the type is not assessed.
+   */
+  masteryEvidence?: {
+    remainingEvents: number;
+    misconceptionBlocks: boolean;
+    stale: boolean;
+  } | null;
+  /**
    * D4 only, and only on the FIRST practice call for a node: the "why is this
    * worth practising" nudge. Null whenever there is nothing honest to say.
    */
@@ -241,6 +272,18 @@ export interface EsoAction {
   cfuItemCount?: number | null;
   /** CFU only: how many check cycles this node has already failed. */
   cfuAttempts?: number | null;
+  /**
+   * D4 practice only: how far through the practice phase this node is.
+   *
+   * Both numbers are the engine's. `done` is the very count
+   * EsoPolicyService::practiceComplete() gates on and `needed` is
+   * practiceItemsRequired(), so the meter and the gate cannot disagree.
+   *
+   * Do NOT derive either of these here. The threshold is MIN_EVENTS_K/A and it
+   * belongs to the engine; a client that computed it would silently diverge the
+   * first time the engine changed its mind.
+   */
+  practiceProgress?: { done: number; needed: number } | null;
 }
 
 export interface DecisionLogEntry {
@@ -300,6 +343,17 @@ function mapAction(raw: unknown): EsoAction {
             chosenAnswer: toRecord(r.evidence).chosen_answer == null ? null : readString(toRecord(r.evidence).chosen_answer),
             previousOccurrences: num(toRecord(r.evidence).previous_occurrences),
           },
+    // Same key, different shape - see masteryEvidence on the type above.
+    // `remaining_events` is the field only the D4 verdict carries, so its
+    // presence is what distinguishes the two.
+    masteryEvidence:
+      r.evidence == null || toRecord(r.evidence).remaining_events == null
+        ? null
+        : {
+            remainingEvents: num(toRecord(r.evidence).remaining_events),
+            misconceptionBlocks: toRecord(r.evidence).misconception_blocks === true,
+            stale: toRecord(r.evidence).stale === true,
+          },
     motivationInstruction: r.motivation_instruction == null ? null : readString(r.motivation_instruction),
     motivationFallback: r.motivation_fallback == null ? null : readString(r.motivation_fallback),
     item: r.item == null ? null : mapQuestion(r.item),
@@ -350,6 +404,18 @@ function mapAction(raw: unknown): EsoAction {
     })(),
     cfuItemCount: numOrNull(r.cfu_item_count),
     cfuAttempts: numOrNull(r.cfu_attempts),
+    // Only D4 practice sends this, so its absence is normal on every other
+    // stage and must stay null rather than becoming a misleading {0, 0}.
+    practiceProgress: (() => {
+      if (r.practice_progress == null) {
+        return null;
+      }
+      const p = toRecord(r.practice_progress);
+      if (p.needed == null) {
+        return null;
+      }
+      return { done: num(p.done), needed: num(p.needed) };
+    })(),
   };
 }
 
@@ -492,8 +558,15 @@ export async function fetchPracticeItem(learnerId: string, nodeId: number, signa
   try {
     const data = toRecord(await esoGet(`api/pal/eso/practice-item/${learnerId}/${nodeId}`, signal));
     return { ...mapQuestion(data), nodeId };
-  } catch {
-    return null; // 404 = no tagged item for this node yet — a real, expected state pre-Phase-0-tagging.
+  } catch (reason) {
+    // A 404 is a genuine content gap and an expected state. Anything else is a
+    // fault, and swallowing it here reported 500s and expired sessions to the
+    // student as "content tagging is still in progress" - so real breakage was
+    // invisible and unlogged. Re-thrown so the caller can say what happened.
+    if (isNotFound(reason)) {
+      return null;
+    }
+    throw reason;
   }
 }
 
@@ -541,8 +614,12 @@ export async function fetchCheckUnderstandingItems(
     const data = await esoGet(`api/pal/eso/cfu-items/${learnerId}/${nodeId}`, signal);
     const rows = Array.isArray(data) ? data : [];
     return rows.map(mapQuestion);
-  } catch {
-    return []; // 404 = no tagged item for this node yet, same expected state as practice.
+  } catch (reason) {
+    // Same distinction as fetchPracticeItem: a gap is not a fault.
+    if (isNotFound(reason)) {
+      return [];
+    }
+    throw reason;
   }
 }
 
@@ -616,17 +693,46 @@ export async function fetchDecisionLog(learnerId: string, conceptId: number, sig
 
 // ── Pal rendering (the only LLM call in this feature) ───────────────────
 
+/**
+ * Phrasings already fetched in this page session, keyed on learner+instruction.
+ *
+ * The flow remounts a step on every advance, which is what makes a repeated
+ * stage serve fresh content. Without this, three practice questions in a row
+ * would each re-render the SAME instruction text over the network. Only
+ * resolved values are cached, so a failure is always retried.
+ *
+ * Deliberately not cached when a `context` is supplied: that varies the prompt,
+ * so the instruction alone would no longer identify the result.
+ */
+const renderedInstructions = new Map<string, { rendered: string | null; fallbackText: string | null }>();
+
 export async function renderInstruction(
   learnerId: string,
   instruction: string,
   context?: Record<string, unknown>,
   signal?: AbortSignal
 ): Promise<{ rendered: string | null; fallbackText: string | null }> {
+  const cacheable = context === undefined;
+  const key = `${learnerId}::${instruction}`;
+
+  if (cacheable) {
+    const hit = renderedInstructions.get(key);
+    if (hit) {
+      return hit;
+    }
+  }
+
   const data = toRecord(await esoPost('api/pal/eso/render', { learner_id: learnerId, instruction, context }, signal));
-  return {
+  const result = {
     rendered: data.rendered == null ? null : readString(data.rendered),
     fallbackText: data.fallback_text == null ? null : readString(data.fallback_text),
   };
+
+  if (cacheable) {
+    renderedInstructions.set(key, result);
+  }
+
+  return result;
 }
 
 // ── Chapter → concept navigation (the student entry point) ──────────────
