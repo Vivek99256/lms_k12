@@ -8,6 +8,10 @@ import {
   type ApiEnvelope,
   type SessionContext,
 } from "@/lib/erp-client";
+import {
+  fetchExamPapers,
+  fetchPaperContext,
+} from "@/app/lms/exam/_question-paper-templates/api";
 
 // ---------------------------------------------------------------------------
 // Shared types (mirror the Laravel `homework` table / StudentHomeworkApiController)
@@ -184,9 +188,9 @@ export type HomeworkDetailInfo = {
   submissionDateFmt: string;
   teacherName: string;
   referenceFileUrl: string;
-  /** "question_bank" when this homework was assigned from the question bank, otherwise the default attachment flow. */
+  /** "question_bank" or "exam_paper" when this homework carries questions, otherwise the default attachment flow. */
   sourceType?: string;
-  /** Present only for `sourceType === "question_bank"` homework. */
+  /** Present only for question-carrying homework ("question_bank" / "exam_paper"). */
   questions?: HomeworkQuestion[];
 };
 
@@ -204,11 +208,23 @@ export type HomeworkQuestionType = {
   label: string;
 };
 
+/**
+ * Where a homework's content comes from: an uploaded file, questions picked
+ * chapter-by-chapter out of the question bank, or an existing homework exam
+ * paper whose question mapping is reused as-is.
+ */
+export type HomeworkSourceType = "attachment" | "question_bank" | "exam_paper";
+
 export type HomeworkQuestion = {
   id: number;
   title: string;
   description: string;
   questionTypeId: number;
+  /**
+   * The type's own label, when the source already names it (an exam paper's
+   * questions do). Empty when it has to be resolved from the question-type list.
+   */
+  questionTypeLabel: string;
   points: number;
   chapterId: number;
 };
@@ -552,6 +568,9 @@ function toHomeworkQuestion(row: UnknownRecord): HomeworkQuestion {
     title: readString(row.question_title ?? row.title),
     description: readString(row.description),
     questionTypeId: readNumber(row.question_type_id),
+    questionTypeLabel: readString(
+      row.question_type_label ?? row.question_type ?? ""
+    ),
     points: readNumber(row.points),
     chapterId: readNumber(row.chapter_id),
   };
@@ -632,10 +651,16 @@ export async function assignHomework(input: {
   subjectId: string;
   prompt?: string;
   image?: File | null;
-  /** Optional: assigns homework from the question bank instead of an uploaded attachment. */
-  sourceType?: "attachment" | "question_bank";
-  /** Optional: question-bank question ids, required when `sourceType === "question_bank"`. */
+  /** Optional: where the homework's questions come from. Defaults to the uploaded attachment. */
+  sourceType?: HomeworkSourceType;
+  /**
+   * Optional: question ids, required when `sourceType` is "question_bank" or
+   * "exam_paper". Exam-paper homework sends the ids the paper already maps, so
+   * the questions are referenced, never copied.
+   */
   questionIds?: number[];
+  /** Optional: the `question_paper` row, required when `sourceType === "exam_paper"`. */
+  examPaperId?: number;
 }): Promise<number> {
   const payload = await postMultipart("lms-homework/store", (form) => {
     form.append("students", input.studentIds.join(","));
@@ -648,6 +673,7 @@ export async function assignHomework(input: {
     if (input.prompt) form.append("prompt", input.prompt);
     if (input.image) form.append("image", input.image);
     if (input.sourceType) form.append("source_type", input.sourceType);
+    if (input.examPaperId) form.append("exam_paper_id", String(input.examPaperId));
     if (input.questionIds) {
       input.questionIds.forEach((id) => form.append("question_ids[]", String(id)));
     }
@@ -687,6 +713,69 @@ export async function listHomeworkQuestions(params: {
     question_type_id: params.questionTypeIds,
   });
   return dataRows(payload).map(toHomeworkQuestion);
+}
+
+// ---------------------------------------------------------------------------
+// Feature 7 — Homework from an existing homework exam paper
+//
+// The papers and their questions are NOT fetched again here: both come from the
+// Exam module's own `/api/question-paper` endpoints, the same ones the question
+// paper templates screen reads. Homework only narrows the listing to
+// `exam_type = 'homework'` and reshapes the rows into the shapes this module
+// already renders, so the picker can never drift from the Exam module's data.
+// ---------------------------------------------------------------------------
+
+/** The `question_paper.exam_type` slug a homework paper is stored under. */
+export const HOMEWORK_EXAM_TYPE = "homework";
+
+export type HomeworkExamPaper = {
+  id: number;
+  /** `paper_name`, with `paper_desc` appended when the paper carries one. */
+  title: string;
+  subjectName: string;
+  standardName: string;
+  totalMarks: number;
+  totalQuestions: number;
+};
+
+/**
+ * Homework question papers only — term, formative, summative, offline and
+ * online papers are excluded by `fetchExamPapers`' exam-type pin. Sorted by
+ * title so the dropdown reads the same way on every load.
+ */
+export async function listHomeworkExamPapers(): Promise<HomeworkExamPaper[]> {
+  const rows = await fetchExamPapers(HOMEWORK_EXAM_TYPE);
+  return rows
+    .map((row) => ({
+      id: row.id,
+      title: [row.paperName, row.paperDesc].filter(Boolean).join(" ").trim(),
+      subjectName: row.subjectName,
+      standardName: row.standardName,
+      totalMarks: row.totalMarks,
+      totalQuestions: row.totalQuestions,
+    }))
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+/**
+ * The questions a homework paper already maps, in the shape the homework screens
+ * render. Nothing is duplicated: these are `lms_question_master` rows reached
+ * through the paper's existing mapping, and assigning the homework stores their
+ * ids — the same ids the question-bank flow stores.
+ */
+export async function listExamPaperQuestions(
+  paperId: number
+): Promise<HomeworkQuestion[]> {
+  const context = await fetchPaperContext(paperId);
+  return context.questions.map((question) => ({
+    id: question.id,
+    title: question.question_title,
+    description: "",
+    questionTypeId: question.question_type_id,
+    questionTypeLabel: question.question_type_label || question.question_type,
+    points: question.points,
+    chapterId: question.chapter_id ?? 0,
+  }));
 }
 
 // ---------------------------------------------------------------------------

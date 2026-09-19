@@ -224,11 +224,25 @@ function readUserProfileName(): string {
  * endpoint. `user_profile_name` is passed along because that endpoint narrows
  * a teacher to their own papers — leaving it out would list papers the Exams
  * tab does not show, and the two screens would disagree.
+ *
+ * `examType` pins the listing to one `question_paper.exam_type` slug, the same
+ * way the question-paper grid pins /lms/worksheet and /lms/project to their own
+ * type. Homework's paper picker passes 'homework', so a teacher can only ever
+ * pick a homework paper - never a term, formative, summative, offline or online
+ * one. The rows are filtered again on the way out: that pin is a correctness
+ * requirement for the picker, not a display preference, so it does not rest on
+ * the endpoint honouring the parameter.
  */
-export async function fetchExamPapers(): Promise<ExamPaperOption[]> {
+export async function fetchExamPapers(examType?: string): Promise<ExamPaperOption[]> {
   const session = requireSession();
   const params = new URLSearchParams();
   appendCommonParams(params, session);
+
+  const pinnedType = (examType ?? '').trim().toLowerCase();
+
+  if (pinnedType) {
+    params.set('exam_type', pinnedType);
+  }
 
   const profileName = readUserProfileName();
 
@@ -267,5 +281,6 @@ export async function fetchExamPapers(): Promise<ExamPaperOption[]> {
       totalMarks: Number(row.total_marks) || 0,
       totalQuestions: Number(row.total_ques) || 0,
     }))
-    .filter((row) => row.id > 0);
+    .filter((row) => row.id > 0)
+    .filter((row) => !pinnedType || row.examType.toLowerCase() === pinnedType);
 }
