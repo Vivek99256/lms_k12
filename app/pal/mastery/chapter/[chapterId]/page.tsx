@@ -15,6 +15,7 @@ import {
   type ConceptMasteryRow,
 } from '@/app/pal/data/pal-diagnostic';
 import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
  * Stage 10 - mastery across a chapter.
@@ -103,7 +104,7 @@ function ChapterMasteryView() {
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-rose-800">{error ?? 'Nothing could be loaded.'}</p>
@@ -127,22 +128,57 @@ function ChapterMasteryView() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href="/pal" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          Back to subjects
-        </Link>
-      </div>
+    <PalWorkspace
+      eyebrow={data.chapterName || 'This chapter'}
+      title="Mastery"
+      description="Concept by concept, from your own answers."
+      backHref="/pal"
+      backLabel="Back to subjects"
+      rail={
+        <>
+          <PalRailSection title="Where you stand">
+            <PalRailStat label="Mastered" value={summary.mastered} tone="positive" />
+            <PalRailStat label="Retained" value={summary.retained} tone="positive" />
+            <PalRailStat label="In progress" value={summary.inProgress} />
+            <PalRailStat label="Not started" value={summary.notStarted} />
+            {summary.recallDue > 0 && (
+              <PalRailStat label="Recall due" value={summary.recallDue} tone="warning" />
+            )}
+            {summary.noQuestions > 0 && (
+              <p className="mt-2 text-xs text-slate-500">
+                {summary.noQuestions} concept{summary.noQuestions === 1 ? '' : 's'} cannot be
+                practised yet — a gap in the question bank.
+              </p>
+            )}
+          </PalRailSection>
 
-      <header className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900">Mastery</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {data.chapterName || 'This chapter'} — concept by concept, from your own answers.
-        </p>
-      </header>
+          <PalRailSection title="Your journey">
+            <JourneyRail
+              current="mastery"
+              completed={['diagnostic', 'adaptive', 'plan', 'learn', 'practice', 'check']}
+              orientation="vertical"
+            />
+          </PalRailSection>
 
-      <JourneyRail current="mastery" completed={['diagnostic', 'adaptive', 'plan', 'learn', 'practice', 'check']} className="mb-5" />
+          <PalRailSection title="Go to">
+            <div className="space-y-2">
+              <Link
+                href={`/pal/plan/chapter/${chapterId}`}
+                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full justify-start')}
+              >
+                My plan
+              </Link>
+              <Link
+                href={`/pal/recall?chapterId=${chapterId}`}
+                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full justify-start')}
+              >
+                Recall reviews
+              </Link>
+            </div>
+          </PalRailSection>
+        </>
+      }
+    >
 
       <Card className="mb-4">
         <CardContent className="pt-6">
@@ -228,7 +264,7 @@ function ChapterMasteryView() {
           <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
         </Link>
       </div>
-    </div>
+    </PalWorkspace>
   );
 }
 

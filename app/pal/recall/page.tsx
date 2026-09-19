@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { ArrowRight, CalendarClock, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { EmptyState } from '@/components/ui/empty-state';
 import { fetchRecallQueue, type RecallItem, type RecallQueue } from '@/app/pal/data/pal-diagnostic';
 import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
  * Stage 11 - recall.
@@ -82,7 +83,7 @@ function RecallView() {
 
   if (error || !queue) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-rose-800">{error ?? 'Nothing could be loaded.'}</p>
@@ -99,26 +100,33 @@ function RecallView() {
   const backHref = chapterId ? `/pal/mastery/chapter/${chapterId}` : '/pal';
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href={backHref} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          {chapterId ? 'Back to mastery' : 'Back to subjects'}
-        </Link>
-      </div>
+    <PalWorkspace
+      title="Recall"
+      description="Short checks on things you have already mastered, spaced further apart each time you pass."
+      backHref={backHref}
+      backLabel={chapterId ? 'Back to mastery' : 'Back to subjects'}
+      rail={
+        <>
+          <PalRailSection title="Your reviews">
+            <PalRailStat
+              label="Due now"
+              value={queue.due.length}
+              tone={queue.due.length > 0 ? 'warning' : 'positive'}
+            />
+            <PalRailStat label="Coming up" value={queue.upcoming.length} />
+            <PalRailStat label="Tracked" value={queue.counts.totalTracked} />
+          </PalRailSection>
 
-      <header className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900">Recall</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Short checks on things you have already mastered, spaced further apart each time you pass.
-        </p>
-      </header>
-
-      <JourneyRail
-        current="recall"
-        completed={['diagnostic', 'adaptive', 'plan', 'learn', 'practice', 'check', 'mastery']}
-        className="mb-5"
-      />
+          <PalRailSection title="Your journey">
+            <JourneyRail
+              current="recall"
+              completed={['diagnostic', 'adaptive', 'plan', 'learn', 'practice', 'check', 'mastery']}
+              orientation="vertical"
+            />
+          </PalRailSection>
+        </>
+      }
+    >
 
       {queue.counts.totalTracked === 0 ? (
         // Not an error and not an empty list - nothing has been mastered yet,
@@ -187,7 +195,7 @@ function RecallView() {
           )}
         </>
       )}
-    </div>
+    </PalWorkspace>
   );
 }
 

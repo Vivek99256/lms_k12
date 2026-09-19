@@ -4,7 +4,11 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Lock, Sparkles, Target } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -192,6 +196,35 @@ function EsoConceptFlow() {
    */
   const opened = useRef<string | null>(null);
 
+  /**
+   * Learning happens on the Learn screen, including the second time round.
+   *
+   * The engine answers `teach` on a first pass and `reteach` after a failed
+   * check. Both are "go and read", and the Learn page is where reading lives -
+   * it shows every video, presentation, note and classroom resource for the
+   * concept, where this screen's TeachStep could only show the single item the
+   * content model picked. A learner re-learning got one video and no sense that
+   * the rest was still there.
+   *
+   * `replace`, not `push`: the engine screen is a waypoint here, and leaving it
+   * in history means Back lands on a screen that immediately forwards again.
+   *
+   * This cannot loop. The Learn page's continue button stamps taught_at before
+   * returning, so the next resolve is `practice`.
+   */
+  const handedToLearn = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!action || !conceptId) return;
+    if (action.action !== 'teach' && action.action !== 'reteach') return;
+
+    const key = `${conceptId}:${action.action}:${action.nodeId ?? ''}`;
+    if (handedToLearn.current === key) return;
+    handedToLearn.current = key;
+
+    router.replace(`/pal/learn/concept/${conceptId}`);
+  }, [action, conceptId, router]);
+
   useEffect(() => {
     const key = `${learnerId}:${conceptId}`;
     if (opened.current === key) return;
@@ -207,27 +240,72 @@ function EsoConceptFlow() {
 
   if (!conceptId) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-10">
+      <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Alert>A concept must be selected to start the adaptive flow (add ?conceptId=... to the URL).</Alert>
       </div>
     );
   }
 
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-      <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
-        <Sparkles className="h-4 w-4 text-indigo-500" />
-        Adaptive learning
-      </div>
+  // The stage list, and - while practising - how far through the phase they
+  // are. Both were inline above the step before; in the rail they stay visible
+  // without pushing the question itself down the page.
+  const rail = (
+    <>
+      <PalRailSection title="Your progress">
+        <LearningFlowRail
+          action={action?.action ?? ''}
+          stageKey={planPending ? 'plan' : undefined}
+          orientation="vertical"
+        />
+      </PalRailSection>
 
-      {/* Cold start: the rail is static, so it paints immediately instead of
-          leaving the student on a bare spinner while the engine resolves. */}
-      {loading && (
-        <>
-          <LearningFlowRail action="" />
-          <StepSkeleton />
-        </>
+      {action?.practiceProgress && action.practiceProgress.needed > 0 && (
+        <PalRailSection title="This step">
+          <div className="flex items-baseline justify-between gap-3 py-1">
+            <span className="text-sm text-slate-600">Question</span>
+            <span className="text-sm font-semibold tabular-nums text-slate-900">
+              {Math.min(action.practiceProgress.done + 1, action.practiceProgress.needed)} of{' '}
+              {action.practiceProgress.needed}
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-indigo-600 transition-all"
+              style={{
+                width: `${(action.practiceProgress.done / action.practiceProgress.needed) * 100}%`,
+              }}
+              role="progressbar"
+              aria-valuenow={action.practiceProgress.done}
+              aria-valuemin={0}
+              aria-valuemax={action.practiceProgress.needed}
+              aria-label="Practice questions answered"
+            />
+          </div>
+        </PalRailSection>
       )}
+
+      <PalRailSection title="Go to">
+        <Link
+          href="/pal"
+          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full justify-start')}
+        >
+          All subjects
+        </Link>
+      </PalRailSection>
+    </>
+  );
+
+  return (
+    <PalWorkspace
+      eyebrow="Adaptive learning"
+      title="Practice"
+      description="The engine picks each step from what you have already shown it."
+      rail={rail}
+    >
+      {/* Cold start: the step skeleton paints immediately instead of leaving
+          the student on a bare spinner while the engine resolves. The stage
+          list is in the rail and is static, so it is already on screen. */}
+      {loading && <StepSkeleton />}
       {!loading && error && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3">
           <p className="text-sm text-rose-800">{error}</p>
@@ -255,7 +333,6 @@ function EsoConceptFlow() {
               Working out your next step...
             </div>
           )}
-          <LearningFlowRail action={action.action} stageKey={planPending ? 'plan' : undefined} />
 
           {/* Hidden by request: the "Your plan / Suggested content" panel and
               its evidence-count breakdown ("3 more demonstrations", "Not part
@@ -296,7 +373,7 @@ function EsoConceptFlow() {
           <AiTutorPanel learnerId={learnerId} conceptId={conceptId} actionKey={action.action} />
         </div>
       )}
-    </div>
+    </PalWorkspace>
   );
 }
 
@@ -711,7 +788,15 @@ function StepSkeleton() {
   );
 }
 
-function LearningFlowRail({ action, stageKey }: { action: string; stageKey?: string }) {
+function LearningFlowRail({
+  action,
+  stageKey,
+  orientation = 'horizontal',
+}: {
+  action: string;
+  stageKey?: string;
+  orientation?: 'horizontal' | 'vertical';
+}) {
   // `stageKey` marks a stage the UI owns rather than the engine — currently
   // only Plan, which has no action of its own. Everything else still derives
   // from the resolved action, so the rail can never drift from the engine.
@@ -719,10 +804,77 @@ function LearningFlowRail({ action, stageKey }: { action: string; stageKey?: str
     ? FLOW_STAGES.findIndex((stage) => stage.key === stageKey)
     : FLOW_STAGES.findIndex((stage) => stage.actions.includes(action));
 
+  const offPath = activeIndex < 0;
+  const asideNote = offPath
+    ? action === 'serve_contrast_pair'
+      ? 'Clearing up a mix-up first'
+      : action === 'remediate_prerequisite' || action === 'prerequisite_quick_probe'
+        ? 'Checking a prerequisite first'
+        : action === 'content_unavailable'
+          ? 'Waiting on content'
+          : 'Getting you set up'
+    : null;
+
+  // Vertical is the side-rail form, matching JourneyRail's so the two read as
+  // one system. The engine still decides which stage is lit; only the axis
+  // changes.
+  if (orientation === 'vertical') {
+    return (
+      <div data-eso-flow-stage={offPath ? 'off-path' : FLOW_STAGES[activeIndex].key}>
+        <ol className="flex flex-col gap-0">
+          {FLOW_STAGES.map((stage, index) => {
+            const done = !offPath && index < activeIndex;
+            const current = index === activeIndex;
+            return (
+              <li key={stage.key} className="flex flex-col">
+                <span
+                  aria-current={current ? 'step' : undefined}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm ${
+                    current
+                      ? 'bg-indigo-50 font-semibold text-indigo-900'
+                      : done
+                        ? 'text-emerald-700'
+                        : 'text-slate-500'
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
+                      current
+                        ? 'border-indigo-600 bg-indigo-600 text-white'
+                        : done
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border-slate-200 bg-white text-slate-400'
+                    }`}
+                  >
+                    {done ? '✓' : index + 1}
+                  </span>
+                  <span className="truncate">{stage.label}</span>
+                  {current && (
+                    <span className="ml-auto text-[11px] font-medium text-indigo-600">Now</span>
+                  )}
+                </span>
+                {index < FLOW_STAGES.length - 1 && (
+                  <span
+                    aria-hidden
+                    className={`ml-[1.4rem] h-2 w-px shrink-0 ${
+                      !offPath && index < activeIndex ? 'bg-emerald-300' : 'bg-slate-200'
+                    }`}
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        {asideNote && <p className="mt-2 px-1 text-xs text-amber-700">{asideNote}</p>}
+      </div>
+    );
+  }
+
   return (
-    <div data-eso-flow-stage={activeIndex >= 0 ? FLOW_STAGES[activeIndex].key : 'off-path'} className="mb-4 flex flex-wrap items-center gap-1.5">
+    <div data-eso-flow-stage={offPath ? 'off-path' : FLOW_STAGES[activeIndex].key} className="mb-4 flex flex-wrap items-center gap-1.5">
       {FLOW_STAGES.map((stage, index) => {
-        const done = activeIndex >= 0 && index < activeIndex;
+        const done = !offPath && index < activeIndex;
         const current = index === activeIndex;
         return (
           <span key={stage.key} className="flex items-center gap-1.5">
@@ -742,17 +894,7 @@ function LearningFlowRail({ action, stageKey }: { action: string; stageKey?: str
         );
       })}
       {/* Said explicitly rather than silently showing nothing highlighted. */}
-      {activeIndex < 0 && (
-        <span className="ml-1 text-xs text-amber-700">
-          {action === 'serve_contrast_pair'
-            ? 'Clearing up a mix-up first'
-            : action === 'remediate_prerequisite' || action === 'prerequisite_quick_probe'
-              ? 'Checking a prerequisite first'
-              : action === 'content_unavailable'
-                ? 'Waiting on content'
-                : 'Getting you set up'}
-        </span>
-      )}
+      {asideNote && <span className="ml-1 text-xs text-amber-700">{asideNote}</span>}
     </div>
   );
 }

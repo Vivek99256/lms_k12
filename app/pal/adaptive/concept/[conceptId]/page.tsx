@@ -3,10 +3,9 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, CheckCircle2, Lightbulb, Loader2, XCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Lightbulb, Loader2, XCircle } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   fetchAdaptiveQuestions,
@@ -21,6 +20,7 @@ import {
 } from '@/app/pal/data/pal-diagnostic';
 import { BandChip, BandRow, bandLabel } from '@/app/pal/_components/BandMeter';
 import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
  * Stages 3 and 4 - five adaptive questions, then the concept result.
@@ -147,7 +147,7 @@ function AdaptivePracticeView() {
 
   if (error && !set) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-rose-800">{error}</p>
@@ -174,25 +174,43 @@ function AdaptivePracticeView() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href={`/pal/adaptive/chapter/${set?.chapterId ?? ''}`} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          All concepts
-        </Link>
-      </div>
+    <PalWorkspace
+      eyebrow="Adaptive practice"
+      title={set?.conceptName || 'Practice'}
+      description="Five questions, chosen from how your diagnostic went."
+      backHref={`/pal/adaptive/chapter/${set?.chapterId ?? ''}`}
+      backLabel="All concepts"
+      actions={set?.difficulty ? <BandChip band={set.difficulty} /> : undefined}
+      rail={
+        <>
+          <PalRailSection title="This set">
+            <div className="flex items-baseline justify-between gap-3 py-1">
+              <span className="text-sm text-slate-600">Answered</span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900">
+                {answeredCount} of {items.length}
+              </span>
+            </div>
+            {items.length > 0 && (
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-indigo-600 transition-all"
+                  style={{ width: `${(answeredCount / items.length) * 100}%` }}
+                  role="progressbar"
+                  aria-valuenow={answeredCount}
+                  aria-valuemin={0}
+                  aria-valuemax={items.length}
+                  aria-label="Questions answered"
+                />
+              </div>
+            )}
+          </PalRailSection>
 
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-slate-900">{set?.conceptName || 'Practice'}</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {answeredCount} of {items.length} answered
-          </p>
-        </div>
-        {set?.difficulty && <BandChip band={set.difficulty} />}
-      </header>
-
-      <JourneyRail current="adaptive" completed={['diagnostic']} className="mb-4" />
+          <PalRailSection title="Your journey">
+            <JourneyRail current="adaptive" completed={['diagnostic']} orientation="vertical" />
+          </PalRailSection>
+        </>
+      }
+    >
 
       {set?.rationale?.trim() && (
         <Card className="mb-4 border-indigo-200 bg-indigo-50">
@@ -257,7 +275,7 @@ function AdaptivePracticeView() {
           </Button>
         </div>
       )}
-    </div>
+    </PalWorkspace>
   );
 }
 
@@ -386,21 +404,42 @@ function ConceptResultView({
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href={`/pal/adaptive/chapter/${chapterId}`} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          All concepts
-        </Link>
-      </div>
+    <PalWorkspace
+      eyebrow="Concept result"
+      title={result.conceptName}
+      description={understandingCopy[result.understanding] ?? ''}
+      backHref={`/pal/adaptive/chapter/${chapterId}`}
+      backLabel="All concepts"
+      actions={result.currentDifficulty ? <BandChip band={result.currentDifficulty} /> : undefined}
+      rail={
+        <>
+          <PalRailSection title="How it went">
+            <div className="flex items-baseline justify-between gap-3 py-1">
+              <span className="text-sm text-slate-600">Accuracy</span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900">
+                {Math.round(result.accuracy)}%
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 py-1">
+              <span className="text-sm text-slate-600">Correct</span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900">
+                {result.correct} of {result.attempted}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 py-1">
+              <span className="text-sm text-slate-600">Understanding</span>
+              <span className="text-sm font-semibold capitalize text-slate-900">
+                {result.understanding}
+              </span>
+            </div>
+          </PalRailSection>
 
-      <header className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900">Concept result</h1>
-        <p className="mt-1 text-sm text-slate-600">{result.conceptName}</p>
-      </header>
-
-      <JourneyRail current="plan" completed={['diagnostic', 'adaptive']} className="mb-5" />
-
+          <PalRailSection title="Your journey">
+            <JourneyRail current="plan" completed={['diagnostic', 'adaptive']} orientation="vertical" />
+          </PalRailSection>
+        </>
+      }
+    >
       <Card className="mb-4">
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -538,7 +577,7 @@ function ConceptResultView({
           </Link>
         </div>
       </div>
-    </div>
+    </PalWorkspace>
   );
 }
 

@@ -3,12 +3,13 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, History, Loader2 } from 'lucide-react';
+import { History, Loader2 } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 import {
   fetchChapterDiagnosticHistory,
   type DiagnosticHistoryEntry,
@@ -80,18 +81,18 @@ function DiagnosticHistoryView() {
   if (loading) return <Centered>Loading your attempts…</Centered>;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href="/pal" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          Back to subjects
-        </Link>
-      </div>
-
-      <header className="mb-5">
-        <h1 className="text-lg font-semibold text-slate-900">Diagnostic attempts</h1>
-        {chapterName && <p className="mt-1 text-sm text-slate-600">{chapterName}</p>}
-      </header>
+    <PalWorkspace
+      eyebrow={chapterName || undefined}
+      title="Diagnostic attempts"
+      description="Every diagnostic you have submitted for this chapter."
+      backHref="/pal"
+      backLabel="Back to subjects"
+      rail={
+        <PalRailSection title="Your journey">
+          <JourneyRail current="diagnostic" orientation="vertical" />
+        </PalRailSection>
+      }
+    >
 
       {error && (
         <Card className="mb-4 border-rose-200 bg-rose-50">
@@ -163,7 +164,7 @@ function DiagnosticHistoryView() {
       <div className="mt-5 flex justify-end">
         <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={buttonVariants({ variant: 'outline' })}>Retake diagnostic</Link>
       </div>
-    </div>
+    </PalWorkspace>
   );
 }
 

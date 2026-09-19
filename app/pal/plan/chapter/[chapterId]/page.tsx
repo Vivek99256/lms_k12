@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   AlertTriangle,
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   CheckCircle2,
@@ -21,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { fetchLearningPlan, type LearningPlan, type PlanStep } from '@/app/pal/data/pal-diagnostic';
 import { BandChip, StrengthBadge, bandLabel } from '@/app/pal/_components/BandMeter';
 import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
  * Stage 5 - the personalised learning plan.
@@ -94,7 +94,7 @@ function LearningPlanView() {
 
   if (error || !plan) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-rose-800">{error ?? 'Your plan could not be built.'}</p>
@@ -110,44 +110,74 @@ function LearningPlanView() {
 
   const noDiagnostic = !plan.hasDiagnostic;
 
-  return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href="/pal" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          Back to subjects
-        </Link>
-      </div>
-
-      <header className="mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-lg font-semibold text-slate-900">Your learning plan</h1>
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-            <Lock aria-hidden className="h-3 w-3" />
-            Read only
-          </span>
-        </div>
-        <p className="mt-1 text-sm text-slate-600">
-          {plan.chapterName || 'This chapter'} — built from your own answers. It updates itself as you work.
-        </p>
-      </header>
-
-      <JourneyRail
-        current={noDiagnostic ? 'diagnostic' : 'plan'}
-        completed={noDiagnostic ? [] : ['diagnostic', 'adaptive']}
-        className="mb-5"
-      />
+  // Everything that is context rather than the task itself moves to the rail:
+  // where the learner is, how the chapter stands, and where else they can go.
+  // The main column is then only the ordered work, which is what they came for.
+  const rail = (
+    <>
+      <PalRailSection title="Your journey">
+        <JourneyRail
+          current={noDiagnostic ? 'diagnostic' : 'plan'}
+          completed={noDiagnostic ? [] : ['diagnostic', 'adaptive']}
+          orientation="vertical"
+        />
+      </PalRailSection>
 
       {!noDiagnostic && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Metric label="Concepts" value={plan.summary.conceptsServable} hint="with questions" />
-          <Metric label="Mastered" value={plan.summary.mastered} tone="positive" />
-          <Metric label="In progress" value={plan.summary.inProgress} />
-          <Metric label="Need work" value={plan.summary.weak} tone={plan.summary.weak > 0 ? 'warn' : undefined} />
-        </div>
+        <PalRailSection title="This chapter">
+          <div className="grid grid-cols-2 gap-2.5">
+            <Metric label="Concepts" value={plan.summary.conceptsServable} hint="with questions" />
+            <Metric label="Mastered" value={plan.summary.mastered} tone="positive" />
+            <Metric label="In progress" value={plan.summary.inProgress} />
+            <Metric
+              label="Need work"
+              value={plan.summary.weak}
+              tone={plan.summary.weak > 0 ? 'warn' : undefined}
+            />
+          </div>
+        </PalRailSection>
       )}
 
-      <Card className="mb-4">
+      <PalRailSection title="Go to">
+        <div className="space-y-2">
+          <Link
+            href={`/pal/mastery/chapter/${chapterId}`}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full justify-start')}
+          >
+            My mastery
+          </Link>
+          <Link
+            href={`/pal/recall?chapterId=${chapterId}`}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full justify-start')}
+          >
+            Recall reviews
+          </Link>
+        </div>
+      </PalRailSection>
+
+      <p className="px-1 text-xs text-slate-400">
+        Generated {formatWhen(plan.generatedAt)} from your saved answers. You cannot edit this plan —
+        it changes when your answers do.
+      </p>
+    </>
+  );
+
+  return (
+    <PalWorkspace
+      eyebrow={plan.chapterName || 'This chapter'}
+      title="Your learning plan"
+      description="Built from your own answers. It updates itself as you work."
+      backHref="/pal"
+      backLabel="Back to subjects"
+      actions={
+        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500">
+          <Lock aria-hidden className="h-3 w-3" />
+          Read only
+        </span>
+      }
+      rail={rail}
+    >
+      <Card>
         <CardHeader>
           <CardTitle className="text-base">What to do, in order</CardTitle>
           <CardDescription>
@@ -166,7 +196,7 @@ function LearningPlanView() {
       </Card>
 
       {plan.contentGaps.length > 0 && (
-        <Card className="mb-4 border-amber-200 bg-amber-50">
+        <Card className="border-amber-200 bg-amber-50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base text-amber-900">
               <AlertTriangle aria-hidden className="h-4 w-4" />
@@ -194,24 +224,7 @@ function LearningPlanView() {
         </Card>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5">
-        <Link
-          href={`/pal/mastery/chapter/${chapterId}`}
-          className={buttonVariants({ variant: 'outline' })}
-        >
-          My mastery
-        </Link>
-        <Link href={`/pal/recall?chapterId=${chapterId}`} className={buttonVariants({ variant: 'outline' })}>
-          Recall reviews
-          <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
-        </Link>
-      </div>
-
-      <p className="text-center text-xs text-slate-400">
-        Generated {formatWhen(plan.generatedAt)} from your saved answers. You cannot edit this plan —
-        it changes when your answers do.
-      </p>
-    </div>
+    </PalWorkspace>
   );
 }
 

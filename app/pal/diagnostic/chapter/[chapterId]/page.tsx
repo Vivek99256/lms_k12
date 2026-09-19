@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ import {
 } from '@/app/pal/data/pal-diagnostic';
 import { BandChip, bandLabel } from '@/app/pal/_components/BandMeter';
 import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
  * Stage 1 - the chapter diagnostic.
@@ -220,8 +221,71 @@ function DiagnosticExam() {
     );
   }
 
+  // Progress, the clock and the band breakdown are context, not the task, so on
+  // a wide screen they live in the rail where they stay visible without
+  // competing with the questions.
+  const rail = (
+    <>
+      <PalRailSection title="Progress">
+        <PalRailStat label="Answered" value={`${answered} of ${total}`} />
+        {secondsLeft !== null && (
+          <PalRailStat
+            label="Time left"
+            value={formatClock(secondsLeft)}
+            tone={secondsLeft <= 120 ? 'warning' : 'default'}
+          />
+        )}
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-indigo-600 transition-all"
+            style={{ width: `${total > 0 ? (answered / total) * 100 : 0}%` }}
+            role="progressbar"
+            aria-valuenow={answered}
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-label="Questions answered"
+          />
+        </div>
+        {answered < total && (
+          <p className="mt-2 text-xs text-slate-500">
+            You can submit before answering them all.
+          </p>
+        )}
+      </PalRailSection>
+
+      {grouped.length > 0 && (
+        <PalRailSection title="By difficulty">
+          {grouped.map(([band, items]) => {
+            const done = items.filter((q) => answers[q.questionId]).length;
+            return (
+              <PalRailStat
+                key={band}
+                label={bandLabel(band)}
+                value={`${done}/${items.length}`}
+                tone={done === items.length ? 'positive' : 'default'}
+              />
+            );
+          })}
+        </PalRailSection>
+      )}
+
+      <PalRailSection title="Your journey">
+        <JourneyRail current="diagnostic" orientation="vertical" />
+      </PalRailSection>
+
+      <p className="px-1 text-xs text-slate-400">
+        <Link
+          href={`/pal/diagnostic/chapter/${chapterId}/history`}
+          className="hover:text-slate-600 hover:underline"
+        >
+          Previous attempts
+        </Link>
+      </p>
+    </>
+  );
+
   return (
-    <Shell chapterId={chapterId}>
+    <Shell chapterId={chapterId} rail={rail}>
       {paper?.resumed && (
         // Restoring answers without saying so reads as a glitch, and the clock
         // restarts on a resume, so both facts are stated plainly.
@@ -239,9 +303,10 @@ function DiagnosticExam() {
         </div>
       )}
 
-      {/* Sticky so the count and the clock stay with the learner through a
-          fifteen-question scroll. */}
-      <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+      {/* Small screens only. The rail carries these on desktop, but it sits
+          BELOW the questions on a phone, so a timer that lived only there would
+          scroll out of sight exactly when it matters. */}
+      <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-baseline gap-2">
             <span className="text-sm font-semibold text-slate-900">
@@ -340,34 +405,40 @@ function DiagnosticExam() {
   );
 }
 
-function Shell({ chapterId, children }: { chapterId: string; children: React.ReactNode }) {
+function Shell({
+  chapterId,
+  rail,
+  children,
+}: {
+  chapterId: string;
+  rail?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
-      <div className="mb-4">
-        <Link href="/pal" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2 text-slate-600')}>
-          <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
-          Back to subjects
-        </Link>
-      </div>
-
-      <header className="mb-4">
-        <h1 className="text-lg font-semibold text-slate-900">Chapter diagnostic</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Fifteen questions — five easy, five medium and five hard. This finds where to start; it is
-          not a test you can fail.
-        </p>
-      </header>
-
-      <JourneyRail current="diagnostic" className="mb-5" />
-
+    <PalWorkspace
+      title="Chapter diagnostic"
+      description="Fifteen questions — five easy, five medium and five hard. This finds where to start; it is not a test you can fail."
+      backHref="/pal"
+      backLabel="Back to subjects"
+      rail={
+        rail ?? (
+          <PalRailSection title="Your journey">
+            <JourneyRail current="diagnostic" orientation="vertical" />
+          </PalRailSection>
+        )
+      }
+    >
       {children}
 
-      <p className="mt-6 text-center text-xs text-slate-400">
-        <Link href={`/pal/diagnostic/chapter/${chapterId}/history`} className="hover:text-slate-600 hover:underline">
+      <p className="text-xs text-slate-400 lg:hidden">
+        <Link
+          href={`/pal/diagnostic/chapter/${chapterId}/history`}
+          className="hover:text-slate-600 hover:underline"
+        >
           Previous attempts
         </Link>
       </p>
-    </div>
+    </PalWorkspace>
   );
 }
 

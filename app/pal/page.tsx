@@ -7,7 +7,6 @@ import {
   BookOpen,
   Brain,
   ChevronDown,
-  ChevronRight,
   ClipboardCheck,
   ExternalLink,
   GraduationCap,
@@ -23,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   buildQuizStartQuery,
   fetchMisconceptions,
@@ -333,9 +333,10 @@ function PalEntryPageContent() {
                 {totalChapters} chapter{totalChapters === 1 ? '' : 's'}
               </div>
               <div className="space-y-3">
-                {data.subjects.map((subject) => (
+                {data.subjects.map((subject, subjectIndex) => (
                   <SubjectCard
                     key={subject.id}
+                    index={subjectIndex}
                     subject={subject}
                     expanded={Boolean(openSubjects[subject.id])}
                     onToggle={() => toggleSubject(subject.id)}
@@ -376,6 +377,7 @@ function SubjectCard({
   studentId,
   getContext,
   isStaff,
+  index,
 }: {
   subject: PalSubject;
   expanded: boolean;
@@ -386,13 +388,18 @@ function SubjectCard({
   studentId: string;
   getContext: (chapter: PalChapter) => PalChapterContext;
   isStaff: boolean;
+  index?: number;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none"
+      // Capped so a long subject list does not make the last card feel late.
+      style={{ animationDelay: `${Math.min(index ?? 0, 5) * 40}ms`, animationFillMode: 'backwards' }}
+    >
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50"
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors duration-150 hover:bg-slate-50 motion-reduce:transition-none"
         aria-expanded={expanded}
       >
         <span className="flex items-center gap-3">
@@ -406,15 +413,17 @@ function SubjectCard({
             </span>
           </span>
         </span>
-        {expanded ? (
-          <ChevronDown className="h-5 w-5 text-slate-400" />
-        ) : (
-          <ChevronRight className="h-5 w-5 text-slate-400" />
-        )}
+        <ChevronDown
+          aria-hidden
+          className={cn(
+            'h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200 motion-reduce:transition-none',
+            expanded ? 'rotate-0' : '-rotate-90'
+          )}
+        />
       </button>
 
       {expanded && (
-        <div className="divide-y divide-slate-100 border-t border-slate-100">
+        <div className="divide-y divide-slate-100 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none">
           {subject.chapters.length === 0 ? (
             <p className="px-5 py-4 text-sm text-slate-500">No chapters mapped for this subject.</p>
           ) : (
@@ -486,7 +495,7 @@ function ChapterRow({
   );
 
   return (
-    <div className="px-5 py-4">
+    <div className="px-5 py-4 transition-colors duration-150 hover:bg-slate-50/60 motion-reduce:transition-none">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
