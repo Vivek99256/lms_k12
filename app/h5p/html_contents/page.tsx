@@ -9,6 +9,7 @@ import {
   HelpCircle,
   Image as ImageIcon,
   Layers3,
+  MousePointerClick,
   Sparkles,
   Video,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ const TYPE_ICONS: Record<string, typeof ImageIcon> = {
   interactive_video: Video,
   multiple_choice: HelpCircle,
   flash_cards: Layers3,
+  drag_and_drop: MousePointerClick,
 };
 
 /** Registry route name (`scenario_based.index`) → this app's route. */
