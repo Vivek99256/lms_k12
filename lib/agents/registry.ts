@@ -47,6 +47,11 @@ export const SHARED_MODULE = 'shared';
 
 export const AGENT_MODULES: AgentModule[] = [
   { key: 'fees', label: 'Fees', description: 'Fee structures, collection, dues and reminders.' },
+  {
+    key: 'attendance',
+    label: 'Attendance',
+    description: 'Daily registers, absence, and following up students who are missing school.',
+  },
   { key: 'g2g', label: 'G2G', description: 'Good-to-great learning and growth workflows.' },
   { key: 'admissions', label: 'Admissions', description: 'Enquiries, registrations and confirmations.' },
   { key: 'students', label: 'Students', description: 'Student records and profiles.' },
@@ -99,6 +104,58 @@ export const AGENT_TOOLS: AgentTool[] = [
     available: false,
     exampleInput: { class_id: 12, term_id: 2 },
   },
+  // ---- Attendance ---------------------------------------------------------
+  //
+  // Both reads are backed by MCP tools annotated `read_only` on the backend, so
+  // neither can mark a register. The drafter writes text and sends nothing — a
+  // message to a family about their child's absence is never dispatched by an
+  // agent.
+  {
+    key: 'attendance.low_attendance',
+    label: 'List students with low attendance',
+    description:
+      'Reads the marked register and reports who is attending least, with how many students it could judge. Changes nothing.',
+    module: 'attendance',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    // The arguments `attendance.overview` accepts. All optional — an empty run
+    // sweeps the default cohort over the last 30 days, which is the safe default
+    // for a read.
+    exampleInput: { standard_id: null, division_id: null, days: 30, limit: 25 },
+  },
+  {
+    key: 'attendance.student_record',
+    label: "Read one student's attendance",
+    description:
+      'Reads one student\'s present and absent day counts and the dates they were recorded absent. Changes nothing.',
+    module: 'attendance',
+    risk: 'read',
+    kind: 'mcp',
+    available: true,
+    // `student_id` is required by the tool; the dialog pre-fills the shape, not a
+    // real child — the operator names the student they are looking at.
+    exampleInput: { student_id: null, days: 30 },
+  },
+  {
+    key: 'attendance.draft_parent_note',
+    label: 'Draft an attendance note to a parent',
+    description:
+      'Writes a short note to one family about their child\'s attendance, from the figures you give it. Sends nothing.',
+    module: 'attendance',
+    risk: 'draft',
+    kind: 'local',
+    available: true,
+    exampleInput: {
+      student_name: '',
+      class_name: '',
+      present_days: 0,
+      absent_days: 0,
+      window_days: 30,
+      tone: 'gentle',
+    },
+  },
+
   // ---- G2G ----------------------------------------------------------------
   {
     key: 'g2g.draft_growth_note',
