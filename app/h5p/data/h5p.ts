@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import type { DragDropImageFit } from '@/lib/h5p/drag-drop-canvas';
 import { getRequestContext, getSyear } from '@/app/course-master/page';
 
 /**
@@ -352,6 +353,7 @@ export const H5P_ROUTE_MAP: Record<string, string> = {
   'h5p_interactive_video.index': '/h5p/h5p_interactive_video',
   'h5p_mcq.index': '/h5p/h5p_mcq',
   'h5p_flashacard.index': '/h5p/h5p_flashacard',
+  'h5p_drag_drop.index': '/h5p/h5p_drag_drop',
 };
 
 export async function fetchHubModules(ctx: H5pContext): Promise<H5pHubModule[]> {
@@ -883,3 +885,393 @@ export async function deleteFlashcard(id: number | string, ctx: H5pContext): Pro
   // The Laravel destroy response message says "updated"; show the intended copy.
   return { status: true, message: 'Flashcard deleted successfully!' };
 }
+
+// ---------------------------------------------------------------------------
+// Drag and drop API (H5P.DragQuestion)
+// ---------------------------------------------------------------------------
+
+/**
+ * Unlike the other types in this module, drag and drop writes JSON rather than
+ * multipart. A task is a background plus two arrays of positioned children that
+ * reference each other, and flattening that into `elements[0][drop_zone_refs][1]`
+ * form keys would be unreadable on both sides. Images are uploaded once by
+ * `uploadDragDropImage` and carried as URLs afterwards, so a save -- including
+ * an autosave -- costs no image traffic.
+ *
+ * Geometry is a PERCENTAGE of the canvas everywhere: in this file, in the
+ * database, and in H5P.DragQuestion's own params. Nothing converts to pixels
+ * until the editor or the player measures its container, which is what lets one
+ * authored task render correctly at any width.
+ */
+
+export type DragDropElementType = 'text' | 'image';
+export type { DragDropImageFit };
+
+export interface H5pDragDropElement {
+  id: number;
+  drag_drop_id: number;
+  element_type: DragDropElementType;
+  text: string | null;
+  image_path: string | null;
+  image_alt: string | null;
+  position_x: number;
+  position_y: number;
+  width: number;
+  height: number;
+  multiple: boolean;
+  /** Zones this draggable may be dropped into. Empty means it is a distractor. */
+  drop_zone_ids: number[] | null;
+  sort_order: number;
+}
+
+export interface H5pDragDropZone {
+  id: number;
+  drag_drop_id: number;
+  label: string | null;
+  tip: string | null;
+  position_x: number;
+  position_y: number;
+  width: number;
+  height: number;
+  /** true = one-to-one (accepts a single draggable); false = one-to-many. */
+  single: boolean;
+  auto_align: boolean;
+  show_label: boolean;
+  /** Draggables that are correct here. This is what scoring checks. */
+  correct_element_ids: number[] | null;
+  sort_order: number;
+}
+
+export interface H5pDragDrop {
+  id: number;
+  standard_id: number | null;
+  subject_id: number | null;
+  chapter_id: number | null;
+  title: string;
+  description: string | null;
+  task_description: string | null;
+  background_image: string | null;
+  /**
+   * How the background meets the canvas: contain (default, nothing cropped),
+   * cover, original or stretch. Rows written before this column existed read
+   * back as null and are treated as contain.
+   */
+  image_fit: DragDropImageFit | null;
+  canvas_width: number;
+  canvas_height: number;
+  pass_percentage: number;
+  enable_retry: boolean;
+  enable_show_solution: boolean;
+  enable_check: boolean;
+  single_point: boolean;
+  apply_penalties: boolean;
+  background_opacity_full: boolean;
+  status: 'draft' | 'published' | string;
+  published_at: string | null;
+  library: string;
+  sub_institute_id: number | null;
+  zones?: H5pDragDropZone[];
+  elements?: H5pDragDropElement[];
+}
+
+/**
+ * Save payloads address children by `ref`, not id.
+ *
+ * A ref is a client-side string that is stable for as long as the editor is
+ * open. The server inserts elements, maps ref -> real id, then writes the zones
+ * with those ids -- so a brand new zone can reference a brand new element in
+ * the same save, which is the normal case when authoring from scratch.
+ */
+export interface DragDropElementInput {
+  ref: string;
+  element_type: DragDropElementType;
+  text: string;
+  image_path: string;
+  image_alt: string;
+  position_x: number;
+  position_y: number;
+  width: number;
+  height: number;
+  multiple: boolean;
+  drop_zone_refs: string[];
+}
+
+export interface DragDropZoneInput {
+  ref: string;
+  label: string;
+  tip: string;
+  position_x: number;
+  position_y: number;
+  width: number;
+  height: number;
+  single: boolean;
+  auto_align: boolean;
+  show_label: boolean;
+  correct_element_refs: string[];
+}
+
+export interface DragDropSavePayload {
+  title: string;
+  description: string;
+  task_description: string;
+  background_image: string;
+  image_fit: DragDropImageFit;
+  canvas_width: number;
+  canvas_height: number;
+  pass_percentage: number;
+  enable_retry: boolean;
+  enable_show_solution: boolean;
+  enable_check: boolean;
+  single_point: boolean;
+  apply_penalties: boolean;
+  elements: DragDropElementInput[];
+  zones: DragDropZoneInput[];
+}
+
+/** POST a JSON document to one of the drag-and-drop endpoints. */
+async function postDragDropJson(
+  path: string,
+  body: Record<string, unknown>,
+  fallback: string
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'API', ...body }),
+  });
+  const raw = await readApiJson(res, fallback);
+  if (!res.ok || !isApiSuccess(raw)) {
+    throw new Error(getApiErrorMessage(raw, fallback));
+  }
+  return raw;
+}
+
+/**
+ * `_method` goes in the QUERY STRING, not the body.
+ *
+ * Laravel reads the override from the request bag or the query string, and a
+ * JSON body populates neither -- so the usual `fd.append('_method', 'PUT')`
+ * trick the other types in this file use silently does nothing here and the
+ * update arrives as a POST with no matching route.
+ */
+function methodOverride(path: string, method: 'PUT' | 'DELETE'): string {
+  return `${path}${path.includes('?') ? '&' : '?'}_method=${method}`;
+}
+
+export async function fetchDragDrops(ctx: H5pContext): Promise<H5pDragDrop[]> {
+  const session = requireSession();
+  const url = buildGetUrl('/h5p/h5p_drag_drop', {
+    ...contextParams(ctx),
+    sub_institute_id: session.sub_institute_id,
+    user_profile_name: session.user_profile_name,
+  });
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+  const raw = await readApiJson(res, 'Failed to load drag and drop activities');
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Failed to load drag and drop activities'));
+  return (raw.dragDropLists as H5pDragDrop[]) ?? [];
+}
+
+export async function fetchDragDrop(id: number | string, ctx: H5pContext): Promise<H5pDragDrop> {
+  const session = requireSession();
+  const url = buildGetUrl(`/h5p/h5p_drag_drop/${id}`, {
+    ...contextParams(ctx),
+    sub_institute_id: session.sub_institute_id,
+    user_profile_name: session.user_profile_name,
+  });
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+  const raw = await readApiJson(res, 'Failed to load activity');
+  if (!res.ok || !raw.dragDrop) {
+    throw new Error(getApiErrorMessage(raw, 'Activity not found'));
+  }
+  return raw.dragDrop as H5pDragDrop;
+}
+
+export async function createDragDrop(
+  ctx: H5pContext,
+  payload: DragDropSavePayload
+): Promise<MutationResult & { id: number }> {
+  const session = requireSession();
+  const raw = await postDragDropJson(
+    '/h5p/h5p_drag_drop',
+    {
+      ...contextParams(ctx),
+      sub_institute_id: session.sub_institute_id,
+      user_id: session.user_id,
+      syear: session.syear,
+      ...payload,
+    },
+    'Failed to create activity'
+  );
+  return {
+    status: true,
+    message: (raw.message as string) || 'Activity created successfully!',
+    id: Number(raw.id ?? 0),
+  };
+}
+
+export async function updateDragDrop(
+  id: number | string,
+  ctx: H5pContext,
+  payload: DragDropSavePayload
+): Promise<MutationResult> {
+  const session = requireSession();
+  const raw = await postDragDropJson(
+    methodOverride(`/h5p/h5p_drag_drop/${id}`, 'PUT'),
+    {
+      ...contextParams(ctx),
+      sub_institute_id: session.sub_institute_id,
+      user_id: session.user_id,
+      ...payload,
+    },
+    'Failed to update activity'
+  );
+  return { status: true, message: (raw.message as string) || 'Activity updated successfully!' };
+}
+
+export async function deleteDragDrop(id: number | string, ctx: H5pContext): Promise<MutationResult> {
+  const session = requireSession();
+  const raw = await postDragDropJson(
+    methodOverride(`/h5p/h5p_drag_drop/${id}`, 'DELETE'),
+    {
+      ...contextParams(ctx),
+      sub_institute_id: session.sub_institute_id,
+      user_id: session.user_id,
+    },
+    'Failed to delete activity'
+  );
+  return { status: true, message: (raw.message as string) || 'Activity deleted successfully!' };
+}
+
+/**
+ * Publish or return to draft.
+ *
+ * The server refuses to publish a task nothing can score (no draggable, no
+ * zone, or no zone with a correct answer). That error is worth showing
+ * verbatim -- it names the specific thing the author still has to do.
+ */
+export async function publishDragDrop(
+  id: number | string,
+  ctx: H5pContext,
+  published: boolean
+): Promise<MutationResult> {
+  const session = requireSession();
+  const raw = await postDragDropJson(
+    `/h5p/h5p_drag_drop/${id}/publish`,
+    {
+      ...contextParams(ctx),
+      sub_institute_id: session.sub_institute_id,
+      user_id: session.user_id,
+      published,
+    },
+    published ? 'Failed to publish activity' : 'Failed to unpublish activity'
+  );
+  return { status: true, message: (raw.message as string) || 'Saved.' };
+}
+
+/** Upload one image and get its URL back. Multipart, because it is a file. */
+export async function uploadDragDropImage(file: File, role: 'background' | 'element'): Promise<string> {
+  const session = requireSession();
+  const fd = buildFormData({
+    sub_institute_id: session.sub_institute_id,
+    user_id: session.user_id,
+    role,
+  });
+  fd.append('image', file);
+
+  const res = await fetch(`${API_BASE_URL}/h5p/h5p_drag_drop/media`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: fd,
+  });
+  const raw = await readApiJson(res, 'Failed to upload image');
+  if (!res.ok || !isApiSuccess(raw) || !raw.url) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to upload image'));
+  }
+  return String(raw.url);
+}
+
+/**
+ * Download this activity as a .h5p package.
+ *
+ * Fetched as a blob rather than navigated to, so the Authorization header goes
+ * with the request -- a plain `window.open` on a token-protected endpoint gets
+ * an HTML login page saved as a .h5p file, which looks like a corrupt export.
+ */
+export async function exportDragDropPackage(id: number | string, ctx: H5pContext): Promise<void> {
+  const session = requireSession();
+  const url = buildGetUrl(`/h5p/h5p_drag_drop/${id}/export`, {
+    ...contextParams(ctx),
+    sub_institute_id: session.sub_institute_id,
+  });
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+  if (!res.ok) {
+    const raw = await readApiJson(res, 'Failed to export package');
+    throw new Error(getApiErrorMessage(raw, 'Failed to export package'));
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = match?.[1] ?? `drag-and-drop-${id}.h5p`;
+
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+export interface DragDropImportResult extends MutationResult {
+  id: number;
+  warnings: string[];
+}
+
+/** Create a new draft from an uploaded .h5p package. */
+export async function importDragDropPackage(ctx: H5pContext, file: File): Promise<DragDropImportResult> {
+  const session = requireSession();
+  const fd = buildFormData({
+    ...contextParams(ctx),
+    sub_institute_id: session.sub_institute_id,
+    user_id: session.user_id,
+    syear: session.syear,
+  });
+  fd.append('package', file);
+
+  const res = await fetch(`${API_BASE_URL}/h5p/h5p_drag_drop/import`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: fd,
+  });
+  const raw = await readApiJson(res, 'Failed to import package');
+  if (!res.ok || !isApiSuccess(raw)) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to import package'));
+  }
+  return {
+    status: true,
+    message: (raw.message as string) || 'Package imported as a draft.',
+    id: Number(raw.id ?? 0),
+    warnings: ((raw.warnings as string[]) ?? []).map(String),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Drag and drop scoring
+// ---------------------------------------------------------------------------
+
+/**
+ * Scoring lives in lib/h5p/drag-drop-scoring.ts so it can be unit-tested
+ * without a browser or a fetch stub -- this module cannot be imported outside
+ * Next.js. Re-exported here so callers still have one import for the type.
+ *
+ * The row types above are structurally compatible with the ScorableTask the
+ * scorer takes, so nothing converts between them.
+ */
+export {
+  dragDropSolution,
+  scoreDragDropAttempt,
+  type DragDropAttemptResult,
+  type DragDropPlacements,
+} from '@/lib/h5p/drag-drop-scoring';

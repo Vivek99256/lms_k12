@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
   LoaderCircle,
   Paperclip,
-  Search,
   Send,
   Users,
   X,
@@ -44,6 +43,10 @@ import {
   type StudentRow,
 } from "@/app/lms/homework/api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
+import {
+  StudentScopeToggle,
+  type StudentScope,
+} from "@/app/lms/_shared/StudentScopeToggle";
 
 /**
  * Where a homework's content comes from. "chapter" and "attachment" are the two
@@ -133,6 +136,13 @@ export default function StudentHomeworkPage() {
   });
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  /**
+   * Student-wise is the default, and everything under it is this screen's
+   * original flow, untouched. All-students only ever removes the picker: the
+   * class is still searched, so the teacher can see how many the homework will
+   * reach, but the roster that is actually written comes from the backend.
+   */
+  const [scope, setScope] = useState<StudentScope>("student_wise");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [submissionDate, setSubmissionDate] = useState("");
@@ -180,6 +190,7 @@ export default function StudentHomeworkPage() {
   const section = readValue(filters.section ?? "");
 
   const allChecked = students.length > 0 && selected.size === students.length;
+  const assignToAll = scope === "all_students";
 
   const fromChapters = source === "chapter";
   const fromAttachment = source === "attachment";
@@ -389,30 +400,92 @@ export default function StudentHomeworkPage() {
     [questionTypes]
   );
 
-  const loadStudents = useCallback(async () => {
+  // Switching modes drops whatever was ticked, so a stale selection can never
+  // leak back into a later assign.
+  function changeScope(next: StudentScope) {
+    setScope(next);
+    setSelected(new Set());
     setError("");
     setSuccess("");
-    setLoading(true);
-    setSearched(true);
-    setSelected(new Set());
-    try {
-      const rows = await listStudents({
-        grade: section,
-        standard,
-        division,
-      });
-      setStudents(rows);
-    } catch (loadError: unknown) {
+  }
+
+  /**
+   * Load the class the filters now describe.
+   *
+   * Called from the dropdown's own onChange rather than from an effect,
+   * because this is a reaction to the teacher picking something, not state
+   * that needs synchronising — and the handler is handed the complete next
+   * values, so there is no render to wait for.
+   *
+   * Two guards, both about not calling the endpoint twice for one class:
+   * `lastSearchKey` skips a change that leaves the class the same (re-picking
+   * the subject already selected), and `requestId` means a slow answer that
+   * arrives after a newer search is dropped instead of overwriting it.
+   */
+  const lastSearchKeyRef = useRef("");
+  const searchRequestRef = useRef(0);
+
+  const runStudentSearch = useCallback(
+    async (values: Partial<SearchDropdownValues>) => {
+      const nextSection = readValue(values.section ?? "");
+      const nextStandard = readValue(values.standard ?? "");
+      const nextDivision = readValue(values.division ?? "");
+      const nextSubject = readValue(values.subject ?? "");
+
+      // Standard and subject are what make a class searchable, and subject is
+      // the last of the four the teacher picks — so this is the moment the
+      // filters describe something to look up. Division is optional in the
+      // dropdown, but a change to it still re-runs the search through the key
+      // below.
+      if (!nextStandard || !nextSubject) {
+        lastSearchKeyRef.current = "";
+        // Abandon anything in flight: its answer is for a class the teacher
+        // has since moved away from.
+        searchRequestRef.current += 1;
+        setStudents([]);
+        setSelected(new Set());
+        setLoading(false);
+        return;
+      }
+
+      const key = [nextSection, nextStandard, nextDivision, nextSubject].join("|");
+      if (key === lastSearchKeyRef.current) return;
+      lastSearchKeyRef.current = key;
+
+      const requestId = searchRequestRef.current + 1;
+      searchRequestRef.current = requestId;
+
+      setError("");
+      setSuccess("");
+      setLoading(true);
+      setSearched(true);
       setStudents([]);
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Students could not be loaded."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [division, section, standard]);
+      setSelected(new Set());
+      try {
+        const rows = await listStudents({
+          grade: nextSection,
+          standard: nextStandard,
+          division: nextDivision,
+        });
+        if (searchRequestRef.current !== requestId) return;
+        setStudents(rows);
+      } catch (loadError: unknown) {
+        if (searchRequestRef.current !== requestId) return;
+        // Forget the key so the same selection can be retried by re-picking
+        // it, rather than being stuck on a failed load.
+        lastSearchKeyRef.current = "";
+        setStudents([]);
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Students could not be loaded."
+        );
+      } finally {
+        if (searchRequestRef.current === requestId) setLoading(false);
+      }
+    },
+    []
+  );
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -469,7 +542,10 @@ export default function StudentHomeworkPage() {
         return "The selected homework paper has no questions.";
       }
     }
-    if (selected.size === 0) return "Select at least one student.";
+    if (!assignToAll && selected.size === 0) return "Select at least one student.";
+    if (assignToAll && students.length === 0) {
+      return "No students found for the selected class.";
+    }
     return "";
   }, [
     standard,
@@ -483,6 +559,8 @@ export default function StudentHomeworkPage() {
     examPaperQuestions.length,
     examPaperQuestionsLoading,
     selected.size,
+    assignToAll,
+    students.length,
   ]);
 
   // Mirrors the Laravel assign form's generateTitleDescriptionPrompt(): every
@@ -523,7 +601,11 @@ export default function StudentHomeworkPage() {
     setSaving(true);
     try {
       const count = await assignHomework({
-        studentIds: Array.from(selected),
+        // All-students sends no ids at all — the backend resolves the class
+        // from the section, standard and division below.
+        studentIds: assignToAll ? [] : Array.from(selected),
+        assignMode: assignToAll ? "all" : "selected",
+        grade: section,
         title: title.trim(),
         description: description.trim(),
         submissionDate,
@@ -600,10 +682,20 @@ export default function StudentHomeworkPage() {
       ) : null}
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-5 border-b border-slate-100 pb-4">
+          <StudentScopeToggle
+            value={scope}
+            onChange={changeScope}
+            name="hw-scope"
+          />
+        </div>
         <SearchDropdown
           fields={academicFields}
           values={filters}
-          onChange={(values) => setFilters(values)}
+          onChange={(values) => {
+            setFilters(values);
+            void runStudentSearch(values);
+          }}
           onStandardChange={(_value, rows) =>
             setStandardName(rows[0]?.name ?? "")
           }
@@ -612,24 +704,16 @@ export default function StudentHomeworkPage() {
           }
           className="gap-x-5 gap-y-4"
         />
-        <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-slate-500">
-            Choose a section, standard, division and subject, then search.
-          </p>
-          <Button
-            type="button"
-            onClick={loadStudents}
-            disabled={loading}
-            className="w-full sm:w-auto"
-          >
-            {loading ? (
+        <p className="mt-5 flex items-center gap-2 border-t border-slate-100 pt-4 text-sm text-slate-500">
+          {loading ? (
+            <>
               <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <Search className="size-4" />
-            )}
-            Search students
-          </Button>
-        </div>
+              Loading students…
+            </>
+          ) : (
+            "Students load automatically once a standard and subject are selected."
+          )}
+        </p>
       </section>
 
       {searched ? (
@@ -1093,6 +1177,23 @@ export default function StudentHomeworkPage() {
             </div>
           </div>
 
+          {assignToAll ? (
+            <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <Users className="mt-0.5 size-5 shrink-0 text-slate-400" />
+              <div>
+                <p className="text-sm font-medium text-slate-700">
+                  {loading
+                    ? "Counting students in this class…"
+                    : `All ${students.length} student(s) in the selected class`}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  The homework goes to every student enrolled in the selected
+                  section, standard and division. No individual selection is
+                  needed.
+                </p>
+              </div>
+            </div>
+          ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <Table>
               <TableHeader className="bg-slate-50">
@@ -1157,10 +1258,13 @@ export default function StudentHomeworkPage() {
               </TableBody>
             </Table>
           </div>
+          )}
 
           <div className="flex items-center justify-between">
             <span className="text-sm text-slate-500">
-              {selected.size} student(s) selected
+              {assignToAll
+                ? `${students.length} student(s) in this class`
+                : `${selected.size} student(s) selected`}
             </span>
             <Button type="submit" disabled={saving || students.length === 0}>
               {saving ? (

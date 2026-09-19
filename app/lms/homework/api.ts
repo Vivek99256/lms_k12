@@ -661,6 +661,15 @@ export async function assignHomework(input: {
   questionIds?: number[];
   /** Optional: the `question_paper` row, required when `sourceType === "exam_paper"`. */
   examPaperId?: number;
+  /**
+   * Who the homework is for. "selected" (the default) sends `studentIds` and is
+   * the screen's original behaviour. "all" tells the backend to resolve the
+   * whole class from `grade`/`standardId`/`divisionId` itself, so no student
+   * ids are sent and none are trusted.
+   */
+  assignMode?: "selected" | "all";
+  /** The section (academic grade) id, sent so "all" can scope the class. */
+  grade?: string;
 }): Promise<number> {
   const payload = await postMultipart("lms-homework/store", (form) => {
     form.append("students", input.studentIds.join(","));
@@ -676,6 +685,10 @@ export async function assignHomework(input: {
     if (input.examPaperId) form.append("exam_paper_id", String(input.examPaperId));
     if (input.questionIds) {
       input.questionIds.forEach((id) => form.append("question_ids[]", String(id)));
+    }
+    if (input.assignMode === "all") {
+      form.append("assign_mode", "all");
+      if (input.grade) form.append("grade", input.grade);
     }
   });
   return records(payload.homework_ids).length || input.studentIds.length;

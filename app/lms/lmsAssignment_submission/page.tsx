@@ -216,7 +216,21 @@ export default function AssignmentSubmissionPage() {
                   <TableRow key={row.id}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{row.subjectName || "-"}</TableCell>
-                    <TableCell>{row.title || "-"}</TableCell>
+                    <TableCell>
+                      {row.title || "-"}
+                      {/*
+                       * A worksheet or project is submitted exactly like an
+                       * assignment, so it sits in this same list — the badge is
+                       * only so the student can tell which is which. Plain
+                       * assignments, which is every row written before work
+                       * types existed, render as they always have.
+                       */}
+                      {row.workType && row.workType !== "assignment" ? (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize text-slate-600">
+                          {row.workType}
+                        </span>
+                      ) : null}
+                    </TableCell>
                     <TableCell>{row.assignedOn || "-"}</TableCell>
                     <TableCell>{row.submissionDate || "-"}</TableCell>
                     <TableCell>
