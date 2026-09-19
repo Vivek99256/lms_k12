@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import {
@@ -32,16 +31,63 @@ import {
 } from "@/components/search-dropdown";
 import {
   assignHomework,
+  listExamPaperQuestions,
   listHomeworkChapters,
+  listHomeworkExamPapers,
   listHomeworkQuestionTypes,
   listHomeworkQuestions,
   listStudents,
   type HomeworkChapter,
+  type HomeworkExamPaper,
   type HomeworkQuestion,
   type HomeworkQuestionType,
   type StudentRow,
 } from "@/app/lms/homework/api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
+
+/**
+ * Where a homework's content comes from. "chapter" and "attachment" are the two
+ * the screen has always had (the old "Send homework from system" switch was
+ * chapter-on / attachment-off); "exam_paper" assigns an existing homework
+ * question paper, questions and all.
+ */
+type HomeworkSource = "chapter" | "attachment" | "exam_paper";
+
+const SOURCE_OPTIONS: Array<{ value: HomeworkSource; label: string; hint: string }> = [
+  {
+    value: "chapter",
+    label: "Chapter",
+    hint: "Pick questions from the question bank, chapter by chapter.",
+  },
+  {
+    value: "attachment",
+    label: "Attachment",
+    hint: "Attach a PDF, Word document or image for students to work from.",
+  },
+  {
+    value: "exam_paper",
+    label: "Exam paper",
+    hint: "Assign an existing homework paper — its questions come with it.",
+  },
+];
+
+/**
+ * "Science homework 1 (20 marks) — Grade 5 · Science": the paper and what it is
+ * worth first, then the class it was written for, which is what tells two
+ * similarly named papers apart.
+ */
+function examPaperLabel(paper: HomeworkExamPaper): string {
+  const name = paper.title || `Paper ${paper.id}`;
+  const marks = paper.totalMarks ? ` (${paper.totalMarks} marks)` : "";
+  // "Grade 5 · Science", the way the question-paper grid labels a paper's class.
+  const context = [
+    paper.standardName ? `Grade ${paper.standardName}` : "",
+    paper.subjectName,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return context ? `${name}${marks} — ${context}` : `${name}${marks}`;
+}
 
 const academicFields: DropdownField[] = [
   "section",
@@ -95,9 +141,9 @@ export default function StudentHomeworkPage() {
   const [standardName, setStandardName] = useState("");
   const [subjectName, setSubjectName] = useState("");
 
-  // Question-bank ("Send homework from system") workflow — additive to the
-  // attachment flow above; only consulted when sendFromSystem is true.
-  const [sendFromSystem, setSendFromSystem] = useState(false);
+  // Question-bank workflow — additive to the attachment flow above; only
+  // consulted while the chapter source is selected.
+  const [source, setSource] = useState<HomeworkSource>("attachment");
   const [chapters, setChapters] = useState<HomeworkChapter[]>([]);
   const [chaptersLoading, setChaptersLoading] = useState(false);
   const [chaptersError, setChaptersError] = useState("");
@@ -110,6 +156,17 @@ export default function StudentHomeworkPage() {
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState("");
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>([]);
+
+  // Exam-paper workflow — the paper list and, once one is chosen, the questions
+  // it already maps. Those questions are shown read-only: the paper decides
+  // them, and assigning stores their ids rather than copying them.
+  const [examPapers, setExamPapers] = useState<HomeworkExamPaper[]>([]);
+  const [examPapersLoading, setExamPapersLoading] = useState(false);
+  const [examPapersError, setExamPapersError] = useState("");
+  const [selectedExamPaperId, setSelectedExamPaperId] = useState("");
+  const [examPaperQuestions, setExamPaperQuestions] = useState<HomeworkQuestion[]>([]);
+  const [examPaperQuestionsLoading, setExamPaperQuestionsLoading] = useState(false);
+  const [examPaperQuestionsError, setExamPaperQuestionsError] = useState("");
 
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -124,10 +181,14 @@ export default function StudentHomeworkPage() {
 
   const allChecked = students.length > 0 && selected.size === students.length;
 
+  const fromChapters = source === "chapter";
+  const fromAttachment = source === "attachment";
+  const fromExamPaper = source === "exam_paper";
+
   // Question-bank workflow: load chapters whenever the picker is on and the
   // standard changes. Independent of the attachment flow above.
   useEffect(() => {
-    if (!sendFromSystem || !standard) {
+    if (!fromChapters || !standard) {
       setChapters([]);
       setSelectedChapterIds([]);
       return;
@@ -156,12 +217,12 @@ export default function StudentHomeworkPage() {
     return () => {
       cancelled = true;
     };
-  }, [sendFromSystem, standard, subject]);
+  }, [fromChapters, standard, subject]);
 
   // Question types load once per entry into the picker (don't depend on
   // chapter/subject selection).
   useEffect(() => {
-    if (!sendFromSystem) return;
+    if (!fromChapters) return;
     let cancelled = false;
     setQuestionTypesLoading(true);
     setQuestionTypesError("");
@@ -185,12 +246,12 @@ export default function StudentHomeworkPage() {
     return () => {
       cancelled = true;
     };
-  }, [sendFromSystem]);
+  }, [fromChapters]);
 
   // Questions re-fetch whenever the subject/standard/chapter/type selection
   // changes, once at least one chapter is selected.
   useEffect(() => {
-    if (!sendFromSystem || selectedChapterIds.length === 0 || !subject || !standard) {
+    if (!fromChapters || selectedChapterIds.length === 0 || !subject || !standard) {
       setQuestions([]);
       return;
     }
@@ -222,7 +283,79 @@ export default function StudentHomeworkPage() {
     return () => {
       cancelled = true;
     };
-  }, [sendFromSystem, subject, standard, selectedChapterIds, selectedQuestionTypeIds]);
+  }, [fromChapters, subject, standard, selectedChapterIds, selectedQuestionTypeIds]);
+
+  // Exam papers load once the exam-paper source is picked. The listing is pinned
+  // to exam_type = 'homework' in the api layer, so a term, formative, summative,
+  // offline or online paper can never appear here.
+  useEffect(() => {
+    if (!fromExamPaper) return;
+    let cancelled = false;
+    // Deferred a tick, the way the Exam module kicks its own paper load off:
+    // the first state change then lands outside the effect body rather than
+    // cascading a render out of it.
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setExamPapersLoading(true);
+      setExamPapersError("");
+      listHomeworkExamPapers()
+        .then((rows) => {
+          if (!cancelled) setExamPapers(rows);
+        })
+        .catch((loadError: unknown) => {
+          if (!cancelled) {
+            setExamPapers([]);
+            setExamPapersError(
+              loadError instanceof Error
+                ? loadError.message
+                : "Exam papers could not be loaded."
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setExamPapersLoading(false);
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fromExamPaper]);
+
+  // The chosen paper's questions, read through the Exam module's existing paper
+  // mapping. Nothing is duplicated — the ids are what the homework stores.
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (!fromExamPaper || !selectedExamPaperId) {
+        setExamPaperQuestions([]);
+        setExamPaperQuestionsError("");
+        return;
+      }
+      setExamPaperQuestionsLoading(true);
+      setExamPaperQuestionsError("");
+      listExamPaperQuestions(Number(selectedExamPaperId))
+        .then((rows) => {
+          if (!cancelled) setExamPaperQuestions(rows);
+        })
+        .catch((loadError: unknown) => {
+          if (!cancelled) {
+            setExamPaperQuestions([]);
+            setExamPaperQuestionsError(
+              loadError instanceof Error
+                ? loadError.message
+                : "The exam paper's questions could not be loaded."
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setExamPaperQuestionsLoading(false);
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fromExamPaper, selectedExamPaperId]);
 
   function handleChapterSelect(event: React.ChangeEvent<HTMLSelectElement>) {
     const ids = Array.from(event.target.selectedOptions, (option) => Number(option.value));
@@ -324,8 +457,17 @@ export default function StudentHomeworkPage() {
     if (!subject) return "Select a subject.";
     if (!title.trim()) return "Enter a homework title.";
     if (!submissionDate) return "Select a submission date.";
-    if (sendFromSystem && selectedQuestionIds.length === 0) {
+    if (fromChapters && selectedQuestionIds.length === 0) {
       return "Select at least one question.";
+    }
+    if (fromExamPaper) {
+      if (!selectedExamPaperId) return "Select an exam paper.";
+      if (examPaperQuestionsLoading) {
+        return "Wait for the exam paper's questions to load.";
+      }
+      if (examPaperQuestions.length === 0) {
+        return "The selected exam paper has no questions.";
+      }
     }
     if (selected.size === 0) return "Select at least one student.";
     return "";
@@ -334,8 +476,12 @@ export default function StudentHomeworkPage() {
     subject,
     title,
     submissionDate,
-    sendFromSystem,
+    fromChapters,
+    fromExamPaper,
     selectedQuestionIds.length,
+    selectedExamPaperId,
+    examPaperQuestions.length,
+    examPaperQuestionsLoading,
     selected.size,
   ]);
 
@@ -385,9 +531,19 @@ export default function StudentHomeworkPage() {
         divisionId: division,
         subjectId: subject,
         prompt,
-        image: sendFromSystem ? null : image,
-        ...(sendFromSystem
+        image: fromAttachment ? image : null,
+        ...(fromChapters
           ? { sourceType: "question_bank" as const, questionIds: selectedQuestionIds }
+          : {}),
+        // Exam-paper homework carries the paper it came from plus the question
+        // ids that paper already maps, so the backend reuses the mapping rather
+        // than copying questions onto the homework.
+        ...(fromExamPaper
+          ? {
+              sourceType: "exam_paper" as const,
+              examPaperId: Number(selectedExamPaperId),
+              questionIds: examPaperQuestions.map((question) => question.id),
+            }
           : {}),
       });
       setSuccess(`Homework assigned to ${count} student(s) successfully.`);
@@ -397,10 +553,13 @@ export default function StudentHomeworkPage() {
       setImage(null);
       setAttachmentError("");
       setSelected(new Set());
-      setSendFromSystem(false);
+      setSource("attachment");
       setSelectedChapterIds([]);
       setSelectedQuestionTypeIds([]);
       setSelectedQuestionIds([]);
+      setSelectedExamPaperId("");
+      setExamPaperQuestions([]);
+      setExamPaperQuestionsError("");
     } catch (saveError: unknown) {
       setError(
         saveError instanceof Error
@@ -503,21 +662,47 @@ export default function StudentHomeworkPage() {
               />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="hw-source-toggle">Send homework from system</Label>
-                <Switch
-                  id="hw-source-toggle"
-                  checked={sendFromSystem}
-                  onChange={(event) => setSendFromSystem(event.target.checked)}
-                />
+              <p
+                id="hw-source-label"
+                className="text-sm font-medium text-slate-700"
+              >
+                Send homework from system
+              </p>
+              {/* Native radios: arrow-key navigation and focus come for free. */}
+              <div
+                role="radiogroup"
+                aria-labelledby="hw-source-label"
+                className="flex flex-wrap gap-2"
+              >
+                {SOURCE_OPTIONS.map((option) => {
+                  const isSelected = source === option.value;
+                  return (
+                    <label
+                      key={option.value}
+                      className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm font-medium transition focus-within:ring-2 focus-within:ring-blue-100 ${
+                        isSelected
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="hw-source"
+                        value={option.value}
+                        checked={isSelected}
+                        onChange={() => setSource(option.value)}
+                        className="sr-only"
+                      />
+                      {option.label}
+                    </label>
+                  );
+                })}
               </div>
-              {!sendFromSystem ? (
-                <p className="text-xs text-slate-400">
-                  Off: attach a file. On: pick questions from the question bank below.
-                </p>
-              ) : null}
+              <p className="text-xs text-slate-400">
+                {SOURCE_OPTIONS.find((option) => option.value === source)?.hint}
+              </p>
             </div>
-            {!sendFromSystem ? (
+            {fromAttachment ? (
             <div className="space-y-2">
               <Label htmlFor="hw-image">Attachment</Label>
               {image ? (
@@ -580,7 +765,7 @@ export default function StudentHomeworkPage() {
               )}
             </div>
             ) : null}
-            {sendFromSystem ? (
+            {fromChapters ? (
             <div className="space-y-5 md:col-span-2 xl:col-span-3">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -755,6 +940,117 @@ export default function StudentHomeworkPage() {
                   </Table>
                 </div>
               </div>
+            </div>
+            ) : null}
+            {fromExamPaper ? (
+            <div className="space-y-5 md:col-span-2 xl:col-span-3">
+              <div className="space-y-2">
+                <Label htmlFor="hw-exam-paper">
+                  Exam paper <span className="text-red-500">*</span>
+                </Label>
+                {examPapersError ? (
+                  <p className="text-sm text-red-600">{examPapersError}</p>
+                ) : (
+                  <select
+                    id="hw-exam-paper"
+                    value={selectedExamPaperId}
+                    onChange={(event) => setSelectedExamPaperId(event.target.value)}
+                    disabled={examPapersLoading || examPapers.length === 0}
+                    className="h-11 w-full max-w-xl rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">
+                      {examPapersLoading
+                        ? "Loading exam papers…"
+                        : examPapers.length === 0
+                          ? "No homework exam papers available"
+                          : "Select an exam paper"}
+                    </option>
+                    {examPapers.map((paper) => (
+                      <option key={paper.id} value={paper.id}>
+                        {examPaperLabel(paper)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="text-xs text-slate-400">
+                  Only homework papers are listed. Its questions are assigned as
+                  they are — there is nothing to pick.
+                </p>
+              </div>
+
+              {selectedExamPaperId ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Questions from this paper
+                    </p>
+                    <span className="text-xs text-slate-500">
+                      {examPaperQuestions.length} question(s) ·{" "}
+                      {examPaperQuestions.reduce(
+                        (total, question) => total + question.points,
+                        0
+                      )}{" "}
+                      marks
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <Table>
+                      <TableHeader className="bg-slate-50">
+                        <TableRow>
+                          <TableHead className="w-12">#</TableHead>
+                          <TableHead>Question</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Points</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {examPaperQuestionsLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-24 text-center text-slate-500">
+                              <LoaderCircle className="mx-auto size-6 animate-spin text-slate-300" />
+                            </TableCell>
+                          </TableRow>
+                        ) : examPaperQuestionsError ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-24 text-center text-sm text-red-600">
+                              {examPaperQuestionsError}
+                            </TableCell>
+                          </TableRow>
+                        ) : examPaperQuestions.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-24 text-center text-sm text-slate-400">
+                              This exam paper has no questions yet.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          examPaperQuestions.map((question, index) => (
+                            <TableRow key={question.id}>
+                              <TableCell className="text-sm text-slate-500">
+                                {index + 1}
+                              </TableCell>
+                              <TableCell>
+                                <span
+                                  className="line-clamp-1 max-w-md text-sm text-slate-700"
+                                  title={question.title}
+                                >
+                                  {question.title || "Untitled question"}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                                  {question.questionTypeLabel ||
+                                    questionTypeLabel(question.questionTypeId)}
+                                </span>
+                              </TableCell>
+                              <TableCell>{question.points || "-"}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : null}
             </div>
             ) : null}
             <div className="space-y-2 md:col-span-2 xl:col-span-3">
