@@ -366,10 +366,31 @@ export function listAgents(context: IntelligenceContext, domain?: string) {
   return get<{ agents: Array<Record<string, unknown>> }>(context, "/agents", { domain });
 }
 
+/**
+ * Run one registered agent.
+ *
+ * The first three fields are the original contract and are unchanged. The rest are
+ * optional cohort filters the backend validates as nullable — an agent that does not read
+ * one ignores it, and a caller that sends none produces exactly the request it did
+ * before. They exist so a run launched from a module's AI Stack can carry the filters
+ * that are on screen; `days` in particular is what lets an attendance sweep read a window
+ * long enough to gather citable evidence.
+ *
+ * The institute and academic year are NOT here and must never be: the backend derives
+ * them from the bearer token, so a caller cannot widen its own scope.
+ */
 export function runAgent(
   context: IntelligenceContext,
   agentKey: string,
-  input: { subject_id?: number; student_ids?: number[]; limit?: number } = {}
+  input: {
+    subject_id?: number;
+    student_ids?: number[];
+    limit?: number;
+    days?: number;
+    standard_id?: number;
+    division_id?: number;
+    min_attendance_rate?: number;
+  } = {}
 ) {
   return post<AgentRunResult>(context, `/agents/${agentKey}/run`, input);
 }

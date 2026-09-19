@@ -106,7 +106,9 @@ async function readViaMcp(
   const session = context.session;
 
   if (!session?.token) {
-    throw new Error('This tool reads live fee records and needs your signed-in session. Sign in again and retry.');
+    // Names no module: this helper now backs Fees and Attendance reads, and a Fees
+    // sentence shown after an attendance run would send somebody to the wrong screen.
+    throw new Error('This tool reads live records and needs your signed-in session. Sign in again and retry.');
   }
 
   const payload = (await callMcpTool(
@@ -200,6 +202,103 @@ const EXECUTORS: Record<string, Executor> = {
         limit: count(args.limit),
       }),
     ).then((output) => ({ output })),
+
+  /**
+   * Who is attending least, from the marked register itself.
+   *
+   * Backed by `attendance.overview`, which reports `students_judged` and
+   * `students_with_insufficient_data` alongside the list — so a student nobody has
+   * marked is never presented as a student who does not attend. The agent passes
+   * that straight through rather than summarising it away.
+   */
+  'attendance.low_attendance': (args, context) =>
+    readViaMcp(
+      context,
+      'attendance.overview',
+      given({
+        standard_id: count(args.standard_id ?? args.class_id),
+        division_id: count(args.division_id ?? args.section_id),
+        student_id: count(args.student_id),
+        days: count(args.days),
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  /**
+   * One student's own record, day by day. Backed by `attendance.student`.
+   */
+  'attendance.student_record': (args, context) =>
+    readViaMcp(
+      context,
+      'attendance.student',
+      given({
+        student_id: count(args.student_id),
+        days: count(args.days),
+      }),
+    ).then((output) => ({ output })),
+
+  /**
+   * A note to a family about their child's attendance.
+   *
+   * Says only what it was given, and asks rather than asserts: the register records
+   * that a child was away and nothing about why, so a note that supplied a reason
+   * would be inventing the one piece of information the school most needs to hear
+   * from the family. It sends nothing.
+   */
+  'attendance.draft_parent_note': (args) => {
+    const student = text(args.student_name, 'your child');
+    const className = text(args.class_name);
+    const present = count(args.present_days);
+    const absent = count(args.absent_days);
+    const windowDays = count(args.window_days);
+    const firm = text(args.tone) === 'firm';
+
+    const marked = (present ?? 0) + (absent ?? 0);
+    // Stated only when both counts are present. A rate computed from one of them
+    // would be a figure nobody supplied.
+    const rate = marked > 0 && present !== undefined ? Math.round((present / marked) * 100) : null;
+
+    const opening = firm
+      ? `We are writing about ${student}'s${className ? ` (${className})` : ''} attendance, which the school is concerned about.`
+      : `We wanted to let you know about ${student}'s${className ? ` (${className})` : ''} attendance.`;
+
+    const figures = absent
+      ? `Our records show ${absent} day${absent === 1 ? '' : 's'} marked absent${
+          marked > 0 ? ` out of ${marked} marked day${marked === 1 ? '' : 's'}` : ''
+        }${windowDays ? ` over the last ${windowDays} days` : ''}${rate === null ? '' : `, an attendance rate of ${rate}%`}.`
+      : '';
+
+    const closing =
+      'If there is something going on that the school should know about, please do tell us — we would rather help than assume. If our records are wrong, let us know and we will correct them.';
+
+    const message = [
+      'Dear Parent,',
+      '',
+      opening,
+      figures,
+      '',
+      closing,
+      '',
+      'Regards,',
+      'School Office',
+    ]
+      .filter((line, index, all) => !(line === '' && all[index - 1] === ''))
+      .join('\n');
+
+    return {
+      output: {
+        subject: `Attendance${student !== 'your child' ? ` — ${student}` : ''}`,
+        message,
+        tone: firm ? 'firm' : 'gentle',
+        attendance_rate_percent: rate,
+        word_count: wordCount(message),
+        // No reason for the absence is stated, because none was supplied and the
+        // register does not hold one.
+        states_reason_for_absence: false,
+        sends: false,
+      },
+    };
+  },
 
   'g2g.draft_growth_note': (args) => {
     const learner = text(args.learner_name, 'the learner');
