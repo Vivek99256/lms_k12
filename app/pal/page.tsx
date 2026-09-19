@@ -8,6 +8,7 @@ import {
   Brain,
   ChevronDown,
   ChevronRight,
+  ClipboardCheck,
   ExternalLink,
   GraduationCap,
   Info,
@@ -16,6 +17,7 @@ import {
   Lock,
   Play,
   RefreshCw,
+  Route,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -43,9 +45,9 @@ import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import { getViewAsStudent, setViewAsStudent } from '@/app/pal/data/pal-view-as';
 import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
-import { DiagnosticButton } from '@/app/pal/_components/DiagnosticPanel';
 import { AdaptiveLearningButton } from '@/app/pal/_components/AdaptiveLearningButton';
 import { PracticePanel } from '@/app/pal/_components/PracticePanel';
+import { JourneyRail } from '@/app/pal/_components/JourneyRail';
 import { fetchChapterGate, type ChapterGateData } from '@/app/pal/data/pal';
 
 type ModalKind = 'pedagogy' | 'misconception';
@@ -543,50 +545,81 @@ function ChapterRow({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          {/* Diagnostic is the onboarding step of the learning journey — it
-              establishes a baseline before instruction, so it's offered
-              whether or not the student has quiz attempts yet. */}
-          <DiagnosticButton studentId={studentId} context={context} />
-          {/* Adaptive Learning is a learner-facing feature: a student may only
-              ever start their own session, never a teacher/staff/admin acting
-              as (or "viewing as") a student — enforced independently on the
-              backend by the eso.student route middleware regardless of what
-              renders here, but the entry point itself must not offer a
-              staff-facing way to start it either. */}
-          {!isStaff && <AdaptiveLearningButton chapterId={context.chapterId} />}
-          {hasAttempts && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onOpenModal('pedagogy')}
-                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                Suggested content
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onOpenModal('misconception')}
-                className="border-rose-200 text-rose-700 hover:bg-rose-50"
-              >
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Misconception
-              </Button>
-              <PracticePanel studentId={studentId} context={context} />
-            </>
+        <div className="flex flex-col items-stretch gap-2 lg:items-end">
+          {/* The journey, as wayfinding. Rendered for students only: the stages
+              describe one learner's path, and a staff member browsing is not on
+              it. No per-chapter request is made to draw this — the plan page
+              below resolves the learner's actual stage server-side. */}
+          {!isStaff && (
+            <JourneyRail current="diagnostic" compact className="lg:justify-end" />
           )}
-          <Button
-            size="sm"
-            onClick={onStartQuiz}
-            disabled={locked}
-            title={locked ? 'Master the prerequisite concept(s) above first' : undefined}
-          >
-            {locked ? <Lock className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {locked ? 'Locked' : hasAttempts ? 'Next quiz' : 'Start quiz'}
-          </Button>
+
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            {/* The primary route in. The plan page is the stage router: it reads
+                the learner's stored evidence and opens on whatever they should
+                do next — take the diagnostic, practise a weak concept, or go to
+                Learn and Check. That keeps the decision server-side instead of
+                asking every chapter row to work it out for itself. */}
+            {!isStaff && (
+              <Button size="sm" onClick={() => router.push(`/pal/plan/chapter/${context.chapterId}`)}>
+                <Route className="h-3.5 w-3.5" />
+                Learning journey
+              </Button>
+            )}
+
+            {/* Straight to the 15-question chapter paper, for a learner who
+                knows that is what they want. */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => router.push(`/pal/diagnostic/chapter/${context.chapterId}`)}
+              className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              Take diagnostic
+            </Button>
+
+            {/* Adaptive Learning is a learner-facing feature: a student may only
+                ever start their own session, never a teacher/staff/admin acting
+                as (or "viewing as") a student — enforced independently on the
+                backend by the eso.student route middleware regardless of what
+                renders here, but the entry point itself must not offer a
+                staff-facing way to start it either. */}
+            {!isStaff && <AdaptiveLearningButton chapterId={context.chapterId} />}
+            {hasAttempts && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onOpenModal('pedagogy')}
+                  className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Suggested content
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onOpenModal('misconception')}
+                  className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Misconception
+                </Button>
+                <PracticePanel studentId={studentId} context={context} />
+              </>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onStartQuiz}
+              disabled={locked}
+              title={locked ? 'Master the prerequisite concept(s) above first' : undefined}
+            >
+              {locked ? <Lock className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              {locked ? 'Locked' : hasAttempts ? 'Next quiz' : 'Start quiz'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
