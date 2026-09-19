@@ -47,7 +47,6 @@ import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 import { AdaptiveLearningButton } from '@/app/pal/_components/AdaptiveLearningButton';
 import { PracticePanel } from '@/app/pal/_components/PracticePanel';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
 import { fetchChapterGate, type ChapterGateData } from '@/app/pal/data/pal';
 
 type ModalKind = 'pedagogy' | 'misconception';
@@ -546,13 +545,22 @@ function ChapterRow({
         </div>
 
         <div className="flex flex-col items-stretch gap-2 lg:items-end">
-          {/* The journey, as wayfinding. Rendered for students only: the stages
-              describe one learner's path, and a staff member browsing is not on
-              it. No per-chapter request is made to draw this — the plan page
-              below resolves the learner's actual stage server-side. */}
-          {!isStaff && (
-            <JourneyRail current="diagnostic" compact className="lg:justify-end" />
-          )}
+          {/* The stage rail is deliberately NOT drawn here.
+              ---------------------------------------------------------------
+              It was meant as wayfinding, but on this screen it was also wrong:
+              every chapter row rendered the same rail pinned to
+              current="diagnostic" regardless of where that learner actually is,
+              because drawing a truthful one would need a per-chapter request.
+              Sixteen identical rails is noise, and a rail telling someone
+              halfway through Mastery that they are on Diagnostic is worse than
+              no rail at all.
+
+              It still renders on every screen that knows the real stage: plan,
+              diagnostic, adaptive, learn, mastery and recall each pass their
+              own `current`. Removed from THIS page only.
+
+              `isStaff` is still used elsewhere on this page, so nothing else
+              changes with it. */}
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             {/* The primary route in. The plan page is the stage router: it reads
