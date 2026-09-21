@@ -221,18 +221,30 @@ export async function listExamPapers(
 /**
  * Where a question paper's PDF is served from.
  *
- * The same path the assign flow writes into `lms_assignment.exam_pdf`
- * ("QuestionPaper/<file>") and the same one the backend hands the student as
- * `exam_pdf_url`, so a teacher previewing a paper and a student opening it are
- * looking at one file. Returns "" for a paper with no PDF name, which is what
- * tells a caller there is nothing to open.
+ * `GET /api/question-paper/{id}/pdf` streams the same stored file the assign
+ * flow records in `lms_assignment.exam_pdf` and the backend later hands the
+ * student as `exam_pdf_url`, so a teacher previewing a paper and a student
+ * opening it are looking at one file.
+ *
+ * WHY NOT `/storage/QuestionPaper/<file>`. That is where the bytes live, but
+ * `lms-assignment/exam-papers` derives the file name from the paper row's own
+ * columns whether or not a file was ever saved. A paper with no stored PDF
+ * therefore answered the raw path with Laravel's styled HTML 404 page, which a
+ * browser's PDF viewer renders as a corrupt document rather than an absent one
+ * — the error a teacher saw on the Worksheet and Project screens. The endpoint
+ * answers a missing file with a plain JSON 404 and sends the real ones with
+ * `Content-Type: application/pdf` + `inline`, so they open in the viewer
+ * instead of downloading.
+ *
+ * Returns "" for a paper with no id, which is what tells a caller there is
+ * nothing to open.
  */
-export function examPaperPdfUrl(pdfName: string): string {
-  const name = (pdfName || "").trim();
-  if (!name) return "";
+export function examPaperPdfUrl(paperId: string | number): string {
+  const id = String(paperId ?? "").trim();
+  if (!id) return "";
   const { baseUrl } = buildSessionContext();
 
-  return `${baseUrl.replace(/\/$/, "")}/storage/QuestionPaper/${name}`;
+  return `${baseUrl.replace(/\/$/, "")}/api/question-paper/${encodeURIComponent(id)}/pdf`;
 }
 
 export async function createAssignment(input: {

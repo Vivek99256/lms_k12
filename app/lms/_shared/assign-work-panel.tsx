@@ -239,13 +239,13 @@ export function AssignWorkPanel({ workType }: { workType: WorkType }) {
   const examType = copy.examType;
 
   /**
-   * The selected paper's PDF, straight from storage. The dropdown packs
-   * "<pdfName>####<id>" into its value, and the pdfName half is the file the
-   * assign flow will record on every student's row — so this previews exactly
-   * what they will receive.
+   * The selected paper's PDF. The dropdown packs "<pdfName>####<id>" into its
+   * value, and the id half is what serves the file — the same paper the assign
+   * flow will record on every student's row, so this previews exactly what they
+   * will receive.
    */
   const selectedPaperPdfUrl = useMemo(
-    () => (copy.showPdfPreview ? examPaperPdfUrl(examPaper.split("####")[0] ?? "") : ""),
+    () => (copy.showPdfPreview ? examPaperPdfUrl(examPaper.split("####")[1] ?? "") : ""),
     [copy.showPdfPreview, examPaper]
   );
 
