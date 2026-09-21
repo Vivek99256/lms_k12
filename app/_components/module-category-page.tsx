@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, Loader2, type LucideIcon } from 'lucide-react';
+import { AlertCircle, CalendarClock, GitBranch, Loader2, ScrollText, type LucideIcon } from 'lucide-react';
 
 import Link from 'next/link';
 
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
+import { ModuleAuditTrail } from '@/app/_components/module-audit-trail';
 import { ModuleJourney } from '@/app/general/onboarding/_components/ModuleJourney';
+import { SchedulerConsole } from '@/app/platform-services/scheduler/_components/SchedulerConsole';
+import { WorkflowConsole } from '@/app/platform-services/workflow/_components/WorkflowConsole';
 import { PageFrame, PageHeader } from '@/app/fees/_components/fees-shared';
 import { getFeesSession, type FeesSession } from '@/app/fees/_lib/fees-api';
 import {
@@ -83,6 +86,88 @@ const ONBOARDING_CATEGORY_KEY = 'onboarding';
 /** Where Onboarding sends a bar that owns no single journey. */
 const ONBOARDING_INDEX_ROUTE = '/general/onboarding';
 
+/**
+ * The categories that are a console rather than a group of menus.
+ *
+ * Approvals and scheduled tasks are both configured centrally — one registry of
+ * modules and components, one set of endpoints — and these categories are the
+ * way into that from inside a module. Fees did each of them by hand, with the
+ * module key written into a Fees-only file; every module's bar now carries both
+ * categories, and which module the console pins to is the row's
+ * `platform_module_key`, one mapping shared by the two.
+ *
+ * They are supplied as a tab rather than replacing the page, the way Onboarding
+ * does, because these categories can also hold real menus from the tree — the
+ * console is the first tab and those follow it.
+ *
+ * `schedular` is the category key as the menu data spells it. The Fees route is
+ * /fees/scheduler, which findCategory resolves by route; every other module's
+ * URL segment is the key itself.
+ */
+/**
+ * The third console-like category: the module's own slice of the access log.
+ *
+ * Unlike Workflow and Schedular it has no central screen to pin — it is the
+ * User Log report narrowed to this module — so what the row carries is the set
+ * of log prefixes the module's screens write rather than a registry key.
+ */
+const AUDIT_CATEGORY_KEY = 'audit-trail';
+
+/** Where a bar whose screens never reach the access log is sent instead. */
+const USER_LOG_ROUTE = '/user_log';
+
+const PLATFORM_CONSOLES: Record<
+  string,
+  {
+    /** The tab, named for what it lists rather than for the service. */
+    id: string;
+    label: string;
+    icon: LucideIcon;
+    title: string;
+    description: string;
+    /** The central screen, for a bar with no module in the registry. */
+    route: string;
+    routeLabel: string;
+    /** What that bar is told, in its own terms. */
+    emptyTitle: string;
+    emptyBody: string;
+    render: (moduleKey: string, title: string, description: string) => ReactNode;
+  }
+> = {
+  workflow: {
+    id: 'workflow-approvals',
+    label: 'Approvals',
+    icon: GitBranch,
+    title: 'Approval workflows',
+    description:
+      'Every action in this module that can pause for a sign-off, and the approval chain each one runs through at this institute.',
+    route: '/platform-services/workflow',
+    routeLabel: 'Open Platform services → Workflow',
+    emptyTitle: 'No approval points for this menu',
+    emptyBody:
+      'Nothing in this module declares an action that pauses for a sign-off, so there is no chain to configure here.',
+    render: (moduleKey, title, description) => (
+      <WorkflowConsole embedded module={moduleKey} title={title} description={description} />
+    ),
+  },
+  schedular: {
+    id: 'scheduler-tasks',
+    label: 'Scheduled tasks',
+    icon: CalendarClock,
+    title: 'Scheduled tasks',
+    description:
+      'Recurring activity in this module: when each task runs, whether it is switched on, and when it last did.',
+    route: '/platform-services/scheduler',
+    routeLabel: 'Open Platform services → Scheduler',
+    emptyTitle: 'No scheduled tasks for this menu',
+    emptyBody:
+      'Nothing in this module declares a task that runs on a schedule, so there is nothing to time here.',
+    render: (moduleKey, title, description) => (
+      <SchedulerConsole embedded module={moduleKey} title={title} description={description} />
+    ),
+  },
+};
+
 type MenuTab = Extract<Tab, { kind: 'menu' }>;
 
 /**
@@ -122,6 +207,25 @@ function normalizePath(route: string | null | undefined) {
 }
 
 /**
+ * A module's name for display, from its slug.
+ *
+ * The bar's real label lives on the level-2 menu, which the category feed does
+ * not carry — it answers "what are this module's categories", not "what is this
+ * module called". Deriving it is enough for the few places that name the module
+ * in a sentence, and it is predictable: 'front-desk' reads "Front Desk",
+ * 'teach_learn' reads "Teach Learn". A trailing id, which disambiguates two
+ * bars that share a name ('task-management-551'), is dropped rather than read
+ * aloud.
+ */
+function moduleLabel(moduleName: string): string {
+  return moduleName
+    .split(/[-_]/)
+    .filter((part) => part !== '' && !/^\d+$/.test(part))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+/**
  * The category this page is showing: the one whose key matches, or failing
  * that, the one whose configured route is this very route.
  *
@@ -158,6 +262,8 @@ export function ModuleCategoryPage({
   staticScreens = [],
   staticScreensPlacement = 'before',
   onboardingModuleKey = '',
+  platformModuleKey = '',
+  auditModuleKeys,
 }: {
   moduleName: string;
   categoryKey: string;
@@ -183,6 +289,19 @@ export function ModuleCategoryPage({
    * row and passes nothing here.
    */
   onboardingModuleKey?: string;
+  /**
+   * The platform-services module to pin the Workflow or Schedular console to
+   * when the category row carries no `platform_module_key`. Passed only by the
+   * two Fees routes that hardcoded 'fees' before the column existed; every
+   * other module reads it from the row.
+   */
+  platformModuleKey?: string;
+  /**
+   * The access-log prefixes to narrow the Audit Trail to when the category row
+   * carries none. Passed only by /fees/audit-trail, which hardcoded 'fees'
+   * before the column existed; every other module reads them from the row.
+   */
+  auditModuleKeys?: string[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -233,8 +352,100 @@ export function ModuleCategoryPage({
     return () => controller.abort();
   }, [session, moduleName, categoryKey, pathname]);
 
+  /**
+   * The console tab for a Workflow or Schedular category, built here so every
+   * module's copy of those categories shows the same screen without a file per
+   * module.
+   *
+   * With no module key the console is not shown pinned to something else and
+   * not shown unpinned either — an unpinned console inside a module bar lists
+   * every other module's points or tasks, which is noise, and the module rail
+   * that would narrow it is deliberately not drawn in embedded mode. The tab
+   * says what is true and offers the central screen.
+   */
+  const consoleScreens = useMemo<ModuleStaticScreen[]>(() => {
+    const spec = PLATFORM_CONSOLES[categoryKey] ?? PLATFORM_CONSOLES[category?.key ?? ''];
+
+    if (!spec) return [];
+
+    const pinned = category?.platformModuleKey || platformModuleKey;
+
+    return [
+      {
+        id: spec.id,
+        label: spec.label,
+        icon: spec.icon,
+        render: () =>
+          pinned ? (
+            spec.render(pinned, spec.title, spec.description)
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
+              <p className="text-sm font-medium text-slate-700">{spec.emptyTitle}</p>
+              <p className="mt-1 text-sm text-slate-500">{spec.emptyBody}</p>
+              <Link
+                href={spec.route}
+                className="mt-3 inline-flex items-center text-sm font-semibold text-[#5846EA] hover:underline"
+              >
+                {spec.routeLabel}
+              </Link>
+            </div>
+          ),
+      },
+    ];
+  }, [categoryKey, category, platformModuleKey]);
+
+  /**
+   * The Audit Trail tab, for any module.
+   *
+   * With no prefixes the trail is not rendered empty: an empty table reads as
+   * "nobody used this module", when the truth is that this module's screens
+   * live only in this app and never pass through the Laravel middleware that
+   * writes the log. The tab says that and offers the full User Log report.
+   */
+  const auditScreens = useMemo<ModuleStaticScreen[]>(() => {
+    if (categoryKey !== AUDIT_CATEGORY_KEY && category?.key !== AUDIT_CATEGORY_KEY) {
+      return [];
+    }
+
+    const keys = category?.auditModuleKeys?.length ? category.auditModuleKeys : auditModuleKeys ?? [];
+    // The module's own name, which the level-2 menu supplies through the
+    // category's label only for the bar itself; 'Audit Trail' is the category,
+    // so the module name comes from the page's own module slug when the row
+    // cannot name it.
+    const label = moduleLabel(moduleName);
+
+    return [
+      {
+        id: 'audit-trail',
+        label: 'Activity',
+        icon: ScrollText,
+        render: () =>
+          keys.length > 0 ? (
+            <ModuleAuditTrail moduleKeys={keys} label={label} />
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
+              <p className="text-sm font-medium text-slate-700">No activity is logged for this menu</p>
+              <p className="mt-1 text-sm text-slate-500">
+                This module&apos;s screens do not pass through the access log, so there is nothing
+                to show here rather than nothing having happened.
+              </p>
+              <Link
+                href={USER_LOG_ROUTE}
+                className="mt-3 inline-flex items-center text-sm font-semibold text-[#5846EA] hover:underline"
+              >
+                Open the User Log report
+              </Link>
+            </div>
+          ),
+      },
+    ];
+  }, [categoryKey, category, auditModuleKeys, moduleName]);
+
   const tabs = useMemo<Tab[]>(() => {
-    const staticTabs = staticScreens.map<Tab>((entry) => ({ kind: 'static', ...entry }));
+    const staticTabs = [...consoleScreens, ...auditScreens, ...staticScreens].map<Tab>((entry) => ({
+      kind: 'static',
+      ...entry,
+    }));
 
     const menuTabs = (category?.items ?? []).map<Tab>((item: ModuleCategoryItem) => {
       const route = mapApiLinkToRoute(item.link);
@@ -251,7 +462,7 @@ export function ModuleCategoryPage({
     return staticScreensPlacement === 'after'
       ? [...menuTabs, ...staticTabs]
       : [...staticTabs, ...menuTabs];
-  }, [staticScreens, staticScreensPlacement, category, screenRegistry]);
+  }, [consoleScreens, auditScreens, staticScreens, staticScreensPlacement, category, screenRegistry]);
 
   /**
    * The open tab, which can only ever be one that actually renders something
