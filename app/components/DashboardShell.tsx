@@ -239,6 +239,35 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [hasBrainAccess, setHasBrainAccess] = useState(() => isBrainVisibleByLmsSession());
   const [isStudent, setIsStudent] = useState(() => isStudentSession());
 
+  /*
+    The shell is a fixed-viewport app: it is exactly 100vh, it clips its own
+    overflow, and the page scrolls inside <main> — which wears .scrollbar-hide,
+    so its scrollbar is deliberately invisible.
+
+    That makes any scrollbar on the document itself both a bug and a trap: what
+    it scrolls to is the clipped area below the shell, an empty band of canvas
+    with the sidebar and header dragged off-screen above it, and because the
+    page's own scrollbar is hidden, that stray bar is the only one a user can
+    see or grab. Anything that lands in <body> outside the shell — a portalled
+    popover left behind, an absolutely positioned stray — grows the document
+    that way without ever growing the page.
+
+    Nothing reachable lives there, so the document does not scroll while the
+    shell is mounted. Restored on unmount, because the routes that render
+    outside the shell (login, the full-bleed template editor) get the document
+    back as they found it.
+  */
+  useEffect(() => {
+    const { body } = document;
+    const previous = body.style.overflow;
+
+    body.style.overflow = 'hidden';
+
+    return () => {
+      body.style.overflow = previous;
+    };
+  }, []);
+
   useEffect(() => {
     const ctx = getStoredMenuContext();
     // eslint-disable-next-line react-hooks/set-state-in-effect
