@@ -90,14 +90,24 @@ export function getUserIdentity(): { name: string; schoolName: string; schoolLog
 // Shared request plumbing
 // ---------------------------------------------------------------------------
 
-interface SessionParams {
+/*
+ * The helpers from here down to `buildFormData`, plus `postH5pJson` and
+ * `methodOverride` further on, are EXPORTED because `h5p-content-types.ts`
+ * builds the four 2026-09-21 types on them.
+ *
+ * They were private while this file was the only caller. They are the
+ * session, header, error-unwrapping and URL rules every H5P endpoint in this
+ * ERP shares, and a second copy of the tenancy plumbing is the last thing
+ * this module needs.
+ */
+export interface SessionParams {
   sub_institute_id: number;
   user_id: number;
   user_profile_name: string;
   syear: string;
 }
 
-function requireSession(): SessionParams {
+export function requireSession(): SessionParams {
   const ctx = getRequestContext();
   if (!ctx) {
     throw new Error('Your session has expired. Please log in again.');
@@ -110,7 +120,7 @@ function requireSession(): SessionParams {
   };
 }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (typeof window !== 'undefined') {
     try {
@@ -124,7 +134,7 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
-async function readApiJson(res: Response, fallback: string): Promise<Record<string, unknown>> {
+export async function readApiJson(res: Response, fallback: string): Promise<Record<string, unknown>> {
   const text = await res.text();
   const trimmed = text.trim();
 
@@ -154,7 +164,7 @@ async function readApiJson(res: Response, fallback: string): Promise<Record<stri
   throw new Error(`${fallback} (HTTP ${res.status}): the server returned a non-JSON response.`);
 }
 
-function getApiErrorMessage(raw: Record<string, unknown>, fallback: string): string {
+export function getApiErrorMessage(raw: Record<string, unknown>, fallback: string): string {
   const errors = raw.errors;
   if (errors && typeof errors === 'object') {
     for (const value of Object.values(errors as Record<string, unknown>)) {
@@ -166,12 +176,12 @@ function getApiErrorMessage(raw: Record<string, unknown>, fallback: string): str
 }
 
 /** Laravel responses in this module mix `{status: 1}`, `{status: true}` and `{status_code: 1}`. */
-function isApiSuccess(raw: Record<string, unknown>): boolean {
+export function isApiSuccess(raw: Record<string, unknown>): boolean {
   const status = raw.status ?? raw.status_code;
   return status === 1 || status === '1' || status === true;
 }
 
-function contextParams(ctx: H5pContext): Record<string, string> {
+export function contextParams(ctx: H5pContext): Record<string, string> {
   return {
     chapter_id: ctx.chapter_id,
     standard_id: ctx.standard_id,
@@ -179,7 +189,7 @@ function contextParams(ctx: H5pContext): Record<string, string> {
   };
 }
 
-function buildGetUrl(path: string, params: Record<string, string | number | undefined>): string {
+export function buildGetUrl(path: string, params: Record<string, string | number | undefined>): string {
   const url = new URL(`${API_BASE_URL}${path}`);
   url.searchParams.set('type', 'API');
   for (const [key, value] of Object.entries(params)) {
@@ -188,7 +198,7 @@ function buildGetUrl(path: string, params: Record<string, string | number | unde
   return url.toString();
 }
 
-function buildFormData(fields: Record<string, string | number | undefined>): FormData {
+export function buildFormData(fields: Record<string, string | number | undefined>): FormData {
   const fd = new FormData();
   fd.append('type', 'API');
   for (const [key, value] of Object.entries(fields)) {
@@ -358,6 +368,14 @@ export const H5P_ROUTE_MAP: Record<string, string> = {
   'h5p_drag_text.index': '/h5p/h5p_drag_text',
   'h5p_blanks.index': '/h5p/h5p_blanks',
   'h5p_mark_the_words.index': '/h5p/h5p_mark_the_words',
+
+  // 2026-09-21 vertical. `image_hotspots` is the new H5P.ImageHotspots type;
+  // `scenario_based.index` above is the older, simpler image-hotspot type over
+  // h5p_scenarios, and is unchanged.
+  'h5p_image_hotspots.index': '/h5p/h5p_image_hotspots',
+  'h5p_memory_game.index': '/h5p/h5p_memory_game',
+  'h5p_course_presentation.index': '/h5p/h5p_course_presentation',
+  'h5p_arithmetic_quiz.index': '/h5p/h5p_arithmetic_quiz',
 };
 
 export async function fetchHubModules(ctx: H5pContext): Promise<H5pHubModule[]> {
@@ -1039,7 +1057,7 @@ export interface DragDropSavePayload {
  * document rather than a form, and both need the `type: API` marker and the
  * same success/error unwrapping.
  */
-async function postH5pJson(
+export async function postH5pJson(
   path: string,
   body: Record<string, unknown>,
   fallback: string
@@ -1064,7 +1082,7 @@ async function postH5pJson(
  * trick the other types in this file use silently does nothing here and the
  * update arrives as a POST with no matching route.
  */
-function methodOverride(path: string, method: 'PUT' | 'DELETE'): string {
+export function methodOverride(path: string, method: 'PUT' | 'DELETE'): string {
   return `${path}${path.includes('?') ? '&' : '?'}_method=${method}`;
 }
 
