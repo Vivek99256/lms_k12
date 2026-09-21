@@ -202,7 +202,7 @@ function ListContent({ type }: { type: TextActivityType }) {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
         <H5pPageHeader
           title={TEXT_ACTIVITY_LABELS[type]}
@@ -495,7 +495,7 @@ function CreateContent({ type }: { type: TextActivityType }) {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
         <H5pPageHeader
           title={`New ${TEXT_ACTIVITY_LABELS[type].toLowerCase()} activity`}
@@ -611,7 +611,7 @@ function EditContent({ type }: { type: TextActivityType }) {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
         <H5pPageHeader
           title={activity?.title ? `Edit — ${activity.title}` : 'Edit activity'}
@@ -704,7 +704,7 @@ function ViewContent({ type }: { type: TextActivityType }) {
   }, [ctx, id, type]);
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-3xl">
         <H5pPageHeader
           title={activity?.title || TEXT_ACTIVITY_LABELS[type]}

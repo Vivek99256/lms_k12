@@ -28,6 +28,18 @@ import { H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from 
  *
  * What a type supplies is its editor body, how its state becomes a payload,
  * and what is stopping it from being publishable.
+ *
+ * THE PAGE ROOT DOES NOT SCROLL. `DashboardShell` owns the one scroll region
+ * in the app — its `<main>` — and every H5P screen renders inside it as an
+ * auto-height block. A page root carrying `flex-1 overflow-auto` (the shape
+ * these screens used to copy) declares a second, nested scroll container. It
+ * is inert only for as long as the shell keeps `<main>` a plain block: give
+ * the root a definite height by any route and it clips the form instead of
+ * growing with it. Inert or not, it is the nearest scrollable ancestor, so it
+ * is the box `scrollIntoView` and focus scrolling move — which is how growing
+ * a form (adding a feedback band, a statement, a hotspot) can scroll the wrong
+ * box and leave the new row off screen. Keep page roots height-auto and
+ * overflow-visible; the shell scrolls.
  */
 
 export interface ContentTypeFormSpec<TRow extends H5pContentRow, TState, TPayload> {
@@ -137,7 +149,7 @@ function CreateInner<TRow extends H5pContentRow, TState, TPayload>(spec: Content
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
         <H5pPageHeader
           title={spec.createTitle}
@@ -290,7 +302,7 @@ function EditInner<TRow extends H5pContentRow, TState, TPayload>(spec: ContentTy
   const published = row?.status === 'published';
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
         <H5pPageHeader
           title={spec.editTitle}

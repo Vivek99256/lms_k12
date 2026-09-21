@@ -401,7 +401,7 @@ function ArithmeticQuizPlayerContent() {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-2xl">
         <H5pPageHeader
           title={quiz?.title || 'Arithmetic quiz'}

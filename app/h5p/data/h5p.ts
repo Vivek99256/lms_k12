@@ -376,6 +376,13 @@ export const H5P_ROUTE_MAP: Record<string, string> = {
   'h5p_memory_game.index': '/h5p/h5p_memory_game',
   'h5p_course_presentation.index': '/h5p/h5p_course_presentation',
   'h5p_arithmetic_quiz.index': '/h5p/h5p_arithmetic_quiz',
+
+  // 2026-09-21, second vertical: the two question types. `h5p_mcq.index`
+  // above is the chapter question bank's multiple-choice slice and is a
+  // different thing entirely -- it has no draft state and no package
+  // exchange, and it is unchanged.
+  'h5p_single_choice_set.index': '/h5p/h5p_single_choice_set',
+  'h5p_true_false.index': '/h5p/h5p_true_false',
 };
 
 export async function fetchHubModules(ctx: H5pContext): Promise<H5pHubModule[]> {

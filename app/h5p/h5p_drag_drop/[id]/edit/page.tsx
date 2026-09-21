@@ -134,7 +134,7 @@ function DragDropEditContent() {
   const published = task?.status === 'published';
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
         <H5pPageHeader
           title={task?.title ? `Edit — ${task.title}` : 'Edit activity'}

@@ -235,7 +235,7 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
     'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-indigo-600 disabled:opacity-50';
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
         <H5pPageHeader
           title={title}
