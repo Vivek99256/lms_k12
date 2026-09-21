@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { AlertCircle, CalendarClock, GitBranch, Loader2, ScrollText, type LucideIcon } from 'lucide-react';
+import { AlertCircle, Brain, CalendarClock, GitBranch, Loader2, ScrollText, type LucideIcon } from 'lucide-react';
 
 import Link from 'next/link';
 
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { ModuleAuditTrail } from '@/app/_components/module-audit-trail';
+import { ModuleIntelligence } from '@/app/_components/module-intelligence';
+import { AddProcessPage } from '@/app/general/add_process/AddProcessPage';
 import { ModuleJourney } from '@/app/general/onboarding/_components/ModuleJourney';
 import { SchedulerConsole } from '@/app/platform-services/scheduler/_components/SchedulerConsole';
 import { WorkflowConsole } from '@/app/platform-services/workflow/_components/WorkflowConsole';
@@ -87,6 +89,52 @@ const ONBOARDING_CATEGORY_KEY = 'onboarding';
 const ONBOARDING_INDEX_ROUTE = '/general/onboarding';
 
 /**
+ * Process Builder: the SOP converter, which is one screen for every module.
+ *
+ * Converting an SOP into a Process, Workflow and Tasks is the same act
+ * everywhere, and the screen already exists at /general/add_process. Fees
+ * reached it by rendering the component with its own module named; every bar
+ * now does, because no bar has a single real menu in this category — all 64 are
+ * empty — so there is nothing for a tab strip to hold.
+ */
+const PROCESS_BUILDER_CATEGORY_KEY = 'process-builder';
+
+/**
+ * The converter's module keys are its own (`lib/process/module-registry.ts`),
+ * not the platform registry's, and only two modules are registered. The one
+ * spelling that differs is mapped here; anything the converter does not know
+ * falls back to its first registered module, which is what
+ * /general/add_process has always opened on.
+ */
+const SOP_MODULE_ALIASES: Record<string, string> = { lms: 'lms-pal' };
+
+/**
+ * The third console-like category: the module's own slice of the access log.
+ *
+ * Unlike Workflow and Schedular it has no central screen to pin — it is the
+ * User Log report narrowed to this module — so what the row carries is the set
+ * of log prefixes the module's screens write rather than a registry key.
+ */
+const AUDIT_CATEGORY_KEY = 'audit-trail';
+
+/** Where a bar whose screens never reach the access log is sent instead. */
+const USER_LOG_ROUTE = '/user_log';
+
+/**
+ * Intelligence: the Brain's loop, narrowed to this module.
+ *
+ * The tenant-wide loop is the Enterprise Brain's screen and answers its
+ * question; a module's tab shows only the signals attributed to that module's
+ * rules. Which module is the row's `platform_module_key` — the same key the
+ * Workflow and Schedular consoles pin to, so one module means one thing
+ * throughout.
+ *
+ * A tab rather than a page takeover: eight bars carry a real Intelligence menu
+ * ("Fees Prediction"), and those follow this one.
+ */
+const INTELLIGENCE_CATEGORY_KEY = 'intelligence';
+
+/**
  * The categories that are a console rather than a group of menus.
  *
  * Approvals and scheduled tasks are both configured centrally — one registry of
@@ -104,18 +152,6 @@ const ONBOARDING_INDEX_ROUTE = '/general/onboarding';
  * /fees/scheduler, which findCategory resolves by route; every other module's
  * URL segment is the key itself.
  */
-/**
- * The third console-like category: the module's own slice of the access log.
- *
- * Unlike Workflow and Schedular it has no central screen to pin — it is the
- * User Log report narrowed to this module — so what the row carries is the set
- * of log prefixes the module's screens write rather than a registry key.
- */
-const AUDIT_CATEGORY_KEY = 'audit-trail';
-
-/** Where a bar whose screens never reach the access log is sent instead. */
-const USER_LOG_ROUTE = '/user_log';
-
 const PLATFORM_CONSOLES: Record<
   string,
   {
@@ -441,8 +477,59 @@ export function ModuleCategoryPage({
     ];
   }, [categoryKey, category, auditModuleKeys, moduleName]);
 
+  /**
+   * The Intelligence tab, for any module that has not brought its own.
+   *
+   * Fees passes its native workspace through `staticScreens`, and that view is
+   * a superset of this one — fee coverage, the decision loop and the fee
+   * records behind it — so a module that supplies its own screens is left
+   * alone rather than given two Intelligence tabs to choose between.
+   */
+  const intelligenceScreens = useMemo<ModuleStaticScreen[]>(() => {
+    const isIntelligence =
+      categoryKey === INTELLIGENCE_CATEGORY_KEY || category?.key === INTELLIGENCE_CATEGORY_KEY;
+
+    if (!isIntelligence || staticScreens.length > 0) return [];
+
+    const pinned = category?.platformModuleKey || platformModuleKey;
+    const label = moduleLabel(moduleName);
+
+    return [
+      {
+        id: 'module-intelligence',
+        label: 'Intelligence',
+        icon: Brain,
+        render: () =>
+          pinned ? (
+            <ModuleIntelligence moduleKey={pinned} fallbackLabel={label} />
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
+              <p className="text-sm font-medium text-slate-700">
+                The Brain does not watch this menu
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                This bar has no module in the platform registry, so no intelligence rule is
+                attributed to it — which is not the same as it having no problems.
+              </p>
+              <Link
+                href="/enterprise-brain/intelligence-loop"
+                className="mt-3 inline-flex items-center text-sm font-semibold text-[#5846EA] hover:underline"
+              >
+                Open the Enterprise Brain
+              </Link>
+            </div>
+          ),
+      },
+    ];
+  }, [categoryKey, category, staticScreens, platformModuleKey, moduleName]);
+
   const tabs = useMemo<Tab[]>(() => {
-    const staticTabs = [...consoleScreens, ...auditScreens, ...staticScreens].map<Tab>((entry) => ({
+    const staticTabs = [
+      ...consoleScreens,
+      ...auditScreens,
+      ...intelligenceScreens,
+      ...staticScreens,
+    ].map<Tab>((entry) => ({
       kind: 'static',
       ...entry,
     }));
@@ -462,7 +549,15 @@ export function ModuleCategoryPage({
     return staticScreensPlacement === 'after'
       ? [...menuTabs, ...staticTabs]
       : [...staticTabs, ...menuTabs];
-  }, [consoleScreens, auditScreens, staticScreens, staticScreensPlacement, category, screenRegistry]);
+  }, [
+    consoleScreens,
+    auditScreens,
+    intelligenceScreens,
+    staticScreens,
+    staticScreensPlacement,
+    category,
+    screenRegistry,
+  ]);
 
   /**
    * The open tab, which can only ever be one that actually renders something
@@ -507,6 +602,28 @@ export function ModuleCategoryPage({
   );
 
   const Outlet = screenRegistry.Outlet;
+
+  // Process Builder is a screen, not a tab strip, for the same reason as
+  // Onboarding: the category holds no menus in any module, and the screen it
+  // shows is one screen for the whole ERP. It brings its own page frame and
+  // heading, so nothing is drawn around it.
+  if (
+    categoryKey === PROCESS_BUILDER_CATEGORY_KEY ||
+    category?.key === PROCESS_BUILDER_CATEGORY_KEY
+  ) {
+    const scope = category?.platformModuleKey || platformModuleKey || moduleName;
+
+    // The name matters as much as the key: a module the converter's registry
+    // does not know is offered under the name the menu uses for it, so Student
+    // → Process Builder opens on Student instead of falling back to whichever
+    // module happens to be registered first.
+    return (
+      <AddProcessPage
+        defaultModuleKey={SOP_MODULE_ALIASES[scope] ?? scope}
+        defaultModuleName={moduleLabel(moduleName)}
+      />
+    );
+  }
 
   // Onboarding is a screen, not a tab strip, so it answers before any of the
   // tab rendering below. No PageHeader: the journey brings its own heading and
