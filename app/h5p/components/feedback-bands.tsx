@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { FeedbackBand } from '../data/h5p-content-types';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,14 @@ import { Input } from '@/components/ui/input';
  * What it does warn about is a GAP, because a score that matches no band shows
  * the learner nothing at the end of an attempt, and that reads as the activity
  * having failed to finish.
+ *
+ * ADDING A BAND MOVES THE CURSOR TO IT. The list is appended to, so on a long
+ * ladder the new row arrives below the fold and the button looks like it did
+ * nothing. The new row's From field takes focus and is scrolled into view —
+ * `block: 'nearest'`, so an already-visible row does not jump. That relies on
+ * the page root being height-auto: the nearest scrollable ancestor has to be
+ * the shell's `<main>`, not a nested container around the editor. See the note
+ * in `content-type-form.tsx`.
  */
 export function FeedbackBandEditor({
   bands,
@@ -31,16 +40,43 @@ export function FeedbackBandEditor({
   onChange: (bands: FeedbackBand[]) => void;
   disabled?: boolean;
 }) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  // The index the author just added, consumed by the effect below on the
+  // render that first contains that row. A ref, not state: this is a one-shot
+  // instruction to the DOM, and putting it in state would mean a second render
+  // whose only job is to clear it.
+  const addedIndex = useRef<number | null>(null);
+
   const update = (index: number, patch: Partial<FeedbackBand>) =>
     onChange(bands.map((band, i) => (i === index ? { ...band, ...patch } : band)));
 
-  const add = () =>
+  const add = () => {
     onChange([
       ...bands,
       // A new band starts where the last one ended, which is what an author
       // building a ladder wants and costs them one edit when it is not.
       { from: bands.length > 0 ? Math.min(100, bands[bands.length - 1].to + 1) : 0, to: 100, feedback: '' },
     ]);
+    addedIndex.current = bands.length;
+  };
+
+  useEffect(() => {
+    const index = addedIndex.current;
+    if (index === null) return;
+    addedIndex.current = null;
+
+    const row = listRef.current?.querySelector<HTMLElement>(`[data-band-index="${index}"]`);
+    if (!row) return;
+
+    row.scrollIntoView({
+      block: 'nearest',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+    // Focusing the From field puts the cursor where the author types next. It
+    // also makes the addition audible to a screen reader without a live region
+    // announcing a row the user has not been moved to.
+    row.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+  }, [bands.length]);
 
   const covered = new Set<number>();
   for (const band of bands) {
@@ -73,11 +109,12 @@ export function FeedbackBandEditor({
           No bands yet. Without one, learners see their score and no message.
         </p>
       ) : (
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-2" ref={listRef}>
           {bands.map((band, index) => (
             <div
               key={index}
-              className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5"
+              data-band-index={index}
+              className="flex scroll-mt-4 flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5"
             >
               <div className="flex items-end gap-1.5">
                 <label className="block">

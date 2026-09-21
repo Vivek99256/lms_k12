@@ -754,7 +754,7 @@ function McqContent() {
   const quizIsEmpty = selectedLevel !== null && questions.length === 0;
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
         <H5pPageHeader
           title="Multiple choice questions"

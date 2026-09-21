@@ -394,6 +394,171 @@ export interface ArithmeticQuizSavePayload {
 }
 
 // ---------------------------------------------------------------------------
+// Single choice set
+// ---------------------------------------------------------------------------
+
+/**
+ * The two question types below join this family unchanged: same row shape,
+ * same generated client, same list and form shells. What is worth knowing
+ * about them is what their payloads say about the H5P format underneath.
+ *
+ * SINGLE CHOICE SET CARRIES `is_correct`, NOT A POSITION. The H5P format says
+ * `answers[0]` is the right one; this schema says the flag is. The conversion
+ * happens once, server-side, in H5PSingleChoiceSetBuilder -- so nothing on
+ * this side, including the player, may read correctness from a position. The
+ * shuffle in `lib/h5p/single-choice-set.ts` is exactly why.
+ */
+
+export interface H5pSingleChoiceOption {
+  id: number;
+  question_id: number;
+  set_id: number;
+  option_text: string;
+  is_correct: boolean;
+  /** What to say to a learner who chose THIS option. */
+  feedback: string | null;
+  sort_order: number;
+}
+
+export interface H5pSingleChoiceQuestion {
+  id: number;
+  set_id: number;
+  /** HTML, as H5P stores it. */
+  question_text: string;
+  feedback_correct: string | null;
+  feedback_incorrect: string | null;
+  /** Shown with the solution rather than with the feedback. */
+  explanation: string | null;
+  sort_order: number;
+  options?: H5pSingleChoiceOption[];
+}
+
+export interface H5pSingleChoiceSet extends H5pContentRow {
+  task_description: string | null;
+  auto_continue: boolean;
+  /** Milliseconds the feedback stays up before the next question. */
+  timeout_correct_ms: number;
+  timeout_wrong_ms: number;
+  sound_effects: boolean;
+  enable_retry: boolean;
+  enable_show_solution: boolean;
+  randomize_questions: boolean;
+  randomize_answers: boolean;
+  points_per_question: number;
+  pass_percentage: number;
+  show_progress: boolean;
+  feedback_bands: FeedbackBand[] | null;
+  questions?: H5pSingleChoiceQuestion[];
+}
+
+export interface SingleChoiceOptionInput {
+  option_text: string;
+  is_correct: boolean;
+  feedback: string;
+}
+
+export interface SingleChoiceQuestionInput {
+  question_text: string;
+  feedback_correct: string;
+  feedback_incorrect: string;
+  explanation: string;
+  options: SingleChoiceOptionInput[];
+}
+
+export interface SingleChoiceSetSavePayload {
+  title: string;
+  description: string;
+  task_description: string;
+  auto_continue: boolean;
+  timeout_correct_ms: number;
+  timeout_wrong_ms: number;
+  sound_effects: boolean;
+  enable_retry: boolean;
+  enable_show_solution: boolean;
+  randomize_questions: boolean;
+  randomize_answers: boolean;
+  points_per_question: number;
+  pass_percentage: number;
+  show_progress: boolean;
+  feedback_bands: FeedbackBand[];
+  questions: SingleChoiceQuestionInput[];
+}
+
+// ---------------------------------------------------------------------------
+// True / false
+// ---------------------------------------------------------------------------
+
+/**
+ * TRUE/FALSE IS A POOL, NOT A QUESTION. H5P.TrueFalse holds one statement;
+ * an item here holds many and asks `questions_to_ask` of them per attempt.
+ * See the backend migration for why, and `lib/h5p/true-false.ts` for how the
+ * draw works.
+ */
+
+export interface H5pTrueFalseQuestion {
+  id: number;
+  true_false_id: number;
+  /** HTML, as H5P stores it. */
+  question_text: string;
+  /** A real boolean here; H5P's param is the string "true"/"false". */
+  correct_answer: boolean;
+  feedback_correct: string | null;
+  feedback_incorrect: string | null;
+  explanation: string | null;
+  media_image: string | null;
+  media_alt: string | null;
+  sort_order: number;
+}
+
+export interface H5pTrueFalse extends H5pContentRow {
+  task_description: string | null;
+  enable_retry: boolean;
+  enable_show_solution: boolean;
+  enable_check_button: boolean;
+  /** Instant feedback: marked the moment an answer is chosen. */
+  auto_check: boolean;
+  confirm_check_dialog: boolean;
+  confirm_retry_dialog: boolean;
+  randomize_questions: boolean;
+  /** 0 means ask the whole pool. */
+  questions_to_ask: number;
+  points_per_question: number;
+  pass_percentage: number;
+  show_progress: boolean;
+  feedback_bands: FeedbackBand[] | null;
+  questions?: H5pTrueFalseQuestion[];
+}
+
+export interface TrueFalseQuestionInput {
+  question_text: string;
+  correct_answer: boolean;
+  feedback_correct: string;
+  feedback_incorrect: string;
+  explanation: string;
+  media_image: string;
+  media_alt: string;
+}
+
+export interface TrueFalseSavePayload {
+  title: string;
+  description: string;
+  task_description: string;
+  enable_retry: boolean;
+  enable_show_solution: boolean;
+  enable_check_button: boolean;
+  auto_check: boolean;
+  confirm_check_dialog: boolean;
+  confirm_retry_dialog: boolean;
+  randomize_questions: boolean;
+  questions_to_ask: number;
+  points_per_question: number;
+  pass_percentage: number;
+  show_progress: boolean;
+  feedback_bands: FeedbackBand[];
+  questions: TrueFalseQuestionInput[];
+}
+
+// ---------------------------------------------------------------------------
 // The shared API
 // ---------------------------------------------------------------------------
 
@@ -709,6 +874,30 @@ export const arithmeticQuizApi = contentTypeApi<
   hasMedia: false,
 });
 
+export const singleChoiceSetApi = contentTypeApi<
+  H5pSingleChoiceSet,
+  SingleChoiceSetSavePayload & Record<string, unknown>
+>({
+  path: 'h5p_single_choice_set',
+  listKey: 'singleChoiceSetLists',
+  itemKey: 'singleChoiceSet',
+  noun: 'single choice set',
+  // No media, and the server routes no upload endpoint for it: a single
+  // choice question is a sentence and a list of sentences. A question that
+  // needs a picture is a Multiple Choice or an Image Hotspots activity.
+  hasMedia: false,
+});
+
+export const trueFalseApi = contentTypeApi<H5pTrueFalse, TrueFalseSavePayload & Record<string, unknown>>({
+  path: 'h5p_true_false',
+  listKey: 'trueFalseLists',
+  itemKey: 'trueFalse',
+  noun: 'true or false activity',
+  // One image per statement. A true/false about a diagram is one of the few
+  // places a picture IS the question rather than decoration.
+  hasMedia: true,
+});
+
 // ---------------------------------------------------------------------------
 // Defaults
 // ---------------------------------------------------------------------------
@@ -795,6 +984,83 @@ export const ARITHMETIC_QUIZ_DEFAULTS: ArithmeticQuizSavePayload = {
   max_attempts: 0,
   feedback_bands: [],
 };
+
+export const SINGLE_CHOICE_SET_DEFAULTS: SingleChoiceSetSavePayload = {
+  title: '',
+  description: '',
+  task_description: '',
+  auto_continue: true,
+  timeout_correct_ms: 2000,
+  timeout_wrong_ms: 3000,
+  sound_effects: false,
+  enable_retry: true,
+  enable_show_solution: true,
+  // Questions stay put by default and answers shuffle. An author who wrote
+  // questions that build on each other would be surprised to find them
+  // reordered; nobody is surprised to find the right answer moving.
+  randomize_questions: false,
+  randomize_answers: true,
+  points_per_question: 1,
+  pass_percentage: 60,
+  show_progress: true,
+  feedback_bands: [],
+  questions: [],
+};
+
+export const TRUE_FALSE_DEFAULTS: TrueFalseSavePayload = {
+  title: '',
+  description: '',
+  task_description: '',
+  enable_retry: true,
+  enable_show_solution: true,
+  enable_check_button: true,
+  auto_check: false,
+  confirm_check_dialog: false,
+  confirm_retry_dialog: false,
+  randomize_questions: false,
+  // 0 = ask the whole pool. An author who wants a draw sets it once they have
+  // written enough statements for one to be worth having.
+  questions_to_ask: 0,
+  points_per_question: 1,
+  pass_percentage: 60,
+  show_progress: true,
+  feedback_bands: [],
+  questions: [],
+};
+
+/**
+ * A blank question for each of the two question types.
+ *
+ * Kept here beside the defaults rather than in the editors, so "what an added
+ * question starts as" and "what a new activity starts as" are one decision.
+ */
+export function blankSingleChoiceQuestion(): SingleChoiceQuestionInput {
+  return {
+    question_text: '',
+    feedback_correct: '',
+    feedback_incorrect: '',
+    explanation: '',
+    // Two options, the first marked correct. A question has to have exactly
+    // one right answer to save at all, so starting with none marked would
+    // make every newly added question an error the author has to clear.
+    options: [
+      { option_text: '', is_correct: true, feedback: '' },
+      { option_text: '', is_correct: false, feedback: '' },
+    ],
+  };
+}
+
+export function blankTrueFalseQuestion(): TrueFalseQuestionInput {
+  return {
+    question_text: '',
+    correct_answer: true,
+    feedback_correct: '',
+    feedback_incorrect: '',
+    explanation: '',
+    media_image: '',
+    media_alt: '',
+  };
+}
 
 /** A fresh client-side ref for a new slide. Stable while the editor is open. */
 export function newRef(prefix = 'slide'): string {

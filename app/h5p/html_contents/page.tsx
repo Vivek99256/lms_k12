@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Brain,
   Calculator,
+  CircleCheck,
   Copy,
   Crosshair,
   Presentation,
@@ -14,6 +15,7 @@ import {
   Highlighter,
   Image as ImageIcon,
   Layers3,
+  ListChecks,
   MousePointerClick,
   Move,
   Sparkles,
@@ -54,6 +56,13 @@ const TYPE_ICONS: Record<string, typeof ImageIcon> = {
   memory_game: Copy,
   course_presentation: Presentation,
   arithmetic_quiz: Calculator,
+
+  // 2026-09-21, second vertical. `multiple_choice` above is the question
+  // bank's MCQ slice and keeps its own glyph: a set of single-choice
+  // questions and a bank of multiple-choice ones are different cards and
+  // must not look like the same one.
+  single_choice_set: ListChecks,
+  true_false: CircleCheck,
 };
 
 /** Registry route name (`scenario_based.index`) → this app's route. */
@@ -182,7 +191,7 @@ function H5pHubContent() {
   const totalNodes = modules.reduce((sum, module) => sum + module.nodeCount, 0);
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
         <H5pPageHeader
           title="H5P content"
