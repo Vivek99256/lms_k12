@@ -6,6 +6,10 @@ import { useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   Brain,
+  Calculator,
+  Copy,
+  Crosshair,
+  Presentation,
   HelpCircle,
   Highlighter,
   Image as ImageIcon,
@@ -42,6 +46,14 @@ const TYPE_ICONS: Record<string, typeof ImageIcon> = {
   drag_text: Move,
   fill_in_the_blanks: TextCursorInput,
   mark_the_words: Highlighter,
+
+  // 2026-09-21 vertical. `image_hotspot` above is the older Scenario type;
+  // `image_hotspots` is H5P.ImageHotspots, and they get different glyphs so
+  // the two cards are not mistaken for one another.
+  image_hotspots: Crosshair,
+  memory_game: Copy,
+  course_presentation: Presentation,
+  arithmetic_quiz: Calculator,
 };
 
 /** Registry route name (`scenario_based.index`) → this app's route. */
@@ -75,7 +87,10 @@ function ModuleCard({ module, contextQuery }: { module: H5pHubModule; contextQue
         </div>
       </div>
 
-      <h2 className="mt-4 text-base font-semibold text-slate-900">{module.title}</h2>
+      {module.category ? (
+        <p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{module.category}</p>
+      ) : null}
+      <h2 className={`${module.category ? 'mt-1' : 'mt-4'} text-base font-semibold text-slate-900`}>{module.title}</h2>
       <p className="mt-1 text-sm text-slate-500">{module.description}</p>
 
       {module.available ? null : (
