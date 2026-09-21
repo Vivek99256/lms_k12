@@ -6,14 +6,19 @@ import { AlertCircle, CheckCircle2, Loader2, Printer, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
+/**
+ * The page body, inside the shell's scroll region.
+ *
+ * Its height is its content's. It used to carry `min-h-screen`, which forced
+ * every page to a full 100vh inside a <main> that is already shorter than the
+ * viewport — the shell spends height on the header, the level-3 subheader and
+ * its own padding — so a short page ended in a band of empty canvas and
+ * scrolled for no reason. A category page nests this frame inside the mounted
+ * screen's own, which doubled it. The shell owns the viewport and the
+ * scrolling; this owns neither.
+ */
 export function PageFrame({ children }: { children: ReactNode }) {
-  return (
-    <div className="min-h-screen">
-      <div className="mx-auto  space-y-4 ">
-        {children}
-      </div>
-    </div>
-  );
+  return <div className="mx-auto space-y-4">{children}</div>;
 }
 
 export function PageHeader({
