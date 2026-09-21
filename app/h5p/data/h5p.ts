@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import type { DragDropImageFit } from '@/lib/h5p/drag-drop-canvas';
+import type { TextActivityType } from '@/lib/h5p/text-activity-markup';
 import { getRequestContext, getSyear } from '@/app/course-master/page';
 
 /**
@@ -354,6 +355,9 @@ export const H5P_ROUTE_MAP: Record<string, string> = {
   'h5p_mcq.index': '/h5p/h5p_mcq',
   'h5p_flashacard.index': '/h5p/h5p_flashacard',
   'h5p_drag_drop.index': '/h5p/h5p_drag_drop',
+  'h5p_drag_text.index': '/h5p/h5p_drag_text',
+  'h5p_blanks.index': '/h5p/h5p_blanks',
+  'h5p_mark_the_words.index': '/h5p/h5p_mark_the_words',
 };
 
 export async function fetchHubModules(ctx: H5pContext): Promise<H5pHubModule[]> {
@@ -1028,8 +1032,14 @@ export interface DragDropSavePayload {
   zones: DragDropZoneInput[];
 }
 
-/** POST a JSON document to one of the drag-and-drop endpoints. */
-async function postDragDropJson(
+/**
+ * POST a JSON document to an H5P endpoint that takes one.
+ *
+ * Shared by drag and drop and by the three text-passage types: both save a
+ * document rather than a form, and both need the `type: API` marker and the
+ * same success/error unwrapping.
+ */
+async function postH5pJson(
   path: string,
   body: Record<string, unknown>,
   fallback: string
@@ -1091,7 +1101,7 @@ export async function createDragDrop(
   payload: DragDropSavePayload
 ): Promise<MutationResult & { id: number }> {
   const session = requireSession();
-  const raw = await postDragDropJson(
+  const raw = await postH5pJson(
     '/h5p/h5p_drag_drop',
     {
       ...contextParams(ctx),
@@ -1115,7 +1125,7 @@ export async function updateDragDrop(
   payload: DragDropSavePayload
 ): Promise<MutationResult> {
   const session = requireSession();
-  const raw = await postDragDropJson(
+  const raw = await postH5pJson(
     methodOverride(`/h5p/h5p_drag_drop/${id}`, 'PUT'),
     {
       ...contextParams(ctx),
@@ -1130,7 +1140,7 @@ export async function updateDragDrop(
 
 export async function deleteDragDrop(id: number | string, ctx: H5pContext): Promise<MutationResult> {
   const session = requireSession();
-  const raw = await postDragDropJson(
+  const raw = await postH5pJson(
     methodOverride(`/h5p/h5p_drag_drop/${id}`, 'DELETE'),
     {
       ...contextParams(ctx),
@@ -1155,7 +1165,7 @@ export async function publishDragDrop(
   published: boolean
 ): Promise<MutationResult> {
   const session = requireSession();
-  const raw = await postDragDropJson(
+  const raw = await postH5pJson(
     `/h5p/h5p_drag_drop/${id}/publish`,
     {
       ...contextParams(ctx),
@@ -1275,3 +1285,419 @@ export {
   type DragDropAttemptResult,
   type DragDropPlacements,
 } from '@/lib/h5p/drag-drop-scoring';
+
+// ---------------------------------------------------------------------------
+// Text-passage activities: Drag the Words, Fill in the Blanks, Mark the Words
+// ---------------------------------------------------------------------------
+
+/**
+ * The three types share one API surface because they share one table and one
+ * controller on the server -- see the `h5p_text_activity` migration for why.
+ * Every function below takes the type as its first argument and resolves the
+ * route from it, so there is one implementation of "save an activity" rather
+ * than three that drift.
+ */
+export type { TextActivityType };
+
+/** Type -> Laravel route prefix. The one place the mapping lives. */
+const TEXT_ACTIVITY_ROUTES: Record<TextActivityType, string> = {
+  drag_text: 'h5p_drag_text',
+  fill_in_the_blanks: 'h5p_blanks',
+  mark_the_words: 'h5p_mark_the_words',
+};
+
+/** Type -> the words shown to a user. Sentence case, per the design system. */
+export const TEXT_ACTIVITY_LABELS: Record<TextActivityType, string> = {
+  drag_text: 'Drag the words',
+  fill_in_the_blanks: 'Fill in the blanks',
+  mark_the_words: 'Mark the words',
+};
+
+/** Type -> what the activity asks a learner to do, for page descriptions. */
+export const TEXT_ACTIVITY_DESCRIPTIONS: Record<TextActivityType, string> = {
+  drag_text: 'Learners drag words into the correct blanks within a sentence or paragraph',
+  fill_in_the_blanks: 'Learners type the correct answers into missing blanks',
+  mark_the_words: 'Learners identify and mark the correct words within a text passage',
+};
+
+/** Type -> the official H5P library it exports as. */
+export const TEXT_ACTIVITY_LIBRARIES: Record<TextActivityType, string> = {
+  drag_text: 'H5P.DragText',
+  fill_in_the_blanks: 'H5P.Blanks',
+  mark_the_words: 'H5P.MarkTheWords',
+};
+
+export function textActivityRoute(type: TextActivityType): string {
+  return `/h5p/${TEXT_ACTIVITY_ROUTES[type]}`;
+}
+
+/** One answer slot, as the server derived it from the passage. */
+export interface H5pTextActivityBlank {
+  id: number;
+  text_activity_id: number;
+  blank_index: number;
+  solution: string | null;
+  alternatives: string[] | null;
+  tip: string | null;
+  is_distractor: boolean;
+}
+
+export interface H5pTextActivity {
+  id: number;
+  content_type: TextActivityType;
+  standard_id: number | null;
+  subject_id: number | null;
+  chapter_id: number | null;
+
+  title: string | null;
+  description: string | null;
+  task_description: string | null;
+  /** The passage WITH its `*answer*` markup. The authored artefact. */
+  passage: string | null;
+  /** Drag the Words only: spare draggable words. */
+  distractors: string | null;
+
+  media_image: string | null;
+  media_alt: string | null;
+
+  enable_retry: boolean;
+  enable_show_solution: boolean;
+  enable_check: boolean;
+  case_sensitive: boolean;
+  accept_spelling_errors: boolean;
+  instant_feedback: boolean;
+  show_score_points: boolean;
+  separate_lines: boolean;
+  solution_requires_input: boolean;
+
+  points_per_blank: number;
+  pass_percentage: number;
+  feedback_bands: Array<{ from: number; to: number; feedback?: string }> | null;
+
+  status: 'draft' | 'published';
+  published_at: string | null;
+  library: string | null;
+
+  blanks?: H5pTextActivityBlank[];
+
+  /**
+   * Computed server-side and sent with every row. Deliberately NOT recomputed
+   * here: a list page, the player and the analytics pipeline have to agree on
+   * what an activity is worth, and three independent counts is three chances
+   * to disagree.
+   */
+  label?: string;
+  machine_name?: string;
+  blank_count?: number;
+  distractor_count?: number;
+  max_score?: number;
+
+  created_at?: string | null;
+}
+
+/** What the editor sends. The answer key is derived server-side, never sent. */
+export interface TextActivitySavePayload {
+  title: string;
+  description?: string;
+  task_description?: string;
+  passage: string;
+  distractors?: string;
+  media_image?: string | null;
+  media_alt?: string | null;
+
+  enable_retry: boolean;
+  enable_show_solution: boolean;
+  enable_check: boolean;
+  case_sensitive: boolean;
+  accept_spelling_errors: boolean;
+  instant_feedback: boolean;
+  show_score_points: boolean;
+  separate_lines: boolean;
+  solution_requires_input: boolean;
+
+  points_per_blank: number;
+  pass_percentage: number;
+  feedback_bands: Array<{ from: number; to: number; feedback: string }>;
+}
+
+export async function fetchTextActivities(
+  type: TextActivityType,
+  ctx: H5pContext
+): Promise<H5pTextActivity[]> {
+  const session = requireSession();
+  const url = buildGetUrl(textActivityRoute(type), {
+    ...contextParams(ctx),
+    sub_institute_id: session.sub_institute_id,
+    user_profile_name: session.user_profile_name,
+  });
+  const fallback = `Failed to load ${TEXT_ACTIVITY_LABELS[type].toLowerCase()} activities`;
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+  const raw = await readApiJson(res, fallback);
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, fallback));
+  return (raw.activityLists as H5pTextActivity[]) ?? [];
+}
+
+export async function fetchTextActivity(
+  type: TextActivityType,
+  id: number | string,
+  ctx: H5pContext
+): Promise<H5pTextActivity> {
+  const session = requireSession();
+  const url = buildGetUrl(`${textActivityRoute(type)}/${id}`, {
+    ...contextParams(ctx),
+    sub_institute_id: session.sub_institute_id,
+    user_profile_name: session.user_profile_name,
+  });
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+  const raw = await readApiJson(res, 'Failed to load activity');
+  if (!res.ok || !raw.activity) {
+    throw new Error(getApiErrorMessage(raw, 'Activity not found'));
+  }
+  return raw.activity as H5pTextActivity;
+}
+
+export async function createTextActivity(
+  type: TextActivityType,
+  ctx: H5pContext,
+  payload: TextActivitySavePayload
+): Promise<MutationResult & { id: number }> {
+  const session = requireSession();
+  const raw = await postH5pJson(
+    textActivityRoute(type),
+    {
+      ...contextParams(ctx),
+      sub_institute_id: session.sub_institute_id,
+      user_id: session.user_id,
+      syear: session.syear,
+      ...payload,
+    },
+    'Failed to create activity'
+  );
+  return {
+    status: true,
+    message: (raw.message as string) || 'Activity created successfully!',
+    id: Number(raw.id ?? 0),
+  };
+}
+
+export async function updateTextActivity(
+  type: TextActivityType,
+  id: number | string,
+  ctx: H5pContext,
+  payload: TextActivitySavePayload
+): Promise<MutationResult> {
+  const session = requireSession();
+  const raw = await postH5pJson(
+    methodOverride(`${textActivityRoute(type)}/${id}`, 'PUT'),
+    {
+      ...contextParams(ctx),
+      sub_institute_id: session.sub_institute_id,
+      user_id: session.user_id,
+      ...payload,
+    },
+    'Failed to update activity'
+  );
+  return { status: true, message: (raw.message as string) || 'Activity updated successfully!' };
+}
+
+export async function deleteTextActivity(
+  type: TextActivityType,
+  id: number | string,
+  ctx: H5pContext
+): Promise<MutationResult> {
+  const session = requireSession();
+  const raw = await postH5pJson(
+    methodOverride(`${textActivityRoute(type)}/${id}`, 'DELETE'),
+    {
+      ...contextParams(ctx),
+      sub_institute_id: session.sub_institute_id,
+      user_id: session.user_id,
+    },
+    'Failed to delete activity'
+  );
+  return { status: true, message: (raw.message as string) || 'Activity deleted successfully!' };
+}
+
+/**
+ * Publish or return to draft.
+ *
+ * The server refuses to publish an activity nothing can score (an empty
+ * passage, or one that marks no answers). That error is worth showing verbatim
+ * -- it names the specific thing the author still has to do.
+ */
+export async function publishTextActivity(
+  type: TextActivityType,
+  id: number | string,
+  ctx: H5pContext,
+  published: boolean
+): Promise<MutationResult> {
+  const session = requireSession();
+  const raw = await postH5pJson(
+    `${textActivityRoute(type)}/${id}/publish`,
+    {
+      ...contextParams(ctx),
+      sub_institute_id: session.sub_institute_id,
+      user_id: session.user_id,
+      published,
+    },
+    published ? 'Failed to publish activity' : 'Failed to unpublish activity'
+  );
+  return { status: true, message: (raw.message as string) || 'Saved.' };
+}
+
+/** Copy an activity into a new draft in the same chapter. */
+export async function duplicateTextActivity(
+  type: TextActivityType,
+  id: number | string,
+  ctx: H5pContext
+): Promise<MutationResult & { id: number }> {
+  const session = requireSession();
+  const raw = await postH5pJson(
+    `${textActivityRoute(type)}/${id}/duplicate`,
+    {
+      ...contextParams(ctx),
+      sub_institute_id: session.sub_institute_id,
+      user_id: session.user_id,
+    },
+    'Failed to duplicate activity'
+  );
+  return {
+    status: true,
+    message: (raw.message as string) || 'Copied to a new draft.',
+    id: Number(raw.id ?? 0),
+  };
+}
+
+/** Upload the optional illustration and get its URL back. */
+export async function uploadTextActivityImage(type: TextActivityType, file: File): Promise<string> {
+  const session = requireSession();
+  const fd = buildFormData({
+    sub_institute_id: session.sub_institute_id,
+    user_id: session.user_id,
+  });
+  fd.append('image', file);
+
+  const res = await fetch(`${API_BASE_URL}${textActivityRoute(type)}/media`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: fd,
+  });
+  const raw = await readApiJson(res, 'Failed to upload image');
+  if (!res.ok || !isApiSuccess(raw) || !raw.url) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to upload image'));
+  }
+  return String(raw.url);
+}
+
+export interface TextActivityExportResult {
+  /**
+   * Answer detail the target library could not express, or media that could
+   * not be bundled. Surfaced rather than swallowed: an export that quietly
+   * drops an alternative produces a package that marks answers wrong.
+   */
+  warningCount: number;
+}
+
+/**
+ * Download this activity as a .h5p package.
+ *
+ * Fetched as a blob rather than navigated to, so the Authorization header goes
+ * with the request -- a plain `window.open` on a token-protected endpoint gets
+ * an HTML login page saved as a .h5p file, which looks like a corrupt export.
+ */
+export async function exportTextActivityPackage(
+  type: TextActivityType,
+  id: number | string,
+  ctx: H5pContext
+): Promise<TextActivityExportResult> {
+  const session = requireSession();
+  const url = buildGetUrl(`${textActivityRoute(type)}/${id}/export`, {
+    ...contextParams(ctx),
+    sub_institute_id: session.sub_institute_id,
+  });
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+  if (!res.ok) {
+    const raw = await readApiJson(res, 'Failed to export package');
+    throw new Error(getApiErrorMessage(raw, 'Failed to export package'));
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = match?.[1] ?? `${TEXT_ACTIVITY_ROUTES[type]}-${id}.h5p`;
+
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+
+  return { warningCount: Number(res.headers.get('X-H5P-Export-Warnings') ?? 0) };
+}
+
+export interface TextActivityImportResult extends MutationResult {
+  id: number;
+  warnings: string[];
+}
+
+/** Create a new draft from an uploaded .h5p package. */
+export async function importTextActivityPackage(
+  type: TextActivityType,
+  ctx: H5pContext,
+  file: File
+): Promise<TextActivityImportResult> {
+  const session = requireSession();
+  const fd = buildFormData({
+    ...contextParams(ctx),
+    sub_institute_id: session.sub_institute_id,
+    user_id: session.user_id,
+    syear: session.syear,
+  });
+  fd.append('package', file);
+
+  const res = await fetch(`${API_BASE_URL}${textActivityRoute(type)}/import`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: fd,
+  });
+  const raw = await readApiJson(res, 'Failed to import package');
+  if (!res.ok || !isApiSuccess(raw)) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to import package'));
+  }
+  return {
+    status: true,
+    message: (raw.message as string) || 'Package imported as a draft.',
+    id: Number(raw.id ?? 0),
+    warnings: ((raw.warnings as string[]) ?? []).map(String),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Text-passage markup and scoring
+// ---------------------------------------------------------------------------
+
+/**
+ * Both live in lib/h5p/ so they can be unit-tested without a browser or a
+ * fetch stub -- this module cannot be imported outside Next.js. Re-exported
+ * here so a page has one import for the types it renders.
+ *
+ * The row types above are structurally compatible with what the scorer takes,
+ * so nothing converts between them.
+ */
+export {
+  answerKey,
+  markableTokens,
+  parseDistractors,
+  parsePassage,
+  passageProblems,
+  plainText,
+  segmentPassage,
+  wordBank,
+} from '@/lib/h5p/text-activity-markup';
+export type { MarkableToken, ParsedSlot, PassageSegment } from '@/lib/h5p/text-activity-markup';
+
+export { feedbackFor, matchesAnswer, scoreAttempt, scoreBlanks, scoreMarkedWords } from '@/lib/h5p/text-activity-scoring';
+export type { TextAttemptResult } from '@/lib/h5p/text-activity-scoring';
