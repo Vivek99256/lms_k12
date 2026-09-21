@@ -10,7 +10,10 @@ import { errorMessage } from "@/lib/erp-legacy";
 import {
   convertSopProcedure,
   deriveTasks,
+  bareModule,
   findModule,
+  findStoredSop,
+  libraryModule,
   findModuleByName,
   findProcedure,
   sampleProcedureFor,
@@ -22,6 +25,8 @@ import {
   type ParseIssue,
   type ProcessSpec,
   type ProcessStatus,
+  type SopModule,
+  type StoredSop,
   type TaskDraft,
 } from "@/lib/process";
 import { deleteAddProcess } from "./api";
@@ -32,6 +37,7 @@ import {
 } from "./_lib/process-store";
 import { PublishPanel } from "./_components/PublishPanel";
 import { StepProcess } from "./_components/StepProcess";
+import { loadInstituteSops } from "./api";
 import { StepSource, type SourceState } from "./_components/StepSource";
 import { StepTasks } from "./_components/StepTasks";
 import { StepWorkflow } from "./_components/StepWorkflow";
@@ -69,11 +75,17 @@ const STATUS_LABELS: Record<ProcessStatus, string> = {
   published: "Published",
 };
 
-function emptySource(defaultModuleKey?: string): SourceState {
+function emptySource(modules: SopModule[], defaultModuleKey?: string): SourceState {
   return {
-    // The module a route belongs to, when it has one - Fees -> Process builder
-    // opens on Fees. Otherwise the first registered module, as it always was.
-    moduleKey: (defaultModuleKey && findModule(defaultModuleKey)?.key) || SOP_MODULES[0]?.key || "",
+    // The module a route belongs to, when it has one - Student -> Process
+    // builder opens on Student, Fees on Fees. `modules` already contains that
+    // module whether or not its SOP has been digitized, so the default is the
+    // place the person actually is. Otherwise the first registered module, as
+    // it always was.
+    moduleKey:
+      (defaultModuleKey && modules.find((entry) => entry.key === defaultModuleKey)?.key) ||
+      modules[0]?.key ||
+      "",
     groupRef: "",
     procedureRef: "",
     text: "",
@@ -96,9 +108,85 @@ function jumpTo(sectionId: string) {
   document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string } = {}) {
+export function AddProcessPage({
+  defaultModuleKey,
+  defaultModuleName,
+}: {
+  defaultModuleKey?: string;
+  /**
+   * What the menu calls the module this screen was opened from.
+   *
+   * Needed only for a module the SOP registry does not know: it is offered and
+   * selected under this name instead of the screen quietly falling back to
+   * LMS + PAL, which claimed the person was somewhere they were not and would
+   * have filed their process under the wrong module.
+   */
+  defaultModuleName?: string;
+} = {}) {
+  /**
+   * The modules this screen offers: the registered ones, plus the module it was
+   * opened from when that module has no SOP catalogue yet.
+   *
+   * A registered module always wins, so a module that digitizes its SOP later
+   * simply starts appearing with its groups and procedures.
+   */
+  /**
+   * The institute's own SOP documents. Loaded only for a module with no shipped
+   * catalogue, because that is the only case whose pickers they fill.
+   */
+  const [sops, setSops] = useState<StoredSop[]>([]);
+  /**
+   * Why the library is empty, when it is empty because the call failed.
+   *
+   * Kept apart from `error`, which is for things that stop the screen working:
+   * the pickers are an aid and the converter still runs on pasted text. But it
+   * is reported, because a silent catch here is exactly what made a 404 look
+   * like "this institute has no SOPs".
+   */
+  const [sopsError, setSopsError] = useState("");
+
+  const modules = useMemo<SopModule[]>(() => {
+    if (!defaultModuleKey || findModule(defaultModuleKey)) return SOP_MODULES;
+
+    const name = (defaultModuleName || "").trim();
+    if (!name) return SOP_MODULES;
+
+    // With documents, the module's Process group and Procedure pickers list
+    // them; without, it carries its identity alone and the screen says the SOP
+    // has not been digitized. Both are the truth about this institute rather
+    // than an invented catalogue.
+    const own = sops.length > 0
+      ? libraryModule(defaultModuleKey, name, sops)
+      : bareModule(defaultModuleKey, name);
+
+    return [own, ...SOP_MODULES];
+  }, [defaultModuleKey, defaultModuleName, sops]);
+
+  const resolveModule = useCallback(
+    (key: string) => modules.find((entry) => entry.key === key),
+    [modules]
+  );
+
+  /**
+   * The text behind a chosen procedure, wherever it comes from: the SOP source
+   * a digitized module ships, or the stored document a library-backed module
+   * offers. One resolver, so "Load SOP text" and the auto-fill on selection can
+   * never disagree about what a procedure's text is.
+   */
+  const sourceTextFor = useCallback(
+    (moduleKey: string, procedureRef: string): string | null => {
+      if (!procedureRef) return null;
+
+      const stored = findStoredSop(sops, procedureRef);
+      if (stored) return stored.content.trim() || null;
+
+      return shippedSourceFor(moduleKey, procedureRef);
+    },
+    [sops]
+  );
+
   const [rows, setRows] = useState<StoredProcessRow[]>([]);
-  const [source, setSource] = useState<SourceState>(() => emptySource(defaultModuleKey));
+  const [source, setSource] = useState<SourceState>(() => emptySource(modules, defaultModuleKey));
   const [spec, setSpec] = useState<ProcessSpec | null>(null);
   const [issues, setIssues] = useState<ParseIssue[]>([]);
   const [status, setStatus] = useState<ProcessStatus>("draft");
@@ -116,7 +204,7 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
   // mid-review, and so what the preview shows is what gets published.
   const [publishFrom] = useState(() => new Date());
 
-  const sopModule = useMemo(() => findModule(source.moduleKey), [source.moduleKey]);
+  const sopModule = useMemo(() => resolveModule(source.moduleKey), [resolveModule, source.moduleKey]);
   /** The procedure this module ships full SOP text for, offered on a first visit. */
   const sample = useMemo(() => sampleProcedureFor(source.moduleKey), [source.moduleKey]);
   const busy = loading || converting || saving || deletingId !== null;
@@ -170,6 +258,37 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
     void load();
   }, [load]);
 
+  /**
+   * The SOP library, for a module the registry does not know.
+   *
+   * A failure does not stop the screen — the converter's real input is the
+   * pasted text — but it is reported in the Source caption rather than
+   * swallowed, so "the library is empty" and "the library could not be read"
+   * are never the same screen.
+   */
+  useEffect(() => {
+    if (!defaultModuleKey || findModule(defaultModuleKey)) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const rows = await loadInstituteSops();
+        if (cancelled) return;
+        setSops(rows);
+        setSopsError("");
+      } catch (value: unknown) {
+        if (cancelled) return;
+        setSops([]);
+        setSopsError(errorMessage(value, "The institute SOP library could not be loaded."));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultModuleKey]);
+
   function updateSource(next: Partial<SourceState>) {
     setSource((current) => {
       const merged = { ...current, ...next };
@@ -178,8 +297,8 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
       // box is empty or still holds another procedure's text - never clobber
       // something the user typed.
       if (next.procedureRef && next.procedureRef !== current.procedureRef) {
-        const shipped = shippedSourceFor(merged.moduleKey, next.procedureRef);
-        const untouched = !current.text.trim() || current.text === shippedSourceFor(merged.moduleKey, current.procedureRef);
+        const shipped = sourceTextFor(merged.moduleKey, next.procedureRef);
+        const untouched = !current.text.trim() || current.text === sourceTextFor(merged.moduleKey, current.procedureRef);
         if (shipped && untouched) merged.text = shipped;
       }
 
@@ -188,7 +307,7 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
   }
 
   function loadShippedSource() {
-    const shipped = shippedSourceFor(source.moduleKey, source.procedureRef);
+    const shipped = sourceTextFor(source.moduleKey, source.procedureRef);
     updateSource({ text: shipped ?? SOP_SOURCE_TEMPLATE });
   }
 
@@ -205,7 +324,7 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
   async function convert(from: SourceState = source) {
     // Resolved from the passed source, not from state: "try the sample"
     // converts a source that has not been committed to state yet.
-    const target = findModule(from.moduleKey);
+    const target = resolveModule(from.moduleKey);
     if (!target) return;
 
     setConverting(true);
@@ -324,7 +443,11 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
     // happens to show: with more than one module registered, opening a Fees
     // process while the picker sits on LMS + PAL would resolve its group
     // against the wrong index and read it back in the wrong vocabulary.
-    const storedModule = findModuleByName(stored.module) ?? findModule(source.moduleKey) ?? SOP_MODULES[0];
+    const storedModule =
+      findModuleByName(stored.module) ??
+      modules.find((entry) => entry.name.toLowerCase() === stored.module.trim().toLowerCase()) ??
+      resolveModule(source.moduleKey) ??
+      modules[0];
     const found = findProcedure(storedModule, stored.ref);
     setSource((current) => ({
       ...current,
@@ -470,12 +593,14 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
       <div id={SECTION_IDS.source} className="scroll-mt-40">
         <StepSource
           state={source}
+          modules={modules}
+          libraryError={sopsError}
           onChange={updateSource}
           issues={spec ? [] : issues}
           converting={converting}
           onConvert={() => void convert()}
           onLoadShippedSource={loadShippedSource}
-          hasShippedSource={Boolean(shippedSourceFor(source.moduleKey, source.procedureRef))}
+          hasShippedSource={Boolean(sourceTextFor(source.moduleKey, source.procedureRef))}
           disabled={saving}
         />
       </div>

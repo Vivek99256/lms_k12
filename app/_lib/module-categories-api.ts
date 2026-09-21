@@ -46,6 +46,28 @@ export type ModuleCategory = {
    * instead of guessing one.
    */
   onboardingModuleKey: string;
+  /**
+   * Set on the Workflow and Schedular categories: the
+   * `config/platform_services.php` module whose approval points and scheduled
+   * tasks this bar configures.
+   *
+   * Both are the same kind of category as Onboarding — a console that already
+   * exists centrally, reached from inside the module — so the key says which
+   * module to pin it to. One key serves both, because both read one registry.
+   * Empty means the registry declares no such module, and the page says so
+   * instead of showing a neighbouring module's records.
+   */
+  platformModuleKey: string;
+  /**
+   * Set on the Audit Trail category only: the `access_log_route.module`
+   * prefixes this module's screens write.
+   *
+   * A list, not a key, because that column holds the first path segment of the
+   * URL that was opened and one bar's screens can sit under several — the Exam
+   * bar logs under both 'exam' and 'result'. Empty means this module's screens
+   * never reach the middleware that writes the log.
+   */
+  auditModuleKeys: string[];
   items: ModuleCategoryItem[];
 };
 
@@ -157,6 +179,10 @@ function readCategories(payload: unknown): ModuleCategory[] {
         description: readString(record.description),
         route: readString(record.route),
         onboardingModuleKey: readString(record.onboarding_module_key),
+        platformModuleKey: readString(record.platform_module_key),
+        auditModuleKeys: Array.isArray(record.audit_module_keys)
+          ? record.audit_module_keys.map(readString).filter((key) => key !== '')
+          : [],
         items,
       },
     ];

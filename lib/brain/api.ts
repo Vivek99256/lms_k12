@@ -372,6 +372,46 @@ export interface BrainStudentsPayload {
 }
 
 export const fetchIntelligence = () => brainFetch<BrainIntelligencePayload>(tenantPath('/intelligence'));
+
+/**
+ * The loop narrowed to one module — what a module's own Intelligence tab shows.
+ *
+ * Backend: BrainIntelligenceController::moduleIntelligence,
+ *          GET /api/brain/{tenant}/modules/{module}/intelligence
+ *
+ * The module is a config/platform_services.php key, the same vocabulary the
+ * menu category rows carry in `platform_module_key`, so one module means the
+ * same thing to the Brain, the workflow console and the scheduler.
+ *
+ * `declared` and an empty `signals` list are different answers and are both
+ * returned: no rule watches this module yet, versus rules watch it and found
+ * nothing. The screen must not collapse them into one empty state.
+ */
+export interface ModuleIntelligencePayload {
+  module: string;
+  label: string;
+  /** Whether config/platform_services.php declares this module at all. */
+  registered: boolean;
+  /** Whether any Brain rule is attributed to it. */
+  declared: boolean;
+  /** The rules that watch this module, firing or not. */
+  rules: string[];
+  signals: BrainFinding[];
+  recommendations: BrainRecommendation[];
+  summary: {
+    signals: number;
+    bySeverity: Record<string, number>;
+    byStatus: Record<string, number>;
+    recommendations: number;
+    open: number;
+  };
+  lastRun: { at: string; changes: Record<string, unknown> } | null;
+}
+
+export const fetchModuleIntelligence = (moduleKey: string) =>
+  brainFetch<ModuleIntelligencePayload>(
+    tenantPath(`/modules/${encodeURIComponent(moduleKey)}/intelligence`)
+  );
 export const runIntelligence = () =>
   brainFetch<Record<string, unknown>>(tenantPath('/intelligence/run'), { method: 'POST' });
 export const fetchSignalDetail = (id: string) => brainFetch<BrainSignalDetail>(tenantPath(`/signals/${id}`));
