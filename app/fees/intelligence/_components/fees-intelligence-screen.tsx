@@ -27,10 +27,20 @@ import {
 } from '@/app/fees/intelligence/_lib/fees-intelligence-api';
 import {
   AgingProfile,
+  BankMandatesCard,
+  CancellationReasonsCard,
   ClassBreakdown,
+  CollectionVelocityCard,
   CycleTrend,
+  FeeRevisionsCard,
+  GatewayReconciliationCard,
   HeadBreakdown,
+  LateRulesCard,
+  OtherCollectionsCard,
+  PaymentFailuresCard,
+  PaymentMethodsCard,
   PaymentModeMix,
+  RemindersCard,
 } from '@/app/fees/intelligence/_components/fees-intelligence-charts';
 import {
   ConfidencePill,
@@ -171,6 +181,7 @@ export function FeesIntelligenceScreen() {
             }
           />
 
+          <OperationalRiskIntelligence data={data} />
           <PriorityAttention data={data} />
           <CancellationAndRefund data={data} />
           <Recommendations data={data} onDecided={refresh} />
@@ -613,7 +624,9 @@ function Trends({ data, onSelectClass }: { data: FeesIntelligencePayload; onSele
     charts.classes.length === 0 &&
     charts.heads.length === 0 &&
     charts.modes.length === 0 &&
-    charts.aging.length === 0;
+    charts.aging.length === 0 &&
+    !(data.velocity?.available && data.velocity.dailyTrend.length > 0) &&
+    !(data.otherCollections?.available && data.otherCollections.receiptsCount > 0);
 
   return (
     <Section
@@ -637,8 +650,43 @@ function Trends({ data, onSelectClass }: { data: FeesIntelligencePayload; onSele
           <HeadBreakdown heads={charts.heads} />
           <AgingProfile bands={charts.aging} />
           <PaymentModeMix modes={charts.modes} />
+          <CollectionVelocityCard data={data.velocity} />
+          <OtherCollectionsCard data={data.otherCollections} />
         </div>
       )}
+    </Section>
+  );
+}
+
+/* ================================= 3.5 operational & risk intelligence */
+
+function OperationalRiskIntelligence({ data }: { data: FeesIntelligencePayload }) {
+  const { paymentFailures, reconciliation, bankMandates, paymentMethods, lateRules, reminders } = data;
+
+  const hasAny =
+    Boolean(paymentFailures?.available && paymentFailures.failureCount > 0) ||
+    Boolean(reconciliation?.available && reconciliation.gatewayTransactions > 0) ||
+    Boolean(bankMandates?.available && bankMandates.registeredMandates > 0) ||
+    Boolean(paymentMethods?.available && paymentMethods.totalMappings > 0) ||
+    Boolean(lateRules?.available && lateRules.rulesCount > 0) ||
+    Boolean(reminders?.available && reminders.remindersSent > 0);
+
+  if (!hasAny) return null;
+
+  return (
+    <Section
+      eyebrow="Operations & Risk"
+      title="Gateway, NACH & Execution Intelligence"
+      description="Live operational health across payment failure rates, gateway settlements, automated mandate readiness, late penalty rules, and collection notice velocity."
+    >
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <PaymentFailuresCard data={paymentFailures} />
+        <GatewayReconciliationCard data={reconciliation} />
+        <BankMandatesCard data={bankMandates} />
+        <PaymentMethodsCard data={paymentMethods} />
+        <LateRulesCard data={lateRules} />
+        <RemindersCard data={reminders} />
+      </div>
     </Section>
   );
 }
@@ -785,6 +833,13 @@ function CancellationAndRefund({ data }: { data: FeesIntelligencePayload }) {
               </div>
             )}
           </Surface>
+
+          {adjustments.cancellationReasons && adjustments.cancellationReasons.length > 0 ? (
+            <CancellationReasonsCard reasons={adjustments.cancellationReasons} />
+          ) : null}
+          {data.feeRevisions?.available && data.feeRevisions.revisionCount > 0 ? (
+            <FeeRevisionsCard data={data.feeRevisions} />
+          ) : null}
         </div>
       )}
     </Section>
@@ -1598,7 +1653,19 @@ function AccountsDrawer({
                 {page?.rows.map((row) => (
                   <tr key={row.studentId} className="border-b border-slate-100 last:border-0">
                     <td className="py-2 pr-3">
-                      <span className="block font-semibold text-slate-800">{row.name}</span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-slate-800">{row.name}</span>
+                        {row.mandateRegistered ? (
+                          <span className="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                            NACH Active
+                          </span>
+                        ) : null}
+                        {row.failureCount && row.failureCount > 0 ? (
+                          <span className="inline-flex items-center rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
+                            {row.failureCount} {row.failureCount === 1 ? 'bounce' : 'bounces'}
+                          </span>
+                        ) : null}
+                      </div>
                       <span className="block text-[11.5px] text-slate-500">
                         {[row.className, row.enrollmentNo ? `Enrolment ${row.enrollmentNo}` : '']
                           .filter(Boolean)

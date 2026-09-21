@@ -8,6 +8,19 @@ import {
   fetchFeesMenuCategories,
   type FeesCategory,
 } from '@/app/fees/_lib/fees-menu-categories-api';
+import { moduleIntelligenceRoute } from '@/components/intelligence/module/registry';
+
+/**
+ * Fees' Intelligence tab, on the one canonical Intelligence route.
+ *
+ * The configured route for this category is still `/fees/intelligence`, and
+ * that page still renders — but the sidebar item and this tab must open the
+ * same address, or the product has two canonical Intelligence routes for Fees.
+ * `/modules/fees/intelligence` mounts the very same Fees Intelligence page
+ * component, so the screen is unchanged. 'fees' is this module's `module_name`
+ * in fees_menu_categories.
+ */
+const FEES_INTELLIGENCE_ROUTE = moduleIntelligenceRoute('fees');
 
 /**
  * The Fees module's level-3 navigation: the seven Fees categories, and nothing
@@ -161,20 +174,30 @@ export function useFeesLevel3Nav({
       };
     }
 
+    const items = categories.map<Level3Item>((category) => {
+      const href = category.key === 'onboarding'
+        ? '/fees/onboarding'
+        : category.key === 'intelligence'
+          ? FEES_INTELLIGENCE_ROUTE
+          : category.route || `/fees/${category.key}`;
+      return {
+        id: `fees-category-${category.key}`,
+        label: category.label,
+        href,
+      };
+    });
+
+    if (!items.some((item) => item.href === FEES_INTELLIGENCE_ROUTE || item.label.toLowerCase() === 'intelligence')) {
+      items.push({
+        id: 'fees-category-intelligence',
+        label: 'Intelligence',
+        href: FEES_INTELLIGENCE_ROUTE,
+      });
+    }
+
     return {
       parentLabel: 'Fees',
-      items: categories.map<Level3Item>((category) => {
-        const href = category.key === 'onboarding'
-          ? '/fees/onboarding'
-          : category.key === 'intelligence'
-            ? '/fees/intelligence'
-            : category.route || `/fees/${category.key}`;
-        return {
-          id: `fees-category-${category.key}`,
-          label: category.label,
-          href,
-        };
-      }),
+      items,
       hideMaster: true,
     };
   }, [active, state, categories]);

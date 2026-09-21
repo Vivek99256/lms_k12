@@ -8,6 +8,10 @@ import {
   fetchTeachLearnMenuCategories,
   type TeachLearnCategory,
 } from '@/app/teach-learn/_lib/teach-learn-menu-categories-api';
+import { moduleIntelligenceRoute } from '@/components/intelligence/module/registry';
+
+/** See the Intelligence tab below. 'teach_learn' is this module's `module_name`. */
+const TEACH_LEARN_INTELLIGENCE_ROUTE = moduleIntelligenceRoute('teach_learn');
 
 /**
  * The Teach/Learn module's level-3 navigation: its category tabs, and nothing
@@ -180,8 +184,16 @@ export function useTeachLearnLevel3Nav({
         items: categories.map<Level3Item>((category) => ({
           id: `teach-learn-category-${category.key}`,
           label: category.label,
-          // The dedicated Teach/Learn endpoint returns this module's route.
-          href: category.route || `/teach-learn/${category.key}`,
+          // The dedicated Teach/Learn endpoint returns this module's route —
+          // used as configured, except for Intelligence, which goes to the one
+          // canonical Intelligence namespace so this tab and the sidebar item
+          // open the same address. That route mounts this module's existing
+          // Intelligence page, so the screen is unchanged. 'teach_learn' is the
+          // module's own `module_name` in fees_menu_categories.
+          href:
+            category.key === 'intelligence'
+              ? TEACH_LEARN_INTELLIGENCE_ROUTE
+              : category.route || `/teach-learn/${category.key}`,
         })),
         hideMaster: true,
       },
