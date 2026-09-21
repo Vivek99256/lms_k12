@@ -7,10 +7,13 @@ import {
   ArrowRight,
   Brain,
   HelpCircle,
+  Highlighter,
   Image as ImageIcon,
   Layers3,
   MousePointerClick,
+  Move,
   Sparkles,
+  TextCursorInput,
   Video,
 } from 'lucide-react';
 import { H5P_ROUTE_MAP, h5pContextQuery, hasH5pContext, readH5pContext } from '../data/h5p';
@@ -36,6 +39,9 @@ const TYPE_ICONS: Record<string, typeof ImageIcon> = {
   multiple_choice: HelpCircle,
   flash_cards: Layers3,
   drag_and_drop: MousePointerClick,
+  drag_text: Move,
+  fill_in_the_blanks: TextCursorInput,
+  mark_the_words: Highlighter,
 };
 
 /** Registry route name (`scenario_based.index`) → this app's route. */
