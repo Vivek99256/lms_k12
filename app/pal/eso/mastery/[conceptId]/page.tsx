@@ -7,6 +7,8 @@ import { ArrowLeft, ArrowRight, Circle, Loader2 } from 'lucide-react';
 
 import { DashboardError } from '@/app/dashboard/_components/DashboardPrimitives';
 import { Button } from '@/components/ui/button';
+import { isConceptCompleted, signalsFromChapterSection } from '@/app/pal/data/pal-completion';
+import { CompletedBadge, ReadOnlyBadge } from '@/app/pal/_components/CompletionState';
 import {
   defaultLearnerId,
   fetchChapterDashboard,
@@ -188,6 +190,16 @@ function MasteryDetailsPageContent() {
         {!loading && !error && details && (
           <MasteryDetailsContent
             details={details}
+            // The engine has no difficulty bands, so its own `mastered`
+            // verdict is what completion turns on here - see
+            // app/pal/data/pal-completion.ts.
+            completed={isConceptCompleted(signalsFromChapterSection({
+              conceptId: details.conceptId,
+              name: details.conceptName,
+              status: details.status,
+              knowledgeMastery: details.knowledgeMastery,
+              applicationMastery: details.applicationMastery,
+            }))}
             onDoNext={() => onOpenConcept(details.conceptId)}
             knowledgeMapHref={`/pal/eso/knowledge-map/${details.conceptId}?learnerId=${learnerId}`}
           />
@@ -213,10 +225,12 @@ const SECTION_STATUS_STYLE: Record<ChapterSectionStatus, string> = {
 
 function MasteryDetailsContent({
   details,
+  completed,
   onDoNext,
   knowledgeMapHref,
 }: {
   details: ConceptMasteryDetails;
+  completed: boolean;
   onDoNext: () => void;
   knowledgeMapHref: string;
 }) {
@@ -423,10 +437,21 @@ function MasteryDetailsContent({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={onDoNext} className="bg-indigo-600 text-white hover:bg-indigo-700">
-          What should I do next?
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
+        {/* "What should I do next?" hands the learner to the engine, which
+            answers with teach, practice or a check. A completed concept has no
+            next step to be handed to, so the control is replaced by the two
+            badges that say why. */}
+        {completed ? (
+          <>
+            <CompletedBadge />
+            <ReadOnlyBadge />
+          </>
+        ) : (
+          <Button onClick={onDoNext} className="bg-indigo-600 text-white hover:bg-indigo-700">
+            What should I do next?
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <a
           href={knowledgeMapHref}
           className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 px-2.5 py-1.5 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-50"

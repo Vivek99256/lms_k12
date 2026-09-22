@@ -47,6 +47,11 @@ import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 import { AdaptiveLearningButton } from '@/app/pal/_components/AdaptiveLearningButton';
 import { PracticePanel } from '@/app/pal/_components/PracticePanel';
+import {
+  CompletedBadge,
+  ReadOnlyBadge,
+  useChapterCompletion,
+} from '@/app/pal/_components/CompletionState';
 import { fetchChapterGate, type ChapterGateData } from '@/app/pal/data/pal';
 
 type ModalKind = 'pedagogy' | 'misconception';
@@ -473,6 +478,13 @@ function ChapterRow({
   const [gate, setGate] = useState<ChapterGateData | null>(null);
   const router = useRouter();
 
+  // Completed chapters are closed to the learner they belong to. Staff browsing
+  // a student's subjects are excluded: the mastery route answers for the
+  // signed-in user id, so asking it here would report the staff member's own
+  // (empty) mastery and quietly mislabel the student's chapters.
+  const { completion } = useChapterCompletion(context.chapterId, !isStaff);
+  const completed = completion.isComplete;
+
   // Prerequisite gate check — Step 5 of the learning journey. A chapter with
   // no mapped concepts (most legacy chapters) comes back with an empty
   // concept list and anyLocked=false, so this defaults to unlocked rather
@@ -514,12 +526,22 @@ function ChapterRow({
             ) : (
               <button
                 type="button"
-                onClick={() => router.push(`/pal/eso/chapter/${context.chapterId}`)}
+                // A completed chapter opens on its mastery, not on the engine
+                // dashboard — that screen offers next steps a closed chapter
+                // no longer has.
+                onClick={() =>
+                  router.push(
+                    completed
+                      ? `/pal/mastery/chapter/${context.chapterId}`
+                      : `/pal/eso/chapter/${context.chapterId}`
+                  )
+                }
                 className="text-sm font-medium text-slate-900 underline-offset-2 hover:text-indigo-700 hover:underline"
               >
                 {chapter.name}
               </button>
             )}
+            {completed && <CompletedBadge />}
             {hasAttempts && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                 {chapter.quizCount} quiz{chapter.quizCount === 1 ? '' : 'zes'}
@@ -527,7 +549,13 @@ function ChapterRow({
             )}
           </div>
 
-          {locked && unmasteredNames.length > 0 && (
+          {completed && (
+            <p className="mt-2 text-xs text-emerald-700">
+              Every concept in this chapter is completed and signed off. It is now read only.
+            </p>
+          )}
+
+          {!completed && locked && unmasteredNames.length > 0 && (
             <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
@@ -577,72 +605,91 @@ function ChapterRow({
               `isStaff` is still used elsewhere on this page, so nothing else
               changes with it. */}
 
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            {/* The primary route in. The plan page is the stage router: it reads
-                the learner's stored evidence and opens on whatever they should
-                do next — take the diagnostic, practise a weak concept, or go to
-                Learn and Check. That keeps the decision server-side instead of
-                asking every chapter row to work it out for itself. */}
-            {!isStaff && (
-              <Button size="sm" onClick={() => router.push(`/pal/plan/chapter/${context.chapterId}`)}>
-                <Route className="h-3.5 w-3.5" />
-                Learning journey
+          {/* A completed chapter keeps one route, and it leads to a read-only
+              record. Every control that would start a quiz, draw a diagnostic
+              or open the engine is gone — not disabled, gone — so there is
+              nothing on this row that could write against a closed chapter. */}
+          {completed ? (
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              <ReadOnlyBadge />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push(`/pal/mastery/chapter/${context.chapterId}`)}
+                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              >
+                <GraduationCap className="h-3.5 w-3.5" />
+                View chapter mastery
               </Button>
-            )}
-
-            {/* Straight to the 15-question chapter paper, for a learner who
-                knows that is what they want. */}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => router.push(`/pal/diagnostic/chapter/${context.chapterId}`)}
-              className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-            >
-              <ClipboardCheck className="h-3.5 w-3.5" />
-              Take chapter diagnostic
-            </Button>
-
-            {/* Adaptive Learning is a learner-facing feature: a student may only
-                ever start their own session, never a teacher/staff/admin acting
-                as (or "viewing as") a student — enforced independently on the
-                backend by the eso.student route middleware regardless of what
-                renders here, but the entry point itself must not offer a
-                staff-facing way to start it either. */}
-            {!isStaff && <AdaptiveLearningButton chapterId={context.chapterId} />}
-            {hasAttempts && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onOpenModal('pedagogy')}
-                  className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Suggested content
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              {/* The primary route in. The plan page is the stage router: it reads
+                  the learner's stored evidence and opens on whatever they should
+                  do next — take the diagnostic, practise a weak concept, or go to
+                  Learn and Check. That keeps the decision server-side instead of
+                  asking every chapter row to work it out for itself. */}
+              {!isStaff && (
+                <Button size="sm" onClick={() => router.push(`/pal/plan/chapter/${context.chapterId}`)}>
+                  <Route className="h-3.5 w-3.5" />
+                  Learning journey
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onOpenModal('misconception')}
-                  className="border-rose-200 text-rose-700 hover:bg-rose-50"
-                >
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Misconception
-                </Button>
-                <PracticePanel studentId={studentId} context={context} />
-              </>
-            )}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onStartQuiz}
-              disabled={locked}
-              title={locked ? 'Master the prerequisite concept(s) above first' : undefined}
-            >
-              {locked ? <Lock className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-              {locked ? 'Locked' : hasAttempts ? 'Next quiz' : 'Start quiz'}
-            </Button>
-          </div>
+              )}
+
+              {/* Straight to the 15-question chapter paper, for a learner who
+                  knows that is what they want. */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push(`/pal/diagnostic/chapter/${context.chapterId}`)}
+                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              >
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                Take chapter diagnostic
+              </Button>
+
+              {/* Adaptive Learning is a learner-facing feature: a student may only
+                  ever start their own session, never a teacher/staff/admin acting
+                  as (or "viewing as") a student — enforced independently on the
+                  backend by the eso.student route middleware regardless of what
+                  renders here, but the entry point itself must not offer a
+                  staff-facing way to start it either. */}
+              {!isStaff && <AdaptiveLearningButton chapterId={context.chapterId} />}
+              {hasAttempts && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onOpenModal('pedagogy')}
+                    className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Suggested content
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onOpenModal('misconception')}
+                    className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Misconception
+                  </Button>
+                  <PracticePanel studentId={studentId} context={context} />
+                </>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onStartQuiz}
+                disabled={locked}
+                title={locked ? 'Master the prerequisite concept(s) above first' : undefined}
+              >
+                {locked ? <Lock className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                {locked ? 'Locked' : hasAttempts ? 'Next quiz' : 'Start quiz'}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

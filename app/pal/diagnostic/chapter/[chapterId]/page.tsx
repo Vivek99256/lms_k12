@@ -16,7 +16,13 @@ import {
   type DiagnosticQuestionItem,
 } from '@/app/pal/data/pal-diagnostic';
 import { BandChip, bandLabel } from '@/app/pal/_components/BandMeter';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import {
+  CompletedBadge,
+  CompletedChapterPanel,
+  ReadOnlyBadge,
+  useChapterCompletion,
+} from '@/app/pal/_components/CompletionState';
+import { COMPLETED_THROUGH_CHECK, JourneyRail } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -39,6 +45,15 @@ import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components
  * comes back with `attemptId: null` and a machine `reason`; only 23 of 150
  * chapters on this estate can, so that path is ordinary and is explained rather
  * than rendered as an error.
+ *
+ * ---------------------------------------------------------------------------
+ * A COMPLETED CHAPTER IS NEVER STARTED
+ * ---------------------------------------------------------------------------
+ * `startChapterDiagnostic` WRITES - it opens or resumes a pal_diagnostic_attempt
+ * - so completion has to be settled before it is called, not after a paper has
+ * already been drawn. A chapter whose every measurable concept has been cleared
+ * to hard and signed off renders its mastery instead, and no attempt is created.
+ * See app/pal/data/pal-completion.ts for the rule.
  */
 
 export default function DiagnosticExamPage() {
@@ -70,6 +85,12 @@ function DiagnosticExam() {
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
+  const {
+    mastery,
+    completion,
+    loading: checkingCompletion,
+  } = useChapterCompletion(chapterId);
 
   const load = useCallback(() => {
     const controller = new AbortController();
@@ -106,7 +127,12 @@ function DiagnosticExam() {
     return () => controller.abort();
   }, [chapterId]);
 
-  useEffect(() => load(), [load]);
+  // Gated, not aborted: `load` opens an attempt server-side, so a completed
+  // chapter must never reach it in the first place.
+  useEffect(() => {
+    if (checkingCompletion || completion.isComplete) return;
+    return load();
+  }, [load, checkingCompletion, completion.isComplete]);
 
   const submit = useCallback(async () => {
     if (!paper?.attemptId || submitting) return;
@@ -200,6 +226,39 @@ function DiagnosticExam() {
 
   const total = paper?.questions.length ?? 0;
   const answered = Object.keys(answers).length;
+
+  if (checkingCompletion) return <Centered>Loading this chapter…</Centered>;
+
+  // Nothing left to diagnose. No paper was drawn and no attempt was opened.
+  if (completion.isComplete && mastery) {
+    return (
+      <PalWorkspace
+        eyebrow={mastery.chapterName || 'This chapter'}
+        title="Chapter mastery"
+        description="This chapter is completed, so there is no diagnostic left to take."
+        backHref="/pal"
+        backLabel="Back to subjects"
+        actions={
+          <>
+            <CompletedBadge />
+            <ReadOnlyBadge />
+          </>
+        }
+        rail={
+          <PalRailSection title="Your journey">
+            <JourneyRail
+              current="mastery"
+              completed={COMPLETED_THROUGH_CHECK}
+              bypassed={['intervention']}
+              orientation="vertical"
+            />
+          </PalRailSection>
+        }
+      >
+        <CompletedChapterPanel mastery={mastery} completion={completion} />
+      </PalWorkspace>
+    );
+  }
 
   if (loading) return <Centered>Drawing your chapter diagnostic…</Centered>;
 
