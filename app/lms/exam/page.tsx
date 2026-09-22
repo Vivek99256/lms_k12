@@ -21,6 +21,7 @@ import {
   BookOpen,
   Play,
   Printer,
+  ScanLine,
   Send,
   Sparkles,
   X,
@@ -37,6 +38,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import ExamResultDashboard from '@/app/lms/exam/_result-dashboard/ExamResultDashboard';
+import AssessmentBlueprints from '@/app/lms/exam/_assessment-blueprint/AssessmentBlueprints';
+import ExamEvaluation from '@/app/lms/exam/_exam-evaluation/ExamEvaluation';
 import QuestionPaperTemplates from '@/app/lms/exam/_question-paper-templates/QuestionPaperTemplates';
 import {
   QuestionPaperTemplateSelect,
@@ -326,12 +329,28 @@ type QuestionRecord = {
 
 const attemptsAllowedOptions = ['1 attempt', '2 attempts', '3 attempts'];
 
-type ExamInnerTab = 'Exams' | 'Results dashboard' | 'Question paper templates';
+type ExamInnerTab =
+  | 'Blueprint'
+  | 'Exams'
+  | 'Question paper templates'
+  | 'Exam evaluation'
+  | 'Results dashboard';
 
+/**
+ * The tabs run in the order the work actually happens in, so the bar reads
+ * left to right as one paper's life: design it, set it, print it, mark it,
+ * report it. Results sits last because it is the only tab that cannot be used
+ * until every other one has been.
+ *
+ * `Exams` is still where the screen opens (see `examInnerTab`) -- it is the
+ * daily screen, and the order is a map of the process, not a wizard.
+ */
 const innerTabs: Array<{ label: ExamInnerTab; icon: LucideIcon }> = [
+  { label: 'Blueprint', icon: BookOpen },
   { label: 'Exams', icon: FileText },
-  { label: 'Results dashboard', icon: GraduationCap },
   { label: 'Question paper templates', icon: Layers },
+  { label: 'Exam evaluation', icon: ScanLine },
+  { label: 'Results dashboard', icon: GraduationCap },
 ];
 
 const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon; hidden?: boolean }> = [
@@ -2391,10 +2410,16 @@ export default function StudentHomeworkIndexPage() {
                   })}
                 </div>
 
-                {examInnerTab === 'Results dashboard' ? (
-                  <ExamResultDashboard />
+                {/* Same order as `innerTabs`; `Exams` is the fallback because it is
+                    the tab the screen opens on. */}
+                {examInnerTab === 'Blueprint' ? (
+                  <AssessmentBlueprints />
                 ) : examInnerTab === 'Question paper templates' ? (
                   <QuestionPaperTemplates />
+                ) : examInnerTab === 'Exam evaluation' ? (
+                  <ExamEvaluation />
+                ) : examInnerTab === 'Results dashboard' ? (
+                  <ExamResultDashboard />
                 ) : (
                   <>
                   <QuestionPaperGrid
