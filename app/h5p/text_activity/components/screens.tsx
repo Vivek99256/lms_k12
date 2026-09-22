@@ -51,6 +51,8 @@ import {
   type TextActivityEditorState,
 } from './editor';
 import { TextActivityPlayer } from './player';
+import { QuestionBankSource } from '../../components/question-bank-source';
+import type { H5pTargetKind } from '@/lib/h5p/question-bank-h5p-map';
 
 /**
  * The four screens each text-passage type needs -- list, create, edit, view --
@@ -90,6 +92,20 @@ function statusChip(activity: H5pTextActivity) {
 // List
 // ---------------------------------------------------------------------------
 
+/**
+ * The H5P type each text-passage route asks the question bank for.
+ *
+ * The three share this screen, this table and this player, and differ only in
+ * `content_type` — so the bank tab differs only in which of the three it
+ * builds. The SAME bank question supplies all three: one passage, one answer
+ * key, three ways of asking it.
+ */
+const TEXT_ACTIVITY_BANK_KIND: Record<TextActivityType, H5pTargetKind> = {
+  fill_in_the_blanks: 'fill_in_the_blanks',
+  drag_text: 'drag_text',
+  mark_the_words: 'mark_the_words',
+};
+
 function ListContent({ type }: { type: TextActivityType }) {
   const router = useRouter();
   const { ctx, contextQuery, searchParams } = useH5pRouteContext();
@@ -104,6 +120,8 @@ function ListContent({ type }: { type: TextActivityType }) {
   const [isStudent, setIsStudent] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
+  /** Activities authored here, or questions read straight from the bank. */
+  const [source, setSource] = useState<'authored' | 'bank'>('authored');
 
   useEffect(() => {
     let cancelled = false;
@@ -251,6 +269,42 @@ function ListContent({ type }: { type: TextActivityType }) {
             <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
             <InlineBanner kind="success" message={success} onDismiss={() => setSuccess('')} />
 
+            <div
+              role="tablist"
+              aria-label="Activity source"
+              className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1"
+            >
+              {(
+                [
+                  ['authored', 'Built here'],
+                  ['bank', 'From the question bank'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={source === value}
+                  onClick={() => setSource(value)}
+                  className={
+                    source === value
+                      ? 'rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm'
+                      : 'rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700'
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {source === 'bank' ? (
+              <QuestionBankSource
+                kind={TEXT_ACTIVITY_BANK_KIND[type]}
+                ctx={ctx}
+                noun={TEXT_ACTIVITY_LABELS[type].toLowerCase()}
+              />
+            ) : (
+            <>
             <div className="mb-4 flex items-center gap-2">
               <div className="relative max-w-sm flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -428,6 +482,8 @@ function ListContent({ type }: { type: TextActivityType }) {
                   </tbody>
                 </table>
               </div>
+            )}
+            </>
             )}
           </>
         )}
@@ -705,7 +761,7 @@ function ViewContent({ type }: { type: TextActivityType }) {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto ">
         <H5pPageHeader
           title={activity?.title || TEXT_ACTIVITY_LABELS[type]}
           ctx={ctx}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Eye } from 'lucide-react';
+import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
 import {
   TEXT_ACTIVITY_LABELS,
   feedbackFor,
@@ -54,10 +55,13 @@ export function TextActivityPlayer({
   type,
   activity,
   ctx,
+  onResult,
 }: {
   type: TextActivityType;
   activity: H5pTextActivity;
   ctx: H5pContext;
+  /** Fired on Check, where this player already reports completion. */
+  onResult?: (result: PlayerQuestionResult) => void;
 }) {
   const tokens = useMemo(
     () => (type === 'mark_the_words' ? markableTokens(activity.passage) : []),
@@ -121,7 +125,19 @@ export function TextActivityPlayer({
       success: result.passed,
       durationSeconds: seconds,
     });
-  }, [ctx, objectId, result.passed, result.score]);
+
+    // The caller's hook, fired where this player already reports completion.
+    // It is what lets PAL or homework use this player without the H5P library
+    // around it; nothing is persisted here either way.
+    onResult?.({
+      questionId: Number(activity.id),
+      score: result.score,
+      maxScore: result.maxScore,
+      correct: result.scoreable ? result.passed : null,
+      durationSeconds: seconds,
+      response: String(result.score),
+    });
+  }, [ctx, objectId, result, onResult, activity.id]);
 
   const retry = useCallback(() => {
     setResponses({});
