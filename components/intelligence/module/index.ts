@@ -54,6 +54,12 @@ export {
 } from './primitives';
 
 export {
+  IntelligenceSectionNav,
+  SECTION_NAV_LABELS,
+  type IntelligenceNavSection,
+} from './section-nav';
+
+export {
   findIntelligenceModule,
   liveIntelligenceModules,
   INTELLIGENCE_MODULES,

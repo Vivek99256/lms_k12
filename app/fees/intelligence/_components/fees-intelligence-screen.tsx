@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -57,6 +57,9 @@ import {
   toneFor,
   Unavailable,
 } from '@/app/fees/intelligence/_components/fees-intelligence-primitives';
+// The section switcher is shared with every other module's Intelligence screen,
+// so Fees and the contract-driven modules cannot drift apart on how it behaves.
+import { IntelligenceSectionNav } from '@/components/intelligence/module/section-nav';
 
 /**
  * Fees Intelligence — the native LMS screen.
@@ -86,6 +89,8 @@ export function FeesIntelligenceScreen() {
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState('');
   const [drawer, setDrawer] = useState<null | { kind: 'accounts'; title: string; subtitle: string; standardId?: string }>(null);
+  /** Which section is on screen; `null` opens on the first one. */
+  const [openSection, setOpenSection] = useState<string | null>(null);
 
   const recompute = useCallback(async () => {
     setRunning(true);
@@ -131,8 +136,84 @@ export function FeesIntelligenceScreen() {
 
   const { coverage, position } = data;
 
+  /**
+   * The eleven sections this screen has always rendered, now switchable.
+   *
+   * NOTHING IS ADDED OR REMOVED HERE — each entry mounts the very component it
+   * did before, with the same props and the same drill-down handlers. The list
+   * is declared inside the render because every section closes over `data`,
+   * which only exists past the guards above.
+   */
+  const sections: { key: string; label: string; render: () => ReactNode }[] =
+    coverage.available && position
+      ? [
+          { key: 'summary', label: 'Summary', render: () => <ManagementSummary data={data} /> },
+          {
+            key: 'position',
+            label: 'Position',
+            render: () => (
+              <FinancialPosition
+                data={data}
+                onDrillOutstanding={() =>
+                  setDrawer({
+                    kind: 'accounts',
+                    title: 'Accounts in arrears',
+                    subtitle: `${count(position.defaulterAccounts)} of ${count(position.feeAccounts)} fee accounts owe money for ${data.academicYear.syear ?? 'this year'}, largest first.`,
+                  })
+                }
+              />
+            ),
+          },
+          {
+            key: 'findings',
+            label: 'Findings',
+            render: () => <WhatTheBrainSees data={data} onRecompute={recompute} running={running} />,
+          },
+          {
+            key: 'trends',
+            label: 'Trends',
+            render: () => (
+              <Trends
+                data={data}
+                onSelectClass={(row: FeesClass) =>
+                  setDrawer({
+                    kind: 'accounts',
+                    title: `${row.label} — accounts in arrears`,
+                    subtitle: `${row.label} carries ${moneyExact(row.outstandingAmount)} across ${row.defaulterAccounts} of ${row.accounts} accounts, largest first.`,
+                    // The drill-down narrows to this class server-side rather
+                    // than filtering a page the browser happens to hold.
+                    standardId: row.standardId,
+                  })
+                }
+              />
+            ),
+          },
+          {
+            key: 'operations',
+            label: 'Operations & risk',
+            render: () => <OperationalRiskIntelligence data={data} />,
+          },
+          { key: 'priorities', label: 'Priorities', render: () => <PriorityAttention data={data} /> },
+          { key: 'adjustments', label: 'Adjustments', render: () => <CancellationAndRefund data={data} /> },
+          {
+            key: 'recommendations',
+            label: 'Recommendations',
+            render: () => <Recommendations data={data} onDecided={refresh} />,
+          },
+          {
+            key: 'decisions',
+            label: 'Decisions',
+            render: () => <DecisionAndOutcome data={data} onRecorded={refresh} />,
+          },
+          { key: 'dataQuality', label: 'Data quality', render: () => <DataQuality data={data} /> },
+          { key: 'learning', label: 'Learning', render: () => <Learning data={data} /> },
+        ]
+      : [];
+
+  const active = sections.find((section) => section.key === openSection) ?? sections[0];
+
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-6 pb-10">
       <Hero data={data} onRecompute={recompute} running={running} refreshing={refreshing} />
 
       {runError ? (
@@ -152,42 +233,13 @@ export function FeesIntelligenceScreen() {
         />
       ) : (
         <>
-          <ManagementSummary data={data} />
-
-          <FinancialPosition
-            data={data}
-            onDrillOutstanding={() =>
-              setDrawer({
-                kind: 'accounts',
-                title: 'Accounts in arrears',
-                subtitle: `${count(position.defaulterAccounts)} of ${count(position.feeAccounts)} fee accounts owe money for ${data.academicYear.syear ?? 'this year'}, largest first.`,
-              })
-            }
+          <IntelligenceSectionNav
+            label="Fees Intelligence"
+            sections={sections.map(({ key, label }) => ({ key, label }))}
+            activeKey={active?.key ?? ''}
+            onSelect={setOpenSection}
           />
-
-          <WhatTheBrainSees data={data} onRecompute={recompute} running={running} />
-
-          <Trends
-            data={data}
-            onSelectClass={(row: FeesClass) =>
-              setDrawer({
-                kind: 'accounts',
-                title: `${row.label} — accounts in arrears`,
-                subtitle: `${row.label} carries ${moneyExact(row.outstandingAmount)} across ${row.defaulterAccounts} of ${row.accounts} accounts, largest first.`,
-                // The drill-down narrows to this class server-side rather than
-                // filtering a page the browser happens to hold.
-                standardId: row.standardId,
-              })
-            }
-          />
-
-          <OperationalRiskIntelligence data={data} />
-          <PriorityAttention data={data} />
-          <CancellationAndRefund data={data} />
-          <Recommendations data={data} onDecided={refresh} />
-          <DecisionAndOutcome data={data} onRecorded={refresh} />
-          <DataQuality data={data} />
-          <Learning data={data} />
+          {active ? active.render() : null}
         </>
       )}
 

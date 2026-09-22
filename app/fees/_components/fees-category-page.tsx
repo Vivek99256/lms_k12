@@ -75,9 +75,22 @@ function menuTab(item: FeesCategoryItem): Tab {
 export function FeesCategoryPage({
   categoryKey,
   staticScreens = [],
+  hideCategoryHeader = false,
 }: {
   categoryKey: string;
   staticScreens?: FeesStaticScreen[];
+  /**
+   * Drop the category's own title card.
+   *
+   * For Intelligence it is pure duplication: the category row says
+   * "Intelligence — predictive and analytical views over fees data", and the
+   * screen immediately below it opens with "Fees Intelligence" and a sentence
+   * saying the same thing, over a hero that carries the organization, year,
+   * coverage and freshness. Two headings for one screen costs a fold of
+   * vertical space before the reader sees a single figure. Every other Fees
+   * category keeps its header, where it is the only one on the page.
+   */
+  hideCategoryHeader?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -163,7 +176,9 @@ export function FeesCategoryPage({
 
   return (
     <PageFrame>
-      <PageHeader title={category?.label ?? 'Fees'} description={category?.description || undefined} />
+      {hideCategoryHeader ? null : (
+        <PageHeader title={category?.label ?? 'Fees'} description={category?.description || undefined} />
+      )}
 
       {state === 'loading' && tabs.length === 0 ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">

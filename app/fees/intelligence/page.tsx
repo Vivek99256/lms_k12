@@ -24,5 +24,17 @@ import { FEES_INTELLIGENCE_SCREENS } from '@/app/fees/intelligence/_screens/inte
  * before is hidden.
  */
 export default function Page() {
-  return <FeesCategoryPage categoryKey="intelligence" staticScreens={FEES_INTELLIGENCE_SCREENS} />;
+  return (
+    <FeesCategoryPage
+      categoryKey="intelligence"
+      staticScreens={FEES_INTELLIGENCE_SCREENS}
+      // The category title card is dropped HERE and nowhere else: the Fees
+      // Intelligence hero underneath already carries the heading, the sentence
+      // and the organization/year/coverage/freshness facts, so the category row
+      // above it was the same screen announced twice. The category's tab strip
+      // is untouched, so every Intelligence menu a tenant has rights to still
+      // appears beside the workspace tab.
+      hideCategoryHeader
+    />
+  );
 }

@@ -8,6 +8,7 @@ import { useBrainResource } from '@/app/enterprise-brain/_components/useBrainRes
 import type { ModuleIntelligenceContract, SectionKey } from './contract';
 import { timestamp } from './format';
 import { AccentButton, Surface, Unavailable } from './primitives';
+import { IntelligenceSectionNav, SECTION_NAV_LABELS } from './section-nav';
 import {
   BreakdownsSection,
   DataQualitySection,
@@ -51,6 +52,13 @@ import {
 export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceContract }) {
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState('');
+  /**
+   * Which section is on screen. `null` means "not chosen yet", which resolves to
+   * the contract's first section — a module cannot open on a section it does not
+   * declare, and switching modules cannot strand the selection on a key the new
+   * contract has never heard of.
+   */
+  const [openSection, setOpenSection] = useState<SectionKey | null>(null);
 
   const { data, error, loading, refreshing, refresh } = useBrainResource(
     () => contract.load(),
@@ -89,6 +97,21 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
     }
     return grouped;
   }, [contract]);
+
+  /** The tabs: this module's own sections, labelled by what they already are. */
+  const navSections = useMemo(
+    () =>
+      contract.sections.map((section) => ({
+        key: section.key,
+        label: SECTION_NAV_LABELS[section.key] ?? section.copy.title,
+      })),
+    [contract],
+  );
+
+  const activeKey =
+    openSection && contract.sections.some((section) => section.key === openSection)
+      ? openSection
+      : contract.sections[0]?.key;
 
   const style = {
     '--intel-accent': contract.accent,
@@ -204,7 +227,19 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
           reason={data.coverage?.reason ?? contract.emptyState.fallbackReason}
         />
       ) : (
-        contract.sections.map((section) => {
+        <>
+          {/* --------------------------------------------- the section switcher */}
+          <IntelligenceSectionNav
+            label={contract.label}
+            accent={contract.accent}
+            sections={navSections}
+            activeKey={activeKey ?? ''}
+            onSelect={(key) => setOpenSection(key as SectionKey)}
+          />
+
+          {contract.sections
+            .filter((section) => section.key === activeKey)
+            .map((section) => {
           const extras = renderExtras(section.key);
 
           switch (section.key) {
@@ -280,7 +315,8 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
             default:
               return null;
           }
-        })
+            })}
+        </>
       )}
 
       {/* ------------------------------------------------------------ footer */}
