@@ -787,6 +787,86 @@ export function parseInteractionOptions(interaction: H5pVideoInteraction): Array
 // MCQ API
 // ---------------------------------------------------------------------------
 
+/** An H5P type that can be served questions straight from the bank. */
+export type H5pBankType =
+  | 'h5p_mcq'
+  | 'h5p_single_choice_set'
+  | 'h5p_true_false'
+  | 'h5p_blanks'
+  | 'h5p_drag_text'
+  | 'h5p_mark_the_words'
+  | 'h5p_memory_game'
+  | 'h5p_drag_drop'
+  | 'h5p_arithmetic_quiz'
+  | 'h5p_course_presentation';
+
+/** One question as `/h5p/question_bank/{type}` returns it. */
+export interface BankSourcedQuestion {
+  question_id: number;
+  question_text: string;
+  /** The `question_type_catalog` code the server resolved for this row. */
+  question_type_code: string | null;
+  marks: number | null;
+  difficulty: string | null;
+  bloom: string | null;
+  model_answer: string | null;
+  chapter_id: number | null;
+  subject_id: number | null;
+  standard_id: number | null;
+  topic_id: number | null;
+  concept_id: number | null;
+}
+
+export interface H5pBankPayload {
+  h5p_type: string;
+  /** The catalogue codes this H5P type can carry. */
+  codes: string[];
+  selectedLevel: string | null;
+  levels: McqLevel[];
+  questions: BankSourcedQuestion[];
+  answers: Record<string, McqAnswer[]>;
+}
+
+/**
+ * Questions for any H5P type, read from `lms_question_master`.
+ *
+ * ONE ENDPOINT FOR EVERY TYPE. Which `question_type_catalog` forms a type can
+ * carry is a table in the server's `QuestionBankSource`, not a route, so there
+ * is one URL and the type is a path segment. Nothing is authored, nothing is
+ * stored -- the rows come back and the shared players in
+ * `components/h5p/players` render them.
+ *
+ * `take` of 0 asks for every match, which is what a library listing wants; a
+ * quiz leaves it at the default ten.
+ */
+export async function fetchH5pQuestionBank(
+  h5pType: H5pBankType,
+  ctx: H5pContext,
+  options: { selectedLevel?: string; take?: number; random?: boolean } = {}
+): Promise<H5pBankPayload> {
+  const session = requireSession();
+  const url = buildGetUrl(`/h5p/question_bank/${h5pType}`, {
+    ...contextParams(ctx),
+    sub_institute_id: session.sub_institute_id,
+    selectedLevel: options.selectedLevel,
+    take: options.take,
+    random: options.random === false ? 0 : undefined,
+  });
+
+  const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+  const raw = await readApiJson(res, 'Failed to load question bank content');
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Failed to load question bank content'));
+
+  return {
+    h5p_type: (raw.h5p_type as string) ?? h5pType,
+    codes: (raw.codes as string[]) ?? [],
+    selectedLevel: (raw.selectedLevel as string | null) ?? null,
+    levels: (raw.levels as McqLevel[]) ?? [],
+    questions: (raw.questions as BankSourcedQuestion[]) ?? [],
+    answers: (raw.answers as Record<string, McqAnswer[]>) ?? {},
+  };
+}
+
 export async function fetchMcqIndex(ctx: H5pContext, selectedLevel?: string): Promise<McqIndexPayload> {
   const session = requireSession();
   const url = buildGetUrl('/h5p/h5p_mcq', {
