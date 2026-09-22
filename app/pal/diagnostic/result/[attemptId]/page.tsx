@@ -100,7 +100,7 @@ function DiagnosticResultView() {
 
   return (
     <PalWorkspace
-      title="Diagnostic result"
+      title="Chapter diagnostic result"
       description="This is your starting point for this chapter, not a grade."
       backHref="/pal"
       backLabel="Back to subjects"
@@ -167,7 +167,7 @@ function DiagnosticResultView() {
               aria-valuenow={Math.round(result.percentage)}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label="Overall diagnostic score"
+              aria-label="Overall chapter diagnostic score"
             />
           </div>
         </CardContent>
@@ -265,7 +265,7 @@ function DiagnosticResultView() {
         <Link href={`/pal/diagnostic/chapter/${result.chapterId}/history`} className={buttonVariants({ variant: 'outline' })}>Previous attempts</Link>
 
         <Button onClick={() => router.push(`/pal/adaptive/chapter/${result.chapterId}`)}>
-          Start adaptive learning
+          Start concept diagnostic
           <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
         </Button>
       </div>

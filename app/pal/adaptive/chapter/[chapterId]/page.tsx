@@ -105,7 +105,7 @@ function AdaptiveConceptsView() {
   return (
     <PalWorkspace
       eyebrow={data.chapterName || 'This chapter'}
-      title="Adaptive learning"
+      title="Concept diagnostic"
       description="Five questions per round, chosen from how you did."
       backHref="/pal"
       backLabel="Back to subjects"
@@ -135,10 +135,10 @@ function AdaptiveConceptsView() {
         <Card className="mb-4 border-amber-200 bg-amber-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-amber-900">
-              You have not taken the diagnostic for this chapter yet, so practice will open at easy
+              You have not taken the chapter diagnostic yet, so practice will open at easy
               and adjust as you go.
             </p>
-            <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Take diagnostic</Link>
+            <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Take chapter diagnostic</Link>
           </CardContent>
         </Card>
       )}
@@ -207,7 +207,7 @@ function ConceptCard({ concept, onStart }: { concept: AdaptiveConcept; onStart: 
         <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
           {concept.diagnosticPercentage !== null && (
             <div className="flex gap-1">
-              <dt>Diagnostic</dt>
+              <dt>Chapter diagnostic</dt>
               <dd className="font-semibold tabular-nums text-slate-700">
                 {Math.round(concept.diagnosticPercentage)}%
               </dd>

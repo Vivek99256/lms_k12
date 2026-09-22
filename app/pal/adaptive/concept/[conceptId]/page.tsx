@@ -175,9 +175,9 @@ function AdaptivePracticeView() {
 
   return (
     <PalWorkspace
-      eyebrow="Adaptive practice"
+      eyebrow="Concept diagnostic"
       title={set?.conceptName || 'Practice'}
-      description="Five questions, chosen from how your diagnostic went."
+      description="Five questions, chosen from how your chapter diagnostic went."
       backHref={`/pal/adaptive/chapter/${set?.chapterId ?? ''}`}
       backLabel="All concepts"
       actions={set?.difficulty ? <BandChip band={set.difficulty} /> : undefined}
@@ -270,7 +270,7 @@ function AdaptivePracticeView() {
               rather than pretending. */}
           <Button onClick={() => void finish()} disabled={submitting}>
             {submitting && <Loader2 aria-hidden className="mr-1.5 h-4 w-4 animate-spin" />}
-            Submit adaptive learning
+            Submit concept diagnostic
             <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
           </Button>
         </div>

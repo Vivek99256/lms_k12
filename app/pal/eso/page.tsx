@@ -241,7 +241,7 @@ function EsoConceptFlow() {
   if (!conceptId) {
     return (
       <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
-        <Alert>A concept must be selected to start the adaptive flow (add ?conceptId=... to the URL).</Alert>
+        <Alert>A concept must be selected to start the concept diagnostic flow (add ?conceptId=... to the URL).</Alert>
       </div>
     );
   }
@@ -297,7 +297,7 @@ function EsoConceptFlow() {
 
   return (
     <PalWorkspace
-      eyebrow="Adaptive learning"
+      eyebrow="Concept diagnostic"
       title="Practice"
       description="The engine picks each step from what you have already shown it."
       rail={rail}
@@ -732,13 +732,13 @@ function SuggestedContentBody({ details }: { details: ConceptMasteryDetails }) {
  * that moment.
  */
 const FLOW_STAGES: Array<{ key: string; label: string; actions: string[] }> = [
-  { key: 'diagnostic', label: 'Diagnostic', actions: ['diagnostic'] },
+  { key: 'diagnostic', label: 'Chapter diagnostic', actions: ['diagnostic'] },
   // Adaptive has no engine action either — it is the chapter-level practice
   // stage that runs on its own screens (/pal/adaptive/*), before a learner
   // ever reaches this one. Listed so this rail reads the same as the shared
   // JourneyRail every other PAL screen shows; leaving it out made the journey
   // look like two different journeys depending on which screen you were on.
-  { key: 'adaptive', label: 'Adaptive', actions: [] },
+  { key: 'adaptive', label: 'Concept diagnostic', actions: [] },
   // Plan has no engine action of its own, and deliberately so: the engine
   // decides WHAT to teach, and Plan is where the learner is shown what it
   // decided and what remains. It is driven by `planPending` in the page rather

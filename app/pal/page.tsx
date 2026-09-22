@@ -231,7 +231,13 @@ function PalEntryPageContent() {
   );
 
   return (
-    <div className="min-h-full px-4 py-5 sm:px-6">
+    // No min-h-full here. This div is a direct child of DashboardShell's
+    // scrolling <main>, which HAS a definite height, so `min-height: 100%`
+    // resolved to the full scroll viewport - and the Level 3 subheader rendered
+    // above it added its own height on top. The page was therefore always
+    // taller than the viewport by about the subheader's height, leaving a dead
+    // scroll gap below the last subject card however short the list was.
+    <div className="px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1800px] space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
@@ -525,7 +531,7 @@ function ChapterRow({
             <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Master {unmasteredNames.join(', ')} first — take the diagnostic to check where
+                Master {unmasteredNames.join(', ')} first — take the chapter diagnostic to check where
                 you stand, then come back here.
               </span>
             </div>
@@ -593,7 +599,7 @@ function ChapterRow({
               className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
             >
               <ClipboardCheck className="h-3.5 w-3.5" />
-              Take diagnostic
+              Take chapter diagnostic
             </Button>
 
             {/* Adaptive Learning is a learner-facing feature: a student may only

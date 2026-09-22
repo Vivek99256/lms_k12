@@ -43,7 +43,7 @@ import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components
 
 export default function DiagnosticExamPage() {
   return (
-    <Suspense fallback={<Centered>Loading the diagnostic…</Centered>}>
+    <Suspense fallback={<Centered>Loading the chapter diagnostic…</Centered>}>
       <DiagnosticExam />
     </Suspense>
   );
@@ -96,7 +96,7 @@ function DiagnosticExam() {
         })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'The diagnostic could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'The chapter diagnostic could not be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -118,7 +118,7 @@ function DiagnosticExam() {
       const outcome = await submitChapterDiagnostic({ attemptId: paper.attemptId, answers });
       router.push(`/pal/diagnostic/result/${outcome.result?.attemptId ?? paper.attemptId}`);
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : 'The diagnostic could not be submitted.');
+      setError(reason instanceof Error ? reason.message : 'The chapter diagnostic could not be submitted.');
       setSubmitting(false);
     }
   }, [paper, answers, submitting, router]);
@@ -160,6 +160,18 @@ function DiagnosticExam() {
     return () => window.clearInterval(id);
   }, [timerRunning]);
 
+  /**
+   * Questions grouped into their bands, in BAND_ORDER, each carrying the
+   * number the learner actually sees.
+   *
+   * The number is assigned HERE, over the grouped order, rather than being the
+   * question's position in `paper.questions`. The paper is drawn interleaved,
+   * so the flat position gave Easy "1, 2, 4, 13, 18" and Medium "6, 9, 10, 15"
+   * - correct indices into a flat list nobody is ever shown, and nonsense
+   * beside the bands the questions are actually read in. Numbering the rendered
+   * order instead runs 1..n straight down the page and keeps every number
+   * unique across the three bands, so "question 7" means one question.
+   */
   const grouped = useMemo(() => {
     const out = new Map<string, DiagnosticQuestionItem[]>();
     (paper?.questions ?? []).forEach((question) => {
@@ -175,13 +187,21 @@ function DiagnosticExam() {
       if (!BAND_ORDER.includes(band as never)) ordered.push([band, items]);
     });
 
-    return ordered;
+    let number = 0;
+
+    return ordered.map(
+      ([band, items]) =>
+        [band, items.map((question) => ({ question, number: ++number }))] as [
+          string,
+          Array<{ question: DiagnosticQuestionItem; number: number }>,
+        ]
+    );
   }, [paper]);
 
   const total = paper?.questions.length ?? 0;
   const answered = Object.keys(answers).length;
 
-  if (loading) return <Centered>Drawing your diagnostic…</Centered>;
+  if (loading) return <Centered>Drawing your chapter diagnostic…</Centered>;
 
   if (error && !paper) {
     return (
@@ -201,7 +221,7 @@ function DiagnosticExam() {
             <AlertTriangle aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
             <div>
               <CardTitle className="text-base text-amber-900">
-                This chapter is not ready for a diagnostic yet
+                This chapter is not ready for a chapter diagnostic yet
               </CardTitle>
               <p className="mt-1 text-sm text-amber-800">
                 {paper.message ||
@@ -211,7 +231,7 @@ function DiagnosticExam() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-amber-800">
-              The diagnostic needs five easy, five medium and five hard questions. Your teacher
+              The chapter diagnostic needs five easy, five medium and five hard questions. Your teacher
               will see this chapter listed as a content gap.
             </p>
             <Link href="/pal" className={cn(buttonVariants({ variant: 'outline' }), 'mt-4')}>Back to subjects</Link>
@@ -256,7 +276,7 @@ function DiagnosticExam() {
       {grouped.length > 0 && (
         <PalRailSection title="By difficulty">
           {grouped.map(([band, items]) => {
-            const done = items.filter((q) => answers[q.questionId]).length;
+            const done = items.filter(({ question }) => answers[question.questionId]).length;
             return (
               <PalRailStat
                 key={band}
@@ -359,11 +379,11 @@ function DiagnosticExam() {
             </div>
 
             <div className="space-y-3">
-              {items.map((question) => (
+              {items.map(({ question, number }) => (
                 <QuestionCard
                   key={question.questionId}
                   question={question}
-                  index={(paper?.questions ?? []).findIndex((q) => q.questionId === question.questionId) + 1}
+                  index={number}
                   selected={answers[question.questionId] ?? null}
                   onSelect={(optionId) =>
                     setAnswers((previous) => ({ ...previous, [question.questionId]: optionId }))
@@ -397,7 +417,7 @@ function DiagnosticExam() {
         ) : (
           <Button onClick={() => setConfirming(true)} disabled={submitting || total === 0}>
             <CheckCircle2 aria-hidden className="mr-1.5 h-4 w-4" />
-            Submit diagnostic
+            Submit chapter diagnostic
           </Button>
         )}
       </div>
@@ -461,13 +481,19 @@ function QuestionCard({
     <Card data-pal-question-id={question.questionId}>
       <CardContent className="pt-5">
         <fieldset disabled={disabled}>
-          <legend className="sr-only">Question {index}</legend>
+          <legend className="sr-only">
+            Question {index}, {bandLabel(question.difficulty).toLowerCase()}
+          </legend>
 
           <div className="mb-3 flex items-start gap-3">
             <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold tabular-nums text-slate-600">
               {index}
             </span>
             <div className="min-w-0 flex-1">
+              {/* The band sits with the number rather than off at the right
+                  edge: the two are read as one label ("7, medium"), and on a
+                  phone a right-aligned chip was squeezed to the far side of a
+                  long question title. */}
               <div
                 className="text-sm font-medium text-slate-900 [&_img]:max-w-full"
                 // Question bodies are authored HTML in lms_question_master and
@@ -476,7 +502,6 @@ function QuestionCard({
                 dangerouslySetInnerHTML={{ __html: question.title }}
               />
             </div>
-            <BandChip band={question.difficulty} className="shrink-0" />
           </div>
 
           <div className="space-y-1.5 pl-9">
@@ -501,9 +526,7 @@ function QuestionCard({
                     onChange={() => onSelect(option.id)}
                     className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
                   />
-                  <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-slate-300 bg-white text-[11px] font-semibold text-slate-600">
-                    {String.fromCharCode(65 + optionIndex)}
-                  </span>
+                 
                   <span
                     className="min-w-0 flex-1 [&_img]:max-w-full"
                     dangerouslySetInnerHTML={{ __html: option.answer }}

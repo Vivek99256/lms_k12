@@ -83,8 +83,8 @@ function DiagnosticHistoryView() {
   return (
     <PalWorkspace
       eyebrow={chapterName || undefined}
-      title="Diagnostic attempts"
-      description="Every diagnostic you have submitted for this chapter."
+      title="Chapter diagnostic attempts"
+      description="Every chapter diagnostic you have submitted for this chapter."
       backHref="/pal"
       backLabel="Back to subjects"
       rail={
@@ -107,9 +107,9 @@ function DiagnosticHistoryView() {
         <EmptyState
           icon={<History aria-hidden className="h-8 w-8" />}
           title="No attempts yet"
-          description="Once you submit a diagnostic for this chapter it will appear here."
+          description="Once you submit a chapter diagnostic it will appear here."
           action={
-            <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={buttonVariants()}>Take the diagnostic</Link>
+            <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={buttonVariants()}>Take the chapter diagnostic</Link>
           }
         />
       ) : (
@@ -162,7 +162,7 @@ function DiagnosticHistoryView() {
       )}
 
       <div className="mt-5 flex justify-end">
-        <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={buttonVariants({ variant: 'outline' })}>Retake diagnostic</Link>
+        <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={buttonVariants({ variant: 'outline' })}>Retake chapter diagnostic</Link>
       </div>
     </PalWorkspace>
   );
