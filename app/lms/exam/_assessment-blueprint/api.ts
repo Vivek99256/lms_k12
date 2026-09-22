@@ -15,7 +15,15 @@ import {
   type ApiEnvelope,
   type SessionContext,
 } from '@/lib/erp-client';
-import type { Blueprint, BlueprintDraft, BlueprintIndex, ChapterOption } from './types';
+import type {
+  Blueprint,
+  BlueprintDraft,
+  BlueprintIndex,
+  ChapterOption,
+  HpcOptionType,
+  HpcSchoolOption,
+  HpcSchoolOptions,
+} from './types';
 
 function requireSession(): SessionContext {
   const session = buildSessionContext();
@@ -195,4 +203,66 @@ export async function deleteBlueprint(id: number): Promise<void> {
   if (status !== '1' && status !== '200') {
     throw new Error(payload?.message || 'Unable to remove this blueprint.');
   }
+}
+
+// -- School HPC option lists -------------------------------------------------
+
+/**
+ * This school's own HPC option lists, with the published defaults alongside.
+ *
+ * A type the school has not customised comes back as the NCERT list with
+ * `is_default: true`, so the settings screen can show what is standard and what
+ * the school chose without holding its own copy of the vocabulary.
+ */
+export async function fetchHpcOptions(): Promise<HpcSchoolOptions> {
+  const session = requireSession();
+  const response = await fetch(url(session, '/hpc-options'), {
+    method: 'GET',
+    cache: 'no-store',
+    headers: createAuthHeaders(session),
+  });
+
+  return unwrap<HpcSchoolOptions>(
+    (await readJson(response)) as never,
+    "Unable to load your school's HPC options."
+  );
+}
+
+/** Replaces this school's list for one option type. Scoped to the caller's own school. */
+export async function saveHpcOptions(
+  optionType: HpcOptionType,
+  options: Array<{ code?: string; label: string; description?: string }>
+): Promise<HpcSchoolOption[]> {
+  const session = requireSession();
+  const response = await fetch(url(session, '/hpc-options'), {
+    method: 'POST',
+    cache: 'no-store',
+    headers: createAuthHeaders(session, 'application/json'),
+    body: JSON.stringify({ ...baseBody(session), option_type: optionType, options }),
+  });
+
+  const data = unwrap<{ options: HpcSchoolOption[] }>(
+    (await readJson(response)) as never,
+    'Unable to save these options.'
+  );
+
+  return data.options ?? [];
+}
+
+/** Drops this school's list for one type so it follows the standard again. */
+export async function resetHpcOptions(optionType: HpcOptionType): Promise<HpcSchoolOption[]> {
+  const session = requireSession();
+  const response = await fetch(url(session, '/hpc-options/reset'), {
+    method: 'POST',
+    cache: 'no-store',
+    headers: createAuthHeaders(session, 'application/json'),
+    body: JSON.stringify({ ...baseBody(session), option_type: optionType }),
+  });
+
+  const data = unwrap<{ options: HpcSchoolOption[] }>(
+    (await readJson(response)) as never,
+    'Unable to reset these options.'
+  );
+
+  return data.options ?? [];
 }

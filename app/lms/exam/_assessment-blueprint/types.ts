@@ -164,6 +164,8 @@ export type HpcPartA = {
   attendance: boolean;
   interest: boolean;
   all_about_me: boolean;
+  /** The Secondary card's structured self-assessment, in place of All About Me. */
+  self_assessment: boolean;
   goal_setting: boolean;
   ambition_card: boolean;
 };
@@ -245,6 +247,41 @@ export type HpcOptions = {
   strengths: string[];
   barriers: string[];
   defaults: HpcDefinition;
+  /** Which option lists this school has taken over; drives the "customised" badge. */
+  customised_types: HpcOptionType[];
+};
+
+/**
+ * One option in a school's own HPC list.
+ *
+ * `code` is the stable machine name a blueprint stores; `label` is what the
+ * school calls it. Renaming a label never orphans the blueprints that already
+ * selected the code, which is why the two are separate.
+ */
+export type HpcSchoolOption = {
+  code: string;
+  label: string;
+  description: string;
+  /** The school added this itself, rather than keeping a published option. */
+  is_custom: boolean;
+  /** Coming from the published NCERT list because the school has not overridden this type. */
+  is_default: boolean;
+};
+
+/** The four lists a school can take over. Stages are national and stay fixed. */
+export type HpcOptionType =
+  | 'assessor'
+  | 'activity_approach'
+  | 'evidence_mode'
+  | 'part_a_element';
+
+export type HpcSchoolOptions = {
+  options: Record<HpcOptionType, HpcSchoolOption[]>;
+  /** The published list each type would revert to. */
+  defaults: Record<HpcOptionType, CodeLabel[]>;
+  /** Which types this school has taken over from the published list. */
+  customised_types: HpcOptionType[];
+  types: HpcOptionType[];
 };
 
 export type BlueprintOptions = {
