@@ -132,7 +132,7 @@ function FlashcardListContent() {
   if (allowed !== true) {
     return (
       <div className="p-4 sm:p-6">
-        <div className="mx-auto max-w-5xl">
+        <div className="mx-auto">
           <LoadingState label="Loading flash cards…" />
         </div>
       </div>
@@ -141,7 +141,7 @@ function FlashcardListContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Flash cards"
           description={`${cards.length} card${cards.length === 1 ? '' : 's'} for this chapter`}

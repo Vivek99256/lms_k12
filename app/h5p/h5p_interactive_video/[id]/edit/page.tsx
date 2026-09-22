@@ -306,7 +306,7 @@ function InteractiveVideoEditContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Edit interactive video"
           description={video?.title ?? undefined}

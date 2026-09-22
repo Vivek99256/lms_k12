@@ -221,7 +221,7 @@ function InteractiveVideoCreateContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Add interactive video"
           description="Upload a video and add timed questions or info cards"

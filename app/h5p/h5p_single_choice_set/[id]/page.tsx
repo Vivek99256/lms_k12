@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { ArrowRight, Check, RotateCcw, X } from 'lucide-react';
+import { ArrowRight, Check, X } from 'lucide-react';
 import {
   h5pContextQuery,
   hasH5pContext,
@@ -24,7 +24,20 @@ import {
   type SingleChoiceAnswer,
   type SingleChoiceAttemptResult,
 } from '@/lib/h5p/single-choice-set';
-import { H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '../../components/shared';
+import { H5pPageHeader, InlineBanner, MissingContextNotice } from '../../components/shared';
+import {
+  PlayerSkeleton,
+  PrimaryAction,
+  ProgressRail,
+  ResultScreen,
+  RetryAction,
+  SecondaryAction,
+  StartScreen,
+  StreakBadge,
+  Verdict,
+  deriveAchievements,
+  encouragement,
+} from '../../components/game';
 
 /**
  * Single choice set — player.
@@ -113,6 +126,18 @@ function SingleChoiceSetPlayerContent() {
   const [chosen, setChosen] = useState<number | null>(null);
   const [showSolution, setShowSolution] = useState(false);
 
+  /**
+   * The run of correct answers, and the longest run this attempt reached.
+   *
+   * State rather than a derivation of `attempt.answers`, because answers are
+   * indexed by their position in the SET while a streak is about the order the
+   * questions were ASKED in — an ordering the shuffle has already thrown away
+   * by the time the answers array is read back.
+   */
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [attemptCount, setAttemptCount] = useState(0);
+
   // --- load ----------------------------------------------------------------
 
   useEffect(() => {
@@ -159,6 +184,7 @@ function SingleChoiceSetPlayerContent() {
 
       const done = { ...finished, finishedAt: Date.now() };
       setAttempt(done);
+      setAttemptCount((n) => n + 1);
 
       const scored = scoreSingleChoiceAttempt(done.paper, done.answers, {
         points_per_question: set.points_per_question,
@@ -184,6 +210,8 @@ function SingleChoiceSetPlayerContent() {
     setAttempt(newAttempt(set));
     setChosen(null);
     setShowSolution(false);
+    setStreak(0);
+    setBestStreak(0);
   };
 
   const advance = useCallback(
@@ -236,6 +264,10 @@ function SingleChoiceSetPlayerContent() {
     setAttempt(answered);
     setChosen(optionId);
 
+    const run = correct ? streak + 1 : 0;
+    setStreak(run);
+    if (run > bestStreak) setBestStreak(run);
+
     const option = entry.options.find((o) => o.id === optionId);
     void postH5pXapiStatement({
       objectId: `single_choice_set:${set.id}`,
@@ -258,8 +290,8 @@ function SingleChoiceSetPlayerContent() {
 
     if (questions.length === 0) {
       return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-sm text-slate-600">This set has no questions yet.</p>
+        <div className="h5p-surface p-8 text-center">
+          <p className="text-sm text-[color:var(--h5p-ink-muted)]">This set has no questions yet.</p>
         </div>
       );
     }
@@ -269,57 +301,47 @@ function SingleChoiceSetPlayerContent() {
       const message = singleChoiceFeedback(result.percentage, set.feedback_bands);
 
       return (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Finished</p>
-            <p className="mt-2 text-4xl font-semibold tabular-nums text-slate-900">
-              {result.score}
-              <span className="text-2xl text-slate-400"> / {result.maxScore}</span>
-            </p>
-            <p className="mt-1 text-sm text-slate-600">
+        <ResultScreen
+          score={result.score}
+          maxScore={result.maxScore}
+          percentage={result.percentage}
+          passed={result.passed}
+          passLabel={`Pass mark is ${set.pass_percentage}%`}
+          summary={
+            <>
               {result.correctCount} of {result.questionCount} correct
               {result.answeredCount < result.questionCount
                 ? ` · ${result.questionCount - result.answeredCount} not answered`
                 : ''}
-            </p>
-
-            <span
-              className={`mt-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                result.passed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-              }`}
-            >
-              {result.passed ? 'Passed' : `Pass mark is ${set.pass_percentage}%`}
-            </span>
-
-            {message ? <p className="mt-4 text-sm text-slate-700">{message}</p> : null}
-
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              {set.enable_retry ? (
-                <button
-                  type="button"
-                  onClick={start}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Try again
-                </button>
-              ) : null}
+            </>
+          }
+          message={message}
+          facts={[
+            { icon: 'gauge', label: 'Score', value: `${Math.round(result.percentage)}%` },
+            ...(bestStreak >= 2
+              ? [{ icon: 'zap' as const, label: 'Best run', value: `${bestStreak} in a row` }]
+              : []),
+          ]}
+          achievements={deriveAchievements({
+            percentage: result.percentage,
+            passed: result.passed,
+            bestStreak,
+            firstTry: attemptCount <= 1,
+          })}
+          actions={
+            <>
+              {set.enable_retry ? <RetryAction onClick={start} /> : null}
 
               {set.enable_show_solution ? (
-                <button
-                  type="button"
-                  onClick={() => setShowSolution((on) => !on)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                  aria-expanded={showSolution}
-                >
+                <SecondaryAction onClick={() => setShowSolution((on) => !on)} ariaExpanded={showSolution}>
                   {showSolution ? 'Hide solution' : 'Show solution'}
-                </button>
+                </SecondaryAction>
               ) : null}
-            </div>
-          </div>
-
+            </>
+          }
+        >
           {showSolution ? <Solution attempt={attempt} /> : null}
-        </div>
+        </ResultScreen>
       );
     }
 
@@ -329,38 +351,38 @@ function SingleChoiceSetPlayerContent() {
       const feedback = chosen !== null ? answerFeedback(entry.question, chosen) : null;
 
       return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+        <div className="h5p-surface h5p-stage p-5 sm:p-8">
           {set.show_progress ? (
             <>
-              <p className="text-xs tabular-nums text-slate-500">
-                Question {attempt.index + 1} of {attempt.paper.length}
-              </p>
-              <div
-                className="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-100"
-                role="progressbar"
-                aria-valuenow={attempt.index}
-                aria-valuemin={0}
-                aria-valuemax={attempt.paper.length}
-                aria-label="Questions answered"
-              >
-                <div
-                  className="h-full rounded-full bg-indigo-500 transition-all"
-                  style={{ width: `${(attempt.index / attempt.paper.length) * 100}%` }}
-                />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium tabular-nums text-[color:var(--h5p-ink-muted)]">
+                  Question {attempt.index + 1} of {attempt.paper.length}
+                </p>
+                <StreakBadge streak={streak} best={bestStreak} />
               </div>
+              <ProgressRail
+                value={attempt.index}
+                max={attempt.paper.length}
+                label="Questions answered"
+                className="mt-2"
+              />
             </>
           ) : null}
 
           <Html
             html={entry.question.question_text}
-            className="mt-5 block text-lg font-semibold leading-snug text-slate-900"
+            className="mt-5 block text-lg font-semibold leading-snug text-[color:var(--h5p-ink)]"
           />
 
-          <div className="mt-5 space-y-2" role="group" aria-label="Answers">
-            {entry.options.map((option) => {
+          <div className="mt-5 space-y-2.5" role="group" aria-label="Answers">
+            {entry.options.map((option, optionIndex) => {
               const picked = chosen === option.id;
               const reveal = chosen !== null;
               const isRight = option.is_correct;
+
+              // Which state this option is in. The colours for each live in
+              // h5p.css; nothing here names one.
+              const state = reveal ? (isRight ? 'is-correct' : picked ? 'is-wrong' : 'is-dimmed') : '';
 
               return (
                 <button
@@ -368,21 +390,20 @@ function SingleChoiceSetPlayerContent() {
                   type="button"
                   onClick={() => choose(option.id)}
                   disabled={reveal}
-                  className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-sm transition disabled:cursor-default ${
-                    reveal && isRight
-                      ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
-                      : picked
-                        ? 'border-red-300 bg-red-50 text-red-900'
-                        : reveal
-                          ? 'border-slate-200 bg-white text-slate-500'
-                          : 'border-slate-200 bg-white text-slate-800 hover:border-indigo-300 hover:bg-indigo-50/50'
-                  }`}
+                  style={{ '--h5p-stagger': `${Math.min(optionIndex, 5) * 45}ms` } as CSSProperties}
+                  className={`h5p-option h5p-tappable h5p-focusable h5p-target h5p-enter h5p-stagger ${state}`}
                 >
-                  <span className="mt-0.5 h-4 w-4 shrink-0">
-                    {/* Right and wrong are marked by an icon as well as by
-                        colour — colour alone is not an accessible signal. */}
-                    {reveal && isRight ? <Check className="h-4 w-4" /> : null}
-                    {reveal && picked && !isRight ? <X className="h-4 w-4" /> : null}
+                  {/* The marker is a letter until the question is marked and a
+                      tick or a cross afterwards, so right and wrong are carried
+                      by shape as well as by colour. */}
+                  <span className="h5p-option__marker" aria-hidden="true">
+                    {reveal && isRight ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : reveal && picked ? (
+                      <X className="h-3.5 w-3.5" />
+                    ) : (
+                      String.fromCharCode(65 + optionIndex)
+                    )}
                   </span>
                   <Html html={option.option_text} className="min-w-0 flex-1" />
                 </button>
@@ -391,27 +412,17 @@ function SingleChoiceSetPlayerContent() {
           </div>
 
           {feedback ? (
-            <div aria-live="polite" className="mt-5">
-              <p
-                className={`flex items-center gap-1.5 text-sm font-medium ${
-                  feedback.correct ? 'text-emerald-700' : 'text-red-600'
-                }`}
-              >
-                {feedback.correct ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
-                {feedback.correct ? 'Correct' : 'Not quite'}
-              </p>
-              {feedback.message ? <p className="mt-1 text-sm text-slate-700">{feedback.message}</p> : null}
+            <div className="mt-5">
+              <Verdict
+                correct={feedback.correct}
+                message={feedback.message || encouragement(feedback.correct, attempt.index)}
+              />
 
               {!set.auto_continue ? (
-                <button
-                  type="button"
-                  onClick={() => advance(attempt)}
-                  autoFocus
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
-                >
+                <PrimaryAction onClick={() => advance(attempt)} className="mt-4" autoFocus>
                   {attempt.index + 1 >= attempt.paper.length ? 'See your result' : 'Next question'}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </PrimaryAction>
               ) : null}
             </div>
           ) : null}
@@ -421,25 +432,15 @@ function SingleChoiceSetPlayerContent() {
 
     // Start screen.
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">{set.title}</h2>
-        {set.task_description ? (
-          <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">{set.task_description}</p>
-        ) : null}
-
-        <p className="mt-4 text-xs text-slate-500">
-          {questions.length} question{questions.length === 1 ? '' : 's'}
-          {` · pass mark ${set.pass_percentage}%`}
-        </p>
-
-        <button
-          type="button"
-          onClick={start}
-          className="mt-6 inline-flex items-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-        >
-          Start
-        </button>
-      </div>
+      <StartScreen
+        title={set.title}
+        description={set.task_description}
+        facts={[
+          { icon: 'target', label: 'Questions', value: questions.length },
+          { icon: 'gauge', label: 'Pass mark', value: `${set.pass_percentage}%` },
+        ]}
+        onStart={start}
+      />
     );
   };
 
@@ -456,7 +457,7 @@ function SingleChoiceSetPlayerContent() {
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />
         ) : loading ? (
-          <LoadingState label="Loading set…" />
+          <PlayerSkeleton label="Loading set" />
         ) : error ? (
           <InlineBanner kind="error" message={error} />
         ) : (
@@ -525,7 +526,7 @@ function Solution({ attempt }: { attempt: Attempt }) {
 
 export default function SingleChoiceSetPlayerPage() {
   return (
-    <Suspense fallback={<LoadingState label="Loading set…" />}>
+    <Suspense fallback={<PlayerSkeleton label="Loading set" />}>
       <SingleChoiceSetPlayerContent />
     </Suspense>
   );

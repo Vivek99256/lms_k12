@@ -21,6 +21,7 @@ import {
   LoadingState,
   MissingContextNotice,
 } from '../../components/shared';
+import { ProgressRail } from '../../components/game';
 
 /**
  * Interactive video player — mirrors Laravel `GET /h5p/h5p_interactive_video/{id}`
@@ -216,7 +217,7 @@ function InteractiveVideoPlayerContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title={video?.title || 'Interactive video'}
           description="Watch the video — questions appear at the marked times"
@@ -254,41 +255,82 @@ function InteractiveVideoPlayerContent() {
 
                 {/* Timeline with interaction markers */}
                 <div className="mt-4 px-1">
-                  <div className="relative h-2 rounded-full bg-slate-200">
+                  {/* The strip is padded vertically so a marker's grown hover
+                      state and its 24px hit area both fit without the bar
+                      itself having to be chunky. */}
+                  <div className="relative py-2.5">
                     <div
-                      className="h-2 rounded-full bg-[#4f46e5] transition-[width] duration-100"
-                      style={{ width: `${progressPct}%` }}
-                    />
+                      className="h-2 rounded-full"
+                      style={{ background: 'color-mix(in srgb, var(--h5p-accent) 14%, var(--h5p-surface-sunken))' }}
+                    >
+                      <div
+                        className="h-2 rounded-full transition-[width] duration-100"
+                        style={{ width: `${progressPct}%`, background: 'var(--h5p-accent)' }}
+                      />
+                    </div>
+
                     {duration > 0
                       ? interactions.map((interaction, index) => {
                           const pct = (interactionTime(interaction) / duration) * 100;
                           if (pct > 100) return null;
                           const type = String(interaction.interaction_type ?? 'multiple_choice');
+                          const done = answered.has(index);
+
                           return (
                             <button
                               key={interaction.id ?? index}
                               type="button"
                               onClick={() => seekToInteraction(index)}
-                              className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow transition hover:scale-125"
-                              style={{ left: `${pct}%`, backgroundColor: MARKER_COLORS[type] ?? '#ff4444' }}
+                              // A marker the learner has already answered is
+                              // ringed and dimmed rather than removed: the
+                              // point of the timeline is to show the shape of
+                              // the whole video, including the parts done.
+                              className={`h5p-tappable h5p-focusable absolute top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ${
+                                done ? '' : 'h5p-ping'
+                              }`}
+                              style={{ left: `${pct}%`, color: MARKER_COLORS[type] ?? 'var(--h5p-accent)' }}
                               title={`${TYPE_LABELS[type] ?? type} at ${formatSeconds(interactionTime(interaction))}`}
-                              aria-label={`Open interaction at ${formatSeconds(interactionTime(interaction))}`}
-                            />
+                              aria-label={`${done ? 'Answered: ' : ''}Open interaction at ${formatSeconds(
+                                interactionTime(interaction)
+                              )}`}
+                            >
+                              <span
+                                className="h-3.5 w-3.5 rounded-full border-2 border-white shadow"
+                                style={{
+                                  backgroundColor: done ? 'var(--h5p-success)' : 'currentColor',
+                                }}
+                              />
+                            </button>
                           );
                         })
                       : null}
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
-                    {(['multiple_choice', 'true_false', 'text_input'] as const).map((type) => (
-                      <span key={type} className="inline-flex items-center gap-1.5">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: MARKER_COLORS[type] }}
-                        />
-                        {TYPE_LABELS[type]}
+
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-4 text-[11px] text-[color:var(--h5p-ink-muted)]">
+                      {(['multiple_choice', 'true_false', 'text_input'] as const).map((type) => (
+                        <span key={type} className="inline-flex items-center gap-1.5">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: MARKER_COLORS[type] }} />
+                          {TYPE_LABELS[type]}
+                        </span>
+                      ))}
+                    </div>
+
+                    {interactions.length > 0 ? (
+                      <span className="text-[11px] font-semibold tabular-nums text-[color:var(--h5p-ink-muted)]">
+                        {answered.size} of {interactions.length} answered
                       </span>
-                    ))}
+                    ) : null}
                   </div>
+
+                  {interactions.length > 0 ? (
+                    <ProgressRail
+                      value={answered.size}
+                      max={interactions.length}
+                      label="Interactions answered"
+                      className="mt-2"
+                    />
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -341,8 +383,20 @@ function InteractiveVideoPlayerContent() {
 
         {/* Interaction popup */}
         {popup && activeInteraction ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={isInfoCard ? 'Did you know?' : 'Interactive question'}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'color-mix(in srgb, var(--h5p-ink) 72%, transparent)' }}
+          >
+            {/* Scales in rather than appearing. The video has just paused
+                under the learner, and a card that grows into place reads as
+                the video handing over, not as an error dialog. */}
+            <div
+              className="h5p-enter-scale w-full max-w-lg overflow-hidden rounded-2xl bg-white"
+              style={{ boxShadow: 'var(--h5p-shadow-overlay)' }}
+            >
               {isInfoCard ? (
                 <>
                   <div className="flex items-center justify-between bg-teal-500 px-5 py-3.5">
@@ -411,7 +465,7 @@ function InteractiveVideoPlayerContent() {
                         return (
                           <label
                             key={option.key}
-                            className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-3.5 py-2.5 text-sm text-slate-700 transition ${optionClass}`}
+                            className={`h5p-tappable h5p-target flex cursor-pointer items-center gap-3 rounded-xl border-2 px-3.5 py-3 text-sm text-slate-700 ${optionClass}`}
                           >
                             <input
                               type="radio"
