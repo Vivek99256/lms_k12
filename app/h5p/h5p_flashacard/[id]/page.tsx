@@ -1,16 +1,17 @@
 'use client';
 
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle, ChevronLeft, ChevronRight, HelpCircle, Lightbulb, XCircle } from 'lucide-react';
+import {
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  HelpCircle,
+  Lightbulb,
+  RotateCcw,
+  Trophy,
+  XCircle,
+} from 'lucide-react';
 import {
   fetchFlashcards,
   h5pContextQuery,
@@ -21,16 +22,7 @@ import {
   type H5pContext,
   type H5pFlashcard,
 } from '@/app/h5p/data/h5p';
-import { EmptyState, H5pPageHeader, InlineBanner, MissingContextNotice } from '@/app/h5p/components/shared';
-import {
-  Celebration,
-  PlayerSkeleton,
-  PrimaryAction,
-  ProgressRail,
-  ResultScreen,
-  RetryAction,
-  deriveAchievements,
-} from '@/app/h5p/components/game';
+import { EmptyState, H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '@/app/h5p/components/shared';
 import { Input } from '@/components/ui/input';
 import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
 
@@ -68,44 +60,6 @@ export interface PreloadedFlashcards {
  * id 0); the player loads every card for the chapter context and steps
  * through them one at a time.
  */
-
-/**
- * Swipe-to-navigate, for the one gesture a learner will try on a phone before
- * they look for a button.
- *
- * TOUCH AND PEN ONLY. A mouse drag across a card is how someone selects the
- * text on it, and turning that into a page change would make the card's own
- * content unreadable. The same reason keeps the threshold generous and the
- * direction check strict: a gesture that is mostly vertical is a scroll, and
- * scrolling the page must never cost the learner their place.
- *
- * Nothing here is the only way to do anything — the arrows and the dots below
- * do the same job for a keyboard, a mouse and a screen reader.
- */
-function useSwipe({ onLeft, onRight }: { onLeft: () => void; onRight: () => void }) {
-  const origin = useRef<{ x: number; y: number } | null>(null);
-
-  return {
-    onPointerDown: (event: ReactPointerEvent) => {
-      origin.current = event.pointerType === 'mouse' ? null : { x: event.clientX, y: event.clientY };
-    },
-    onPointerUp: (event: ReactPointerEvent) => {
-      const start = origin.current;
-      origin.current = null;
-      if (!start) return;
-
-      const dx = event.clientX - start.x;
-      const dy = event.clientY - start.y;
-      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-
-      if (dx < 0) onLeft();
-      else onRight();
-    },
-    onPointerCancel: () => {
-      origin.current = null;
-    },
-  };
-}
 
 function resultMessage(percentage: number): string {
   if (percentage >= 90) return 'Excellent! You are a star!';
@@ -359,14 +313,9 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
   const backHref = isStudent ? `/h5p/html_contents?${contextQuery}` : `/h5p/h5p_flashacard?${contextQuery}`;
   const hasHint = Boolean(card?.hint && card.hint.trim() !== '');
 
-  const swipe = useSwipe({
-    onLeft: () => requestNavigate(current + 1),
-    onRight: () => requestNavigate(current - 1),
-  });
-
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mx-auto">
+    <div className="flex-1 overflow-auto p-4 sm:p-6">
+      <div className="mx-auto max-w-5xl">
         <H5pPageHeader
           title="Flash cards"
           description={total > 0 ? `Card ${Math.min(current + 1, total)} of ${total}` : 'Interactive flash card practice'}
@@ -381,48 +330,23 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
             <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
 
             {loading ? (
-              <PlayerSkeleton lines={2} label="Loading flash cards" />
+              <LoadingState label="Loading flash cards…" />
             ) : total === 0 ? (
               <EmptyState title="No flashcards available" hint="No flash cards have been created for this chapter yet." />
             ) : card ? (
               <div className="mx-auto max-w-xl">
-                {/* How far through the deck, above the card rather than below
-                    it: on a phone the dots are past the fold, and a learner
-                    who cannot see how much is left assumes it is endless. */}
-                <div className="mb-4 flex items-center gap-3">
-                  <ProgressRail value={correctCount} max={total} label="Cards answered correctly" />
-                  <span className="shrink-0 text-xs font-semibold tabular-nums text-[color:var(--h5p-ink-muted)]">
-                    {correctCount}/{total}
-                  </span>
-                </div>
-
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() => requestNavigate(current - 1)}
                     disabled={current === 0}
-                    className="h5p-tappable h5p-focusable h5p-target inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white disabled:pointer-events-none disabled:opacity-40"
-                    style={{ background: 'var(--h5p-accent)', boxShadow: 'var(--h5p-shadow-raised)' }}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#4f46e5] text-white shadow-sm transition hover:bg-[#4338ca] disabled:pointer-events-none disabled:opacity-40"
                     aria-label="Previous card"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </button>
 
-                  {/* `h5p-stack` draws the rest of the deck behind this card as
-                      two pseudo-elements — depth with no extra DOM and nothing
-                      a keyboard can land on. */}
-                  <div
-                    {...swipe}
-                    className="h5p-stack h5p-enter relative min-w-0 flex-1 rounded-[var(--h5p-radius)]"
-                    // pan-y leaves vertical scrolling to the browser; the swipe
-                    // handler only ever claims a horizontal gesture.
-                    style={{ touchAction: 'pan-y' }}
-                  >
-                    {/* The card itself. Separate from the stack wrapper because
-                        the wrapper must NOT clip its overflow — the two deck
-                        layers behind it peek out at the bottom, and
-                        `overflow: hidden` here would erase them. */}
-                    <div className="h5p-surface overflow-hidden">
+                  <div className="relative min-w-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     {/* Card body */}
                     <div className="relative min-h-[320px] p-6 sm:p-8">
                       {card.content && card.content.trim() !== '' ? (
@@ -455,33 +379,19 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
                         </div>
                       ) : null}
 
-                      {/* Feedback overlay. Tinted with the verdict's own token
-                          rather than a flat black scrim, so the card underneath
-                          stays legible and the colour itself carries meaning —
-                          backed up by the icon, which is what actually does. */}
+                      {/* Feedback overlay */}
                       {feedback !== null ? (
-                        <div
-                          className="h5p-enter-scale absolute inset-0 z-30 flex items-center justify-center"
-                          style={{
-                            background:
-                              feedback === 'correct'
-                                ? 'color-mix(in srgb, var(--h5p-success) 92%, transparent)'
-                                : 'color-mix(in srgb, var(--h5p-danger) 92%, transparent)',
-                          }}
-                        >
-                          <Celebration show={feedback === 'correct'} pieces={14} />
-                          <div className="relative px-6 text-center text-white">
+                        <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-900/90">
+                          <div className="px-6 text-center text-white">
                             {feedback === 'correct' ? (
                               <>
-                                <CheckCircle className="mx-auto h-16 w-16" aria-hidden="true" />
-                                <p className="mt-4 text-xl font-bold">Correct</p>
-                                <p className="mt-1 text-sm opacity-90">Next card coming up.</p>
+                                <CheckCircle className="mx-auto h-16 w-16 text-emerald-400" />
+                                <p className="mt-4 text-xl font-bold">Correct!</p>
                               </>
                             ) : (
                               <>
-                                <XCircle className="mx-auto h-16 w-16" aria-hidden="true" />
-                                <p className="mt-4 text-xl font-bold">Not quite</p>
-                                <p className="mt-1 text-sm opacity-90">Have another go.</p>
+                                <XCircle className="mx-auto h-16 w-16 text-red-400" />
+                                <p className="mt-4 text-xl font-bold">Incorrect — try again</p>
                               </>
                             )}
                           </div>
@@ -516,35 +426,31 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
                             disabled={feedback === 'correct'}
                             aria-label="Your answer"
                           />
-                          <PrimaryAction
+                          <button
                             type="submit"
                             disabled={answer.trim() === '' || feedback === 'correct'}
-                            icon={<CheckCircle className="h-4 w-4" aria-hidden="true" />}
-                            className="shrink-0"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#4f46e5] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#4338ca] disabled:pointer-events-none disabled:opacity-50"
                           >
+                            <CheckCircle className="h-4 w-4" />
                             Check
-                          </PrimaryAction>
+                          </button>
                         </form>
                       )}
-                    </div>
                     </div>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => requestNavigate(current + 1)}
-                    className="h5p-tappable h5p-focusable h5p-target inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white"
-                    style={{ background: 'var(--h5p-accent)', boxShadow: 'var(--h5p-shadow-raised)' }}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#4f46e5] text-white shadow-sm transition hover:bg-[#4338ca]"
                     aria-label={current === total - 1 ? 'Finish' : 'Next card'}
                   >
                     <ChevronRight className="h-5 w-5" />
                   </button>
                 </div>
 
-                {/* Indicator dots. Each is a real button with a 24px hit area
-                    around a small visual pip — WCAG 2.2 target size without a
-                    row of chunky dots dominating the card. */}
-                <div className="mt-5 flex flex-wrap items-center justify-center gap-0.5">
+                {/* Indicator dots */}
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                   {cards.map((dotCard, index) => {
                     const isActive = index === current;
                     const isCompleted = solved[index] === true;
@@ -553,58 +459,42 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
                         key={dotCard.id}
                         type="button"
                         onClick={() => requestNavigate(index)}
-                        className="h5p-focusable flex h-6 w-6 items-center justify-center rounded-full"
-                        aria-label={`Go to card ${index + 1}${isCompleted ? ', answered' : ''}`}
+                        className={`h-2.5 rounded-full transition-all ${
+                          isActive ? 'w-7 bg-[#4f46e5]' : isCompleted ? 'w-2.5 bg-emerald-500' : 'w-2.5 bg-slate-300 hover:bg-slate-400'
+                        }`}
+                        aria-label={`Go to card ${index + 1}`}
                         aria-current={isActive ? 'true' : undefined}
-                      >
-                        <span
-                          className={`h5p-pip ${isActive ? 'is-current' : isCompleted ? 'is-done' : ''}`}
-                          aria-hidden="true"
-                        />
-                      </button>
+                      />
                     );
                   })}
                 </div>
-
-                <p className="mt-2 text-center text-[11px] text-[color:var(--h5p-ink-faint)] sm:hidden">
-                  Swipe left or right to move between cards.
-                </p>
               </div>
             ) : null}
           </>
         )}
       </div>
 
-      {/* Result. A dialog rather than a decorated div: it takes the whole
-          screen and the deck behind it is no longer usable, so it has to say
-          so to anything that is not reading pixels. */}
+      {/* Result modal */}
       {showResult ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Your result"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'color-mix(in srgb, var(--h5p-ink) 82%, transparent)' }}
-        >
-          <div className="w-full max-w-md">
-            <ResultScreen
-              headline="Deck finished"
-              score={correctCount}
-              maxScore={total}
-              percentage={total > 0 ? (correctCount / total) * 100 : 0}
-              // A deck has no pass mark, so "passed" here means the learner
-              // answered more than they missed — enough to be worth the
-              // celebration without handing it out for one right card.
-              passed={total > 0 && correctCount / total >= 0.5}
-              passLabel="Worth another pass"
-              summary={`${correctCount} of ${total} answered correctly`}
-              message={resultMessage(total > 0 ? (correctCount / total) * 100 : 0)}
-              achievements={deriveAchievements({
-                percentage: total > 0 ? (correctCount / total) * 100 : 0,
-                passed: total > 0 && correctCount === total,
-              })}
-              actions={<RetryAction onClick={restart} label="Start over" />}
-            />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/90 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xl">
+            <Trophy className="mx-auto h-14 w-14 text-amber-400" />
+            <h2 className="mt-4 text-lg font-semibold text-slate-900">Quiz completed!</h2>
+            <p className="mt-3 text-4xl font-bold text-[#4f46e5]">
+              {correctCount} / {total}
+            </p>
+            <p className="mt-1 text-sm text-slate-500">correct</p>
+            <p className="mt-4 text-sm text-slate-600">
+              {resultMessage(total > 0 ? (correctCount / total) * 100 : 0)}
+            </p>
+            <button
+              type="button"
+              onClick={restart}
+              className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-[#4f46e5] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#4338ca]"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Start Over
+            </button>
           </div>
         </div>
       ) : null}
@@ -638,7 +528,7 @@ export function FlashcardsPlayer({ cards, ctx, questionId, embedded, onResult }:
 
 export default function FlashcardPlayerPage() {
   return (
-    <Suspense fallback={<PlayerSkeleton lines={2} label="Loading flash cards" />}>
+    <Suspense fallback={<LoadingState label="Loading flash cards…" />}>
       <FlashcardPlayerContent />
     </Suspense>
   );

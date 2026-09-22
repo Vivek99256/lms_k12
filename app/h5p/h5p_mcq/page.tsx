@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -39,7 +39,6 @@ import {
   LoadingState,
   MissingContextNotice,
 } from '../components/shared';
-import { ProgressRail } from '../components/game';
 import { QuestionBankSource } from '../components/question-bank-source';
 
 /**
@@ -216,6 +215,7 @@ function QuizPlayer({
   const total = questions.length;
   const attempted = Object.keys(userAnswers).length;
   const remaining = Math.max(0, total - attempted);
+  const progressPercent = total > 0 ? Math.round((attempted / total) * 100) : 0;
   const question = questions[currentIndex];
   const options = question ? answersByQuestion[String(question.question_id)] ?? [] : [];
   const isLast = currentIndex === total - 1;
@@ -233,20 +233,21 @@ function QuizPlayer({
 
       {/* Progress */}
       <div className="mt-5">
-        <p className="text-center text-sm font-medium text-[color:var(--h5p-ink-muted)]">
+        <p className="text-center text-sm font-medium text-slate-600">
           Question {currentIndex + 1} of {total}
         </p>
-        <div className="mt-2">
-          <ProgressRail value={attempted} max={total} label="Questions answered" />
+        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-[#4f46e5] transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
         </div>
       </div>
 
-      {/* Question. Keyed so each one animates in rather than the text swapping
-          inside a static box — on a long paper that is the only signal that
-          the Next press did anything. */}
-      <div key={question.question_id} className="h5p-enter mt-6 border-b-2 border-indigo-100 pb-4">
+      {/* Question */}
+      <div className="mt-6 border-b-2 border-indigo-100 pb-4">
         <div
-          className="text-lg font-semibold text-[color:var(--h5p-ink)]"
+          className="text-lg font-semibold text-slate-900"
           // Question titles are stored with HTML entities/tags in the ERP DB.
           dangerouslySetInnerHTML={{ __html: question.question_text }}
         />
@@ -263,25 +264,16 @@ function QuizPlayer({
               role="radio"
               aria-checked={selected}
               onClick={() => onSelect(question.question_id, option.id)}
-              style={
-                {
-                  '--h5p-stagger': `${Math.min(index, 5) * 45}ms`,
-                  ...(selected
-                    ? { borderColor: 'var(--h5p-accent)', background: 'var(--h5p-accent)', color: '#fff' }
-                    : null),
-                } as CSSProperties
-              }
-              className={`h5p-tappable h5p-focusable h5p-target h5p-enter h5p-stagger flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left text-sm font-medium ${
-                selected ? '' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:bg-slate-100'
+              className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-sm font-medium transition ${
+                selected
+                  ? 'border-[#4f46e5] bg-[#4f46e5] text-white shadow-md'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:bg-slate-100'
               }`}
             >
               <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                style={
-                  selected
-                    ? { background: '#fff', color: 'var(--h5p-accent)' }
-                    : { background: 'var(--h5p-accent)', color: '#fff' }
-                }
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  selected ? 'bg-white text-[#4f46e5]' : 'bg-[#4f46e5] text-white'
+                }`}
               >
                 {String.fromCharCode(65 + index)}
               </span>
@@ -765,8 +757,8 @@ function McqContent() {
   const quizIsEmpty = selectedLevel !== null && questions.length === 0;
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mx-auto">
+    <div className="flex-1 overflow-auto p-4 sm:p-6">
+      <div className="mx-auto max-w-5xl">
         <H5pPageHeader
           title="Multiple choice questions"
           description={

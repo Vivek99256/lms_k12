@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { ArrowRight, GitBranch, ShieldAlert, Workflow as WorkflowIcon } from "lucide-react";
 
 import { ErpSection } from "@/components/erp/erp-ui";
-import { vocabularyForModuleName, type ActorMode, type ProcessSpec } from "@/lib/process";
+import { ACTOR_LABELS, type ActorMode, type ProcessSpec } from "@/lib/process";
 import { ActorBadge, ExecutionLabel, RuleChip } from "./process-ui";
 
 /**
@@ -46,7 +46,7 @@ export function StepWorkflow({ spec }: { spec: ProcessSpec }) {
             {lanes.map((actor) => (
               <div key={actor} className="flex items-stretch gap-3">
                 <div className="flex w-36 shrink-0 items-center">
-                  <ActorBadge actor={actor} module={spec.module} />
+                  <ActorBadge actor={actor} />
                 </div>
                 <div
                   className="grid flex-1 gap-2"
@@ -92,9 +92,9 @@ export function StepWorkflow({ spec }: { spec: ProcessSpec }) {
                 <tr key={step.no} className="border-b border-slate-100 align-top last:border-0">
                   <td className="px-2 py-3 font-mono text-xs font-semibold text-slate-900">{step.no}</td>
                   <td className="px-2 py-3">
-                    <ActorBadge actor={step.actor} module={spec.module} />
+                    <ActorBadge actor={step.actor} />
                     <div className="mt-1">
-                      <ExecutionLabel execution={step.execution} module={spec.module} />
+                      <ExecutionLabel execution={step.execution} />
                     </div>
                   </td>
                   <td className="px-2 py-3 text-slate-700">
@@ -169,8 +169,7 @@ export function StepWorkflow({ spec }: { spec: ProcessSpec }) {
 
 /** Exported for the summary line on the review screen. */
 export function actorSummary(spec: ProcessSpec): string {
-  const { actorLabels } = vocabularyForModuleName(spec.module);
   const counts = new Map<ActorMode, number>();
   for (const step of spec.workflow.steps) counts.set(step.actor, (counts.get(step.actor) ?? 0) + 1);
-  return [...counts.entries()].map(([actor, count]) => `${count} ${actorLabels[actor]}`).join(", ");
+  return [...counts.entries()].map(([actor, count]) => `${count} ${ACTOR_LABELS[actor]}`).join(", ");
 }

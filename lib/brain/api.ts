@@ -372,46 +372,6 @@ export interface BrainStudentsPayload {
 }
 
 export const fetchIntelligence = () => brainFetch<BrainIntelligencePayload>(tenantPath('/intelligence'));
-
-/**
- * The loop narrowed to one module — what a module's own Intelligence tab shows.
- *
- * Backend: BrainIntelligenceController::moduleIntelligence,
- *          GET /api/brain/{tenant}/modules/{module}/intelligence
- *
- * The module is a config/platform_services.php key, the same vocabulary the
- * menu category rows carry in `platform_module_key`, so one module means the
- * same thing to the Brain, the workflow console and the scheduler.
- *
- * `declared` and an empty `signals` list are different answers and are both
- * returned: no rule watches this module yet, versus rules watch it and found
- * nothing. The screen must not collapse them into one empty state.
- */
-export interface ModuleIntelligencePayload {
-  module: string;
-  label: string;
-  /** Whether config/platform_services.php declares this module at all. */
-  registered: boolean;
-  /** Whether any Brain rule is attributed to it. */
-  declared: boolean;
-  /** The rules that watch this module, firing or not. */
-  rules: string[];
-  signals: BrainFinding[];
-  recommendations: BrainRecommendation[];
-  summary: {
-    signals: number;
-    bySeverity: Record<string, number>;
-    byStatus: Record<string, number>;
-    recommendations: number;
-    open: number;
-  };
-  lastRun: { at: string; changes: Record<string, unknown> } | null;
-}
-
-export const fetchModuleIntelligence = (moduleKey: string) =>
-  brainFetch<ModuleIntelligencePayload>(
-    tenantPath(`/modules/${encodeURIComponent(moduleKey)}/intelligence`)
-  );
 export const runIntelligence = () =>
   brainFetch<Record<string, unknown>>(tenantPath('/intelligence/run'), { method: 'POST' });
 export const fetchSignalDetail = (id: string) => brainFetch<BrainSignalDetail>(tenantPath(`/signals/${id}`));
@@ -435,6 +395,53 @@ export const decideRecommendation = (id: string, status: string, rationale: stri
   brainFetch<{ decisionId: string; executionId: string | null; status: string }>(
     tenantPath(`/recommendations/${id}/decide`),
     { method: 'POST', body: JSON.stringify({ status, rationale }) },
+  );
+
+/**
+ * Write one module's findings into the signal ledger.
+ *
+ * This is what gives a module screen its recommendations, its decision trail and
+ * its learning memory: until the loop has run, all three are honestly empty and
+ * say so. It is IDEMPOTENT — the backend dedupes on (tenant, rule, year) — so
+ * pressing it twice refreshes the same signals with fresher figures rather than
+ * raising them again.
+ */
+export const runModuleIntelligence = (module: string) =>
+  brainFetch<{
+    signalsCreated: number;
+    signalsRefreshed: number;
+    recommendations: number;
+    /** Findings whose rule has no approved cause. They stop at evidence. */
+    undetermined: number;
+    elapsedMs: number | null;
+  }>(tenantPath(`/${module}/intelligence/run`), { method: 'POST' });
+
+/**
+ * Report back what an approved action actually achieved.
+ *
+ * `measured` is optional and is supplied by the person reporting back. The loop
+ * closes without it — an outcome nobody quantified is still an outcome — but
+ * when both ends are given the change becomes a fact the next decision can be
+ * weighed against.
+ */
+export const recordExecutionOutcome = (
+  id: string,
+  result: 'success' | 'partial' | 'failed',
+  feedback: string,
+  measured?: { before?: number; after?: number; unitsAffected?: number },
+) =>
+  brainFetch<{ executionId: string; outcomeId: string | null; result: string }>(
+    tenantPath(`/executions/${id}/complete`),
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        result,
+        feedback,
+        measured_before: measured?.before ?? null,
+        measured_after: measured?.after ?? null,
+        accounts_affected: measured?.unitsAffected ?? null,
+      }),
+    },
   );
 
 export const completeExecution = (id: string, result: string, feedback: string) =>

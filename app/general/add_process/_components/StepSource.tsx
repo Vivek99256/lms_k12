@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ErpSection, erpSelectClass } from "@/components/erp/erp-ui";
-import { SOP_MODULES, vocabularyFor, type SopModule } from "@/lib/process";
+import { SOP_MODULES, type SopModule } from "@/lib/process";
 import { IssueList } from "./process-ui";
 import type { ParseIssue } from "@/lib/process";
 
@@ -26,13 +26,6 @@ import type { ParseIssue } from "@/lib/process";
  * a person choose from hundreds of unrelated titles to answer a question the
  * procedure number already answers. Storage now keys itself off the module and
  * the reference, so the question is not asked.
- *
- * All three lists come from the module registry and nowhere else: the Module
- * select is `SOP_MODULES`, Process group is the chosen module's `groups`, and
- * Procedure is the chosen group's `procedures`. Registering a module is
- * therefore the whole of adding it to this screen - there is no list here to
- * keep in step. Each option is annotated with what the module actually
- * carries, so "configured" is visible rather than assumed.
  */
 
 export interface SourceState {
@@ -45,8 +38,6 @@ export interface SourceState {
 
 export function StepSource({
   state,
-  modules = SOP_MODULES,
-  libraryError = "",
   onChange,
   issues,
   converting,
@@ -56,21 +47,6 @@ export function StepSource({
   disabled,
 }: {
   state: SourceState;
-  /**
-   * The modules this screen offers.
-   *
-   * Defaults to the registry, and the converter passes the registry plus the
-   * module it was opened from when that module has no SOP catalogue yet — so a
-   * person who reached Process Builder from Student is offered Student, rather
-   * than a list that silently excludes where they are.
-   */
-  modules?: SopModule[];
-  /**
-   * Why the institute's SOP library is missing from the pickers, when it is
-   * missing because the request failed rather than because there is nothing to
-   * show. Reported here because the two look identical otherwise.
-   */
-  libraryError?: string;
   onChange: (next: Partial<SourceState>) => void;
   issues: ParseIssue[];
   converting: boolean;
@@ -80,8 +56,8 @@ export function StepSource({
   disabled: boolean;
 }) {
   const sopModule: SopModule | undefined = useMemo(
-    () => modules.find((entry) => entry.key === state.moduleKey),
-    [modules, state.moduleKey]
+    () => SOP_MODULES.find((entry) => entry.key === state.moduleKey),
+    [state.moduleKey]
   );
 
   const group = useMemo(
@@ -93,15 +69,6 @@ export function StepSource({
     () => group?.procedures.find((entry) => entry.ref === state.procedureRef),
     [group, state.procedureRef]
   );
-
-  /** What the chosen module carries, so the caption states it rather than implies it. */
-  const catalogued = useMemo(() => {
-    const groups = sopModule?.groups ?? [];
-    return {
-      groups: groups.length,
-      procedures: groups.reduce((total, entry) => total + entry.procedures.length, 0),
-    };
-  }, [sopModule]);
 
   return (
     <ErpSection
@@ -133,39 +100,16 @@ export function StepSource({
             disabled={disabled}
             onChange={(event) => onChange({ moduleKey: event.target.value, groupRef: "", procedureRef: "" })}
           >
-            {modules.map((entry) => (
+            {SOP_MODULES.map((entry) => (
               <option key={entry.key} value={entry.key}>
                 {entry.name}
               </option>
             ))}
           </select>
-          {sopModule && sopModule.sop.document ? (
+          {sopModule ? (
             <p className="text-xs text-slate-500">
               {sopModule.sop.document} v{sopModule.sop.version} &middot; {sopModule.sop.organization} &middot; effective{" "}
-              {sopModule.sop.effectiveDate} &middot; {catalogued.groups} process groups, {catalogued.procedures}{" "}
-              procedures
-            </p>
-          ) : sopModule && libraryError ? (
-            <p className="text-xs text-amber-700">
-              The institute SOP library could not be loaded, so the pickers are empty &middot;{" "}
-              {libraryError}
-            </p>
-          ) : sopModule && catalogued.procedures > 0 ? (
-            // No shipped catalogue, but the institute has written SOPs and they
-            // are what the pickers below list. Counted rather than described,
-            // so the caption cannot claim more than the library holds.
-            <p className="text-xs text-slate-500">
-              No SOP catalogue shipped for {sopModule.name} &middot; {catalogued.procedures}{" "}
-              {catalogued.procedures === 1 ? "document" : "documents"} from this institute&apos;s SOP
-              library, in {catalogued.groups} {catalogued.groups === 1 ? "group" : "groups"}
-            </p>
-          ) : sopModule ? (
-            // Neither a catalogue nor a stored document. Saying so is the point:
-            // the pickers below will be empty, and that is a fact about the SOP
-            // rather than a fault in this screen.
-            <p className="text-xs text-slate-500">
-              No SOP digitized for {sopModule.name} yet &middot; paste the procedure text below and
-              the converter will read it
+              {sopModule.sop.effectiveDate}
             </p>
           ) : null}
         </div>
@@ -182,7 +126,7 @@ export function StepSource({
             <option value="">Select a process group</option>
             {sopModule?.groups.map((entry) => (
               <option key={entry.ref} value={entry.ref}>
-                {entry.ref} {entry.title} ({entry.procedures.length})
+                {entry.ref} {entry.title}
               </option>
             ))}
           </select>
@@ -206,9 +150,9 @@ export function StepSource({
               </option>
             ))}
           </select>
-          {procedure && sopModule ? (
+          {procedure ? (
             <p className="text-xs text-slate-500">
-              Primary actor per the SOP index: {vocabularyFor(sopModule).actorLabels[procedure.primaryActor]}
+              Primary actor per the SOP index: {procedure.primaryActor.replace("_", " + ")}
             </p>
           ) : null}
         </div>

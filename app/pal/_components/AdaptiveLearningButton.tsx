@@ -56,7 +56,7 @@ export function AdaptiveLearningButton({ chapterId }: { chapterId: string }) {
         className="border-violet-200 text-violet-700 hover:bg-violet-50"
       >
         <Sparkles className="h-3.5 w-3.5" />
-        Concept diagnostic
+        Adaptive learning
       </Button>
       {open && (
         <ConceptPickerModal concepts={concepts} onClose={() => setOpen(false)} />
@@ -96,7 +96,7 @@ function ConceptPickerModal({
               <Sparkles className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Start concept diagnostic</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Start Adaptive Learning</h2>
               <p className="text-xs text-slate-500">Pick a concept to work on</p>
             </div>
           </div>

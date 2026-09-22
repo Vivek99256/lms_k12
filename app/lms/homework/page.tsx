@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   ClipboardList,
   LoaderCircle,
   Paperclip,
+  Search,
   Send,
   Users,
   X,
@@ -13,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AiFieldAssistant } from "@/components/ai/AiFieldAssistant";
 import {
@@ -30,67 +32,16 @@ import {
 } from "@/components/search-dropdown";
 import {
   assignHomework,
-  listExamPaperQuestions,
   listHomeworkChapters,
-  listHomeworkExamPapers,
   listHomeworkQuestionTypes,
   listHomeworkQuestions,
   listStudents,
   type HomeworkChapter,
-  type HomeworkExamPaper,
   type HomeworkQuestion,
   type HomeworkQuestionType,
   type StudentRow,
 } from "@/app/lms/homework/api";
 import RequireStaff from "@/app/lms/_shared/RequireStaff";
-import {
-  StudentScopeToggle,
-  type StudentScope,
-} from "@/app/lms/_shared/StudentScopeToggle";
-
-/**
- * Where a homework's content comes from. "chapter" and "attachment" are the two
- * the screen has always had (the old "Send homework from system" switch was
- * chapter-on / attachment-off); "exam_paper" assigns an existing homework
- * question paper, questions and all.
- */
-type HomeworkSource = "chapter" | "attachment" | "exam_paper";
-
-const SOURCE_OPTIONS: Array<{ value: HomeworkSource; label: string; hint: string }> = [
-  {
-    value: "chapter",
-    label: "Chapter",
-    hint: "Pick questions from the question bank, chapter by chapter.",
-  },
-  {
-    value: "attachment",
-    label: "Attachment",
-    hint: "Attach a PDF, Word document or image for students to work from.",
-  },
-  {
-    value: "exam_paper",
-    label: "Homework paper",
-    hint: "Assign an existing homework paper — its questions come with it.",
-  },
-];
-
-/**
- * "Science homework 1 (20 marks) — Grade 5 · Science": the paper and what it is
- * worth first, then the class it was written for, which is what tells two
- * similarly named papers apart.
- */
-function examPaperLabel(paper: HomeworkExamPaper): string {
-  const name = paper.title || `Paper ${paper.id}`;
-  const marks = paper.totalMarks ? ` (${paper.totalMarks} marks)` : "";
-  // "Grade 5 · Science", the way the question-paper grid labels a paper's class.
-  const context = [
-    paper.standardName ? `Grade ${paper.standardName}` : "",
-    paper.subjectName,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return context ? `${name}${marks} — ${context}` : `${name}${marks}`;
-}
 
 const academicFields: DropdownField[] = [
   "section",
@@ -136,13 +87,6 @@ export default function StudentHomeworkPage() {
   });
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  /**
-   * Student-wise is the default, and everything under it is this screen's
-   * original flow, untouched. All-students only ever removes the picker: the
-   * class is still searched, so the teacher can see how many the homework will
-   * reach, but the roster that is actually written comes from the backend.
-   */
-  const [scope, setScope] = useState<StudentScope>("student_wise");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [submissionDate, setSubmissionDate] = useState("");
@@ -151,9 +95,9 @@ export default function StudentHomeworkPage() {
   const [standardName, setStandardName] = useState("");
   const [subjectName, setSubjectName] = useState("");
 
-  // Question-bank workflow — additive to the attachment flow above; only
-  // consulted while the chapter source is selected.
-  const [source, setSource] = useState<HomeworkSource>("attachment");
+  // Question-bank ("Send homework from system") workflow — additive to the
+  // attachment flow above; only consulted when sendFromSystem is true.
+  const [sendFromSystem, setSendFromSystem] = useState(false);
   const [chapters, setChapters] = useState<HomeworkChapter[]>([]);
   const [chaptersLoading, setChaptersLoading] = useState(false);
   const [chaptersError, setChaptersError] = useState("");
@@ -167,17 +111,6 @@ export default function StudentHomeworkPage() {
   const [questionsError, setQuestionsError] = useState("");
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<number[]>([]);
 
-  // Exam-paper workflow — the paper list and, once one is chosen, the questions
-  // it already maps. Those questions are shown read-only: the paper decides
-  // them, and assigning stores their ids rather than copying them.
-  const [examPapers, setExamPapers] = useState<HomeworkExamPaper[]>([]);
-  const [examPapersLoading, setExamPapersLoading] = useState(false);
-  const [examPapersError, setExamPapersError] = useState("");
-  const [selectedExamPaperId, setSelectedExamPaperId] = useState("");
-  const [examPaperQuestions, setExamPaperQuestions] = useState<HomeworkQuestion[]>([]);
-  const [examPaperQuestionsLoading, setExamPaperQuestionsLoading] = useState(false);
-  const [examPaperQuestionsError, setExamPaperQuestionsError] = useState("");
-
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -190,16 +123,11 @@ export default function StudentHomeworkPage() {
   const section = readValue(filters.section ?? "");
 
   const allChecked = students.length > 0 && selected.size === students.length;
-  const assignToAll = scope === "all_students";
-
-  const fromChapters = source === "chapter";
-  const fromAttachment = source === "attachment";
-  const fromExamPaper = source === "exam_paper";
 
   // Question-bank workflow: load chapters whenever the picker is on and the
   // standard changes. Independent of the attachment flow above.
   useEffect(() => {
-    if (!fromChapters || !standard) {
+    if (!sendFromSystem || !standard) {
       setChapters([]);
       setSelectedChapterIds([]);
       return;
@@ -228,12 +156,12 @@ export default function StudentHomeworkPage() {
     return () => {
       cancelled = true;
     };
-  }, [fromChapters, standard, subject]);
+  }, [sendFromSystem, standard, subject]);
 
   // Question types load once per entry into the picker (don't depend on
   // chapter/subject selection).
   useEffect(() => {
-    if (!fromChapters) return;
+    if (!sendFromSystem) return;
     let cancelled = false;
     setQuestionTypesLoading(true);
     setQuestionTypesError("");
@@ -257,12 +185,12 @@ export default function StudentHomeworkPage() {
     return () => {
       cancelled = true;
     };
-  }, [fromChapters]);
+  }, [sendFromSystem]);
 
   // Questions re-fetch whenever the subject/standard/chapter/type selection
   // changes, once at least one chapter is selected.
   useEffect(() => {
-    if (!fromChapters || selectedChapterIds.length === 0 || !subject || !standard) {
+    if (!sendFromSystem || selectedChapterIds.length === 0 || !subject || !standard) {
       setQuestions([]);
       return;
     }
@@ -294,79 +222,7 @@ export default function StudentHomeworkPage() {
     return () => {
       cancelled = true;
     };
-  }, [fromChapters, subject, standard, selectedChapterIds, selectedQuestionTypeIds]);
-
-  // Exam papers load once the exam-paper source is picked. The listing is pinned
-  // to exam_type = 'homework' in the api layer, so a term, formative, summative,
-  // offline or online paper can never appear here.
-  useEffect(() => {
-    if (!fromExamPaper) return;
-    let cancelled = false;
-    // Deferred a tick, the way the Exam module kicks its own paper load off:
-    // the first state change then lands outside the effect body rather than
-    // cascading a render out of it.
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setExamPapersLoading(true);
-      setExamPapersError("");
-      listHomeworkExamPapers()
-        .then((rows) => {
-          if (!cancelled) setExamPapers(rows);
-        })
-        .catch((loadError: unknown) => {
-          if (!cancelled) {
-            setExamPapers([]);
-            setExamPapersError(
-              loadError instanceof Error
-                ? loadError.message
-                : "Exam papers could not be loaded."
-            );
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setExamPapersLoading(false);
-        });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [fromExamPaper]);
-
-  // The chosen paper's questions, read through the Exam module's existing paper
-  // mapping. Nothing is duplicated — the ids are what the homework stores.
-  useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      if (!fromExamPaper || !selectedExamPaperId) {
-        setExamPaperQuestions([]);
-        setExamPaperQuestionsError("");
-        return;
-      }
-      setExamPaperQuestionsLoading(true);
-      setExamPaperQuestionsError("");
-      listExamPaperQuestions(Number(selectedExamPaperId))
-        .then((rows) => {
-          if (!cancelled) setExamPaperQuestions(rows);
-        })
-        .catch((loadError: unknown) => {
-          if (!cancelled) {
-            setExamPaperQuestions([]);
-            setExamPaperQuestionsError(
-              loadError instanceof Error
-                ? loadError.message
-                : "The exam paper's questions could not be loaded."
-            );
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setExamPaperQuestionsLoading(false);
-        });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [fromExamPaper, selectedExamPaperId]);
+  }, [sendFromSystem, subject, standard, selectedChapterIds, selectedQuestionTypeIds]);
 
   function handleChapterSelect(event: React.ChangeEvent<HTMLSelectElement>) {
     const ids = Array.from(event.target.selectedOptions, (option) => Number(option.value));
@@ -400,92 +256,30 @@ export default function StudentHomeworkPage() {
     [questionTypes]
   );
 
-  // Switching modes drops whatever was ticked, so a stale selection can never
-  // leak back into a later assign.
-  function changeScope(next: StudentScope) {
-    setScope(next);
-    setSelected(new Set());
+  const loadStudents = useCallback(async () => {
     setError("");
     setSuccess("");
-  }
-
-  /**
-   * Load the class the filters now describe.
-   *
-   * Called from the dropdown's own onChange rather than from an effect,
-   * because this is a reaction to the teacher picking something, not state
-   * that needs synchronising — and the handler is handed the complete next
-   * values, so there is no render to wait for.
-   *
-   * Two guards, both about not calling the endpoint twice for one class:
-   * `lastSearchKey` skips a change that leaves the class the same (re-picking
-   * the subject already selected), and `requestId` means a slow answer that
-   * arrives after a newer search is dropped instead of overwriting it.
-   */
-  const lastSearchKeyRef = useRef("");
-  const searchRequestRef = useRef(0);
-
-  const runStudentSearch = useCallback(
-    async (values: Partial<SearchDropdownValues>) => {
-      const nextSection = readValue(values.section ?? "");
-      const nextStandard = readValue(values.standard ?? "");
-      const nextDivision = readValue(values.division ?? "");
-      const nextSubject = readValue(values.subject ?? "");
-
-      // Standard and subject are what make a class searchable, and subject is
-      // the last of the four the teacher picks — so this is the moment the
-      // filters describe something to look up. Division is optional in the
-      // dropdown, but a change to it still re-runs the search through the key
-      // below.
-      if (!nextStandard || !nextSubject) {
-        lastSearchKeyRef.current = "";
-        // Abandon anything in flight: its answer is for a class the teacher
-        // has since moved away from.
-        searchRequestRef.current += 1;
-        setStudents([]);
-        setSelected(new Set());
-        setLoading(false);
-        return;
-      }
-
-      const key = [nextSection, nextStandard, nextDivision, nextSubject].join("|");
-      if (key === lastSearchKeyRef.current) return;
-      lastSearchKeyRef.current = key;
-
-      const requestId = searchRequestRef.current + 1;
-      searchRequestRef.current = requestId;
-
-      setError("");
-      setSuccess("");
-      setLoading(true);
-      setSearched(true);
+    setLoading(true);
+    setSearched(true);
+    setSelected(new Set());
+    try {
+      const rows = await listStudents({
+        grade: section,
+        standard,
+        division,
+      });
+      setStudents(rows);
+    } catch (loadError: unknown) {
       setStudents([]);
-      setSelected(new Set());
-      try {
-        const rows = await listStudents({
-          grade: nextSection,
-          standard: nextStandard,
-          division: nextDivision,
-        });
-        if (searchRequestRef.current !== requestId) return;
-        setStudents(rows);
-      } catch (loadError: unknown) {
-        if (searchRequestRef.current !== requestId) return;
-        // Forget the key so the same selection can be retried by re-picking
-        // it, rather than being stuck on a failed load.
-        lastSearchKeyRef.current = "";
-        setStudents([]);
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Students could not be loaded."
-        );
-      } finally {
-        if (searchRequestRef.current === requestId) setLoading(false);
-      }
-    },
-    []
-  );
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Students could not be loaded."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [division, section, standard]);
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -530,37 +324,19 @@ export default function StudentHomeworkPage() {
     if (!subject) return "Select a subject.";
     if (!title.trim()) return "Enter a homework title.";
     if (!submissionDate) return "Select a submission date.";
-    if (fromChapters && selectedQuestionIds.length === 0) {
+    if (sendFromSystem && selectedQuestionIds.length === 0) {
       return "Select at least one question.";
     }
-    if (fromExamPaper) {
-      if (!selectedExamPaperId) return "Select a homework paper.";
-      if (examPaperQuestionsLoading) {
-        return "Wait for the homework paper's questions to load.";
-      }
-      if (examPaperQuestions.length === 0) {
-        return "The selected homework paper has no questions.";
-      }
-    }
-    if (!assignToAll && selected.size === 0) return "Select at least one student.";
-    if (assignToAll && students.length === 0) {
-      return "No students found for the selected class.";
-    }
+    if (selected.size === 0) return "Select at least one student.";
     return "";
   }, [
     standard,
     subject,
     title,
     submissionDate,
-    fromChapters,
-    fromExamPaper,
+    sendFromSystem,
     selectedQuestionIds.length,
-    selectedExamPaperId,
-    examPaperQuestions.length,
-    examPaperQuestionsLoading,
     selected.size,
-    assignToAll,
-    students.length,
   ]);
 
   // Mirrors the Laravel assign form's generateTitleDescriptionPrompt(): every
@@ -601,11 +377,7 @@ export default function StudentHomeworkPage() {
     setSaving(true);
     try {
       const count = await assignHomework({
-        // All-students sends no ids at all — the backend resolves the class
-        // from the section, standard and division below.
-        studentIds: assignToAll ? [] : Array.from(selected),
-        assignMode: assignToAll ? "all" : "selected",
-        grade: section,
+        studentIds: Array.from(selected),
         title: title.trim(),
         description: description.trim(),
         submissionDate,
@@ -613,19 +385,9 @@ export default function StudentHomeworkPage() {
         divisionId: division,
         subjectId: subject,
         prompt,
-        image: fromAttachment ? image : null,
-        ...(fromChapters
+        image: sendFromSystem ? null : image,
+        ...(sendFromSystem
           ? { sourceType: "question_bank" as const, questionIds: selectedQuestionIds }
-          : {}),
-        // Exam-paper homework carries the paper it came from plus the question
-        // ids that paper already maps, so the backend reuses the mapping rather
-        // than copying questions onto the homework.
-        ...(fromExamPaper
-          ? {
-              sourceType: "exam_paper" as const,
-              examPaperId: Number(selectedExamPaperId),
-              questionIds: examPaperQuestions.map((question) => question.id),
-            }
           : {}),
       });
       setSuccess(`Homework assigned to ${count} student(s) successfully.`);
@@ -635,13 +397,10 @@ export default function StudentHomeworkPage() {
       setImage(null);
       setAttachmentError("");
       setSelected(new Set());
-      setSource("attachment");
+      setSendFromSystem(false);
       setSelectedChapterIds([]);
       setSelectedQuestionTypeIds([]);
       setSelectedQuestionIds([]);
-      setSelectedExamPaperId("");
-      setExamPaperQuestions([]);
-      setExamPaperQuestionsError("");
     } catch (saveError: unknown) {
       setError(
         saveError instanceof Error
@@ -682,20 +441,10 @@ export default function StudentHomeworkPage() {
       ) : null}
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-5 border-b border-slate-100 pb-4">
-          <StudentScopeToggle
-            value={scope}
-            onChange={changeScope}
-            name="hw-scope"
-          />
-        </div>
         <SearchDropdown
           fields={academicFields}
           values={filters}
-          onChange={(values) => {
-            setFilters(values);
-            void runStudentSearch(values);
-          }}
+          onChange={(values) => setFilters(values)}
           onStandardChange={(_value, rows) =>
             setStandardName(rows[0]?.name ?? "")
           }
@@ -704,16 +453,24 @@ export default function StudentHomeworkPage() {
           }
           className="gap-x-5 gap-y-4"
         />
-        <p className="mt-5 flex items-center gap-2 border-t border-slate-100 pt-4 text-sm text-slate-500">
-          {loading ? (
-            <>
+        <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500">
+            Choose a section, standard, division and subject, then search.
+          </p>
+          <Button
+            type="button"
+            onClick={loadStudents}
+            disabled={loading}
+            className="w-full sm:w-auto"
+          >
+            {loading ? (
               <LoaderCircle className="size-4 animate-spin" />
-              Loading students…
-            </>
-          ) : (
-            "Students load automatically once a standard and subject are selected."
-          )}
-        </p>
+            ) : (
+              <Search className="size-4" />
+            )}
+            Search students
+          </Button>
+        </div>
       </section>
 
       {searched ? (
@@ -746,47 +503,21 @@ export default function StudentHomeworkPage() {
               />
             </div>
             <div className="space-y-2">
-              <p
-                id="hw-source-label"
-                className="text-sm font-medium text-slate-700"
-              >
-                Send homework from system
-              </p>
-              {/* Native radios: arrow-key navigation and focus come for free. */}
-              <div
-                role="radiogroup"
-                aria-labelledby="hw-source-label"
-                className="flex flex-wrap gap-2"
-              >
-                {SOURCE_OPTIONS.map((option) => {
-                  const isSelected = source === option.value;
-                  return (
-                    <label
-                      key={option.value}
-                      className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm font-medium transition focus-within:ring-2 focus-within:ring-blue-100 ${
-                        isSelected
-                          ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="hw-source"
-                        value={option.value}
-                        checked={isSelected}
-                        onChange={() => setSource(option.value)}
-                        className="sr-only"
-                      />
-                      {option.label}
-                    </label>
-                  );
-                })}
+              <div className="flex items-center justify-between">
+                <Label htmlFor="hw-source-toggle">Send homework from system</Label>
+                <Switch
+                  id="hw-source-toggle"
+                  checked={sendFromSystem}
+                  onChange={(event) => setSendFromSystem(event.target.checked)}
+                />
               </div>
-              <p className="text-xs text-slate-400">
-                {SOURCE_OPTIONS.find((option) => option.value === source)?.hint}
-              </p>
+              {!sendFromSystem ? (
+                <p className="text-xs text-slate-400">
+                  Off: attach a file. On: pick questions from the question bank below.
+                </p>
+              ) : null}
             </div>
-            {fromAttachment ? (
+            {!sendFromSystem ? (
             <div className="space-y-2">
               <Label htmlFor="hw-image">Attachment</Label>
               {image ? (
@@ -849,7 +580,7 @@ export default function StudentHomeworkPage() {
               )}
             </div>
             ) : null}
-            {fromChapters ? (
+            {sendFromSystem ? (
             <div className="space-y-5 md:col-span-2 xl:col-span-3">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -1026,117 +757,6 @@ export default function StudentHomeworkPage() {
               </div>
             </div>
             ) : null}
-            {fromExamPaper ? (
-            <div className="space-y-5 md:col-span-2 xl:col-span-3">
-              <div className="space-y-2">
-                <Label htmlFor="hw-exam-paper">
-                  Homework paper <span className="text-red-500">*</span>
-                </Label>
-                {examPapersError ? (
-                  <p className="text-sm text-red-600">{examPapersError}</p>
-                ) : (
-                  <select
-                    id="hw-exam-paper"
-                    value={selectedExamPaperId}
-                    onChange={(event) => setSelectedExamPaperId(event.target.value)}
-                    disabled={examPapersLoading || examPapers.length === 0}
-                    className="h-11 w-full max-w-xl rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    <option value="">
-                      {examPapersLoading
-                        ? "Loading homework papers…"
-                        : examPapers.length === 0
-                          ? "No homework papers available"
-                          : "Select a homework paper"}
-                    </option>
-                    {examPapers.map((paper) => (
-                      <option key={paper.id} value={paper.id}>
-                        {examPaperLabel(paper)}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <p className="text-xs text-slate-400">
-                  Only homework papers are listed. Its questions are assigned as
-                  they are — there is nothing to pick.
-                </p>
-              </div>
-
-              {selectedExamPaperId ? (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Questions from this paper
-                    </p>
-                    <span className="text-xs text-slate-500">
-                      {examPaperQuestions.length} question(s) ·{" "}
-                      {examPaperQuestions.reduce(
-                        (total, question) => total + question.points,
-                        0
-                      )}{" "}
-                      marks
-                    </span>
-                  </div>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <Table>
-                      <TableHeader className="bg-slate-50">
-                        <TableRow>
-                          <TableHead className="w-12">#</TableHead>
-                          <TableHead>Question</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Points</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {examPaperQuestionsLoading ? (
-                          <TableRow>
-                            <TableCell colSpan={4} className="h-24 text-center text-slate-500">
-                              <LoaderCircle className="mx-auto size-6 animate-spin text-slate-300" />
-                            </TableCell>
-                          </TableRow>
-                        ) : examPaperQuestionsError ? (
-                          <TableRow>
-                            <TableCell colSpan={4} className="h-24 text-center text-sm text-red-600">
-                              {examPaperQuestionsError}
-                            </TableCell>
-                          </TableRow>
-                        ) : examPaperQuestions.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={4} className="h-24 text-center text-sm text-slate-400">
-                              This exam paper has no questions yet.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          examPaperQuestions.map((question, index) => (
-                            <TableRow key={question.id}>
-                              <TableCell className="text-sm text-slate-500">
-                                {index + 1}
-                              </TableCell>
-                              <TableCell>
-                                <span
-                                  className="line-clamp-1 max-w-md text-sm text-slate-700"
-                                  title={question.title}
-                                >
-                                  {question.title || "Untitled question"}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                                  {question.questionTypeLabel ||
-                                    questionTypeLabel(question.questionTypeId)}
-                                </span>
-                              </TableCell>
-                              <TableCell>{question.points || "-"}</TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            ) : null}
             <div className="space-y-2 md:col-span-2 xl:col-span-3">
               <div className="flex items-center justify-between">
                 <Label htmlFor="hw-desc">Description</Label>
@@ -1177,23 +797,6 @@ export default function StudentHomeworkPage() {
             </div>
           </div>
 
-          {assignToAll ? (
-            <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <Users className="mt-0.5 size-5 shrink-0 text-slate-400" />
-              <div>
-                <p className="text-sm font-medium text-slate-700">
-                  {loading
-                    ? "Counting students in this class…"
-                    : `All ${students.length} student(s) in the selected class`}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  The homework goes to every student enrolled in the selected
-                  section, standard and division. No individual selection is
-                  needed.
-                </p>
-              </div>
-            </div>
-          ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <Table>
               <TableHeader className="bg-slate-50">
@@ -1258,13 +861,10 @@ export default function StudentHomeworkPage() {
               </TableBody>
             </Table>
           </div>
-          )}
 
           <div className="flex items-center justify-between">
             <span className="text-sm text-slate-500">
-              {assignToAll
-                ? `${students.length} student(s) in this class`
-                : `${selected.size} student(s) selected`}
+              {selected.size} student(s) selected
             </span>
             <Button type="submit" disabled={saving || students.length === 0}>
               {saving ? (

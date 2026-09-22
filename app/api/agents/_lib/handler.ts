@@ -19,21 +19,7 @@ export function engineContextFor(request: Request): EngineContext {
     store: getAgentStore(),
     actor: actingUserOf(session),
     authorize: laravelAuthorizer(session),
-    // The credential a `read` tool needs to fetch live records as this person. It
-    // reaches one backend call and is never stored: `actingUserOf` above is what the
-    // run log gets, and it deliberately has no token in it.
-    toolSession: {
-      baseUrl: session.baseUrl,
-      token: session.token,
-      instituteId: session.tenant_id,
-      academicYear: header(request, 'x-academic-year'),
-      termId: header(request, 'x-term-id'),
-    },
   };
-}
-
-function header(request: Request, name: string): string {
-  return request.headers.get(name)?.trim() || '';
 }
 
 export function ok<T>(data: T, status = 200) {

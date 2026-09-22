@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Activity, Award, BarChart3, BookOpenCheck, CalendarCheck2, CalendarRange, CheckSquare,
+  Activity, Award, BarChart3, BookOpenCheck, Brain, CalendarCheck2, CalendarRange, CheckSquare,
   ClipboardCheck, ClipboardList, FileBadge, FileCode2, FileSpreadsheet, FileText, GraduationCap,
   Grid3x3, Layers3, ListChecks, MessageSquareText, Printer, Scale, School, Search, Sheet,
   Smartphone, Table2, TrendingUp, Upload, Users, type LucideIcon,
@@ -16,11 +16,41 @@ import {
 import PageHeader from '@/components/result/PageHeader';
 import { EmptyState } from '@/components/result/primitives';
 import { Input } from '@/components/ui/input';
+import { canonicalIntelligenceRoute, findIntelligenceModule } from '@/components/intelligence/module/registry';
+
+/**
+ * Result Intelligence, on the one canonical Intelligence route.
+ *
+ * Read from the registry rather than typed out, so this card and the Exam
+ * module's own category bar open the same address. The legacy
+ * `/result/intelligence` still renders the same contract for links already
+ * shared; nothing in the product navigates to it.
+ */
+const resultIntelligence = findIntelligenceModule('result');
+const RESULT_INTELLIGENCE_ROUTE = resultIntelligence
+  ? canonicalIntelligenceRoute(resultIntelligence)
+  : '/result/intelligence';
 
 type Screen = { title: string; description: string; href: string; icon: LucideIcon };
 type Category = { id: string; label: string; blurb: string; screens: Screen[] };
 
 const CATEGORIES: Category[] = [
+  {
+    id: 'intelligence',
+    label: 'Intelligence',
+    // Kept OUT of Reports deliberately. A report answers a question you asked;
+    // this raises findings nobody asked for, each carrying the marks behind it.
+    // Filing it under Reports would teach readers to expect the first thing.
+    blurb: 'Findings raised from this year’s marks, with the evidence behind each one',
+    screens: [
+      {
+        title: 'Result intelligence',
+        description: 'Academic position, weak class-subject pairs and students below threshold, with evidence',
+        href: RESULT_INTELLIGENCE_ROUTE,
+        icon: Brain,
+      },
+    ],
+  },
   {
     id: 'entry',
     label: 'Entry',

@@ -10,7 +10,8 @@ import {
 import type { NotificationChange, NotificationPayload } from '@/lib/platform/types';
 
 import { Card, ErrorState, LoadingState, Note, Pill, RefreshButton, StatTiles, Switch } from '@/app/platform-services/_components/shell';
-import { FEES_PLATFORM_MODULE as FEES_MODULE } from '@/app/fees/_lib/fees-platform-scope';
+
+const FEES_MODULE = 'fees';
 
 export function FeesNotificationSettings() {
   const [payload, setPayload] = useState<NotificationPayload | null>(null);

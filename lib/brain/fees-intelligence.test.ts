@@ -179,3 +179,74 @@ test('a request without a session fails instead of calling unauthenticated', asy
   // Nothing may leave the browser without a tenant to scope it to.
   assert.equal(calls.length, 0);
 });
+
+test('fetchFeesIntelligence returns operational and risk intelligence payloads', async () => {
+  installSession({ tenantId: '42', syear: '2021' });
+  const mockPayload = {
+    coverage: { available: true, feeAccounts: 100, receiptRows: 50, enrolledStudents: 120, hasBilledAccounts: true, hasReceipts: true, capabilities: { failureTracking: true, paymentMethods: true } },
+    position: { totalBilled: 100000, totalCollected: 80000, totalOutstanding: 20000, collectionRate: 80, feeAccounts: 100, payingAccounts: 80, defaulterAccounts: 20, agingBands: [] },
+    trends: { cycles: [], classes: [{ standardId: '1', label: 'Grade 1', accounts: 20, demandAmount: 20000, collectedAmount: 18000, outstandingAmount: 2000, collectionRate: 90, failureCount: 2 }], heads: [], paymentModes: [] },
+    paymentFailures: { available: true, reason: null, failureCount: 15, failureAmount: 45000, bouncedAccounts: 12, topReasons: [{ reason: 'INSUFFICIENT_FUNDS', count: 10, amount: 30000 }] },
+    paymentMethods: { available: true, reason: null, totalMapped: 50, methods: [{ method: 'NACH', count: 35, sharePercent: 70 }] },
+    reconciliation: { available: true, reason: null, gatewayTransactions: 120, gatewayTotalAmount: 350000, erpRecordedAmount: 338000, reconciliationGapAmount: 12000, unmatchedCount: 4, statusBreakdown: [] },
+    bankMandates: { available: true, reason: null, registeredMandates: 85, pendingMandates: 5, rejectedMandates: 3, totalEligible: 120, coveragePercent: 70.8, rejectionReasons: [] },
+    lateRules: { available: true, reason: null, rulesCount: 2, rules: [], overdueAccountsPastConfiguredDate: 10, overdueAmountPastConfiguredDate: 5000 },
+    reminders: { available: true, reason: null, remindersSent: 150, accountsReminded: 40, totalRemindedAmount: 60000, subsequentPayingAccounts: 25, subsequentCollectionConversionRate: 62.5 },
+    velocity: { available: true, reason: null, dailyTrend: [{ date: '2021-04-01', receipts: 5, amount: 15000 }], peakDay: null, receiptDays: 1, averageDailyCollection: 15000 },
+    otherCollections: { available: true, reason: null, receiptsCount: 15, totalAmount: 25000, heads: [{ headId: '1', amount: 25000, count: 15 }], paymentModes: [] },
+    feeRevisions: { available: true, reason: null, revisionCount: 3, affectedStandardsCount: 2, recentRevisions: [] },
+    adjustments: { available: true, reason: null, cancelledAmount: 0, refundedAmount: 0, cancelledReceipts: 0, refunds: 0, cancelledShareOfCollection: 0, cancellationReasons: [{ reason: 'Double payment', type: 'CHEQUE_BOUNCE', count: 1, amount: 2000 }], refundPaymentModes: [] },
+    priorities: [],
+    findings: [],
+    recommendations: [],
+    execution: { status: 'idle', recentDecisions: [], outcomes: [] },
+    dataQuality: { available: true, checks: [] },
+    learning: { available: false, memoryCount: 0, memories: [] },
+    academicYear: { syear: '2021', isCurrent: true, availableYears: ['2021'] },
+    freshness: { calculatedAt: '2026-09-16T12:00:00Z', positionLive: true, findingsCached: false, executionFresh: true },
+    organization: 'Test Org',
+  };
+
+  installFetch(mockPayload);
+  const client = await loadClient();
+  const data = await client.fetchFeesIntelligence();
+
+  assert.equal(data.paymentFailures?.available, true);
+  assert.equal(data.paymentFailures?.failureCount, 15);
+  assert.equal(data.reconciliation?.reconciliationGapAmount, 12000);
+  assert.equal(data.bankMandates?.registeredMandates, 85);
+  assert.equal(data.reminders?.subsequentCollectionConversionRate, 62.5);
+  assert.equal(data.trends.classes[0].failureCount, 2);
+  assert.equal(data.adjustments?.cancellationReasons?.[0].reason, 'Double payment');
+});
+
+test('fetchFeesAccounts parses failureCount and mandateRegistered per account', async () => {
+  installSession({ tenantId: '42', syear: '2021' });
+  const mockAccounts = {
+    total: 1,
+    offset: 0,
+    limit: 25,
+    rows: [
+      {
+        studentId: 'st-1',
+        name: 'John Doe',
+        className: 'Grade 1',
+        enrollmentNo: 'EN100',
+        demandAmount: 10000,
+        collectedAmount: 6000,
+        outstandingAmount: 4000,
+        failureCount: 3,
+        mandateRegistered: true,
+      },
+    ],
+  };
+
+  installFetch(mockAccounts);
+  const client = await loadClient();
+  const page = await client.fetchFeesAccounts(0, 25);
+
+  assert.equal(page.total, 1);
+  assert.equal(page.rows[0].failureCount, 3);
+  assert.equal(page.rows[0].mandateRegistered, true);
+});
+

@@ -4,8 +4,8 @@ import { useState, type ReactNode } from "react";
 import { AlertTriangle, Bot, CircleCheck, GraduationCap, Info, ShieldCheck, User } from "lucide-react";
 
 import {
+  ACTOR_LABELS,
   TASK_ORIGIN_LABELS,
-  vocabularyForModuleName,
   type ActorMode,
   type ExecutionMode,
   type ParseIssue,
@@ -20,12 +20,6 @@ import {
  * and whether a task can be assigned at all - so it gets a consistent colour
  * and icon everywhere it appears, and never carries meaning by colour alone
  * (icon + label always present, per the design system's accessibility rules).
- *
- * The colour and the icon are fixed to the acting mode, which is the same in
- * every module. The *word* is not: each of these takes the process's `module`
- * and reads its label out of that module's vocabulary, so a Fees step shows
- * "Fees officer" and "Parent" where an LMS step shows "Teacher" and "Student".
- * Omit `module` and the LMS + PAL wording is used, as it always was.
  */
 
 const ACTOR_STYLES: Record<ActorMode, { className: string; Icon: typeof User }> = {
@@ -36,33 +30,27 @@ const ACTOR_STYLES: Record<ActorMode, { className: string; Icon: typeof User }> 
   student_ai: { className: "border-teal-200 bg-teal-50 text-teal-700", Icon: GraduationCap },
 };
 
-export function ActorBadge({
-  actor,
-  module,
-  className = "",
-}: {
-  actor: ActorMode;
-  /** The process's module name, e.g. 'Fees'. */
-  module?: string;
-  className?: string;
-}) {
+export function ActorBadge({ actor, className = "" }: { actor: ActorMode; className?: string }) {
   const { className: tone, Icon } = ACTOR_STYLES[actor];
   return (
     <span
       className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${tone} ${className}`}
     >
       <Icon className="size-3" aria-hidden />
-      {vocabularyForModuleName(module).actorLabels[actor]}
+      {ACTOR_LABELS[actor]}
     </span>
   );
 }
 
-export function ExecutionLabel({ execution, module }: { execution: ExecutionMode; module?: string }) {
-  return (
-    <span className="text-xs text-slate-500">
-      {vocabularyForModuleName(module).executionLabels[execution]}
-    </span>
-  );
+const EXECUTION_LABELS: Record<ExecutionMode, string> = {
+  manual: "Performed by a person",
+  system: "Runs unattended",
+  human_in_the_loop: "AI proposes, human applies",
+  learner: "Performed by the learner",
+};
+
+export function ExecutionLabel({ execution }: { execution: ExecutionMode }) {
+  return <span className="text-xs text-slate-500">{EXECUTION_LABELS[execution]}</span>;
 }
 
 /**
@@ -120,19 +108,12 @@ const ORIGIN_STYLES: Record<TaskDraft["origin"], string> = {
   learner_activity: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
-export function OriginBadge({ origin, module }: { origin: TaskDraft["origin"]; module?: string }) {
-  // Only the self-service origin is named differently per module - a learner
-  // activity in the LMS is a parent activity at the fees counter.
-  const label =
-    origin === "learner_activity"
-      ? vocabularyForModuleName(module).selfService.originLabel
-      : TASK_ORIGIN_LABELS[origin];
-
+export function OriginBadge({ origin }: { origin: TaskDraft["origin"] }) {
   return (
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${ORIGIN_STYLES[origin]}`}
     >
-      {label}
+      {TASK_ORIGIN_LABELS[origin]}
     </span>
   );
 }
