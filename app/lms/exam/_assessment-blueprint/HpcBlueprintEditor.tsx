@@ -57,7 +57,11 @@ function newId(prefix: string): string {
  * the wrong one makes the screen read like it belongs to another document.
  */
 function areaNoun(stage: HpcStage): { singular: string; plural: string } {
-  return stage === 'Foundational' || stage === 'Preparatory'
+  // Only the Foundational card lists development DOMAINS. From Preparatory
+  // upwards the same slot lists curricular AREAS — six of them at Preparatory,
+  // nine at Middle, and at Secondary a single group project the learner picks
+  // subjects for.
+  return stage === 'Foundational'
     ? { singular: 'domain', plural: 'Development domains' }
     : { singular: 'area', plural: 'Curricular areas' };
 }

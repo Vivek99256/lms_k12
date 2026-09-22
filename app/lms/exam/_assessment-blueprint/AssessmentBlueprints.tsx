@@ -23,15 +23,20 @@ import {
   Copy,
   ExternalLink,
   FileStack,
+  FileText,
   Loader2,
   Plus,
   Save,
+  Settings2,
   Trash2,
   X,
 } from 'lucide-react';
 import { SearchDropdown, type SearchDropdownValues } from '@/components/search-dropdown';
 import BlueprintEditor, { sectionMarks, totalSectionMarks } from './BlueprintEditor';
 import HpcBlueprintEditor from './HpcBlueprintEditor';
+import HpcSchoolOptionsPanel from './HpcSchoolOptions';
+import BlueprintPreview from './BlueprintPreview';
+import { readSchoolBranding } from '../_question-paper-templates/api';
 import {
   cloneBlueprint,
   deleteBlueprint,
@@ -122,10 +127,17 @@ export default function AssessmentBlueprints() {
   const [busy, setBusy] = useState(false);
 
   const [category, setCategory] = useState<BlueprintKind>('regular');
+  const [showSchoolOptions, setShowSchoolOptions] = useState(false);
+  // Which blueprint is open in the PDF preview — a reference or one of ours.
+  const [previewing, setPreviewing] = useState<Blueprint | null>(null);
   const [selectedKey, setSelectedKey] = useState('');
   const [draft, setDraft] = useState<BlueprintDraft | null>(null);
   const [chapters, setChapters] = useState<ChapterOption[]>([]);
   const [chaptersLoading, setChaptersLoading] = useState(false);
+
+  // The same letterhead the printed question papers carry, read from the
+  // signed-in session rather than stored again here.
+  const branding = useMemo(() => readSchoolBranding(), []);
 
   const load = useCallback(async (keepKey = '') => {
     setIndexLoading(true);
@@ -383,15 +395,30 @@ export default function AssessmentBlueprints() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => void startBlank()}
-          disabled={!index || busy}
-          className="inline-flex items-center gap-2 rounded-[10px] bg-[#5846EA] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4738CE] disabled:opacity-50"
-        >
-          <Plus size={16} />
-          New blueprint
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Only on HPC: the marks-based side has no school-configurable
+              vocabulary, its question types come from the question bank. */}
+          {category === 'hpc' ? (
+            <button
+              type="button"
+              onClick={() => setShowSchoolOptions(true)}
+              className="inline-flex items-center gap-2 rounded-[10px] border border-[#E4E9F2] px-4 py-2.5 text-[13px] font-semibold text-[#334155] transition hover:bg-[#F3F5F9]"
+            >
+              <Settings2 size={16} />
+              School settings
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => void startBlank()}
+            disabled={!index || busy}
+            className="inline-flex items-center gap-2 rounded-[10px] bg-[#5846EA] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4738CE] disabled:opacity-50"
+          >
+            <Plus size={16} />
+            New blueprint
+          </button>
+        </div>
       </div>
 
       {error ? (
@@ -474,9 +501,19 @@ export default function AssessmentBlueprints() {
             </div>
           ) : selected.is_preset ? (
             selected.kind === 'hpc' ? (
-              <HpcPresetPreview blueprint={selected} busy={busy} onUse={() => void use(selected)} />
+              <HpcPresetPreview
+                blueprint={selected}
+                busy={busy}
+                onUse={() => void use(selected)}
+                onPreview={() => setPreviewing(selected)}
+              />
             ) : (
-              <PresetPreview blueprint={selected} busy={busy} onUse={() => void use(selected)} />
+              <PresetPreview
+                blueprint={selected}
+                busy={busy}
+                onUse={() => void use(selected)}
+                onPreview={() => setPreviewing(selected)}
+              />
             )
           ) : draft && index ? (
             <div className="flex flex-col gap-4">
@@ -491,6 +528,13 @@ export default function AssessmentBlueprints() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewing(selected)}
+                    className="inline-flex items-center gap-1.5 rounded-[10px] border border-[#E4E9F2] px-3.5 py-2 text-[13px] font-semibold text-[#334155] transition hover:bg-[#F3F5F9]"
+                  >
+                    <FileText size={15} /> PDF preview
+                  </button>
                   <button
                     type="button"
                     onClick={() => void use(selected)}
@@ -566,6 +610,24 @@ export default function AssessmentBlueprints() {
           ) : null}
         </section>
       </div>
+
+      {previewing ? (
+        <BlueprintPreview
+          blueprint={previewing}
+          branding={branding}
+          onClose={() => setPreviewing(null)}
+        />
+      ) : null}
+
+      {showSchoolOptions ? (
+        <HpcSchoolOptionsPanel
+          onClose={() => setShowSchoolOptions(false)}
+          // The pickers inside every open editor are built from options.hpc, so
+          // the index has to be re-read once a list changes or a coordinator
+          // would keep seeing the vocabulary they just replaced.
+          onSaved={() => void load(selectedKey)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -646,10 +708,12 @@ function PresetPreview({
   blueprint,
   busy,
   onUse,
+  onPreview,
 }: {
   blueprint: RegularBlueprint;
   busy: boolean;
   onUse: () => void;
+  onPreview: () => void;
 }) {
   const definition = blueprint.definition;
   const marks = totalSectionMarks(definition.sections);
@@ -674,15 +738,25 @@ function PresetPreview({
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={onUse}
-          disabled={busy}
-          className="inline-flex items-center gap-2 rounded-[10px] bg-[#5846EA] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4738CE] disabled:opacity-50"
-        >
-          {busy ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} />}
-          Use this blueprint
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onPreview}
+            className="inline-flex items-center gap-2 rounded-[10px] border border-[#E4E9F2] px-3.5 py-2.5 text-[13px] font-semibold text-[#334155] transition hover:bg-[#F3F5F9]"
+          >
+            <FileText size={16} /> PDF preview
+          </button>
+
+          <button
+            type="button"
+            onClick={onUse}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-[10px] bg-[#5846EA] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4738CE] disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} />}
+            Use this blueprint
+          </button>
+        </div>
       </div>
 
       <div className="rounded-[18px] border border-[#E4E9F2] bg-white p-4">
@@ -820,16 +894,16 @@ function HpcPresetPreview({
   blueprint,
   busy,
   onUse,
+  onPreview,
 }: {
   blueprint: HpcBlueprintRow;
   busy: boolean;
   onUse: () => void;
+  onPreview: () => void;
 }) {
   const definition = blueprint.definition;
   const goals = definition.areas.reduce((total, area) => total + area.curricular_goals.length, 0);
-  const areaNoun = definition.stage === 'Foundational' || definition.stage === 'Preparatory'
-    ? 'Development domains'
-    : 'Curricular areas';
+  const areaNoun = definition.stage === 'Foundational' ? 'Development domains' : 'Curricular areas';
 
   return (
     <div className="flex flex-col gap-4">
@@ -851,15 +925,25 @@ function HpcPresetPreview({
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={onUse}
-          disabled={busy}
-          className="inline-flex items-center gap-2 rounded-[10px] bg-[#5846EA] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4738CE] disabled:opacity-50"
-        >
-          {busy ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} />}
-          Use this blueprint
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onPreview}
+            className="inline-flex items-center gap-2 rounded-[10px] border border-[#E4E9F2] px-3.5 py-2.5 text-[13px] font-semibold text-[#334155] transition hover:bg-[#F3F5F9]"
+          >
+            <FileText size={16} /> PDF preview
+          </button>
+
+          <button
+            type="button"
+            onClick={onUse}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-[10px] bg-[#5846EA] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4738CE] disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} />}
+            Use this blueprint
+          </button>
+        </div>
       </div>
 
       <div className="rounded-[18px] border border-[#E4E9F2] bg-white p-4">

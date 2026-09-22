@@ -39,7 +39,7 @@ type Props = {
   onChange: (draft: RegularDraft) => void;
 };
 
-const CLASS_BANDS = ['I-II', 'III-V', 'VI-VIII', 'IX-X', 'XI-XII'];
+const CLASS_BANDS = ['I-II', 'III-V', 'VI-VIII', 'IX-X', 'IX-XII', 'XI-XII'];
 
 /**
  * A short id that does not need a library.
