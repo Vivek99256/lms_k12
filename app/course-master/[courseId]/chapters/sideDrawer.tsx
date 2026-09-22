@@ -83,6 +83,38 @@ type IntelligenceKey = (typeof INTELLIGENCE_DIMENSIONS)[number]['key'];
 
 const ALL_INTELLIGENCE_KEYS: IntelligenceKey[] = INTELLIGENCE_DIMENSIONS.map((dimension) => dimension.key);
 
+/** Which slice of a chapter a teacher training deck is built for. */
+type TeacherScope = 'concept' | 'chapter';
+
+/**
+ * What one generation is scoped to.
+ *
+ * Passed explicitly into generateOne rather than read out of component state,
+ * so an "All content types" run - where the teacher deck is requested by name
+ * from the Classroom tab - can scope its teacher entry independently of
+ * whatever the Teacher Workspace tab happens to be left on.
+ */
+type GenerationScope =
+  | { kind: 'classroom' }
+  | { kind: 'teacher-concept'; conceptId: string }
+  | { kind: 'teacher-chapter' };
+
+/**
+ * Slide budget for a chapter-wide teacher deck: a fixed chapter-level frame
+ * plus two slides per concept (snapshot + pedagogy in practice).
+ *
+ * Floored at the 18 of the single-concept template so a one-concept chapter is
+ * never thinner than its concept-scoped equivalent, and capped at 50 because
+ * that is the hard ceiling `slide_count` validation enforces server-side in
+ * contentController::storeGammaContent. Past ~20 concepts the deck stops
+ * scaling, so the prompt tells the model to compress rather than letting it
+ * discover the limit by being truncated.
+ */
+const CHAPTER_TRAINING_FIXED_SLIDES = 12;
+const CHAPTER_TRAINING_SLIDES_PER_CONCEPT = 2;
+const TEACHER_TRAINING_SLIDE_COUNT = 18;
+const MAX_SLIDE_COUNT = 50;
+
 const NOT_SPECIFIED = 'Not specified';
 const PDF_FORMATTING_INSTRUCTIONS = `PDF formatting instructions:
 - Generate the final answer as clean HTML suitable for direct PDF conversion.
@@ -158,6 +190,12 @@ export function GeneratePresentationDrawer({
   onSuccess,
 }: GeneratePresentationDrawerProps) {
   const [presentationMode, setPresentationMode] = useState<'Classroom' | 'Teacher training'>('Classroom');
+  // A teacher training deck is built either for one concept - the original
+  // behaviour, an 18-slide template threaded with that concept's intelligence -
+  // or for the whole chapter, synthesising every selected concept into one
+  // training session. Chapter is the default: it matches how Classroom Resource
+  // already works, and it is the scope an "All content types" run uses.
+  const [teacherScope, setTeacherScope] = useState<TeacherScope>('chapter');
   const [contentType, setContentType] = useState('Presentation');
   const [teacherContentType, setTeacherContentType] = useState('Teacher Presentation');
   const [presentationChapterId, setPresentationChapterId] = useState(initialChapterId);
@@ -211,10 +249,14 @@ export function GeneratePresentationDrawer({
     [allChapters]
   );
 
-  // Update concept selection when chapter changes in teacher training mode
+  // Update concept selection when chapter changes in teacher training mode.
+  // Chapter scope ignores the concept entirely, so forcing concepts[0] into
+  // state there would put a concept on the wire for a deck that covers all of
+  // them - which is what content_master.concept_id would then claim.
   useEffect(() => {
     if (!presentationChapterId || presentationMode !== 'Teacher training') return;
-    
+    if (teacherScope === 'chapter') return;
+
     const chapter = allChapters.find((ch) => ch.id === presentationChapterId);
     const concepts = chapter?.concepts ?? [];
     const currentConceptExists = concepts.some((concept) => concept.id === presentationConcept);
@@ -228,7 +270,7 @@ export function GeneratePresentationDrawer({
 
     const timeoutId = window.setTimeout(() => setPresentationConcept(nextConcept), 0);
     return () => window.clearTimeout(timeoutId);
-  }, [presentationChapterId, presentationMode, allChapters, presentationConcept]);
+  }, [presentationChapterId, presentationMode, teacherScope, allChapters, presentationConcept]);
 
   // Reset form when drawer opens
   useEffect(() => {
@@ -237,6 +279,7 @@ export function GeneratePresentationDrawer({
     const timeoutId = window.setTimeout(() => {
       setPresentationChapterId(initialChapterId);
       setPresentationConcept(resolveConceptId(initialChapterId, initialConcept));
+      setTeacherScope('chapter');
       setGenerationError(null);
       setGenerationSuccess(null);
       setIsGenerating(false);
@@ -495,7 +538,16 @@ CRITICAL INSTRUCTION: You MUST use the exact definitions, examples, and terminol
 ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
   };
 
-  const constructTeacherTrainingPrompt = (chapter: Chapter, conceptId: string, semanticResult?: SemanticIntelligenceResult | null): string => {
+  /**
+   * Teacher training deck for a single concept.
+   *
+   * Returns the slide count alongside the prompt because the two must not be
+   * able to disagree: the template pins an exact slide structure, and that same
+   * number is what Gamma is told to produce as `numCards`. Sending
+   * DEFAULT_SLIDE_COUNT here - as this path used to - asked Gamma for 30 cards
+   * from an 18-slide script.
+   */
+  const constructTeacherTrainingPrompt = (chapter: Chapter, conceptId: string, semanticResult?: SemanticIntelligenceResult | null): { prompt: string; slideCount: number } => {
     const standard = course?.classGrade || 'Standard';
     const subject = course?.subject || 'Subject';
     const chapterName = chapter.title || 'Chapter';
@@ -530,7 +582,7 @@ ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summa
     const outcomes = read('outcomes');
     const prerequisites = read('prerequisites');
 
-    return `Teacher Training PPT — Master Prompt Template (Single-Concept, Suggested-Pedagogy Oriented + Differentiated Instruction)
+    const prompt = `Teacher Training PPT — Master Prompt Template (Single-Concept, Suggested-Pedagogy Oriented + Differentiated Instruction)
 
 Concept Data Block (fill once)
 Concept: ${conceptName}
@@ -548,7 +600,7 @@ Learning Outcomes: ${outcomes}
 Prerequisites: ${prerequisites}
 
 Slide-by-Slide Prompt
-Follow exactly the 18-slide structure below.Do not add extra slides, extra frameworks, or generic pedagogy explanations unless they are directly i nside the named slide's required content.
+Follow exactly the ${TEACHER_TRAINING_SLIDE_COUNT}-slide structure below.Do not add extra slides, extra frameworks, or generic pedagogy explanations unless they are directly i nside the named slide's required content.
 
 Slide 1: Title Slide
  Title: Teacher Training through ${pedagogy} Pedagogy-Oriented Learning Design for ${conceptName} (${standard}, ${subject}, ${chapterName})
@@ -631,6 +683,174 @@ CRITICAL INSTRUCTION: You MUST use the exact definitions, examples, and terminol
 CRITICAL INSTRUCTION 2: Ensure all generated slide content is highly detailed, comprehensive, and perfectly explained. Do not use short or superficial bullet points. Provide deep, clear, and perfectly articulated explanations suitable for a professional presentation.
 
 ${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
+
+    return { prompt, slideCount: TEACHER_TRAINING_SLIDE_COUNT };
+  };
+
+  /**
+   * Teacher training deck for a whole chapter.
+   *
+   * The single-concept template above is concept-shaped: its middle slides are
+   * all "this one concept", and its prose names one pedagogy inline in most of
+   * the eighteen slides. Covering a chapter means keeping the training lens -
+   * pedagogy fit, differentiation, teacher role, reflection - while letting the
+   * concept-specific middle repeat, so the structure here is a fixed
+   * chapter-level frame wrapped around two slides per concept.
+   *
+   * Grounding follows the same rules as the rest of the drawer: only the
+   * concepts ticked in "Concepts to cover", and within those only the ticked
+   * intelligence dimensions.
+   */
+  const constructChapterTeacherTrainingPrompt = (chapter: Chapter, semanticResult?: SemanticIntelligenceResult | null): { prompt: string; slideCount: number } => {
+    const standard = course?.classGrade || 'Standard';
+    const subject = course?.subject || 'Subject';
+    const chapterName = chapter.title || 'Chapter';
+
+    const semanticPayload = getSemanticPayload(chapter, semanticResult);
+    const entries = getConceptEntries(semanticPayload.intelligence);
+    const chosenEntries = entries.filter((entry) =>
+      effectiveConceptNames.length === 0 || effectiveConceptNames.includes(getEntryConceptName(entry))
+    );
+
+    /** Every distinct value of one dimension across the chosen concepts. */
+    const readAll = (key: IntelligenceKey): string[] => {
+      const dimension = INTELLIGENCE_DIMENSIONS.find((item) => item.key === key)!;
+      return Array.from(
+        new Set(
+          chosenEntries
+            .map((entry) => dimensionValue(entry, dimension, selectedIntelligence))
+            .filter((value) => value !== NOT_SPECIFIED)
+            .flatMap((value) => value.split(';').map((part) => part.trim()))
+            .filter(Boolean)
+        )
+      );
+    };
+
+    /** Flattened, for the slides that survey the whole chapter. */
+    const join = (key: IntelligenceKey) => {
+      const values = readAll(key);
+      return values.length > 0 ? values.join('; ') : NOT_SPECIFIED;
+    };
+
+    /**
+     * The most common value, for the slides whose prose reads as one named
+     * thing. The pedagogy appears inline in most slide titles, so joining the
+     * list there would produce "Teacher Training through Inquiry; Jigsaw;
+     * Demonstration Pedagogy-Oriented...". Mode rather than first, so a single
+     * outlier concept cannot name the whole session.
+     */
+    const dominant = (key: IntelligenceKey) => {
+      const counts = new Map<string, number>();
+      for (const value of readAll(key)) counts.set(value, (counts.get(value) ?? 0) + 1);
+      let best = NOT_SPECIFIED;
+      let bestCount = 0;
+      for (const [value, count] of counts) {
+        if (count > bestCount) {
+          best = value;
+          bestCount = count;
+        }
+      }
+      return best;
+    };
+
+    // Deliberately "Concept Name:" and not "Concept:". The read API recovers a
+    // concept label for the content library by regexing /^\s*Concept\s*:\s*(.+)$/mi
+    // over content_master.description - which stores this prompt
+    // (ApiLmsCourseController::conceptNameFromDescription). A bare "Concept:"
+    // line would label this whole-chapter deck with whichever concept happened
+    // to come first.
+    let conceptBlocks = '';
+    for (const entry of chosenEntries) {
+      conceptBlocks += `- Concept Name: ${getEntryConceptName(entry)}\n`;
+      for (const dimension of INTELLIGENCE_DIMENSIONS) {
+        if (!selectedIntelligence.includes(dimension.key)) continue;
+        conceptBlocks += `    ${dimension.promptLabel}: ${dimensionValue(entry, dimension, selectedIntelligence)}\n`;
+      }
+      conceptBlocks += '\n';
+    }
+
+    const pedagogy = dominant('pedagogy');
+    const pedagogyMix = join('pedagogy');
+    const blooms = join('blooms');
+    const dok = join('dok');
+    const objectives = join('objectives');
+    const outcomes = join('outcomes');
+    const misconceptions = join('misconceptions');
+    const realWorld = join('realWorld');
+    const prerequisites = join('prerequisites');
+    const competency = join('competency');
+
+    const conceptCount = chosenEntries.length;
+    const slideCount = Math.min(
+      MAX_SLIDE_COUNT,
+      Math.max(
+        TEACHER_TRAINING_SLIDE_COUNT,
+        CHAPTER_TRAINING_FIXED_SLIDES + CHAPTER_TRAINING_SLIDES_PER_CONCEPT * conceptCount
+      )
+    );
+    const perConceptSlides = Math.max(0, slideCount - CHAPTER_TRAINING_FIXED_SLIDES);
+
+    const prompt = `Teacher Training PPT — Master Prompt Template (Whole-Chapter, Multi-Concept, Suggested-Pedagogy Oriented + Differentiated Instruction)
+
+Chapter Data Block (fill once)
+Standard: ${standard}
+Subject: ${subject}
+Chapter: ${chapterName}
+Concepts in scope: ${conceptCount}
+Dominant Suggested Pedagogy: ${pedagogy}
+Full Pedagogy Mix: ${pedagogyMix}
+Bloom's Levels across the chapter: ${blooms}
+Depth of Knowledge across the chapter: ${dok}
+Chapter Competencies: ${competency}
+Chapter Learning Objectives: ${objectives}
+Chapter Learning Outcomes: ${outcomes}
+Common Misconceptions across the chapter: ${misconceptions}
+Real-Time Applications across the chapter: ${realWorld}
+Prerequisites across the chapter: ${prerequisites}
+
+Per-Concept Intelligence
+${conceptBlocks}
+Slide Plan
+Generate exactly ${slideCount} slides, numbered sequentially, in this order:
+
+Slides 1-5 — Chapter-level framing:
+ Slide 1: Title Slide. Title: Teacher Training through ${pedagogy} Pedagogy-Oriented Learning Design for the chapter ${chapterName} (${standard}, ${subject}). Sub-title: Aligned with NCERT, NEP 2020, NCTE, NPST | Whole-Chapter Pedagogy & Differentiated Instruction. Image Prompt: a diverse group of students engaged in an activity matching ${pedagogy}. Warm natural lighting, modern classroom. Minimalist, no text.
+ Slide 2: Objectives of the Session. Content: what a teacher will be able to do across the whole chapter — understand each concept's nature, select the pedagogy that fits it, and differentiate by readiness and cognitive demand. Image Prompt: a clipboard with three icons — puzzle piece, gears, checklist. Pastel background, no text.
+ Slide 3: Why Pedagogy Must Match Each Concept. Content: why one method cannot carry ${chapterName}; contrast a uniform approach with the matched mix ${pedagogyMix}. Image Prompt: split-screen of identical worksheets versus varied stations. No labels, muted colors.
+ Slide 4: NEP 2020 & NPST Emphasis. Content: active, inquiry-led and competency-aligned choices, evidenced by the pedagogy mix chosen for this chapter. Image Prompt: minimalist desk, open NEP 2020 document, magnifying glass over "Competency". Soft blue background.
+ Slide 5: Chapter Concept Landscape. Content: map all ${conceptCount} concepts, how they cluster and build on each other, and the Bloom (${blooms}) and DOK (${dok}) progression across the chapter. Image Prompt: a branching concept map of unlabelled nodes, increasing complexity left to right. Clean, no text.
+
+Slides 6-${5 + perConceptSlides} — Concept cycle. Work through the concepts in the Per-Concept Intelligence list above, in order, spending ${CHAPTER_TRAINING_SLIDES_PER_CONCEPT} slides on each:
+ First slide for a concept — "Concept Snapshot": its definition and scope inside ${chapterName}, its Bloom's level and DOK placement, its prerequisites, and why its suggested pedagogy was selected for it.
+ Second slide for a concept — "Pedagogy in Practice": step-by-step on running that concept's suggested pedagogy, the Knowledge / Ability / Skill / Competency it targets, its real-world application, and the misconceptions it surfaces and corrects.
+ If there are more concepts than slides allow, group the closest-related concepts into a shared cycle rather than dropping any concept — every concept in the list must appear somewhere.
+
+Slides ${6 + perConceptSlides}-${slideCount} — Chapter-level practice:
+ Differentiating Across the Chapter: tiering by readiness (Content), grouping by role (Process) and assessing at different levels (Product), using the Knowledge/Ability/Skill/Competency layers.
+ Role of the Teacher: the facilitator stances the pedagogy mix ${pedagogyMix} asks for, and when to switch between them.
+ Differentiated Assessment Design: formats matched to each pedagogy and to ${competency}, tiered by ${dok}, with observable evidence and success criteria.
+ Sample Lesson Plan Sequence: a teaching sequence across the whole chapter built from ${objectives} and ${outcomes}, showing timing, materials, grouping and transitions.
+ Digital Tools & Overcoming Challenges: which tools support which pedagogy here, plus time, preparation and mixed-readiness considerations.
+ Teacher Reflection & Action Plan: what to review after teaching the chapter, and the steps to implement, reflect and refine before teaching it again.
+ Feedback, Q&A and Thank You: collect participant responses on how the pedagogy mix worked across ${chapterName}.
+
+Output Requirements
+For every slide generate, in this order: Slide Number; Slide Title; Concept Coverage (which concept or cluster it addresses, or "Chapter-level"); Purpose; Content (detailed, classroom-ready, drawn from the Ground Truth Chapter Content); Speaker Notes for the facilitator; Participant Activity or Discussion; Image Prompt (one detailed visual prompt, age-appropriate, realistic classroom or contextual scene, no readable text, no labels, no UI screenshots).
+
+Quality Requirements
+Do not add extra slides, extra frameworks, or generic pedagogy theory unless it is directly inside a named slide's required content. Every concept listed above must be visibly covered. Where a required data item is "Not specified", write a brief classroom-appropriate placeholder based only on the Ground Truth Chapter Content and keep it within the chapter's scope.
+
+Final Compliance Audit
+End the response with a short audit stating Yes/No for: all ${conceptCount} concepts covered; pedagogy justified per concept; differentiation present; assessment design present; lesson planning details present; image prompt on every slide; no unrelated content added.
+
+Ground Truth Chapter Content (No Hallucinations)
+Below is the exact, raw textbook content for this chapter.
+CRITICAL INSTRUCTION: You MUST use the exact definitions, examples, and terminology found in this text when generating the slide content. Do not invent outside examples unless explicitly requested by the pedagogy.
+CRITICAL INSTRUCTION 2: Ensure all generated slide content is highly detailed, comprehensive, and perfectly explained. Do not use short or superficial bullet points. Provide deep, clear, and perfectly articulated explanations suitable for a professional presentation.
+
+${semanticPayload.mdContent || String(semanticPayload.intelligence.chapter_summary ?? chapter.title ?? 'Content not available.')}`;
+
+    return { prompt, slideCount };
   };
 
   const constructDocumentPrompt = (chapter: Chapter, selectedContentType: string, semanticResult?: SemanticIntelligenceResult | null): string => {
@@ -706,7 +926,8 @@ ${groundTruthContent}`;
     typeValue: string,
     chapter: Chapter,
     semanticResult: SemanticIntelligenceResult | null,
-    identity: { sub_institute_id: number; user_id: number; user_profile_name: string }
+    identity: { sub_institute_id: number; user_id: number; user_profile_name: string },
+    scope: GenerationScope
   ): Promise<{ ok: boolean; message: string }> => {
     const normalizedContentType = typeValue.trim().toLowerCase();
     // In a loop run the teacher deck is requested by name from the Classroom
@@ -722,15 +943,33 @@ ${groundTruthContent}`;
       ? TEACHER_TRAINING_CONTENT_CATEGORY
       : CONTENT_TYPE_OPTIONS.find((option) => option.value === typeValue)?.apiValue ?? typeValue;
 
-    if (isTeacherTraining && !presentationConcept) {
+    // Only concept scope needs a concept. A whole-chapter deck genuinely has
+    // none, which is a valid state rather than a missing selection.
+    if (isTeacherTraining && scope.kind === 'teacher-concept' && !scope.conceptId) {
       return { ok: false, message: 'Select a concept to generate the teacher training deck.' };
     }
 
-    const prompt = isPresentation
-      ? isTeacherTraining
-        ? constructTeacherTrainingPrompt(chapter, presentationConcept, semanticResult)
-        : constructPrompt(chapter, semanticResult)
-      : constructDocumentPrompt(chapter, typeValue, semanticResult);
+    // The teacher-training templates pin their own slide structure, so they
+    // carry the count that matches the script they just wrote. Everything else
+    // keeps the drawer-wide default.
+    let slideCount = DEFAULT_SLIDE_COUNT;
+    let prompt: string;
+    if (isTeacherTraining) {
+      const built =
+        scope.kind === 'teacher-concept'
+          ? constructTeacherTrainingPrompt(chapter, scope.conceptId, semanticResult)
+          : constructChapterTeacherTrainingPrompt(chapter, semanticResult);
+      prompt = built.prompt;
+      slideCount = built.slideCount;
+    } else if (isPresentation) {
+      prompt = constructPrompt(chapter, semanticResult);
+    } else {
+      prompt = constructDocumentPrompt(chapter, typeValue, semanticResult);
+    }
+
+    // '' for a chapter-wide deck, so concept_id is omitted from the payload and
+    // content_master records the chapter alone.
+    const scopedConceptId = scope.kind === 'teacher-concept' ? scope.conceptId : '';
 
     console.log(`[GeneratePresentation] ${typeValue} prompt:`, prompt);
 
@@ -746,9 +985,10 @@ ${groundTruthContent}`;
         hasGroundTruthContent: Boolean(semanticResult?.md_content),
       },
       presentationChapterId,
-      presentationConcept,
+      scope: scope.kind,
+      conceptId: scopedConceptId || null,
       exportFormat,
-      slideCount: DEFAULT_SLIDE_COUNT,
+      slideCount,
       contentType: typeValue,
       apiContentType,
     });
@@ -760,16 +1000,21 @@ ${groundTruthContent}`;
       user_id: identity.user_id,
       user_profile_name: identity.user_profile_name,
       chapter_name: chapter.title,
-      // The deck is generated for one concept; sending it lets the stored row
-      // carry the concept mapping instead of only the chapter.
-      concept_id: presentationConcept || undefined,
+      // Sent alongside the name because chapter_name is not unique - 'Number
+      // Play' exists in both Standard 6 and Standard 7 Mathematics - and the
+      // endpoint's name lookup would otherwise file this against whichever row
+      // came back first. The endpoint prefers the id when it is present.
+      chapter_id: Number(chapter.id) || undefined,
+      // Set only for a concept-scoped deck; a whole-chapter deck covers every
+      // concept, so it is stored against the chapter alone.
+      concept_id: scopedConceptId || undefined,
       concept_name:
-        presentationConceptOptions.find((c) => c.id === presentationConcept)?.title || undefined,
+        presentationConceptOptions.find((c) => c.id === scopedConceptId)?.title || undefined,
       prompt,
       content_type: apiContentType,
       format: isPresentation ? 'presentation' : 'document',
       export_format: exportFormat,
-      slide_count: DEFAULT_SLIDE_COUNT,
+      slide_count: slideCount,
     };
 
     // Per request, not per run: a single timer started at the top of a five-type
@@ -844,7 +1089,7 @@ ${groundTruthContent}`;
         ? TEACHER_TRAINING_CONTENT_CATEGORY
         : CONTENT_TYPE_OPTIONS.find((option) => option.value === contentType)?.apiValue ?? contentType;
 
-      if (isTeacherTraining && !presentationConcept) {
+      if (isTeacherTraining && teacherScope === 'concept' && !presentationConcept) {
         setGenerationError('Please select a concept for teacher training.');
         setIsGenerating(false);
         return;
@@ -876,19 +1121,29 @@ ${groundTruthContent}`;
       const identity = { sub_institute_id, user_id, user_profile_name };
 
       const isLoop = contentType === ALL_CONTENT_TYPES_VALUE && presentationMode !== 'Teacher training';
-      // Teacher training is concept-scoped and the other four are chapter-wide,
-      // so it only joins the run when a concept is actually selected. Skipped
-      // rather than failed, so "all types" stays honest without inventing one.
+      // Every type in the sequence is now chapter-wide, teacher training
+      // included, so nothing has to be filtered out of an "all types" run for
+      // want of a concept - it is always the full five.
       const sequence = isLoop
-        ? ALL_CONTENT_TYPES_SEQUENCE.filter(
-            (type) => type !== TEACHER_TRAINING_CONTENT_CATEGORY || Boolean(presentationConcept)
-          )
-        : [contentType];
+        ? ALL_CONTENT_TYPES_SEQUENCE
+        : [presentationMode === 'Teacher training' ? TEACHER_TRAINING_CONTENT_CATEGORY : contentType];
 
-      const skippedTeacherTraining =
-        isLoop && !presentationConcept
-          ? [{ type: TEACHER_TRAINING_CONTENT_CATEGORY, ok: false, message: 'Skipped - no concept selected.' }]
-          : [];
+      /**
+       * What each type in the run is scoped to.
+       *
+       * Only a deck asked for from the Teacher Workspace tab follows that tab's
+       * scope selector. The teacher deck inside an "All content types" run is
+       * requested by name from the Classroom tab, where there is no selector,
+       * so it is always chapter-wide.
+       */
+      const scopeFor = (type: string): GenerationScope => {
+        if (type !== TEACHER_TRAINING_CONTENT_CATEGORY && presentationMode !== 'Teacher training') {
+          return { kind: 'classroom' };
+        }
+        return presentationMode === 'Teacher training' && teacherScope === 'concept'
+          ? { kind: 'teacher-concept', conceptId: presentationConcept }
+          : { kind: 'teacher-chapter' };
+      };
 
       const results: { type: string; ok: boolean; message: string }[] = [];
 
@@ -899,9 +1154,9 @@ ${groundTruthContent}`;
         // Sequential on purpose: five concurrent long generations would risk the
         // tenant's provider rate limit, and a failure part-way still leaves the
         // earlier types stored.
-        const result = await generateOne(type, chapter, semanticResult, identity);
+        const result = await generateOne(type, chapter, semanticResult, identity, scopeFor(type));
         results.push({ type, ...result });
-        setTypeResults([...results, ...skippedTeacherTraining]);
+        setTypeResults([...results]);
       }
 
       setGenerationProgress(null);
@@ -1088,6 +1343,41 @@ ${groundTruthContent}`;
 
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Deck covers <span className="text-rose-500">*</span>
+                </Label>
+                <div className="rounded-2xl bg-slate-100/90 p-1">
+                  <div className="grid grid-cols-2 gap-1">
+                    {(['chapter', 'concept'] as const).map((scope) => (
+                      <button
+                        key={scope}
+                        type="button"
+                        onClick={() => setTeacherScope(scope)}
+                        className={cn(
+                          'rounded-xl px-4 py-2.5 text-left text-[14px] font-semibold transition-colors',
+                          teacherScope === scope
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        )}
+                      >
+                        {scope === 'chapter' ? 'Whole chapter' : 'Single concept'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[13px] leading-6 text-slate-500">
+                  {teacherScope === 'chapter'
+                    ? 'One training deck covering every concept you tick below.'
+                    : 'One training deck for the single concept you choose.'}
+                </p>
+              </div>
+
+              {/* Concept is the scope under concept mode; a whole-chapter deck
+                  is scoped by "Concepts to cover" below instead. Hidden rather
+                  than disabled, so a required-marked control is never left
+                  greyed out with nothing to do about it. */}
+              {teacherScope === 'concept' ? (
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Concept <span className="text-rose-500">*</span>
                 </Label>
                 <Select 
@@ -1118,6 +1408,7 @@ ${groundTruthContent}`;
                   </SelectContent>
                 </Select>
               </div>
+              ) : null}
 
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -1173,7 +1464,11 @@ ${groundTruthContent}`;
               </p>
             ) : (
               <>
-                {presentationMode === 'Classroom' ? (
+                {/* Also shown for a whole-chapter teacher deck: it is the only
+                    control that scopes one. Under concept scope the Concept
+                    select above is the scope, and two concept pickers would
+                    contradict each other. */}
+                {presentationMode === 'Classroom' || teacherScope === 'chapter' ? (
                   <div className="mt-4">
                     <p className="text-[13px] font-semibold text-slate-700">Concepts to cover</p>
                     {intelligenceConceptNames.length === 0 ? (
