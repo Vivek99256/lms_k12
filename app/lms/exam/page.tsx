@@ -2551,7 +2551,7 @@ export default function StudentHomeworkIndexPage() {
                           {[
                             {
                               key: 'diagnostic',
-                              title: 'Diagnostic assessment',
+                              title: 'Chapter diagnostic',
                               description: 'Baseline for the chapter',
                               state: 'completed' as const,
                             },

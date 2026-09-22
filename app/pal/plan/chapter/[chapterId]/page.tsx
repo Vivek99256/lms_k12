@@ -183,7 +183,7 @@ function LearningPlanView() {
           <CardDescription>
             {noDiagnostic
               ? 'Start here.'
-              : 'Worked out from your diagnostic and practice. Weakest first.'}
+              : 'Worked out from your chapter diagnostic and practice. Weakest first.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -248,7 +248,7 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
           <p className="mt-0.5 text-sm text-slate-600">{step.detail}</p>
           {step.key === 'diagnostic' && (
             <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={cn(buttonVariants({ size: 'sm' }), 'mt-3')}>
-              Take diagnostic
+              Take chapter diagnostic
               <ArrowRight aria-hidden className="ml-1.5 h-3.5 w-3.5" />
             </Link>
           )}

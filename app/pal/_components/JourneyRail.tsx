@@ -42,9 +42,11 @@ export interface JourneyStage {
 }
 
 /**
- * Ordered exactly as the product brief specifies the journey. `adaptive` is
- * labelled "Adaptive" rather than "Adaptive learning" purely so the stages fit
- * a phone without wrapping to three rows.
+ * Ordered exactly as the product brief specifies the journey. The two entry
+ * stages carry their full product names - "Chapter diagnostic" for the
+ * fifteen-question chapter paper, "Concept diagnostic" for the per-concept
+ * drill that follows - because "Diagnostic" and "Adaptive" on their own gave a
+ * learner no way to tell which of the two they were looking at.
  *
  * `practice` sits between Learn and Check because that is the order the engine
  * actually runs (EsoPolicyService::phaseFor(): Learn -> Practice -> Check). It
@@ -53,8 +55,8 @@ export interface JourneyStage {
  * while they were still practising.
  */
 export const JOURNEY_STAGES: JourneyStage[] = [
-  { key: 'diagnostic', label: 'Diagnostic' },
-  { key: 'adaptive', label: 'Adaptive' },
+  { key: 'diagnostic', label: 'Chapter diagnostic' },
+  { key: 'adaptive', label: 'Concept diagnostic' },
   { key: 'plan', label: 'Plan' },
   { key: 'learn', label: 'Learn' },
   { key: 'practice', label: 'Practice' },

@@ -427,9 +427,7 @@ function ResourceCard({ item, sectionKey }: { item: LearnResourceItem; sectionKe
 
         <p className="line-clamp-2 text-sm font-medium text-slate-900">{item.title}</p>
 
-        {item.description && (
-          <p className="mt-1 line-clamp-2 text-xs text-slate-600">{item.description}</p>
-        )}
+       
 
         {meta.length > 0 && (
           <p className="mt-1.5 text-[11px] text-slate-500">{meta.join(' \u00b7 ')}</p>

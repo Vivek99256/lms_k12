@@ -301,7 +301,7 @@ const SECTION_STATUS_STYLE: Record<ChapterSectionStatus, string> = {
 
 function ChapterSectionsList({ sections, onOpen }: { sections: ChapterSection[]; onOpen: (conceptId: number) => void }) {
   if (sections.length === 0) {
-    return <EmptyState message="No sections are ready for adaptive learning in this chapter yet." />;
+    return <EmptyState message="No sections are ready for the concept diagnostic in this chapter yet." />;
   }
 
   return (
