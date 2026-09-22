@@ -1,0 +1,492 @@
+/*
+ * H5P student experience layer.
+ *
+ * WHY A STYLESHEET AND NOT MORE TAILWIND CLASSES
+ *
+ * Everything here is either a token, a keyframe, or a state machine over a
+ * handful of states (picked / correct / wrong / matched / locked). Those are
+ * the three things utility classes are worst at: a token repeated at forty
+ * call sites is forty places to change a colour, a keyframe cannot be written
+ * as a utility at all, and a five-state option button written inline becomes
+ * the nested ternary every player used to carry.
+ *
+ * The rule the rest of the module follows is that A PLAYER NEVER NAMES A
+ * COLOUR. It names a state -- `class="h5p-option is-correct"` -- and the
+ * colour for that state is resolved here, once, from a token. That is what
+ * makes a theme change a one-file change, and it is why the palette below is
+ * the only place in the H5P module where a literal colour is written down.
+ *
+ * MOTION IS A LAYER, NOT THE STRUCTURE. Every animation here is additive:
+ * remove all of it and each activity still reads, still marks, still scores.
+ * `prefers-reduced-motion` at the bottom of this file does exactly that, by
+ * zeroing the duration tokens rather than by disabling rules one at a time --
+ * so an animation added later is collapsed by default instead of being
+ * forgotten.
+ */
+
+:root {
+  /* --- palette ---------------------------------------------------------
+     Derived from the app shell's own brand where one exists, so the H5P
+     surfaces cannot drift from the ERP around them. Everything else is
+     mixed from these, never written out again. */
+  --h5p-accent: var(--primary-blue, #4f46e5);
+  --h5p-success: #059669;
+  --h5p-warning: #d97706;
+  --h5p-danger: #dc2626;
+  --h5p-reward: #f59e0b;
+
+  --h5p-surface: #ffffff;
+  --h5p-surface-sunken: #f8fafc;
+  --h5p-ink: #0f172a;
+  --h5p-ink-muted: #475569;
+  --h5p-ink-faint: #94a3b8;
+  --h5p-line: #e2e8f0;
+
+  /* Tints. color-mix keeps a state's fill, border and text in step with its
+     base colour, so a palette change needs one edit rather than four. */
+  --h5p-accent-soft: color-mix(in srgb, var(--h5p-accent) 8%, var(--h5p-surface));
+  --h5p-accent-line: color-mix(in srgb, var(--h5p-accent) 32%, var(--h5p-surface));
+  --h5p-accent-deep: color-mix(in srgb, var(--h5p-accent) 88%, #000);
+  --h5p-success-soft: color-mix(in srgb, var(--h5p-success) 10%, var(--h5p-surface));
+  --h5p-success-line: color-mix(in srgb, var(--h5p-success) 36%, var(--h5p-surface));
+  --h5p-danger-soft: color-mix(in srgb, var(--h5p-danger) 9%, var(--h5p-surface));
+  --h5p-danger-line: color-mix(in srgb, var(--h5p-danger) 34%, var(--h5p-surface));
+  --h5p-reward-soft: color-mix(in srgb, var(--h5p-reward) 14%, var(--h5p-surface));
+
+  /* --- shape ----------------------------------------------------------- */
+  --h5p-radius-sm: 0.625rem;
+  --h5p-radius: 1rem;
+  --h5p-radius-lg: 1.25rem;
+
+  /* A layered, low-opacity ramp. Depth comes from the number of layers, not
+     from one heavy blur, which is what keeps it calm at high density. */
+  --h5p-shadow-flat: 0 1px 2px rgb(15 23 42 / 0.04);
+  --h5p-shadow-raised: 0 1px 2px rgb(15 23 42 / 0.05), 0 4px 12px rgb(15 23 42 / 0.05);
+  --h5p-shadow-lifted: 0 2px 4px rgb(15 23 42 / 0.06), 0 12px 28px rgb(15 23 42 / 0.10);
+  --h5p-shadow-overlay: 0 24px 60px rgb(15 23 42 / 0.22);
+
+  /* --- motion -----------------------------------------------------------
+     Five durations, three curves. Players reference these and never a raw
+     millisecond, so the reduced-motion block at the bottom of this file can
+     collapse the whole layer by rewriting six values. */
+  --h5p-dur-instant: 90ms;
+  --h5p-dur-quick: 160ms;
+  --h5p-dur-base: 240ms;
+  --h5p-dur-slow: 420ms;
+  --h5p-dur-celebrate: 1100ms;
+
+  --h5p-ease: cubic-bezier(0.2, 0, 0, 1);
+  --h5p-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --h5p-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --h5p-press-scale: 0.97;
+}
+
+/* =====================================================================
+   Keyframes
+   ===================================================================== */
+
+@keyframes h5p-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+@keyframes h5p-nudge {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-5px); }
+  45%      { transform: translateX(4px); }
+  70%      { transform: translateX(-2px); }
+}
+
+@keyframes h5p-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes h5p-rise-in-place {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes h5p-scale-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes h5p-float-away {
+  0%   { opacity: 0; transform: translateY(6px) scale(0.9); }
+  25%  { opacity: 1; transform: translateY(-2px) scale(1); }
+  100% { opacity: 0; transform: translateY(-34px) scale(1); }
+}
+
+@keyframes h5p-shimmer {
+  from { background-position: -140% 0; }
+  to   { background-position: 240% 0; }
+}
+
+@keyframes h5p-halo {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--h5p-success) 45%, transparent); }
+  100% { box-shadow: 0 0 0 16px color-mix(in srgb, var(--h5p-success) 0%, transparent); }
+}
+
+@keyframes h5p-confetti {
+  0%   { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate3d(var(--h5p-confetti-x), var(--h5p-confetti-y), 0) rotate(var(--h5p-confetti-r)); }
+}
+
+/* A slow outward ring. The one looping animation that is not decoration: on a
+   detailed diagram an unopened hotspot is genuinely easy to miss, and the ring
+   is how a learner is told there is something there without a caption saying
+   so. It stops the moment the hotspot has been read. */
+@keyframes h5p-ping {
+  0%        { transform: scale(1); opacity: 0.5; }
+  70%, 100% { transform: scale(2.1); opacity: 0; }
+}
+
+@keyframes h5p-flame {
+  0%, 100% { transform: scale(1) rotate(-2deg); }
+  50%      { transform: scale(1.12) rotate(2deg); }
+}
+
+/* =====================================================================
+   Surfaces
+   ===================================================================== */
+
+.h5p-surface {
+  background: var(--h5p-surface);
+  border: 1px solid var(--h5p-line);
+  border-radius: var(--h5p-radius);
+  box-shadow: var(--h5p-shadow-raised);
+}
+
+.h5p-stage {
+  animation: h5p-rise var(--h5p-dur-base) var(--h5p-ease-out) both;
+}
+
+/* =====================================================================
+   Interaction
+   ===================================================================== */
+
+/* Press feedback for anything a learner taps. Applied to the element itself
+   rather than a wrapper so the transform composites on the GPU and never
+   reflows the row it sits in. */
+.h5p-tappable {
+  transition:
+    transform var(--h5p-dur-quick) var(--h5p-ease-spring),
+    box-shadow var(--h5p-dur-quick) var(--h5p-ease),
+    border-color var(--h5p-dur-quick) var(--h5p-ease),
+    background-color var(--h5p-dur-quick) var(--h5p-ease);
+}
+.h5p-tappable:hover:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(-1px);
+  box-shadow: var(--h5p-shadow-lifted);
+}
+.h5p-tappable:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(var(--h5p-press-scale));
+  box-shadow: var(--h5p-shadow-flat);
+  transition-duration: var(--h5p-dur-instant);
+}
+
+/* A focus ring that survives every state below, because the state classes set
+   their own border colour and a border-based ring would be eaten by them. */
+.h5p-focusable:focus-visible {
+  outline: 2px solid var(--h5p-accent);
+  outline-offset: 2px;
+}
+
+/* Touch: WCAG 2.2 target size, applied only where the pointer is coarse so a
+   dense desktop grid is not inflated for a mouse user. */
+@media (pointer: coarse) {
+  .h5p-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* =====================================================================
+   Answer options -- the shared state machine
+   ===================================================================== */
+
+.h5p-option {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1.5px solid var(--h5p-line);
+  border-radius: var(--h5p-radius-sm);
+  background: var(--h5p-surface);
+  padding: 0.875rem 1rem;
+  text-align: left;
+  color: var(--h5p-ink);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+.h5p-option:hover:not(:disabled):not(.is-locked) {
+  border-color: var(--h5p-accent-line);
+  background: var(--h5p-accent-soft);
+}
+.h5p-option.is-picked {
+  border-color: var(--h5p-accent);
+  background: var(--h5p-accent-soft);
+  color: var(--h5p-accent-deep);
+  font-weight: 600;
+}
+.h5p-option.is-correct {
+  border-color: var(--h5p-success-line);
+  background: var(--h5p-success-soft);
+  color: color-mix(in srgb, var(--h5p-success) 80%, #000);
+  font-weight: 600;
+  animation: h5p-pop var(--h5p-dur-base) var(--h5p-ease-spring);
+}
+.h5p-option.is-wrong {
+  border-color: var(--h5p-danger-line);
+  background: var(--h5p-danger-soft);
+  color: color-mix(in srgb, var(--h5p-danger) 80%, #000);
+  font-weight: 600;
+  animation: h5p-nudge var(--h5p-dur-slow) var(--h5p-ease);
+}
+/* Marked, and this one was neither the learner's answer nor the right one.
+   Dimmed so the two that matter carry the eye -- never hidden. */
+.h5p-option.is-dimmed {
+  color: var(--h5p-ink-faint);
+  background: var(--h5p-surface-sunken);
+}
+.h5p-option:disabled,
+.h5p-option.is-locked {
+  cursor: default;
+}
+
+/* The leading marker inside an option: a letter before marking, a tick or a
+   cross after. Sized to stay aligned with the first line of a wrapped label. */
+.h5p-option__marker {
+  display: flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  opacity: 0.55;
+}
+.h5p-option.is-picked .h5p-option__marker,
+.h5p-option.is-correct .h5p-option__marker,
+.h5p-option.is-wrong .h5p-option__marker {
+  opacity: 1;
+}
+
+/* =====================================================================
+   Progress
+   ===================================================================== */
+
+.h5p-rail {
+  height: 0.5rem;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--h5p-accent) 12%, var(--h5p-surface-sunken));
+}
+.h5p-rail__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--h5p-accent);
+  transition: width var(--h5p-dur-slow) var(--h5p-ease-out);
+}
+.h5p-rail__fill.is-complete {
+  background: var(--h5p-success);
+}
+
+/* Step pips, for a run short enough to show every question at once. */
+.h5p-pip {
+  height: 0.375rem;
+  width: 0.375rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--h5p-accent) 16%, var(--h5p-surface-sunken));
+  transition:
+    width var(--h5p-dur-base) var(--h5p-ease-out),
+    background-color var(--h5p-dur-base) var(--h5p-ease);
+}
+.h5p-pip.is-current { width: 1.5rem; background: var(--h5p-accent); }
+.h5p-pip.is-done    { background: var(--h5p-success); }
+.h5p-pip.is-missed  { background: var(--h5p-danger-line); }
+
+/* =====================================================================
+   Reward
+   ===================================================================== */
+
+/* The confetti layer. Purely decorative and therefore aria-hidden at the call
+   site; pointer-events off so it can never intercept the button underneath. */
+.h5p-burst {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.h5p-burst__piece {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 0.5rem;
+  width: 0.375rem;
+  border-radius: 1px;
+  background: var(--h5p-confetti-color, var(--h5p-accent));
+  animation: h5p-confetti var(--h5p-dur-celebrate) var(--h5p-ease-out) both;
+  animation-delay: var(--h5p-confetti-delay, 0ms);
+}
+
+/* The +N that floats off a score when it changes. */
+.h5p-gain {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  translate: -50% 0;
+  font-weight: 700;
+  color: var(--h5p-success);
+  animation: h5p-float-away var(--h5p-dur-celebrate) var(--h5p-ease-out) both;
+  pointer-events: none;
+}
+
+.h5p-halo { animation: h5p-halo var(--h5p-dur-slow) var(--h5p-ease-out); }
+
+/* The ring is drawn by a pseudo-element under the marker, so it never affects
+   the marker's own size or its hit area. `currentColor` inherits the marker's
+   colour, which the author chose. */
+.h5p-ping::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: currentColor;
+  animation: h5p-ping 2400ms var(--h5p-ease-out) infinite;
+  pointer-events: none;
+}
+
+.h5p-streak__flame {
+  display: inline-block;
+  animation: h5p-flame 900ms var(--h5p-ease) infinite;
+}
+
+/* =====================================================================
+   Cards that flip -- flashcards, memory tiles
+   ===================================================================== */
+
+.h5p-flip {
+  perspective: 1200px;
+  -webkit-tap-highlight-color: transparent;
+}
+.h5p-flip__inner {
+  /* Block, because the only element that carries this class is a <span>, and
+     an inline box ignores width and height -- which collapsed it to 0x0 and
+     took the two absolutely-positioned faces with it, leaving a memory board
+     of 4px dots. The card above it sizes correctly; this is the box that has
+     to fill it. */
+  display: block;
+  position: relative;
+  height: 100%;
+  width: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--h5p-dur-slow) var(--h5p-ease-spring);
+}
+.h5p-flip.is-flipped .h5p-flip__inner { transform: rotateY(180deg); }
+.h5p-flip__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.h5p-flip__face--back { transform: rotateY(180deg); }
+
+/* The stack behind the top flashcard: two pseudo-layers, so the depth costs
+   no DOM and cannot be tabbed into. */
+.h5p-stack::before,
+.h5p-stack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--h5p-line);
+  border-radius: inherit;
+  background: var(--h5p-surface);
+  transition: transform var(--h5p-dur-base) var(--h5p-ease-out);
+}
+.h5p-stack::before { transform: translateY(6px) scale(0.985); opacity: 0.85; }
+.h5p-stack::after  { transform: translateY(12px) scale(0.97); opacity: 0.6; }
+
+/* =====================================================================
+   Loading
+   ===================================================================== */
+
+.h5p-skeleton {
+  border-radius: var(--h5p-radius-sm);
+  background:
+    linear-gradient(
+      90deg,
+      var(--h5p-surface-sunken) 0%,
+      color-mix(in srgb, var(--h5p-accent) 7%, var(--h5p-surface-sunken)) 50%,
+      var(--h5p-surface-sunken) 100%
+    );
+  background-size: 220% 100%;
+  animation: h5p-shimmer 1.4s linear infinite;
+}
+
+/* =====================================================================
+   Entrance
+   ===================================================================== */
+
+.h5p-enter { animation: h5p-rise-in-place var(--h5p-dur-base) var(--h5p-ease-out) both; }
+.h5p-enter-scale { animation: h5p-scale-in var(--h5p-dur-base) var(--h5p-ease-spring) both; }
+
+/* A list that reveals in sequence. The delay is set per item at the call site
+   via --h5p-stagger, capped there so a long list never crawls. */
+.h5p-stagger { animation-delay: var(--h5p-stagger, 0ms); }
+
+/* =====================================================================
+   Reduced motion
+   ===================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --h5p-dur-instant: 0ms;
+    --h5p-dur-quick: 0ms;
+    --h5p-dur-base: 0ms;
+    --h5p-dur-slow: 0ms;
+    --h5p-dur-celebrate: 0ms;
+    --h5p-press-scale: 1;
+  }
+
+  /* The duration tokens cover every transition and every one-shot animation
+     above. These loop, so they are stopped outright rather than run forever
+     at zero length. */
+  .h5p-skeleton,
+  .h5p-streak__flame,
+  .h5p-burst__piece {
+    animation: none;
+  }
+  /* The ring is removed rather than stopped: frozen mid-pulse it is a grey
+     halo around the marker that means nothing. */
+  .h5p-ping::after { display: none; }
+  .h5p-skeleton { background: var(--h5p-surface-sunken); }
+  .h5p-burst { display: none; }
+
+  .h5p-tappable:hover { transform: none; }
+}
+
+/* =====================================================================
+   Forced colours
+   ===================================================================== */
+
+@media (forced-colors: active) {
+  .h5p-option { border-width: 2px; }
+  .h5p-option.is-picked { outline: 2px solid Highlight; }
+  .h5p-rail__fill { background: Highlight; }
+  .h5p-burst { display: none; }
+}

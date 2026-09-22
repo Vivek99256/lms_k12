@@ -19,10 +19,40 @@ import {
   isStudentProfile,
   postH5pXapiStatement,
   readH5pContext,
+  type H5pContext,
   type H5pFlashcard,
 } from '@/app/h5p/data/h5p';
 import { EmptyState, H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '@/app/h5p/components/shared';
 import { Input } from '@/components/ui/input';
+import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
+
+/**
+ * A deck handed to the player, instead of one it fetches for itself.
+ *
+ * WHY THIS EXISTS. The route fetches every card saved against a chapter. A
+ * question bank question has no saved cards — it IS the card, derived in the
+ * browser by `lib/h5p/question-bank-runtime.ts` — so the caller already holds
+ * the deck and there is nothing to fetch. Same player, same scoring, same xAPI
+ * statements; the only difference is where the array came from.
+ *
+ * The fetching route is untouched and still plays authored decks exactly as
+ * before. This path is additive.
+ */
+export interface PreloadedFlashcards {
+  cards: H5pFlashcard[];
+  ctx: H5pContext;
+  /** The `lms_question_master` row behind the deck, reported back on finish. */
+  questionId?: number;
+  embedded?: boolean;
+  /**
+   * Fired once when the learner reaches the end of the deck.
+   *
+   * Unlike the written-answer player, this one DOES score: a card is checked
+   * by comparing what was typed against the stored answer, so a count of
+   * correct cards is a real number rather than a stand-in for one.
+   */
+  onResult?: (result: PlayerQuestionResult) => void;
+}
 
 /**
  * Flashcard player — mirrors Laravel `GET /h5p/h5p_flashacard/{id}`
@@ -38,12 +68,14 @@ function resultMessage(percentage: number): string {
   return 'Keep learning! You will do better next time!';
 }
 
-function FlashcardPlayerContent() {
+function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards }) {
   const searchParams = useSearchParams();
-  const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
+  const routeCtx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
+  const ctx = preloaded?.ctx ?? routeCtx;
 
-  const [cards, setCards] = useState<H5pFlashcard[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetched, setFetched] = useState<H5pFlashcard[]>([]);
+  const cards = preloaded?.cards ?? fetched;
+  const [loading, setLoading] = useState(!preloaded);
   const [error, setError] = useState('');
   const [isStudent, setIsStudent] = useState(false);
 
@@ -56,6 +88,16 @@ function FlashcardPlayerContent() {
 
   const feedbackTimer = useRef<number | null>(null);
   const hintTimer = useRef<number | null>(null);
+  /** Fired once per deck; both routes to the result screen pass through it. */
+  const reported = useRef(false);
+  /**
+   * When this deck was put in front of the learner.
+   *
+   * Seeded inside an effect rather than at `useRef(Date.now())`, because a
+   * render is meant to be pure and reading the clock in one is not — the same
+   * render happening twice would produce two different start times.
+   */
+  const startedAt = useRef(0);
 
   const clearTimers = useCallback(() => {
     if (feedbackTimer.current !== null) {
@@ -81,6 +123,9 @@ function FlashcardPlayerContent() {
 
   useEffect(() => {
     let cancelled = false;
+    // A preloaded deck is already here; there is nothing to load and no
+    // context to be missing.
+    if (preloaded) return;
     if (!hasH5pContext(ctx)) {
       queueMicrotask(() => {
         if (!cancelled) setLoading(false);
@@ -98,7 +143,7 @@ function FlashcardPlayerContent() {
     fetchFlashcards(ctx)
       .then((list) => {
         if (cancelled) return;
-        setCards(list);
+        setFetched(list);
         setSolved(new Array<boolean>(list.length).fill(false));
         setCurrent(0);
         setAnswer('');
@@ -115,12 +160,68 @@ function FlashcardPlayerContent() {
     return () => {
       cancelled = true;
     };
-  }, [ctx]);
+  }, [ctx, preloaded]);
+
+  // A preloaded deck never runs the effect above, so its answer array is
+  // seeded here instead — and re-seeded when the caller previews a different
+  // question, which changes the deck under a player that is already mounted.
+  useEffect(() => {
+    if (!preloaded) return;
+    let cancelled = false;
+
+    // Deferred out of the effect body, as every other state write on this
+    // module's screens is: setting state synchronously in an effect is a
+    // cascading render.
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setSolved(new Array<boolean>(preloaded.cards.length).fill(false));
+      setCurrent(0);
+      setAnswer('');
+      setFeedback(null);
+      setHintVisible(false);
+      setShowResult(false);
+      reported.current = false;
+      startedAt.current = Date.now();
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preloaded]);
 
   const card: H5pFlashcard | undefined = cards[current];
   const total = cards.length;
   const correctCount = solved.filter(Boolean).length;
   const isLocked = solved[current] === true;
+
+  /**
+   * Report the outcome to whoever mounted this player.
+   *
+   * Hung off the result screen rather than off either of the two places that
+   * raise it — a learner reaches the end by answering the last card or by
+   * skipping to it, and a caller that heard about one but not the other would
+   * record half the attempts. The ref makes it once per deck regardless.
+   *
+   * The player still persists nothing. PAL would write an attempt here, the
+   * H5P library writes nothing, and this component does not know which of
+   * them is listening.
+   */
+  useEffect(() => {
+    if (!showResult || reported.current) return;
+    const report = preloaded?.onResult;
+    if (!report) return;
+
+    reported.current = true;
+    report({
+      questionId: Number(preloaded?.questionId ?? 0),
+      score: correctCount,
+      maxScore: total,
+      correct: total > 0 && correctCount === total,
+      durationSeconds:
+        startedAt.current > 0 ? Math.max(0, Math.round((Date.now() - startedAt.current) / 1000)) : 0,
+      response: `${correctCount} of ${total} cards answered correctly`,
+    });
+  }, [showResult, correctCount, total, preloaded]);
 
   const goToCard = useCallback(
     (index: number) => {
@@ -398,6 +499,30 @@ function FlashcardPlayerContent() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The player as a component, for a caller that already holds the deck.
+ *
+ * The Suspense boundary stays even though a preloaded deck reads nothing from
+ * the query string: the body still CALLS `useSearchParams`, hooks cannot be
+ * conditional, and an unwrapped call opts the whole embedding route into
+ * client-side rendering.
+ */
+export function FlashcardsPlayer({ cards, ctx, questionId, embedded, onResult }: PreloadedFlashcards) {
+  // Memoised because this object is a dependency of the effects above.
+  // A fresh one per render re-seeds the deck on every render, which resets the
+  // learner to the first card as they type into it.
+  const preloaded = useMemo(
+    () => ({ cards, ctx, questionId, embedded, onResult }),
+    [cards, ctx, questionId, embedded, onResult]
+  );
+
+  return (
+    <Suspense fallback={<PlayerSkeleton lines={2} label="Loading flash cards" />}>
+      <FlashcardPlayerContent preloaded={preloaded} />
+    </Suspense>
   );
 }
 

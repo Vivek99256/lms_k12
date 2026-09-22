@@ -200,6 +200,12 @@ function H5pHubContent() {
               ))}
             </div>
 
+            {/* There is no "generate from the question bank" entry any more.
+                Generation was the step this module removed: a question is
+                rendered straight from `lms_question_master` by the shared
+                players in `components/h5p/players`, so there is nothing to
+                generate and nothing to link to. */}
+
             {hasH5pContext(ctx) ? (
               <Link
                 href={`/h5p/model?${contextQuery}`}
