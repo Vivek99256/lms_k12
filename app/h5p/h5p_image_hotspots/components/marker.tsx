@@ -59,6 +59,7 @@ export function HotspotMarker({
   showNumber,
   selected,
   opened,
+  pulse,
   onPointerDown,
   onKeyDown,
   onFocus,
@@ -71,6 +72,13 @@ export function HotspotMarker({
   selected?: boolean;
   /** Player only: a hotspot the learner has already read. */
   opened?: boolean;
+  /**
+   * Player only: draw the attention ring until this hotspot has been read.
+   *
+   * Off in the editor. An author placing pins needs to see exactly where they
+   * are, and twelve pulsing rings over a diagram makes that harder, not easier.
+   */
+  pulse?: boolean;
   onPointerDown?: (event: PointerEvent<HTMLButtonElement>) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
   onFocus?: () => void;
@@ -92,9 +100,9 @@ export function HotspotMarker({
       // The native tooltip as well as the styled one below: it is what a
       // touch-and-hold and a browser's own accessibility tooling surface.
       title={tooltip || name}
-      className={`group absolute z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-white shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+      className={`h5p-tappable h5p-focusable group absolute z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-white shadow-md ${
         selected ? 'ring-2 ring-indigo-400 ring-offset-2' : ''
-      } ${opened ? 'opacity-70' : ''}`}
+      } ${opened ? 'opacity-70' : ''} ${pulse && !opened ? 'h5p-ping' : ''}`}
       style={{
         left: `${point.position_x}%`,
         top: `${point.position_y}%`,

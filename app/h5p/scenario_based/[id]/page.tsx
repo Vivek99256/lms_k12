@@ -18,6 +18,7 @@ import {
   LoadingState,
   MissingContextNotice,
 } from '../../components/shared';
+import { ProgressRail } from '../../components/game';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -60,6 +61,14 @@ function ScenarioShowContent() {
   const [error, setError] = useState('');
   const [activePoint, setActivePoint] = useState<H5pScenarioPoint | null>(null);
   const viewedPointIds = useRef<Set<number>>(new Set());
+  /**
+   * The same set again, as state.
+   *
+   * The ref above is telemetry bookkeeping and must not re-render. Whether a
+   * marker still pulses is a rendered fact, and reading it off a ref would
+   * mean rendering from something React was never told had changed.
+   */
+  const [viewed, setViewed] = useState<ReadonlySet<number>>(() => new Set<number>());
   const completedSent = useRef(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -111,7 +120,7 @@ function ScenarioShowContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title={scenario?.title ?? 'Scenario'}
           description="Click a numbered marker to explore each point of interest"
@@ -154,13 +163,19 @@ function ScenarioShowContent() {
                     setActivePoint(point);
                     void postH5pXapiStatement({ objectId: `image_hotspot:${id}`, verb: 'attempted', ctx });
                     viewedPointIds.current.add(point.id);
+                    setViewed((current) => new Set(current).add(point.id));
                     if (!completedSent.current && viewedPointIds.current.size >= points.length && points.length > 0) {
                       completedSent.current = true;
                       void postH5pXapiStatement({ objectId: `image_hotspot:${id}`, verb: 'completed', ctx });
                     }
                   }}
                   style={{ left: point.position_x, top: point.position_y }}
-                  className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow"
+                  // Pulses until this point has been READ, so a marker on a
+                  // busy photograph announces itself instead of waiting to be
+                  // found. Pressed once, it goes quiet.
+                  className={`h5p-tappable h5p-focusable absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-red-500 text-xs font-bold text-white shadow ${
+                    viewed.has(point.id) ? '' : 'h5p-ping'
+                  }`}
                   title={point.title}
                   aria-label={`Point ${index + 1}: ${point.title}`}
                 >
@@ -173,10 +188,18 @@ function ScenarioShowContent() {
                 This scenario has no interactive points yet.
               </p>
             ) : (
-              <p className="mt-3 text-xs text-slate-500">
-                {points.length} interactive point{points.length === 1 ? '' : 's'} — click a marker
-                to learn more.
-              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <ProgressRail
+                  value={viewed.size}
+                  max={points.length}
+                  label="Points explored"
+                  className="max-w-[14rem]"
+                />
+                <p className="text-xs text-[color:var(--h5p-ink-muted)]">
+                  {viewed.size} of {points.length} point{points.length === 1 ? '' : 's'} explored — select a
+                  marker to learn more.
+                </p>
+              </div>
             )}
           </div>
         ) : null}

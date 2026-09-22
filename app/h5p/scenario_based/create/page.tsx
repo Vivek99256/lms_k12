@@ -220,7 +220,7 @@ function ScenarioCreateContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Add scenario"
           description="Upload an image and click on it to place interactive points"

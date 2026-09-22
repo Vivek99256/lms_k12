@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Check, Clock, RotateCcw, X } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import {
   h5pContextQuery,
   hasH5pContext,
@@ -19,7 +19,19 @@ import {
   type ArithmeticAttemptResult,
   type ArithmeticQuestion,
 } from '@/lib/h5p/arithmetic-quiz';
-import { H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '../../components/shared';
+import { H5pPageHeader, InlineBanner, MissingContextNotice } from '../../components/shared';
+import {
+  PlayerSkeleton,
+  PrimaryAction,
+  ProgressRail,
+  ResultScreen,
+  RetryAction,
+  StartScreen,
+  StreakBadge,
+  Verdict,
+  deriveAchievements,
+  encouragement,
+} from '../../components/game';
 import { Input } from '@/components/ui/input';
 
 /**
@@ -90,6 +102,26 @@ function ArithmeticQuizPlayerContent() {
   const [attemptCount, setAttemptCount] = useState(0);
   const [entry, setEntry] = useState('');
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null);
+
+  /**
+   * The run of correct answers, and the best run this attempt.
+   *
+   * A fluency drill is the one type where a streak is not decoration: it is
+   * the thing the drill is actually training, and a learner watching it climb
+   * answers faster than one watching a question counter.
+   */
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  /**
+   * The previous finished attempt's percentage, and whether the one just
+   * finished beat it.
+   *
+   * `improved` is worked out in `finish` and stored, rather than compared on
+   * the result screen: by then `lastPercentage` has already been overwritten
+   * with this attempt's score, and the comparison would be against itself.
+   */
+  const [lastPercentage, setLastPercentage] = useState<number | null>(null);
+  const [improved, setImproved] = useState(false);
   // The live clock. Written by the interval rather than seeded at render:
   // Date.now() during render is impure and drifts with every re-render,
   // which is exactly the number that must not reach a reported duration.
@@ -158,6 +190,9 @@ function ArithmeticQuizPlayerContent() {
         pass_percentage: quiz.pass_percentage,
       });
 
+      setImproved(lastPercentage !== null && scored.percentage > lastPercentage);
+      setLastPercentage(scored.percentage);
+
       // The completion statement. `answered` statements are sent per question
       // as they are answered, so a partial attempt still produces evidence.
       void postH5pXapiStatement({
@@ -169,7 +204,7 @@ function ArithmeticQuizPlayerContent() {
         durationSeconds: (done.finishedAt - done.startedAt) / 1000,
       });
     },
-    [quiz, ctx]
+    [quiz, ctx, lastPercentage]
   );
 
   // One interval drives both the displayed clock and the time limit.
@@ -196,6 +231,8 @@ function ArithmeticQuizPlayerContent() {
     setAttempt(newAttempt(quiz));
     setEntry('');
     setLastCorrect(null);
+    setStreak(0);
+    setBestStreak(0);
     setNow(Date.now());
     queueMicrotask(() => answerRef.current?.focus());
   };
@@ -226,6 +263,10 @@ function ArithmeticQuizPlayerContent() {
     setLastCorrect(correct);
     setEntry('');
 
+    const run = correct ? streak + 1 : 0;
+    setStreak(run);
+    if (run > bestStreak) setBestStreak(run);
+
     const next = { ...attempt, answers, index: attempt.index + 1 };
     if (next.index >= next.questions.length) {
       finish(next);
@@ -248,45 +289,47 @@ function ArithmeticQuizPlayerContent() {
     if (attempt && attempt.finishedAt !== null && result) {
       const message = arithmeticFeedback(result.percentage, quiz.feedback_bands);
       return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Finished</p>
-          <p className="mt-2 text-4xl font-semibold tabular-nums text-slate-900">
-            {result.score}
-            <span className="text-2xl text-slate-400"> / {result.maxScore}</span>
-          </p>
-          <p className="mt-1 text-sm text-slate-600">
-            {result.correctCount} of {result.questionCount} correct
-            {result.answeredCount < result.questionCount
-              ? ` · ${result.questionCount - result.answeredCount} not reached`
-              : ''}
-            {quiz.enable_timer ? ` · ${formatClock(elapsedSeconds)}` : ''}
-          </p>
-
-          <span
-            className={`mt-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-              result.passed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-            }`}
-          >
-            {result.passed ? 'Passed' : `Pass mark is ${quiz.pass_percentage}%`}
-          </span>
-
-          {message ? <p className="mt-4 text-sm text-slate-700">{message}</p> : null}
-
-          {canRetry ? (
-            <button
-              type="button"
-              onClick={start}
-              className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Try a new set of questions
-            </button>
-          ) : attemptsExhausted ? (
-            <p className="mt-6 text-xs text-slate-500">
-              You have used all {quiz.max_attempts} attempts on this quiz.
-            </p>
-          ) : null}
-        </div>
+        <ResultScreen
+          score={result.score}
+          maxScore={result.maxScore}
+          percentage={result.percentage}
+          passed={result.passed}
+          passLabel={`Pass mark is ${quiz.pass_percentage}%`}
+          summary={
+            <>
+              {result.correctCount} of {result.questionCount} correct
+              {result.answeredCount < result.questionCount
+                ? ` · ${result.questionCount - result.answeredCount} not reached`
+                : ''}
+            </>
+          }
+          message={message}
+          facts={[
+            { icon: 'gauge', label: 'Score', value: `${Math.round(result.percentage)}%` },
+            ...(quiz.enable_timer
+              ? [{ icon: 'timer' as const, label: 'Time', value: formatClock(elapsedSeconds) }]
+              : []),
+            ...(bestStreak >= 2
+              ? [{ icon: 'zap' as const, label: 'Best run', value: `${bestStreak} in a row` }]
+              : []),
+          ]}
+          achievements={deriveAchievements({
+            percentage: result.percentage,
+            passed: result.passed,
+            bestStreak,
+            improvedOnLast: improved,
+            firstTry: attemptCount <= 1,
+          })}
+          actions={
+            canRetry ? (
+              <RetryAction onClick={start} label="Try a new set of questions" />
+            ) : attemptsExhausted ? (
+              <p className="text-xs text-[color:var(--h5p-ink-faint)]">
+                You have used all {quiz.max_attempts} attempts on this quiz.
+              </p>
+            ) : null
+          }
+        />
       );
     }
 
@@ -294,45 +337,56 @@ function ArithmeticQuizPlayerContent() {
     if (attempt) {
       const question = attempt.questions[attempt.index];
       return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span className="tabular-nums">
+        <div className="h5p-surface h5p-stage p-6 sm:p-10">
+          <div className="flex items-center justify-between gap-3 text-xs text-[color:var(--h5p-ink-muted)]">
+            <span className="font-medium tabular-nums">
               Question {attempt.index + 1} of {attempt.questions.length}
             </span>
             {quiz.enable_timer ? (
               <span
-                className={`inline-flex items-center gap-1.5 tabular-nums ${
-                  remaining !== null && remaining <= 10 ? 'font-semibold text-red-600' : ''
-                }`}
+                className="inline-flex items-center gap-1.5 font-medium tabular-nums"
+                // The clock turns urgent in the last ten seconds. It is also
+                // announced by the verdict region, so the colour is a nudge
+                // rather than the only warning.
+                style={
+                  remaining !== null && remaining <= 10
+                    ? { color: 'var(--h5p-danger)', fontWeight: 700 }
+                    : undefined
+                }
               >
-                <Clock className="h-3.5 w-3.5" />
+                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                 {remaining !== null ? formatClock(remaining) : formatClock(elapsedSeconds)}
               </span>
             ) : null}
           </div>
 
-          <div
-            className="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-100"
-            role="progressbar"
-            aria-valuenow={attempt.index}
-            aria-valuemin={0}
-            aria-valuemax={attempt.questions.length}
-            aria-label="Questions answered"
-          >
-            <div
-              className="h-full rounded-full bg-indigo-500 transition-all"
-              style={{ width: `${(attempt.index / attempt.questions.length) * 100}%` }}
-            />
+          <ProgressRail
+            value={attempt.index}
+            max={attempt.questions.length}
+            label="Questions answered"
+            className="mt-2"
+          />
+
+          <div className="mt-3 flex justify-center">
+            <StreakBadge streak={streak} best={bestStreak} />
           </div>
 
           <form
-            className="mt-8 flex flex-col items-center gap-4"
+            className="mt-6 flex flex-col items-center gap-4"
             onSubmit={(e) => {
               e.preventDefault();
               submitAnswer();
             }}
           >
-            <p className="font-mono text-4xl tabular-nums text-slate-900 sm:text-5xl">{question.prompt} =</p>
+            {/* Keyed on the question so each new prompt animates in. Without
+                the key React reuses the node, the text swaps silently, and a
+                drill that changes nothing visible reads as a frozen page. */}
+            <p
+              key={attempt.index}
+              className="h5p-enter-scale font-mono text-4xl tabular-nums text-[color:var(--h5p-ink)] sm:text-5xl"
+            >
+              {question.prompt} =
+            </p>
 
             <label className="sr-only" htmlFor="arithmetic-answer">
               Your answer to {question.prompt}
@@ -351,27 +405,17 @@ function ArithmeticQuizPlayerContent() {
               autoFocus
             />
 
-            <button
-              type="submit"
-              disabled={entry.trim() === ''}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-40"
-            >
+            <PrimaryAction type="submit" disabled={entry.trim() === ''}>
               Answer
-            </button>
+            </PrimaryAction>
           </form>
 
           {lastCorrect !== null ? (
             // The previous question's result, announced politely so a screen
             // reader reads it without interrupting the new question.
-            <p
-              aria-live="polite"
-              className={`mt-6 flex items-center justify-center gap-1.5 text-sm ${
-                lastCorrect ? 'text-emerald-700' : 'text-red-600'
-              }`}
-            >
-              {lastCorrect ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
-              {lastCorrect ? 'Correct' : 'Not quite'}
-            </p>
+            <div className="mt-6 flex justify-center">
+              <Verdict correct={lastCorrect} message={encouragement(lastCorrect, attempt.index)} />
+            </div>
           ) : null}
         </div>
       );
@@ -379,24 +423,26 @@ function ArithmeticQuizPlayerContent() {
 
     // Start screen.
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">{quiz.title}</h2>
-        {quiz.intro_text ? <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">{quiz.intro_text}</p> : null}
-
-        <p className="mt-4 text-xs text-slate-500">
-          {quiz.max_questions} questions
-          {quiz.time_limit_seconds > 0 ? ` · ${formatClock(quiz.time_limit_seconds)}` : ''}
-          {` · pass mark ${quiz.pass_percentage}%`}
-        </p>
-
-        <button
-          type="button"
-          onClick={start}
-          className="mt-6 inline-flex items-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-        >
-          Start quiz
-        </button>
-      </div>
+      <StartScreen
+        title={quiz.title}
+        description={quiz.intro_text}
+        actionLabel="Start quiz"
+        facts={[
+          { icon: 'target', label: 'Questions', value: quiz.max_questions },
+          ...(quiz.time_limit_seconds > 0
+            ? [{ icon: 'timer' as const, label: 'Time limit', value: formatClock(quiz.time_limit_seconds) }]
+            : []),
+          { icon: 'gauge', label: 'Pass mark', value: `${quiz.pass_percentage}%` },
+        ]}
+        onStart={start}
+        footer={
+          lastPercentage !== null ? (
+            <p className="text-xs text-[color:var(--h5p-ink-faint)]">
+              Your last attempt: {Math.round(lastPercentage)}%. Beat it.
+            </p>
+          ) : null
+        }
+      />
     );
   };
 
@@ -413,7 +459,7 @@ function ArithmeticQuizPlayerContent() {
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />
         ) : loading ? (
-          <LoadingState label="Loading quiz…" />
+          <PlayerSkeleton lines={1} label="Loading quiz" />
         ) : error ? (
           <InlineBanner kind="error" message={error} />
         ) : (
@@ -426,7 +472,7 @@ function ArithmeticQuizPlayerContent() {
 
 export default function ArithmeticQuizPlayerPage() {
   return (
-    <Suspense fallback={<LoadingState label="Loading quiz…" />}>
+    <Suspense fallback={<PlayerSkeleton lines={1} label="Loading quiz" />}>
       <ArithmeticQuizPlayerContent />
     </Suspense>
   );

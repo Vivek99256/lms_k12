@@ -19,6 +19,7 @@ import {
 } from '../../data/h5p-content-types';
 import { hotspotFeedback, scoreHotspotVisit } from '@/lib/h5p/image-hotspots';
 import { H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '../../components/shared';
+import { ProgressRail, SecondaryAction } from '../../components/game';
 import { HotspotMarker, markerName } from '../components/marker';
 
 /**
@@ -78,13 +79,20 @@ function Popup({
     <div
       role="dialog"
       aria-label={name}
-      className="absolute z-20 max-h-[70%] overflow-auto rounded-xl border border-slate-200 bg-white p-3 shadow-lg"
+      // Scales in from the marker it belongs to rather than appearing, so the
+      // connection between the pin pressed and the panel that opened is
+      // carried by the motion instead of having to be inferred.
+      className="h5p-enter-scale absolute z-20 max-h-[70%] overflow-auto rounded-xl p-3.5"
       style={{
         left,
         right,
         top: `${Math.min(80, Number(point.position_y) + 4)}%`,
         width: `${width}%`,
         minWidth: '10rem',
+        background: 'var(--h5p-surface)',
+        border: '1px solid var(--h5p-line)',
+        boxShadow: 'var(--h5p-shadow-lifted)',
+        transformOrigin: right ? 'top right' : 'top left',
       }}
     >
       <div className="mb-1.5 flex items-start justify-between gap-2">
@@ -249,6 +257,11 @@ function HotspotActivity({ item, ctx }: { item: H5pImageHotspots; ctx: H5pContex
             defaults={{ icon: item.default_icon, color: item.default_icon_color }}
             showNumber={item.show_hotspot_numbers}
             opened={showing.includes(point.id)}
+            // The ring stops once the hotspot has been READ, not once its
+            // panel happens to be open — `opened` above is the open panel, and
+            // a pin the learner already explored should stay quiet when they
+            // close it again.
+            pulse={!opened.has(point.id)}
             onClick={() => open(point, index)}
           />
         ))}
@@ -265,35 +278,39 @@ function HotspotActivity({ item, ctx }: { item: H5pImageHotspots; ctx: H5pContex
           ))}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="min-w-0">
-          <p className="text-sm text-slate-700">
-            <span className="font-semibold tabular-nums">
-              {result.openedCount} of {result.hotspotCount}
-            </span>{' '}
-            hotspots explored
-          </p>
+      {/* Sticky, so on a phone — where the diagram is taller than the screen —
+          the "how much is left to find" line stays with the learner while they
+          work down the image. */}
+      <div className="h5p-surface sticky bottom-2 mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            <ProgressRail
+              value={result.openedCount}
+              max={result.hotspotCount}
+              label="Hotspots explored"
+              className="max-w-[16rem]"
+            />
+            <span className="shrink-0 text-sm font-semibold tabular-nums text-[color:var(--h5p-ink)]">
+              {result.openedCount} / {result.hotspotCount}
+            </span>
+          </div>
+
           {/* Said plainly, because a percentage beside a diagram invites being
               read as a test result. */}
-          <p className="mt-0.5 text-[11px] text-slate-500">
+          <p className="mt-1 text-[11px] text-[color:var(--h5p-ink-faint)]">
             {result.completed ? 'You have opened every hotspot.' : `${result.remaining.length} still to open.`}
           </p>
           {message ? (
-            <p aria-live="polite" className="mt-1.5 text-sm text-slate-700">
+            <p aria-live="polite" className="mt-1.5 text-sm text-[color:var(--h5p-ink-muted)]">
               {message}
             </p>
           ) : null}
         </div>
 
         {item.enable_retry && result.openedCount > 0 ? (
-          <button
-            type="button"
-            onClick={reset}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
+          <SecondaryAction onClick={reset} icon={<RotateCcw className="h-4 w-4" aria-hidden="true" />}>
             Start again
-          </button>
+          </SecondaryAction>
         ) : null}
       </div>
     </>

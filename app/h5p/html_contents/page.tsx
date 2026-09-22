@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   Brain,
+  Clock,
   Calculator,
   CircleCheck,
   Copy,
@@ -25,6 +26,7 @@ import {
 import { H5P_ROUTE_MAP, h5pContextQuery, hasH5pContext, readH5pContext } from '../data/h5p';
 import { fetchHub, humanise, type H5pHub, type H5pHubModule } from '../data/h5p-model';
 import { H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '../components/shared';
+import { CardGridSkeleton } from '../components/game';
 
 /**
  * H5P content hub — `GET /api/pal/h5p/hub`.
@@ -75,14 +77,21 @@ function ModuleCard({ module, contextQuery }: { module: H5pHubModule; contextQue
   const href = routeFor(module);
   const pedagogies = [...module.pedagogies.primary, ...module.pedagogies.secondary];
 
+  // Authored in the registry, not measured, so it is always present and is a
+  // genuine "how long will this take me" rather than a cohort average that
+  // reads as one. `null` engagement means the registry row predates the field.
+  const minutes = module.engagement?.expectedCompletionMinutes ?? 0;
+
   const card = (
     <div
-      className={`group flex h-full flex-col rounded-2xl border bg-white p-5 shadow-sm transition ${
-        module.available ? 'border-slate-200 hover:border-indigo-200 hover:shadow-md' : 'border-amber-200'
-      }`}
+      className={`h5p-surface ${module.available ? 'h5p-tappable' : ''} group flex h-full flex-col p-5`}
+      style={module.available ? undefined : { borderColor: 'var(--h5p-warning)' }}
     >
       <div className="flex items-start justify-between gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-[#4f46e5]">
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+          style={{ background: 'var(--h5p-accent-soft)', color: 'var(--h5p-accent)' }}
+        >
           <Icon className="h-5 w-5" />
         </span>
         <div className="text-right">
@@ -106,21 +115,30 @@ function ModuleCard({ module, contextQuery }: { module: H5pHubModule; contextQue
         <p className="mt-2 text-xs text-amber-700">{module.unavailableReason}</p>
       )}
 
-      {pedagogies.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {pedagogies.slice(0, 3).map((code) => (
-            <span
-              key={code}
-              className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600"
-            >
-              {humanise(code)}
-            </span>
-          ))}
-          {pedagogies.length > 3 ? (
-            <span className="px-1 text-[10px] text-slate-400">+{pedagogies.length - 3}</span>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="mt-3 flex flex-wrap items-center gap-1">
+        {minutes > 0 ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+            style={{ background: 'var(--h5p-accent-soft)', color: 'var(--h5p-accent-deep)' }}
+          >
+            <Clock className="h-3 w-3" aria-hidden="true" />
+            about {minutes} min
+          </span>
+        ) : null}
+
+        {pedagogies.slice(0, 2).map((code) => (
+          <span
+            key={code}
+            className="rounded-full px-2 py-0.5 text-[10px] font-medium text-[color:var(--h5p-ink-muted)]"
+            style={{ background: 'var(--h5p-surface-sunken)' }}
+          >
+            {humanise(code)}
+          </span>
+        ))}
+        {pedagogies.length > 2 ? (
+          <span className="px-1 text-[10px] text-[color:var(--h5p-ink-faint)]">+{pedagogies.length - 2}</span>
+        ) : null}
+      </div>
 
       <div className="mt-3 flex flex-1 items-end justify-between gap-2">
         <span className="text-[11px] text-slate-400">
@@ -192,7 +210,7 @@ function H5pHubContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title="H5P content"
           description={
@@ -223,10 +241,10 @@ function H5pHubContent() {
         <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
 
         {loading ? (
-          <LoadingState label="Loading modules…" />
+          <CardGridSkeleton cards={6} />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {modules.map((module) => (
                 <ModuleCard key={module.h5pType} module={module} contextQuery={contextQuery} />
               ))}

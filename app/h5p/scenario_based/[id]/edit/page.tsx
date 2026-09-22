@@ -210,7 +210,7 @@ function ScenarioEditContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Edit scenario"
           description="Update the scenario, replace the image or adjust interactive points"

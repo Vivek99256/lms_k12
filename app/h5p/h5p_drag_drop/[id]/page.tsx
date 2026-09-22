@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Check, CheckCircle2, Eye, Lightbulb, RotateCcw, X } from 'lucide-react';
+import { Check, CheckCircle2, Eye, Lightbulb, X } from 'lucide-react';
 import {
   dragDropSolution,
   fetchDragDrop,
@@ -21,6 +21,14 @@ import {
   LoadingState,
   MissingContextNotice,
 } from '../../components/shared';
+import {
+  Celebration,
+  PrimaryAction,
+  ProgressRail,
+  RetryAction,
+  ScoreCounter,
+  SecondaryAction,
+} from '../../components/game';
 import { DROP_TARGET_ATTRIBUTE, useDragGesture } from '../components/use-drag-gesture';
 import { useBackgroundSize } from '../components/use-background-size';
 import {
@@ -384,16 +392,19 @@ function DragDropPlayerContent() {
             ? `${elementLabel(element)}, placed. Select to return it to the tray.`
             : `${elementLabel(element)}. Select to pick it up, then choose a drop zone.`
         }
-        className={`inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-medium transition ${
+        // An item that has landed in a zone animates in, so the placement is
+        // visible as an event rather than as the tray quietly getting shorter.
+        // Keyed by zone above, so the animation runs per placement.
+        className={`h5p-tappable h5p-focusable h5p-target inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
           drag.draggingId === element.id ? 'opacity-40' : ''
-        } ${
+        } ${inZone ? 'h5p-enter-scale' : ''} ${
           carrying
-            ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-400'
+            ? 'border-[color:var(--h5p-accent)] bg-[color:var(--h5p-accent-soft)] text-[color:var(--h5p-accent-deep)] ring-2 ring-[color:var(--h5p-accent-line)]'
             : verdict === true
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+              ? 'h5p-halo border-emerald-300 bg-emerald-50 text-emerald-800'
               : verdict === false
                 ? 'border-red-300 bg-red-50 text-red-800'
-                : 'border-slate-300 bg-white text-slate-700 hover:border-indigo-400'
+                : 'border-slate-300 bg-white text-slate-700 hover:border-[color:var(--h5p-accent)]'
         }`}
       >
         {element.element_type === 'image' && element.image_path ? (
@@ -414,7 +425,7 @@ function DragDropPlayerContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title={task?.title ?? 'Drag and drop'}
           description={task?.task_description || 'Drag each item onto the zone it belongs to'}
@@ -446,9 +457,9 @@ function DragDropPlayerContent() {
                   </h2>
                   <div
                     {...{ [DROP_TARGET_ATTRIBUTE]: 'tray' }}
-                    className={`flex min-h-[3rem] flex-wrap items-center gap-2 rounded-xl border border-dashed p-2 transition-colors ${
+                    className={`flex min-h-[3rem] flex-wrap items-center gap-2 rounded-xl border border-dashed p-2 transition-all duration-[--h5p-dur-quick] ${
                       drag.isDragging && drag.hoveredTarget === 'tray'
-                        ? 'border-indigo-400 bg-indigo-50'
+                        ? 'border-[color:var(--h5p-accent)] bg-[color:var(--h5p-accent-soft)] ring-4 ring-[color:var(--h5p-accent-line)]'
                         : 'border-slate-300'
                     }`}
                   >
@@ -529,10 +540,17 @@ function DragDropPlayerContent() {
                               ? `Drop into ${zone.label || `zone ${index + 1}`}`
                               : undefined
                           }
-                          className={`absolute flex flex-wrap content-start items-start gap-1 overflow-auto rounded-lg border-2 border-dashed p-1 transition-colors ${
+                          // A zone under the pointer, or waiting for a carried
+                          // item, is lit and lifted rather than only tinted:
+                          // on a phone the finger covers the tint, and a ring
+                          // that extends past the fingertip is the part the
+                          // learner can actually see.
+                          className={`absolute flex flex-wrap content-start items-start gap-1 overflow-auto rounded-lg border-2 border-dashed p-1 transition-all duration-[--h5p-dur-quick] ${
                             highlighted
-                              ? 'border-indigo-500 bg-indigo-500/10'
-                              : 'border-slate-400 bg-white/50'
+                              ? 'scale-[1.03] border-[color:var(--h5p-accent)] bg-[color:var(--h5p-accent-soft)] ring-4 ring-[color:var(--h5p-accent-line)]'
+                              : carried !== null
+                                ? 'border-[color:var(--h5p-accent-line)] bg-white/70'
+                                : 'border-slate-400 bg-white/50'
                           }`}
                           style={{
                             left: `${zone.position_x}%`,
@@ -578,24 +596,52 @@ function DragDropPlayerContent() {
                   ) : null}
 
                   {result && result.scoreable ? (
-                    <div
-                      className={`mb-3 rounded-xl border px-3 py-2.5 text-sm ${
+                    <div className="h5p-enter relative mb-3 overflow-visible rounded-xl border px-4 py-3"
+                      style={
                         result.passed
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                          : 'border-amber-200 bg-amber-50 text-amber-800'
-                      }`}
+                          ? { borderColor: 'var(--h5p-success-line)', background: 'var(--h5p-success-soft)' }
+                          : { borderColor: 'var(--h5p-line)', background: 'var(--h5p-surface-sunken)' }
+                      }
                       role="status"
                     >
-                      <p className="flex items-center gap-1.5 font-medium">
-                        {result.passed ? <CheckCircle2 className="h-4 w-4" /> : null}
-                        You scored {result.score} out of {result.maxScore} ({result.percentage}%).
-                      </p>
-                      <p className="mt-0.5 text-xs">
-                        {result.correct} placed correctly
-                        {result.incorrect > 0 ? `, ${result.incorrect} in the wrong place` : ''}
-                        {result.missed > 0 ? `, ${result.missed} still to place` : ''}.
-                        {result.passed ? '' : ` The pass mark is ${task.pass_percentage}%.`}
-                      </p>
+                      <Celebration show={result.passed} pieces={14} />
+
+                      <div className="relative flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="sr-only">
+                            {`You scored ${result.score} out of ${result.maxScore}, ${result.percentage} percent.`}
+                          </p>
+                          <p aria-hidden="true">
+                            <ScoreCounter value={result.score} max={result.maxScore} size="md" />
+                          </p>
+                          <p className="mt-0.5 text-xs text-[color:var(--h5p-ink-muted)]">
+                            {result.correct} placed correctly
+                            {result.incorrect > 0 ? `, ${result.incorrect} in the wrong place` : ''}
+                            {result.missed > 0 ? `, ${result.missed} still to place` : ''}.
+                            {result.passed ? '' : ` The pass mark is ${task.pass_percentage}%.`}
+                          </p>
+                        </div>
+
+                        {result.passed ? (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+                            style={{
+                              background: 'var(--h5p-surface)',
+                              color: 'color-mix(in srgb, var(--h5p-success) 80%, #000)',
+                            }}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Passed
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <ProgressRail
+                        value={result.score}
+                        max={result.maxScore}
+                        label="Your score on this activity"
+                        className="relative mt-3"
+                      />
                     </div>
                   ) : null}
 
@@ -611,37 +657,21 @@ function DragDropPlayerContent() {
 
                   <div className="flex flex-wrap items-center gap-2">
                     {task.enable_check ? (
-                      <button
-                        type="button"
+                      <PrimaryAction
                         onClick={check}
                         disabled={Object.keys(placements).length === 0 || showingSolution}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                        icon={<Check className="h-4 w-4" aria-hidden="true" />}
                       >
-                        <Check className="h-3.5 w-3.5" />
                         Check
-                      </button>
+                      </PrimaryAction>
                     ) : null}
 
-                    {task.enable_retry ? (
-                      <button
-                        type="button"
-                        onClick={retry}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        Retry
-                      </button>
-                    ) : null}
+                    {task.enable_retry ? <RetryAction onClick={retry} label="Retry" /> : null}
 
                     {task.enable_show_solution ? (
-                      <button
-                        type="button"
-                        onClick={showSolution}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
+                      <SecondaryAction onClick={showSolution} icon={<Eye className="h-4 w-4" aria-hidden="true" />}>
                         Show solution
-                      </button>
+                      </SecondaryAction>
                     ) : null}
                   </div>
                 </section>
@@ -665,9 +695,25 @@ function DragDropPlayerContent() {
         <div
           aria-hidden="true"
           className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2"
-          style={{ left: drag.pointer.x, top: drag.pointer.y }}
+          // Lifted and tilted while it is in the air, and a little larger than
+          // the item it came from, so it reads as picked up rather than as a
+          // duplicate that appeared. The tilt is what makes it feel physical;
+          // it costs one transform on an already-composited layer.
+          style={{
+            left: drag.pointer.x,
+            top: drag.pointer.y,
+            rotate: '-3deg',
+            scale: '1.08',
+          }}
         >
-          <span className="inline-flex max-w-[12rem] items-center gap-1.5 rounded-lg border border-indigo-400 bg-white px-2 py-1 text-xs font-medium text-slate-800 shadow-lg ring-2 ring-indigo-200">
+          <span
+            className="inline-flex max-w-[12rem] items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-[color:var(--h5p-ink)]"
+            style={{
+              borderColor: 'var(--h5p-accent)',
+              background: 'var(--h5p-surface)',
+              boxShadow: 'var(--h5p-shadow-overlay)',
+            }}
+          >
             {draggingElement.element_type === 'image' && draggingElement.image_path ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img

@@ -1,9 +1,18 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Copy, Download, Eye, Loader2, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { Copy, Download, Eye, Loader2, Pencil, Play, Plus, Search, Sparkles, Trash2, Upload } from 'lucide-react';
 import {
   h5pContextQuery,
   hasH5pContext,
@@ -13,6 +22,7 @@ import {
 } from '../data/h5p';
 import type { H5pContentRow, H5pContentTypeApi } from '../data/h5p-content-types';
 import { EmptyState, H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from './shared';
+import { CardGridSkeleton, ProgressRail } from './game';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -55,6 +65,120 @@ export interface ContentTypeListProps<TRow extends H5pContentRow> {
   searchText?: (row: TRow) => string;
   /** A type with no media still imports and exports; this is about the button. */
   canImport?: boolean;
+}
+
+/**
+ * What a learner sees instead of the authoring table.
+ *
+ * WHY STUDENTS DO NOT GET THE TABLE. The table is an authoring tool: a row per
+ * item, an eye icon at the end, and columns whose headers ("Elements", "Pairs
+ * in play") describe how the activity was BUILT. A learner does not pick an
+ * activity the way an author audits a list, and being handed the audit view is
+ * most of why the H5P area reads as a form rather than as something to play.
+ *
+ * WHAT IS ON THE CARD IS ONLY WHAT IS REAL. The row carries a title, a
+ * description, a status and a server-computed `max_score`, and this renders
+ * those. It does NOT render a completion percentage, an earned score, a
+ * difficulty or a resume point, because this platform has no per-learner
+ * progress read — xAPI statements are written (`postH5pXapiStatement`) and
+ * never read back. `progress` below is the seam for when that endpoint exists;
+ * until it returns something, a card showing "0% complete" would be stating a
+ * fact nobody measured.
+ */
+export interface ActivityProgress {
+  /** 0–100. */
+  percentage: number;
+  score?: number | null;
+  maxScore?: number | null;
+  /** True when an attempt was started and not finished. */
+  resumable?: boolean;
+}
+
+function ActivityCard<TRow extends H5pContentRow>({
+  row,
+  index,
+  href,
+  facts,
+  progress,
+}: {
+  row: TRow;
+  index: number;
+  href: string;
+  facts: Array<{ label: string; value: ReactNode }>;
+  progress?: ActivityProgress;
+}) {
+  return (
+    <Link
+      href={href}
+      // The whole card is the target, so there is one thing to hit on a phone
+      // rather than a small "open" icon at the end of a row.
+      className="h5p-surface h5p-tappable h5p-focusable h5p-enter h5p-stagger group flex h-full flex-col p-5"
+      style={{ '--h5p-stagger': `${Math.min(index, 8) * 50}ms` } as CSSProperties}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+          style={{ background: 'var(--h5p-accent-soft)', color: 'var(--h5p-accent)' }}
+        >
+          <Sparkles className="h-5 w-5" aria-hidden="true" />
+        </span>
+
+        {row.max_score ? (
+          <span
+            className="rounded-full px-2.5 py-1 text-[11px] font-semibold tabular-nums"
+            style={{ background: 'var(--h5p-reward-soft)', color: 'color-mix(in srgb, var(--h5p-reward) 82%, #000)' }}
+          >
+            {row.max_score} {row.max_score === 1 ? 'point' : 'points'}
+          </span>
+        ) : null}
+      </div>
+
+      <h3 className="mt-4 text-base font-semibold text-[color:var(--h5p-ink)]">{row.title}</h3>
+      {row.description ? (
+        <p className="mt-1 line-clamp-2 text-sm text-[color:var(--h5p-ink-muted)]">{row.description}</p>
+      ) : null}
+
+      {facts.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {facts.slice(0, 3).map((fact) => (
+            <span
+              key={fact.label}
+              className="rounded-full px-2 py-0.5 text-[11px] font-medium text-[color:var(--h5p-ink-muted)]"
+              style={{ background: 'var(--h5p-surface-sunken)' }}
+            >
+              {fact.value}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {progress ? (
+        <div className="mt-4">
+          <ProgressRail
+            value={progress.percentage}
+            max={100}
+            label={`${row.title}: ${Math.round(progress.percentage)} percent complete`}
+          />
+          <p className="mt-1.5 text-[11px] tabular-nums text-[color:var(--h5p-ink-faint)]">
+            {Math.round(progress.percentage)}% complete
+            {progress.score != null && progress.maxScore != null
+              ? ` · scored ${progress.score}/${progress.maxScore}`
+              : ''}
+          </p>
+        </div>
+      ) : null}
+
+      <span className="mt-4 flex flex-1 items-end">
+        <span
+          className="inline-flex items-center gap-1.5 text-sm font-semibold"
+          style={{ color: 'var(--h5p-accent)' }}
+        >
+          <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+          {progress?.resumable ? 'Resume' : 'Start'}
+        </span>
+      </span>
+    </Link>
+  );
 }
 
 function StatusChip({ status }: { status: string }) {
@@ -279,13 +403,62 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
             <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
 
             {loading ? (
-              <LoadingState label={`Loading ${noun}s…`} />
+              isStudent ? (
+                <CardGridSkeleton cards={3} />
+              ) : (
+                <LoadingState label={`Loading ${noun}s…`} />
+              )
             ) : rows.length === 0 ? (
               <EmptyState
                 title={`No ${noun}s yet`}
                 hint={emptyHint}
                 action={!isStudent ? createButton : undefined}
               />
+            ) : isStudent ? (
+              // The learner's view: a grid of things to play, not a register
+              // of things that exist.
+              <>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="relative w-full max-w-xs">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search by title…"
+                      className="pl-8"
+                      aria-label={`Search ${noun}s`}
+                    />
+                  </div>
+                  <span className="shrink-0 text-xs text-[color:var(--h5p-ink-faint)]">
+                    {filtered.length} of {rows.length}
+                  </span>
+                </div>
+
+                {filtered.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-[color:var(--h5p-ink-muted)]">
+                    No {noun}s match your search.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {filtered.map((row, index) => (
+                      <ActivityCard
+                        key={row.id}
+                        row={row}
+                        index={index}
+                        href={`/h5p/${path}/${row.id}?${contextQuery}`}
+                        // The authoring columns, reused as the card's chips.
+                        // They already say the one useful thing about each type
+                        // — how many questions, how many pairs — and reusing
+                        // them means a new type gets card chips for free.
+                        facts={columns.map((column) => ({
+                          label: column.header,
+                          value: column.render(row),
+                        }))}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
