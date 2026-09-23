@@ -26,6 +26,7 @@ import {
   type ScorableSlideElement,
   type SlideResponse,
 } from '@/lib/h5p/course-presentation-scoring';
+import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
 import { H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '../../components/shared';
 import {
   PrimaryAction,
@@ -77,21 +78,57 @@ function toScorable(element: H5pSlideElement): ScorableSlideElement {
   };
 }
 
-function CoursePresentationPlayerContent() {
+/**
+ * A row supplied by the caller instead of fetched by id.
+ *
+ * This is what makes the player embeddable. The route below still loads by id
+ * from the URL, but a caller that already HAS the row -- the question bank
+ * library, which builds one in memory from a bank question and never saves it
+ * -- hands it over directly and skips the fetch entirely. `embedded` drops the
+ * page header, because an embedding surface has its own.
+ *
+ * Nothing downstream of here knows the difference: the row shape is identical,
+ * so scoring, feedback, solutions and xAPI behave exactly as they do for a
+ * saved activity.
+ */
+export interface PreloadedCoursePresentation {
+  item: H5pCoursePresentation;
+  ctx: H5pContext;
+  embedded?: boolean;
+  /**
+   * Fired once, where this player already reports completion over xAPI.
+   *
+   * It is how a module other than the H5P library uses this player: PAL needs
+   * the score to advance its state machine and homework needs it to record an
+   * attempt. The player still persists nothing itself -- the caller decides.
+   */
+  onResult?: (result: PlayerQuestionResult) => void;
+}
+
+function CoursePresentationPlayerContent({ preloaded }: { preloaded?: PreloadedCoursePresentation }) {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
   const searchParams = useSearchParams();
-  const ctx: H5pContext = useMemo(
+  const routeCtx: H5pContext = useMemo(
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
+  const ctx = preloaded?.ctx ?? routeCtx;
   const contextQuery = h5pContextQuery(ctx);
 
-  const [deck, setDeck] = useState<H5pCoursePresentation | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [fetchedDeck, setFetchedDeck] = useState<H5pCoursePresentation | null>(null);
+  const [loading, setLoading] = useState(!preloaded);
   const [error, setError] = useState('');
 
+  // Derived rather than copied into state: a preloaded row can change between
+  // renders (the library previews a different question), and state seeded once
+  // would keep showing the first one.
+  const deck = preloaded?.item ?? fetchedDeck;
+
   const [slideId, setSlideId] = useState<number | null>(null);
+  /** Which preloaded deck has had its opening slide set, so a re-render does
+   *  not send the learner back to slide one. */
+  const initialisedFor = useRef<number | null>(null);
   const [visited, setVisited] = useState<Set<number>>(new Set());
   const [responses, setResponses] = useState<Record<number, SlideResponse>>({});
   const [checked, setChecked] = useState<Set<number>>(new Set());
@@ -102,6 +139,27 @@ function CoursePresentationPlayerContent() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // The caller supplied the row, so there is nothing to fetch -- but the
+    // opening slide, the visited set and the clock are set BELOW, inside the
+    // fetch callback, and skipping it left `slideId` null and the stage
+    // rendering nothing at all. The same setup, once per deck.
+    if (preloaded) {
+      if (initialisedFor.current !== preloaded.item.id) {
+        initialisedFor.current = preloaded.item.id;
+        queueMicrotask(() => {
+          startedAt.current = Date.now();
+          const first = (preloaded.item.slides ?? [])[0];
+          if (first) {
+            setSlideId(first.id);
+            setVisited(new Set([first.id]));
+          }
+        });
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
     if (!hasH5pContext(ctx) || !id) {
       queueMicrotask(() => {
         if (!cancelled) setLoading(false);
@@ -115,7 +173,7 @@ function CoursePresentationPlayerContent() {
       .get(id, ctx)
       .then((data) => {
         if (cancelled) return;
-        setDeck(data);
+        setFetchedDeck(data);
         startedAt.current = Date.now();
         const first = (data.slides ?? [])[0];
         if (first) {
@@ -133,7 +191,7 @@ function CoursePresentationPlayerContent() {
     return () => {
       cancelled = true;
     };
-  }, [ctx, id]);
+  }, [ctx, id, preloaded]);
 
   // Memoised rather than derived inline: `deck?.slides ?? []` produces a new
   // array identity on every render when a deck has no slides, which would make
@@ -175,7 +233,16 @@ function CoursePresentationPlayerContent() {
       response: `${result.score}/${result.maxScore}`,
       durationSeconds: (Date.now() - startedAt.current) / 1000,
     });
-  }, [deck, result, ctx]);
+
+    preloaded?.onResult?.({
+      questionId: Number(deck.id),
+      score: result.score,
+      maxScore: result.maxScore,
+      correct: result.maxScore > 0 ? result.passed : null,
+      durationSeconds: (Date.now() - startedAt.current) / 1000,
+      response: `${result.score}/${result.maxScore}`,
+    });
+  }, [deck, result, ctx, preloaded]);
 
   const restart = () => {
     setResponses({});
@@ -639,12 +706,14 @@ function CoursePresentationPlayerContent() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mx-auto">
+        {preloaded?.embedded ? null : (
         <H5pPageHeader
           title={deck?.title || 'Course presentation'}
           description={deck?.description || undefined}
           ctx={ctx}
           backHref={`/h5p/h5p_course_presentation?${contextQuery}`}
         />
+        )}
 
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />
@@ -657,6 +726,30 @@ function CoursePresentationPlayerContent() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The player as a component, for a caller that already holds the row.
+ *
+ * The Suspense boundary stays, because the body still calls `useSearchParams`
+ * even when it does not read it -- hooks cannot be conditional, and an
+ * unwrapped `useSearchParams` opts the whole embedding route into client-side
+ * rendering.
+ */
+export function CoursePresentationPlayer({ item, ctx, embedded, onResult }: PreloadedCoursePresentation) {
+  // Memoised, because this object is the load effect's dependency. Passing a
+  // fresh one each render re-ran that effect on every render, and its cleanup
+  // then cancelled the setup the previous run had just scheduled.
+  const preloaded = useMemo(
+    () => ({ item, ctx, embedded, onResult }),
+    [item, ctx, embedded, onResult]
+  );
+
+  return (
+    <Suspense fallback={<LoadingState label="Loading presentation…" />}>
+      <CoursePresentationPlayerContent preloaded={preloaded} />
+    </Suspense>
   );
 }
 

@@ -49,7 +49,7 @@ export function StepProcess({
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="rounded bg-slate-900 px-2 py-1 font-mono text-xs font-semibold text-white">{spec.ref}</span>
           <h3 className="text-lg font-semibold text-slate-900">{spec.title}</h3>
-          <ActorBadge actor={spec.primaryActor} module={spec.module} />
+          <ActorBadge actor={spec.primaryActor} />
         </div>
 
         <dl>

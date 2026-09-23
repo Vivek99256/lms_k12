@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -18,8 +18,15 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { fetchLearningPlan, type LearningPlan, type PlanStep } from '@/app/pal/data/pal-diagnostic';
+import { isConceptCompleted, signalsFromMasteryRow } from '@/app/pal/data/pal-completion';
 import { BandChip, StrengthBadge, bandLabel } from '@/app/pal/_components/BandMeter';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import {
+  CompletedBadge,
+  CompletedChapterPanel,
+  ReadOnlyBadge,
+  useChapterCompletion,
+} from '@/app/pal/_components/CompletionState';
+import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -39,6 +46,18 @@ import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace
  * server's, the reasons are AdaptiveDifficultyRule's own `rationale`, and the
  * mastery wording is MasteryLadder's. Nothing is composed client-side, so the
  * plan cannot drift from the evidence that produced it.
+ *
+ * ---------------------------------------------------------------------------
+ * A COMPLETED CHAPTER HAS NO PLAN
+ * ---------------------------------------------------------------------------
+ * When every measurable concept is completed there is no remaining work to
+ * order, so the plan is replaced by the chapter's mastery record.
+ *
+ * The verdict comes from the mastery overview, not from the ladders the plan
+ * itself carries. The plan reports a ladder per concept but nothing about which
+ * difficulty band was actually reached, so a verdict derived here would drift
+ * from the one the mastery screen reaches about the same concept. One
+ * authority, one answer - see app/pal/data/pal-completion.ts.
  */
 
 export default function LearningPlanPage() {
@@ -90,7 +109,24 @@ function LearningPlanView() {
 
   useEffect(() => load(), [load]);
 
-  if (loading) return <Centered>Building your plan…</Centered>;
+  // The mastery overview, not the plan's own ladders, decides what is
+  // completed here. The plan reports a ladder per concept but no evidence of
+  // which difficulty band was actually reached, so judging from it alone would
+  // let this screen and the mastery screen disagree about the same concept.
+  // One authority, one answer.
+  const { mastery, completion, loading: loadingMastery } = useChapterCompletion(chapterId);
+
+  const completedConceptIds = useMemo(
+    () =>
+      new Set(
+        (mastery?.concepts ?? [])
+          .filter((concept) => isConceptCompleted(signalsFromMasteryRow(concept)))
+          .map((concept) => String(concept.conceptId))
+      ),
+    [mastery]
+  );
+
+  if (loading || loadingMastery) return <Centered>Building your plan…</Centered>;
 
   if (error || !plan) {
     return (
@@ -108,6 +144,45 @@ function LearningPlanView() {
     );
   }
 
+  // No work left to order. The plan stands down and the chapter's mastery
+  // record takes its place — read-only, with no route back into a question set.
+  if (completion.isComplete && mastery) {
+    return (
+      <PalWorkspace
+        eyebrow={plan.chapterName || 'This chapter'}
+        title="Chapter mastery"
+        description="This chapter is completed. Everything below is a record of how you got there."
+        backHref="/pal"
+        backLabel="Back to subjects"
+        actions={
+          <>
+            <CompletedBadge />
+            <ReadOnlyBadge />
+          </>
+        }
+        rail={
+          <>
+            <PalRailSection title="Your journey">
+              <JourneyRail
+                current="mastery"
+                completed={COMPLETED_THROUGH_CHECK}
+                bypassed={['intervention']}
+                orientation="vertical"
+              />
+            </PalRailSection>
+
+            <p className="px-1 text-xs text-slate-400">
+              Generated {formatWhen(plan.generatedAt)} from your saved answers. A completed chapter
+              is read only — there is nothing left here to change.
+            </p>
+          </>
+        }
+      >
+        <CompletedChapterPanel mastery={mastery} completion={completion} />
+      </PalWorkspace>
+    );
+  }
+
   const noDiagnostic = !plan.hasDiagnostic;
 
   // Everything that is context rather than the task itself moves to the rail:
@@ -118,7 +193,7 @@ function LearningPlanView() {
       <PalRailSection title="Your journey">
         <JourneyRail
           current={noDiagnostic ? 'diagnostic' : 'plan'}
-          completed={noDiagnostic ? [] : ['diagnostic', 'adaptive']}
+          completed={noDiagnostic ? [] : stagesBefore('plan')}
           orientation="vertical"
         />
       </PalRailSection>
@@ -127,7 +202,7 @@ function LearningPlanView() {
         <PalRailSection title="This chapter">
           <div className="grid grid-cols-2 gap-2.5">
             <Metric label="Concepts" value={plan.summary.conceptsServable} hint="with questions" />
-            <Metric label="Mastered" value={plan.summary.mastered} tone="positive" />
+            <Metric label="Completed" value={completion.completed} tone="positive" />
             <Metric label="In progress" value={plan.summary.inProgress} />
             <Metric
               label="Need work"
@@ -135,6 +210,10 @@ function LearningPlanView() {
               tone={plan.summary.weak > 0 ? 'warn' : undefined}
             />
           </div>
+          <p className="mt-2.5 text-xs text-slate-500">
+            A concept is completed once it is cleared to {bandLabel('hard').toLowerCase()} and
+            mastery is signed off. The chapter closes when all of them are.
+          </p>
         </PalRailSection>
       )}
 
@@ -189,7 +268,13 @@ function LearningPlanView() {
         <CardContent>
           <ol className="space-y-4">
             {plan.steps.map((step, index) => (
-              <StepRow key={`${step.key}-${step.conceptId ?? index}`} step={step} index={index + 1} chapterId={chapterId} />
+              <StepRow
+                key={`${step.key}-${step.conceptId ?? index}`}
+                step={step}
+                index={index + 1}
+                chapterId={chapterId}
+                completed={step.conceptId != null && completedConceptIds.has(String(step.conceptId))}
+              />
             ))}
           </ol>
         </CardContent>
@@ -228,7 +313,17 @@ function LearningPlanView() {
   );
 }
 
-function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; chapterId: string }) {
+function StepRow({
+  step,
+  index,
+  chapterId,
+  completed,
+}: {
+  step: PlanStep;
+  index: number;
+  chapterId: string;
+  completed: boolean;
+}) {
   // The diagnostic and all-mastered steps carry no concept, so they render as a
   // single call to action rather than a sub-journey.
   if (step.key !== 'concept') {
@@ -259,15 +354,26 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
 
   return (
     <li className="flex items-start gap-3">
-      <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold tabular-nums text-slate-600">
-        {index}
+      <span
+        className={cn(
+          'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums',
+          completed ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+        )}
+      >
+        {completed ? <CheckCircle2 aria-hidden className="h-4 w-4" /> : index}
       </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold text-slate-900">{step.title}</p>
-          <StrengthBadge band={step.band} />
-          {step.nextDifficulty && <BandChip band={step.nextDifficulty} />}
+          {completed ? (
+            <CompletedBadge />
+          ) : (
+            <>
+              <StrengthBadge band={step.band} />
+              {step.nextDifficulty && <BandChip band={step.nextDifficulty} />}
+            </>
+          )}
         </div>
 
         {step.detail && <p className="mt-1 text-sm text-slate-600">{step.detail}</p>}
@@ -292,9 +398,22 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
         {/* Learn leads, then Practise — the same order as the path listed
             directly above and as the engine itself runs. These were the other
             way round, so the first control under a "Learn -> Practice -> Check"
-            path was the one that skipped to practice. */}
+            path was the one that skipped to practice.
+
+            A completed concept keeps neither: it is read-only, and the only
+            route left is its own mastery record. */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {step.esoReady ? (
+          {completed ? (
+            <>
+              <Link
+                href={`/pal/adaptive/concept/${step.conceptId}`}
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              >
+                View mastery
+              </Link>
+              <ReadOnlyBadge />
+            </>
+          ) : step.esoReady ? (
             <Link
               href={`/pal/learn/concept/${step.conceptId}?chapterId=${chapterId}`}
               className={buttonVariants({ size: 'sm' })}
@@ -311,11 +430,16 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
             </span>
           )}
 
-          <Link href={`/pal/adaptive/concept/${step.conceptId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            Practise{step.nextDifficulty ? ` at ${bandLabel(step.nextDifficulty).toLowerCase()}` : ''}
-          </Link>
+          {!completed && (
+            <Link href={`/pal/adaptive/concept/${step.conceptId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Practise{step.nextDifficulty ? ` at ${bandLabel(step.nextDifficulty).toLowerCase()}` : ''}
+            </Link>
+          )}
 
-          {step.ladder?.mastered && (
+          {/* Mastered but NOT completed — the ladder signed the concept off
+              without the hard rung having been reached, so it is still open to
+              practise and says so rather than reading as finished. */}
+          {!completed && step.ladder?.mastered && (
             <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
               <CheckCircle2 aria-hidden className="h-3.5 w-3.5" />
               Mastered

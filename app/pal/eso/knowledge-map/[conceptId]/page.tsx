@@ -783,7 +783,7 @@ function GraphNode({
         role="button"
         tabIndex={0}
         aria-disabled="true"
-        title={concept.status === 'locked' ? 'Locked until its prerequisites are mastered' : 'No concept diagnostic content authored for this concept yet'}
+        title={concept.status === 'locked' ? 'Locked until its prerequisites are mastered' : 'No adaptive content authored for this concept yet'}
         {...interactionProps}
       >
         {body}

@@ -14,7 +14,17 @@ import {
   type ChapterMastery,
   type ConceptMasteryRow,
 } from '@/app/pal/data/pal-diagnostic';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import {
+  chapterCompletionFromRows,
+  isConceptCompleted,
+  signalsFromMasteryRow,
+} from '@/app/pal/data/pal-completion';
+import {
+  CompletedBadge,
+  CompletedChapterPanel,
+  ReadOnlyBadge,
+} from '@/app/pal/_components/CompletionState';
+import { COMPLETED_THROUGH_CHECK, JourneyRail } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -36,6 +46,16 @@ import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components
  * only the flattering number would tell a learner they had mastered something
  * the system will not let them past. So the page shows the stage, and the
  * evidence behind it, and says plainly what is still outstanding.
+ *
+ * ---------------------------------------------------------------------------
+ * COMPLETED IS NARROWER THAN MASTERED
+ * ---------------------------------------------------------------------------
+ * `stage: 'mastered'` is the reconciled verdict above. COMPLETED additionally
+ * requires the ladder to have been climbed to hard, and it is what turns a
+ * concept read-only - see app/pal/data/pal-completion.ts. So a row can read
+ * "Mastered" without being completed, which is the honest answer when the hard
+ * rung was never reached, and this page keeps its practice routes open in that
+ * case rather than closing a concept the learner can still climb.
  */
 
 export default function ChapterMasteryPage() {
@@ -121,6 +141,53 @@ function ChapterMasteryView() {
   const { summary } = data;
   const provable = summary.conceptsTotal - summary.noQuestions;
   const pct = provable > 0 ? Math.round((summary.mastered / provable) * 100) : 0;
+  const completion = chapterCompletionFromRows(data.concepts);
+
+  // A completed chapter is closed: the mastery record, and no route back into
+  // a question set from anywhere on the page.
+  if (completion.isComplete) {
+    return (
+      <PalWorkspace
+        eyebrow={data.chapterName || 'This chapter'}
+        title="Chapter mastery"
+        description="This chapter is completed. Everything below is a record of how you got there."
+        backHref="/pal"
+        backLabel="Back to subjects"
+        actions={
+          <>
+            <CompletedBadge />
+            <ReadOnlyBadge />
+          </>
+        }
+        rail={
+          <>
+            <PalRailSection title="Where you finished">
+              <PalRailStat label="Completed" value={completion.completed} tone="positive" />
+              <PalRailStat label="Mastered" value={summary.mastered} tone="positive" />
+              <PalRailStat label="Retained" value={summary.retained} tone="positive" />
+              {completion.unmeasurable > 0 && (
+                <p className="mt-2 text-xs text-slate-500">
+                  {completion.unmeasurable} concept{completion.unmeasurable === 1 ? '' : 's'} cannot
+                  be practised yet — a gap in the question bank.
+                </p>
+              )}
+            </PalRailSection>
+
+            <PalRailSection title="Your journey">
+              <JourneyRail
+                current="mastery"
+                completed={COMPLETED_THROUGH_CHECK}
+                bypassed={['intervention']}
+                orientation="vertical"
+              />
+            </PalRailSection>
+          </>
+        }
+      >
+        <CompletedChapterPanel mastery={data} completion={completion} />
+      </PalWorkspace>
+    );
+  }
 
   // Furthest along first, so progress is what the learner sees.
   const concepts = [...data.concepts].sort(
@@ -155,7 +222,8 @@ function ChapterMasteryView() {
           <PalRailSection title="Your journey">
             <JourneyRail
               current="mastery"
-              completed={['diagnostic', 'adaptive', 'plan', 'learn', 'practice', 'check']}
+              completed={COMPLETED_THROUGH_CHECK}
+              bypassed={['intervention']}
               orientation="vertical"
             />
           </PalRailSection>
@@ -271,6 +339,7 @@ function ChapterMasteryView() {
 function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
   const stage = stageOf(concept.stage);
   const done = concept.stage === 'mastered' || concept.stage === 'retained';
+  const completed = isConceptCompleted(signalsFromMasteryRow(concept));
   const pct = concept.pMastery === null ? null : Math.round(concept.pMastery * 100);
 
   return (
@@ -284,9 +353,13 @@ function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
               <Circle aria-hidden className="h-4 w-4 shrink-0 text-slate-300" />
             )}
             <span className="text-sm font-medium text-slate-900">{concept.name}</span>
-            <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', stage.chip)}>
-              {stage.label}
-            </span>
+            {completed ? (
+              <CompletedBadge />
+            ) : (
+              <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', stage.chip)}>
+                {stage.label}
+              </span>
+            )}
           </div>
 
           {/* The ladder's own sentence - what is still outstanding, in words. */}
@@ -335,7 +408,17 @@ function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
             </div>
           )}
 
-          {concept.esoReady ? (
+          {/* Completed is read-only: no review, no revisit, no practice. The
+              only route left is the concept's own mastery record, which the
+              practice page serves in place of a question set. */}
+          {completed ? (
+            <Link
+              href={`/pal/adaptive/concept/${concept.conceptId}`}
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              View mastery
+            </Link>
+          ) : concept.esoReady ? (
             <Link
               href={`/pal/eso?conceptId=${concept.conceptId}`}
               className={buttonVariants({ variant: 'outline', size: 'sm' })}

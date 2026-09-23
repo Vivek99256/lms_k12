@@ -1,11 +1,12 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowRight, Brain, Loader2 } from 'lucide-react';
+import { ArrowRight, Brain, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
@@ -13,8 +14,15 @@ import {
   type AdaptiveConcept,
   type AdaptiveConceptList,
 } from '@/app/pal/data/pal-diagnostic';
+import { isConceptCompleted, signalsFromMasteryRow } from '@/app/pal/data/pal-completion';
 import { BandChip, LevelBadge, bandLabel } from '@/app/pal/_components/BandMeter';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import {
+  CompletedBadge,
+  CompletedChapterPanel,
+  ReadOnlyBadge,
+  useChapterCompletion,
+} from '@/app/pal/_components/CompletionState';
+import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -29,6 +37,17 @@ import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace
  * Concepts with no servable questions stay in the list, greyed out. Dropping
  * them would quietly remove half a syllabus from view; showing them disabled
  * says plainly that practice is not ready for that topic yet.
+ *
+ * ---------------------------------------------------------------------------
+ * COMPLETED CONCEPTS, AND A COMPLETED CHAPTER
+ * ---------------------------------------------------------------------------
+ * A concept cleared to hard and signed off is read-only: its card keeps the
+ * evidence and loses the button. Once every measurable concept in the chapter
+ * is completed, the list itself is replaced by the chapter's mastery - there is
+ * no longer a next concept to choose, so offering a choice would be a lie.
+ *
+ * The verdict comes from the mastery overview (one extra GET) rather than being
+ * re-derived here; the rule lives in app/pal/data/pal-completion.ts.
  */
 
 export default function AdaptiveConceptsPage() {
@@ -57,6 +76,24 @@ function AdaptiveConceptsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const {
+    mastery,
+    completion,
+    loading: checkingCompletion,
+  } = useChapterCompletion(chapterId);
+
+  // Concept ids are numbers on the mastery overview and strings on the concept
+  // list, so they are normalised once here rather than at every comparison.
+  const completedConceptIds = useMemo(
+    () =>
+      new Set(
+        (mastery?.concepts ?? [])
+          .filter((concept) => isConceptCompleted(signalsFromMasteryRow(concept)))
+          .map((concept) => String(concept.conceptId))
+      ),
+    [mastery]
+  );
+
   const load = useCallback(() => {
     const controller = new AbortController();
     // Every setState is deferred, including the loading/error reset: calling
@@ -81,7 +118,39 @@ function AdaptiveConceptsView() {
 
   useEffect(() => load(), [load]);
 
-  if (loading) return <Centered>Loading concepts…</Centered>;
+  if (loading || checkingCompletion) return <Centered>Loading concepts…</Centered>;
+
+  // Nothing left to practise in this chapter: the mastery record replaces the
+  // list, and every route into a question set goes with it.
+  if (completion.isComplete && mastery) {
+    return (
+      <PalWorkspace
+        eyebrow={mastery.chapterName || data?.chapterName || 'This chapter'}
+        title="Chapter mastery"
+        description="This chapter is completed. Everything below is a record of how you got there."
+        backHref="/pal"
+        backLabel="Back to subjects"
+        actions={
+          <>
+            <CompletedBadge />
+            <ReadOnlyBadge />
+          </>
+        }
+        rail={
+          <PalRailSection title="Your journey">
+            <JourneyRail
+              current="mastery"
+              completed={COMPLETED_THROUGH_CHECK}
+              bypassed={['intervention']}
+              orientation="vertical"
+            />
+          </PalRailSection>
+        }
+      >
+        <CompletedChapterPanel mastery={mastery} completion={completion} />
+      </PalWorkspace>
+    );
+  }
 
   if (error || !data) {
     return (
@@ -121,13 +190,42 @@ function AdaptiveConceptsView() {
         </>
       }
       rail={
-        <PalRailSection title="Your journey">
-          <JourneyRail
-            current="adaptive"
-            completed={data.hasDiagnostic ? ['diagnostic'] : []}
-            orientation="vertical"
-          />
-        </PalRailSection>
+        <>
+          {completion.measurable > 0 && (
+            <PalRailSection title="Chapter progress">
+              <div className="flex items-baseline justify-between gap-3 py-1">
+                <span className="text-sm text-slate-600">Completed</span>
+                <span className="text-sm font-semibold tabular-nums text-slate-900">
+                  {completion.completed} of {completion.measurable}
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-emerald-600 transition-all"
+                  style={{ width: `${(completion.completed / completion.measurable) * 100}%` }}
+                  role="progressbar"
+                  aria-valuenow={completion.completed}
+                  aria-valuemin={0}
+                  aria-valuemax={completion.measurable}
+                  aria-label="Concepts completed"
+                />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                A concept is completed once it is cleared to{' '}
+                {bandLabel('hard').toLowerCase()} and mastery is signed off. The chapter closes when
+                all of them are.
+              </p>
+            </PalRailSection>
+          )}
+
+          <PalRailSection title="Your journey">
+            <JourneyRail
+              current="adaptive"
+              completed={data.hasDiagnostic ? stagesBefore('adaptive') : []}
+              orientation="vertical"
+            />
+          </PalRailSection>
+        </>
       }
     >
 
@@ -156,6 +254,7 @@ function AdaptiveConceptsView() {
             <ConceptCard
               key={concept.conceptId}
               concept={concept}
+              completed={completedConceptIds.has(String(concept.conceptId))}
               onStart={() => router.push(`/pal/adaptive/concept/${concept.conceptId}`)}
             />
           ))}
@@ -189,20 +288,40 @@ function AdaptiveConceptsView() {
   );
 }
 
-function ConceptCard({ concept, onStart }: { concept: AdaptiveConcept; onStart: () => void }) {
+function ConceptCard({
+  concept,
+  completed,
+  onStart,
+}: {
+  concept: AdaptiveConcept;
+  completed: boolean;
+  onStart: () => void;
+}) {
   const attempted = concept.practiceAttempts > 0;
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card className={cn('flex h-full flex-col', completed && 'border-emerald-200 bg-emerald-50/40')}>
       <CardContent className="flex flex-1 flex-col pt-5">
         <div className="mb-2 flex items-start justify-between gap-2">
           <h2 className="min-w-0 text-sm font-semibold text-slate-900">{concept.name}</h2>
-          {concept.nextDifficulty && <BandChip band={concept.nextDifficulty} className="shrink-0" />}
+          {completed ? (
+            <CompletedBadge className="shrink-0" />
+          ) : (
+            concept.nextDifficulty && <BandChip band={concept.nextDifficulty} className="shrink-0" />
+          )}
         </div>
 
         {/* The engine's own sentence. Rewording it here would let this screen
-            and the practice screen explain the same decision differently. */}
-        {concept.rationale && <p className="text-xs text-slate-600">{concept.rationale}</p>}
+            and the practice screen explain the same decision differently. On a
+            completed concept the engine has no next decision to explain, so the
+            card says what it has become instead. */}
+        {completed ? (
+          <p className="text-xs text-emerald-800">
+            You have shown this at every level available. Nothing left to practise.
+          </p>
+        ) : (
+          concept.rationale && <p className="text-xs text-slate-600">{concept.rationale}</p>
+        )}
 
         <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
           {concept.diagnosticPercentage !== null && (
@@ -225,14 +344,33 @@ function ConceptCard({ concept, onStart }: { concept: AdaptiveConcept; onStart: 
         </dl>
 
         <div className="mt-auto pt-4">
-          <Button className="w-full" size="sm" onClick={onStart}>
-            {attempted ? 'Continue practice' : 'Start practice'}
-            <ArrowRight aria-hidden className="ml-1.5 h-3.5 w-3.5" />
-          </Button>
-          <p className="mt-1.5 text-center text-[11px] text-slate-400">
-            {concept.availability.total} question{concept.availability.total === 1 ? '' : 's'} available
-            {concept.nextDifficulty && ` · opening at ${bandLabel(concept.nextDifficulty).toLowerCase()}`}
-          </p>
+          {completed ? (
+            // Read-only. The only route out of a completed concept is its own
+            // mastery record, which the practice page serves in place of a set.
+            <>
+              <Link
+                href={`/pal/adaptive/concept/${concept.conceptId}`}
+                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full')}
+              >
+                <CheckCircle2 aria-hidden className="mr-1.5 h-3.5 w-3.5" />
+                View mastery
+              </Link>
+              <p className="mt-1.5 text-center text-[11px] text-emerald-700">
+                Completed &middot; read only
+              </p>
+            </>
+          ) : (
+            <>
+              <Button className="w-full" size="sm" onClick={onStart}>
+                {attempted ? 'Continue practice' : 'Start practice'}
+                <ArrowRight aria-hidden className="ml-1.5 h-3.5 w-3.5" />
+              </Button>
+              <p className="mt-1.5 text-center text-[11px] text-slate-400">
+                {concept.availability.total} question{concept.availability.total === 1 ? '' : 's'} available
+                {concept.nextDifficulty && ` · opening at ${bandLabel(concept.nextDifficulty).toLowerCase()}`}
+              </p>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>

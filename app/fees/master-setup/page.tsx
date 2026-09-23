@@ -1,11 +1,11 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { FeesCategoryPage } from '@/app/fees/_components/fees-category-page';
 
 /**
  * Fees → master-setup. One of the seven Fees category pages; all seven share
- * ModuleCategoryPage and differ only by which category they render.
+ * FeesCategoryPage and differ only by which category they render.
  */
 export default function Page() {
-  return <ModuleCategoryPage moduleName="fees" categoryKey="master-setup" />;
+  return <FeesCategoryPage categoryKey="master-setup" />;
 }

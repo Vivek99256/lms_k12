@@ -16,41 +16,36 @@
  *
  *   1. preconditions      -> readiness work that must be true before the
  *                            process can run at all (SOP 4.1 / 4.2)
- *   2. staff steps        -> steps whose actor is the staff mode, alone or
- *                            with AI
+ *   2. staff steps        -> steps whose actor is Teacher or Teacher + AI
  *   3. AI-output gates    -> BR-07: the AI owns no record, so every unattended
- *                            step that moves a protected record earns a human
- *                            verification task
+ *                            step that moves a learner-visible record earns a
+ *                            human verification task (6.15.6)
  *   4. handovers          -> procedures this one feeds (6.10, 6.11 ...)
  *
- * Self-service steps - the learner's, the parent's - are still emitted, marked
- * `assignable: false`, so the process record stays complete and the reviewer
- * can see what was deliberately not assigned rather than wondering what was
- * dropped.
- *
- * Every word this file puts in front of a person comes from the module's
- * `ModuleVocabulary`: which record BR-07 protects, which results earn a gate,
- * what the owners are called. Nothing here is LMS-specific any more.
+ * Learner steps are still emitted, marked `assignable: false`, so the process
+ * record stays complete and the reviewer can see what was deliberately not
+ * assigned rather than wondering what was dropped.
  */
 
-import type { ModuleVocabulary, SopModule } from './sop-catalog'
-import { findProcedure, resolveRef, vocabularyFor } from './sop-catalog'
-import type { ProcessSpec, TaskDraft, TaskPriority, WorkflowStep } from './types'
+import type { SopModule } from './sop-catalog'
+import { findProcedure, resolveRef } from './sop-catalog'
+import { ACTOR_LABELS, type ProcessSpec, type TaskDraft, type TaskPriority, type WorkflowStep } from './types'
 
 /**
- * Who owns a precondition.
- *
- * Taken from the SOP's master-data register (4.2), which names who owns each
- * prerequisite: the patterns are the masters an operator cannot change from
- * their own screen, and anything they do not match is the staff actor's - they
- * own the day-to-day content. Both the patterns and the two owner names come
- * from the module's vocabulary, so a fees counter reads 'Fees administrator'
- * where the LMS reads 'LMS Administrator'.
+ * Owners taken from the SOP's master-data register (4.2), which names who owns
+ * each prerequisite. Anything not matched here is the teacher's - they own the
+ * academic content.
  */
-function ownerFor(text: string, vocabulary: ModuleVocabulary): string {
-  return vocabulary.adminOwned.some((pattern) => pattern.test(text))
-    ? vocabulary.owners.admin
-    : vocabulary.owners.staff
+const ADMIN_OWNED = [
+  /session year|syear|academic year|term\b/i,
+  /grade|standard|division|section master/i,
+  /difficulty band/i,
+  /role|menu|permission/i,
+  /model|prompt|persona|confidence threshold/i,
+]
+
+function ownerFor(text: string): string {
+  return ADMIN_OWNED.some((pattern) => pattern.test(text)) ? 'LMS Administrator' : 'Teacher'
 }
 
 /** Sentence-case a fragment lifted out of the SOP so it reads as an instruction. */
@@ -107,6 +102,9 @@ function rulesTouching(module: SopModule, text: string): string[] {
     .map((rule) => rule.id)
 }
 
+/** A step is learner-visible when its result touches a record a student or parent sees. */
+const LEARNER_VISIBLE = /mastery|misconception|score|scores|result|mark|grade|recommendation|band/i
+
 function priorityFor(origin: TaskDraft['origin'], ruleRefs: string[]): TaskPriority {
   if (origin === 'gate') return 'High'
   if (origin === 'precondition') return ruleRefs.length ? 'High' : 'Medium'
@@ -145,7 +143,6 @@ export interface DeriveOptions {
 }
 
 export function deriveTasks(spec: ProcessSpec, module: SopModule, options: DeriveOptions = {}): TaskDraft[] {
-  const vocabulary = vocabularyFor(module)
   const kraStage = spec.lifecycleStage || findProcedure(module, spec.ref)?.group.lifecycleStage || 'Operations'
   const kra = `${module.name} - ${kraStage}`
   const drafts: TaskDraft[] = []
@@ -158,7 +155,7 @@ export function deriveTasks(spec: ProcessSpec, module: SopModule, options: Deriv
 
   spec.attributes.preconditions.forEach((precondition, position) => {
     const ruleRefs = rulesTouching(module, precondition)
-    const owner = ownerFor(precondition, vocabulary)
+    const owner = ownerFor(precondition)
     push({
       key: `${spec.ref}-P${position + 1}`,
       title: asTitle('Confirm', precondition),
@@ -192,16 +189,15 @@ export function deriveTasks(spec: ProcessSpec, module: SopModule, options: Deriv
       key: `${spec.ref}-S${step.no}`,
       title: asTitle('Carry out', step.userAction || step.systemAction || `step ${step.no}`),
       description:
-        `Step ${step.no} of ${spec.ref} ${spec.title}, performed by ${vocabulary.actorLabels[step.actor]}. ` +
+        `Step ${step.no} of ${spec.ref} ${spec.title}, performed by ${ACTOR_LABELS[step.actor]}. ` +
         (step.userAction ? `Action: ${step.userAction}. ` : '') +
         (step.systemAction ? `The system will ${lowerFirst(step.systemAction)}. ` : '') +
         (gated
-          ? 'BR-07 applies: the AI proposal must be previewed and explicitly applied by this person ' +
-            `before it reaches any ${vocabulary.gatedRecordNoun}.`
+          ? 'BR-07 applies: the AI proposal must be previewed and explicitly applied by this person before it reaches any learner-visible record.'
           : ''),
       origin: 'step',
       actor: step.actor,
-      owner: vocabulary.owners.staff,
+      owner: 'Teacher',
       priority: priorityFor('step', step.ruleRefs),
       stepNos: [step.no],
       ruleRefs: step.ruleRefs,
@@ -216,7 +212,7 @@ export function deriveTasks(spec: ProcessSpec, module: SopModule, options: Deriv
   /* 3. Unattended AI steps -> human verification gates ------------------ */
 
   spec.workflow.steps
-    .filter((step) => step.actor === 'ai' && vocabulary.gatedResult.test(`${step.result} ${step.systemAction}`))
+    .filter((step) => step.actor === 'ai' && LEARNER_VISIBLE.test(`${step.result} ${step.systemAction}`))
     .forEach((step) => {
       push({
         key: `${spec.ref}-G${step.no}`,
@@ -229,10 +225,10 @@ export function deriveTasks(spec: ProcessSpec, module: SopModule, options: Deriv
           `unattended and the SOP gives the AI ownership of no record, so a named person confirms the output ` +
           `before it is relied on. System action: ${step.systemAction}. Expected result: ${step.result}.` +
           (step.ruleRefs.length ? ` Checked against ${step.ruleRefs.join(', ')}.` : '') +
-          ` ${vocabulary.gateInstruction}`,
+          ' Log the acceptance per 6.15.6; flag and do not apply anything that looks wrong (9.5).',
         origin: 'gate',
         actor: 'teacher_ai',
-        owner: vocabulary.owners.staff,
+        owner: 'Teacher',
         priority: priorityFor('gate', step.ruleRefs),
         stepNos: [step.no],
         ruleRefs: [...new Set([...step.ruleRefs, 'BR-07'])],
@@ -256,12 +252,10 @@ export function deriveTasks(spec: ProcessSpec, module: SopModule, options: Deriv
         `${spec.ref} ${spec.title} hands its output to ${handoffRef} ${targetTitle}. ` +
         `Pick up what this run produced and carry it into that ` +
         `${target?.kind === 'group' ? 'process group' : 'procedure'} so the loop closes.` +
-        (target?.kind === 'procedure'
-          ? ` Primary actor there: ${vocabulary.actorLabels[target.primaryActor]}.`
-          : ''),
+        (target?.kind === 'procedure' ? ` Primary actor there: ${ACTOR_LABELS[target.primaryActor]}.` : ''),
       origin: 'output',
       actor: 'teacher',
-      owner: vocabulary.owners.staff,
+      owner: 'Teacher',
       priority: priorityFor('output', []),
       stepNos: [],
       ruleRefs: [],
@@ -280,15 +274,14 @@ export function deriveTasks(spec: ProcessSpec, module: SopModule, options: Deriv
     .forEach((step) => {
       push({
         key: `${spec.ref}-L${step.no}`,
-        title: asTitle(`${vocabulary.selfService.originLabel}:`, step.userAction || `step ${step.no}`),
+        title: asTitle('Learner activity:', step.userAction || `step ${step.no}`),
         description:
-          `Step ${step.no} of ${spec.ref} ${spec.title} is performed by ${vocabulary.selfService.noun} ` +
-          `(${vocabulary.actorLabels[step.actor]}). ` +
+          `Step ${step.no} of ${spec.ref} ${spec.title} is performed by the learner (${ACTOR_LABELS[step.actor]}). ` +
           'Recorded here for completeness. Task Management assigns to staff, so this is not published as a task; ' +
-          `it is delivered to ${vocabulary.selfService.noun} by ${vocabulary.selfService.surface} itself.`,
+          'it is delivered to the learner by the PAL workspace itself.',
         origin: 'learner_activity',
         actor: step.actor,
-        owner: vocabulary.selfService.owner,
+        owner: 'Student',
         priority: 'Low',
         stepNos: [step.no],
         ruleRefs: step.ruleRefs,

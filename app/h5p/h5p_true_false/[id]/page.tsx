@@ -22,6 +22,7 @@ import {
   type TrueFalseAnswer,
   type TrueFalseAttemptResult,
 } from '@/lib/h5p/true-false';
+import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
 import { H5pPageHeader, InlineBanner, MissingContextNotice } from '../../components/shared';
 import {
   PlayerSkeleton,
@@ -103,19 +104,52 @@ function Html({ html, className }: { html: string; className?: string }) {
   return <span className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-function TrueFalsePlayerContent() {
+/**
+ * A row supplied by the caller instead of fetched by id.
+ *
+ * This is what makes the player embeddable. The route below still loads by id
+ * from the URL, but a caller that already HAS the row -- the question bank
+ * library, which builds one in memory from a bank question and never saves it
+ * -- hands it over directly and skips the fetch entirely. `embedded` drops the
+ * page header, because an embedding surface has its own.
+ *
+ * Nothing downstream of here knows the difference: the row shape is identical,
+ * so scoring, feedback, solutions and xAPI behave exactly as they do for a
+ * saved activity.
+ */
+export interface PreloadedTrueFalse {
+  item: H5pTrueFalse;
+  ctx: H5pContext;
+  embedded?: boolean;
+  /**
+   * Fired once, where this player already reports completion over xAPI.
+   *
+   * It is how a module other than the H5P library uses this player: PAL needs
+   * the score to advance its state machine and homework needs it to record an
+   * attempt. The player still persists nothing itself -- the caller decides.
+   */
+  onResult?: (result: PlayerQuestionResult) => void;
+}
+
+function TrueFalsePlayerContent({ preloaded }: { preloaded?: PreloadedTrueFalse }) {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
   const searchParams = useSearchParams();
-  const ctx: H5pContext = useMemo(
+  const routeCtx: H5pContext = useMemo(
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
+  const ctx = preloaded?.ctx ?? routeCtx;
   const contextQuery = h5pContextQuery(ctx);
 
-  const [item, setItem] = useState<H5pTrueFalse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [fetched, setFetched] = useState<H5pTrueFalse | null>(null);
+  const [loading, setLoading] = useState(!preloaded);
   const [error, setError] = useState('');
+
+  // Derived rather than copied into state: a preloaded row can change between
+  // renders (the library previews a different question), and state seeded once
+  // would keep showing the first one.
+  const item = preloaded?.item ?? fetched;
 
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   /** What the learner has picked but not yet committed. Only used on-check. */
@@ -141,6 +175,11 @@ function TrueFalsePlayerContent() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // The caller supplied the row; there is nothing to fetch and no id to
+    // fetch it by.
+    if (preloaded) return;
+
     if (!hasH5pContext(ctx) || !id) {
       queueMicrotask(() => {
         if (!cancelled) setLoading(false);
@@ -153,7 +192,7 @@ function TrueFalsePlayerContent() {
     trueFalseApi
       .get(id, ctx)
       .then((data) => {
-        if (!cancelled) setItem(data);
+        if (!cancelled) setFetched(data);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load this activity');
@@ -165,7 +204,7 @@ function TrueFalsePlayerContent() {
     return () => {
       cancelled = true;
     };
-  }, [ctx, id]);
+  }, [ctx, id, preloaded]);
 
   // --- scoring -------------------------------------------------------------
 
@@ -198,8 +237,17 @@ function TrueFalsePlayerContent() {
         response: `${scored.score}/${scored.maxScore}`,
         durationSeconds: (done.finishedAt - done.startedAt) / 1000,
       });
+
+      preloaded?.onResult?.({
+        questionId: Number(item.id),
+        score: scored.score,
+        maxScore: scored.maxScore,
+        correct: scored.passed,
+        durationSeconds: (done.finishedAt - done.startedAt) / 1000,
+        response: `${scored.score}/${scored.maxScore}`,
+      });
     },
-    [item, ctx]
+    [item, ctx, preloaded]
   );
 
   // --- actions -------------------------------------------------------------
@@ -475,12 +523,14 @@ function TrueFalsePlayerContent() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mx-auto max-w-2xl">
+        {preloaded?.embedded ? null : (
         <H5pPageHeader
           title={item?.title || 'True or false'}
           description={item?.description || undefined}
           ctx={ctx}
           backHref={`/h5p/h5p_true_false?${contextQuery}`}
         />
+        )}
 
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />
@@ -547,6 +597,30 @@ function Solution({ attempt }: { attempt: Attempt }) {
         })}
       </ol>
     </section>
+  );
+}
+
+/**
+ * The player as a component, for a caller that already holds the row.
+ *
+ * The Suspense boundary stays, because the body still calls `useSearchParams`
+ * even when it does not read it -- hooks cannot be conditional, and an
+ * unwrapped `useSearchParams` opts the whole embedding route into client-side
+ * rendering.
+ */
+export function TrueFalsePlayer({ item, ctx, embedded, onResult }: PreloadedTrueFalse) {
+  // Memoised, because this object is the load effect's dependency. Passing a
+  // fresh one each render re-ran that effect on every render, and its cleanup
+  // then cancelled the setup the previous run had just scheduled.
+  const preloaded = useMemo(
+    () => ({ item, ctx, embedded, onResult }),
+    [item, ctx, embedded, onResult]
+  );
+
+  return (
+    <Suspense fallback={<PlayerSkeleton lines={2} label="Loading activity" />}>
+      <TrueFalsePlayerContent preloaded={preloaded} />
+    </Suspense>
   );
 }
 

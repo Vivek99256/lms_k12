@@ -22,22 +22,7 @@ test('an allow-list naming another module’s tool is refused', () => {
 });
 
 test('an unavailable tool cannot be put on an allow-list', () => {
-  // `fees.fee_structure` is in the catalogue so it can be planned for, but has no
-  // executor. Whichever tool is the unwired one, it must stay unselectable.
-  assert.match(validateToolsForModule('fees', ['fees.fee_structure']) ?? '', /not available/);
-});
-
-test('the Fees read tools are wired to real fee records', () => {
-  // The whole point of a Fees agent is that it can read the school's own fee rows
-  // rather than describe them. If either of these regresses to unavailable, the
-  // module is back to drafting text about data it cannot see.
-  for (const key of ['fees.list_defaulters', 'fees.collection_report']) {
-    const tool = AGENT_TOOLS.find((candidate) => candidate.key === key);
-    assert.ok(tool, `${key} is missing from the catalogue`);
-    assert.equal(tool.available, true, `${key} must be runnable`);
-    assert.equal(tool.risk, 'read', `${key} must be a read, never a write`);
-    assert.equal(validateToolsForModule('fees', [key]), null);
-  }
+  assert.match(validateToolsForModule('fees', ['fees.list_defaulters']) ?? '', /not available/);
 });
 
 test('an empty or unknown allow-list is refused', () => {

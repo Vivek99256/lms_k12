@@ -25,7 +25,13 @@ import {
   type LearnResourceItem,
   type LearnResourceSection,
 } from '@/app/pal/data/pal-diagnostic';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import {
+  CompletedBadge,
+  CompletedConceptPanel,
+  ReadOnlyBadge,
+  useConceptCompletion,
+} from '@/app/pal/_components/CompletionState';
+import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -43,6 +49,15 @@ import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components
  * nothing and moves nobody, so the lesson always opens. The engine is still the
  * only thing that can advance the learner: the CTA at the bottom hands them
  * back to it.
+ *
+ * ---------------------------------------------------------------------------
+ * EXCEPT ON A COMPLETED CONCEPT
+ * ---------------------------------------------------------------------------
+ * A concept cleared to hard and signed off shows its mastery instead of its
+ * lesson. The bottom CTA writes (`acknowledgeConceptLearn` stamps taught_at and
+ * hands the learner to the engine), so a completed concept must not reach a
+ * screen that carries it. Completion is therefore resolved before the lesson is
+ * requested - see app/pal/data/pal-completion.ts for the rule.
  */
 
 export default function ConceptLearnPage() {
@@ -75,6 +90,12 @@ function ConceptLearnView() {
   const [continuing, setContinuing] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
 
+  const {
+    result: completedResult,
+    completed,
+    loading: checkingCompletion,
+  } = useConceptCompletion(conceptId);
+
   const load = useCallback(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
@@ -94,7 +115,10 @@ function ConceptLearnView() {
     return () => controller.abort();
   }, [conceptId]);
 
-  useEffect(() => load(), [load]);
+  useEffect(() => {
+    if (checkingCompletion || completed) return;
+    return load();
+  }, [load, checkingCompletion, completed]);
 
   /**
    * Record that the lesson was read, then let the engine decide the screen.
@@ -129,6 +153,42 @@ function ConceptLearnView() {
       setContinuing(false);
     }
   }, [conceptId, router]);
+
+  if (checkingCompletion) return <Centered>Loading this concept…</Centered>;
+
+  // Read-only: mastery in place of the lesson, and no CTA that would stamp
+  // taught_at or hand the learner back to the engine.
+  if (completed && completedResult) {
+    const masteryChapterId = completedResult.chapterId || chapterHint || '';
+
+    return (
+      <PalWorkspace
+        eyebrow="Concept mastery"
+        title={completedResult.conceptName || 'Concept'}
+        description="This concept is completed. Everything below is a record of how you got there."
+        backHref={masteryChapterId ? `/pal/plan/chapter/${masteryChapterId}` : '/pal'}
+        backLabel={masteryChapterId ? 'Back to my plan' : 'Back to subjects'}
+        actions={
+          <>
+            <CompletedBadge />
+            <ReadOnlyBadge />
+          </>
+        }
+        rail={
+          <PalRailSection title="Your journey">
+            <JourneyRail
+              current="mastery"
+              completed={COMPLETED_THROUGH_CHECK}
+              bypassed={['intervention']}
+              orientation="vertical"
+            />
+          </PalRailSection>
+        }
+      >
+        <CompletedConceptPanel result={completedResult} />
+      </PalWorkspace>
+    );
+  }
 
   if (loading) return <Centered>Loading the lesson…</Centered>;
 
@@ -166,7 +226,7 @@ function ConceptLearnView() {
       <PalRailSection title="Your journey">
         <JourneyRail
           current="learn"
-          completed={['diagnostic', 'adaptive', 'plan']}
+          completed={stagesBefore('learn')}
           orientation="vertical"
         />
       </PalRailSection>
