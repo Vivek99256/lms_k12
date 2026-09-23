@@ -390,6 +390,11 @@ export function runAgent(
     standard_id?: number;
     division_id?: number;
     min_attendance_rate?: number;
+    // Admissions filters, added with the matching nullable rules on AgentController.
+    // Optional like the rest, so every existing caller is unaffected.
+    enquiry_id?: number;
+    overdue_days?: number;
+    search_text?: string;
   } = {}
 ) {
   return post<AgentRunResult>(context, `/agents/${agentKey}/run`, input);

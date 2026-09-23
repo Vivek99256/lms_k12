@@ -168,7 +168,18 @@ export function createAiPolicy(payload: AiPolicyPayload): Promise<{ policy: AiPo
   return call('/policies', 'POST', payload);
 }
 
-export function updateAiPolicy(id: number, payload: AiPolicyPayload): Promise<{ policy: AiPolicyRow }> {
+/**
+ * Save an edit, and report which of the two things the backend did.
+ *
+ * `action` is `updated` for a policy this school owns and `forked` for a shared platform
+ * one — saving a shared policy writes this institute its own copy rather than changing
+ * every school's. Optional on the type because an older backend returns neither, and a
+ * caller that ignores it behaves exactly as it did before.
+ */
+export function updateAiPolicy(
+  id: number,
+  payload: AiPolicyPayload,
+): Promise<{ policy: AiPolicyRow; action?: 'updated' | 'forked'; forked_from?: number }> {
   return call(`/policies/${id}`, 'PUT', payload);
 }
 
