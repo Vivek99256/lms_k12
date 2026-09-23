@@ -9,6 +9,7 @@ import {
   TASK_ORIGIN_LABELS,
   dueDateFor,
   unmappedSteps,
+  vocabularyForModuleName,
   type ProcessSpec,
   type TaskDraft,
   type TaskPriority,
@@ -150,7 +151,7 @@ export function StepTasks({
           return (
           <div key={origin}>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <OriginBadge origin={origin} />
+              <OriginBadge origin={origin} module={spec.module} />
               <span className="text-sm font-medium text-slate-700">
                 {drafts.length} {drafts.length === 1 ? "task" : "tasks"}
               </span>
@@ -193,7 +194,8 @@ export function StepTasks({
             {gaps.map((step) => (
               <li key={step.no}>
                 <span className="font-mono">Step {step.no}</span> - {step.systemAction || step.userAction}. Runs
-                unattended and moves no learner-visible record, so no human owns an outcome here.
+                unattended and moves no {vocabularyForModuleName(spec.module).gatedRecordNoun}, so no human owns an
+                outcome here.
               </li>
             ))}
           </ul>
@@ -241,7 +243,7 @@ function TaskCard({
           <p className="mt-1 text-sm leading-6 text-slate-600">{task.description}</p>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <ActorBadge actor={task.actor} />
+            <ActorBadge actor={task.actor} module={spec.module} />
             <span className="text-xs text-slate-500">Owner: {task.owner}</span>
             {task.stepNos.length ? (
               <span className="text-xs text-slate-500">Covers step {task.stepNos.join(", ")}</span>
@@ -289,7 +291,12 @@ function TaskCard({
             </div>
           ) : (
             <p className="mt-3 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-600">
-              Not published as a task - {TASK_ORIGIN_LABELS[task.origin].toLowerCase()}.
+              Not published as a task -{" "}
+              {(task.origin === "learner_activity"
+                ? vocabularyForModuleName(spec.module).selfService.originLabel
+                : TASK_ORIGIN_LABELS[task.origin]
+              ).toLowerCase()}
+              .
             </p>
           )}
 

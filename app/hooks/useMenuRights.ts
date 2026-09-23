@@ -5,8 +5,6 @@ import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { useAuth } from '@/contexts/AuthContext';
 import { buildMenuTree, type ApiMenuGroups, type ApiMenuItem } from '@/app/data/menuMappers';
 import { MenuItem } from '@/app/data/menuItems';
-import { getFeesSession } from '@/app/fees/_lib/fees-api';
-import { fetchModuleMenuCategories } from '@/app/modules/_lib/module-menu-categories-api';
 
 interface MenuContextPayload {
   sub_institute_id: number;
@@ -99,32 +97,6 @@ export function getStoredMenuContext(): MenuContextPayload | null {
   return null;
 }
 
-/**
- * level-2 `tblmenumaster.id` → the module slug its category rows are keyed by.
- *
- * This is what lets the menu point Intelligence at the canonical
- * `/modules/<slug>/intelligence` rather than the module's legacy folder route,
- * without a table of slugs in the frontend: the pairing is already a column
- * (`fees_menu_categories.level2_menu_id`) and is served by
- * ModuleMenuCategoryApiController alongside every category response.
- *
- * A failure here is deliberately not an error. The menu is built either way —
- * the Intelligence item then falls back to the legacy route, which still
- * renders — because a nav feed being briefly unavailable must not take the
- * whole sidebar with it.
- */
-async function fetchModuleSlugsByLevel2Id(signal: AbortSignal): Promise<Map<number, string>> {
-  try {
-    const session = getFeesSession();
-    if (!session.subInstituteId || !session.userId) return new Map();
-
-    const { modules } = await fetchModuleMenuCategories(session, {}, signal);
-    return new Map(modules.map((entry) => [entry.level2MenuId, entry.moduleName]));
-  } catch {
-    return new Map();
-  }
-}
-
 function normalizeLevel(value: unknown): ApiMenuItem[] {
    if (Array.isArray(value)) return value;
    if (!value || typeof value !== 'object') return [];
@@ -156,25 +128,19 @@ export function useMenuRights() {
      setLoading(true);
      setError(null);
      try {
-       // Both feeds at once: the menu tree, and the slug ↔ level-2 pairing the
-       // tree's Intelligence items are routed with. The second never fails the
-       // first — see fetchModuleSlugsByLevel2Id.
-       const [res, moduleSlugsByLevel2Id] = await Promise.all([
-         fetch(`${API_BASE_URL}/api/menu-rights`, {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({
-             type: 'API',
-             sub_institute_id: requestContext.sub_institute_id,
-             user_id: requestContext.user_id,
-             user_profile_name: requestContext.user_profile_name,
-             user_profile_id: requestContext.user_profile_id,
-             client_id: requestContext.client_id,
-           }),
-           signal: controller.signal,
+       const res = await fetch(`${API_BASE_URL}/api/menu-rights`, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           type: 'API',
+           sub_institute_id: requestContext.sub_institute_id,
+           user_id: requestContext.user_id,
+           user_profile_name: requestContext.user_profile_name,
+           user_profile_id: requestContext.user_profile_id,
+           client_id: requestContext.client_id,
          }),
-         fetchModuleSlugsByLevel2Id(controller.signal),
-       ]);
+         signal: controller.signal,
+       });
        const data = (await res.json()) as MenuRightsResponse;
        if (!res.ok) throw new Error(data.message || 'Failed to fetch menu rights');
        if (data.status && data.status !== 1) throw new Error('Menu rights request failed');
@@ -187,7 +153,7 @@ export function useMenuRights() {
        const l2 = rawL2 || {};
        const l3 = rawL3 || {};
 
-       const tree = buildMenuTree(l1, l2, l3, moduleSlugsByLevel2Id);
+       const tree = buildMenuTree(l1, l2, l3);
        setMenuItems(tree);
      } catch (e: unknown) {
        if (controller.signal.aborted) return;

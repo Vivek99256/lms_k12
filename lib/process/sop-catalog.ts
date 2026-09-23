@@ -1,19 +1,122 @@
 /**
- * Module registry: the SOP vocabulary a converted process is validated against.
+ * The shape of a module catalogue, plus the LMS + PAL one.
  *
  * Conversion is only "standardised" if there is something to standardise
- * against. This file is that something for LMS + PAL - the SOP's header block,
- * its lifecycle stages (section 5), its business rules (section 8), its records
+ * against. A `SopModule` is that something - a module's SOP header block, its
+ * lifecycle stages (section 5), its business rules (section 8), its records
  * register (section 11) and its full procedure index (section 6). The converter
  * resolves a procedure reference here, so a parsed process inherits the module's
  * rules and stage instead of inventing them, and the UI can offer a real
  * "module -> process group -> procedure" pick list rather than a free-text box.
  *
- * Adding a second module means adding a second `SopModule` - no change to the
- * parser, the task derivation, the storage envelope or the screens.
+ * Adding a module means adding a second `SopModule` and listing it in
+ * `module-registry.ts` - no change to the parser, the task derivation, the
+ * storage envelope or the screens. Fees is the second one; see
+ * `fees-catalog.ts`.
+ *
+ * The five acting modes are fixed (they encode *who decides*, not job titles),
+ * but the words wrapped around them are not: a fees counter has officers and
+ * parents, not teachers and learners. `ModuleVocabulary` is where a module
+ * renames them, and every default in it is the LMS + PAL wording this file
+ * used before Fees existed - so a module that declares no vocabulary behaves
+ * exactly as it always did.
  */
 
-import type { ActorMode, BusinessRule } from './types'
+import { ACTOR_LABELS, type ActorMode, type BusinessRule, type ExecutionMode } from './types'
+
+/**
+ * A module's own words for the acting modes, the owners and the surfaces its
+ * SOP talks about. Every field has an LMS + PAL default; a module overrides
+ * only what it says differently.
+ */
+export interface ModuleVocabulary {
+  /** How this module's SOP names each of the five acting modes, on screen. */
+  actorLabels: Record<ActorMode, string>
+  /**
+   * Extra spellings of an actor that this module's SOPs use, e.g. 'Accountant'.
+   * Keys are matched case- and space-insensitively; the canonical five always
+   * parse, whatever a module adds here.
+   */
+  actorAliases: Record<string, ActorMode>
+  /** How each execution mode reads on screen. */
+  executionLabels: Record<ExecutionMode, string>
+  /** Owner names written onto derived tasks. */
+  owners: { staff: string; admin: string }
+  /** Preconditions matching any of these are the admin's, not the staff actor's. */
+  adminOwned: RegExp[]
+  /** The non-staff actor: someone the module serves rather than employs. */
+  selfService: {
+    /** How the SOP refers to them, e.g. 'the learner'. */
+    noun: string
+    /** Owner recorded on their (non-assignable) task drafts. */
+    owner: string
+    /** Where their step is actually delivered, e.g. 'the PAL workspace'. */
+    surface: string
+    /** Badge and title wording for those drafts. */
+    originLabel: string
+  }
+  /** An unattended system step whose result matches this earns a human gate. */
+  gatedResult: RegExp
+  /** What BR-07 protects in this module, named in a gated step's description. */
+  gatedRecordNoun: string
+  /** Closing instruction on a human-verification task. */
+  gateInstruction: string
+}
+
+/** LMS + PAL's wording, and the fallback for any module that states none. */
+export const DEFAULT_MODULE_VOCABULARY: ModuleVocabulary = {
+  actorLabels: ACTOR_LABELS,
+  actorAliases: {},
+  executionLabels: {
+    manual: 'Performed by a person',
+    system: 'Runs unattended',
+    human_in_the_loop: 'AI proposes, human applies',
+    learner: 'Performed by the learner',
+  },
+  owners: { staff: 'Teacher', admin: 'LMS Administrator' },
+  adminOwned: [
+    /session year|syear|academic year|term\b/i,
+    /grade|standard|division|section master/i,
+    /difficulty band/i,
+    /role|menu|permission/i,
+    /model|prompt|persona|confidence threshold/i,
+  ],
+  selfService: {
+    noun: 'the learner',
+    owner: 'Student',
+    surface: 'the PAL workspace',
+    originLabel: 'Learner activity',
+  },
+  gatedResult: /mastery|misconception|score|scores|result|mark|grade|recommendation|band/i,
+  gatedRecordNoun: 'learner-visible record',
+  gateInstruction:
+    'Log the acceptance per 6.15.6; flag and do not apply anything that looks wrong (9.5).',
+}
+
+/** What a module may restate. Nested groups are merged field by field. */
+export type ModuleVocabularyOverride = Partial<
+  Omit<ModuleVocabulary, 'actorLabels' | 'executionLabels' | 'owners' | 'selfService'>
+> & {
+  actorLabels?: Partial<ModuleVocabulary['actorLabels']>
+  executionLabels?: Partial<ModuleVocabulary['executionLabels']>
+  owners?: Partial<ModuleVocabulary['owners']>
+  selfService?: Partial<ModuleVocabulary['selfService']>
+}
+
+/** A module's vocabulary, with every unstated field filled from the default. */
+export function vocabularyFor(module: Pick<SopModule, 'vocabulary'>): ModuleVocabulary {
+  const stated = module.vocabulary
+  if (!stated) return DEFAULT_MODULE_VOCABULARY
+
+  return {
+    ...DEFAULT_MODULE_VOCABULARY,
+    ...stated,
+    actorLabels: { ...DEFAULT_MODULE_VOCABULARY.actorLabels, ...stated.actorLabels },
+    executionLabels: { ...DEFAULT_MODULE_VOCABULARY.executionLabels, ...stated.executionLabels },
+    owners: { ...DEFAULT_MODULE_VOCABULARY.owners, ...stated.owners },
+    selfService: { ...DEFAULT_MODULE_VOCABULARY.selfService, ...stated.selfService },
+  }
+}
 
 /** One procedure as the SOP's table of contents lists it. */
 export interface ProcedureIndexEntry {
@@ -51,6 +154,12 @@ export interface SopModule {
   businessRules: BusinessRule[]
   /** Records register (section 11) - what a process may declare as an output record. */
   records: string[]
+  /**
+   * This module's own words for the acting modes, owners and surfaces. Omit it
+   * and the LMS + PAL wording is used, which is what every screen showed before
+   * a second module existed.
+   */
+  vocabulary?: ModuleVocabularyOverride
 }
 
 /** SOP section 8 - the rules a converted process is checked against. */
@@ -141,8 +250,14 @@ const LMS_PAL_RULES: BusinessRule[] = [
   },
 ]
 
-/** Compact index builder - the SOP's ToC is title + actor, nothing more. */
-function index(rows: Array<[string, string, ActorMode]>, digitizedRefs: string[] = []): ProcedureIndexEntry[] {
+/**
+ * Compact index builder - the SOP's ToC is title + actor, nothing more.
+ * Exported so every module catalogue writes its index the same way.
+ */
+export function procedureIndex(
+  rows: Array<[string, string, ActorMode]>,
+  digitizedRefs: string[] = []
+): ProcedureIndexEntry[] {
   return rows.map(([ref, title, primaryActor]) => ({
     ref,
     title,
@@ -191,7 +306,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.1',
       title: 'Academic foundation and module setup',
       lifecycleStage: 'Plan',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.1.1', 'Activate academic year, term and session year', 'teacher'],
         ['6.1.2', 'Configure grade, standard and division structure', 'teacher'],
         ['6.1.3', 'Map subjects to standards and allocate teachers', 'teacher'],
@@ -206,7 +321,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.2',
       title: 'Curriculum and instructional planning',
       lifecycleStage: 'Plan',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.2.1', 'Prepare the annual curriculum plan', 'teacher'],
         ['6.2.2', 'Define the syllabus plan and pacing', 'teacher_ai'],
         ['6.2.3', 'Prepare the monthly plan', 'teacher'],
@@ -221,7 +336,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.3',
       title: 'Learning content and resource authoring',
       lifecycleStage: 'Author',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.3.1', 'Upload chapter content (documents, video, links)', 'teacher'],
         ['6.3.2', 'Maintain the teacher resource library', 'teacher'],
         ['6.3.3', 'Publish the book list and reference material', 'teacher'],
@@ -238,7 +353,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.4',
       title: 'Content review, approval and publication',
       lifecycleStage: 'Approve',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.4.1', 'Submit content for review', 'teacher'],
         ['6.4.2', 'Review academic accuracy and curriculum alignment', 'teacher'],
         ['6.4.3', 'Screen AI-assisted content for age-appropriateness and safety', 'teacher_ai'],
@@ -252,7 +367,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.5',
       title: 'Learning delivery and engagement',
       lifecycleStage: 'Deliver',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.5.1', 'Access the student LMS dashboard', 'student'],
         ['6.5.2', 'Consume chapter content and learning material', 'student'],
         ['6.5.3', 'Play interactive (H5P) practice content', 'student_ai'],
@@ -268,7 +383,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.6',
       title: 'Homework',
       lifecycleStage: 'Deliver',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.6.1', 'Create and schedule homework', 'teacher_ai'],
         ['6.6.2', 'Publish homework to a class', 'teacher'],
         ['6.6.3', 'Submit homework', 'student'],
@@ -282,7 +397,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.7',
       title: 'Assignments and evaluation',
       lifecycleStage: 'Deliver',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.7.1', 'Create an assignment with rubric and due date', 'teacher_ai'],
         ['6.7.2', 'Distribute the assignment to the class', 'teacher'],
         ['6.7.3', 'Submit an assignment and upload files', 'student'],
@@ -297,7 +412,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.8',
       title: 'Assessment - LMS quiz and online examination',
       lifecycleStage: 'Deliver',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.8.1', 'Define the question-paper blueprint', 'teacher'],
         ['6.8.2', 'Author questions and maintain the question bank', 'teacher'],
         ['6.8.3', 'Generate candidate questions from chapter content with AI', 'teacher_ai'],
@@ -316,7 +431,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.9',
       title: 'PAL adaptive learning loop',
       lifecycleStage: 'Diagnose',
-      procedures: index(
+      procedures: procedureIndex(
         [
           ['6.9.1', 'Enter the PAL workspace and select subject and chapter', 'student'],
           ['6.9.2', 'Evaluate prerequisite completion and attempt eligibility', 'ai'],
@@ -339,7 +454,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.10',
       title: 'Misconception detection and remediation',
       lifecycleStage: 'Remediate',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.10.1', 'Detect misconceptions from incorrect responses', 'ai'],
         ['6.10.2', 'Surface the detected misconception to the learner', 'student_ai'],
         ['6.10.3', 'Generate corrective content for a misconception', 'teacher_ai'],
@@ -354,7 +469,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.11',
       title: 'Pedagogy engine and adaptive practice',
       lifecycleStage: 'Adapt',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.11.1', 'Configure pedagogy-engine rules and thresholds', 'teacher'],
         ['6.11.2', 'Evaluate the engagement score and rule triggers', 'ai'],
         ['6.11.3', 'Recommend suggested content for a concept', 'ai'],
@@ -371,7 +486,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.12',
       title: 'Marks, results and result personalisation',
       lifecycleStage: 'Report & intervene',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.12.1', 'Capture offline or classroom marks', 'teacher'],
         ['6.12.2', 'Enter bulk personalised marks', 'teacher'],
         ['6.12.3', 'Ingest marks into the adaptive engine', 'ai'],
@@ -385,7 +500,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.13',
       title: 'Learner progress monitoring and intervention',
       lifecycleStage: 'Report & intervene',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.13.1', 'Review the student analysis view', 'teacher_ai'],
         ['6.13.2', 'Identify weak concepts from mastery data', 'ai'],
         ['6.13.3', 'Identify and prioritise at-risk learners', 'teacher_ai'],
@@ -401,7 +516,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.14',
       title: 'Reporting, analytics and communication',
       lifecycleStage: 'Report & intervene',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.14.1', 'Generate and export the PAL attempts report', 'teacher'],
         ['6.14.2', 'Generate the question-wise report', 'teacher'],
         ['6.14.3', 'Generate homework and assignment submission reports', 'teacher'],
@@ -416,7 +531,7 @@ export const LMS_PAL_MODULE: SopModule = {
       ref: '6.15',
       title: 'AI operations and human-in-the-loop governance',
       lifecycleStage: 'Report & intervene',
-      procedures: index([
+      procedures: procedureIndex([
         ['6.15.1', 'Use the AI field assistant (suggest, preview, apply)', 'teacher_ai'],
         ['6.15.2', 'Use the conversational assistant within session scope', 'teacher_ai'],
         ['6.15.3', 'Apply guardrails to the student-facing AI assistant', 'student_ai'],
@@ -429,13 +544,6 @@ export const LMS_PAL_MODULE: SopModule = {
       ]),
     },
   ],
-}
-
-/** Every module whose SOP this feature can convert. */
-export const SOP_MODULES: SopModule[] = [LMS_PAL_MODULE]
-
-export function findModule(key: string): SopModule | undefined {
-  return SOP_MODULES.find((module) => module.key === key)
 }
 
 /** Resolve a procedure reference to its group + index entry within a module. */

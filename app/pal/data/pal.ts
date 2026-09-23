@@ -7,6 +7,7 @@ import {
   readString,
   type ApiEnvelope,
 } from '@/lib/erp-client';
+import type { InteractiveSubmission, PalExamQuestion } from '@/lib/pal/exam-answers';
 
 /**
  * PAL (Personalized Adaptive Learning) data layer.
@@ -653,11 +654,22 @@ export interface PalAnswerOption {
   correctFlag: string;
 }
 
-export interface PalQuestion {
-  questionId: string;
-  questionText: string;
-  options: PalAnswerOption[];
-}
+/**
+ * A PAL question, with the form it is.
+ *
+ * THE TYPE FIELDS ARE WHY THIS IS NOT JUST A STEM AND SOME OPTIONS. PAL Test
+ * questions are rendered by the shared H5P players, which choose a player from
+ * the question's own form -- so a fill-in-the-blank row plays as Blanks and a
+ * match-the-following row plays as a matching activity, with no conversion and
+ * no second copy of the question. That decision is made in
+ * `lib/h5p/question-bank-h5p-map.ts` and needs these columns; without them
+ * every question falls back to "no form is recorded on this row".
+ *
+ * Structurally this is `PalExamQuestion` in `lib/pal/exam-answers.ts`, which
+ * is where it is turned into a bank row. Declared there rather than here so
+ * the projection stays testable without this module's session and fetch.
+ */
+export interface PalQuestion extends PalExamQuestion {}
 
 export interface PalQuizData {
   paperName: string;
@@ -676,6 +688,12 @@ export function formatQuizTimestamp(date: Date): string {
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
     `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
   );
+}
+
+/** A positive id, or null. Laravel returns these as strings as often as numbers. */
+function readId(value: unknown): number | null {
+  const id = Number(value ?? NaN);
+  return Number.isFinite(id) && id > 0 ? id : null;
 }
 
 export async function fetchPalQuiz(
@@ -717,6 +735,20 @@ export async function fetchPalQuiz(
       questionId,
       questionText: readString(record.question_text),
       options,
+      // The form, resolved server-side on the same three-tier ladder the
+      // question bank endpoint uses (extraction sidecar -> generated column ->
+      // grading type), so PAL and the bank never disagree about what a
+      // question is.
+      questionTypeCode: readString(record.question_type_code) || null,
+      questionType: readString(record.question_type) || null,
+      modelAnswer: readString(record.model_answer) || null,
+      marks: readNumber(record.marks) || null,
+      difficulty: readString(record.difficulty) || null,
+      assertion: readString(record.assertion) || null,
+      reason: readString(record.reason) || null,
+      standardId: readId(record.standard_id),
+      subjectId: readId(record.subject_id),
+      chapterId: readId(record.chapter_id),
     };
   });
 
@@ -738,6 +770,15 @@ export interface PalQuizSubmitInput {
   timeAllowedMinutes: number;
   /** questionId -> selected "answerId##correctFlag". */
   answers: Record<string, string>;
+  /**
+   * questionId -> verdict, for the questions whose answer is not one of the
+   * stored options: a typed blank, a matched pair, a marked word.
+   *
+   * These carry no `answer_master` id to send, so they go on their own
+   * channel and the controller records them with a null answer_id -- see
+   * `lib/pal/exam-answers.ts` for why both channels exist.
+   */
+  interactiveAnswers?: Record<string, InteractiveSubmission>;
   /** questionId -> seconds spent (capped upstream at 60). */
   attemptTimes: Record<string, number>;
   questionIds: string[];
@@ -780,6 +821,21 @@ export async function submitPalQuiz(
   input.questionIds.forEach((questionId) => form.append('question_ids[]', questionId));
   Object.entries(input.answers).forEach(([questionId, value]) => {
     if (value) form.append(`answer_multiple[${questionId}][]`, value);
+  });
+  // One JSON object per question, rather than a flat pair, because a verdict
+  // carries more than a yes/no: the response is what the result screen shows
+  // in place of a highlighted option, and the score is what a partially
+  // correct activity (four blanks, three right) actually earned.
+  Object.entries(input.interactiveAnswers ?? {}).forEach(([questionId, verdict]) => {
+    form.append(
+      `answer_interactive[${questionId}]`,
+      JSON.stringify({
+        correct: verdict.correct ? 1 : 0,
+        response: verdict.response,
+        score: verdict.score,
+        max_score: verdict.maxScore,
+      })
+    );
   });
   Object.entries(input.attemptTimes).forEach(([questionId, seconds]) => {
     form.set(`attempt_time[${questionId}]`, String(Math.min(60, Math.max(0, Math.round(seconds)))));
@@ -835,6 +891,17 @@ export interface PalResultQuestion {
   givenAnswerIds: string[];
   correctAnswerIds: string[];
   mapping: PalResultMapping[];
+  /**
+   * True when the learner answered by CHOOSING one of the stored options.
+   *
+   * False for a typed answer -- a blank, a value, a matched pair -- which has
+   * no `answer_master` row behind it, so `givenAnswerIds` is empty and
+   * `typedAnswer` holds what they actually wrote. A result screen that reads
+   * the ids without checking this renders a sentence as a list of option ids.
+   */
+  choseOptions: boolean;
+  /** What the learner typed or did, for the questions that are not a choice. */
+  typedAnswer: string;
 }
 
 export interface PalResultData {
@@ -900,6 +967,10 @@ export async function fetchPalResult(
       typeName,
       values: toArray(values).map((value) => readString(value)).filter(Boolean),
     }));
+    // Absent on a result recorded before PAL carried the flag; those are all
+    // option answers, which is what the fallback says.
+    const choseOptions = oa.CHOSE_OPTIONS === undefined || readString(oa.CHOSE_OPTIONS) === '1';
+
     return {
       questionId,
       title: readString(record.question_title ?? record.question_text),
@@ -907,9 +978,11 @@ export async function fetchPalResult(
       rightWrong: readString(oa.RIGHT_WRONG),
       conceptName: readString(record.concept_name),
       options,
-      givenAnswerIds: csvToIds(oa.GIVEN_ANSWER),
+      givenAnswerIds: choseOptions ? csvToIds(oa.GIVEN_ANSWER) : [],
       correctAnswerIds: csvToIds(oa.ACTUAL_ANSWER),
       mapping,
+      choseOptions,
+      typedAnswer: choseOptions ? '' : readString(oa.GIVEN_ANSWER),
     };
   });
 

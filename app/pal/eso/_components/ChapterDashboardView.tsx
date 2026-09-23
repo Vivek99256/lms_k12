@@ -7,6 +7,12 @@ import { ArrowRight, Award, BookOpen, CheckCircle2, Circle, Flame, ListChecks, L
 import { Button } from '@/components/ui/button';
 import { EmptyState, SectionPanel, StatCard } from '@/app/dashboard/_components/DashboardPrimitives';
 import { type ChapterDashboard, type ChapterSection, type ChapterSectionStatus, type MasterySignal } from '@/app/pal/data/pal-eso';
+import {
+  chapterCompletionFromSections,
+  isConceptCompleted,
+  signalsFromChapterSection,
+} from '@/app/pal/data/pal-completion';
+import { CompletedBadge, ReadOnlyBadge } from '@/app/pal/_components/CompletionState';
 
 /**
  * The "Hello, {name}" chapter-level PAL dashboard content — everything
@@ -33,6 +39,13 @@ export default function ChapterDashboardView({
   const router = useRouter();
   const [showWhy, setShowWhy] = useState(false);
   const initialMasteryConceptId = data.currentConceptId ?? data.chapterSections[0]?.conceptId ?? null;
+
+  // The engine reports no difficulty bands, so a section it holds as
+  // `mastered` is completed - see app/pal/data/pal-completion.ts. Once every
+  // section it can act on is completed the chapter is closed, and the Next Step
+  // panel goes with it: there is no next step, and offering one would send the
+  // learner back into teach or practice on work they have finished.
+  const completion = chapterCompletionFromSections(data.chapterSections);
 
   return (
     <>
@@ -135,7 +148,21 @@ export default function ChapterDashboardView({
         <StatCard label="All responses" value={data.allResponses} icon={BookOpen} />
       </div>
 
-      {data.nextStep && (
+      {completion.isComplete && (
+        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-emerald-900">Chapter completed</span>
+            <CompletedBadge />
+            <ReadOnlyBadge />
+          </div>
+          <p className="mt-1 text-xs text-emerald-800">
+            Every concept in {data.chapterName} is completed and signed off. This chapter is now
+            read only — its mastery record is below.
+          </p>
+        </div>
+      )}
+
+      {data.nextStep && !completion.isComplete && (
         <NextStepPanel
           nextStep={data.nextStep}
           conceptId={data.currentConceptId}
@@ -150,7 +177,11 @@ export default function ChapterDashboardView({
           title={`Sections in this chapter (${data.chapterSections.length})`}
           description={`This shows every section in ${data.chapterName}.`}
         >
-          <ChapterSectionsList sections={data.chapterSections} onOpen={onOpenConcept} />
+          <ChapterSectionsList
+            sections={data.chapterSections}
+            chapterId={data.chapterId}
+            onOpen={onOpenConcept}
+          />
         </SectionPanel>
 
         <SectionPanel title="What PAL has seen so far" description="Evidence gathered on your current concept.">
@@ -299,21 +330,41 @@ const SECTION_STATUS_STYLE: Record<ChapterSectionStatus, string> = {
   mastered: 'bg-emerald-50 text-emerald-700',
 };
 
-function ChapterSectionsList({ sections, onOpen }: { sections: ChapterSection[]; onOpen: (conceptId: number) => void }) {
+function ChapterSectionsList({
+  sections,
+  chapterId,
+  onOpen,
+}: {
+  sections: ChapterSection[];
+  chapterId: number;
+  onOpen: (conceptId: number) => void;
+}) {
+  const router = useRouter();
+
   if (sections.length === 0) {
-    return <EmptyState message="No sections are ready for adaptive learning in this chapter yet." />;
+    return <EmptyState message="No sections are ready for the concept diagnostic in this chapter yet." />;
   }
 
   return (
     <div className="divide-y divide-slate-100">
       {sections.map((section) => {
+        const completed = isConceptCompleted(signalsFromChapterSection(section));
         const clickable = section.status !== 'locked';
+
         return (
           <button
             key={section.conceptId}
             type="button"
             disabled={!clickable}
-            onClick={() => clickable && onOpen(section.conceptId)}
+            // A completed section opens its mastery record, never the engine.
+            // Handing it to the engine is what put Learn and Practice back in
+            // front of a learner who had already finished the concept.
+            onClick={() =>
+              clickable &&
+              (completed
+                ? router.push(`/pal/eso/mastery/${section.conceptId}?chapterId=${chapterId}`)
+                : onOpen(section.conceptId))
+            }
             className={`flex w-full items-center justify-between gap-3 py-3 text-left ${
               clickable ? 'hover:bg-slate-50' : 'cursor-not-allowed opacity-70'
             }`}
@@ -321,16 +372,20 @@ function ChapterSectionsList({ sections, onOpen }: { sections: ChapterSection[];
             <span className="flex items-center gap-2 text-sm font-medium text-slate-900">
               {section.status === 'locked' ? (
                 <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              ) : section.status === 'mastered' ? (
+              ) : completed ? (
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
               ) : (
                 <Circle className="h-3.5 w-3.5 shrink-0 text-slate-300" />
               )}
               {section.name}
             </span>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${SECTION_STATUS_STYLE[section.status]}`}>
-              {SECTION_STATUS_LABEL[section.status]}
-            </span>
+            {completed ? (
+              <CompletedBadge className="shrink-0" />
+            ) : (
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${SECTION_STATUS_STYLE[section.status]}`}>
+                {SECTION_STATUS_LABEL[section.status]}
+              </span>
+            )}
           </button>
         );
       })}

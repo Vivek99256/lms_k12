@@ -16,23 +16,41 @@ import type { Agent, AgentRun, CreateAgentInput } from '@/lib/agents/types';
  *
  * The first module screen on the central Agent Management engine, and the
  * pattern every other module should copy: this file owns NO agent logic. It
- * describes one preset — the "Fee reminder drafter" — and asks the engine
- * (lib/agents via /api/agents) to create, run and log it exactly as the central
- * console would. Underneath, the same `AgentManagement` component renders,
- * scoped to `module="fees"`, so the Fees admin sees only Fees agents and their
- * runs while the Enterprise Brain console sees everything.
+ * describes a handful of presets and asks the engine (lib/agents via
+ * /api/agents) to create, run and log them exactly as the central console
+ * would. Underneath, the same `AgentManagement` component renders, scoped to
+ * `module="fees"`, so the Fees admin gets the full console — agent library,
+ * agent dashboard, create agent, run log and analytics — over Fees agents only,
+ * while the Enterprise Brain console sees everything.
  *
- * WHY THIS AGENT FIRST. It drafts text and sends nothing: `fees.draft_reminder`
- * is `draft` risk, touches no fee record, and its output is a message a person
- * still has to read and choose to send. Every run is logged against the person
- * who pressed Run, under `agents.fees` rights.
+ * WHAT THE PRESETS ARE FOR
  *
- * The preset is recognised by name within the tenant; v1 has no preset key
- * column, and the name is fixed here rather than typed by the operator.
+ * Create Agent is fully available in the console below, and a Fees admin can
+ * build anything the module's tool catalogue allows. The presets are not a
+ * separate mechanism: each is exactly the `CreateAgentInput` that form would
+ * submit, offered as one button because the useful Fees agents are known and
+ * making somebody re-derive a tool allow-list is not a feature. Enabling one
+ * writes an ordinary agent that then behaves like any other.
+ *
+ * THESE AGENTS READ REAL FEE RECORDS
+ *
+ * `fees.list_defaulters` and `fees.collection_report` call the governed MCP
+ * tools `fees.arrears` and `fees.collection_report` — the same read-only tools
+ * the assistant uses — as the person who pressed Run, scoped to their institute
+ * and academic year. Nothing is sampled, seeded or invented: a run either
+ * returns the school's own rows or fails in the log saying why. Both are
+ * annotated `read` on the backend, so neither can change a fee record, and
+ * `fees.draft_reminder` sends nothing — its output is text a person still has to
+ * read and choose to send.
+ *
+ * Every run is logged against the person who pressed Run, under `agents.fees`
+ * rights. A preset is recognised by name within the tenant; v1 has no preset key
+ * column, and the names are fixed here rather than typed by the operator.
  */
 
 const MODULE = 'fees';
 
+/** Kept as a named export because it is the canonical example of the preset shape. */
 export const FEE_REMINDER_PRESET: CreateAgentInput = {
   name: 'Fee reminder drafter',
   description: 'Drafts a fee reminder message for one family. Sends nothing.',
@@ -43,24 +61,58 @@ export const FEE_REMINDER_PRESET: CreateAgentInput = {
   status: 'active',
 };
 
+const DEFAULTER_ANALYST_PRESET: CreateAgentInput = {
+  name: 'Fee defaulter analyst',
+  description: 'Reads the live fee records and reports who owes anything, and how much. Changes nothing.',
+  module: MODULE,
+  tools_allowed: ['fees.list_defaulters'],
+  instructions:
+    'Report only what the fee records return. Always state how many students were checked against the size of the cohort, so a partial sweep is never read as a school-wide figure.',
+  status: 'active',
+};
+
+const COLLECTION_REPORTER_PRESET: CreateAgentInput = {
+  name: 'Fee collection reporter',
+  description: 'Reads what was actually collected over a date range, from the receipts. Changes nothing.',
+  module: MODULE,
+  tools_allowed: ['fees.collection_report'],
+  instructions:
+    'Report collections exactly as the receipts show them. Do not estimate a total for a period the report did not cover.',
+  status: 'active',
+};
+
+/** Reads first: the two that answer from records, then the one that drafts text. */
+const FEES_PRESETS: CreateAgentInput[] = [
+  DEFAULTER_ANALYST_PRESET,
+  COLLECTION_REPORTER_PRESET,
+  FEE_REMINDER_PRESET,
+];
+
 export function FeesAutomationsScreen() {
   const agents = useBrainResource(() => fetchAgents({ module: MODULE }), []);
-  const runs = useBrainResource(() => fetchRuns({ module: MODULE, limit: 50 }), []);
+  const runs = useBrainResource(() => fetchRuns({ module: MODULE, limit: 100 }), []);
   const canCreate = usePermission(rbacModuleKey(MODULE), 'create');
   const canRun = usePermission(rbacModuleKey(MODULE), 'update');
 
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [running, setRunning] = useState<Agent | null>(null);
   // Remounts the scoped console after a preset action so its own lists refresh.
   const [consoleKey, setConsoleKey] = useState(0);
 
-  const preset = useMemo(
-    () => (agents.data ?? []).find((agent) => agent.name === FEE_REMINDER_PRESET.name && agent.status !== 'archived') ?? null,
-    [agents.data],
-  );
-  const presetRuns = useMemo(() => (runs.data ?? []).filter((run) => preset && run.agent_id === preset.id).slice(0, 5), [runs.data, preset]);
-  const tool = findTool(FEE_REMINDER_PRESET.tools_allowed[0]);
+  /** The agent each preset resolves to in this tenant, matched by name. */
+  const configured = useMemo(() => {
+    const map = new Map<string, Agent>();
+
+    for (const preset of FEES_PRESETS) {
+      const match = (agents.data ?? []).find(
+        (agent) => agent.name === preset.name && agent.status !== 'archived',
+      );
+      if (match) map.set(preset.name, match);
+    }
+
+    return map;
+  }, [agents.data]);
 
   const refreshAll = useCallback(() => {
     agents.refresh();
@@ -68,115 +120,77 @@ export function FeesAutomationsScreen() {
     setConsoleKey((key) => key + 1);
   }, [agents, runs]);
 
-  const enable = useCallback(async () => {
-    setBusy(true);
-    setNote(null);
-    try {
-      const agent = await createAgent(FEE_REMINDER_PRESET);
-      setNote(`${agent.name} enabled as ${agent.id}. It runs only when someone presses Run, and only as that person.`);
-      refreshAll();
-    } catch (cause) {
-      setNote(cause instanceof Error ? cause.message : 'The agent could not be enabled.');
-    } finally {
-      setBusy(false);
-    }
-  }, [refreshAll]);
+  const enable = useCallback(
+    async (preset: CreateAgentInput) => {
+      setBusy(preset.name);
+      setNote(null);
+      try {
+        const agent = await createAgent(preset);
+        setNote(`${agent.name} enabled as ${agent.id}. It runs only when someone presses Run, and only as that person.`);
+        refreshAll();
+      } catch (cause) {
+        setNote(cause instanceof Error ? cause.message : 'The agent could not be enabled.');
+      } finally {
+        setBusy(null);
+      }
+    },
+    [refreshAll],
+  );
 
-  const toggle = useCallback(async () => {
-    if (!preset) return;
-    setBusy(true);
-    setNote(null);
-    const next = preset.status === 'active' ? 'paused' : 'active';
-    try {
-      await setAgentStatus(preset.id, next);
-      setNote(`${preset.name} is now ${next}.`);
-      refreshAll();
-    } catch (cause) {
-      setNote(cause instanceof Error ? cause.message : 'The status could not be changed.');
-    } finally {
-      setBusy(false);
-    }
-  }, [preset, refreshAll]);
+  const toggle = useCallback(
+    async (agent: Agent) => {
+      setBusy(agent.name);
+      setNote(null);
+      const next = agent.status === 'active' ? 'paused' : 'active';
+      try {
+        await setAgentStatus(agent.id, next);
+        setNote(`${agent.name} is now ${next}.`);
+        refreshAll();
+      } catch (cause) {
+        setNote(cause instanceof Error ? cause.message : 'The status could not be changed.');
+      } finally {
+        setBusy(null);
+      }
+    },
+    [refreshAll],
+  );
 
   const rightsNote =
-    canCreate === false && !preset
+    canCreate === false && configured.size === 0
       ? `Your role cannot enable agents for Fees. Ask an administrator for ${rbacModuleKey(MODULE)} create rights.`
-      : canRun === false && preset
-        ? `Your role can see this agent but cannot run or pause it (${rbacModuleKey(MODULE)} update rights).`
+      : canRun === false && configured.size > 0
+        ? `Your role can see these agents but cannot run or pause them (${rbacModuleKey(MODULE)} update rights).`
         : null;
+
+  const refreshing = agents.refreshing || runs.refreshing;
 
   return (
     <div className="space-y-6">
       <section className="rounded-lg border border-slate-200 bg-white px-5 py-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 rounded-lg bg-indigo-50 p-2 text-indigo-600">
-              <Bot size={20} />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-base font-semibold text-slate-950">{FEE_REMINDER_PRESET.name}</h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">{FEE_REMINDER_PRESET.description}</p>
-              <p className="mt-2 text-xs text-slate-500">
-                Tool <span className="font-mono">{tool?.key}</span> · {tool?.risk} risk · runs as the signed-in user · logged under{' '}
-                <span className="font-mono">{rbacModuleKey(MODULE)}</span>
-                {preset && (
-                  <>
-                    {' '}
-                    · <span className="font-mono">{preset.id}</span> ·{' '}
-                    <span className={preset.status === 'active' ? 'font-semibold text-emerald-600' : 'font-semibold text-amber-600'}>{preset.status}</span>
-                  </>
-                )}
-              </p>
-            </div>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-slate-950">Fees agents</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              Each one runs on the central Agent Management engine, scoped to Fees. The two read agents answer from
+              this school&apos;s own fee records; the drafter writes text and sends nothing. Every run is recorded
+              against the person who pressed Run.
+            </p>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={refreshAll}
-              disabled={agents.refreshing || runs.refreshing}
-              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 hover:border-gray-300 disabled:opacity-60"
-            >
-              <RefreshCw size={14} className={agents.refreshing || runs.refreshing ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-            {agents.loading && !agents.data ? (
-              <span className="text-xs text-slate-400">Checking…</span>
-            ) : preset ? (
-              <>
-                <button
-                  type="button"
-                  onClick={toggle}
-                  disabled={busy || canRun !== true}
-                  className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {preset.status === 'active' ? <Pause size={14} /> : <Play size={14} />}
-                  {preset.status === 'active' ? 'Pause' : 'Resume'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRunning(preset)}
-                  disabled={busy || preset.status !== 'active' || canRun !== true}
-                  className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Play size={14} />
-                  Draft a reminder
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={enable}
-                disabled={busy || canCreate !== true}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {busy ? 'Enabling…' : 'Enable agent'}
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={refreshAll}
+            disabled={refreshing}
+            className="flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 hover:border-gray-300 disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
         </div>
 
-        {agents.error && !agents.data && <p className="mt-4 rounded-xl border border-red-200 bg-red-50/70 px-3 py-2 text-xs text-red-700">{agents.error}</p>}
+        {agents.error && !agents.data && (
+          <p className="mt-4 rounded-xl border border-red-200 bg-red-50/70 px-3 py-2 text-xs text-red-700">{agents.error}</p>
+        )}
         {rightsNote && (
           <p className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
             <Lock size={14} className="mt-0.5 shrink-0" />
@@ -185,24 +199,27 @@ export function FeesAutomationsScreen() {
         )}
         {note && <p className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3 py-2 text-xs text-indigo-900">{note}</p>}
 
-        {preset && (
-          <div className="mt-5 border-t border-slate-100 pt-4">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Recent drafts</p>
-            {presetRuns.length ? (
-              <ul className="mt-2 divide-y divide-slate-100">
-                {presetRuns.map((run) => (
-                  <RecentRun key={run.id} run={run} />
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2 text-sm text-slate-400">No drafts yet. Press “Draft a reminder” to make the first one; it will appear here and in the run log.</p>
-            )}
-          </div>
-        )}
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          {FEES_PRESETS.map((preset) => (
+            <PresetCard
+              key={preset.name}
+              preset={preset}
+              agent={configured.get(preset.name) ?? null}
+              runs={runs.data ?? []}
+              checking={agents.loading && !agents.data}
+              busy={busy === preset.name}
+              canCreate={canCreate === true}
+              canRun={canRun === true}
+              onEnable={() => void enable(preset)}
+              onToggle={(agent) => void toggle(agent)}
+              onRun={setRunning}
+            />
+          ))}
+        </div>
       </section>
 
       <div>
-        <h3 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">All Fees agents</h3>
+        <h3 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">Fees agent management</h3>
         <AgentManagement key={consoleKey} moduleFilter={MODULE} embedded />
       </div>
 
@@ -220,26 +237,114 @@ export function FeesAutomationsScreen() {
   );
 }
 
-function RecentRun({ run }: { run: AgentRun }) {
-  const when = new Date(run.started_at);
-  const message = typeof run.output?.message === 'string' ? run.output.message : null;
+function PresetCard({
+  preset,
+  agent,
+  runs,
+  checking,
+  busy,
+  canCreate,
+  canRun,
+  onEnable,
+  onToggle,
+  onRun,
+}: {
+  preset: CreateAgentInput;
+  agent: Agent | null;
+  runs: AgentRun[];
+  checking: boolean;
+  busy: boolean;
+  canCreate: boolean;
+  canRun: boolean;
+  onEnable: () => void;
+  onToggle: (agent: Agent) => void;
+  onRun: (agent: Agent) => void;
+}) {
+  const tool = findTool(preset.tools_allowed[0]);
+  const lastRun = agent ? runs.find((run) => run.agent_id === agent.id) ?? null : null;
+
   return (
-    <li className="py-2.5">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-mono text-slate-500">{run.id}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${run.status === 'success' ? 'bg-emerald-50 text-emerald-600' : run.status === 'denied' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-600'}`}>
-          {run.status}
+    <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 shrink-0 rounded-lg bg-indigo-50 p-2 text-indigo-600">
+          <Bot size={18} />
         </span>
-        <span className="text-slate-500">
-          {Number.isNaN(when.getTime()) ? run.started_at : when.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · by{' '}
-          {run.acting_user_name || run.acting_user_id} ({run.acting_profile_name || 'role unknown'})
-        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-slate-950">{preset.name}</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-600">{preset.description}</p>
+        </div>
       </div>
-      {message ? (
-        <pre className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-sans text-xs text-slate-700">{message}</pre>
-      ) : (
-        run.error && <p className="mt-1 text-xs text-amber-700">{run.error}</p>
-      )}
-    </li>
+
+      <p className="mt-3 text-[11px] leading-5 text-slate-500">
+        <span className="font-mono">{tool?.key}</span> ·{' '}
+        <span className={tool?.risk === 'read' ? 'text-emerald-700' : 'text-slate-500'}>{tool?.risk} risk</span>
+        {tool?.kind === 'mcp' && <> · reads live records</>}
+        {agent && (
+          <>
+            {' '}
+            · <span className="font-mono">{agent.id}</span> ·{' '}
+            <span className={agent.status === 'active' ? 'font-semibold text-emerald-600' : 'font-semibold text-amber-600'}>
+              {agent.status}
+            </span>
+          </>
+        )}
+      </p>
+
+      <div className="mt-auto pt-4">
+        {checking ? (
+          <span className="text-xs text-slate-400">Checking…</span>
+        ) : agent ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onRun(agent)}
+              disabled={busy || agent.status !== 'active' || !canRun}
+              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Play size={12} />
+              Run
+            </button>
+            <button
+              type="button"
+              onClick={() => onToggle(agent)}
+              disabled={busy || !canRun}
+              className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-600 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {agent.status === 'active' ? <Pause size={12} /> : <Play size={12} />}
+              {agent.status === 'active' ? 'Pause' : 'Resume'}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onEnable}
+            disabled={busy || !canCreate}
+            className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? 'Enabling…' : 'Enable agent'}
+          </button>
+        )}
+
+        {lastRun && (
+          <p className="mt-2 text-[11px] leading-4 text-slate-500">
+            Last run{' '}
+            <span
+              className={
+                lastRun.status === 'success'
+                  ? 'font-semibold text-emerald-600'
+                  : lastRun.status === 'denied'
+                    ? 'font-semibold text-amber-600'
+                    : 'font-semibold text-slate-600'
+              }
+            >
+              {lastRun.status}
+            </span>{' '}
+            · {new Date(lastRun.started_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{' '}
+            by {lastRun.acting_user_name || lastRun.acting_user_id}
+            {lastRun.error && <span className="mt-0.5 block text-amber-700">{lastRun.error}</span>}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

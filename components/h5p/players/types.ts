@@ -56,6 +56,22 @@ export interface QuestionResult {
   durationSeconds: number;
   /** What the learner actually did, for a module that wants to store it. */
   response?: string;
+  /**
+   * The `answer_master` rows the learner chose, when the activity was built
+   * from a question that carried option ids.
+   *
+   * WHY `response` IS NOT ENOUGH. `response` is a human-readable summary
+   * ("3/4"), which is all a report or an xAPI statement needs. A module that
+   * WRITES an attempt needs the option itself: PAL stores it in
+   * `lms_online_exam_answer.answer_id` and its misconception detection keys
+   * off which distractor was chosen, not merely that one was.
+   *
+   * Empty for an authored activity and for every type whose answer is not an
+   * option -- a typed blank, a matched pair, a marked word. Those are recorded
+   * by verdict, and a caller must be ready for that rather than assuming an id
+   * is always available.
+   */
+  choiceIds?: number[];
 }
 
 export interface PlayerProps {

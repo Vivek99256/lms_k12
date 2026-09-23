@@ -17,10 +17,18 @@ export interface AiPolicyRuleCatalogItem {
 export interface AiPolicyAssignment {
   id: number;
   policy_id: number;
+  /** `module` means `scope_id` is an `ai_modules` row id. See AiPolicyController. */
   scope_type: string;
   scope_id: number | null;
   sub_institute_id: number | null;
   status: number;
+}
+
+/** A module a policy can be scoped to. The id is what an assignment stores. */
+export interface AiPolicyModuleOption {
+  id: number;
+  key: string;
+  label: string;
 }
 
 export interface AiPolicyRow {
@@ -41,14 +49,25 @@ export interface AiPolicyRow {
   assignments: AiPolicyAssignment[];
 }
 
+/** One `ai_modules` row a policy can be scoped to. The id, never hardcoded, differs per estate. */
+export interface AiPolicyModuleOption {
+  id: number;
+  key: string;
+  label: string;
+}
+
 export interface AiPolicyOptions {
   policy_types: AiPolicyOption[];
   rule_catalogue: AiPolicyRuleCatalogItem[];
   scope_types: AiPolicyOption[];
+  modules: AiPolicyModuleOption[];
 }
 
 export interface AiPolicyIndex {
   sub_institute_id: string | number;
+  module_key: string | null;
+  /** The `ai_modules` ids `module_key` resolved to on this estate — empty when none did. */
+  module_ids: number[];
   policies: AiPolicyRow[];
 }
 
@@ -135,15 +154,33 @@ export function fetchAiPolicyOptions(): Promise<AiPolicyOptions> {
   return call<AiPolicyOptions>('/policies/options');
 }
 
-export function fetchAiPolicies(): Promise<AiPolicyIndex> {
-  return call<AiPolicyIndex>('/policies');
+/**
+ * Policies this school can see. Pass a module key to narrow the list to the policies
+ * that govern that module only — omit it for every policy, which is what the central
+ * console wants.
+ */
+export function fetchAiPolicies(moduleKey?: string): Promise<AiPolicyIndex> {
+  return call<AiPolicyIndex>(
+    moduleKey ? `/policies?module_key=${encodeURIComponent(moduleKey)}` : '/policies',
+  );
 }
 
 export function createAiPolicy(payload: AiPolicyPayload): Promise<{ policy: AiPolicyRow }> {
   return call('/policies', 'POST', payload);
 }
 
-export function updateAiPolicy(id: number, payload: AiPolicyPayload): Promise<{ policy: AiPolicyRow }> {
+/**
+ * Save an edit, and report which of the two things the backend did.
+ *
+ * `action` is `updated` for a policy this school owns and `forked` for a shared platform
+ * one — saving a shared policy writes this institute its own copy rather than changing
+ * every school's. Optional on the type because an older backend returns neither, and a
+ * caller that ignores it behaves exactly as it did before.
+ */
+export function updateAiPolicy(
+  id: number,
+  payload: AiPolicyPayload,
+): Promise<{ policy: AiPolicyRow; action?: 'updated' | 'forked'; forked_from?: number }> {
   return call(`/policies/${id}`, 'PUT', payload);
 }
 

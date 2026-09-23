@@ -160,10 +160,20 @@ const EXAM_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/question_paper': '/lms/exam',
   'student_homework': '/lms/exam',
   '/student_homework': '/lms/exam',
-  // Worksheet and Project are the exam hub's own screen (ExamOperationsScreen
-  // in app/lms/exam/page.tsx), mounted at their own route and pinned to one
-  // exam_type, rather than a `type` query param on the exam hub itself — that
-  // is what lets ModuleCategoryPage mount them inline instead of navigating.
+  /*
+   * Worksheet and Project, mapped exactly the way PAL is.
+   *
+   * These resolve to their screen's own route, NOT to a /modules/... URL. That
+   * is what makes them render inside Test → Operations instead of navigating:
+   * ModuleCategoryPage mounts a tab's route inline whenever the screen registry
+   * knows it, and only falls back to router.push() for a route it cannot mount.
+   * 'pal.index' → '/pal' works the same way and stays on
+   * /modules/test/operations?tab=<menu id>.
+   *
+   * Pointing these at '/modules/test/operations?...' is what caused a
+   * navigation: a dynamic route is not in the screen registry, so the tab had
+   * nothing to mount and pushed instead.
+   */
   'worksheet.index': '/lms/worksheet',
   'lms/worksheet': '/lms/worksheet',
   'project.index': '/lms/project',

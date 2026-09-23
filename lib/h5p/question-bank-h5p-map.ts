@@ -39,6 +39,20 @@ export interface BankOption {
   label: string;
   text: string;
   is_correct?: boolean;
+  /**
+   * The `answer_master` row this option came from, when the caller has one.
+   *
+   * WHY A PROJECTION THAT OTHERWISE IGNORES IDS CARRIES THIS ONE. A module
+   * that RECORDS an attempt -- PAL is the one that does -- stores the option
+   * the learner chose, not merely whether they were right: misconception
+   * detection keys off the distractor, and `lms_online_exam_answer.answer_id`
+   * is where it lands. The bank endpoint does not return the id (its
+   * `optionsFor` shapes rows as label/text/is_correct), so this is absent for
+   * every caller reading that endpoint and everything downstream treats it as
+   * optional. PAL's own quiz payload does carry it, which is why the field
+   * exists at all.
+   */
+  source_option_id?: number | null;
 }
 
 /**
@@ -803,6 +817,8 @@ export interface SingleChoiceOptionPayload {
   option_text: string;
   is_correct: boolean;
   feedback: string;
+  /** The `answer_master` row behind this option, or null. See `BankOption`. */
+  source_option_id: number | null;
 }
 export interface SingleChoiceQuestionPayload {
   question_text: string;
@@ -852,6 +868,18 @@ export function composedStem(question: BankQuestion): string {
     .join('');
 }
 
+/**
+ * A stored option id, or null when the caller did not supply one.
+ *
+ * Folded through `Number` rather than trusted, because the value crosses a
+ * JSON boundary where Laravel returns ids as strings as readily as numbers,
+ * and a string id would compare unequal to the number the player holds.
+ */
+function sourceOptionId(option: BankOption): number | null {
+  const id = Number(option.source_option_id ?? NaN);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
 export function toSingleChoiceSetPayload(questions: BankQuestion[], context?: string): SingleChoiceSetPayload {
   const first = questions[0];
 
@@ -883,6 +911,9 @@ export function toSingleChoiceSetPayload(questions: BankQuestion[], context?: st
         option_text: String(option.text ?? '').trim(),
         is_correct: option.is_correct === true,
         feedback: '',
+        // Null for every caller reading the bank endpoint; a real
+        // `answer_master` id for PAL, which has to record what was chosen.
+        source_option_id: sourceOptionId(option),
       })),
     })),
   };
