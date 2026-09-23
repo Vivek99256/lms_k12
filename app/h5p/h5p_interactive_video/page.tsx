@@ -20,6 +20,8 @@ import {
   LoadingState,
   MissingContextNotice,
 } from '../components/shared';
+import { QuestionBankSource } from '../components/question-bank-source';
+import { NO_BANK_SOURCE_REASON } from '../data/question-bank-source';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -121,8 +123,8 @@ function InteractiveVideoListContent() {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+    <div className="p-4 sm:p-6">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Interactive videos"
           description="Videos with timed questions and info cards"
@@ -147,6 +149,19 @@ function InteractiveVideoListContent() {
           <>
             <InlineBanner kind="success" message={success} onDismiss={() => setSuccess('')} />
             <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
+
+            {/*
+              No bank tab on this type, and the reason said out loud.
+
+              Every other H5P content type can ask questions straight out of
+              `lms_question_master`. This one cannot, and a page that simply
+              lacked the tab would read as an oversight. What is missing is
+              named instead — it is a gap in what the bank RECORDS, not in
+              this screen, and it is the thing that would have to change.
+            */}
+            <div className="mb-4">
+              <QuestionBankSource kind={null} unavailableReason={NO_BANK_SOURCE_REASON['h5p_interactive_video']} ctx={ctx} noun="interactive video" />
+            </div>
 
             {loading ? (
               <LoadingState label="Loading videos…" />

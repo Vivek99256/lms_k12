@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Copy, ExternalLink, Pencil, RefreshCw, X } from 'lucide-react';
+import { Check, Copy, Pencil, RefreshCw, X } from 'lucide-react';
 
 import type { GenerationOutcome } from '@/lib/intelligence/types';
 import {
   generateForContext,
-  generateReportForContext,
-  type WorkspaceReport,
   type WorkspaceContext,
   type WorkspaceSession,
   type WorkspaceSuggestion,
@@ -51,9 +49,6 @@ export function CreateTab({
   presetTemplateKey?: string | null;
 }) {
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  // A report is a document, not prose, so it is held separately from `result` — the
-  // panel offers a link to it rather than text to copy.
-  const [report, setReport] = useState<{ suggestion: WorkspaceSuggestion; report: WorkspaceReport } | null>(null);
   const [result, setResult] = useState<{ suggestion: WorkspaceSuggestion; outcome: GenerationOutcome } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -64,31 +59,16 @@ export function CreateTab({
   const [draft, setDraft] = useState('');
 
   async function run(suggestion: WorkspaceSuggestion) {
-    // A report action names its module, not a template, so it has no action_ref to check.
-    if (suggestion.action_type !== 'report' && !suggestion.action_ref) return;
+    if (!suggestion.action_ref) return;
 
     setBusyKey(suggestion.key);
     setError(null);
     setResult(null);
-    setReport(null);
     setCopied(false);
     setEditing(false);
     setDraft('');
 
     try {
-      if (suggestion.action_type === 'report') {
-        const built = await generateReportForContext(session, { route });
-        setReport({ suggestion, report: built });
-
-        return;
-      }
-
-      // Narrowed here rather than at the top: the report branch above returns before
-      // this point and needs no template key, so the early guard cannot cover both.
-      if (!suggestion.action_ref) {
-        return;
-      }
-
       const outcome = await generateForContext(session, {
         route,
         template_key: suggestion.action_ref,
@@ -172,36 +152,6 @@ export function CreateTab({
       </TabSection>
 
       {error ? <TabError message={error} /> : null}
-
-      {report ? (
-        <TabSection title="Report">
-          <div className="rounded-2xl border border-gray-200/80 bg-white p-3.5">
-            <p className="text-xs font-semibold text-gray-900">{report.report.title}</p>
-            <p className="mt-1 text-[11px] text-gray-500">
-              {report.report.row_count} row{report.report.row_count === 1 ? '' : 's'} read live
-              {report.report.source_tool ? ` through ${report.report.source_tool}` : ''}.
-            </p>
-            {/*
-              A link, not a copy button. The report page is where preview, edit, refresh,
-              print and send already live — duplicating any of them here would be a second
-              implementation of the same four actions, and the one place a person sends a
-              parent their own figures from should not be two places.
-            */}
-            <a
-              href={report.report.template_link}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#0D6EFD] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#0b5ed7]"
-            >
-              Open report
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-            <p className="mt-2 text-[11px] text-gray-500">
-              Preview, edit, refresh the figures, print or send it to each family from there.
-            </p>
-          </div>
-        </TabSection>
-      ) : null}
 
       {result ? (
         <TabSection title="Draft">

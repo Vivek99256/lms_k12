@@ -7,6 +7,11 @@ import type { ComponentType } from 'react';
 import { MenuItem, SubmenuItem, Level3Item } from './menuItems';
 import { createMdIcon } from '@/app/components/MdIcon';
 import { mapApiLinkToRoute } from './routeMapper';
+import {
+  intelligenceHrefFor,
+  moduleIntelligenceRoute,
+  resolveIntelligenceModuleForMenu,
+} from '@/components/intelligence/module/registry';
 
 export interface ApiMenuItem {
   id: number;
@@ -194,10 +199,31 @@ function overrideMenuLabel(link: string | null | undefined, fallback: string): s
   return EXAM_MENU_LINKS.has(normalizeMenuLink(link)) ? 'Exam' : fallback;
 }
 
+/**
+ * Which modules get an "Intelligence" item, and where it points.
+ *
+ * READ FROM THE REGISTRY, NOT RESTATED HERE. This file used to keep its own
+ * table of twelve `{key, route, match}` triples. It had already drifted from
+ * `components/intelligence/module/registry.ts`: Fees — the reference
+ * implementation, and the only module with the full ladder — was missing, so
+ * the one complete Intelligence screen in the product was the one a user could
+ * only reach by typing its URL. The registry's own
+ * `resolveIntelligenceModuleForMenu` is now the single matcher, shared with the
+ * `/modules/<slug>/intelligence` route, so the two cannot disagree about which
+ * screen a module gets.
+ *
+ * `moduleSlugsByLevel2Id` maps a level-2 `tblmenumaster.id` to that module's
+ * slug, straight from `fees_menu_categories.level2_menu_id`. With it the item
+ * points at the canonical `/modules/<slug>/intelligence`; without it — an
+ * unconfigured module, or a directory request that failed — it falls back to
+ * the module's legacy route, which still renders. The menu never loses its
+ * Intelligence item because a lookup was unavailable.
+ */
 export function buildMenuTree(
   level1: ApiMenuItem[],
   level2: ApiMenuGroups | undefined,
   level3: ApiMenuGroups | undefined,
+  moduleSlugsByLevel2Id?: ReadonlyMap<number, string>,
 ): MenuItem[] {
   return level1
     .filter(item => item.status === 1)
@@ -237,6 +263,46 @@ export function buildMenuTree(
           // module navigates to /user_log and nothing else.
           const isAuditModule =
             (sub.name || sub.menu_title || sub.site_map_name || '').trim().replace(/\s+/g, ' ').toLowerCase() === 'audit';
+
+          const subLabel = (sub.name || sub.menu_title || sub.site_map_name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+          const subLink = (sub.link || '').toLowerCase().trim();
+          const existingHrefs = level3Items.map(l3 => (l3.href || '').toLowerCase());
+
+          const intelMatch = resolveIntelligenceModuleForMenu(subLabel, subLink, existingHrefs);
+          if (intelMatch && !isAuditModule) {
+            const moduleSlug = moduleSlugsByLevel2Id?.get(Number(sub.id));
+            const intelRoute = moduleSlug
+              ? moduleIntelligenceRoute(moduleSlug)
+              : intelligenceHrefFor(intelMatch);
+            const alreadyHasIntel = level3Items.some(
+              l3 => (l3.href || '').toLowerCase() === intelRoute.toLowerCase() ||
+                    (l3.label || '').toLowerCase() === 'intelligence'
+            );
+            if (!alreadyHasIntel) {
+              if (level3Items.length === 0) {
+                const subRoute = resolveRoute(sub.link);
+                if (subRoute && subRoute !== '#') {
+                  level3Items.push({
+                    id: `${sub.id}-main`,
+                    parentId: sub.id,
+                    menuType: sub.menu_type,
+                    label: overrideMenuLabel(sub.link, sub.name || sub.menu_title || sub.site_map_name),
+                    href: subRoute,
+                    link: sub.link,
+                  });
+                }
+              }
+              level3Items.push({
+                id: `${intelMatch.key}-intelligence`,
+                parentId: sub.id,
+                menuType: null,
+                label: 'Intelligence',
+                href: intelRoute,
+                link: intelRoute,
+              });
+            }
+          }
+
           return {
             id: sub.id,
             parentId: sub.parent_menu_id,

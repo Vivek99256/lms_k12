@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -39,6 +39,8 @@ import {
   LoadingState,
   MissingContextNotice,
 } from '../components/shared';
+import { ProgressRail } from '../components/game';
+import { QuestionBankSource } from '../components/question-bank-source';
 
 /**
  * MCQ quiz — mirrors Laravel `GET /h5p/h5p_mcq`
@@ -115,7 +117,7 @@ function LevelPicker({
   onStart,
 }: {
   levels: McqLevel[];
-  startingLevelId: number | null;
+  startingLevelId: string | number | null;
   onStart: (level: McqLevel) => void;
 }) {
   if (levels.length === 0) {
@@ -214,7 +216,6 @@ function QuizPlayer({
   const total = questions.length;
   const attempted = Object.keys(userAnswers).length;
   const remaining = Math.max(0, total - attempted);
-  const progressPercent = total > 0 ? Math.round((attempted / total) * 100) : 0;
   const question = questions[currentIndex];
   const options = question ? answersByQuestion[String(question.question_id)] ?? [] : [];
   const isLast = currentIndex === total - 1;
@@ -232,21 +233,20 @@ function QuizPlayer({
 
       {/* Progress */}
       <div className="mt-5">
-        <p className="text-center text-sm font-medium text-slate-600">
+        <p className="text-center text-sm font-medium text-[color:var(--h5p-ink-muted)]">
           Question {currentIndex + 1} of {total}
         </p>
-        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-[#4f46e5] transition-all duration-300"
-            style={{ width: `${progressPercent}%` }}
-          />
+        <div className="mt-2">
+          <ProgressRail value={attempted} max={total} label="Questions answered" />
         </div>
       </div>
 
-      {/* Question */}
-      <div className="mt-6 border-b-2 border-indigo-100 pb-4">
+      {/* Question. Keyed so each one animates in rather than the text swapping
+          inside a static box — on a long paper that is the only signal that
+          the Next press did anything. */}
+      <div key={question.question_id} className="h5p-enter mt-6 border-b-2 border-indigo-100 pb-4">
         <div
-          className="text-lg font-semibold text-slate-900"
+          className="text-lg font-semibold text-[color:var(--h5p-ink)]"
           // Question titles are stored with HTML entities/tags in the ERP DB.
           dangerouslySetInnerHTML={{ __html: question.question_text }}
         />
@@ -263,16 +263,25 @@ function QuizPlayer({
               role="radio"
               aria-checked={selected}
               onClick={() => onSelect(question.question_id, option.id)}
-              className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-sm font-medium transition ${
-                selected
-                  ? 'border-[#4f46e5] bg-[#4f46e5] text-white shadow-md'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:bg-slate-100'
+              style={
+                {
+                  '--h5p-stagger': `${Math.min(index, 5) * 45}ms`,
+                  ...(selected
+                    ? { borderColor: 'var(--h5p-accent)', background: 'var(--h5p-accent)', color: '#fff' }
+                    : null),
+                } as CSSProperties
+              }
+              className={`h5p-tappable h5p-focusable h5p-target h5p-enter h5p-stagger flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left text-sm font-medium ${
+                selected ? '' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:bg-slate-100'
               }`}
             >
               <span
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                  selected ? 'bg-white text-[#4f46e5]' : 'bg-[#4f46e5] text-white'
-                }`}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                style={
+                  selected
+                    ? { background: '#fff', color: 'var(--h5p-accent)' }
+                    : { background: 'var(--h5p-accent)', color: '#fff' }
+                }
               >
                 {String.fromCharCode(65 + index)}
               </span>
@@ -606,7 +615,7 @@ function McqContent() {
 
   const [levels, setLevels] = useState<McqLevel[]>([]);
   const [levelsLoading, setLevelsLoading] = useState(true);
-  const [startingLevelId, setStartingLevelId] = useState<number | null>(null);
+  const [startingLevelId, setStartingLevelId] = useState<string | number | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<McqLevel | null>(null);
   const [questions, setQuestions] = useState<McqQuestion[]>([]);
   const [answersByQuestion, setAnswersByQuestion] = useState<Record<string, McqAnswer[]>>({});
@@ -615,6 +624,8 @@ function McqContent() {
   const [view, setView] = useState<McqView>('picker');
   const [error, setError] = useState('');
   const [identity, setIdentity] = useState<UserIdentity>({ name: '', schoolName: '', schoolLogo: '' });
+  /** The legacy level-keyed MCQ estate, or the question bank itself. */
+  const [source, setSource] = useState<'levels' | 'bank'>('levels');
 
   // Session identity lives in localStorage — read it after mount only.
   useEffect(() => {
@@ -754,8 +765,8 @@ function McqContent() {
   const quizIsEmpty = selectedLevel !== null && questions.length === 0;
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+    <div className="p-4 sm:p-6">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Multiple choice questions"
           description={
@@ -773,7 +784,49 @@ function McqContent() {
           <>
             <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
 
+            {/*
+              The bank tab sits on the LEVEL PICKER only, not over a quiz in
+              progress: switching source mid-attempt would throw away answers a
+              learner has already given.
+
+              The two halves read different tables on purpose. "By level" is
+              the legacy MCQ estate keyed by difficulty; "From the question
+              bank" is `lms_question_master` itself, played one question at a
+              time as a single choice set. Neither is converted into the other.
+            */}
             {view === 'picker' ? (
+              <div
+                role="tablist"
+                aria-label="Question source"
+                className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1"
+              >
+                {(
+                  [
+                    ['levels', 'By level'],
+                    ['bank', 'From the question bank'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={source === value}
+                    onClick={() => setSource(value)}
+                    className={
+                      source === value
+                        ? 'rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm'
+                        : 'rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700'
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {view === 'picker' && source === 'bank' ? (
+              <QuestionBankSource kind="single_choice_set" ctx={ctx} noun="multiple choice question" />
+            ) : view === 'picker' ? (
               levelsLoading ? (
                 <LoadingState label="Loading MCQ levels…" />
               ) : (

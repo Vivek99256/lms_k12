@@ -20,6 +20,7 @@ import {
   LoadingState,
   MissingContextNotice,
 } from '@/app/h5p/components/shared';
+import { QuestionBankSource } from '@/app/h5p/components/question-bank-source';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -122,6 +123,9 @@ function FlashcardListContent() {
     }
   };
 
+  /** Cards authored here, or questions read straight from the bank. */
+  const [source, setSource] = useState<'authored' | 'bank'>('authored');
+
   const contextQuery = h5pContextQuery(ctx);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -131,8 +135,8 @@ function FlashcardListContent() {
 
   if (allowed !== true) {
     return (
-      <div className="flex-1 overflow-auto p-4 sm:p-6">
-        <div className="mx-auto max-w-5xl">
+      <div className="p-4 sm:p-6">
+        <div className="mx-auto">
           <LoadingState label="Loading flash cards…" />
         </div>
       </div>
@@ -140,8 +144,8 @@ function FlashcardListContent() {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+    <div className="p-4 sm:p-6">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Flash cards"
           description={`${cards.length} card${cards.length === 1 ? '' : 's'} for this chapter`}
@@ -165,7 +169,44 @@ function FlashcardListContent() {
             <InlineBanner kind="success" message={success} onDismiss={() => setSuccess('')} />
             <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
 
-            {loading ? (
+            {/*
+              Flash cards is the type the bank reaches most widely: a deck needs
+              a front, a back and an optional hint, and nearly every question
+              form already stores those three. So this tab typically offers far
+              more of a chapter than the stricter types do — and creates
+              nothing to do it.
+            */}
+            <div
+              role="tablist"
+              aria-label="Flash card source"
+              className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1"
+            >
+              {(
+                [
+                  ['authored', 'Built here'],
+                  ['bank', 'From the question bank'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={source === value}
+                  onClick={() => setSource(value)}
+                  className={
+                    source === value
+                      ? 'rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm'
+                      : 'rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700'
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {source === 'bank' ? (
+              <QuestionBankSource kind="flashcards" ctx={ctx} noun="flash card deck" />
+            ) : loading ? (
               <LoadingState label="Loading flash cards…" />
             ) : cards.length === 0 ? (
               <EmptyState

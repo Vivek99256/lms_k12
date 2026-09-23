@@ -397,6 +397,53 @@ export const decideRecommendation = (id: string, status: string, rationale: stri
     { method: 'POST', body: JSON.stringify({ status, rationale }) },
   );
 
+/**
+ * Write one module's findings into the signal ledger.
+ *
+ * This is what gives a module screen its recommendations, its decision trail and
+ * its learning memory: until the loop has run, all three are honestly empty and
+ * say so. It is IDEMPOTENT — the backend dedupes on (tenant, rule, year) — so
+ * pressing it twice refreshes the same signals with fresher figures rather than
+ * raising them again.
+ */
+export const runModuleIntelligence = (module: string) =>
+  brainFetch<{
+    signalsCreated: number;
+    signalsRefreshed: number;
+    recommendations: number;
+    /** Findings whose rule has no approved cause. They stop at evidence. */
+    undetermined: number;
+    elapsedMs: number | null;
+  }>(tenantPath(`/${module}/intelligence/run`), { method: 'POST' });
+
+/**
+ * Report back what an approved action actually achieved.
+ *
+ * `measured` is optional and is supplied by the person reporting back. The loop
+ * closes without it — an outcome nobody quantified is still an outcome — but
+ * when both ends are given the change becomes a fact the next decision can be
+ * weighed against.
+ */
+export const recordExecutionOutcome = (
+  id: string,
+  result: 'success' | 'partial' | 'failed',
+  feedback: string,
+  measured?: { before?: number; after?: number; unitsAffected?: number },
+) =>
+  brainFetch<{ executionId: string; outcomeId: string | null; result: string }>(
+    tenantPath(`/executions/${id}/complete`),
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        result,
+        feedback,
+        measured_before: measured?.before ?? null,
+        measured_after: measured?.after ?? null,
+        accounts_affected: measured?.unitsAffected ?? null,
+      }),
+    },
+  );
+
 export const completeExecution = (id: string, result: string, feedback: string) =>
   brainFetch<{ executionId: string; outcomeId: string | null; result: string }>(
     tenantPath(`/executions/${id}/complete`),

@@ -11,9 +11,7 @@ import {
   convertSopProcedure,
   deriveTasks,
   findModule,
-  findModuleByName,
   findProcedure,
-  sampleProcedureFor,
   shippedSourceFor,
   specToIntakeText,
   storageKeyFor,
@@ -69,17 +67,18 @@ const STATUS_LABELS: Record<ProcessStatus, string> = {
   published: "Published",
 };
 
-function emptySource(defaultModuleKey?: string): SourceState {
+function emptySource(): SourceState {
   return {
-    // The module a route belongs to, when it has one - Fees -> Process builder
-    // opens on Fees. Otherwise the first registered module, as it always was.
-    moduleKey: (defaultModuleKey && findModule(defaultModuleKey)?.key) || SOP_MODULES[0]?.key || "",
+    moduleKey: SOP_MODULES[0]?.key ?? "",
     groupRef: "",
     procedureRef: "",
     text: "",
     allowAi: true,
   };
 }
+
+/** The one procedure that ships with its full SOP text, offered on first run. */
+const SAMPLE = { moduleKey: "lms-pal", groupRef: "6.9", procedureRef: "6.9.4" } as const;
 
 /**
  * What "unsaved" compares. Everything a save would persist, and nothing else -
@@ -96,9 +95,9 @@ function jumpTo(sectionId: string) {
   document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string } = {}) {
+export function AddProcessPage() {
   const [rows, setRows] = useState<StoredProcessRow[]>([]);
-  const [source, setSource] = useState<SourceState>(() => emptySource(defaultModuleKey));
+  const [source, setSource] = useState<SourceState>(emptySource);
   const [spec, setSpec] = useState<ProcessSpec | null>(null);
   const [issues, setIssues] = useState<ParseIssue[]>([]);
   const [status, setStatus] = useState<ProcessStatus>("draft");
@@ -117,8 +116,6 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
   const [publishFrom] = useState(() => new Date());
 
   const sopModule = useMemo(() => findModule(source.moduleKey), [source.moduleKey]);
-  /** The procedure this module ships full SOP text for, offered on a first visit. */
-  const sample = useMemo(() => sampleProcedureFor(source.moduleKey), [source.moduleKey]);
   const busy = loading || converting || saving || deletingId !== null;
 
   const selectedTaskCount = spec?.tasks.filter((task) => task.selected).length ?? 0;
@@ -320,16 +317,10 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
 
   /** Reopen a stored process for review. */
   function open(stored: ProcessSpec) {
-    // Resolved from the process's own module, not from whatever the dropdown
-    // happens to show: with more than one module registered, opening a Fees
-    // process while the picker sits on LMS + PAL would resolve its group
-    // against the wrong index and read it back in the wrong vocabulary.
-    const storedModule = findModuleByName(stored.module) ?? findModule(source.moduleKey) ?? SOP_MODULES[0];
-    const found = findProcedure(storedModule, stored.ref);
+    const found = findProcedure(findModule(source.moduleKey) ?? SOP_MODULES[0], stored.ref);
     setSource((current) => ({
       ...current,
-      moduleKey: storedModule.key,
-      groupRef: found?.group.ref ?? "",
+      groupRef: found?.group.ref ?? current.groupRef,
       procedureRef: stored.ref,
       text: specToIntakeText(stored),
     }));
@@ -343,14 +334,13 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
 
   /** Fill in the shipped sample and convert it in one click, for a first visit. */
   function trySample() {
-    if (!sample) return;
-    const shipped = shippedSourceFor(sample.moduleKey, sample.procedureRef);
+    const shipped = shippedSourceFor(SAMPLE.moduleKey, SAMPLE.procedureRef);
     if (!shipped) return;
 
     const next: SourceState = {
-      moduleKey: sample.moduleKey,
-      groupRef: sample.groupRef,
-      procedureRef: sample.procedureRef,
+      moduleKey: SAMPLE.moduleKey,
+      groupRef: SAMPLE.groupRef,
+      procedureRef: SAMPLE.procedureRef,
       text: shipped,
       allowAi: true,
     };
@@ -457,14 +447,8 @@ export function AddProcessPage({ defaultModuleKey }: { defaultModuleKey?: string
       <ErpAlert tone="error">{error}</ErpAlert>
       <ErpAlert tone="success">{notice}</ErpAlert>
 
-      {!spec && !loading && !rows.length && sample && sopModule ? (
-        <GettingStarted
-          moduleName={sopModule.name}
-          procedureRef={sample.procedureRef}
-          procedureTitle={sample.title}
-          onTrySample={trySample}
-          disabled={busy}
-        />
+      {!spec && !loading && !rows.length ? (
+        <GettingStarted onTrySample={trySample} disabled={busy} />
       ) : null}
 
       <div id={SECTION_IDS.source} className="scroll-mt-40">

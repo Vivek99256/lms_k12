@@ -16,24 +16,8 @@ import { erpCardClass } from "@/components/erp/erp-ui";
  *
  * It disappears the moment a process exists, and never returns for someone who
  * already has saved processes.
- *
- * Which procedure it offers is the caller's to say, because it depends on the
- * module being viewed: each SOP authors one procedure in full, and the Fees
- * screen should not advertise the LMS one.
  */
-export function GettingStarted({
-  moduleName,
-  procedureRef,
-  procedureTitle,
-  onTrySample,
-  disabled,
-}: {
-  moduleName: string;
-  procedureRef: string;
-  procedureTitle: string;
-  onTrySample: () => void;
-  disabled: boolean;
-}) {
+export function GettingStarted({ onTrySample, disabled }: { onTrySample: () => void; disabled: boolean }) {
   return (
     <section className={erpCardClass}>
       <h2 className="font-semibold text-slate-900">Turn a written SOP procedure into something the ERP can run</h2>
@@ -73,12 +57,12 @@ export function GettingStarted({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-900">Try it on a real procedure</p>
           <p className="text-xs text-slate-600">
-            {moduleName} {procedureRef} &ldquo;{procedureTitle}&rdquo; ships with its full SOP text. Nothing is saved
-            until you choose to save it.
+            LMS + PAL 6.9.4 &ldquo;Deliver the adaptive quiz and capture per-question responses&rdquo; ships with its
+            full SOP text. Nothing is saved until you choose to save it.
           </p>
         </div>
         <Button type="button" onClick={onTrySample} disabled={disabled}>
-          Load and convert {procedureRef}
+          Load and convert 6.9.4
           <ArrowRight className="size-4" />
         </Button>
       </div>

@@ -5,14 +5,46 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Clock, GraduationCap, Loader2, Send } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { QuestionPlayer, libraryForQuestion } from '@/components/h5p/players';
+import type { QuestionResult } from '@/components/h5p/players/types';
+import {
+  splitSubmissions,
+  submissionFor,
+  toPlayerQuestion,
+  type PalSubmission,
+} from '@/lib/pal/exam-answers';
 import {
   fetchPalQuiz,
   formatQuizTimestamp,
   submitPalQuiz,
   type PalChapterContext,
+  type PalQuestion,
   type PalQuizData,
 } from '@/app/pal/data/pal';
 
+/**
+ * The PAL Test.
+ *
+ * EVERY QUESTION IS AN H5P ACTIVITY, CHOSEN FROM ITS OWN FORM. This page used
+ * to draw one thing: a stem and a list of radio buttons. That was wrong for
+ * most of the bank -- a fill-in-the-blank question became four options to pick
+ * between, a match-the-following became a list -- and it was a second renderer
+ * to keep in step with the H5P library's players.
+ *
+ * It now hands each question to `QuestionPlayer`, which reads the question's
+ * recorded form and renders the matching player: multiple choice as a single
+ * choice set, true/false as True or false, fill-in-the-blank as Blanks, match
+ * the following as a matching activity, and so on for every form the platform
+ * has built. Nothing is converted and no H5P record is created -- the question
+ * bank row IS the content, and `lib/h5p/question-bank-runtime.ts` builds the
+ * activity in the browser at render time.
+ *
+ * WHAT THIS PAGE STILL OWNS. Timing, the paper, and the submission. A player
+ * scores its own activity and reports the outcome through `onResult`; it never
+ * persists anything. This page collects those outcomes, turns each into
+ * something `palController@store` can record (`lib/pal/exam-answers.ts`) and
+ * submits the paper once.
+ */
 export default function PalExamPage() {
   return (
     <Suspense
@@ -51,7 +83,15 @@ function PalExamContent() {
   const [quiz, setQuiz] = useState<PalQuizData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  /**
+   * questionId -> what the player reported when the learner finished it.
+   *
+   * The player is the only thing that knows whether an activity was answered
+   * correctly -- it holds the attempt and it does the scoring -- so this page
+   * stores the verdict rather than the raw interaction. A question with no
+   * entry here was never finished, which is what "unanswered" means on submit.
+   */
+  const [results, setResults] = useState<Record<string, QuestionResult>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -61,6 +101,17 @@ function PalExamContent() {
   const attemptTimesRef = useRef<Record<string, number>>({});
   const activeQuestionRef = useRef<string>('');
   const submittedRef = useRef(false);
+  // Which question is currently in view, for the ONE overall "Question X of
+  // N" counter in the sticky header -- mirrored from `activeQuestionRef`
+  // (already tracked for per-question attempt time) into state, since a ref
+  // does not re-render. This is the single source of "where am I", not
+  // anything an individual player draws for itself.
+  const [activeIndex, setActiveIndex] = useState(0);
+  // Read inside `handleSubmit`, which must not be rebuilt on every answer: the
+  // countdown effect depends on it, and a new identity each keystroke would
+  // restart the timer.
+  const resultsRef = useRef(results);
+  resultsRef.current = results;
 
   // --- load the adaptive quiz --------------------------------------------
   useEffect(() => {
@@ -91,28 +142,45 @@ function PalExamContent() {
     return () => controller.abort();
   }, [context, hasContext]);
 
+  const recordResult = useCallback((questionId: string, result: QuestionResult) => {
+    setResults((prev) => ({ ...prev, [questionId]: result }));
+  }, []);
+
   const handleSubmit = useCallback(
     async (auto: boolean) => {
       if (!quiz || submittedRef.current) return;
+      const finished = resultsRef.current;
+
       if (!auto) {
-        const unanswered = quiz.questions.filter((q) => !answers[q.questionId]).length;
+        const unanswered = quiz.questions.filter((q) => !finished[q.questionId]).length;
         if (unanswered > 0) {
           const proceed = window.confirm(
-            `${unanswered} question${unanswered === 1 ? '' : 's'} left unanswered. Submit anyway?`
+            `${unanswered} question${unanswered === 1 ? '' : 's'} not finished. ` +
+              'An activity counts as answered once you check or complete it. Submit anyway?'
           );
           if (!proceed) return;
         }
       }
       submittedRef.current = true;
 
-      // Guest preview → score client-side (answer values are "id##correctFlag").
+      // Guest preview → score client-side from what the players reported.
       if (isGuest) {
         const correct = quiz.questions.filter(
-          (q) => (answers[q.questionId] ?? '').split('##')[1] === '1'
+          (q) => finished[q.questionId]?.correct === true
         ).length;
         setPreviewResult({ correct, total: quiz.questions.length });
         return;
       }
+
+      const submissions: PalSubmission[] = quiz.questions
+        .filter((question) => finished[question.questionId])
+        .map((question) => submissionFor(question, finished[question.questionId]))
+        // `submissionFor` returns null for an activity that could not be
+        // marked at all. Dropping it records the question as unattempted,
+        // which is true; submitting it would record the learner as wrong,
+        // which is not.
+        .filter((submission): submission is PalSubmission => submission !== null);
+      const { options, interactive } = splitSubmissions(submissions);
 
       setSubmitting(true);
       setSubmitError(null);
@@ -122,7 +190,8 @@ function PalExamContent() {
           paperName: quiz.paperName,
           totalMarks: quiz.totalMarks,
           timeAllowedMinutes: quiz.timeAllowedMinutes,
-          answers,
+          answers: options,
+          interactiveAnswers: interactive,
           attemptTimes: attemptTimesRef.current,
           questionIds: quiz.questions.map((q) => q.questionId),
           startedAt: startedAtRef.current || formatQuizTimestamp(new Date()),
@@ -138,7 +207,7 @@ function PalExamContent() {
         setSubmitting(false);
       }
     },
-    [quiz, answers, router, isGuest]
+    [quiz, router, isGuest]
   );
 
   // --- countdown timer (auto-submit on expiry) ---------------------------
@@ -162,7 +231,10 @@ function PalExamContent() {
           .filter((entry) => entry.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (visible) {
-          activeQuestionRef.current = (visible.target as HTMLElement).dataset.questionId ?? '';
+          const id = (visible.target as HTMLElement).dataset.questionId ?? '';
+          activeQuestionRef.current = id;
+          const idx = quiz.questions.findIndex((q) => q.questionId === id);
+          if (idx >= 0) setActiveIndex(idx);
         }
       },
       { threshold: [0.25, 0.5, 0.75] }
@@ -183,8 +255,8 @@ function PalExamContent() {
   }, [quiz]);
 
   const answeredCount = useMemo(
-    () => (quiz ? quiz.questions.filter((q) => answers[q.questionId]).length : 0),
-    [quiz, answers]
+    () => (quiz ? quiz.questions.filter((q) => results[q.questionId]).length : 0),
+    [quiz, results]
   );
 
   if (!hasContext) {
@@ -262,21 +334,32 @@ function PalExamContent() {
 
   return (
     <div className="min-h-screen p-6">
-      <div className="mx-auto  space-y-4">
-        {/* Sticky header with timer */}
-        <div className="sticky top-0 z-10 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 px-5 py-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">{quiz.paperName}</h1>
-            <p className="text-xs text-slate-500">
-              {answeredCount} of {quiz.questions.length} answered
-            </p>
+      <div className="mx-auto space-y-3">
+        {/* Sticky header with timer — the ONE progress readout for the whole
+            paper. Every question below is embedded, so none of them draws
+            its own "Question X of Y" any more; this is the only one. */}
+        <div className="sticky top-0 z-10 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/95 px-5 py-3 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-slate-900">{quiz.paperName}</h1>
+              <p className="text-xs text-slate-500">
+                Question {Math.min(activeIndex + 1, quiz.questions.length)} of {quiz.questions.length} ·{' '}
+                {answeredCount} answered
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <TimerPill seconds={timeLeft ?? 0} />
+              <Button onClick={() => void handleSubmit(false)} disabled={submitting}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Submit
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <TimerPill seconds={timeLeft ?? 0} />
-            <Button onClick={() => void handleSubmit(false)} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Submit
-            </Button>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-indigo-600 transition-all duration-300"
+              style={{ width: `${(answeredCount / quiz.questions.length) * 100}%` }}
+            />
           </div>
         </div>
 
@@ -286,54 +369,19 @@ function PalExamContent() {
           </div>
         )}
 
-        {/* Questions */}
-        <div className="space-y-4">
+        {/* One continuous container for every question, not a stack of
+            separately bordered and shadowed cards -- a single assessment,
+            not a row of independent activities that happen to be near each
+            other. Each question gets a divider, not its own card. */}
+        <div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           {quiz.questions.map((question, index) => (
-            <section
+            <QuestionCard
               key={question.questionId}
-              data-question-id={question.questionId}
-              className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
-            >
-              <div className="flex items-start gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-600">
-                  {index + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div
-                    className="text-sm font-medium text-slate-900 [&_img]:max-w-full"
-                    dangerouslySetInnerHTML={{ __html: question.questionText }}
-                  />
-                  <div className="mt-3 space-y-2">
-                    {question.options.map((option) => {
-                      const value = `${option.id}##${option.correctFlag}`;
-                      const selected = answers[question.questionId] === value;
-                      return (
-                        <label
-                          key={option.id}
-                          className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
-                            selected
-                              ? 'border-indigo-400 bg-indigo-50 text-indigo-900'
-                              : 'border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name={`question-${question.questionId}`}
-                            value={value}
-                            checked={selected}
-                            onChange={() =>
-                              setAnswers((prev) => ({ ...prev, [question.questionId]: value }))
-                            }
-                            className="h-4 w-4 accent-indigo-600"
-                          />
-                          <span className="[&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: option.answer }} />
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </section>
+              question={question}
+              index={index}
+              done={Boolean(results[question.questionId])}
+              onResult={recordResult}
+            />
           ))}
         </div>
 
@@ -345,6 +393,59 @@ function PalExamContent() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * One question, played as whatever it is.
+ *
+ * The activity is derived from the question on every render, which is cheap
+ * and pure, and memoised only so the player is not handed a new object each
+ * time the paper's answered-count changes -- a fresh `question` prop would
+ * restart an attempt the learner is halfway through.
+ */
+function QuestionCard({
+  question,
+  index,
+  done,
+  onResult,
+}: {
+  question: PalQuestion;
+  index: number;
+  done: boolean;
+  onResult: (questionId: string, result: QuestionResult) => void;
+}) {
+  const playable = useMemo(() => toPlayerQuestion(question), [question]);
+  const library = libraryForQuestion(playable);
+
+  const handleResult = useCallback(
+    (result: QuestionResult) => onResult(question.questionId, result),
+    [onResult, question.questionId]
+  );
+
+  return (
+    <section data-question-id={question.questionId} className="px-5 py-4">
+      <div className="flex items-center gap-3">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+            done ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
+          }`}
+        >
+          {index + 1}
+        </span>
+        {/* Named, not decorative: a learner meeting a different interaction on
+            every question is helped by knowing which one this is. */}
+        {library && (
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+            {library.replace(/^H5P\./, '').replace(/([a-z])([A-Z])/g, '$1 $2')}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-2">
+        <QuestionPlayer question={playable} onResult={handleResult} embedded />
+      </div>
+    </section>
   );
 }
 

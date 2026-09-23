@@ -85,7 +85,7 @@ export function PalEmptyState({
     <div className="min-h-full px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1800px] space-y-6">
         <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-12 shadow-sm">
-          <div className="mx-auto max-w-3xl text-center">
+          <div className="mx-auto  text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-50 text-amber-600">
               <AlertCircle className="h-8 w-8" />
             </div>
