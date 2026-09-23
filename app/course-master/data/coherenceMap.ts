@@ -71,7 +71,6 @@ export type CoherenceEdge = {
   tagged_by: string;
   /** Row id in its own table; null for hierarchy edges, which are derived not stored. */
   relation_id: number | null;
-<<<<<<< HEAD
   /**
    * Which store the row lives in.
    *
@@ -84,10 +83,6 @@ export type CoherenceEdge = {
    * offering Approve / Dismiss / Remove buttons that would 404.
    */
   source_table: 'concept' | 'learning' | 'expert' | null;
-=======
-  /** Which table the row lives in. Needed to address it for review or delete. */
-  source_table: 'concept' | 'learning' | null;
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   relation_type: string | null;
   link_type: string | null;
   confidence: number | null;
@@ -110,7 +105,6 @@ export type CoherenceMeta = {
    * cannot honour.
    */
   topic_level_available: boolean;
-<<<<<<< HEAD
   /**
    * Academic years this subject+grade does have chapters for.
    *
@@ -119,8 +113,6 @@ export type CoherenceMeta = {
    * look identical on screen and have completely different fixes.
    */
   available_syears?: number[];
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 };
 
 export type CoherenceStats = {
@@ -139,7 +131,6 @@ export type CoherenceStats = {
   cycle_nodes: string[];
 };
 
-<<<<<<< HEAD
 /**
  * Which concept the server says to centre on.
  *
@@ -155,17 +146,12 @@ export type CoherenceFocus = {
   standard_id: number;
 };
 
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 export type CoherenceMap = {
   meta: CoherenceMeta;
   nodes: CoherenceNode[];
   edges: CoherenceEdge[];
   stats: CoherenceStats;
-<<<<<<< HEAD
   focus?: CoherenceFocus;
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 };
 
 type Envelope<T> = { status: boolean; message?: string; data?: T; errors?: unknown };
@@ -215,11 +201,7 @@ export async function fetchCoherenceMap(
   session: CurriculumSession,
   subjectId: string | number,
   standardId: string | number,
-<<<<<<< HEAD
   options: { includeSuggested?: boolean; includeCrossGrade?: boolean; syear?: string | number } = {}
-=======
-  options: { includeSuggested?: boolean; includeCrossGrade?: boolean } = {}
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 ): Promise<CoherenceMap> {
   const query = new URLSearchParams({
     subject_id: String(subjectId),
@@ -230,15 +212,11 @@ export async function fetchCoherenceMap(
 
   // syear is optional server-side: omitted, the backend takes the newest
   // curriculum for the subject rather than guessing a year the tenant is not on.
-<<<<<<< HEAD
   // An explicit `options.syear` overrides the session's, which is how the empty
   // state offers "show me the year that does have curriculum" without making the
   // teacher go and change the global academic-year selector first.
   const syear = options.syear ?? session.academicYearId;
   if (syear) query.set('syear', String(syear));
-=======
-  if (session.academicYearId) query.set('syear', session.academicYearId);
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 
   const response = await fetch(`${baseUrl(session)}/api/lms/coherence-map?${query.toString()}`, {
     method: 'GET',
@@ -248,7 +226,6 @@ export async function fetchCoherenceMap(
   return unwrap<CoherenceMap>(response);
 }
 
-<<<<<<< HEAD
 /**
  * The map located by a concept instead of by a subject and grade.
  *
@@ -303,8 +280,6 @@ export function isReviewableEdge(
   );
 }
 
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 export type RelationMutationResult = {
   relation: CoherenceEdge;
   /** e.g. ['creates_cycle'] — advisory, the write still happened. */
@@ -395,7 +370,6 @@ export function useCoherenceMap(
   loading: boolean;
   error: string | null;
   reload: () => void;
-<<<<<<< HEAD
   /**
    * Refetch against a different academic year.
    *
@@ -404,18 +378,12 @@ export function useCoherenceMap(
    * what lets the teacher see it from here instead of hunting for the selector.
    */
   viewYear: (syear: number) => void;
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   /** Apply a mutation result locally so an approval shows instantly, without a refetch. */
   applyEdge: (edge: CoherenceEdge) => void;
   removeEdge: (edgeId: string) => void;
 } {
-<<<<<<< HEAD
   const [syearOverride, setSyearOverride] = useState<number | null>(null);
   const key = `${subjectId}|${standardId ?? ''}|${syearOverride ?? ''}`;
-=======
-  const key = `${subjectId}|${standardId ?? ''}`;
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 
   /**
    * One piece of state for the whole request, stamped with the scope it answers.
@@ -441,13 +409,9 @@ export function useCoherenceMap(
 
     let cancelled = false;
 
-<<<<<<< HEAD
     fetchCoherenceMap(session, subjectId, standardId ?? subjectId, {
       ...(syearOverride === null ? {} : { syear: syearOverride }),
     })
-=======
-    fetchCoherenceMap(session, subjectId, standardId ?? subjectId)
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
       .then((data) => {
         if (!cancelled) setResult({ key, map: data, error: null });
       })
@@ -464,47 +428,27 @@ export function useCoherenceMap(
     return () => {
       cancelled = true;
     };
-<<<<<<< HEAD
   }, [key, subjectId, standardId, nonce, session, syearOverride]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   const viewYear = useCallback((syear: number) => setSyearOverride(syear), []);
 
-=======
-  }, [key, subjectId, standardId, nonce, session]);
-
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
-
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   const applyEdge = useCallback((edge: CoherenceEdge) => {
     setResult((current) => {
       if (!current?.map) return current;
 
       // A rejected edge leaves the map entirely — it is a decision to stop showing
       // the suggestion, not a state to render.
-<<<<<<< HEAD
       return { ...current, map: applyEdgeTo(current.map, edge) };
-=======
-      const others = current.map.edges.filter((e) => e.id !== edge.id);
-      const edges = edge.status === 'rejected' ? others : [...others, edge];
-
-      return { ...current, map: { ...current.map, edges, stats: recount(current.map, edges) } };
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
     });
   }, []);
 
   const removeEdge = useCallback((edgeId: string) => {
     setResult((current) => {
       if (!current?.map) return current;
-<<<<<<< HEAD
 
       return { ...current, map: removeEdgeFrom(current.map, edgeId) };
-=======
-      const edges = current.map.edges.filter((e) => e.id !== edgeId);
-
-      return { ...current, map: { ...current.map, edges, stats: recount(current.map, edges) } };
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
     });
   }, []);
 
@@ -520,10 +464,7 @@ export function useCoherenceMap(
     loading: sessionError === null && !settled,
     error: sessionError ?? (settled ? result.error : null),
     reload,
-<<<<<<< HEAD
     viewYear,
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
     applyEdge,
     removeEdge,
   };
@@ -537,7 +478,6 @@ export function useCoherenceMap(
  * the browser would be a second implementation of the traversal and the two would
  * eventually disagree.
  */
-<<<<<<< HEAD
 /**
  * Apply a mutation result to a map, returning a new one.
  *
@@ -559,8 +499,6 @@ export function removeEdgeFrom(map: CoherenceMap, edgeId: string): CoherenceMap 
   return { ...map, edges, stats: recount(map, edges) };
 }
 
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 function recount(map: CoherenceMap, edges: CoherenceEdge[]): CoherenceStats {
   let approved = 0;
   let draft = 0;

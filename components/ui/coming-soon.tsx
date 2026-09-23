@@ -44,7 +44,6 @@ import { Switch } from '@/components/ui/switch'
 import { Tooltip } from '@/components/ui/tooltip'
 import {
   getRoadmapItem,
-  roadmapChipLabel,
   roadmapStatusLabel,
   roadmapTooltip,
   type RoadmapPhase,
@@ -80,7 +79,7 @@ function resolveCopy(source: CopySource, fallbackTitle = 'Coming soon'): Resolve
   const item = source.roadmapId ? getRoadmapItem(source.roadmapId) : undefined
 
   // Deliberately no fallback phase. Defaulting to one made every placeholder
-  // without a roadmap row announce a phase — a delivery commitment
+  // without a roadmap row announce "Coming in Phase 2" — a delivery commitment
   // invented by this function rather than agreed by anyone, on 38 Fees screens
   // at once. A vaguer promise is fine; a specific unearned one is not.
   const phase = source.phase ?? item?.phase
@@ -242,7 +241,9 @@ export function ComingSoonPanel({
         <Tooltip content={copy.tooltip} focusable>
           <span className={statusChipVariants({ status: copy.status })}>
             <Icon className="size-3 shrink-0" aria-hidden="true" />
-            {roadmapChipLabel(copy)}
+            {copy.status === 'coming-soon' && copy.phase && copy.phase !== 'Exploring'
+              ? `Coming in ${copy.phase}`
+              : roadmapStatusLabel(copy.status)}
           </span>
         </Tooltip>
       </div>
@@ -310,7 +311,9 @@ export function ComingSoonTile({ icon, className, ...source }: ComingSoonTilePro
 
       <Tooltip content={copy.tooltip} focusable>
         <span className={statusChipVariants({ status: copy.status, size: 'sm' })}>
-          {roadmapChipLabel(copy)}
+          {copy.status === 'coming-soon' && copy.phase && copy.phase !== 'Exploring'
+            ? `Coming in ${copy.phase}`
+            : roadmapStatusLabel(copy.status)}
         </span>
       </Tooltip>
     </div>
@@ -441,7 +444,9 @@ export function RoadmapRollupStrip({
             {!delivered && (
               <Tooltip content={roadmapTooltip(entry)} focusable>
                 <span className={statusChipVariants({ status: entry.status, size: 'sm' })}>
-                  {roadmapChipLabel(entry)}
+                  {entry.status === 'coming-soon' && entry.phase !== 'Exploring'
+                    ? `Coming in ${entry.phase}`
+                    : roadmapStatusLabel(entry.status)}
                 </span>
               </Tooltip>
             )}

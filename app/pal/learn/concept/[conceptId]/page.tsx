@@ -25,7 +25,6 @@ import {
   type LearnResourceItem,
   type LearnResourceSection,
 } from '@/app/pal/data/pal-diagnostic';
-<<<<<<< HEAD
 import {
   CompletedBadge,
   CompletedConceptPanel,
@@ -33,9 +32,6 @@ import {
   useConceptCompletion,
 } from '@/app/pal/_components/CompletionState';
 import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
-=======
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -53,7 +49,6 @@ import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components
  * nothing and moves nobody, so the lesson always opens. The engine is still the
  * only thing that can advance the learner: the CTA at the bottom hands them
  * back to it.
-<<<<<<< HEAD
  *
  * ---------------------------------------------------------------------------
  * EXCEPT ON A COMPLETED CONCEPT
@@ -63,8 +58,6 @@ import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components
  * hands the learner to the engine), so a completed concept must not reach a
  * screen that carries it. Completion is therefore resolved before the lesson is
  * requested - see app/pal/data/pal-completion.ts for the rule.
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
  */
 
 export default function ConceptLearnPage() {
@@ -97,15 +90,12 @@ function ConceptLearnView() {
   const [continuing, setContinuing] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
 
-<<<<<<< HEAD
   const {
     result: completedResult,
     completed,
     loading: checkingCompletion,
   } = useConceptCompletion(conceptId);
 
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   const load = useCallback(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
@@ -125,14 +115,10 @@ function ConceptLearnView() {
     return () => controller.abort();
   }, [conceptId]);
 
-<<<<<<< HEAD
   useEffect(() => {
     if (checkingCompletion || completed) return;
     return load();
   }, [load, checkingCompletion, completed]);
-=======
-  useEffect(() => load(), [load]);
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 
   /**
    * Record that the lesson was read, then let the engine decide the screen.
@@ -168,7 +154,6 @@ function ConceptLearnView() {
     }
   }, [conceptId, router]);
 
-<<<<<<< HEAD
   if (checkingCompletion) return <Centered>Loading this concept…</Centered>;
 
   // Read-only: mastery in place of the lesson, and no CTA that would stamp
@@ -205,8 +190,6 @@ function ConceptLearnView() {
     );
   }
 
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   if (loading) return <Centered>Loading the lesson…</Centered>;
 
   if (error || !data) {
@@ -243,11 +226,7 @@ function ConceptLearnView() {
       <PalRailSection title="Your journey">
         <JourneyRail
           current="learn"
-<<<<<<< HEAD
           completed={stagesBefore('learn')}
-=======
-          completed={['diagnostic', 'adaptive', 'plan']}
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
           orientation="vertical"
         />
       </PalRailSection>

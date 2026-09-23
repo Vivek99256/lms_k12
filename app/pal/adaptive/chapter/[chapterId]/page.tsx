@@ -1,6 +1,5 @@
 'use client';
 
-<<<<<<< HEAD
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -8,14 +7,6 @@ import { ArrowRight, Brain, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-=======
-import { Suspense, useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowRight, Brain, Loader2 } from 'lucide-react';
-
-import { Button, buttonVariants } from '@/components/ui/button';
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
@@ -23,7 +14,6 @@ import {
   type AdaptiveConcept,
   type AdaptiveConceptList,
 } from '@/app/pal/data/pal-diagnostic';
-<<<<<<< HEAD
 import { isConceptCompleted, signalsFromMasteryRow } from '@/app/pal/data/pal-completion';
 import { BandChip, LevelBadge, bandLabel } from '@/app/pal/_components/BandMeter';
 import {
@@ -33,10 +23,6 @@ import {
   useChapterCompletion,
 } from '@/app/pal/_components/CompletionState';
 import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
-=======
-import { BandChip, LevelBadge, bandLabel } from '@/app/pal/_components/BandMeter';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -51,7 +37,6 @@ import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace
  * Concepts with no servable questions stay in the list, greyed out. Dropping
  * them would quietly remove half a syllabus from view; showing them disabled
  * says plainly that practice is not ready for that topic yet.
-<<<<<<< HEAD
  *
  * ---------------------------------------------------------------------------
  * COMPLETED CONCEPTS, AND A COMPLETED CHAPTER
@@ -63,8 +48,6 @@ import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace
  *
  * The verdict comes from the mastery overview (one extra GET) rather than being
  * re-derived here; the rule lives in app/pal/data/pal-completion.ts.
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
  */
 
 export default function AdaptiveConceptsPage() {
@@ -93,7 +76,6 @@ function AdaptiveConceptsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-<<<<<<< HEAD
   const {
     mastery,
     completion,
@@ -112,8 +94,6 @@ function AdaptiveConceptsView() {
     [mastery]
   );
 
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   const load = useCallback(() => {
     const controller = new AbortController();
     // Every setState is deferred, including the loading/error reset: calling
@@ -138,7 +118,6 @@ function AdaptiveConceptsView() {
 
   useEffect(() => load(), [load]);
 
-<<<<<<< HEAD
   if (loading || checkingCompletion) return <Centered>Loading concepts…</Centered>;
 
   // Nothing left to practise in this chapter: the mastery record replaces the
@@ -172,9 +151,6 @@ function AdaptiveConceptsView() {
       </PalWorkspace>
     );
   }
-=======
-  if (loading) return <Centered>Loading concepts…</Centered>;
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 
   if (error || !data) {
     return (
@@ -214,7 +190,6 @@ function AdaptiveConceptsView() {
         </>
       }
       rail={
-<<<<<<< HEAD
         <>
           {completion.measurable > 0 && (
             <PalRailSection title="Chapter progress">
@@ -251,15 +226,6 @@ function AdaptiveConceptsView() {
             />
           </PalRailSection>
         </>
-=======
-        <PalRailSection title="Your journey">
-          <JourneyRail
-            current="adaptive"
-            completed={data.hasDiagnostic ? ['diagnostic'] : []}
-            orientation="vertical"
-          />
-        </PalRailSection>
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
       }
     >
 
@@ -288,10 +254,7 @@ function AdaptiveConceptsView() {
             <ConceptCard
               key={concept.conceptId}
               concept={concept}
-<<<<<<< HEAD
               completed={completedConceptIds.has(String(concept.conceptId))}
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
               onStart={() => router.push(`/pal/adaptive/concept/${concept.conceptId}`)}
             />
           ))}
@@ -325,7 +288,6 @@ function AdaptiveConceptsView() {
   );
 }
 
-<<<<<<< HEAD
 function ConceptCard({
   concept,
   completed,
@@ -360,22 +322,6 @@ function ConceptCard({
         ) : (
           concept.rationale && <p className="text-xs text-slate-600">{concept.rationale}</p>
         )}
-=======
-function ConceptCard({ concept, onStart }: { concept: AdaptiveConcept; onStart: () => void }) {
-  const attempted = concept.practiceAttempts > 0;
-
-  return (
-    <Card className="flex h-full flex-col">
-      <CardContent className="flex flex-1 flex-col pt-5">
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <h2 className="min-w-0 text-sm font-semibold text-slate-900">{concept.name}</h2>
-          {concept.nextDifficulty && <BandChip band={concept.nextDifficulty} className="shrink-0" />}
-        </div>
-
-        {/* The engine's own sentence. Rewording it here would let this screen
-            and the practice screen explain the same decision differently. */}
-        {concept.rationale && <p className="text-xs text-slate-600">{concept.rationale}</p>}
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 
         <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
           {concept.diagnosticPercentage !== null && (
@@ -398,7 +344,6 @@ function ConceptCard({ concept, onStart }: { concept: AdaptiveConcept; onStart: 
         </dl>
 
         <div className="mt-auto pt-4">
-<<<<<<< HEAD
           {completed ? (
             // Read-only. The only route out of a completed concept is its own
             // mastery record, which the practice page serves in place of a set.
@@ -426,16 +371,6 @@ function ConceptCard({ concept, onStart }: { concept: AdaptiveConcept; onStart: 
               </p>
             </>
           )}
-=======
-          <Button className="w-full" size="sm" onClick={onStart}>
-            {attempted ? 'Continue practice' : 'Start practice'}
-            <ArrowRight aria-hidden className="ml-1.5 h-3.5 w-3.5" />
-          </Button>
-          <p className="mt-1.5 text-center text-[11px] text-slate-400">
-            {concept.availability.total} question{concept.availability.total === 1 ? '' : 's'} available
-            {concept.nextDifficulty && ` · opening at ${bandLabel(concept.nextDifficulty).toLowerCase()}`}
-          </p>
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
         </div>
       </CardContent>
     </Card>

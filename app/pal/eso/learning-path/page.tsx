@@ -124,7 +124,7 @@ function LearningPathView() {
           <CardHeader>
             <CardTitle className="text-base">No learning path yet</CardTitle>
             <CardDescription>
-              None of your chapters have been prepared for the concept diagnostic yet. When they are, your plan will
+              None of your chapters have been prepared for adaptive learning yet. When they are, your plan will
               appear here.
             </CardDescription>
           </CardHeader>

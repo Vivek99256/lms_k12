@@ -17,8 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { FeesAiAssist } from '@/app/fees/_components/fees-ai-assist';
-import { logFeesOperation } from '@/lib/fees/fees-ai-stack';
 
 type SessionContext = {
   token: string;
@@ -531,28 +529,6 @@ export default function FeesCollectionStudentPage() {
         throw new Error(payload.message || 'Unable to save fee collection.');
       }
 
-      // The money is taken and the receipt exists by this point. Recording is
-      // fire-and-forget on purpose: a busy audit table must never cost a parent their
-      // receipt, so this returns nothing to await and swallows its own failures.
-      logFeesOperation('fee_collection', {
-        status: 'completed',
-        message: `Collected ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalAmount)} from ${student?.studentName ?? 'a student'}.`,
-        studentId: Number(studentId) || null,
-        studentName: student?.studentName ?? null,
-        reference: readString(asRecord(payload).receipt_no ?? asRecord(payload).receiptno) || null,
-        workflow: 'fees.collect',
-        result: {
-          total: totalAmount,
-          discount,
-          fine,
-          payment_mode: paymentMode,
-          receipt_date: receiptDate,
-          months: selectedMonthIds.length,
-          sms_requested: sendSms,
-          remarks_present: remarks.trim() !== '',
-        },
-      });
-
       if (printReceipt) {
         const html = extractReceiptHtml(payload, responseText);
         if (!html) {
@@ -772,27 +748,6 @@ export default function FeesCollectionStudentPage() {
               <CardContent className="space-y-4 p-4 sm:p-5">
                 <Field label="Remarks">
                   <Textarea value={remarks} onChange={(event) => setRemarks(event.target.value)} placeholder="Enter remarks" className="min-h-24 rounded-lg border-slate-200 bg-slate-50/70 text-sm" />
-                  {/* Generative AI on the one free-text field in this form. The prompt,
-                      the policy check and the usage record all come from the Fees AI
-                      Stack; this screen only supplies the fee data and receives text. */}
-                  <FeesAiAssist
-                    className="mt-2"
-                    operation="remarks_drafted"
-                    label="Draft remarks with AI"
-                    student={{ id: Number(studentId) || null, name: student?.studentName ?? null }}
-                    variables={{
-                      student_name: student?.studentName ?? '',
-                      standard_division: student?.standardDivision ?? '',
-                      enrollment_no: student?.grNo ?? '',
-                      total_amount: totalAmount,
-                      discount,
-                      fine,
-                      payment_mode: paymentMode,
-                      receipt_date: receiptDate,
-                      pending_fees: student?.pendingFees ?? 0,
-                    }}
-                    onInsert={(text) => setRemarks(text)}
-                  />
                 </Field>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field label="Discount">

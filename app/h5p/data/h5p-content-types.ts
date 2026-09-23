@@ -418,7 +418,6 @@ export interface H5pSingleChoiceOption {
   /** What to say to a learner who chose THIS option. */
   feedback: string | null;
   sort_order: number;
-<<<<<<< HEAD
   /**
    * The `answer_master` row behind this option, for a set built in the
    * browser from a question bank row rather than read from `h5p_*` tables.
@@ -429,8 +428,6 @@ export interface H5pSingleChoiceOption {
    * attempt can name the option the learner chose.
    */
   source_option_id?: number | null;
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 }
 
 export interface H5pSingleChoiceQuestion {

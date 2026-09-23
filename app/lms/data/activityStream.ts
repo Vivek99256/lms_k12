@@ -113,33 +113,114 @@ interface SectionMeta {
   time: string[];
   chips: string[];
   status: string[];
+  /**
+   * The fields that establish which record a row IS, beyond its `id`.
+   *
+   * ── WHY THIS EXISTS: `id` IS NOT UNIQUE IN EVERY SECTION ──────────────────
+   *
+   * `class_schedule` is built by `lmsActivityStreamController` as
+   *
+   *     DB::table('timetable as tt')->join('period as p', …)
+   *       ->selectRaw("tt.*,p.*, …")
+   *
+   * and BOTH tables have an `id` column. Because `p.*` is selected after
+   * `tt.*`, the period's id overwrites the timetable row's id in the fetched
+   * record, so every row in the section is emitted carrying `id = period.id`.
+   * Six columns collide this way — `id`, `sub_institute_id`,
+   * `academic_section_id`, `created_at`, `updated_at`, `marking_period_id` —
+   * and the timetable columns that SURVIVE are exactly the ones that identify
+   * the slot: `standard_id`, `division_id`, `subject_id`, `teacher_id`,
+   * `period_id`, `week_day`, `syear`, `batch_id`.
+   *
+   * The consequence is that every class scheduled in the same period on the
+   * same day is emitted with the same `id`. That is the reported collision:
+   * `class_schedule-16425` is period 16425 ("Period-1", 08:00–08:45), and at
+   * one institute eleven distinct timetable rows for eleven distinct classes
+   * carry it on a single Monday.
+   *
+   * THOSE ARE LEGITIMATELY DIFFERENT ACTIVITIES — different class, division,
+   * subject and teacher — so all of them must stay on screen. Only the key was
+   * wrong, and the fields below are what make it right.
+   *
+   * Listed only where the collision has been verified against the real query.
+   * Every other section is left empty rather than guessed at; `disambiguate()`
+   * below is the backstop for anything not enumerated here.
+   */
+  identity: string[];
 }
 
 const SECTION_META: SectionMeta[] = [
-  { key: 'class_schedule', label: 'Schedule', title: ['title', 'subject_name', 'week_day'], subtitle: ['week_day'], date: ['attendance_date', 'date'], time: ['start_time'], chips: ['standard', 'division'], status: [] },
-  { key: 'homework', label: 'Homework', title: ['title'], subtitle: ['description', 'display_name'], date: ['date', 'submission_date', 'created_on'], time: [], chips: ['standard', 'division'], status: ['completion_status'] },
-  { key: 'eventCalender', label: 'Events & Calendar', title: ['title'], subtitle: [], date: ['school_date', 'created_at'], time: [], chips: ['standard'], status: [] },
-  { key: 'announcementNotice', label: 'Announcement & Notice', title: ['title'], subtitle: [], date: ['from_date', 'created_at'], time: [], chips: [], status: [] },
-  { key: 'dueBooks', label: 'Due Books', title: ['book_name', 'title'], subtitle: [], date: ['due_date', 'return_date'], time: [], chips: ['standard_id'], status: [] },
-  { key: 'studentProgress', label: 'Student Progress', title: ['name'], subtitle: [], date: [], time: [], chips: ['standard', 'division'], status: [] },
-  { key: 'ptm', label: 'PTM', title: ['ptmTitle', 'title'], subtitle: [], date: ['ptm_date'], time: ['from_time'], chips: ['standard', 'division'], status: [] },
-  { key: 'lessonPlan', label: 'Lesson Plan', title: ['chapter_name', 'title'], subtitle: [], date: ['date', 'created_on'], time: [], chips: ['standard'], status: [] },
-  { key: 'hrmsPunchInOut', label: 'Punch In/Out', title: ['user_name'], subtitle: [], date: ['punch_in', 'date'], time: ['punch_in', 'punch_out'], chips: [], status: [] },
-  { key: 'proxyLecture', label: 'Proxy Lecture', title: ['user_name'], subtitle: ['periods'], date: ['proxy_date'], time: ['start_time'], chips: ['standard', 'division'], status: [] },
-  { key: 'examMarks', label: 'Exam Marks', title: ['title', 'standard'], subtitle: [], date: ['exam_date'], time: [], chips: ['standard'], status: [] },
-  { key: 'studentAttendance', label: 'Student Attendance', title: ['title', 'standard'], subtitle: [], date: ['attendance_date'], time: [], chips: ['standard'], status: [] },
-  { key: 'taskAssigned', label: 'Task Assigned', title: ['TASK_TITLE', 'title'], subtitle: ['task_user_name'], date: ['TASK_DATE', 'CREATED_ON'], time: [], chips: [], status: ['STATUS'] },
-  { key: 'parentCommunication', label: 'Parent Communication', title: ['title'], subtitle: ['reply'], date: ['date_', 'start_date', 'created_on'], time: [], chips: [], status: [] },
-  { key: 'studentLeave', label: 'Student Leave', title: ['title'], subtitle: [], date: ['apply_date'], time: [], chips: ['standard'], status: ['status'] },
+  { key: 'class_schedule', label: 'Schedule', title: ['title', 'subject_name', 'week_day'], subtitle: ['week_day'], date: ['attendance_date', 'date'], time: ['start_time'], chips: ['standard', 'division'], status: [], identity: ['standard_id', 'division_id', 'subject_id', 'teacher_id', 'period_id', 'week_day', 'batch_id', 'syear'] },
+  { key: 'homework', label: 'Homework', title: ['title'], subtitle: ['description', 'display_name'], date: ['date', 'submission_date', 'created_on'], time: [], chips: ['standard', 'division'], status: ['completion_status'], identity: [] },
+  { key: 'eventCalender', label: 'Events & Calendar', title: ['title'], subtitle: [], date: ['school_date', 'created_at'], time: [], chips: ['standard'], status: [], identity: [] },
+  { key: 'announcementNotice', label: 'Announcement & Notice', title: ['title'], subtitle: [], date: ['from_date', 'created_at'], time: [], chips: [], status: [], identity: [] },
+  { key: 'dueBooks', label: 'Due Books', title: ['book_name', 'title'], subtitle: [], date: ['due_date', 'return_date'], time: [], chips: ['standard_id'], status: [], identity: [] },
+  { key: 'studentProgress', label: 'Student Progress', title: ['name'], subtitle: [], date: [], time: [], chips: ['standard', 'division'], status: [], identity: [] },
+  { key: 'ptm', label: 'PTM', title: ['ptmTitle', 'title'], subtitle: [], date: ['ptm_date'], time: ['from_time'], chips: ['standard', 'division'], status: [], identity: [] },
+  { key: 'lessonPlan', label: 'Lesson Plan', title: ['chapter_name', 'title'], subtitle: [], date: ['date', 'created_on'], time: [], chips: ['standard'], status: [], identity: [] },
+  { key: 'hrmsPunchInOut', label: 'Punch In/Out', title: ['user_name'], subtitle: [], date: ['punch_in', 'date'], time: ['punch_in', 'punch_out'], chips: [], status: [], identity: [] },
+  { key: 'proxyLecture', label: 'Proxy Lecture', title: ['user_name'], subtitle: ['periods'], date: ['proxy_date'], time: ['start_time'], chips: ['standard', 'division'], status: [], identity: [] },
+  { key: 'examMarks', label: 'Exam Marks', title: ['title', 'standard'], subtitle: [], date: ['exam_date'], time: [], chips: ['standard'], status: [], identity: [] },
+  { key: 'studentAttendance', label: 'Student Attendance', title: ['title', 'standard'], subtitle: [], date: ['attendance_date'], time: [], chips: ['standard'], status: [], identity: [] },
+  { key: 'taskAssigned', label: 'Task Assigned', title: ['TASK_TITLE', 'title'], subtitle: ['task_user_name'], date: ['TASK_DATE', 'CREATED_ON'], time: [], chips: [], status: ['STATUS'], identity: [] },
+  { key: 'parentCommunication', label: 'Parent Communication', title: ['title'], subtitle: ['reply'], date: ['date_', 'start_date', 'created_on'], time: [], chips: [], status: [], identity: [] },
+  { key: 'studentLeave', label: 'Student Leave', title: ['title'], subtitle: [], date: ['apply_date'], time: [], chips: ['standard'], status: ['status'], identity: [] },
 ];
 
-function mapItem(meta: SectionMeta, entry: unknown, index: number): ActivityItem {
+/**
+ * The stable identity of one activity row, as a React key.
+ *
+ * Built from the record's own fields — the section it belongs to, the `id` the
+ * API emitted, and the section's declared identity columns. Nothing here is
+ * random and nothing is derived from array position, so the same payload
+ * always produces the same keys and React can match a row across renders.
+ *
+ * `index` is used ONLY when a row carries no usable `id` and no identity field
+ * at all. That is a last resort for an empty record, not the primary key.
+ */
+function itemKey(meta: SectionMeta, r: Record<string, unknown>, index: number): string {
+  const id = readString(r.id).trim();
+  const identity = meta.identity.map((field) => readString(r[field]).trim()).filter(Boolean);
+
+  const parts = [id, ...identity].filter(Boolean);
+
+  return parts.length > 0 ? `${meta.key}-${parts.join('-')}` : `${meta.key}-${index}`;
+}
+
+/**
+ * Guarantee uniqueness among siblings without dropping a single row.
+ *
+ * `itemKey` resolves every collision this API is known to produce, but the
+ * activity payload is read defensively — the row shape varies per section and
+ * per role — so two rows CAN still compose the same key: a record whose
+ * identity fields are all blank, or a section whose own collision has not been
+ * enumerated yet.
+ *
+ * When that happens the later row gets an occurrence suffix rather than being
+ * merged away or hidden. It is deterministic — the n-th occurrence of a key in
+ * a given order is always `~n` — so it is stable across renders of the same
+ * data, and BOTH rows stay visible, which is the point: two records that look
+ * alike to this transformation may still be two real activities.
+ */
+function disambiguate(key: string, seen: Map<string, number>): string {
+  const previous = seen.get(key) ?? 0;
+  seen.set(key, previous + 1);
+
+  return previous === 0 ? key : `${key}~${previous + 1}`;
+}
+
+function mapItem(
+  meta: SectionMeta,
+  entry: unknown,
+  index: number,
+  seen: Map<string, number>,
+): ActivityItem {
   const r = toRecord(entry);
   const chips = meta.chips.map((k) => pick(r, [k])).filter(Boolean);
   const status = pick(r, meta.status);
   if (status) chips.push(status);
   return {
-    key: `${meta.key}-${readString(r.id) || index}`,
+    key: disambiguate(itemKey(meta, r, index), seen),
     title: pick(r, meta.title) || meta.label,
     subtitle: pick(r, meta.subtitle),
     dateLabel: formatDate(pick(r, meta.date)),
@@ -148,11 +229,21 @@ function mapItem(meta: SectionMeta, entry: unknown, index: number): ActivityItem
   };
 }
 
-function mapBucket(bucket: unknown): ActivitySection[] {
+/**
+ * One bucket of the API response (`upcoming` / `today` / `recent`) as the
+ * sections the page renders.
+ *
+ * Exported so the key-collision regression test can drive the real
+ * transformation with real payload shapes rather than re-implementing it.
+ */
+export function mapBucket(bucket: unknown): ActivitySection[] {
   const record = toRecord(bucket);
   const sections: ActivitySection[] = [];
   for (const meta of SECTION_META) {
-    const items = toArray(record[meta.key]).map((entry, i) => mapItem(meta, entry, i));
+    // Keys only have to be unique among siblings, and the siblings are the
+    // items of one section — that is the single <ul> they are rendered into.
+    const seen = new Map<string, number>();
+    const items = toArray(record[meta.key]).map((entry, i) => mapItem(meta, entry, i, seen));
     if (items.length > 0) sections.push({ key: meta.key, label: meta.label, items });
   }
   return sections;

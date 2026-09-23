@@ -15,11 +15,7 @@ function screen(loader: () => Promise<{ default: ScreenComponent }>): ScreenComp
 
 /**
  * Route -> page component, for every page in this app that can be mounted
-<<<<<<< HEAD
  * inside a category tab. 512 entries.
-=======
- * inside a category tab. 494 entries.
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
  */
 export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/academic_setup/create_batch': screen(() => import('@/app/academic_setup/create_batch/page')),
@@ -148,10 +144,6 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/exam/marks-entry': screen(() => import('@/app/exam/marks-entry/page')),
   '/exam/online': screen(() => import('@/app/exam/online/page')),
   '/exam/progress-report': screen(() => import('@/app/exam/progress-report/page')),
-<<<<<<< HEAD
-=======
-  '/fees/audit-trail': screen(() => import('@/app/fees/audit-trail/page')),
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   '/fees/cancel-refund': screen(() => import('@/app/fees/cancel-refund/page')),
   '/fees/circulars': screen(() => import('@/app/fees/circulars/page')),
   '/fees/collect': screen(() => import('@/app/fees/collect/page')),
@@ -170,18 +162,10 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/fees/nach_s2excel_import': screen(() => import('@/app/fees/NACH_s2excel_import/page')),
   '/fees/nach_s3excel_export': screen(() => import('@/app/fees/NACH_s3excel_export/page')),
   '/fees/nach_s4excel_import': screen(() => import('@/app/fees/NACH_s4excel_import/page')),
-<<<<<<< HEAD
-=======
-  '/fees/onboarding': screen(() => import('@/app/fees/onboarding/page')),
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   '/fees/online_fees_collect': screen(() => import('@/app/fees/online_fees_collect/page')),
   '/fees/online-fees-settings': screen(() => import('@/app/fees/online-fees-settings/page')),
   '/fees/other_fees_cancel': screen(() => import('@/app/fees/other_fees_cancel/page')),
   '/fees/other_fees_collect': screen(() => import('@/app/fees/other_fees_collect/page')),
-<<<<<<< HEAD
-=======
-  '/fees/process-builder': screen(() => import('@/app/fees/process-builder/page')),
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   '/fees/reports/audit-logs': screen(() => import('@/app/fees/reports/audit-logs/page')),
   '/fees/reports/datewise-summary': screen(() => import('@/app/fees/reports/datewise-summary/page')),
   '/fees/reports/fees-cancel': screen(() => import('@/app/fees/reports/fees-cancel/page')),
@@ -220,7 +204,6 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/general/onboarding': screen(() => import('@/app/general/onboarding/page')),
   '/general/template_management': screen(() => import('@/app/general/template_management/page')),
   '/general/user_profile_masters': screen(() => import('@/app/general/user_profile_masters/page')),
-<<<<<<< HEAD
   '/h5p/h5p_arithmetic_quiz': screen(() => import('@/app/h5p/h5p_arithmetic_quiz/page')),
   '/h5p/h5p_arithmetic_quiz/create': screen(() => import('@/app/h5p/h5p_arithmetic_quiz/create/page')),
   '/h5p/h5p_blanks': screen(() => import('@/app/h5p/h5p_blanks/page')),
@@ -246,13 +229,6 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/h5p/h5p_single_choice_set/create': screen(() => import('@/app/h5p/h5p_single_choice_set/create/page')),
   '/h5p/h5p_true_false': screen(() => import('@/app/h5p/h5p_true_false/page')),
   '/h5p/h5p_true_false/create': screen(() => import('@/app/h5p/h5p_true_false/create/page')),
-=======
-  '/h5p/h5p_flashacard': screen(() => import('@/app/h5p/h5p_flashacard/page')),
-  '/h5p/h5p_flashacard/create': screen(() => import('@/app/h5p/h5p_flashacard/create/page')),
-  '/h5p/h5p_interactive_video': screen(() => import('@/app/h5p/h5p_interactive_video/page')),
-  '/h5p/h5p_interactive_video/create': screen(() => import('@/app/h5p/h5p_interactive_video/create/page')),
-  '/h5p/h5p_mcq': screen(() => import('@/app/h5p/h5p_mcq/page')),
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   '/h5p/html_contents': screen(() => import('@/app/h5p/html_contents/page')),
   '/h5p/model': screen(() => import('@/app/h5p/model/page')),
   '/h5p/scenario_based': screen(() => import('@/app/h5p/scenario_based/page')),
@@ -379,10 +355,6 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/lms/teacher-timetable': screen(() => import('@/app/lms/teacher-timetable/page')),
   '/lms/worksheet': screen(() => import('@/app/lms/worksheet/page')),
   '/login': screen(() => import('@/app/login/page')),
-<<<<<<< HEAD
-=======
-  '/onboarding/lms': screen(() => import('@/app/onboarding/lms/page')),
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   '/organization_managment/department': screen(() => import('@/app/organization_managment/Department/page')),
   '/organization_managment/oragnization_profile': screen(() => import('@/app/organization_managment/oragnization_profile/page')),
   '/organization-management/compliance-library': screen(() => import('@/app/organization-management/compliance-library/page')),
@@ -397,10 +369,7 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/pal/eso/learning-path': screen(() => import('@/app/pal/eso/learning-path/page')),
   '/pal/exam': screen(() => import('@/app/pal/exam/page')),
   '/pal/intelligence': screen(() => import('@/app/pal/intelligence/page')),
-<<<<<<< HEAD
   '/pal/intervention': screen(() => import('@/app/pal/intervention/page')),
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   '/pal/new': screen(() => import('@/app/pal/new/page')),
   '/pal/new/administration': screen(() => import('@/app/pal/new/administration/page')),
   '/pal/new/coherence-map': screen(() => import('@/app/pal/new/coherence-map/page')),
@@ -419,10 +388,7 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/pal/new/gamification/streaks': screen(() => import('@/app/pal/new/gamification/streaks/page')),
   '/pal/new/gamification/team-challenges': screen(() => import('@/app/pal/new/gamification/team-challenges/page')),
   '/pal/personalize-marks': screen(() => import('@/app/pal/personalize-marks/page')),
-<<<<<<< HEAD
   '/pal/recall': screen(() => import('@/app/pal/recall/page')),
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   '/pal/report': screen(() => import('@/app/pal/report/page')),
   '/pal/reports/attainment': screen(() => import('@/app/pal/reports/attainment/page')),
   '/pal/result': screen(() => import('@/app/pal/result/page')),

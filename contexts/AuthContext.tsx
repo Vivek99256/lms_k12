@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { clearTeachAssistantStorage } from '@/lib/chatbot-storage';
-import { purgeClientState, recordBuildId, syncAppBuild } from '@/lib/app-version';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 
 interface AuthContextType {
@@ -154,20 +153,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [enforceDailyReset]);
 
-  /**
-   * Catch a browser that is still holding the previous frontend build.
-   *
-   * Runs once per page load, before the user does anything: if the build id this
-   * bundle was compiled with differs from the one the browser last recorded, every
-   * cache, storage and cookie on the origin is dropped and the page is reloaded
-   * against the deployed build. Someone who never signs out still picks up a deploy
-   * on their next visit, and the state they carried over cannot outlive the code that
-   * wrote it. See `lib/app-version.ts` for how the id is produced.
-   */
-  useEffect(() => {
-    void syncAppBuild();
-  }, []);
-
   const persistLoginPayload = useCallback(
     (data: Record<string, unknown>) => {
       function getValue(obj: unknown, key: string): unknown {
@@ -209,10 +194,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(sessionPayload));
       setAcademicTerms(Array.isArray(data.academicTerms) ? (data.academicTerms as Array<Record<string, unknown>>) : []);
       setAcademicYears(Array.isArray(data.academicYears) ? (data.academicYears as Array<Record<string, unknown>>) : []);
-      // Stamp the build that wrote this session. Logout cleared the previous stamp
-      // along with everything else, so without this the first startup after a login
-      // would look like a fresh browser and the next deploy would go unnoticed.
-      recordBuildId();
       resetInactivityTimer();
     },
     [resetInactivityTimer]
@@ -267,7 +248,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [persistLoginPayload]);
 
   /**
-<<<<<<< HEAD
    * The WebView bridge's counterpart to login()/loginWithGoogle(): exchange
    * something that isn't a password (here, a ticket the ERP already bound to
    * one user, one tenant and one target page) for the same kind of session
@@ -305,8 +285,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /**
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
    * Signing out takes the browser back to a clean copy of the app, not just to a
    * logged-out React state.
    *
@@ -325,15 +303,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMenuContext(null);
     setAcademicTerms([]);
     setAcademicYears([]);
+    localStorage.removeItem(STORAGE_KEY_AUTH);
+    localStorage.removeItem(STORAGE_KEY_MENU);
+    localStorage.removeItem(STORAGE_KEY_USER);
+    localStorage.removeItem(STORAGE_SESSION_DATE);
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-    clearTeachAssistantStorage();
-
-    void purgeClientState().finally(() => {
-      if (typeof window === 'undefined') return;
-      // Land on the login route rather than the current deep link: the user is signed
-      // out, so the path they were on is no longer theirs to return to.
-      window.location.replace('/');
-    });
   }, []);
 
   /**

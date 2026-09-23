@@ -367,7 +367,7 @@ function ChapterRow({ chapter }: { chapter: UnitChapter }) {
                     >
                       {isTopicOpen ? <ChevronDown size={15} className="mt-0.5 shrink-0 text-[#64748B]" /> : <ChevronRight size={15} className="mt-0.5 shrink-0 text-[#64748B]" />}
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] font-semibold leading-5 text-[#0F172A]">{topicLabel(topic.name, index)}</span>
+                        <span className="block text-[13px] font-semibold leading-5 text-[#0F172A]">{index + 1}. {topic.name}</span>
                         {topic.description ? <span className="mt-0.5 block text-[12px] leading-5 text-[#64748B]">{topic.description}</span> : null}
                       </span>
                       <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] font-semibold text-[#475569]">{topic.concepts.length} {topic.concepts.length === 1 ? 'concept' : 'concepts'}</span>
@@ -454,24 +454,6 @@ function OutcomeTree({
       ))}
     </div>
   );
-}
-
-/**
- * How a topic is labelled in the curriculum tree.
- *
- * Most topic names already carry the textbook's own section number - "2.1
- * Introduction", "4.6 Factorisation without using algebra tiles". Prefixing a
- * running index on top of that produced "1. 2.1 Introduction", and for a
- * sub-section "1.1.1" appearing under "2.1.2", which reads as two competing
- * numbering schemes. The book's own number always wins; the running index is
- * only a fallback for names that carry none, such as the thematic strands used
- * by the literature subjects ("Theme and Content").
- */
-function topicLabel(name: string, index: number): string {
-  const trimmed = (name ?? '').trim();
-  // A leading "2.1", "2.1.1" or "7." - optionally followed by punctuation.
-  if (/^\d+(\.\d+)*[.)]?\s/.test(trimmed)) return trimmed;
-  return `${index + 1}. ${trimmed}`;
 }
 
 export default function CurriculumPage() {

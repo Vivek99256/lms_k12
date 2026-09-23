@@ -1,10 +1,6 @@
 'use client';
 
-<<<<<<< HEAD
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-=======
-import { Suspense, useCallback, useEffect, useState } from 'react';
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -22,7 +18,6 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { fetchLearningPlan, type LearningPlan, type PlanStep } from '@/app/pal/data/pal-diagnostic';
-<<<<<<< HEAD
 import { isConceptCompleted, signalsFromMasteryRow } from '@/app/pal/data/pal-completion';
 import { BandChip, StrengthBadge, bandLabel } from '@/app/pal/_components/BandMeter';
 import {
@@ -32,10 +27,6 @@ import {
   useChapterCompletion,
 } from '@/app/pal/_components/CompletionState';
 import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
-=======
-import { BandChip, StrengthBadge, bandLabel } from '@/app/pal/_components/BandMeter';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -55,7 +46,6 @@ import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace
  * server's, the reasons are AdaptiveDifficultyRule's own `rationale`, and the
  * mastery wording is MasteryLadder's. Nothing is composed client-side, so the
  * plan cannot drift from the evidence that produced it.
-<<<<<<< HEAD
  *
  * ---------------------------------------------------------------------------
  * A COMPLETED CHAPTER HAS NO PLAN
@@ -68,8 +58,6 @@ import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace
  * difficulty band was actually reached, so a verdict derived here would drift
  * from the one the mastery screen reaches about the same concept. One
  * authority, one answer - see app/pal/data/pal-completion.ts.
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
  */
 
 export default function LearningPlanPage() {
@@ -121,7 +109,6 @@ function LearningPlanView() {
 
   useEffect(() => load(), [load]);
 
-<<<<<<< HEAD
   // The mastery overview, not the plan's own ladders, decides what is
   // completed here. The plan reports a ladder per concept but no evidence of
   // which difficulty band was actually reached, so judging from it alone would
@@ -140,9 +127,6 @@ function LearningPlanView() {
   );
 
   if (loading || loadingMastery) return <Centered>Building your plan…</Centered>;
-=======
-  if (loading) return <Centered>Building your plan…</Centered>;
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 
   if (error || !plan) {
     return (
@@ -160,7 +144,6 @@ function LearningPlanView() {
     );
   }
 
-<<<<<<< HEAD
   // No work left to order. The plan stands down and the chapter's mastery
   // record takes its place — read-only, with no route back into a question set.
   if (completion.isComplete && mastery) {
@@ -200,8 +183,6 @@ function LearningPlanView() {
     );
   }
 
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   const noDiagnostic = !plan.hasDiagnostic;
 
   // Everything that is context rather than the task itself moves to the rail:
@@ -212,11 +193,7 @@ function LearningPlanView() {
       <PalRailSection title="Your journey">
         <JourneyRail
           current={noDiagnostic ? 'diagnostic' : 'plan'}
-<<<<<<< HEAD
           completed={noDiagnostic ? [] : stagesBefore('plan')}
-=======
-          completed={noDiagnostic ? [] : ['diagnostic', 'adaptive']}
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
           orientation="vertical"
         />
       </PalRailSection>
@@ -225,11 +202,7 @@ function LearningPlanView() {
         <PalRailSection title="This chapter">
           <div className="grid grid-cols-2 gap-2.5">
             <Metric label="Concepts" value={plan.summary.conceptsServable} hint="with questions" />
-<<<<<<< HEAD
             <Metric label="Completed" value={completion.completed} tone="positive" />
-=======
-            <Metric label="Mastered" value={plan.summary.mastered} tone="positive" />
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
             <Metric label="In progress" value={plan.summary.inProgress} />
             <Metric
               label="Need work"
@@ -237,13 +210,10 @@ function LearningPlanView() {
               tone={plan.summary.weak > 0 ? 'warn' : undefined}
             />
           </div>
-<<<<<<< HEAD
           <p className="mt-2.5 text-xs text-slate-500">
             A concept is completed once it is cleared to {bandLabel('hard').toLowerCase()} and
             mastery is signed off. The chapter closes when all of them are.
           </p>
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
         </PalRailSection>
       )}
 
@@ -298,7 +268,6 @@ function LearningPlanView() {
         <CardContent>
           <ol className="space-y-4">
             {plan.steps.map((step, index) => (
-<<<<<<< HEAD
               <StepRow
                 key={`${step.key}-${step.conceptId ?? index}`}
                 step={step}
@@ -306,9 +275,6 @@ function LearningPlanView() {
                 chapterId={chapterId}
                 completed={step.conceptId != null && completedConceptIds.has(String(step.conceptId))}
               />
-=======
-              <StepRow key={`${step.key}-${step.conceptId ?? index}`} step={step} index={index + 1} chapterId={chapterId} />
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
             ))}
           </ol>
         </CardContent>
@@ -347,7 +313,6 @@ function LearningPlanView() {
   );
 }
 
-<<<<<<< HEAD
 function StepRow({
   step,
   index,
@@ -359,9 +324,6 @@ function StepRow({
   chapterId: string;
   completed: boolean;
 }) {
-=======
-function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; chapterId: string }) {
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   // The diagnostic and all-mastered steps carry no concept, so they render as a
   // single call to action rather than a sub-journey.
   if (step.key !== 'concept') {
@@ -392,7 +354,6 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
 
   return (
     <li className="flex items-start gap-3">
-<<<<<<< HEAD
       <span
         className={cn(
           'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums',
@@ -400,16 +361,11 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
         )}
       >
         {completed ? <CheckCircle2 aria-hidden className="h-4 w-4" /> : index}
-=======
-      <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold tabular-nums text-slate-600">
-        {index}
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
       </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold text-slate-900">{step.title}</p>
-<<<<<<< HEAD
           {completed ? (
             <CompletedBadge />
           ) : (
@@ -418,10 +374,6 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
               {step.nextDifficulty && <BandChip band={step.nextDifficulty} />}
             </>
           )}
-=======
-          <StrengthBadge band={step.band} />
-          {step.nextDifficulty && <BandChip band={step.nextDifficulty} />}
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
         </div>
 
         {step.detail && <p className="mt-1 text-sm text-slate-600">{step.detail}</p>}
@@ -446,7 +398,6 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
         {/* Learn leads, then Practise — the same order as the path listed
             directly above and as the engine itself runs. These were the other
             way round, so the first control under a "Learn -> Practice -> Check"
-<<<<<<< HEAD
             path was the one that skipped to practice.
 
             A completed concept keeps neither: it is read-only, and the only
@@ -463,11 +414,6 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
               <ReadOnlyBadge />
             </>
           ) : step.esoReady ? (
-=======
-            path was the one that skipped to practice. */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {step.esoReady ? (
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
             <Link
               href={`/pal/learn/concept/${step.conceptId}?chapterId=${chapterId}`}
               className={buttonVariants({ size: 'sm' })}
@@ -484,7 +430,6 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
             </span>
           )}
 
-<<<<<<< HEAD
           {!completed && (
             <Link href={`/pal/adaptive/concept/${step.conceptId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
               Practise{step.nextDifficulty ? ` at ${bandLabel(step.nextDifficulty).toLowerCase()}` : ''}
@@ -495,13 +440,6 @@ function StepRow({ step, index, chapterId }: { step: PlanStep; index: number; ch
               without the hard rung having been reached, so it is still open to
               practise and says so rather than reading as finished. */}
           {!completed && step.ladder?.mastered && (
-=======
-          <Link href={`/pal/adaptive/concept/${step.conceptId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            Practise{step.nextDifficulty ? ` at ${bandLabel(step.nextDifficulty).toLowerCase()}` : ''}
-          </Link>
-
-          {step.ladder?.mastered && (
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
             <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
               <CheckCircle2 aria-hidden className="h-3.5 w-3.5" />
               Mastered

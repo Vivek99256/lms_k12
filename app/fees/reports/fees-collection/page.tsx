@@ -273,19 +273,6 @@ export default function FeesCollectionReportPage() {
             onExportExcel={() => exportRowsAsExcel({ filename: 'fees-collection-report.xls', title: 'Fees Collection Report', columns: exportColumns, rows: exportRows })}
             onExportPdf={() => exportRowsAsPdf({ filename: 'fees-collection-report.pdf', title: 'Fees Collection Report', subtitle: `Academic year ${academicYearId || '-'}`, columns: exportColumns, rows: exportRows })}
             onPrint={() => openPrintPreview({ title: 'Fees Collection Report', subtitle: `Academic year ${academicYearId || '-'}`, columns: exportColumns, rows: exportRows })}
-            // Records each export in the Fees AI Stack ledger, against the published
-            // Fees report layout. The export itself is unchanged.
-            activity={{
-              operation: 'fee_report',
-              label: 'Fees Collection Report',
-              rowCount: rows.length,
-              filters: {
-                from_date: fromDate || null,
-                to_date: toDate || null,
-                payment_mode: paymentMode || null,
-                academic_year: academicYearId || null,
-              },
-            }}
           />
         }
       />

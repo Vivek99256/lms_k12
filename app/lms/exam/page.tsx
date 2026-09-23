@@ -14,14 +14,13 @@ import {
   GraduationCap,
   Hourglass,
   Info,
-  Layers,
   Lock,
   Monitor,
   Plus,
   BookOpen,
   Play,
   Printer,
-  ScanLine,
+  Search,
   Send,
   Sparkles,
   X,
@@ -38,22 +37,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import ExamResultDashboard from '@/app/lms/exam/_result-dashboard/ExamResultDashboard';
-import AssessmentBlueprints from '@/app/lms/exam/_assessment-blueprint/AssessmentBlueprints';
-import ExamEvaluation from '@/app/lms/exam/_exam-evaluation/ExamEvaluation';
-import QuestionPaperTemplates from '@/app/lms/exam/_question-paper-templates/QuestionPaperTemplates';
-import {
-  QuestionPaperTemplateSelect,
-  useExamPaperPdf,
-} from '@/app/lms/exam/_question-paper-templates/ExamPaperPdf';
-import {
-  ALL_QUESTION_PAPER_COLUMNS,
-  QuestionPaperGrid,
-  examTypeLabel,
-  examTypeOptions,
-  getQuestionPaperSession as getCreateExamSession,
-  useQuestionPaperRows,
-} from '@/app/lms/_shared/question-paper-grid';
 
+type ExamStatus = 'Scheduled' | 'Open' | 'Draft' | 'Closed';
 type AudienceMode = 'Teacher' | 'Student';
 type StudentLearningTab = 'PAL' | 'Online Exam' | 'Offline Exam';
 
@@ -109,6 +94,18 @@ type StudentPracticeAssessment = {
   durationMinutes: number;
   masteryTarget: number;
   questions: StudentPracticeQuestion[];
+};
+
+type ExamRecord = {
+  id: string;
+  name: string;
+  classLabel: string;
+  type: string;
+  window: string;
+  attempts: number;
+  questions: number;
+  marks: number;
+  status: ExamStatus;
 };
 
 type ApiQuestionPaperRecord = {
@@ -327,29 +324,30 @@ type QuestionRecord = {
   marks: number;
 };
 
+const statusBadgeClasses: Record<ExamStatus, string> = {
+  Scheduled: 'bg-[#FFF4E8] text-[#A45C14]',
+  Open: 'bg-[#EAF9F1] text-[#14804A]',
+  Draft: 'bg-[#EEF2F7] text-[#64748B]',
+  Closed: 'bg-[#EEF2F7] text-[#475569]',
+};
+
+const statusDotClasses: Record<ExamStatus, string> = {
+  Scheduled: 'bg-[#B96A1F]',
+  Open: 'bg-[#14804A]',
+  Draft: 'bg-[#7C8AA0]',
+  Closed: 'bg-[#64748B]',
+};
+
+const examTypeOptions = [
+  { label: 'Online', value: 'online' },
+  { label: 'Offline', value: 'offline' },
+];
 const attemptsAllowedOptions = ['1 attempt', '2 attempts', '3 attempts'];
 
-type ExamInnerTab =
-  | 'Blueprint'
-  | 'Exams'
-  | 'Question paper templates'
-  | 'Exam evaluation'
-  | 'Results dashboard';
+type ExamInnerTab = 'Exams' | 'Results dashboard';
 
-/**
- * The tabs run in the order the work actually happens in, so the bar reads
- * left to right as one paper's life: design it, set it, print it, mark it,
- * report it. Results sits last because it is the only tab that cannot be used
- * until every other one has been.
- *
- * `Exams` is still where the screen opens (see `examInnerTab`) -- it is the
- * daily screen, and the order is a map of the process, not a wizard.
- */
 const innerTabs: Array<{ label: ExamInnerTab; icon: LucideIcon }> = [
-  { label: 'Blueprint', icon: BookOpen },
   { label: 'Exams', icon: FileText },
-  { label: 'Question paper templates', icon: Layers },
-  { label: 'Exam evaluation', icon: ScanLine },
   { label: 'Results dashboard', icon: GraduationCap },
 ];
 
@@ -403,6 +401,60 @@ function toNumber(value: unknown): number {
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
+function getCreateExamSession() {
+  if (typeof window === 'undefined') {
+    return { token: '', subInstituteId: '', userProfileName: '', userId: '', syear: '' };
+  }
+
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+    const academicYears = userData.academicYears;
+    let syear = readString(localStorage.getItem('selectedAcademicYear'));
+
+    if (!syear && Array.isArray(academicYears) && academicYears.length > 0) {
+      const firstYear = academicYears[0] as Record<string, unknown>;
+      syear = readString(firstYear.syear);
+    }
+
+    if (!syear) {
+      syear = readString(userData.academic_year_id ?? userData.academicYearId ?? menuContext.academic_year_id);
+    }
+
+    return {
+      token: readString(userData.user_token ?? userData.token ?? menuContext.user_token ?? menuContext.token),
+      subInstituteId: readString(userData.sub_institute_id ?? menuContext.sub_institute_id),
+      userProfileName: readString(menuContext.user_profile_name ?? userData.user_profile_name),
+      userId: readString(menuContext.user_id ?? userData.user_id),
+      syear,
+    };
+  } catch {
+    return { token: '', subInstituteId: '', userProfileName: '', userId: '', syear: '' };
+  }
+}
+
+function mapQuestionPaperToExam(row: ApiQuestionPaperRecord): ExamRecord {
+  const paperName = row.paper_name?.trim() ?? '';
+  const paperDesc = row.paper_desc?.trim() ?? '';
+  const examName = [paperName, paperDesc].filter(Boolean).join(' ');
+  const standardName = row.standard_name == null ? '' : String(row.standard_name).trim();
+  const subjectName = row.subject_name?.trim() ?? '';
+  const openDate = row.open_date?.trim() ?? '';
+  const closeDate = row.close_date?.trim() ?? '';
+
+  return {
+    id: `EXM-${row.id}`,
+    name: examName || 'Untitled exam',
+    classLabel: `Grade ${standardName} - ${subjectName}`.trim(),
+    type: row.exam_type?.trim() || '-',
+    window: [openDate, closeDate].filter(Boolean).join(' - '),
+    attempts: toNumber(row.attempt_allowed),
+    questions: toNumber(row.total_ques),
+    marks: toNumber(row.total_marks),
+    status: row.active_exam === 'yes' ? 'Open' : 'Closed',
+  };
 }
 
 // --- PAL mastery map (GET /api/pal/mastery-map/{learnerId}) ---------------
@@ -977,22 +1029,17 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
     getCreateExamSession().userProfileName.trim().toUpperCase() === 'STUDENT'
       ? 'Student'
       : 'Teacher';
-  // No exam_type is pinned here, so the grid shows every type — Worksheet and
-  // Project are their own screens. Bumping `examReloadToken` re-runs the fetch
-  // after a publish.
-  const [examReloadToken, setExamReloadToken] = useState(0);
-  const {
-    rows: apiExams,
-    isLoading: isLoadingExams,
-    loadError: examLoadError,
-  } = useQuestionPaperRows(undefined, examReloadToken);
+  const [apiExams, setApiExams] = useState<ExamRecord[]>([]);
+  const [isLoadingExams, setIsLoadingExams] = useState(true);
+  const [examLoadError, setExamLoadError] = useState('');
   const [publishSuccessMessage, setPublishSuccessMessage] = useState('');
   const [lmsCourses, setLmsCourses] = useState<LmsCoursesSubjectRecord[]>([]);
   const [isLoadingLmsCourses, setIsLoadingLmsCourses] = useState(false);
   const [lmsCoursesError, setLmsCoursesError] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All statuses');
+  const [typeFilter, setTypeFilter] = useState('All types');
   const [examInnerTab, setExamInnerTab] = useState<ExamInnerTab>('Exams');
-  // Drives the template dropdown in the toolbar and the PDF action on each row.
-  const examPaperPdf = useExamPaperPdf();
   const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>(defaultStudentLearningTab);
   const [examFilters, setExamFilters] = useState({
     grade_id: '',
@@ -1072,6 +1119,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
   const scopeScrollRef = useRef<HTMLDivElement | null>(null);
+  const exams = apiExams;
   const onlineExamSession = getCreateExamSession();
   const isStudentProfile = onlineExamSession.userProfileName.trim().toUpperCase() === 'STUDENT';
   const activeStudentChapter = useMemo(
@@ -1469,7 +1517,6 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
   }, [fetchOfflineExams]);
  
 
-<<<<<<< HEAD
   // Worksheet/Project pin the grid to one exam_type before any of the other
   // filters apply, so their "N of M" count and empty states read against
   // their own rows rather than every exam.
@@ -1495,8 +1542,6 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
     });
   }, [scopedExams, search, statusFilter, typeFilter]);
 
-=======
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   const chapterOptions = useMemo(() => {
     if (selectedStandardId == null || selectedSubjectId == null) return [];
 
@@ -1804,6 +1849,58 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
+  const refreshExamList = useCallback(async (options?: { signal?: AbortSignal; showLoading?: boolean }) => {
+    const { signal, showLoading = true } = options ?? {};
+    const session = getCreateExamSession();
+
+    if (showLoading) {
+      setIsLoadingExams(true);
+    }
+    setExamLoadError('');
+
+    if (!session.subInstituteId || !session.userProfileName || !session.userId || !session.syear) {
+      setApiExams([]);
+      setExamLoadError('Exam session data is missing.');
+      if (showLoading) {
+        setIsLoadingExams(false);
+      }
+      return;
+    }
+
+    try {
+      const url = new URL(`${API_BASE_URL}/api/question-paper`);
+      url.searchParams.set('sub_institute_id', session.subInstituteId);
+      url.searchParams.set('syear', session.syear);
+      url.searchParams.set('user_profile_name', session.userProfileName);
+      url.searchParams.set('user_id', session.userId);
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        signal,
+        headers: {
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
+      });
+      const payload = (await response.json()) as QuestionPaperApiResponse;
+
+      if (!response.ok || payload.status_code !== 1) {
+        throw new Error(payload.message || 'Failed to load exams');
+      }
+
+      const mappedExams = Array.isArray(payload.data) ? payload.data.map(mapQuestionPaperToExam) : [];
+      setApiExams(mappedExams);
+    } catch (error) {
+      if (signal?.aborted) return;
+      setApiExams([]);
+      setExamLoadError(error instanceof Error ? error.message : 'Failed to load exams');
+    } finally {
+      if (!signal?.aborted && showLoading) {
+        setIsLoadingExams(false);
+      }
+    }
+  }, []);
+
   const goToNextExamStep = () => {
     if (createExamStep === 1) {
       const gradeId = Array.isArray(createExamFilters.section)
@@ -1933,7 +2030,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       setPublishSuccessMessage(successMessage);
       setIsCreateExamOpen(false);
       resetCreateExamForm();
-      setExamReloadToken((token) => token + 1);
+      await refreshExamList({ showLoading: false });
     } catch (error) {
       console.error('Publish exam error:', error);
 
@@ -2037,6 +2134,22 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       setIsPracticeLoading(false);
     }
   };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      refreshExamList({ signal: controller.signal }).catch((error) => {
+        if (!controller.signal.aborted) {
+          console.error('Exam list refresh error:', error);
+        }
+      });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [refreshExamList]);
 
   useEffect(() => {
     if (!isStudentProfile) return;
@@ -2461,7 +2574,6 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                   </div>
                 ) : null}
 
-<<<<<<< HEAD
                 {!isScopedToOneType && examInnerTab === 'Results dashboard' ? (
                   <ExamResultDashboard />
                 ) : (
@@ -2620,53 +2732,6 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                   </div>
                 ) : null}
               </div>
-=======
-                {/* Same order as `innerTabs`; `Exams` is the fallback because it is
-                    the tab the screen opens on. */}
-                {examInnerTab === 'Blueprint' ? (
-                  <AssessmentBlueprints />
-                ) : examInnerTab === 'Question paper templates' ? (
-                  <QuestionPaperTemplates />
-                ) : examInnerTab === 'Exam evaluation' ? (
-                  <ExamEvaluation />
-                ) : examInnerTab === 'Results dashboard' ? (
-                  <ExamResultDashboard />
-                ) : (
-                  <>
-                  <QuestionPaperGrid
-                    rows={apiExams}
-                    isLoading={isLoadingExams}
-                    loadError={examLoadError}
-                    columns={ALL_QUESTION_PAPER_COLUMNS}
-                    pdfController={examPaperPdf}
-                    toolbarActions={
-                      <>
-                        <QuestionPaperTemplateSelect controller={examPaperPdf} />
-                        <Link
-                          href="/exam/exam-creation"
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[#5846EA] bg-white px-4 text-[14px] font-semibold text-[#5846EA] transition hover:bg-[#EEEBFF]"
-                        >
-                          <Sparkles size={18} />
-                          AI generated exam
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={openCreateExamModal}
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[#5846EA] px-4 text-[14px] font-semibold text-white"
-                        >
-                          <Plus size={18} />
-                          Create exam
-                        </button>
-                      </>
-                    }
-                  >
-                    {publishSuccessMessage ? (
-                      <div className="rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-[14px] font-medium text-[#166534]">
-                        {publishSuccessMessage}
-                      </div>
-                    ) : null}
-                  </QuestionPaperGrid>
->>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
                   </>
                 )}
               </div>
@@ -2788,7 +2853,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                           {[
                             {
                               key: 'diagnostic',
-                              title: 'Chapter diagnostic',
+                              title: 'Diagnostic assessment',
                               description: 'Baseline for the chapter',
                               state: 'completed' as const,
                             },
@@ -4245,7 +4310,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                     </div>
                     <div>
                       <p className="text-[14px] text-[#64748B]">Type</p>
-                      <p className="mt-1 text-[16px] font-semibold text-[#1E293B]">{examTypeLabel(examType)}</p>
+                      <p className="mt-1 text-[16px] font-semibold text-[#1E293B]">{examType || '-'}</p>
                     </div>
                     <div>
                       <p className="text-[14px] text-[#64748B]">Standard</p>
