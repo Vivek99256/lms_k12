@@ -11,10 +11,12 @@ import { AccentButton, Surface, Unavailable } from './primitives';
 import { IntelligenceSectionNav, SECTION_NAV_LABELS } from './section-nav';
 import {
   BreakdownsSection,
+  CrossModuleWorkflowSection,
   DataQualitySection,
   DecisionsSection,
   FindingsSection,
   LearningSection,
+  ModuleIntegrationSection,
   PositionSection,
   PrioritiesSection,
   RecommendationsSection,
@@ -312,6 +314,22 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
               );
             case 'learning':
               return <LearningSection key={section.key} copy={section.copy} learning={data.learning} extras={extras} />;
+            case 'integration':
+              return (
+                <ModuleIntegrationSection
+                  key={section.key}
+                  module={contract.key}
+                  copy={section.copy}
+                />
+              );
+            case 'workflow':
+              return (
+                <CrossModuleWorkflowSection
+                  key={section.key}
+                  module={contract.key}
+                  copy={section.copy}
+                />
+              );
             default:
               return null;
           }

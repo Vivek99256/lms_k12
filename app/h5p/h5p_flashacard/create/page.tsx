@@ -96,8 +96,8 @@ function FlashcardCreateContent() {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+    <div className="p-4 sm:p-6">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Add flash cards"
           description="Create one or more flash cards for this chapter"

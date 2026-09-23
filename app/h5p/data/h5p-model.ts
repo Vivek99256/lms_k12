@@ -356,6 +356,13 @@ export interface H5pHubModule {
   h5pType: string;
   title: string;
   description: string;
+  /**
+   * The card category chip: Interactive Content, Assessment, Teaching
+   * Content. Null on a registry row whose implementation block predates
+   * the 2026-09-21 vertical, which renders as no chip rather than an
+   * empty one.
+   */
+  category: string | null;
   icon: string;
   route: string | null;
   nodeCount: number;
@@ -377,6 +384,7 @@ function readHubModule(value: unknown): H5pHubModule {
     h5pType: readString(record.h5p_type),
     title: readString(record.title),
     description: readString(record.description),
+    category: readNullableString(record.category),
     icon: readString(record.icon),
     route: readNullableString(record.route),
     nodeCount: readNumber(record.node_count),

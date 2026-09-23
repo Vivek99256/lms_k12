@@ -60,6 +60,10 @@ import {
 // The section switcher is shared with every other module's Intelligence screen,
 // so Fees and the contract-driven modules cannot drift apart on how it behaves.
 import { IntelligenceSectionNav } from '@/components/intelligence/module/section-nav';
+import {
+  CrossModuleWorkflowSection,
+  ModuleIntegrationSection,
+} from '@/components/intelligence/module/sections';
 
 /**
  * Fees Intelligence — the native LMS screen.
@@ -207,6 +211,16 @@ export function FeesIntelligenceScreen() {
           },
           { key: 'dataQuality', label: 'Data quality', render: () => <DataQuality data={data} /> },
           { key: 'learning', label: 'Learning', render: () => <Learning data={data} /> },
+          {
+            key: 'integration',
+            label: 'Module Integration',
+            render: () => <ModuleIntegrationSection module="fees" />,
+          },
+          {
+            key: 'workflow',
+            label: 'Cross-Module Workflow',
+            render: () => <CrossModuleWorkflowSection module="fees" />,
+          },
         ]
       : [];
 

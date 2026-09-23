@@ -143,8 +143,8 @@ function ScenarioListContent() {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+    <div className="p-4 sm:p-6">
+      <div className="mx-auto">
         <H5pPageHeader
           title="Scenario based learning"
           description="Interactive image scenarios with clickable points of interest"
