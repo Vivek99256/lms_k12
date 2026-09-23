@@ -62,7 +62,6 @@ import { nodeTypes, type ConceptCardData } from './ConceptCard';
 import { FocusBreadcrumb, crumbsFor } from './FocusBreadcrumb';
 import { MapInteractionContext, edgeTypes, markerColour, type LaneEdgeData } from './LaneEdge';
 import {
-  FOCUS_EXPANDED,
   isDependencyEdge,
   layoutFocusMap,
   type FocusFilters,
@@ -104,7 +103,15 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
   const active = walked ?? map;
 
   const [rootId, setRootId] = useState<string | null>(null);
-  const [rootStack, setRootStack] = useState<string[]>([]);
+  /**
+   * Where we have been, each entry remembering WHICH map it belongs to.
+   *
+   * A bare id is not enough once the walk crosses a grade: concept ids are only
+   * meaningful inside the scope that returned them, so stepping back to a concept from
+   * the original map while a walked map is still active would look the id up in the
+   * wrong map, find nothing, and render an empty canvas.
+   */
+  const [rootStack, setRootStack] = useState<{ id: string; walked: CoherenceMap | null }[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FocusFilters>({
@@ -301,7 +308,9 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
       savedViewport.current = null;
 
       if (!node.off_map) {
-        setRootStack((stack) => (rootId && rootId !== id ? [...stack, rootId] : stack));
+        setRootStack((stack) =>
+          rootId && rootId !== id ? [...stack, { id: rootId, walked }] : stack
+        );
         setRootId(id);
         setExpandedId(id);
 
@@ -312,7 +321,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
 
       try {
         const next = await fetchCoherenceMapForConcept(session, node.entity_id);
-        setRootStack((stack) => (rootId ? [...stack, rootId] : stack));
+        setRootStack((stack) => (rootId ? [...stack, { id: rootId, walked }] : stack));
         setWalked(next);
         setRootId(next.focus?.ref ?? id);
         setExpandedId(next.focus?.ref ?? id);
@@ -325,19 +334,32 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
         setWalking(false);
       }
     },
-    [active, session, rootId]
+    [active, session, rootId, walked]
   );
 
   const goBack = useCallback(() => {
-    setRootStack((stack) => {
-      const previous = stack[stack.length - 1];
-      if (previous === undefined) return stack;
+    const previous = rootStack[rootStack.length - 1];
+    if (previous === undefined) return;
 
-      setRootId(previous);
-      setExpandedId(previous);
+    // Restore the map that id came from, not just the id.
+    setWalked(previous.walked);
+    setRootId(previous.id);
+    setExpandedId(previous.id);
+    setRootStack((stack) => stack.slice(0, -1));
+  }, [rootStack]);
 
-      return stack.slice(0, -1);
-    });
+  /**
+   * Leaving the canvas has to drop the walk as well.
+   *
+   * The deck lists the subject this screen opened with. Returning to it while a walked
+   * map was still active meant the next pick handed a concept id from one map to a
+   * layout running over another - the same empty-canvas failure by a different route.
+   */
+  const backToDeck = useCallback(() => {
+    setWalked(null);
+    setRootId(null);
+    setExpandedId(null);
+    setRootStack([]);
   }, []);
 
   const expand = useCallback(
@@ -348,7 +370,13 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
       // Normalise the zoom on open. Without this, someone who had zoomed out reads the
       // detail at whatever scale they left the canvas on - and this is the one moment
       // the text actually has to be legible.
-      setCenter(node.x + FOCUS_EXPANDED.width / 2, node.y + FOCUS_EXPANDED.height / 2, {
+      //
+      // `node` is the card at its CURRENT size, and its centre is the right target
+      // because a card does not move when it opens: the column being opened is the one
+      // column `columnX` leaves in place, and growth is symmetric about the centre.
+      // Measuring against the expanded size instead would aim 224px right and 154px
+      // low, which lands the viewport on the card's bottom-right corner.
+      setCenter(node.x + node.width / 2, node.y + node.height / 2, {
         zoom: 1,
         duration: reduceMotion ? 0 : 240,
       });
@@ -574,7 +602,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
   }
 
   const rootNode = layout?.nodes.find((n) => n.isRoot) ?? null;
-  const crumbs = active ? crumbsFor(active, rootNode, () => setRootId(null)) : [];
+  const crumbs = active ? crumbsFor(active, rootNode, backToDeck) : [];
 
   return (
     <Shell
@@ -613,6 +641,9 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
             <ConceptDeck
               map={map}
               onPick={(id) => {
+                // The deck always lists the hook's own map, so any walk must already be
+                // cleared by the time a pick from it is laid out.
+                setWalked(null);
                 setRootId(id);
                 setExpandedId(id);
               }}
