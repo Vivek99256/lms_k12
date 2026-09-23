@@ -7,11 +7,20 @@ import { AlertCircle, Loader2, type LucideIcon } from 'lucide-react';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { PageFrame, PageHeader } from '@/app/fees/_components/fees-shared';
 import { getFeesSession, type FeesSession } from '@/app/fees/_lib/fees-api';
-import {
-  fetchModuleMenuCategories,
-  type ModuleCategoriesResponse,
-  type ModuleCategory,
-} from '@/app/modules/_lib/module-menu-categories-api';
+import { fetchModuleMenuCategories, type ModuleCategory } from '@/app/_lib/module-categories-api';
+
+/**
+ * "front-desk" reads "Front Desk", "teach_learn" reads "Teach Learn" — the same
+ * derivation the shared category page (app/_components/module-category-page.tsx)
+ * uses, since the categories feed carries no separate module label of its own.
+ */
+function moduleLabelFrom(moduleSlug: string): string {
+  return moduleSlug
+    .split(/[-_]/)
+    .filter((part) => part !== '')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
 
 /**
  * One module category's page — the body behind a category tab in the module's
@@ -67,7 +76,7 @@ export function ModuleCategoryPage({
   const router = useRouter();
 
   const [session, setSession] = useState<FeesSession | null>(null);
-  const [response, setResponse] = useState<ModuleCategoriesResponse | null>(null);
+  const [categories, setCategories] = useState<ModuleCategory[]>([]);
   const [state, setState] = useState<LoadState>('loading');
   const [error, setError] = useState('');
 
@@ -95,7 +104,7 @@ export function ModuleCategoryPage({
       try {
         const result = await fetchModuleMenuCategories(session, { moduleName: moduleSlug }, controller.signal);
         if (controller.signal.aborted) return;
-        setResponse(result);
+        setCategories(result);
         setState('ready');
       } catch (caught) {
         if (controller.signal.aborted) return;
@@ -108,11 +117,11 @@ export function ModuleCategoryPage({
   }, [session, moduleSlug]);
 
   const category = useMemo<ModuleCategory | null>(
-    () => response?.categories.find((entry) => entry.key === categoryKey) ?? null,
-    [response, categoryKey],
+    () => categories.find((entry) => entry.key === categoryKey) ?? null,
+    [categories, categoryKey],
   );
 
-  const moduleLabel = response?.module?.label || moduleSlug;
+  const moduleLabel = moduleLabelFrom(moduleSlug);
   const title = category ? `${moduleLabel} — ${category.label}` : moduleLabel;
 
   const screens = useMemo(
@@ -143,13 +152,13 @@ export function ModuleCategoryPage({
         </div>
       ) : null}
 
-      {state === 'ready' && !response?.module ? (
+      {state === 'ready' && categories.length === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
           {`No module is configured under "${moduleSlug}".`}
         </div>
       ) : null}
 
-      {state === 'ready' && response?.module && !category ? (
+      {state === 'ready' && categories.length > 0 && !category ? (
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
           {`${moduleLabel} has no "${categoryKey}" category configured.`}
         </div>

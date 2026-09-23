@@ -17,10 +17,18 @@ export interface AiPolicyRuleCatalogItem {
 export interface AiPolicyAssignment {
   id: number;
   policy_id: number;
+  /** `module` means `scope_id` is an `ai_modules` row id. See AiPolicyController. */
   scope_type: string;
   scope_id: number | null;
   sub_institute_id: number | null;
   status: number;
+}
+
+/** A module a policy can be scoped to. The id is what an assignment stores. */
+export interface AiPolicyModuleOption {
+  id: number;
+  key: string;
+  label: string;
 }
 
 export interface AiPolicyRow {

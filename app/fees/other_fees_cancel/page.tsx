@@ -29,6 +29,7 @@ import {
   type ApiStatusPayload,
   type FeesSession,
 } from '@/app/fees/_lib/fees-api';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -330,7 +331,20 @@ export default function OtherFeesCancelPage() {
                 <Button type="button" variant="outline" onClick={applyBulkDate}>Apply</Button>
               </div>
             </Field>
-            <Field label="Reason of cancel">
+            <Field
+              label="Reason of cancel"
+              assist={
+                <AiFieldAssistant
+                  value={bulkReason}
+                  onApply={setBulkReason}
+                  fieldType="notes"
+                  label="Reason of cancel"
+                  module="fees"
+                  page="Other fees cancel"
+                  entityType="fees_other_cancellation"
+                />
+              }
+            >
               <div className="flex gap-2">
                 <Input value={bulkReason} onChange={(event) => setBulkReason(event.target.value)} placeholder="Reason" />
                 <Button type="button" variant="outline" onClick={applyBulkReason}>Apply</Button>

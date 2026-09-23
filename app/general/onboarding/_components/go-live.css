@@ -1,0 +1,333 @@
+/* ---------------------------------------------------------------------------
+   Go-live launch overlay — styles for GoLiveOverlay.tsx.
+
+   Imported by that component rather than declared in app/globals.css: the
+   overlay is the only thing that uses any of it, so it is downloaded with the
+   onboarding journey instead of on every page in the app.
+
+   The whole celebration runs on transform and opacity so it stays on the
+   compositor, and every animation is switched off by the reduced-motion block
+   at the end — the card then renders at its finished state.
+--------------------------------------------------------------------------- */
+
+.golive-root {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #ffffff;
+  animation: golive-fade-in 320ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.golive-root.is-leaving {
+  animation: golive-fade-out 400ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* Purple to blue wash. Two offset radials so the tint shifts across the canvas
+   instead of reading as one flat colour. */
+.golive-glow {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(38% 38% at 28% 30%, rgba(139, 92, 246, 0.26), transparent 70%),
+    radial-gradient(42% 42% at 72% 68%, rgba(59, 130, 246, 0.22), transparent 70%),
+    radial-gradient(60% 60% at 50% 50%, rgba(99, 102, 241, 0.1), transparent 75%);
+  animation: golive-breathe 6s ease-in-out infinite;
+}
+
+.golive-particles {
+  position: absolute;
+  inset: 0;
+}
+
+.golive-particle {
+  position: absolute;
+  bottom: -12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  opacity: 0;
+  animation-name: golive-float;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* Glassmorphism success card — the one blurred surface in this system, and only
+   because it sits over a live animated field rather than over data. */
+.golive-card {
+  position: relative;
+  width: min(30rem, calc(100vw - 2rem));
+  padding: 2.5rem 2rem;
+  text-align: center;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 12px 32px -8px rgba(79, 70, 229, 0.18),
+    0 32px 64px -24px rgba(15, 23, 42, 0.22);
+  animation: golive-card-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Focused programmatically so the overlay owns the reading order; it is not an
+   interactive target, so it does not draw a ring. */
+.golive-card:focus {
+  outline: none;
+}
+
+.golive-ring-wrap {
+  position: relative;
+  width: 7.5rem;
+  height: 7.5rem;
+  margin: 0 auto 1.75rem;
+}
+
+.golive-ring {
+  width: 100%;
+  height: 100%;
+  /* 12 o'clock start, so the fill reads as a clock rather than a comet. */
+  transform: rotate(-90deg);
+}
+
+.golive-ring-track {
+  fill: none;
+  stroke: rgba(99, 102, 241, 0.14);
+  stroke-width: 8;
+}
+
+.golive-ring-fill {
+  fill: none;
+  stroke: #6366f1;
+  stroke-width: 8;
+  stroke-linecap: round;
+  /* The offset is driven from React on a ~40ms tick; the transition smooths
+     between ticks so the stroke sweeps rather than steps. */
+  transition: stroke-dashoffset 120ms linear;
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.45));
+}
+
+.golive-ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f46e5;
+}
+
+.golive-rocket {
+  display: flex;
+  color: #4f46e5;
+  animation: golive-liftoff 1.6s cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+
+/* The module mark takes over from the rocket and pulses its glow. */
+.golive-module-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 9999px;
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.1);
+  animation:
+    golive-mark-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both,
+    golive-mark-glow 1.4s ease-in-out 420ms infinite;
+}
+
+.golive-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 9999px;
+  color: #ffffff;
+  background: #10b981;
+  box-shadow: 0 8px 24px -6px rgba(16, 185, 129, 0.6);
+  animation: golive-check-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.golive-percent {
+  position: absolute;
+  left: 50%;
+  bottom: -1.5rem;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+}
+
+.golive-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: rgba(99, 102, 241, 0.08);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4338ca;
+}
+
+.golive-headline {
+  margin: 0.875rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+  animation: golive-line-in 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.golive-body {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.golive-footnote {
+  margin: 1.25rem 0 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.golive-progress {
+  margin-top: 0.625rem;
+  height: 3px;
+  border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.12);
+  overflow: hidden;
+}
+
+.golive-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  transition: width 120ms linear;
+}
+
+/* Confetti fans out from the centre of the screen; each ribbon carries its own
+   angle and distance as custom properties set inline. */
+.golive-confetti {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+}
+
+.golive-confetto {
+  position: absolute;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  animation: golive-burst 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes golive-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes golive-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes golive-breathe {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+@keyframes golive-float {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  12% { opacity: 0.6; }
+  88% { opacity: 0.5; }
+  100% { opacity: 0; transform: translateY(-105vh) scale(1); }
+}
+
+@keyframes golive-card-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes golive-line-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Settle, dip, then climb out of the ring. */
+@keyframes golive-liftoff {
+  0% { opacity: 0; transform: translateY(14px) scale(0.9); }
+  25% { opacity: 1; transform: translateY(2px) scale(1); }
+  45% { transform: translateY(4px) scale(0.98); }
+  100% { transform: translateY(-10px) scale(1.04); }
+}
+
+@keyframes golive-mark-in {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes golive-mark-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.35); }
+  50% { box-shadow: 0 0 0 12px rgba(99, 102, 241, 0); }
+}
+
+@keyframes golive-check-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes golive-burst {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--golive-angle)) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--golive-angle))
+      translateY(calc(var(--golive-distance) * -1))
+      scale(0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .golive-root,
+  .golive-root.is-leaving,
+  .golive-glow,
+  .golive-particle,
+  .golive-card,
+  .golive-rocket,
+  .golive-module-mark,
+  .golive-check,
+  .golive-headline,
+  .golive-confetto {
+    animation: none !important;
+  }
+
+  .golive-ring-fill,
+  .golive-progress-fill {
+    transition: none !important;
+  }
+
+  /* The particles and confetti exist only as motion, so they render as nothing
+     rather than as a static scatter of dots. */
+  .golive-particles,
+  .golive-confetti {
+    display: none;
+  }
+}

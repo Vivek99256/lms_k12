@@ -1,11 +1,11 @@
 'use client';
 
-import { TeachLearnCategoryPage } from '@/app/teach-learn/_components/teach-learn-category-page';
+import { ModuleCategoryPage } from '@/app/_components/module-category-page';
 
 /**
  * Teach/Learn → reports. One of the ten Teach/Learn category pages; all ten
- * share TeachLearnCategoryPage and differ only by which category they render.
+ * share ModuleCategoryPage and differ only by which category they render.
  */
 export default function Page() {
-  return <TeachLearnCategoryPage categoryKey="reports" />;
+  return <ModuleCategoryPage moduleName="teach_learn" categoryKey="reports" />;
 }

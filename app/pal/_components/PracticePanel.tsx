@@ -52,7 +52,7 @@ export function PracticePanel({
           onClick={() => setModal('practice')}
         >
           <Sparkles className="h-3.5 w-3.5" />
-          Adaptive practice
+          Concept diagnostic
         </Button>
         <Button
           variant="outline"
@@ -258,7 +258,7 @@ function AdaptivePracticeModal({
 
   return (
     <ModalShell
-      title="Adaptive practice"
+      title="Concept diagnostic"
       subtitle={data?.strategy?.description || 'Targeted practice based on your mastery.'}
       icon={<Sparkles className="h-5 w-5" />}
       onClose={onClose}

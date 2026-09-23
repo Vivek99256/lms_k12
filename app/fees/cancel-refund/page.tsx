@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -515,13 +516,29 @@ export default function FeesCancelRefundPage() {
                             </TableCell>
                             <TableCell className="min-w-56">
                               {row.feesType === 'REGULAR' ? (
-                                <Textarea
-                                  value={currentForm.cancelRemark}
-                                  onChange={(event) => updateCancelField(row, 'cancelRemark', event.target.value)}
-                                  disabled={!selected || !cancellable}
-                                  placeholder="Please enter cancel remark"
-                                  className="min-h-8"
-                                />
+                                <div className="space-y-1">
+                                  <Textarea
+                                    value={currentForm.cancelRemark}
+                                    onChange={(event) => updateCancelField(row, 'cancelRemark', event.target.value)}
+                                    disabled={!selected || !cancellable}
+                                    placeholder="Please enter cancel remark"
+                                    className="min-h-8"
+                                  />
+                                  <div className="flex justify-end">
+                                    <AiFieldAssistant
+                                      value={currentForm.cancelRemark}
+                                      onApply={(next) => updateCancelField(row, 'cancelRemark', next)}
+                                      fieldType="notes"
+                                      label="Cancel remark"
+                                      module="fees"
+                                      page="Fees cancel / refund"
+                                      entityType="fees_cancellation"
+                                      disabled={!selected || !cancellable}
+                                      triggerLabel={`Draft the cancel remark for ${row.studentName}`}
+                                      related={{ Student: row.studentName, Receipt: row.receiptNo }}
+                                    />
+                                  </div>
+                                </div>
                               ) : (
                                 <span className="text-slate-500">-</span>
                               )}
@@ -617,10 +634,29 @@ function TabButton({ active, children, onClick }: { active: boolean; children: R
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * A labelled control. `assist` is an optional slot at the end of the label row for the
+ * generative-AI trigger; without it the markup is exactly what it was.
+ */
+function Field({
+  label,
+  children,
+  assist,
+}: {
+  label: string;
+  children: React.ReactNode;
+  assist?: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
+      {assist ? (
+        <div className="flex items-center justify-between gap-2">
+          <Label>{label}</Label>
+          {assist}
+        </div>
+      ) : (
+        <Label>{label}</Label>
+      )}
       {children}
     </div>
   );
@@ -747,7 +783,7 @@ function RefundWorkflow({ session }: { session: SessionContext }) {
       <div className="grid gap-3 md:grid-cols-[1fr_auto]"><Input value={enrollment} onChange={(event) => setEnrollment(event.target.value)} placeholder="Enter enrollment number" /><Button type="button" onClick={search} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Search student</Button></div>
       {notice ? <InlineMessage type={notice.type} text={notice.text} /> : null}
       {students.length > 0 ? <div className="flex flex-wrap gap-2">{students.map((row) => <Button key={row.student_id} type="button" variant="outline" onClick={() => loadDetail(row.student_id)} disabled={busy}>{row.enrollment_no} — {row.student_name}</Button>)}</div> : null}
-      {student ? <div className="space-y-4 rounded-lg border border-slate-200 p-4"><div><h2 className="text-sm font-bold text-slate-950">Refund for {student.name}</h2><p className="text-xs text-slate-600">{student.enrollment}</p></div><div className="grid gap-3 md:grid-cols-2">{Object.entries(heads).map(([key, head]) => <Field key={key} label={`${head.label} (paid: ${currencyFormatter.format(head.amount)})`}><Input type="number" min="0" max={head.amount} value={amounts[key] ?? ''} onChange={(event) => setAmounts((current) => ({ ...current, [key]: event.target.value }))} /></Field>)}</div><div className="grid gap-3 md:grid-cols-2"><Field label="Payment mode"><select className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" value={paymentMode} onChange={(event) => setPaymentMode(event.target.value)}><option>Cash</option><option>Cheque</option><option>Bank Transfer</option></select></Field><Field label="Refund remark"><Textarea value={remark} onChange={(event) => setRemark(event.target.value)} /></Field></div><Button type="button" onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Save refund</Button></div> : null}
+      {student ? <div className="space-y-4 rounded-lg border border-slate-200 p-4"><div><h2 className="text-sm font-bold text-slate-950">Refund for {student.name}</h2><p className="text-xs text-slate-600">{student.enrollment}</p></div><div className="grid gap-3 md:grid-cols-2">{Object.entries(heads).map(([key, head]) => <Field key={key} label={`${head.label} (paid: ${currencyFormatter.format(head.amount)})`}><Input type="number" min="0" max={head.amount} value={amounts[key] ?? ''} onChange={(event) => setAmounts((current) => ({ ...current, [key]: event.target.value }))} /></Field>)}</div><div className="grid gap-3 md:grid-cols-2"><Field label="Payment mode"><select className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" value={paymentMode} onChange={(event) => setPaymentMode(event.target.value)}><option>Cash</option><option>Cheque</option><option>Bank Transfer</option></select></Field><Field label="Refund remark" assist={<AiFieldAssistant value={remark} onApply={setRemark} fieldType="notes" label="Refund remark" module="fees" page="Fees cancel / refund" entityType="fees_refund" related={{ Student: student.name, Enrollment: student.enrollment, 'Payment mode': paymentMode }} />}><Textarea value={remark} onChange={(event) => setRemark(event.target.value)} /></Field></div><Button type="button" onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />} Save refund</Button></div> : null}
     </div>
   );
 }

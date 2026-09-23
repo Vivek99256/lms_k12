@@ -198,12 +198,53 @@ export async function listAssignmentStudents(filters: {
   return dataRows(payload).map(toStudent);
 }
 
-export async function listExamPapers(subjectId: string): Promise<ExamPaperRow[]> {
+/**
+ * The papers a screen can assign from.
+ *
+ * Omitting `examType` keeps the endpoint's original pool — the offline papers
+ * the Assignment screen has always listed. The Worksheet and Project screens
+ * pass their own `question_paper.exam_type`, which is the only thing that
+ * differs between the three.
+ */
+export async function listExamPapers(
+  subjectId: string,
+  examType?: string
+): Promise<ExamPaperRow[]> {
   if (!subjectId) return [];
   const payload = await postJson("lms-assignment/exam-papers", {
     subject_id: subjectId,
+    ...(examType ? { exam_type: examType } : {}),
   });
   return dataRows(payload).map(toExamPaper);
+}
+
+/**
+ * Where a question paper's PDF is served from.
+ *
+ * `GET /api/question-paper/{id}/pdf` streams the same stored file the assign
+ * flow records in `lms_assignment.exam_pdf` and the backend later hands the
+ * student as `exam_pdf_url`, so a teacher previewing a paper and a student
+ * opening it are looking at one file.
+ *
+ * WHY NOT `/storage/QuestionPaper/<file>`. That is where the bytes live, but
+ * `lms-assignment/exam-papers` derives the file name from the paper row's own
+ * columns whether or not a file was ever saved. A paper with no stored PDF
+ * therefore answered the raw path with Laravel's styled HTML 404 page, which a
+ * browser's PDF viewer renders as a corrupt document rather than an absent one
+ * — the error a teacher saw on the Worksheet and Project screens. The endpoint
+ * answers a missing file with a plain JSON 404 and sends the real ones with
+ * `Content-Type: application/pdf` + `inline`, so they open in the viewer
+ * instead of downloading.
+ *
+ * Returns "" for a paper with no id, which is what tells a caller there is
+ * nothing to open.
+ */
+export function examPaperPdfUrl(paperId: string | number): string {
+  const id = String(paperId ?? "").trim();
+  if (!id) return "";
+  const { baseUrl } = buildSessionContext();
+
+  return `${baseUrl.replace(/\/$/, "")}/api/question-paper/${encodeURIComponent(id)}/pdf`;
 }
 
 export async function createAssignment(input: {
@@ -216,7 +257,26 @@ export async function createAssignment(input: {
   examPdf: string;
   assignmentSourceType?: "exam_paper" | "uploaded_homework";
   homeworkFile?: string;
+  /**
+   * Who the assignment is for. "selected" (the default) sends `studentIds` and
+   * is the screen's original behaviour. "all" tells the backend to resolve the
+   * whole class from `grade`/`standardId`/`divisionId` itself, so no student
+   * ids are sent and none are trusted.
+   */
+  assignMode?: "selected" | "all";
+  /** Class scope for "all": section (academic grade), standard and division ids. */
+  grade?: string;
+  standardId?: string;
+  divisionId?: string;
+  /**
+   * Which kind of work this row is. Absent means "assignment", so a request
+   * from the Assignment screen is exactly the one this endpoint has always
+   * received; worksheets and projects are the same row under a different
+   * label, submitted and graded by the same screens.
+   */
+  workType?: "assignment" | "worksheet" | "project";
 }): Promise<number> {
+  const forAll = input.assignMode === "all";
   const payload = await postJson("lms-assignment/store", {
     students: input.studentIds.join(","),
     title: input.title,
@@ -227,6 +287,19 @@ export async function createAssignment(input: {
     exam_pdf: input.examPdf,
     assignment_source_type: input.assignmentSourceType ?? "exam_paper",
     homework_file: input.homeworkFile ?? null,
+    ...(input.workType && input.workType !== "assignment"
+      ? { work_type: input.workType }
+      : {}),
+    // Only sent for the class-wide mode; a "selected" request is byte-for-byte
+    // the one this endpoint has always received.
+    ...(forAll
+      ? {
+          assign_mode: "all",
+          grade: input.grade || null,
+          standard_id: input.standardId || null,
+          division_id: input.divisionId || null,
+        }
+      : {}),
   });
   return readNumber(payload.count) || records(payload.assignment_ids).length || input.studentIds.length;
 }

@@ -79,7 +79,15 @@ export interface WorkspaceSuggestion {
   label: string;
   description: string | null;
   icon: string | null;
-  action_type: "prompt" | "generate" | "analyse" | "run_agent" | "start_workflow" | "ontology_view";
+  action_type:
+    | "prompt"
+    | "generate"
+    | "analyse"
+    | "run_agent"
+    | "start_workflow"
+    | "ontology_view"
+    // Writes a saved report rather than prose — see `generateReportForContext`.
+    | "report";
   action_ref: string | null;
   prompt?: string | null;
   payload?: Record<string, unknown>;

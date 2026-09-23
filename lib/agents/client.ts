@@ -22,6 +22,9 @@ export interface AgentBrowserSession {
   userName: string;
   userProfileId: string;
   userProfileName: string;
+  /** Scope a read tool needs so it reports this year's figures, not last year's. */
+  academicYear: string;
+  termId: string;
 }
 
 function readRecord(storage: Storage, key: string): Record<string, unknown> {
@@ -46,7 +49,17 @@ function firstString(sources: Record<string, unknown>[], keys: string[]): string
 
 export function readAgentBrowserSession(): AgentBrowserSession {
   if (typeof window === 'undefined') {
-    return { baseUrl: API_BASE_URL, token: '', subInstituteId: '', userId: '', userName: '', userProfileId: '', userProfileName: '' };
+    return {
+      baseUrl: API_BASE_URL,
+      token: '',
+      subInstituteId: '',
+      userId: '',
+      userName: '',
+      userProfileId: '',
+      userProfileName: '',
+      academicYear: '',
+      termId: '',
+    };
   }
 
   const sources: Record<string, unknown>[] = [];
@@ -65,7 +78,22 @@ export function readAgentBrowserSession(): AgentBrowserSession {
     userName: firstString(sources, ['user_name', 'first_name', 'name', 'username']),
     userProfileId: firstString(sources, ['user_profile_id', 'userProfileId', 'profile_id']),
     userProfileName: firstString(sources, ['user_profile_name', 'userProfileName', 'profile_name']),
+    // The picker writes `selectedAcademicYear`; the login payload carries `syear`.
+    // Read separately because they are stored as plain strings, not inside a record.
+    academicYear: readPlain(['selectedAcademicYear', 'syear']) || firstString(sources, ['syear', 'academic_year']),
+    termId: firstString(sources, ['term_id', 'marking_period_id', 'termId']),
   };
+}
+
+/** A value stored as a bare string rather than inside one of the JSON records. */
+function readPlain(keys: string[]): string {
+  for (const storage of [sessionStorage, localStorage]) {
+    for (const key of keys) {
+      const value = storage.getItem(key)?.trim();
+      if (value) return value;
+    }
+  }
+  return '';
 }
 
 /** The session `x-*` headers every app-local API expects; shared with the Conversational AI admin client. */
@@ -80,6 +108,8 @@ export function buildSessionHeaders(session: AgentBrowserSession, json = false):
   if (session.userName) headers.set('x-user-name', session.userName);
   if (session.userProfileId) headers.set('x-user-profile-id', session.userProfileId);
   if (session.userProfileName) headers.set('x-user-profile-name', session.userProfileName);
+  if (session.academicYear) headers.set('x-academic-year', session.academicYear);
+  if (session.termId) headers.set('x-term-id', session.termId);
   return headers;
 }
 
