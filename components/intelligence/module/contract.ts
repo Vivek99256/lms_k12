@@ -50,7 +50,9 @@ export type SectionKey =
   | 'recommendations'
   | 'decisions'
   | 'dataQuality'
-  | 'learning';
+  | 'learning'
+  | 'integration'
+  | 'workflow';
 
 export interface SectionCopy {
   /** The small coloured overline: "Analytics", "Intelligence", "Ledger". */
@@ -257,6 +259,22 @@ export function defaultSections(): SectionConfig[] {
           'What earlier decisions in this module actually achieved, carried forward so the next decision is better informed.',
       },
     },
+    {
+      key: 'integration',
+      copy: {
+        eyebrow: 'Ecosystem',
+        title: 'Module Integration',
+        description: 'Cross-module data relationships, shared metrics, and verified entity connections for this module.',
+      },
+    },
+    {
+      key: 'workflow',
+      copy: {
+        eyebrow: 'Execution',
+        title: 'Cross-Module Workflow',
+        description: 'Multi-module operational workflows, trigger conditions, approval gates, and live execution history.',
+      },
+    },
   ];
 }
 
@@ -301,4 +319,77 @@ export function sectionsWith(
       ...section,
       copy: { ...section.copy, ...(overrides[section.key] ?? {}) },
     }));
+}
+
+/* ----------------------------------------------------------- integrations & workflows */
+
+export interface ModuleIntegrationItem {
+  id: string;
+  target_module: string;
+  target_label: string;
+  relationship: string;
+  why_it_matters: string;
+  status: 'available' | 'unavailable';
+  record_count: number;
+  metrics: Array<{ label: string; value: string }>;
+  shared_entities: string[];
+  route: string;
+  reason?: string | null;
+}
+
+export interface ModuleIntegrationsResponse {
+  module: string;
+  module_label: string;
+  academic_year: string | null;
+  summary: {
+    total_integrations: number;
+    active_connections: number;
+    headline: string;
+  };
+  integrations: ModuleIntegrationItem[];
+}
+
+export interface WorkflowStepItem {
+  step_number: number;
+  name: string;
+  approver_type: string;
+  approver: string;
+  sla_hours: number;
+}
+
+export interface ModuleWorkflowItem {
+  key: string;
+  label: string;
+  description: string;
+  subject: string;
+  module: string;
+  component: string;
+  involved_modules: string[];
+  is_customized: boolean;
+  status: string;
+  steps: WorkflowStepItem[];
+  trigger_capabilities: {
+    can_trigger: boolean;
+    requires_confirmation: boolean;
+    destructive: boolean;
+  };
+}
+
+export interface WorkflowRunItem {
+  id: number;
+  run_reference: string;
+  workflow_key: string;
+  status: string;
+  current_step: string | null;
+  initiated_by: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface ModuleWorkflowsResponse {
+  module: string;
+  module_label: string;
+  available_workflows_count: number;
+  workflows: ModuleWorkflowItem[];
+  recent_runs: WorkflowRunItem[];
 }
