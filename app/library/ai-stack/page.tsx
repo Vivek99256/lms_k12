@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { LIBRARY_AI_STACK_SCREENS } from '@/app/library/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -13,14 +13,14 @@ import { LIBRARY_AI_STACK_SCREENS } from '@/app/library/ai-stack/_screens/ai-sta
  * It sits beside the library screens at `/library`, which the module's own row already
  * claims as `/library/**`.
  *
- * `moduleName="library"` is the MENU slug and the AI module key is also `library`. The
+ * `moduleSlug="library"` is the MENU slug and the AI module key is also `library`. The
  * level-2 menu is shown as "Books" in the navigation, which is why the AI Stack category
  * row created for it names the module `library` and the menu `Books`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="library"
+      moduleSlug="library"
       categoryKey="ai-stack"
       staticScreens={LIBRARY_AI_STACK_SCREENS}
     />

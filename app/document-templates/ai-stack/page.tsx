@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { DOCUMENT_TEMPLATES_AI_STACK_SCREENS } from '@/app/document-templates/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -13,14 +13,14 @@ import { DOCUMENT_TEMPLATES_AI_STACK_SCREENS } from '@/app/document-templates/ai
  * It sits beside the template editor at `/document-templates`, which the module's own row
  * already claims as `/document-templates/**`.
  *
- * `moduleName="document-templates"` is the MENU slug and the AI module key is the same
+ * `moduleSlug="document-templates"` is the MENU slug and the AI module key is the same
  * string - hyphen and all, because that is how `ai_modules` has spelled it since the
  * workspace was seeded. Everything downstream builds from the key verbatim.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="document-templates"
+      moduleSlug="document-templates"
       categoryKey="ai-stack"
       staticScreens={DOCUMENT_TEMPLATES_AI_STACK_SCREENS}
     />

@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { UTILITY_AI_STACK_SCREENS } from '@/app/Utility/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -14,14 +14,14 @@ import { UTILITY_AI_STACK_SCREENS } from '@/app/Utility/ai-stack/_screens/ai-sta
  * claimed as `/Utility/**` since the workspace was seeded - so this page resolves without
  * any new pattern.
  *
- * `moduleName="utility"` is the MENU slug; the AI module KEY is `migration-modules`,
+ * `moduleSlug="utility"` is the MENU slug; the AI module KEY is `migration-modules`,
  * because that is the row that owns these routes. See
  * `lib/utility/utility-ai-stack.ts` for why it was not given a new one.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="utility"
+      moduleSlug="utility"
       categoryKey="ai-stack"
       staticScreens={UTILITY_AI_STACK_SCREENS}
     />

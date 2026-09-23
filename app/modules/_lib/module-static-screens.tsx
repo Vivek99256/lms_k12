@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage, type ModuleStaticScreen } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage, type ModuleStaticScreen } from '@/app/modules/_components/module-category-page';
 import { COMPLAINT_AI_STACK_SCREENS } from '@/app/admin-services/complaint-ai-stack/_screens/ai-stack-screens';
 import { PARENT_COMMUNICATION_AI_STACK_SCREENS } from '@/app/front_desk/parent_communication/ai-stack/_screens/ai-stack-screens';
 import { SQAA_AI_STACK_SCREENS } from '@/app/sqaa/ai-stack/_screens/ai-stack-screens';
@@ -17,7 +17,6 @@ import { PETTY_CASH_AI_STACK_SCREENS } from '@/app/admin-services/petty-cash-ai-
 import { PTM_AI_STACK_SCREENS } from '@/app/admin-services/ptm-ai-stack/_screens/ai-stack-screens';
 import { VISITOR_AI_STACK_SCREENS } from '@/app/admin-services/visitor-ai-stack/_screens/ai-stack-screens';
 import { ADMISSIONS_AI_STACK_SCREENS } from '@/app/admissions/ai-stack/_screens/ai-stack-screens';
-import { ATTENDANCE_AI_STACK_SCREENS } from '@/app/attendance/ai-stack/_screens/ai-stack-screens';
 import { COMMUNICATION_AI_STACK_SCREENS } from '@/app/easy_com/ai-stack/_screens/ai-stack-screens';
 import { EXAM_AI_STACK_SCREENS } from '@/app/exam/ai-stack/_screens/ai-stack-screens';
 import { CIRCULAR_AI_STACK_SCREENS } from '@/app/front_desk/circular/ai-stack/_screens/ai-stack-screens';
@@ -66,7 +65,10 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   // `admissions` module, `student:` renders `students`, and `student-request:` renders
   // `student_request`, which is a different module from both.
   'admission:ai-stack': ADMISSIONS_AI_STACK_SCREENS,
-  'attendance:ai-stack': ATTENDANCE_AI_STACK_SCREENS,
+  // `attendance:` is deliberately absent. Its hand-written screens were removed pending
+  // migration to the shared descriptor pattern (see lib/exam/exam-ai-stack.ts) — until
+  // that lands, the category falls back to its database-driven menus, same as any
+  // module with no static screens.
   'certificate:ai-stack': CERTIFICATE_AI_STACK_SCREENS,
   'circular:ai-stack': CIRCULAR_AI_STACK_SCREENS,
   // `communication:` renders the `easy_com` module — the key this estate has always used
@@ -144,7 +146,7 @@ export function ModuleCategoryRoute({
 
   return (
     <ModuleCategoryPage
-      moduleName={moduleKey}
+      moduleSlug={moduleKey}
       categoryKey={categoryKey}
       staticScreens={screens}
       // 'before' is the default and is right here: the AI Stack category has no database

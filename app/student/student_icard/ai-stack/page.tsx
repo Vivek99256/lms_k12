@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { STUDENT_ICARD_AI_STACK_SCREENS } from '@/app/student/student_icard/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -18,14 +18,14 @@ import { STUDENT_ICARD_AI_STACK_SCREENS } from '@/app/student/student_icard/ai-s
  * segments above wildcards - `/student/student_icard` scores 20 against 11. So this page
  * resolves to `student_icard` and every other student page is untouched.
  *
- * `moduleName="student-i-card"` is the MENU slug, hyphenated because it is derived from the
+ * `moduleSlug="student-i-card"` is the MENU slug, hyphenated because it is derived from the
  * level-2 menu's own name. The AI module key is `student_icard`, underscored, and it is
  * never typed into a screen.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="student-i-card"
+      moduleSlug="student-i-card"
       categoryKey="ai-stack"
       staticScreens={STUDENT_ICARD_AI_STACK_SCREENS}
     />

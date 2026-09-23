@@ -1,6 +1,6 @@
 'use client';
 
-import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
+import type { ModuleStaticScreen } from '@/app/modules/_components/module-category-page';
 import { buildAiStackScreens } from '@/app/_components/ai-stack/build-ai-stack-screens';
 import { PARENT_COMMUNICATION_AI_STACK } from '@/lib/parent-communication/parent-communication-ai-stack';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { FRONT_DESK_AI_STACK_SCREENS } from '@/app/front_desk/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -19,12 +19,12 @@ import { FRONT_DESK_AI_STACK_SCREENS } from '@/app/front_desk/ai-stack/_screens/
  * module's wildcard. `RouteMatcher` scores a literal segment above a wildcard, so each
  * keeps its own page.
  *
- * `moduleName="front-desk"` is the MENU slug; the AI module key is `front_desk`.
+ * `moduleSlug="front-desk"` is the MENU slug; the AI module key is `front_desk`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="front-desk"
+      moduleSlug="front-desk"
       categoryKey="ai-stack"
       staticScreens={FRONT_DESK_AI_STACK_SCREENS}
     />

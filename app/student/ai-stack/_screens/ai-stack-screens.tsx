@@ -2,7 +2,7 @@
 
 import { BookMarked, Cpu, FileText, Gauge, History, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
 
-import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
+import type { ModuleStaticScreen } from '@/app/modules/_components/module-category-page';
 import { StudentsActivityScreen } from '@/app/student/ai-stack/_screens/students-activity-screen';
 import { StudentsAutomationsScreen } from '@/app/student/ai-stack/_screens/students-automations-screen';
 import { StudentsGuardrailsScreen } from '@/app/student/ai-stack/_screens/students-guardrails-screen';

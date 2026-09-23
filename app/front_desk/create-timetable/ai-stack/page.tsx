@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { TIMETABLE_AI_STACK_SCREENS } from '@/app/front_desk/create-timetable/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -18,12 +18,12 @@ import { TIMETABLE_AI_STACK_SCREENS } from '@/app/front_desk/create-timetable/ai
  * at `/classteacher` and `/proxy_master`, which belong to the classteacher and proxy
  * modules. Neither is claimed by this route.
  *
- * `moduleName="timetable"` is the MENU slug and the AI module key is also `timetable`.
+ * `moduleSlug="timetable"` is the MENU slug and the AI module key is also `timetable`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="timetable"
+      moduleSlug="timetable"
       categoryKey="ai-stack"
       staticScreens={TIMETABLE_AI_STACK_SCREENS}
     />

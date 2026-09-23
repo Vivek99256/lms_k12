@@ -37,7 +37,11 @@
  */
 
 import { AiStackModelsScreen } from '@/app/_components/ai-stack/models-screen';
-import { FEES_MODULE } from '@/lib/fees/fees-ai-stack';
+
+// The `ai_modules` key this estate has carried for Fees since the workspace was seeded.
+// `lib/fees/fees-ai-stack.ts` (the full descriptor) was retired with the rest of Fees'
+// hand-written screens; this tab only ever needed the key, not the whole descriptor.
+const FEES_MODULE = 'fees';
 
 export function FeesModelsScreen() {
   return <AiStackModelsScreen module={{ key: FEES_MODULE, label: 'Fees' }} />;

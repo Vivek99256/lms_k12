@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { PETTY_CASH_AI_STACK_SCREENS } from '@/app/admin-services/petty-cash-ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -16,12 +16,12 @@ import { PETTY_CASH_AI_STACK_SCREENS } from '@/app/admin-services/petty-cash-ai-
  * patterns and is more specific than the admin-services module's `/admin-services/**`, so
  * it resolves here without admin-services losing anything.
  *
- * `moduleName="petty-cash"` is the MENU slug and the AI module key is `petty_cash`.
+ * `moduleSlug="petty-cash"` is the MENU slug and the AI module key is `petty_cash`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="petty-cash"
+      moduleSlug="petty-cash"
       categoryKey="ai-stack"
       staticScreens={PETTY_CASH_AI_STACK_SCREENS}
     />

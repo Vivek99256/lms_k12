@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { CURRICULUM_PLANNING_AI_STACK_SCREENS } from '@/app/lms/curriculum-planning/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -13,7 +13,7 @@ import { CURRICULUM_PLANNING_AI_STACK_SCREENS } from '@/app/lms/curriculum-plann
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="curriculum-planning"
+      moduleSlug="curriculum-planning"
       categoryKey="ai-stack"
       staticScreens={CURRICULUM_PLANNING_AI_STACK_SCREENS}
     />

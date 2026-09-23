@@ -2,14 +2,10 @@
 
 import { BookMarked, Cpu, FileText, Gauge, History, ShieldAlert, Terminal, Workflow } from 'lucide-react';
 
-import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
+import type { ModuleStaticScreen } from '@/app/modules/_components/module-category-page';
 import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-screen';
-import { ComingSoonPanel, ComingSoonToggle } from '@/components/ui/coming-soon';
 import { FeesAutomationsScreen } from '@/app/fees/ai-stack/_screens/fees-automations-screen';
-import { FeesGuardrailsScreen } from '@/app/fees/ai-stack/_screens/fees-guardrails-screen';
-import { FeesKnowledgeBaseScreen } from '@/app/fees/ai-stack/_screens/fees-knowledge-base-screen';
 import { FeesModelsScreen } from '@/app/fees/ai-stack/_screens/fees-models-screen';
-import { FeesPromptsScreen } from '@/app/fees/ai-stack/_screens/fees-prompts-screen';
 import { FeesTemplatesScreen } from '@/app/fees/ai-stack/_screens/fees-templates-screen';
 
 /**

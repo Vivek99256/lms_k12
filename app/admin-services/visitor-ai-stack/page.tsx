@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { VISITOR_AI_STACK_SCREENS } from '@/app/admin-services/visitor-ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -17,13 +17,13 @@ import { VISITOR_AI_STACK_SCREENS } from '@/app/admin-services/visitor-ai-stack/
  * claimed by this module. They are a different register over a different table, kept by
  * different people, and taking them would merge two counts that must stay apart.
  *
- * `moduleName="visitor-management"` is the MENU slug and the AI module key is
+ * `moduleSlug="visitor-management"` is the MENU slug and the AI module key is
  * `visitor_management`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="visitor-management"
+      moduleSlug="visitor-management"
       categoryKey="ai-stack"
       staticScreens={VISITOR_AI_STACK_SCREENS}
     />

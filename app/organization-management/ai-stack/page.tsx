@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { INSTITUTE_AI_STACK_SCREENS } from '@/app/organization-management/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -14,14 +14,14 @@ import { INSTITUTE_AI_STACK_SCREENS } from '@/app/organization-management/ai-sta
  * live - `/Institute_Detail` is the route the seeded `institute` module row carries but
  * has no page in this application.
  *
- * `moduleName="institute"` is the MENU slug and the AI module key is also `institute`. The
+ * `moduleSlug="institute"` is the MENU slug and the AI module key is also `institute`. The
  * seeded menu row points at `/modules/institute/ai-stack`, which serves the same tabs
  * through the shared dynamic route.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="institute"
+      moduleSlug="institute"
       categoryKey="ai-stack"
       staticScreens={INSTITUTE_AI_STACK_SCREENS}
     />

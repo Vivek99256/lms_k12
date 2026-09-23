@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { USERS_AI_STACK_SCREENS } from '@/app/user/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -17,12 +17,12 @@ import { USERS_AI_STACK_SCREENS } from '@/app/user/ai-stack/_screens/ai-stack-sc
  * claimed here. Both read `tbluser`; this one reads the ACCOUNT fields and that one the
  * fields an identity card prints.
  *
- * `moduleName="user"` is the MENU slug and the AI module key is also `user`.
+ * `moduleSlug="user"` is the MENU slug and the AI module key is also `user`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="user"
+      moduleSlug="user"
       categoryKey="ai-stack"
       staticScreens={USERS_AI_STACK_SCREENS}
     />

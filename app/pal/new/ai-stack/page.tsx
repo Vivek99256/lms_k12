@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { NEW_PAL_AI_STACK_SCREENS } from '@/app/pal/new/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -9,5 +9,5 @@ import { NEW_PAL_AI_STACK_SCREENS } from '@/app/pal/new/ai-stack/_screens/ai-sta
  * This page exists so the direct path under `/pal/new` works too.
  */
 export default function Page() {
-  return <ModuleCategoryPage moduleName="new-pal" categoryKey="ai-stack" staticScreens={NEW_PAL_AI_STACK_SCREENS} />;
+  return <ModuleCategoryPage moduleSlug="new-pal" categoryKey="ai-stack" staticScreens={NEW_PAL_AI_STACK_SCREENS} />;
 }

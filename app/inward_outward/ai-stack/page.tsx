@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { INWARD_AI_STACK_SCREENS } from '@/app/inward_outward/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -14,7 +14,7 @@ import { INWARD_AI_STACK_SCREENS } from '@/app/inward_outward/ai-stack/_screens/
  * already claims as `/inward_outward/**` - so this page resolves to Inward without any
  * new pattern and without taking anything from a neighbour.
  *
- * `moduleName="inward-outward"` is the MENU slug; the AI module key is `inward_outward`,
+ * `moduleSlug="inward-outward"` is the MENU slug; the AI module key is `inward_outward`,
  * which is the key that row has carried since the workspace was seeded. The two differ by
  * a hyphen and that is fine: a route is how a URL is recognised, not what a module is
  * called.
@@ -22,7 +22,7 @@ import { INWARD_AI_STACK_SCREENS } from '@/app/inward_outward/ai-stack/_screens/
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="inward-outward"
+      moduleSlug="inward-outward"
       categoryKey="ai-stack"
       staticScreens={INWARD_AI_STACK_SCREENS}
     />

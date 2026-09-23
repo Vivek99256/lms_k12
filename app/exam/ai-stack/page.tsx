@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { EXAM_AI_STACK_SCREENS } from '@/app/exam/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -15,10 +15,10 @@ import { EXAM_AI_STACK_SCREENS } from '@/app/exam/ai-stack/_screens/ai-stack-scr
  * Both render the identical screen list from one module, so there is no second AI Stack to
  * keep in step.
  *
- * `moduleName="exam"` is the MENU slug, which is what `ModuleCategoryPage` looks the
+ * `moduleSlug="exam"` is the MENU slug, which is what `ModuleCategoryPage` looks the
  * category up by. The AI module key is also `exam`, and it is never typed into a screen:
  * every screen takes it from the descriptor in `lib/exam/exam-ai-stack.ts`.
  */
 export default function Page() {
-  return <ModuleCategoryPage moduleName="exam" categoryKey="ai-stack" staticScreens={EXAM_AI_STACK_SCREENS} />;
+  return <ModuleCategoryPage moduleSlug="exam" categoryKey="ai-stack" staticScreens={EXAM_AI_STACK_SCREENS} />;
 }

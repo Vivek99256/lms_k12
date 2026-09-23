@@ -2,7 +2,7 @@
 
 import { BookMarked, Cpu, FileText, Gauge, History, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
 
-import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
+import type { ModuleStaticScreen } from '@/app/modules/_components/module-category-page';
 import { AdmissionsActivityScreen } from '@/app/admissions/ai-stack/_screens/admissions-activity-screen';
 import { AdmissionsAutomationsScreen } from '@/app/admissions/ai-stack/_screens/admissions-automations-screen';
 import { AdmissionsGuardrailsScreen } from '@/app/admissions/ai-stack/_screens/admissions-guardrails-screen';

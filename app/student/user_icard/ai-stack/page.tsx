@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { USER_ICARD_AI_STACK_SCREENS } from '@/app/student/user_icard/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -19,12 +19,12 @@ import { USER_ICARD_AI_STACK_SCREENS } from '@/app/student/user_icard/ai-stack/_
  * not claimed by this route. One prints a card for a member of staff and one for a child;
  * they read different tables and neither can reach the other's.
  *
- * `moduleName="user-i-card"` is the MENU slug; the AI module key is `user_icard`.
+ * `moduleSlug="user-i-card"` is the MENU slug; the AI module key is `user_icard`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="user-i-card"
+      moduleSlug="user-i-card"
       categoryKey="ai-stack"
       staticScreens={USER_ICARD_AI_STACK_SCREENS}
     />

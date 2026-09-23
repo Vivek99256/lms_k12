@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { STUDENT_MEDICAL_AI_STACK_SCREENS } from '@/app/student/student_infirmary/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -15,13 +15,13 @@ import { STUDENT_MEDICAL_AI_STACK_SCREENS } from '@/app/student/student_infirmar
  * health - are claimed by the module's `ai_modules` route patterns one path at a time, each
  * more specific than the Students module's `/student/**`.
  *
- * `moduleName="student-medical"` is the MENU slug. The AI module key is `student_medical`,
+ * `moduleSlug="student-medical"` is the MENU slug. The AI module key is `student_medical`,
  * underscored, and it is never typed into a screen.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="student-medical"
+      moduleSlug="student-medical"
       categoryKey="ai-stack"
       staticScreens={STUDENT_MEDICAL_AI_STACK_SCREENS}
     />

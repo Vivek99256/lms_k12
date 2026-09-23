@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { ENGAGEMENT_AI_STACK_SCREENS } from '@/app/engagement/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -9,5 +9,5 @@ import { ENGAGEMENT_AI_STACK_SCREENS } from '@/app/engagement/ai-stack/_screens/
  * route (see `module-static-screens.tsx`). This page exists so the direct path works too.
  */
 export default function Page() {
-  return <ModuleCategoryPage moduleName="engagement" categoryKey="ai-stack" staticScreens={ENGAGEMENT_AI_STACK_SCREENS} />;
+  return <ModuleCategoryPage moduleSlug="engagement" categoryKey="ai-stack" staticScreens={ENGAGEMENT_AI_STACK_SCREENS} />;
 }

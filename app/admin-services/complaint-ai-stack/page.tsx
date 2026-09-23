@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { COMPLAINT_AI_STACK_SCREENS } from '@/app/admin-services/complaint-ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -15,12 +15,12 @@ import { COMPLAINT_AI_STACK_SCREENS } from '@/app/admin-services/complaint-ai-st
  * Management follow in that tree. The path is named individually in the module's route
  * patterns and is more specific than the admin-services module's `/admin-services/**`.
  *
- * `moduleName="complaint"` is the MENU slug and the AI module key is also `complaint`.
+ * `moduleSlug="complaint"` is the MENU slug and the AI module key is also `complaint`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="complaint"
+      moduleSlug="complaint"
       categoryKey="ai-stack"
       staticScreens={COMPLAINT_AI_STACK_SCREENS}
     />

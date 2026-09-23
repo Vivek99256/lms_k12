@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { STUDENTS_AI_STACK_SCREENS } from '@/app/student/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -14,11 +14,11 @@ import { STUDENTS_AI_STACK_SCREENS } from '@/app/student/ai-stack/_screens/ai-st
  * Both render the identical screen list from one module, so there is no second AI Stack to
  * keep in step.
  *
- * `moduleName="student"` is the MENU slug, which is what `ModuleCategoryPage` looks the
+ * `moduleSlug="student"` is the MENU slug, which is what `ModuleCategoryPage` looks the
  * category up by — it is derived from the level-2 menu's own name. The AI module key is
  * `students`, and it is never typed into a screen: every screen imports it from
  * `lib/students/students-ai-stack`.
  */
 export default function Page() {
-  return <ModuleCategoryPage moduleName="student" categoryKey="ai-stack" staticScreens={STUDENTS_AI_STACK_SCREENS} />;
+  return <ModuleCategoryPage moduleSlug="student" categoryKey="ai-stack" staticScreens={STUDENTS_AI_STACK_SCREENS} />;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { PTM_AI_STACK_SCREENS } from '@/app/admin-services/ptm-ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -22,10 +22,10 @@ import { PTM_AI_STACK_SCREENS } from '@/app/admin-services/ptm-ai-stack/_screens
  * Both routes render the identical screen list from one module, so there is no second AI
  * Stack to keep in step.
  *
- * `moduleName="ptm"` is the MENU slug, which is what `ModuleCategoryPage` looks the
+ * `moduleSlug="ptm"` is the MENU slug, which is what `ModuleCategoryPage` looks the
  * category up by. The AI module key is also `ptm`, and it is never typed into a screen:
  * every screen takes it from the descriptor in `lib/ptm/ptm-ai-stack.ts`.
  */
 export default function Page() {
-  return <ModuleCategoryPage moduleName="ptm" categoryKey="ai-stack" staticScreens={PTM_AI_STACK_SCREENS} />;
+  return <ModuleCategoryPage moduleSlug="ptm" categoryKey="ai-stack" staticScreens={PTM_AI_STACK_SCREENS} />;
 }

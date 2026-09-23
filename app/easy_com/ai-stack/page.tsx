@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { COMMUNICATION_AI_STACK_SCREENS } from '@/app/easy_com/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -13,7 +13,7 @@ import { COMMUNICATION_AI_STACK_SCREENS } from '@/app/easy_com/ai-stack/_screens
  * It sits beside the send screens at `/easy_com/...`, which the Communication menu's five
  * level-3 rows point at.
  *
- * `moduleName="communication"` is the MENU slug. The AI module key is `easy_com` - the key
+ * `moduleSlug="communication"` is the MENU slug. The AI module key is `easy_com` - the key
  * this estate has carried since the workspace was seeded, and the one whose route patterns
  * already cover these screens. Registering a second `communication` key would split one
  * module across two policy scopes, two template lists and two ledgers, so the module keeps
@@ -22,7 +22,7 @@ import { COMMUNICATION_AI_STACK_SCREENS } from '@/app/easy_com/ai-stack/_screens
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="communication"
+      moduleSlug="communication"
       categoryKey="ai-stack"
       staticScreens={COMMUNICATION_AI_STACK_SCREENS}
     />

@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { SQAA_AI_STACK_SCREENS } from '@/app/sqaa/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -13,12 +13,12 @@ import { SQAA_AI_STACK_SCREENS } from '@/app/sqaa/ai-stack/_screens/ai-stack-scr
  * It sits beside the SQAA screens at `/sqaa`, which the module's own row already claims as
  * `/sqaa/**`.
  *
- * `moduleName="sqaa"` is the MENU slug and the AI module key is also `sqaa`.
+ * `moduleSlug="sqaa"` is the MENU slug and the AI module key is also `sqaa`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="sqaa"
+      moduleSlug="sqaa"
       categoryKey="ai-stack"
       staticScreens={SQAA_AI_STACK_SCREENS}
     />

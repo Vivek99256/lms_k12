@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { MOBILE_APPS_AI_STACK_SCREENS } from '@/app/mobile-apps/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -10,7 +10,7 @@ import { MOBILE_APPS_AI_STACK_SCREENS } from '@/app/mobile-apps/ai-stack/_screen
  * through the shared dynamic route. This page exists so the direct path works too, and it
  * renders the identical screen list - there is no second AI Stack to keep in step.
  *
- * `moduleName="mobile-apps"` is the MENU slug, which is what `ModuleCategoryPage` looks the
+ * `moduleSlug="mobile-apps"` is the MENU slug, which is what `ModuleCategoryPage` looks the
  * category up by. The AI module key is `mobile_apps`, underscored, and it is never typed
  * into a screen: every screen takes it from the descriptor in
  * `lib/mobile-apps/mobile-apps-ai-stack.ts`.
@@ -23,7 +23,7 @@ import { MOBILE_APPS_AI_STACK_SCREENS } from '@/app/mobile-apps/ai-stack/_screen
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="mobile-apps"
+      moduleSlug="mobile-apps"
       categoryKey="ai-stack"
       staticScreens={MOBILE_APPS_AI_STACK_SCREENS}
     />

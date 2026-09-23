@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { PARENT_COMMUNICATION_AI_STACK_SCREENS } from '@/app/front_desk/parent_communication/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -14,13 +14,13 @@ import { PARENT_COMMUNICATION_AI_STACK_SCREENS } from '@/app/front_desk/parent_c
  * which is named literally in the module's route patterns and so beats the front_desk
  * module's `/front_desk/**` wildcard.
  *
- * `moduleName="parent-communication"` is the MENU slug; the AI module key is
+ * `moduleSlug="parent-communication"` is the MENU slug; the AI module key is
  * `parent_communication`.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="parent-communication"
+      moduleSlug="parent-communication"
       categoryKey="ai-stack"
       staticScreens={PARENT_COMMUNICATION_AI_STACK_SCREENS}
     />

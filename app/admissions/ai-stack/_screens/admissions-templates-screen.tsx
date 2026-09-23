@@ -717,7 +717,7 @@ function BuildReportPanel({
             {report.layout_name ? ` into the "${report.layout_name}" layout` : ''}.
           </p>
           <a
-            href={report.template_link}
+            href={report.template_link ?? undefined}
             className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-700 px-4 text-sm font-medium text-white hover:bg-emerald-800"
           >
             Open to preview, edit, print or send

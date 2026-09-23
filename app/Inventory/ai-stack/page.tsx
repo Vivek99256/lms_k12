@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { INVENTORY_AI_STACK_SCREENS } from '@/app/Inventory/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -14,13 +14,13 @@ import { INVENTORY_AI_STACK_SCREENS } from '@/app/Inventory/ai-stack/_screens/ai
  * claims as `/Inventory/**` - so this page resolves to Inventory without any new pattern
  * and without taking anything from a neighbour.
  *
- * `moduleName="inventory"` is the MENU slug and the AI module key is also `inventory`,
+ * `moduleSlug="inventory"` is the MENU slug and the AI module key is also `inventory`,
  * which that row has carried since the workspace was seeded.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="inventory"
+      moduleSlug="inventory"
       categoryKey="ai-stack"
       staticScreens={INVENTORY_AI_STACK_SCREENS}
     />

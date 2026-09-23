@@ -1,6 +1,6 @@
 'use client';
 
-import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
+import type { ModuleStaticScreen } from '@/app/modules/_components/module-category-page';
 import { buildAiStackScreens } from '@/app/_components/ai-stack/build-ai-stack-screens';
 import { STUDENT_ICARD_AI_STACK } from '@/lib/student-icard/student-icard-ai-stack';
 

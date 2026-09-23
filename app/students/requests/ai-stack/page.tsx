@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { STUDENT_REQUEST_AI_STACK_SCREENS } from '@/app/students/requests/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -18,7 +18,7 @@ import { STUDENT_REQUEST_AI_STACK_SCREENS } from '@/app/students/requests/ai-sta
  * So this page resolves to `student_request` and every other student page is untouched.
  * Nothing was removed from the Students row to make that work.
  *
- * `moduleName="student-request"` is the MENU slug, hyphenated because it is derived from
+ * `moduleSlug="student-request"` is the MENU slug, hyphenated because it is derived from
  * the level-2 menu's own name. The AI module key is `student_request`, underscored, and it
  * is never typed into a screen: every screen takes it from the descriptor in
  * `lib/student-requests/student-requests-ai-stack.ts`. The two spellings are each correct
@@ -27,7 +27,7 @@ import { STUDENT_REQUEST_AI_STACK_SCREENS } from '@/app/students/requests/ai-sta
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="student-request"
+      moduleSlug="student-request"
       categoryKey="ai-stack"
       staticScreens={STUDENT_REQUEST_AI_STACK_SCREENS}
     />

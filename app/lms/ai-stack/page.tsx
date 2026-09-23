@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { LMS_AI_STACK_SCREENS } from '@/app/lms/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -13,14 +13,14 @@ import { LMS_AI_STACK_SCREENS } from '@/app/lms/ai-stack/_screens/ai-stack-scree
  * It sits beside the learning screens at `/lms`, which the module's own row already claims
  * as `/lms/**`.
  *
- * `moduleName="lms"` is the MENU slug and the AI module key is also `lms`. The descriptor
+ * `moduleSlug="lms"` is the MENU slug and the AI module key is also `lms`. The descriptor
  * lives in `lib/lms-ai/` rather than `lib/lms/`, which is an existing folder of LMS
  * feature code that this has no business being mixed into.
  */
 export default function Page() {
   return (
     <ModuleCategoryPage
-      moduleName="lms"
+      moduleSlug="lms"
       categoryKey="ai-stack"
       staticScreens={LMS_AI_STACK_SCREENS}
     />

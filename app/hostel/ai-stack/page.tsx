@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { HOSTEL_AI_STACK_SCREENS } from '@/app/hostel/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -14,10 +14,10 @@ import { HOSTEL_AI_STACK_SCREENS } from '@/app/hostel/ai-stack/_screens/ai-stack
  * Both render the identical screen list from one module, so there is no second AI Stack to
  * keep in step.
  *
- * `moduleName="hostel"` is the MENU slug, which is what `ModuleCategoryPage` looks the
+ * `moduleSlug="hostel"` is the MENU slug, which is what `ModuleCategoryPage` looks the
  * category up by. The AI module key is also `hostel`, and it is never typed into a screen:
  * every screen takes it from the descriptor in `lib/hostel/hostel-ai-stack.ts`.
  */
 export default function Page() {
-  return <ModuleCategoryPage moduleName="hostel" categoryKey="ai-stack" staticScreens={HOSTEL_AI_STACK_SCREENS} />;
+  return <ModuleCategoryPage moduleSlug="hostel" categoryKey="ai-stack" staticScreens={HOSTEL_AI_STACK_SCREENS} />;
 }

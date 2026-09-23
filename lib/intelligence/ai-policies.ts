@@ -41,14 +41,25 @@ export interface AiPolicyRow {
   assignments: AiPolicyAssignment[];
 }
 
+/** One `ai_modules` row a policy can be scoped to. The id, never hardcoded, differs per estate. */
+export interface AiPolicyModuleOption {
+  id: number;
+  key: string;
+  label: string;
+}
+
 export interface AiPolicyOptions {
   policy_types: AiPolicyOption[];
   rule_catalogue: AiPolicyRuleCatalogItem[];
   scope_types: AiPolicyOption[];
+  modules: AiPolicyModuleOption[];
 }
 
 export interface AiPolicyIndex {
   sub_institute_id: string | number;
+  module_key: string | null;
+  /** The `ai_modules` ids `module_key` resolved to on this estate — empty when none did. */
+  module_ids: number[];
   policies: AiPolicyRow[];
 }
 
@@ -135,8 +146,15 @@ export function fetchAiPolicyOptions(): Promise<AiPolicyOptions> {
   return call<AiPolicyOptions>('/policies/options');
 }
 
-export function fetchAiPolicies(): Promise<AiPolicyIndex> {
-  return call<AiPolicyIndex>('/policies');
+/**
+ * Policies this school can see. Pass a module key to narrow the list to the policies
+ * that govern that module only — omit it for every policy, which is what the central
+ * console wants.
+ */
+export function fetchAiPolicies(moduleKey?: string): Promise<AiPolicyIndex> {
+  return call<AiPolicyIndex>(
+    moduleKey ? `/policies?module_key=${encodeURIComponent(moduleKey)}` : '/policies',
+  );
 }
 
 export function createAiPolicy(payload: AiPolicyPayload): Promise<{ policy: AiPolicyRow }> {

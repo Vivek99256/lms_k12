@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { ModuleCategoryPage } from '@/app/modules/_components/module-category-page';
 import { CIRCULAR_AI_STACK_SCREENS } from '@/app/front_desk/circular/ai-stack/_screens/ai-stack-screens';
 
 /**
@@ -19,11 +19,11 @@ import { CIRCULAR_AI_STACK_SCREENS } from '@/app/front_desk/circular/ai-stack/_s
  * page rather than "This category is not configured". The other nine categories are
  * deliberately not seeded: they group menus, and Circular has no menus to group.
  *
- * `moduleName="circular"` is the MENU slug, which is what `ModuleCategoryPage` looks the
+ * `moduleSlug="circular"` is the MENU slug, which is what `ModuleCategoryPage` looks the
  * category up by. The AI module key is also `circular`, and it is never typed into a
  * screen: every screen takes it from the descriptor in
  * `lib/circulars/circulars-ai-stack.ts`.
  */
 export default function Page() {
-  return <ModuleCategoryPage moduleName="circular" categoryKey="ai-stack" staticScreens={CIRCULAR_AI_STACK_SCREENS} />;
+  return <ModuleCategoryPage moduleSlug="circular" categoryKey="ai-stack" staticScreens={CIRCULAR_AI_STACK_SCREENS} />;
 }
