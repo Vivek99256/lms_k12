@@ -197,37 +197,18 @@ function ExpandedBody({ data: d }: { data: ConceptCardData }) {
             </h3>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5">
-            {/* An open card that is not the centre still needs the one action that
-                matters - make this the concept the map is about. Without it, reading a
-                prerequisite and then wanting to follow it means closing the card first. */}
-            {!node.isRoot && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  d.onMapConcept(node.id);
-                }}
-                className="nodrag nopan inline-flex items-center gap-1 rounded-lg bg-[#4f46e5] px-2.5 py-1.5 text-[11.5px] font-semibold text-white transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
-              >
-                <Network size={12} strokeWidth={2.2} aria-hidden />
-                Map this concept
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                d.onCollapse();
-              }}
-              className="nodrag nopan flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
-              aria-label="Close this concept"
-              title="Close"
-            >
-              <Minimize2 size={14} strokeWidth={2} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              d.onCollapse();
+            }}
+            className="nodrag nopan flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+            aria-label="Close this concept"
+            title="Close"
+          >
+            <Minimize2 size={14} strokeWidth={2} />
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 px-4 pt-2 text-[10px]">
