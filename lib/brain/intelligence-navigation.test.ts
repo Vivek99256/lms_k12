@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
@@ -56,6 +56,39 @@ function menuRow(overrides: Partial<ApiMenuItem> & { id: number }): ApiMenuItem 
   };
 }
 
+/**
+ * Does a page exist at this href — literally, or behind a Next.js dynamic
+ * segment (`[module]`, `[id]`, …)?
+ *
+ * Five People & Competency modules (organization, task-management, talent,
+ * capability, lms-activity) have no own per-module folder: they are served
+ * entirely by `app/modules/[module]/intelligence/page.tsx`, resolved at
+ * request time from `fees_menu_categories`. A literal `existsSync` on their
+ * href's exact path segments would report a 404 that does not exist — this
+ * walks the same path `existsSync` would, but accepts a `[...]` directory as
+ * a match for any literal segment, the way the Next.js router itself does.
+ */
+function pageExistsForHref(href: string, dir = APP_DIR, segments = href.replace(/^\//, '').split('/').filter(Boolean)): boolean {
+  if (segments.length === 0) return existsSync(path.join(dir, 'page.tsx'));
+
+  const [segment, ...rest] = segments;
+
+  const literal = path.join(dir, segment);
+  if (existsSync(literal) && pageExistsForHref(href, literal, rest)) return true;
+
+  // A directory can hold more than one dynamic segment (`app/modules/` has
+  // both `[module]` and `[moduleKey]`) — every candidate is tried, not just
+  // the first found, since picking the wrong one silently resolves to a
+  // sibling route that does not actually serve this href.
+  const entries = existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !/^\[.+\]$/.test(entry.name)) continue;
+    if (pageExistsForHref(href, path.join(dir, entry.name), rest)) return true;
+  }
+
+  return false;
+}
+
 /** Every href in a built menu tree, at any depth. */
 function allHrefs(tree: ReturnType<typeof buildMenuTree>): string[] {
   const hrefs: string[] = [];
@@ -81,11 +114,11 @@ test('every routed Intelligence module has a page at the href the registry gives
     assert.ok(href.startsWith('/'), `${entry.key}: href must be absolute, got ${href}`);
 
     // The route is a filesystem path under app/. A registry entry pointing at a
-    // directory that does not exist is a menu item that 404s.
-    const page = path.join(APP_DIR, href.replace(/^\//, ''), 'page.tsx');
+    // directory that does not exist (literally, or behind a Next.js dynamic
+    // segment) is a menu item that 404s.
     assert.ok(
-      existsSync(page),
-      `${entry.key}: the registry points at ${href} but ${path.relative(process.cwd(), page)} does not exist`,
+      pageExistsForHref(href),
+      `${entry.key}: the registry points at ${href} but no literal or dynamic-segment page resolves it`,
     );
   }
 });
@@ -128,18 +161,44 @@ test('a module that appears in the LMS menu gets an Intelligence item beneath it
     // catalogue. Its own two routes resolve it as well, but the label alone
     // must, because this fixture builds no level-3 rows.
     'teach-learn': 'Teach/Learn',
+
+    // People & Competency (tblmenumaster 350) — verified against live
+    // tblmenumaster/fees_menu_categories rows before these matchers were
+    // written (590, 551, 563, 598, 628).
+    organization: 'Organization Management',
+    talent: 'Talent Management',
+    capability: 'Capability Intelligence',
+    // LMS (628) is a different row from Teach/Learn's parent "LMS + PAL"
+    // (230); the label alone must resolve it, because its own children
+    // resolve to route-name identifiers rather than real paths.
+    'lms-activity': 'LMS',
+  };
+
+  // task-management is deliberately NOT label-matched (an unrelated legacy
+  // module, tblmenumaster 253, shares the exact same label "Task
+  // Management"), so it needs a real level-3 href fixture instead of relying
+  // on the label alone, unlike every other module in this test.
+  const level3Fixtures: Record<string, string> = {
+    'task-management': '/task-management/dashboard',
   };
 
   for (const entry of INTELLIGENCE_MODULES) {
     if (entry.status === 'planned' || typeof entry.nav !== 'function') continue;
 
-    const label = labels[entry.key];
-    assert.ok(label, `No menu label fixture for registered module "${entry.key}" — add one`);
-
+    const label = labels[entry.key] ?? entry.label;
     const level1 = [menuRow({ id: 1, name: 'Modules', link: 'dashboard' })];
     const level2 = { '1': [menuRow({ id: 2, parent_menu_id: 1, level: 2, name: label, link: label.toLowerCase() })] };
 
-    const tree = buildMenuTree(level1, level2, undefined);
+    const level3Href = level3Fixtures[entry.key];
+    const level3 = level3Href
+      ? { '2': [menuRow({ id: 3, parent_menu_id: 2, level: 3, name: label, link: level3Href })] }
+      : undefined;
+
+    if (!labels[entry.key] && !level3Href) {
+      assert.fail(`No menu label or level-3 href fixture for registered module "${entry.key}" — add one`);
+    }
+
+    const tree = buildMenuTree(level1, level2, level3);
     const hrefs = allHrefs(tree).map((h) => h.toLowerCase());
 
     assert.ok(

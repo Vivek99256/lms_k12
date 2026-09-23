@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
@@ -108,12 +108,45 @@ test('both canonical module routes have a page', () => {
   }
 });
 
+/**
+ * Does a page exist at this href — literally, or behind a Next.js dynamic
+ * segment (`[module]`, `[id]`, …)?
+ *
+ * The five People & Competency modules added after this test was written
+ * (organization, task-management, talent, capability, lms-activity) have no
+ * own per-module folder — they were born under, and only ever served by,
+ * `app/modules/[module]/intelligence/page.tsx`. A literal `existsSync` on
+ * their href's exact path segments reports a 404 that is not real.
+ */
+function pageExistsForHref(href: string, dir = APP_DIR, segments = href.replace(/^\//, '').split('/').filter(Boolean)): boolean {
+  if (segments.length === 0) return existsSync(path.join(dir, 'page.tsx'));
+
+  const [segment, ...rest] = segments;
+
+  const literal = path.join(dir, segment);
+  if (existsSync(literal) && pageExistsForHref(href, literal, rest)) return true;
+
+  // A directory can hold more than one dynamic segment (`app/modules/` has
+  // both `[module]` and `[moduleKey]`) — every candidate is tried, not just
+  // the first found, since picking the wrong one silently resolves to a
+  // sibling route that does not actually serve this href.
+  const entries = existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !/^\[.+\]$/.test(entry.name)) continue;
+    if (pageExistsForHref(href, path.join(dir, entry.name), rest)) return true;
+  }
+
+  return false;
+}
+
 test('the legacy per-module Intelligence routes still render', () => {
   // They are no longer navigated to, but links already shared must keep working.
   for (const entry of INTELLIGENCE_MODULES) {
     if (entry.status === 'planned') continue;
-    const page = path.join(APP_DIR, intelligenceHrefFor(entry).replace(/^\//, ''), 'page.tsx');
-    assert.ok(existsSync(page), `${entry.key}: the legacy route ${intelligenceHrefFor(entry)} no longer has a page`);
+    assert.ok(
+      pageExistsForHref(intelligenceHrefFor(entry)),
+      `${entry.key}: the legacy route ${intelligenceHrefFor(entry)} no longer has a page`,
+    );
   }
 });
 
@@ -226,25 +259,77 @@ test('a module is not claimed because one of its screens has "library" in its na
   // Intelligence and Organization Management were both being handed LIBRARY
   // Intelligence, because their own screens are called competency-library and
   // compliance-library. A menu item that opens another module's screen.
+  //
+  // Both modules have since been given their own real Intelligence contracts
+  // (they are genuine level-2 modules under People & Competency, verified
+  // against live tblmenumaster rows 598 and 590) — so the assertion that
+  // matters now is that they resolve to THEMSELVES, never to Library.
   assert.equal(
     resolveIntelligenceModuleForMenu('Capability Intelligence', 'javascript:void(0);', [
       '/capability-intelligence/competency-library',
       '/capability-intelligence/capability-explorer',
-    ]),
-    undefined,
+    ])?.key,
+    'capability',
   );
   assert.equal(
     resolveIntelligenceModuleForMenu('Organization Management', 'javascript:void(0);', [
       '/organization-management/compliance-library',
       '/organization-management/disciplinary-library',
-    ]),
-    undefined,
+    ])?.key,
+    'organization',
   );
 
   // The real Library module, by label and by its own route family.
   assert.equal(resolveIntelligenceModuleForMenu('Books', 'javascript:void(0);', ['/library/book_resources'])?.key, 'library');
   assert.equal(resolveIntelligenceModuleForMenu('Library Report', 'javascript:void(0);', [])?.key, 'library');
   assert.equal(resolveIntelligenceModuleForMenu('Anything', '', ['/library/quick_return'])?.key, 'library');
+});
+
+test('the five new People & Competency modules resolve by their own label and route family, and HRIT Management still reaches HR', () => {
+  assert.equal(
+    resolveIntelligenceModuleForMenu('Organization Management', 'javascript:void(0);', [
+      '/organization-management/employee-directory',
+    ])?.key,
+    'organization',
+  );
+  // A different, unrelated menu row sharing the same label must NOT be
+  // claimed — only the real route family is trusted for this one.
+  assert.equal(resolveIntelligenceModuleForMenu('Task Management', 'javascript:void(0);', ['/some-other-legacy-path'])?.key, undefined);
+  assert.equal(
+    resolveIntelligenceModuleForMenu('Task Management', 'javascript:void(0);', [
+      '/task-management/dashboard',
+      '/task-management/my-tasks',
+    ])?.key,
+    'task-management',
+  );
+  assert.equal(
+    resolveIntelligenceModuleForMenu('Talent Management', 'javascript:void(0);', [
+      '/talent-management/talent-dashboard',
+    ])?.key,
+    'talent',
+  );
+  assert.equal(
+    resolveIntelligenceModuleForMenu('Capability Intelligence', 'javascript:void(0);', [
+      '/capability-intelligence/dashboard',
+    ])?.key,
+    'capability',
+  );
+  // LMS (tblmenumaster 628, under People & Competency) is a different row
+  // from Teach/Learn (269, under the unrelated "LMS + PAL"), and its own
+  // children resolve to route-name identifiers rather than real paths, so
+  // only the label is trusted here.
+  assert.equal(resolveIntelligenceModuleForMenu('LMS', 'javascript:void(0);', [])?.key, 'lms-activity');
+  assert.equal(resolveIntelligenceModuleForMenu('Teach/Learn', 'javascript:void(0);', ['/course-master'])?.key, 'teach-learn');
+
+  // HRIT Management (535) is still fully owned by `hr`, unchanged — there is
+  // no separate "Attendance Management" registry entry to contest it with.
+  assert.equal(
+    resolveIntelligenceModuleForMenu('HRIT Management', 'javascript:void(0);', [
+      '/hrit/attendance-management/attendance-tracking',
+      '/hrit/leave/leave-dashboard',
+    ])?.key,
+    'hr',
+  );
 });
 
 test('the six staff modules all reach HR, and none of them reaches a pupil screen', () => {

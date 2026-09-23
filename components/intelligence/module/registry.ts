@@ -774,6 +774,132 @@ export const INTELLIGENCE_MODULES: RegisteredIntelligenceModule[] = [
         return href.startsWith('/course-master') || href.startsWith('/lms/global-mapping');
       }),
   },
+
+  // ── PEOPLE & COMPETENCY ────────────────────────────────────────────────
+  //
+  // Six level-2 modules under `tblmenumaster` 350 "People & Competency":
+  // Organization Management (590), Task Management (551), Talent Management
+  // (563), HRIT Management (535), Capability Intelligence (598) and LMS
+  // (628) — verified against live `tblmenumaster`/`fees_menu_categories`
+  // rows before writing any matcher below, per the standing rule that this
+  // question is never answered by reading code alone.
+  //
+  // HRIT MANAGEMENT (535) IS DELIBERATELY ABSENT FROM THIS LIST. It is the
+  // exact same row the `hr` entry above already claims by name — its own
+  // documented six-module staff domain names "hrit-management (535)"
+  // explicitly, and its children include "Attendance Tracking" and
+  // "Attendance Reports". A dedicated staff Attendance Management
+  // Intelligence screen exists, but it is mounted directly as a tab on
+  // `/hrit/attendance-management/attendance-reports` (see that page), not
+  // reached through this registry — adding a second entry here would only
+  // ever lose to `hr`'s prior claim, or contest it.
+  {
+    key: 'organization',
+    label: 'Organization Management Intelligence',
+    route: '/modules/organization-management',
+    status: 'live',
+    ladder: 'L5',
+    moduleSlug: 'organization-management',
+    loadContract: async () => (await import('./contracts/organization')).organizationIntelligenceContract,
+    note:
+      'Built on tbluser, hrms_departments, talent_job_postings and talent_job_applications — the same tables the ' +
+      'Employee Directory analytics endpoint already reads. Active headcount excludes terminated staff. ' +
+      's_user_jobrole is not queried: it has no migration in this deployment.',
+    // Two legacy children still use the old typo`d/underscored path
+    // (`/organization_managment/...`) alongside the current hyphenated one —
+    // both are matched as route-family prefixes, never as a bare label
+    // substring, which is what let this module's own `/compliance-library`
+    // child get mis-claimed by Library Intelligence before that matcher was
+    // narrowed (see `library` above).
+    nav: (label, link, hrefs) =>
+      label === 'organization management' ||
+      hrefs.some((h) => {
+        const href = h.toLowerCase();
+        return href.startsWith('/organization-management/') || href.startsWith('/organization_managment/');
+      }),
+  },
+  {
+    key: 'task-management',
+    label: 'Task Management Intelligence',
+    route: '/modules/task-management-551',
+    status: 'live',
+    ladder: 'L5',
+    // The fees_menu_categories module_name for this row really is
+    // `task-management-551`, not `task-management` — that slug is already
+    // taken by an unrelated legacy module (tblmenumaster 253, "Institute
+    // ERP"). Declared explicitly so `canonicalIntelligenceRoute` links here
+    // rather than guessing the shorter slug.
+    moduleSlug: 'task-management-551',
+    loadContract: async () => (await import('./contracts/task-management')).taskManagementIntelligenceContract,
+    note:
+      'Built on the task table, scoped by sub_institute_id and SYEAR. There is no completed_at column, so the ' +
+      'estimated cycle time is derived from updated_at rather than measured — the same precedent the task ' +
+      'module\'s own workspace summary already relies on.',
+    // NOT matched on the bare label: a different, unrelated menu row is also
+    // literally labelled "Task Management" (tblmenumaster 253), so label
+    // equality alone would claim the wrong module wherever that one appears.
+    // Matched on the /task-management/ route family instead, confirmed
+    // against this row's own ten children (dashboard, my-tasks,
+    // projects-workstreams, calendar, reports-analysis, administration/*).
+    nav: (label, link, hrefs) => hrefs.some((h) => h.toLowerCase().startsWith('/task-management/')),
+  },
+  {
+    key: 'talent',
+    label: 'Talent Management Intelligence',
+    route: '/modules/talent-management',
+    status: 'live',
+    ladder: 'L5',
+    moduleSlug: 'talent-management',
+    loadContract: async () => (await import('./contracts/talent')).talentIntelligenceContract,
+    note:
+      'Built on talent_job_postings, talent_job_applications, talent_onboarding_journeys, s_mobility_applications/' +
+      '_transfers/_promotions, talent_offboarding_cases and s_performance_reviews. talent_mobility_requests and ' +
+      'talent_offboarding_clearances do not exist in this deployment; internal mobility and offboarding clearance ' +
+      'read from the tables that actually hold that data instead of returning a silent zero.',
+    nav: (label, link, hrefs) =>
+      label === 'talent management' || hrefs.some((h) => h.toLowerCase().startsWith('/talent-management/')),
+  },
+  {
+    key: 'capability',
+    label: 'Capability Intelligence',
+    route: '/modules/capability-intelligence',
+    status: 'live',
+    ladder: 'L5',
+    moduleSlug: 'capability-intelligence',
+    loadContract: async () => (await import('./contracts/capability')).capabilityIntelligenceContract,
+    note:
+      'Built on s_user_jobrole and s_user_skill_jobrole. The real job-role title lives on ' +
+      's_user_skill_jobrole.skill, not .jobrole as an existing dashboard controller assumes — joining on .jobrole ' +
+      'returns zero mapped roles despite tens of thousands of real mapping rows; this module joins on .skill.',
+    // This module's own children include /capability-intelligence/competency-library
+    // and /capability-intelligence/competency-framework — exactly the routes
+    // the `library` matcher above was previously narrowed to exclude after
+    // both were found opening Library Intelligence by mistake. Matched here
+    // on the module's own label and route family, not on either word.
+    nav: (label, link, hrefs) =>
+      label === 'capability intelligence' ||
+      hrefs.some((h) => h.toLowerCase().startsWith('/capability-intelligence/')),
+  },
+  {
+    key: 'lms-activity',
+    label: 'LMS Intelligence',
+    route: '/modules/lms',
+    status: 'live',
+    ladder: 'L5',
+    moduleSlug: 'lms',
+    loadContract: async () => (await import('./contracts/lms-activity')).lmsActivityIntelligenceContract,
+    note:
+      'Blends the real course/content catalogue (sub_std_map, content_master — the same tables Teach/Learn reads) ' +
+      'with real homework submission activity. NOT the same menu row as Teach/Learn: this is tblmenumaster 628 ' +
+      '"LMS" under "People & Competency" (350); Teach/Learn is 269 under the unrelated "LMS + PAL" (230). No ' +
+      'evaluation/scoring signal exists in the homework data (0 of 1,543 rows carry teacher review), so none is shown.',
+    // This row's own nine children resolve to dotted route-name identifiers
+    // (`g2g_lms.course_builder` and similar), not real paths, so no href
+    // route family can be matched reliably here — the level-2 label, which
+    // was verified against the live menu row and is not used as a label by
+    // any other registered module, is the only safe signal.
+    nav: (label) => label === 'lms',
+  },
 ];
 
 export function findIntelligenceModule(key: string): RegisteredIntelligenceModule | undefined {
