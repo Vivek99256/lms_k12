@@ -63,7 +63,7 @@ browser contract.
 | `lib/ai/field-edit/prompt.ts` | System prompt, prompt builder, output cleaning and inspection. |
 | `docs/AI_FIELD_ASSISTANT.md` | This document. |
 
-### Modified — 32 files, 42 assistant instances
+### Modified — 24 files, 32 assistant instances
 
 Three of these are **shared renderers**, so they cover many screens each:
 `components/result/DynamicForm.tsx`, `app/general/_components/GeneralPage.tsx`,
@@ -106,15 +106,6 @@ Three of these are **shared renderers**, so they cover many screens each:
 | 29 | Library | Book resources | Add/edit resource | Custom textarea fields | `description` | as above | `app/library/book_resources/page.tsx` |
 | 30 | Student | Student care | Care record | Any `textarea` care field | `feedback` | Improve · **For parents** · Specific · Shorter · Simplify · Grammar | `app/student/_components/StudentCareModule.tsx` |
 | 31 | Admissions | Admission enquiry | Enquiry modal | Remarks *(uncontrolled → `targetId`)* | `notes` | Improve · Bullets · Shorter · Grammar | `app/admissions/admission_enquiry/page.tsx` |
-| 32 | Fees | Other fees collect | Bulk collection inputs | Remarks | `notes` | Improve · Bullets · Shorter · Grammar | `app/fees/other_fees_collect/page.tsx` |
-| 33 | Fees | Other fees cancel | Bulk cancellation inputs | Reason of cancel | `notes` | as above | `app/fees/other_fees_cancel/page.tsx` |
-| 34 | Fees | Fees cancel / refund | Refund workflow | Refund remark | `notes` | as above | `app/fees/cancel-refund/page.tsx` |
-| 35 | Fees | Fees cancel / refund | Receipt table *(per row)* | Cancel remark | `notes` | as above | same |
-| 36 | Fees | Fees circular | Student table *(per row)* | Fees circular remarks | `announcement` | Improve · More formal · Shorter · For parents · Simplify · Grammar · Translate | `app/fees/circulars/page.tsx` |
-| 37 | Fees | Fees config master | Config drawer | Fees Receipt Note | `notes` | Improve · Bullets · Shorter · Grammar | `app/fees/master/fees-config-master/page.tsx` |
-| 38 | Fees | AI Stack — Reports & templates | Template drawer | What it is for | `description` | Improve · Shorter · Longer · Simplify · Specific · Engaging | `app/fees/ai-stack/_screens/fees-templates-screen.tsx` |
-| 39 | Fees | AI Stack — Policies | Policy drawer | What it permits, in plain words | `policy` | More formal · Improve · Specific · Bullets · Add details · Grammar | `app/fees/ai-stack/_screens/fees-policies-screen.tsx` |
-| 40 | Fees | AI Stack — Prompts | Prompt drawer | What it is for | `description` | as #38 | `app/fees/ai-stack/_screens/fees-prompts-screen.tsx` |
 
 ---
 
@@ -125,10 +116,7 @@ The brief says not to add the icon everywhere. These were reviewed and left out:
 | Area | Why |
 |---|---|
 | Inventory — PO, quotation, direct purchase, receivable, requisition (7 files) | Transactional. Remarks on a purchase order are a record, not content. |
-| Fees — amounts, receipt numbers, enrollment numbers, report filters, master names and codes | Numbers and identifiers, not prose. |
-| Fees — collect → Remarks | Already carries `FeesAiAssist`, the governed Fees AI Stack generator. Two AI buttons on one field would be worse than either alone. |
-| Fees — AI Stack → Prompts → System / User prompt | Template source containing `{{placeholders}}` a rewrite would silently break. |
-| Fees — online fees settings | Gateway credentials. |
+| Fees — collect, cancel/refund, other fees, circular remarks, config master | Money. Rewriting a fee remark risks altering the record of a transaction. |
 | Marks entry (exam + result), student attendance | Numeric data entry. |
 | Petty cash, PTM attended status, inward/outward register | Ledger entries. |
 | Address fields — add user, admission enquiry, admission registration, admission-Enquiry | Factual. An AI must never "improve" an address. |

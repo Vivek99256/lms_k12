@@ -24,6 +24,8 @@ import type { H5pContentRow, H5pContentTypeApi } from '../data/h5p-content-types
 import { EmptyState, H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from './shared';
 import { CardGridSkeleton, ProgressRail } from './game';
 import { Input } from '@/components/ui/input';
+import { QuestionBankSource } from './question-bank-source';
+import { BANK_SOURCE_BY_ROUTE, NO_BANK_SOURCE_REASON } from '../data/question-bank-source';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 /**
@@ -223,6 +225,25 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
   const [busyId, setBusyId] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
 
+  /**
+   * Which half of the page is showing: the activities authored here, or the
+   * questions this type can ask straight out of `lms_question_master`.
+   *
+   * AUTHORED IS THE DEFAULT, deliberately. The bank half creates nothing and
+   * saves nothing, so a teacher who lands here looking for the activity they
+   * built last week must find it where they left it. The bank is the other
+   * tab, not the new front page.
+   *
+   * WHICH TYPE THE BANK TAB SOURCES IS DERIVED FROM THE ROUTE, not passed in
+   * by each page. Fourteen pages passing their own kind is fourteen chances
+   * to pass the wrong one; the route segment already identifies the type
+   * uniquely, and `BANK_SOURCE_BY_ROUTE` is the single table that says what
+   * each one can ask.
+   */
+  const [source, setSource] = useState<'authored' | 'bank'>('authored');
+  const bankKind = BANK_SOURCE_BY_ROUTE[path] ?? null;
+  const hasBankTab = path in BANK_SOURCE_BY_ROUTE;
+
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
@@ -402,7 +423,44 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
             <InlineBanner kind="success" message={success} onDismiss={() => setSuccess('')} />
             <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
 
-            {loading ? (
+            {hasBankTab ? (
+              <div
+                role="tablist"
+                aria-label={`${title} source`}
+                className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1"
+              >
+                {(
+                  [
+                    ['authored', `Built here`],
+                    ['bank', 'From the question bank'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={source === value}
+                    onClick={() => setSource(value)}
+                    className={
+                      source === value
+                        ? 'rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm'
+                        : 'rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700'
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {source === 'bank' ? (
+              <QuestionBankSource
+                kind={bankKind}
+                unavailableReason={NO_BANK_SOURCE_REASON[path]}
+                ctx={ctx}
+                noun={noun}
+              />
+            ) : loading ? (
               isStudent ? (
                 <CardGridSkeleton cards={3} />
               ) : (

@@ -8,11 +8,8 @@ import {
   recordArray,
   type UnknownRecord,
 } from "@/lib/erp-legacy";
-import { readStoredSops, type StoredSop } from "@/lib/process";
 
 const BASE_PATH = "requirements";
-/** An api.php route, unlike BASE_PATH — hence the prefix. */
-const SOP_PATH = "api/ai-sop";
 const STATIC_SUB_INSTITUTE_ID = "0";
 const PROCESS_FLAG = "1";
 
@@ -53,38 +50,6 @@ export async function loadAddProcessRecords(): Promise<AddProcessRecord[]> {
     return readPayloadList(payload, "TrizProcess").map(mapRecord);
   } catch (value: unknown) {
     throw new Error(errorMessage(value, "Add Process data could not be loaded."));
-  }
-}
-
-/**
- * The institute's own SOP documents, for the Process group and Procedure
- * pickers of a module that ships no catalogue.
- *
- * Upstream: GET /api/ai-sop (AiSopGenerationController::index), the same table
- * the AI Stack knowledge-base screens read. Active only: a draft is somebody's
- * work in progress, and a process converted from one would carry its name as
- * provenance.
- *
- * TWO THINGS ABOUT THE PATH, both learned the hard way.
- *
- * It carries the `api/` prefix. `legacyRequest` proxies to whatever sits under
- * API_BASE_URL, which has no `/api` segment — correct for `requirements`, a
- * web.php route, and wrong for this one, which lives in api.php. Without the
- * prefix the call resolved to /ai-sop and returned 404.
- *
- * And it goes through the proxy rather than straight to Laravel. A direct
- * browser call is cross-origin, `fetchLaravelJson` sends
- * `credentials: 'include'`, and the ERP sets `supports_credentials => false` —
- * so the preflight comes back without Access-Control-Allow-Credentials and the
- * browser discards the response as "Failed to fetch". The proxy fetches from
- * the server, where none of that applies.
- */
-export async function loadInstituteSops(): Promise<StoredSop[]> {
-  try {
-    const payload = await legacyRequest(SOP_PATH, { query: { status: "Active" } });
-    return readStoredSops(payload);
-  } catch (value: unknown) {
-    throw new Error(errorMessage(value, "The institute SOP library could not be loaded."));
   }
 }
 

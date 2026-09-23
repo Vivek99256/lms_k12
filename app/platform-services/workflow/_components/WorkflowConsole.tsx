@@ -52,31 +52,11 @@ import {
 
 const RBAC_KEY = 'platform.workflow';
 
-export interface WorkflowConsoleProps {
-  /**
-   * Pin the console to one module (`'fees'`), for a module that wants its own
-   * approvals screen rather than sending its administrators to Platform services.
-   *
-   * THE SCOPE IS A REQUEST PARAMETER, NOT A FILTER OVER A FETCHED LIST. The key
-   * travels to GET /api/platform/workflow as `module=`, the same way the module
-   * rail's selection does, so the browser is never handed another module's
-   * points or chains in the first place. Left undefined, the operator picks the
-   * module from the rail — which is what Platform services does, unchanged.
-   */
-  module?: string;
-  /** The trail above the title, for a console mounted inside another module. */
-  breadcrumb?: React.ReactNode[];
-  /** Render as a section inside a Fees category page rather than as a page. */
-  embedded?: boolean;
-  title?: string;
-  description?: string;
-}
-
-export function WorkflowConsole({ module: pinnedModule, breadcrumb, title, description, embedded }: WorkflowConsoleProps = {}) {
+export function WorkflowConsole() {
   const { registry, problems, loading: registryLoading, error: registryError, reload } = usePlatformRegistry();
   const rights = usePermissions([RBAC_KEY]);
 
-  const [moduleKey, setModuleKey] = useState<string | null>(pinnedModule ?? null);
+  const [moduleKey, setModuleKey] = useState<string | null>(null);
   const [componentKey, setComponentKey] = useState<string | null>(null);
 
   const [payload, setPayload] = useState<WorkflowPayload | null>(null);
@@ -188,20 +168,13 @@ export function WorkflowConsole({ module: pinnedModule, breadcrumb, title, descr
 
   return (
     <PlatformShell
-      title={title ?? 'Workflow'}
-      description={
-        description ??
-        'Every action in the ERP that can pause for a sign-off, module by module and component by component — and the approval chain each one runs through at this institute.'
-      }
+      title="Workflow"
+      description="Every action in the ERP that can pause for a sign-off, module by module and component by component — and the approval chain each one runs through at this institute."
       countKey="workflows"
       registry={registry}
       problems={problems}
-      breadcrumb={breadcrumb}
-      modulePinned={Boolean(pinnedModule)}
-      embedded={embedded}
       selectedModule={moduleKey}
       onSelectModule={(next) => {
-        if (pinnedModule) return;
         setModuleKey(next);
         setComponentKey(null);
         setEditing(null);

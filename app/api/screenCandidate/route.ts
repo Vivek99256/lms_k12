@@ -22,7 +22,7 @@ const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 // requests for it with a misleading 503 "This model is currently
 // experiencing high demand" instead of a clear "model not found", which is
 // exactly the error this route was surfacing to the frontend. Verified live
-// against this repo's configured : `gemini-2.5-flash` (the
+// against this repo's configured GEMINI_API_KEY: `gemini-2.5-flash` (the
 // model this same repo's other Gemini integration,
 // AnalyzeJDController::analyze() in the backend, already uses successfully).
 const GEMINI_ENDPOINT =
