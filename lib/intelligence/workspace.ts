@@ -79,7 +79,15 @@ export interface WorkspaceSuggestion {
   label: string;
   description: string | null;
   icon: string | null;
-  action_type: "prompt" | "generate" | "analyse" | "run_agent" | "start_workflow" | "ontology_view";
+  action_type:
+    | "prompt"
+    | "generate"
+    | "analyse"
+    | "run_agent"
+    | "start_workflow"
+    | "ontology_view"
+    // Writes a saved report rather than prose — see `generateReportForContext`.
+    | "report";
   action_ref: string | null;
   prompt?: string | null;
   payload?: Record<string, unknown>;
@@ -313,6 +321,32 @@ export function generateForContext(
   }
 ) {
   return post<GenerationOutcome>(session, "/generate", input);
+}
+
+/**
+ * A saved report for the module on screen.
+ *
+ * Distinct from `generateForContext`, which returns text to read and copy. This returns
+ * a document with an id, which `/ai-reports/{id}` previews, edits, refreshes, prints and
+ * sends — four actions that already existed and had no way of being reached from the
+ * assistant, because nothing in the panel produced a report to open.
+ */
+export function generateReportForContext(
+  session: WorkspaceSession,
+  input: { route: string; arguments?: Record<string, unknown> }
+) {
+  return post<WorkspaceReport>(session, "/report", input);
+}
+
+export interface WorkspaceReport {
+  module: string;
+  template_id: number;
+  title: string;
+  row_count: number;
+  source_tool: string | null;
+  layout_name: string | null;
+  /** Where the report opens, e.g. `/ai-reports/11`. */
+  template_link: string;
 }
 
 export function fetchOntologyView(

@@ -1,107 +1,76 @@
 'use client';
 
-import { BookMarked, Cpu, FileText, Gauge, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
+import { BookMarked, FileText, Gauge, History, ShieldAlert, Terminal, Workflow } from 'lucide-react';
 
-import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
-import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-screen';
-import { ComingSoonPanel, ComingSoonToggle } from '@/components/ui/coming-soon';
+import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
+import { FeesActivityScreen } from '@/app/fees/ai-stack/_screens/fees-activity-screen';
 import { FeesAutomationsScreen } from '@/app/fees/ai-stack/_screens/fees-automations-screen';
+import { FeesGuardrailsScreen } from '@/app/fees/ai-stack/_screens/fees-guardrails-screen';
+import { FeesKnowledgeBaseScreen } from '@/app/fees/ai-stack/_screens/fees-knowledge-base-screen';
+import { FeesPromptsScreen } from '@/app/fees/ai-stack/_screens/fees-prompts-screen';
 import { FeesTemplatesScreen } from '@/app/fees/ai-stack/_screens/fees-templates-screen';
+import { FeesUsageCostScreen } from '@/app/fees/ai-stack/_screens/fees-usage-cost-screen';
 
 /**
  * Fees → AI Stack tabs.
  *
- * Scaffolding for the AI services and automation behind the Fees module. This
- * is the plumbing view — what the module runs on — as distinct from
- * Intelligence, which is what that plumbing produces. Nothing is wired up yet,
- * and nothing here touches the separate AI Administration module; each tab
- * renders the shared placeholder.
+ * The AI services and automation behind the Fees module. This is the plumbing view —
+ * what the module runs on — as distinct from Intelligence, which is what that plumbing
+ * produces. Nothing here touches the separate AI Administration module.
  *
- * The Policies tab holds the module-scoped settings the architecture review
- * approved for a module's AI Stack tab: whether the Recommendation Engine and
- * the module agent are on, their thresholds, which knowledge sources they read,
- * and a usage view scoped to this module. Its switches are deliberately shown
- * locked rather than hidden — a visible, disabled control says the capability is
- * designed and coming, where a missing row just reads as absent.
+ * ALL EIGHT TABS ARE LIVE, AND ALL EIGHT ARE FEES-ONLY
  *
- * NOTE for whoever wires this up: the Models and Prompts tabs below are
- * engine-level concerns (model management, prompt management). The same review
- * ruled those stay central and must not be re-implemented per module, so they
- * likely want to become links into the central AI console rather than editable
- * screens here.
- * Intelligence, which is what that plumbing produces. Automations is live — it
- * runs on the central Agent Management engine (lib/agents), scoped to Fees.
- * The other tabs are not wired up yet and render the shared placeholder;
- * nothing here touches the separate AI Administration module.
+ * Each renders its own screen in this folder, and each is decentralised in the sense
+ * that matters to the person using it: it shows only Fees configuration, and a save
+ * from it cannot be filed against another module. The module is never a control the
+ * operator can reach.
+ *
+ * DECENTRALISED IS NOT DUPLICATED
+ *
+ * There is no second AI stack under Fees. Every screen calls the same client, the same
+ * endpoint and the same table as the central AI console, scoped to Fees:
+ *
+ *   Prompts        → ai_templates, module_key = fees, kind = prompt
+ *   Templates      → ai_templates, module_key = fees, kind = report
+ *   Knowledge Base → the read-only Fees MCP tools, from the backend tool registry
+ *   Automations    → the central Agent Management engine (lib/agents), module = fees
+ *   Usage & Cost   → ai_conversations.module_key, Fees template generations, the quota
+ *   Guardrails     → the four places a Fees guardrail is actually enforced
+ *   Activity       → ai_audit_logs rows under `module.fees.*`, written by Fees screens
+ *
+ * So a change to any of those contracts breaks both the central screen and this one at
+ * compile time, rather than leaving this one quietly wrong. No table, column or store
+ * was added to make these tabs Fees-specific — every module filter is a column the
+ * schema already had.
+ *
+ * NO TAB DOES ANOTHER TAB'S JOB. Prompts and Templates are both `ai_templates` rows and
+ * are split by `kind`, because a prompt is text sent to a model and a report is a layout
+ * filled from fee records. Guardrails reads what the other tabs configure and offers no
+ * second place to change it.
  */
-export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
+export const FEES_AI_STACK_SCREENS: ModuleStaticScreen[] = [
+  /*
+   * Policies and Models are deliberately absent.
+   *
+   * Both are estate-wide settings with one central console — AI & Intelligence →
+   * Policies and → Models — and both wrote to the very same tables this module would
+   * have shown: `ai_policies`, and `ai_models` / `ai_api_keys`. Two screens onto one
+   * row is not configurability, it is two places to look when the answer disagrees,
+   * and a per-module model binding invites a school to run Fees on a model nobody
+   * else is using without meaning to.
+   *
+   * Removing the tabs changes no data and no behaviour: Fees resolves its provider,
+   * model and policy through `AiConfigurationResolver` and `AiPolicyResolver`, which
+   * read the central tables and never consulted this screen. The screen components
+   * remain in the tree, unrouted, so restoring a tab is one entry here.
+   */
   {
-    id: 'policies',
-    label: 'Policies',
-    icon: SlidersHorizontal,
-    render: () => (
-      <ComingSoonPanel
-        title="Fees AI policies"
-        summary="What the central AI engines are allowed to do for Fees. The switches are shown locked until each engine is wired to this module — the setting exists, it is just not connected yet."
-      >
-        <div className="space-y-3">
-          <ComingSoonToggle
-            roadmapId="fees.ai-stack.recommendation-engine"
-            label="Recommendation engine"
-            description="Rank collection actions and flag likely defaulters for this module."
-            hint="Will carry a confidence threshold below which a recommendation is not shown."
-          />
-          <ComingSoonToggle
-            roadmapId="fees.ai-stack.agent"
-            label="Fees agent"
-            description="Let an agent carry out fees tasks on a person's behalf."
-            hint="Will carry an approval threshold above which a person must confirm before anything runs."
-          />
-          <ComingSoonToggle
-            roadmapId="fees.ai-stack.knowledge-source"
-            label="Knowledge sources"
-            description="Point the knowledge and retrieval layer at fees policies, circulars and structures."
-          />
-          <ComingSoonToggle
-            roadmapId="fees.ai-stack.usage-audit"
-            label="Usage and audit view"
-            description="See what the AI did in Fees, what it cost, and who approved it."
-          />
-        </div>
-      </ComingSoonPanel>
-    ),
-  },
-  {
-    id: 'models',
-    label: 'Models',
-    icon: Cpu,
-    render: () => (
-      <FeesPlaceholderScreen
-        title="Models"
-        summary="The models Fees calls, and which task each one serves."
-        points={[
-          'Model per task — forecasting, classification, summarisation.',
-          'Version in use, and what it replaced.',
-          'Fallback model when the primary is unavailable.',
-        ]}
-      />
-    ),
-  },
-  {
+    // Live. `ai_templates` rows for Fees with `kind = 'prompt'` — the other half of
+    // the store Templates reads. See fees-prompts-screen.tsx.
     id: 'prompts',
     label: 'Prompts',
     icon: Terminal,
-    render: () => (
-      <FeesPlaceholderScreen
-        title="Prompts"
-        summary="The prompts behind each Fees AI feature, kept out of the code."
-        points={[
-          'Prompt per feature, with the fees fields it is given.',
-          'Version history, and which version is live.',
-          'Test a change against sample data before publishing it.',
-        ]}
-      />
-    ),
+    render: () => <FeesPromptsScreen />,
   },
   {
     // Live. The Fees module's own report templates — the designs the assistant fills
@@ -117,20 +86,12 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
     render: () => <FeesTemplatesScreen />,
   },
   {
+    // Live. The read-only Fees MCP tools the assistant draws on, plus the indexed
+    // documents, each checkable against real records. See fees-knowledge-base-screen.tsx.
     id: 'knowledge-base',
     label: 'Knowledge Base',
     icon: BookMarked,
-    render: () => (
-      <FeesPlaceholderScreen
-        title="Knowledge Base"
-        summary="The fees material the AI is allowed to draw on when answering."
-        points={[
-          'Indexed sources: policies, circulars, fee structures and guides.',
-          'When each source was last refreshed.',
-          'Scope rules limiting what may be surfaced to whom.',
-        ]}
-      />
-    ),
+    render: () => <FeesKnowledgeBaseScreen />,
   },
   {
     id: 'automations',
@@ -141,35 +102,29 @@ export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
     render: () => <FeesAutomationsScreen />,
   },
   {
+    // Live. Aggregated from ai_conversations.module_key, Fees template generations and
+    // the Fees credential's quota. Cost is measured or blank, never estimated.
+    // See fees-usage-cost-screen.tsx.
     id: 'usage-cost',
     label: 'Usage & Cost',
     icon: Gauge,
-    render: () => (
-      <FeesPlaceholderScreen
-        title="Usage & Cost"
-        summary="What the Fees module is consuming, and what it costs."
-        points={[
-          'Requests and tokens by feature over time.',
-          'Spend against budget, with alerts before the cap.',
-          'The features driving the most consumption.',
-        ]}
-      />
-    ),
+    render: () => <FeesUsageCostScreen />,
   },
   {
+    // Live. Reads the guardrails from the four places they are enforced, and lists the
+    // requests they refused. See fees-guardrails-screen.tsx.
     id: 'guardrails',
     label: 'Guardrails',
     icon: ShieldAlert,
-    render: () => (
-      <FeesPlaceholderScreen
-        title="Guardrails"
-        summary="The limits Fees AI operates within."
-        points={[
-          'Which fee and student fields may be sent to a model.',
-          'Actions that always require a person to confirm.',
-          'Blocked requests, with the rule that stopped each one.',
-        ]}
-      />
-    ),
+    render: () => <FeesGuardrailsScreen />,
+  },
+  {
+    // Live. The execution ledger: what ran in Fees, which AI record it used, who did it
+    // and how it ended. `ai_audit_logs` rows under `module.fees.*`, written by the Fees
+    // screens themselves as they finish. See fees-activity-screen.tsx.
+    id: 'activity',
+    label: 'Activity',
+    icon: History,
+    render: () => <FeesActivityScreen />,
   },
 ];

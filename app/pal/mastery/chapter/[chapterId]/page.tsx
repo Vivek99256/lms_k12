@@ -14,6 +14,7 @@ import {
   type ChapterMastery,
   type ConceptMasteryRow,
 } from '@/app/pal/data/pal-diagnostic';
+<<<<<<< HEAD
 import {
   chapterCompletionFromRows,
   isConceptCompleted,
@@ -25,6 +26,9 @@ import {
   ReadOnlyBadge,
 } from '@/app/pal/_components/CompletionState';
 import { COMPLETED_THROUGH_CHECK, JourneyRail } from '@/app/pal/_components/JourneyRail';
+=======
+import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -46,6 +50,7 @@ import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components
  * only the flattering number would tell a learner they had mastered something
  * the system will not let them past. So the page shows the stage, and the
  * evidence behind it, and says plainly what is still outstanding.
+<<<<<<< HEAD
  *
  * ---------------------------------------------------------------------------
  * COMPLETED IS NARROWER THAN MASTERED
@@ -56,6 +61,8 @@ import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components
  * "Mastered" without being completed, which is the honest answer when the hard
  * rung was never reached, and this page keeps its practice routes open in that
  * case rather than closing a concept the learner can still climb.
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
  */
 
 export default function ChapterMasteryPage() {
@@ -141,6 +148,7 @@ function ChapterMasteryView() {
   const { summary } = data;
   const provable = summary.conceptsTotal - summary.noQuestions;
   const pct = provable > 0 ? Math.round((summary.mastered / provable) * 100) : 0;
+<<<<<<< HEAD
   const completion = chapterCompletionFromRows(data.concepts);
 
   // A completed chapter is closed: the mastery record, and no route back into
@@ -188,6 +196,8 @@ function ChapterMasteryView() {
       </PalWorkspace>
     );
   }
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 
   // Furthest along first, so progress is what the learner sees.
   const concepts = [...data.concepts].sort(
@@ -222,8 +232,12 @@ function ChapterMasteryView() {
           <PalRailSection title="Your journey">
             <JourneyRail
               current="mastery"
+<<<<<<< HEAD
               completed={COMPLETED_THROUGH_CHECK}
               bypassed={['intervention']}
+=======
+              completed={['diagnostic', 'adaptive', 'plan', 'learn', 'practice', 'check']}
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
               orientation="vertical"
             />
           </PalRailSection>
@@ -339,7 +353,10 @@ function ChapterMasteryView() {
 function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
   const stage = stageOf(concept.stage);
   const done = concept.stage === 'mastered' || concept.stage === 'retained';
+<<<<<<< HEAD
   const completed = isConceptCompleted(signalsFromMasteryRow(concept));
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   const pct = concept.pMastery === null ? null : Math.round(concept.pMastery * 100);
 
   return (
@@ -353,6 +370,7 @@ function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
               <Circle aria-hidden className="h-4 w-4 shrink-0 text-slate-300" />
             )}
             <span className="text-sm font-medium text-slate-900">{concept.name}</span>
+<<<<<<< HEAD
             {completed ? (
               <CompletedBadge />
             ) : (
@@ -360,6 +378,11 @@ function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
                 {stage.label}
               </span>
             )}
+=======
+            <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold', stage.chip)}>
+              {stage.label}
+            </span>
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
           </div>
 
           {/* The ladder's own sentence - what is still outstanding, in words. */}
@@ -408,6 +431,7 @@ function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
             </div>
           )}
 
+<<<<<<< HEAD
           {/* Completed is read-only: no review, no revisit, no practice. The
               only route left is the concept's own mastery record, which the
               practice page serves in place of a question set. */}
@@ -419,6 +443,9 @@ function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
               View mastery
             </Link>
           ) : concept.esoReady ? (
+=======
+          {concept.esoReady ? (
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
             <Link
               href={`/pal/eso?conceptId=${concept.conceptId}`}
               className={buttonVariants({ variant: 'outline', size: 'sm' })}

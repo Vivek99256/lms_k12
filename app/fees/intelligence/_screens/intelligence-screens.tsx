@@ -2,7 +2,7 @@
 
 import { Brain } from 'lucide-react';
 
-import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
+import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
 import { FeesIntelligenceScreen } from '@/app/fees/intelligence/_components/fees-intelligence-screen';
 
 /**
@@ -22,13 +22,13 @@ import { FeesIntelligenceScreen } from '@/app/fees/intelligence/_components/fees
  * agent roster, an ingestion console — are gone rather than reproduced as
  * convincing empty shells.
  *
- * NOTHING ELSE ABOUT FEES NAVIGATION MOVES. FeesCategoryPage still renders this
+ * NOTHING ELSE ABOUT FEES NAVIGATION MOVES. ModuleCategoryPage still renders this
  * as the first tab and still appends every Intelligence menu the user has
  * rights to from the database ("Fees Prediction" today), so no working screen
  * is hidden by this one.
  */
 
-export const FEES_INTELLIGENCE_SCREENS: FeesStaticScreen[] = [
+export const FEES_INTELLIGENCE_SCREENS: ModuleStaticScreen[] = [
   {
     id: 'fees-intelligence',
     label: 'Fees Intelligence',

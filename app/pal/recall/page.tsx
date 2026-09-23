@@ -10,7 +10,11 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { fetchRecallQueue, type RecallItem, type RecallQueue } from '@/app/pal/data/pal-diagnostic';
+<<<<<<< HEAD
 import { COMPLETED_THROUGH_MASTERY, JourneyRail } from '@/app/pal/_components/JourneyRail';
+=======
+import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -120,8 +124,12 @@ function RecallView() {
           <PalRailSection title="Your journey">
             <JourneyRail
               current="recall"
+<<<<<<< HEAD
               completed={COMPLETED_THROUGH_MASTERY}
               bypassed={['intervention']}
+=======
+              completed={['diagnostic', 'adaptive', 'plan', 'learn', 'practice', 'check', 'mastery']}
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
               orientation="vertical"
             />
           </PalRailSection>

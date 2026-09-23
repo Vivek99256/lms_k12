@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { ErpAlert, ErpEmpty, ErpLoading, ErpPageHeader } from "@/components/erp/erp-ui";
+import { resolveModuleLaunch } from "../_lib/module-launch";
+import { GoLiveOverlay } from "./GoLiveOverlay";
 import { JourneyRibbon } from "./JourneyRibbon";
 import { StepDrawer } from "./StepDrawer";
 import { OnboardingLegend, OnboardingPanel, ProgressMeter } from "./onboarding-ui";
@@ -44,6 +46,7 @@ export function ModuleJourney({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [launching, setLaunching] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -95,6 +98,29 @@ export function ModuleJourney({
       setSaving(false);
     }
   }, []);
+
+  /**
+   * Opening the launch overlay closes the step drawer first: the overlay covers
+   * the screen and ends in a redirect, so leaving a dialog mounted underneath
+   * would only strand focus and unsaved notes behind it.
+   */
+  const startLaunch = useCallback(() => {
+    setSelectedId(null);
+    setLaunching(true);
+  }, []);
+
+  /**
+   * What the launch pad says it is opening. The route itself is resolved again
+   * inside the overlay; this is only the label, so an unmapped module says
+   * "institute dashboard" rather than naming a screen it will not land on.
+   */
+  const launchDestination = useMemo(() => {
+    const target = resolveModuleLaunch(moduleKey);
+    if (target.isFallback) return "institute dashboard";
+
+    const name = journey?.module.moduleName?.trim();
+    return name ? `${name} dashboard` : "module dashboard";
+  }, [moduleKey, journey?.module.moduleName]);
 
   const selectedStep = useMemo(
     () => journey?.steps.find((step) => step.id === selectedId) ?? null,
@@ -178,6 +204,16 @@ export function ModuleJourney({
                 selectedId={selectedId}
                 currentUserName={journey.context.currentUserName}
                 onSelect={(step) => setSelectedId(step.id)}
+                /* `isComplete` is derived by the API from the records that
+                   actually exist, so the pad cannot be unlocked by ticking a box
+                   the data does not support. */
+                launchUnlocked={journey.summary.isComplete}
+                launchDestination={launchDestination}
+                remainingSteps={Math.max(
+                  0,
+                  journey.summary.requiredSteps - journey.summary.requiredCompleted
+                )}
+                onLaunch={startLaunch}
               />
             </div>
           </section>
@@ -192,6 +228,14 @@ export function ModuleJourney({
             onClose={() => setSelectedId(null)}
             onSave={handleSave}
           />
+
+          {launching ? (
+            <GoLiveOverlay
+              moduleKey={moduleKey}
+              moduleName={journey.module.moduleName}
+              onDismiss={() => setLaunching(false)}
+            />
+          ) : null}
         </>
       )}
     </div>

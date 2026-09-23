@@ -34,6 +34,7 @@ export interface SingleChoiceOption {
   option_text: string;
   is_correct: boolean;
   feedback?: string | null;
+<<<<<<< HEAD
   /**
    * The row this option was derived from, for an activity built out of a
    * question bank row rather than authored into `h5p_single_choice_set`.
@@ -45,6 +46,8 @@ export interface SingleChoiceOption {
    * the stored row.
    */
   source_option_id?: number | null;
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 }
 
 export interface SingleChoiceQuestion {

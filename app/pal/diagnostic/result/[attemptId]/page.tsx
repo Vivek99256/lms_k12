@@ -13,7 +13,11 @@ import {
   type DiagnosticConceptBreakdown,
 } from '@/app/pal/data/pal-diagnostic';
 import { BandRow, LevelBadge, StrengthBadge, bandLabel } from '@/app/pal/_components/BandMeter';
+<<<<<<< HEAD
 import { JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
+=======
+import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -127,7 +131,11 @@ function DiagnosticResultView() {
           )}
 
           <PalRailSection title="Your journey">
+<<<<<<< HEAD
             <JourneyRail current="adaptive" completed={stagesBefore('adaptive')} orientation="vertical" />
+=======
+            <JourneyRail current="adaptive" completed={['diagnostic']} orientation="vertical" />
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
           </PalRailSection>
         </>
       }

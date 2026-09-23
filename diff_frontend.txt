@@ -1,0 +1,1660 @@
+﻿diff --git a/app/course-master/[courseId]/chapters/page.tsx b/app/course-master/[courseId]/chapters/page.tsx
+index 2c8dfcb..00d3fba 100644
+--- a/app/course-master/[courseId]/chapters/page.tsx
++++ b/app/course-master/[courseId]/chapters/page.tsx
+@@ -3,10 +3,12 @@
+ 
+ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+ import { useRouter, useParams, useSearchParams } from 'next/navigation';
++import dynamic from 'next/dynamic';
+ import { usePermission } from '@/app/hooks/usePermission';
+ import {
+   ArrowLeft,
+   Download,
++  Network,
+   ChevronLeft,
+   ChevronRight,
+   ChevronUp,
+@@ -101,6 +103,24 @@ import type { LmsSubject } from '../../data/lmsCourses';
+ import { GeneratePresentationDrawer } from './sideDrawer';
+ import { persistPalConceptContext } from '@/app/pal/_components/PalContextBootstrap';
+ 
++/**
++ * Loaded on demand: the map pulls in @xyflow/react, which no other view on this
++ * page needs. `ssr: false` because the canvas measures the DOM on mount and this
++ * page is client-rendered anyway.
++ *
++ * The folder is underscore-prefixed so the App Router treats it as colocated files
++ * rather than a `/coherence-map` route segment ΓÇö without that, its `graphLayout`
++ * module was being validated as a route layout.
++ */
++const CoherenceMapView = dynamic(() => import('./_coherence-map/CoherenceMapView'), {
++  ssr: false,
++  loading: () => (
++    <div className="flex h-[480px] items-center justify-center rounded-[14px] border border-slate-200 bg-white text-sm text-slate-500">
++      Loading the coherence mapΓÇª
++    </div>
++  ),
++});
++
+ const EMPTY_CHAPTER_FORM = {
+   chapterName: '',
+   chapterDescription: '',
+@@ -4290,6 +4310,41 @@ export default function ChapterListPage() {
+     );
+   }
+ 
++  if (view === 'coherence-map') {
++    return (
++      <div className="min-h-screen rounded-t-3xl">
++        <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8">
++          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
++            <button
++              type="button"
++              onClick={() => router.push('/course-master')}
++              className="font-medium transition-colors hover:text-slate-900"
++            >
++              Teach / learn
++            </button>
++            <ChevronRight size={14} className="text-slate-400" />
++            <button
++              type="button"
++              onClick={() => router.push(`/course-master/${courseId}/chapters`)}
++              className="font-medium transition-colors hover:text-slate-900"
++            >
++              {course.subject} - {getCourseGradeLabel(course.classGrade)}
++            </button>
++            <ChevronRight size={14} className="text-slate-400" />
++            <span className="font-semibold text-slate-900">Coherence map</span>
++          </div>
++
++          <CoherenceMapView
++            subjectId={subjectId}
++            standardId={standardId}
++            title={`${course.subject} - ${getCourseGradeLabel(course.classGrade)}`}
++            onClose={() => router.push(`/course-master/${courseId}/chapters`)}
++          />
++        </div>
++      </div>
++    );
++  }
++
+   if (view === 'concept-intelligence') {
+     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
+     const intelChapter = allChapters.find((chapter) => chapter.id === activeChapterId) ?? null;
+@@ -5153,6 +5208,15 @@ export default function ChapterListPage() {
+               </p>
+             </div>
+           </div>
++
++          <button
++            type="button"
++            onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
++            className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-[#c7d2fe] bg-white px-3.5 py-2 text-[14px] font-medium text-[#4338ca] shadow-sm transition-colors hover:bg-[#eef2ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
++          >
++            <Network size={16} strokeWidth={1.9} />
++            Coherence map
++          </button>
+         </div>
+ 
+         <div className="mb-6 border-b border-slate-200/80">
+@@ -5180,6 +5244,14 @@ export default function ChapterListPage() {
+               <BookOpen size={16} />
+               Chapters
+             </button>
++            <button
++              type="button"
++              onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
++              className="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 font-medium text-slate-600 transition-colors hover:text-slate-900"
++            >
++              <Network size={16} />
++              Coherence map
++            </button>
+           </div>
+         </div>
+ 
+diff --git a/app/course-master/page.tsx b/app/course-master/page.tsx
+index 842c53f..48d84a4 100644
+--- a/app/course-master/page.tsx
++++ b/app/course-master/page.tsx
+@@ -16,6 +16,7 @@ import {
+   Globe,
+   Library,
+   ListTree,
++  Network,
+   Music,
+   Palette,
+   PenTool,
+@@ -95,6 +96,9 @@ function getCourseRoutes(courseId: number | string, standardId?: number | string
+     chapters: `/course-master/${id}/chapters`,
+     lessonPlan: `/course-master/lesson-plan/${id}`,
+     curriculum: `/course-master/lesson-plan/${id}/curriculum`,
++    // A view of the chapters screen rather than its own route, matching the other
++    // sub-views there (question-bank, concept-intelligence, content).
++    coherenceMap: `/course-master/${id}/chapters?view=coherence-map`,
+   };
+ }
+ 
+@@ -650,6 +654,7 @@ export default function CourseMasterPage() {
+             <button type="button" title="Lesson plans" aria-label={`Open ${subject.subject_name} lesson plans`} onClick={(event) => { event.stopPropagation(); router.push(routes.lessonPlan); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDD6FE] bg-[#F3F0FF] text-[#6D4AFF] transition hover:bg-[#E8E1FF]"><CalendarDays className="h-4 w-4" strokeWidth={1.9} /></button>
+             <button type="button" title="Curriculum" aria-label={`Open ${subject.subject_name} curriculum`} onClick={(event) => { event.stopPropagation(); router.push(routes.curriculum); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BAE6FD] bg-[#ECF9FF] text-[#0284C7] transition hover:bg-[#DDF4FF]"><ListTree className="h-4 w-4" strokeWidth={1.9} /></button>
+             <button type="button" title="Chapters" aria-label={`Open ${subject.subject_name} chapters`} onClick={(event) => { event.stopPropagation(); router.push(routes.chapters); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BBF7D0] bg-[#ECFDF3] text-[#16A34A] transition hover:bg-[#DCFBE8]"><BookOpen className="h-4 w-4" strokeWidth={1.9} /></button>
++            <button type="button" title="Coherence map" aria-label={`Open ${subject.subject_name} coherence map`} onClick={(event) => { event.stopPropagation(); router.push(routes.coherenceMap); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#FDE68A] bg-[#FFFBEB] text-[#D97706] transition hover:bg-[#FEF3C7]"><Network className="h-4 w-4" strokeWidth={1.9} /></button>
+           </div>
+         </div>
+ 
+diff --git a/app/pal/_components/AdaptiveLearningButton.tsx b/app/pal/_components/AdaptiveLearningButton.tsx
+index 7c39ae4..22a9973 100644
+--- a/app/pal/_components/AdaptiveLearningButton.tsx
++++ b/app/pal/_components/AdaptiveLearningButton.tsx
+@@ -5,43 +5,81 @@ import { useRouter } from 'next/navigation';
+ import { Loader2, Sparkles, X } from 'lucide-react';
+ 
+ import { Button } from '@/components/ui/button';
+-import { fetchChapterConcepts, type EsoChapterConcept } from '@/app/pal/data/pal-eso';
++import {
++  defaultLearnerId,
++  fetchAdaptiveConcepts,
++  type AdaptiveConcept,
++} from '@/app/pal/data/pal-diagnostic';
+ 
+ /**
+- * "Start Adaptive Learning" ΓÇö the real student entry point into the
+- * Adaptive Learning Engine (/pal/eso), replacing the manually-typed-URL-only
+- * path that existed before. Mirrors DiagnosticButton's shape (a button that
+- * opens a small modal) rather than introducing a new UI pattern.
++ * "Adaptive learning" ΓÇö the student entry point into concept practice.
+  *
+- * Renders nothing when the chapter has no ESO-ready concepts yet (Phase 0
+- * tagging scope) ΓÇö no dead-end link is ever shown.
++ * ---------------------------------------------------------------------------
++ * WHY THE CONCEPT SOURCE CHANGED
++ * ---------------------------------------------------------------------------
++ * This used to call fetchChapterConcepts(), which lists only ESO-READY
++ * concepts: those carrying K/A/S nodes plus approved, node-mapped questions.
++ * That tagging has barely been done, so the check almost always came back
++ * empty and this component rendered nothing ΓÇö the feature looked absent rather
++ * than untagged.
+  *
+- * Student-only: the caller (ChapterRow, app/pal/page.tsx) does not render
+- * this component at all for a staff/admin session, so it never needs ΓÇö and
+- * never accepts ΓÇö a learner id. The `/pal/eso` link it builds carries only
+- * `conceptId`; the backend independently derives and enforces the learner
+- * from the authenticated student's own JWT (EsoStudentOnlyAuth /
+- * routes/pal_eso_api.php), never from anything this file could pass.
++ * It now asks the adaptive endpoint, whose test is the one that actually
++ * matters here: does this concept have at least one answerable MCQ we could
++ * serve right now. A concept with questions and no ESO nodes is perfectly
++ * practisable.
++ *
++ * The "no dead-end link" rule is unchanged ΓÇö the backend omits concepts with
++ * no servable questions, and this still renders nothing when the list is
++ * empty.
++ *
++ * ---------------------------------------------------------------------------
++ * WHY THIS IS SUBJECT-SCOPED, NOT CHAPTER-SCOPED
++ * ---------------------------------------------------------------------------
++ * It briefly filtered the subject's concepts down to one chapter, so it could
++ * stay on the chapter row where it used to live. That silently rendered
++ * nothing: content-estate chapter ids and concept-layer chapter ids are not
++ * the same numbers on this estate ΓÇö ChapterAligner exists precisely because
++ * the two have to be matched by NAME ΓÇö so the filter discarded every concept
++ * even when the subject had plenty.
++ *
++ * Subject scope is also what the feature is actually specified as: pick a
++ * subject, see its concepts, choose one. Matching the endpoint's own scope
++ * removes the mismatch rather than papering over it.
++ *
++ * The guided ESO flow is not orphaned by this: /pal/eso is still reached from
++ * the chapter dashboard (/pal/eso/chapter/[chapterId]) and the student
++ * dashboard.
++ *
++ * Student-only: the caller (ChapterRow, app/pal/page.tsx) does not render this
++ * component at all for a staff/admin session. The link it builds carries only
++ * `conceptId`; the backend independently derives and enforces the learner from
++ * the authenticated student's own JWT (eso.student / routes/pal_api.php),
++ * never from anything this file could pass.
+  */
+-export function AdaptiveLearningButton({ chapterId }: { chapterId: string }) {
+-  const [concepts, setConcepts] = useState<EsoChapterConcept[] | null>(null);
++export function AdaptiveLearningButton({ subjectId }: { subjectId: string }) {
++  const [concepts, setConcepts] = useState<AdaptiveConcept[] | null>(null);
+   const [open, setOpen] = useState(false);
+ 
+   useEffect(() => {
+-    if (!chapterId) return;
++    const numericSubjectId = Number(subjectId);
++    const learnerId = defaultLearnerId();
++
++    if (!Number.isFinite(numericSubjectId) || !numericSubjectId || !learnerId) return;
++
+     const controller = new AbortController();
+-    const numericChapterId = Number(chapterId);
+-    if (!Number.isFinite(numericChapterId)) return;
+-    fetchChapterConcepts(numericChapterId, controller.signal)
++
++    fetchAdaptiveConcepts(learnerId, numericSubjectId, controller.signal)
+       .then((data) => {
+-        if (!controller.signal.aborted) setConcepts(data);
++        if (!controller.signal.aborted) setConcepts(data.concepts);
+       })
+       .catch(() => {
+-        // Chapter-readiness check failing shouldn't break the rest of the row ΓÇö just hide the entry point.
++        // A readiness check failing must not break the rest of the header ΓÇö
++        // just hide the entry point.
+         if (!controller.signal.aborted) setConcepts([]);
+       });
++
+     return () => controller.abort();
+-  }, [chapterId]);
++  }, [subjectId]);
+ 
+   if (!concepts || concepts.length === 0) {
+     return null;
+@@ -69,21 +107,21 @@ function ConceptPickerModal({
+   concepts,
+   onClose,
+ }: {
+-  concepts: EsoChapterConcept[];
++  concepts: AdaptiveConcept[];
+   onClose: () => void;
+ }) {
+   const router = useRouter();
+   const [navigating, setNavigating] = useState<number | null>(null);
+ 
+   // No learnerId in the URL ΓÇö the backend derives the learner from the
+-  // authenticated student's own JWT (see EsoStudentOnlyAuth /
+-  // routes/pal_eso_api.php), never from a client-supplied value. This
+-  // component only ever renders for a genuine student session (the entry
+-  // point hides it entirely for staff ΓÇö see ChapterRow in app/pal/page.tsx),
+-  // so there is no learner identity to pass here at all.
++  // authenticated student's own JWT (see eso.student / routes/pal_api.php),
++  // never from a client-supplied value. This component only ever renders for a
++  // genuine student session (the entry point hides it entirely for staff ΓÇö see
++  // ChapterRow in app/pal/page.tsx), so there is no learner identity to pass
++  // here at all.
+   const start = (conceptId: number) => {
+     setNavigating(conceptId);
+-    router.push(`/pal/eso?conceptId=${conceptId}`);
++    router.push(`/pal/adaptive/${conceptId}`);
+   };
+ 
+   return (
+@@ -96,7 +134,7 @@ function ConceptPickerModal({
+               <Sparkles className="h-4 w-4" />
+             </div>
+             <div>
+-              <h2 className="text-sm font-semibold text-slate-900">Start Adaptive Learning</h2>
++              <h2 className="text-sm font-semibold text-slate-900">Start adaptive learning</h2>
+               <p className="text-xs text-slate-500">Pick a concept to work on</p>
+             </div>
+           </div>
+@@ -112,14 +150,23 @@ function ConceptPickerModal({
+         <div className="overflow-y-auto p-2">
+           {concepts.map((concept) => (
+             <button
+-              key={concept.id}
++              key={concept.conceptId}
+               type="button"
+-              onClick={() => start(concept.id)}
++              onClick={() => start(concept.conceptId)}
+               disabled={navigating !== null}
+               className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-slate-800 transition-colors hover:bg-violet-50 disabled:opacity-60"
+             >
+               <span>{concept.name}</span>
+-              {navigating === concept.id && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-violet-500" />}
++              <span className="flex shrink-0 items-center gap-2">
++                {/* Where practice will start. Stated as a level, not as the
++                    engine's band key ΓÇö a student reads "Easy", not "weak". */}
++                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium capitalize text-slate-600">
++                  {concept.recommendedDifficulty}
++                </span>
++                {navigating === concept.conceptId && (
++                  <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" aria-hidden="true" />
++                )}
++              </span>
+             </button>
+           ))}
+         </div>
+diff --git a/app/pal/_components/DiagnosticPanel.tsx b/app/pal/_components/DiagnosticPanel.tsx
+index 8449da6..416d629 100644
+--- a/app/pal/_components/DiagnosticPanel.tsx
++++ b/app/pal/_components/DiagnosticPanel.tsx
+@@ -47,7 +47,11 @@ export function DiagnosticButton({
+         className="border-violet-200 text-violet-700 hover:bg-violet-50"
+       >
+         <ClipboardCheck className="h-3.5 w-3.5" />
+-        Take diagnostic
++        {/* Distinguished from the subject-level placement diagnostic on the
++            subject header (SubjectDiagnosticButton). Two controls both reading
++            "Take diagnostic" on the same screen would be ambiguous; this one
++            samples a single chapter and its prerequisites. */}
++        Chapter diagnostic
+       </Button>
+       {open && (
+         <DiagnosticModal studentId={studentId} context={context} onClose={() => setOpen(false)} />
+diff --git a/app/pal/data/pal-eso.ts b/app/pal/data/pal-eso.ts
+index eb42b20..98a886c 100644
+--- a/app/pal/data/pal-eso.ts
++++ b/app/pal/data/pal-eso.ts
+@@ -88,6 +88,17 @@ export function defaultLearnerId(): string {
+ 
+ export type NodeType = 'K' | 'A' | 'S';
+ 
++/** Where a piece of learning content came from. See EsoAction.learningContent. */
++export type EsoLearningSource = 'authored' | 'derived' | 'institute_video' | 'curated_video';
++
++const LEARNING_SOURCES: readonly string[] = ['authored', 'derived', 'institute_video', 'curated_video'];
++
++function readLearningSource(value: unknown): EsoLearningSource {
++  return typeof value === 'string' && LEARNING_SOURCES.includes(value)
++    ? (value as EsoLearningSource)
++    : 'derived';
++}
++
+ export interface QuestionOption {
+   id: number;
+   answer: string;
+@@ -197,10 +208,18 @@ export interface EsoAction {
+    */
+   expects?: 'acknowledge' | 'check_understanding' | 'answer' | null;
+   /**
+-   * The concept's learning object from the PAL content model, when one
+-   * genuinely exists. `mediaUrl` is only ever non-null for an AUTHORED asset ΓÇö
+-   * a `derived` variant is an authoring specification whose format describes
+-   * what should be built, so it carries rich text and no media.
++   * The concept's learning object, when one genuinely exists.
++   *
++   * `source` says where it came from, and they behave differently:
++   *   'authored'        ΓÇö a reviewed asset a human attached to this node.
++   *   'derived'         ΓÇö an authoring SPECIFICATION backed by extracted
++   *                       curriculum text. Its `format` describes what should
++   *                       be built, so it never carries media.
++   *   'institute_video' ΓÇö an approved video from the school's own library.
++   *   'curated_video'   ΓÇö an approved video from outside it, hence `attribution`.
++   *
++   * The two video sources only ever appear on a reteach, and only once a human
++   * has approved them.
+    */
+   learningContent?: {
+     variant: number;
+@@ -210,7 +229,13 @@ export interface EsoAction {
+     title: string | null;
+     body: string | null;
+     mediaUrl: string | null;
+-    source: 'authored' | 'derived';
++    source: EsoLearningSource;
++    /** 'upload' | 'youtube' | 'vimeo' ΓÇö video sources only. */
++    provider?: string | null;
++    /** Channel or uploader, shown to the student beneath the player. */
++    attribution?: string | null;
++    /** How well this matched the concept. Diagnostic; never shown to students. */
++    matchScore?: number | null;
+   } | null;
+   /** CFU only: how many questions the gate will serve. */
+   cfuItemCount?: number | null;
+@@ -314,7 +339,13 @@ function mapAction(raw: unknown): EsoAction {
+         title: c.title == null ? null : readString(c.title),
+         body: c.body == null ? null : readString(c.body),
+         mediaUrl: c.media_url == null ? null : readString(c.media_url),
+-        source: c.source === 'authored' ? ('authored' as const) : ('derived' as const),
++        // A whitelist rather than a binary ternary: an unrecognised future
++        // source should fall back to the conservative 'derived' handling, not
++        // be silently relabelled as a reviewed 'authored' asset.
++        source: readLearningSource(c.source),
++        provider: c.provider == null ? null : readString(c.provider),
++        attribution: c.attribution == null ? null : readString(c.attribution),
++        matchScore: numOrNull(c.match_score),
+       };
+     })(),
+     cfuItemCount: numOrNull(r.cfu_item_count),
+diff --git a/app/pal/eso/page.tsx b/app/pal/eso/page.tsx
+index 06e1486..144d16a 100644
+--- a/app/pal/eso/page.tsx
++++ b/app/pal/eso/page.tsx
+@@ -34,6 +34,7 @@ import {
+ } from '@/app/pal/data/pal-eso';
+ import { useViewAsStudent } from '@/app/pal/data/pal-view-as';
+ import AiTutorPanel from '@/app/pal/eso/_components/AiTutorPanel';
++import { isDirectMediaFile, looksLikeFile, toEmbedUrl } from '@/lib/video-embed';
+ 
+ /**
+  * The Adaptive Learning Engine's guided concept flow ΓÇö Developer Brief v1,
+@@ -912,7 +913,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
+               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
+                 {index + 1}
+               </span>
+-              <Badge variant="secondary">{item.nodeType}</Badge>
++              {/* <Badge variant="secondary">{item.nodeType}</Badge> */}
+             </div>
+             <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+             <div className="mt-2 space-y-1.5">
+@@ -1136,12 +1137,30 @@ function usePalMotivation(learnerId: string, instruction: string | null, fallbac
+  *     text. Its `format` says what *should* be built. It is rendered as the
+  *     text it actually is ΓÇö never as a video placeholder, which would promise
+  *     the student something that does not exist.
++ *   - `institute_video` / `curated_video`: an approved video for this concept,
++ *     served on a reteach. These carry provenance, which is shown: a student
++ *     being handed a third-party video mid-remediation should be able to see
++ *     where it came from, and a teacher checking a poor recommendation needs
++ *     that on screen rather than in a database.
+  */
+ function LearningContentPanel({ content }: { content: NonNullable<EsoAction['learningContent']> }) {
+   const hasMedia = content.mediaUrl != null && content.mediaUrl !== '';
+ 
++  const provenance =
++    content.source === 'institute_video'
++      ? "From your school's library"
++      : content.source === 'curated_video'
++        ? content.attribution
++          ? `${content.attribution} on YouTube`
++          : 'Recommended for this concept'
++        : null;
++
+   return (
+-    <div data-eso-learning-content={content.format} className="space-y-3 rounded-lg border border-sky-200 bg-sky-50 p-4">
++    <div
++      data-eso-learning-content={content.format}
++      data-eso-content-source={content.source}
++      className="space-y-3 rounded-lg border border-sky-200 bg-sky-50 p-4"
++    >
+       <div className="flex items-center justify-between gap-2">
+         <span className="text-sm font-medium text-sky-900">{content.title || 'Learning material'}</span>
+         {/* Only claim a format when there is an asset behind it. */}
+@@ -1150,6 +1169,8 @@ function LearningContentPanel({ content }: { content: NonNullable<EsoAction['lea
+ 
+       {hasMedia && <CorrectiveResource url={content.mediaUrl as string} format={content.format} title={content.title} />}
+ 
++      {hasMedia && provenance && <p className="text-xs text-sky-700">{provenance}</p>}
++
+       {content.body && <div className="whitespace-pre-line text-sm text-sky-900">{content.body}</div>}
+     </div>
+   );
+@@ -1586,20 +1607,68 @@ function ContrastPairStep({
+ }
+ 
+ /**
+- * A corrective's richer resource, launched directly rather than described.
++ * A richer resource, launched directly rather than described.
+  *
+- * Video gets an inline player (the common case, and the one worth not making
+- * the student leave the flow for). Anything else ΓÇö a simulation, an
+- * externally-hosted activity, a document ΓÇö opens in a new tab rather than an
+- * iframe: third-party content routinely refuses to be framed, and a blocked
+- * blank box is a worse experience than an honest link.
++ * Three branches, in this order, because picking the wrong element gives the
++ * student a black box rather than a lesson:
++ *
++ *   1. Something we can frame (YouTube, Vimeo) ΓÇö an iframe. The reteach step
++ *      can now serve an external video for concepts the school has none for,
++ *      and those arrive as watch URLs. They previously fell into the <video>
++ *      branch below on the strength of `format` alone and rendered as an empty
++ *      black player.
++ *   2. A real media file ΓÇö the inline <video> player, which is what the
++ *      school's own uploads are.
++ *   3. Anything else ΓÇö an honest link in a new tab. Third-party pages
++ *      routinely refuse to be framed, and a blocked blank box is worse than a
++ *      link the student can actually follow.
+  */
+ function CorrectiveResource({ url, format, title }: { url: string; format: string | null; title: string | null }) {
+-  const isVideo = /\.(mp4|webm|ogg)(\?|$)/i.test(url) || (format ?? '').toLowerCase().includes('video');
++  const embed = toEmbedUrl(url);
++
++  if (embed) {
++    return (
++      // Capped rather than full-bleed: at card width a 16:9 frame is taller
++      // than the viewport, so the questions underneath fall off the screen and
++      // the step stops looking like a step. Still fluid below the cap.
++      <div data-eso-media-kind="iframe" className="w-full max-w-2xl space-y-1.5">
++        <div className="aspect-video w-full overflow-hidden rounded-lg border border-slate-200 bg-black">
++          <iframe
++            src={embed.src}
++            title={title || embed.title}
++            loading="lazy"
++            allowFullScreen
++            referrerPolicy="strict-origin-when-cross-origin"
++            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
++            className="h-full w-full border-0"
++          />
++        </div>
++        {/* An owner can withdraw embedding permission after we harvested the
++            video, which turns the frame into a refusal notice. This is the way
++            out when that happens. */}
++        <a
++          href={embed.externalUrl}
++          target="_blank"
++          rel="noopener noreferrer"
++          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700"
++        >
++          Open in a new tab
++          <ExternalLink className="h-3 w-3 shrink-0" />
++        </a>
++      </div>
++    );
++  }
++
++  const declaredVideo = (format ?? '').toLowerCase().includes('video');
+ 
+-  if (isVideo) {
++  if (isDirectMediaFile(url) || (declaredVideo && looksLikeFile(url))) {
+     return (
+-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-black">
++      // Same cap as the embed branch, so an uploaded mp4 and a YouTube video
++      // sit at the same size on the page.
++      <div
++        data-eso-media-kind="file"
++        className="w-full max-w-2xl overflow-hidden rounded-lg border border-slate-200 bg-black"
++      >
+         <video src={url} controls className="h-auto w-full" />
+       </div>
+     );
+@@ -1607,6 +1676,7 @@ function CorrectiveResource({ url, format, title }: { url: string; format: strin
+ 
+   return (
+     <a
++      data-eso-media-kind="link"
+       href={url}
+       target="_blank"
+       rel="noopener noreferrer"
+diff --git a/app/pal/page.tsx b/app/pal/page.tsx
+index 9befa88..95b47e6 100644
+--- a/app/pal/page.tsx
++++ b/app/pal/page.tsx
+@@ -45,6 +45,7 @@ import StudentPicker from '@/app/pal/_components/StudentPicker';
+ import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
+ import { DiagnosticButton } from '@/app/pal/_components/DiagnosticPanel';
+ import { AdaptiveLearningButton } from '@/app/pal/_components/AdaptiveLearningButton';
++import { SubjectDiagnosticButton } from '@/app/pal/_components/SubjectDiagnosticButton';
+ import { PracticePanel } from '@/app/pal/_components/PracticePanel';
+ import { fetchChapterGate, type ChapterGateData } from '@/app/pal/data/pal';
+ 
+@@ -386,16 +387,24 @@ function SubjectCard({
+   getContext: (chapter: PalChapter) => PalChapterContext;
+   isStaff: boolean;
+ }) {
++  // The subject diagnostic needs a standard to scope question selection; every
++  // chapter in a subject shares one, so the first chapter's context supplies it.
++  const firstChapter = subject.chapters[0];
++  const subjectContext = firstChapter ? getContext(firstChapter) : null;
++
+   return (
+     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+-      <button
+-        type="button"
+-        onClick={onToggle}
+-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50"
+-        aria-expanded={expanded}
+-      >
+-        <span className="flex items-center gap-3">
+-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
++      {/* The toggle and the diagnostic action are siblings, not nested: an
++          interactive control inside a button is invalid and unreachable by
++          keyboard. */}
++      <div className="flex items-center justify-between gap-3 px-5 py-4">
++        <button
++          type="button"
++          onClick={onToggle}
++          className="flex flex-1 items-center gap-3 text-left"
++          aria-expanded={expanded}
++        >
++          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+             <BookOpen className="h-4 w-4" />
+           </span>
+           <span>
+@@ -404,13 +413,41 @@ function SubjectCard({
+               {subject.chapters.length} chapter{subject.chapters.length === 1 ? '' : 's'}
+             </span>
+           </span>
+-        </span>
+-        {expanded ? (
+-          <ChevronDown className="h-5 w-5 text-slate-400" />
+-        ) : (
+-          <ChevronRight className="h-5 w-5 text-slate-400" />
+-        )}
+-      </button>
++        </button>
++
++        <div className="flex shrink-0 items-center gap-2">
++          {/* Student-only, like adaptive learning: sitting a diagnostic writes
++              evidence against a learner, and staff viewing as a student must
++              not be able to do that in their name. */}
++          {!isStaff && subjectContext && (
++            <>
++              <SubjectDiagnosticButton
++                subjectId={Number(subjectContext.subjectId)}
++                subjectName={subject.name}
++                standardId={Number(subjectContext.standardId) || null}
++              />
++              {/* Subject-scoped, matching both the endpoint and the feature as
++                  specified: pick a subject, see its concepts, choose one. It
++                  used to sit on the chapter row, where a chapter-id filter
++                  discarded every concept ΓÇö the two estates number chapters
++                  differently. */}
++              <AdaptiveLearningButton subjectId={subjectContext.subjectId} />
++            </>
++          )}
++          <button
++            type="button"
++            onClick={onToggle}
++            aria-label={expanded ? `Collapse ${subject.name}` : `Expand ${subject.name}`}
++            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
++          >
++            {expanded ? (
++              <ChevronDown className="h-5 w-5" />
++            ) : (
++              <ChevronRight className="h-5 w-5" />
++            )}
++          </button>
++        </div>
++      </div>
+ 
+       {expanded && (
+         <div className="divide-y divide-slate-100 border-t border-slate-100">
+@@ -544,17 +581,18 @@ function ChapterRow({
+         </div>
+ 
+         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+-          {/* Diagnostic is the onboarding step of the learning journey ΓÇö it
+-              establishes a baseline before instruction, so it's offered
+-              whether or not the student has quiz attempts yet. */}
++          {/* The subject-level placement diagnostic now lives on the subject
++              header (SubjectDiagnosticButton), because it measures the whole
++              subject and produces the level that drives adaptive practice.
++              This chapter-scoped one samples a single chapter and its
++              prerequisites ΓÇö a different, narrower measurement ΓÇö and stays
++              here for that. */}
+           <DiagnosticButton studentId={studentId} context={context} />
+-          {/* Adaptive Learning is a learner-facing feature: a student may only
+-              ever start their own session, never a teacher/staff/admin acting
+-              as (or "viewing as") a student ΓÇö enforced independently on the
+-              backend by the eso.student route middleware regardless of what
+-              renders here, but the entry point itself must not offer a
+-              staff-facing way to start it either. */}
+-          {!isStaff && <AdaptiveLearningButton chapterId={context.chapterId} />}
++          {/* Adaptive learning now lives on the subject header, next to the
++              diagnostic: it is subject-scoped, and filtering its concepts down
++              to a chapter here discarded all of them, because the content
++              estate and the concept layer number chapters differently. The
++              student-only rule still applies at that entry point. */}
+           {hasAttempts && (
+             <>
+               <Button
+diff --git a/components/intelligence/ConceptIntelligenceTabs.tsx b/components/intelligence/ConceptIntelligenceTabs.tsx
+index 6843a6c..faaf68b 100644
+--- a/components/intelligence/ConceptIntelligenceTabs.tsx
++++ b/components/intelligence/ConceptIntelligenceTabs.tsx
+@@ -28,6 +28,23 @@ import {
+   fetchConceptIntelligenceTabLabels,
+   saveConceptIntelligenceTabLabel,
+ } from '@/app/course-master/data/conceptIntelligenceTabLabels';
++import {
++  FIELD_GUIDE,
++  REASONING_TITLES,
++  TAB_GUIDE,
++  describeConfidence,
++  explainValue,
++  marksLabel,
++  toCoveragePercent,
++} from './conceptIntelligenceGuide';
++import {
++  FactTile,
++  FieldLabel,
++  InfoHint,
++  MetaChip,
++  NothingHere,
++  TabIntro,
++} from './ConceptIntelligenceHelp';
+ 
+ function flattenText(value: unknown): string[] {
+   if (value === null || value === undefined) return [];
+@@ -85,8 +102,6 @@ interface TabDef {
+ }
+ 
+ const CARD = 'rounded-xl border p-4';
+-const EMPTY =
+-  'flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-12 text-center text-sm text-slate-500';
+ 
+ function Chip({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+   return (
+@@ -98,11 +113,20 @@ function Chip({ children, className = '' }: { children: React.ReactNode; classNa
+   );
+ }
+ 
+-function SectionLabel({ children }: { children: React.ReactNode }) {
++function SectionLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
++  return <FieldLabel hint={hint}>{children}</FieldLabel>;
++}
++
++/** "Ability refs: K1, K3" says nothing on its own ΓÇö name what the ids point at. */
++function RefLine({ label, hint, items }: { label: string; hint: string; items: string[] }) {
++  if (items.length === 0) return null;
++
+   return (
+-    <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+-      {children}
+-    </div>
++    <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
++      <span className="font-semibold text-slate-500">{label}</span>
++      <span>{items.join(', ')}</span>
++      <InfoHint text={hint} label={label} />
++    </p>
+   );
+ }
+ 
+@@ -132,6 +156,27 @@ export function ConceptIntelligenceTabs({
+   const evidence = toArr(entry.evidence);
+   const rubrics = (entry.assessment_rubrics ?? null) as Record<string, unknown> | null;
+   const rubricItems = toArr(rubrics?.items);
++  // teaching_notes is a record of named lists (key vocabulary, activities,
++  // evidence tips). Flattening it to one ` ┬╖ `-joined line, as every other field
++  // here is, turns it into unreadable soup ΓÇö so it keeps its headings.
++  const TEACHING_NOTE_TITLES: Record<string, string> = {
++    key_vocabulary: 'Words students must be able to use',
++    practical_activities: 'Activities to do in class',
++    blooms_verbs_used: 'Action words used in these questions',
++    written_evidence_tips: 'What to look for in written work',
++    oral_evidence_tips: 'What to listen for when students speak',
++    experimental_evidence_tips: 'What to look for in practical work',
++  };
++  const teachingNoteGroups = Object.entries(
++    (rubrics?.teaching_notes ?? {}) as Record<string, unknown>
++  )
++    .map(([key, value]) => ({
++      key,
++      title: TEACHING_NOTE_TITLES[key] ?? key.replace(/_/g, ' '),
++      items: toStrList(value),
++    }))
++    .filter((group) => group.items.length > 0);
++
+   const reasoning = (entry.agent_reasoning ?? null) as Record<string, unknown> | null;
+   const reasoningSections = reasoning
+     ? Object.entries(reasoning).filter(([, val]) => s(val))
+@@ -265,33 +310,83 @@ export function ConceptIntelligenceTabs({
+ 
+   const renderActive = () => {
+     switch (activeTab) {
+-      case 'overview':
++      case 'overview': {
++        // Everything here is spelled out rather than chipped: this is the first
++        // screen a new user lands on, and "Medium / Core / 0.92" in a row of
++        // pills teaches nobody what the panel is measuring.
++        const confidence = describeConfidence(s(concept.confidence));
++        const conceptName = s(concept.concept_name);
++
+         return (
+           <div className="space-y-4">
+-            <div className={`${CARD} border-indigo-100 bg-indigo-50/40`}>
+-              <div className="flex flex-wrap items-center gap-1.5">
+-                {s(concept.concept_type) && (
+-                  <Chip className="bg-indigo-100 text-indigo-700">{s(concept.concept_type)}</Chip>
++            {(conceptName || s(concept.definition)) && (
++              <div className={`${CARD} border-indigo-100 bg-indigo-50/40`}>
++                {conceptName && (
++                  <>
++                    <SectionLabel hint={FIELD_GUIDE['concept.name']}>Concept</SectionLabel>
++                    <p className="text-lg font-semibold leading-7 text-slate-900">{conceptName}</p>
++                  </>
+                 )}
+-                {s(concept.difficulty) && (
+-                  <Chip className="bg-amber-100 text-amber-700">Difficulty: {s(concept.difficulty)}</Chip>
+-                )}
+-                {s(concept.importance) && (
+-                  <Chip className="bg-slate-100 text-slate-600">Importance: {s(concept.importance)}</Chip>
+-                )}
+-                {s(concept.confidence) && (
+-                  <Chip className="bg-slate-100 text-slate-600">Confidence: {s(concept.confidence)}</Chip>
++                {s(concept.definition) && (
++                  <div className={conceptName ? 'mt-3' : ''}>
++                    <SectionLabel hint={FIELD_GUIDE['concept.definition']}>
++                      What it means
++                    </SectionLabel>
++                    <p className="text-[15px] leading-6 text-slate-700">{s(concept.definition)}</p>
++                  </div>
+                 )}
+               </div>
+-              {s(concept.definition) && (
+-                <div className="mt-3">
+-                  <SectionLabel>Definition</SectionLabel>
+-                  <p className="text-[15px] leading-6 text-slate-700">{s(concept.definition)}</p>
+-                </div>
++            )}
++
++            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
++              {s(concept.concept_type) && (
++                <FactTile
++                  label="Kind of concept"
++                  value={s(concept.concept_type)}
++                  hint={FIELD_GUIDE['concept.type']}
++                  tone="brand"
++                />
++              )}
++              {s(concept.difficulty) && (
++                <FactTile
++                  label="Difficulty"
++                  value={s(concept.difficulty)}
++                  hint={FIELD_GUIDE['concept.difficulty']}
++                  meaning={explainValue('difficulty', s(concept.difficulty))}
++                  tone="warn"
++                />
++              )}
++              {s(concept.importance) && (
++                <FactTile
++                  label="Importance"
++                  value={s(concept.importance)}
++                  hint={FIELD_GUIDE['concept.importance']}
++                  meaning={explainValue('importance', s(concept.importance))}
++                />
++              )}
++              {confidence && (
++                <FactTile
++                  label="How sure the AI is"
++                  value={`${confidence.percent} ΓÇö ${confidence.band}`}
++                  hint={FIELD_GUIDE['concept.confidence']}
++                  meaning={
++                    confidence.tone === 'low'
++                      ? 'Please check the Evidence tab before you use this.'
++                      : 'This depends on how clearly the book explains the concept.'
++                  }
++                  tone={confidence.tone === 'low' ? 'alert' : 'neutral'}
++                />
+               )}
+             </div>
++
++            <p className="text-[13px] leading-5 text-slate-500">
++              The tabs above break this concept down further ΓÇö what to teach, what students should be
++              able to do, where they go wrong, and how to test them. Each tab tells you what it is
++              for at the top.
++            </p>
+           </div>
+         );
++      }
+ 
+       case 'knowledge':
+         return (
+@@ -303,7 +398,12 @@ export function ConceptIntelligenceTabs({
+                     {getDisplayTitle(k, ['knowledge', 'statement', 'definition', 'concept_name'])}
+                   </p>
+                   {hasTruthy(k.knowledge_type) && (
+-                    <Chip className="shrink-0 bg-slate-100 text-slate-600">{s(k.knowledge_type)}</Chip>
++                    <MetaChip
++                      label="Type"
++                      value={s(k.knowledge_type)}
++                      hint={FIELD_GUIDE['knowledge.type']}
++                      className="shrink-0 bg-slate-100 text-slate-600"
++                    />
+                   )}
+                 </div>
+                 {getDisplayBody(k, ['statement', 'definition', 'description']) && (
+@@ -311,9 +411,14 @@ export function ConceptIntelligenceTabs({
+                     {getDisplayBody(k, ['statement', 'definition', 'description'])}
+                   </p>
+                 )}
+-                {hasTruthy(k.confidence) && (
++                {describeConfidence(s(k.confidence)) && (
+                   <div className="mt-3">
+-                    <Chip className="bg-slate-100 text-slate-500">Confidence: {s(k.confidence)}</Chip>
++                    <MetaChip
++                      label="How sure the AI is"
++                      value={describeConfidence(s(k.confidence))!.percent}
++                      hint={FIELD_GUIDE['knowledge.confidence']}
++                      className="bg-slate-100 text-slate-500"
++                    />
+                   </div>
+                 )}
+               </div>
+@@ -327,15 +432,22 @@ export function ConceptIntelligenceTabs({
+             {abilities.map((a, i) => (
+               <div key={i} className={`${CARD} border-blue-100 bg-blue-50/40`}>
+                 {s(a.verb) && (
+-                  <Chip className="mb-2 bg-blue-600 text-white">{s(a.verb)}</Chip>
++                  <MetaChip
++                    label="Action"
++                    value={s(a.verb)}
++                    hint={FIELD_GUIDE['ability.verb']}
++                    className="mb-2 bg-blue-600 text-white"
++                  />
+                 )}
+-                <p className="text-[15px] font-semibold text-blue-900">{s(a.ability)}</p>
++                <p className="text-[15px] font-semibold text-blue-900">
++                  A student should be able to: {s(a.ability)}
++                </p>
+                 {s(a.description) && <p className="mt-2 text-sm leading-6 text-slate-700">{s(a.description)}</p>}
+-                {toStrList(a.knowledge_refs).length > 0 && (
+-                  <p className="mt-2 text-xs text-blue-700/80">
+-                    <span className="font-semibold">Refs:</span> {toStrList(a.knowledge_refs).join(', ')}
+-                  </p>
+-                )}
++                <RefLine
++                  label="Needs this knowledge first:"
++                  hint={FIELD_GUIDE['ability.knowledgeRefs']}
++                  items={toStrList(a.knowledge_refs)}
++                />
+               </div>
+             ))}
+           </div>
+@@ -349,11 +461,11 @@ export function ConceptIntelligenceTabs({
+                 <p className="text-[15px] font-semibold text-teal-800">
+                   {getDisplayTitle(sk, ['skill', 'title', 'concept_name'])}
+                 </p>
+-                {toStrList(sk.ability_refs).length > 0 && (
+-                  <p className="mt-2 text-xs text-teal-700/80">
+-                    <span className="font-semibold">Ability refs:</span> {toStrList(sk.ability_refs).join(', ')}
+-                  </p>
+-                )}
++                <RefLine
++                  label="Built from these abilities:"
++                  hint={FIELD_GUIDE['skill.abilityRefs']}
++                  items={toStrList(sk.ability_refs)}
++                />
+               </div>
+             ))}
+           </div>
+@@ -368,55 +480,122 @@ export function ConceptIntelligenceTabs({
+                   {getDisplayTitle(c, ['competency', 'statement', 'concept_name'])}
+                 </p>
+                 {getDisplayBody(c, ['statement', 'description']) && (
+-                  <p className="mt-2 text-sm italic leading-6 text-slate-700">ΓÇ£{getDisplayBody(c, ['statement', 'description'])}ΓÇ¥</p>
++                  <div className="mt-2">
++                    <SectionLabel hint={FIELD_GUIDE['competency.statement']}>
++                      What the student can do
++                    </SectionLabel>
++                    <p className="text-sm italic leading-6 text-slate-700">ΓÇ£{getDisplayBody(c, ['statement', 'description'])}ΓÇ¥</p>
++                  </div>
++                )}
++                {(toStrList(c.knowledge_refs).length > 0 ||
++                  toStrList(c.ability_refs).length > 0 ||
++                  toStrList(c.skill_refs).length > 0) && (
++                  <div className="mt-3">
++                    <SectionLabel hint={FIELD_GUIDE['competency.refs']}>Made up of</SectionLabel>
++                    <div className="flex flex-wrap gap-1.5">
++                      {toStrList(c.knowledge_refs).length > 0 && (
++                        <MetaChip
++                          label="Knowledge"
++                          value={toStrList(c.knowledge_refs).join(', ')}
++                          className="bg-indigo-100 text-indigo-700"
++                        />
++                      )}
++                      {toStrList(c.ability_refs).length > 0 && (
++                        <MetaChip
++                          label="Abilities"
++                          value={toStrList(c.ability_refs).join(', ')}
++                          className="bg-indigo-100 text-indigo-700"
++                        />
++                      )}
++                      {toStrList(c.skill_refs).length > 0 && (
++                        <MetaChip
++                          label="Skills"
++                          value={toStrList(c.skill_refs).join(', ')}
++                          className="bg-indigo-100 text-indigo-700"
++                        />
++                      )}
++                    </div>
++                  </div>
+                 )}
+-                <div className="mt-2 flex flex-wrap gap-1.5">
+-                  {toStrList(c.knowledge_refs).length > 0 && (
+-                    <Chip className="bg-indigo-100 text-indigo-700">Knowledge: {toStrList(c.knowledge_refs).join(', ')}</Chip>
+-                  )}
+-                  {toStrList(c.ability_refs).length > 0 && (
+-                    <Chip className="bg-indigo-100 text-indigo-700">Ability: {toStrList(c.ability_refs).join(', ')}</Chip>
+-                  )}
+-                  {toStrList(c.skill_refs).length > 0 && (
+-                    <Chip className="bg-indigo-100 text-indigo-700">Skill: {toStrList(c.skill_refs).join(', ')}</Chip>
+-                  )}
+-                </div>
+               </div>
+             ))}
+           </div>
+         );
+ 
+       case 'blooms':
++        // A bare "Apply 40%" is meaningless to anyone who has not met Bloom's
++        // taxonomy, so each level carries its plain-English meaning and the
++        // percentage is drawn as a bar with its unit named.
+         return (
+-          <div className="flex flex-wrap gap-2">
++          <div className="space-y-2.5">
+             {blooms.map((b, i) => {
+-              const score = Number(b.coverage_score);
++              const level = s(b.level);
++              const percent = toCoveragePercent(b.coverage_score);
++              const meaning = explainValue('bloom', level);
++
+               return (
+-                <div
+-                  key={i}
+-                  className="flex items-center gap-2 rounded-xl border border-purple-100 bg-purple-50/50 px-4 py-2"
+-                >
+-                  <span className="text-sm font-semibold text-purple-700">{s(b.level)}</span>
+-                  {Number.isFinite(score) && (
+-                    <span className="text-xs text-slate-500">{Math.round(score * 100)}%</span>
++                <div key={i} className={`${CARD} border-purple-100 bg-purple-50/40`}>
++                  <div className="flex flex-wrap items-baseline justify-between gap-2">
++                    <p className="text-[15px] font-semibold text-purple-800">{level}</p>
++                    {percent !== null && (
++                      <p className="text-sm font-semibold text-purple-700">
++                        {percent}%
++                        <span className="ml-1 text-xs font-normal text-slate-500">of this concept</span>
++                      </p>
++                    )}
++                  </div>
++                  {meaning && <p className="mt-1 text-sm leading-6 text-slate-600">{meaning}</p>}
++                  {percent !== null && (
++                    <div
++                      className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-purple-100"
++                      role="img"
++                      aria-label={`${percent}% of this concept's thinking is at the ${level} level`}
++                    >
++                      <div
++                        className="h-full rounded-full bg-purple-500"
++                        style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
++                      />
++                    </div>
+                   )}
+                 </div>
+               );
+             })}
++            <p className="pt-1 text-[13px] leading-5 text-slate-500">
++              {FIELD_GUIDE['bloom.coverage']} This is called Bloom&apos;s taxonomy ΓÇö a standard way of
++              sorting thinking from easy to hard.
++            </p>
+           </div>
+         );
+ 
+       case 'dok':
+         return (
+           <div className="grid grid-cols-1 gap-3">
+-            {dok.map((d, i) => (
+-              <div key={i} className={`${CARD} flex items-center gap-4 border-amber-100 bg-amber-50/40`}>
+-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-lg font-bold text-white">
+-                  {s(d.level)}
++            {dok.map((d, i) => {
++              const level = s(d.level);
++              const meaning = explainValue('dok', level);
++
++              return (
++                <div key={i} className={`${CARD} flex items-start gap-4 border-amber-100 bg-amber-50/40`}>
++                  <div className="flex shrink-0 flex-col items-center" aria-hidden="true">
++                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500 text-lg font-bold text-white">
++                      {level}
++                    </div>
++                    <span className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
++                      Level
++                    </span>
++                  </div>
++                  <span className="sr-only">Depth of knowledge level {level} of 4.</span>
++                  <div className="min-w-0">
++                    <p className="text-[15px] font-semibold text-amber-900">{s(d.description)}</p>
++                    {meaning && <p className="mt-1 text-sm leading-6 text-slate-600">{meaning}</p>}
++                  </div>
+                 </div>
+-                <p className="text-sm font-medium text-amber-900">{s(d.description)}</p>
+-              </div>
+-            ))}
++              );
++            })}
++            <p className="pt-1 text-[13px] leading-5 text-slate-500">
++              Depth is not the same as difficulty. A level 1 question can still be hard to remember,
++              and a level 4 project can use easy facts.
++            </p>
+           </div>
+         );
+ 
+@@ -424,14 +603,33 @@ export function ConceptIntelligenceTabs({
+         return (
+           <div className="grid grid-cols-1 gap-3">
+             {prerequisites.map((p, i) => (
+-              <div key={i} className={`${CARD} flex items-center justify-between gap-3 border-slate-200 bg-white`}>
+-                <div>
++              <div key={i} className={`${CARD} border-slate-200 bg-white`}>
++                <div className="flex items-start justify-between gap-3">
+                   <p className="text-[15px] font-semibold text-slate-900">{s(p.concept_name)}</p>
+-                  {s(p.prerequisite_type) && (
+-                    <p className="text-xs text-slate-500">{s(p.prerequisite_type)}</p>
++                  {s(p.necessity) && (
++                    <MetaChip
++                      label="Needed"
++                      value={s(p.necessity)}
++                      hint={FIELD_GUIDE['prerequisite.necessity']}
++                      className="shrink-0 bg-slate-100 text-slate-600"
++                    />
+                   )}
+                 </div>
+-                {s(p.necessity) && <Chip className="shrink-0 bg-slate-100 text-slate-600">{s(p.necessity)}</Chip>}
++                {explainValue('necessity', s(p.necessity)) && (
++                  <p className="mt-1.5 text-sm leading-6 text-slate-600">
++                    {explainValue('necessity', s(p.necessity))}
++                  </p>
++                )}
++                {s(p.prerequisite_type) && (
++                  <div className="mt-2">
++                    <MetaChip
++                      label="Kind"
++                      value={s(p.prerequisite_type)}
++                      hint={FIELD_GUIDE['prerequisite.type']}
++                      className="bg-slate-100 text-slate-500"
++                    />
++                  </div>
++                )}
+               </div>
+             ))}
+           </div>
+@@ -443,21 +641,32 @@ export function ConceptIntelligenceTabs({
+             {misconceptions.map((m, i) => (
+               <div key={i} className={`${CARD} border-red-100 bg-red-50/40`}>
+                 <div className="flex items-start gap-1.5">
+-                  <TriangleAlert size={16} className="mt-0.5 shrink-0 text-red-500" />
+-                  <p className="text-[15px] font-semibold text-red-800">{s(m.misconception)}</p>
++                  <TriangleAlert size={16} className="mt-0.5 shrink-0 text-red-500" aria-hidden="true" />
++                  <div className="min-w-0">
++                    <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-red-600">
++                      What students get wrong
++                    </div>
++                    <p className="mt-0.5 text-[15px] font-semibold text-red-800">{s(m.misconception)}</p>
++                  </div>
+                 </div>
+                 {s(m.statement) && <p className="mt-2 text-sm leading-6 text-red-700/90">{s(m.statement)}</p>}
+                 <div className="mt-3 space-y-2">
+                   {s(m.root_cause) && (
+                     <div className="rounded-lg bg-red-100/70 p-2.5">
+-                      <div className="text-[11px] font-semibold text-red-700">Root cause</div>
+-                      <p className="text-sm text-red-900/90">{s(m.root_cause)}</p>
++                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-700">
++                        Why they think it
++                        <InfoHint text={FIELD_GUIDE['misconception.rootCause']} label="why they think it" />
++                      </div>
++                      <p className="mt-0.5 text-sm text-red-900/90">{s(m.root_cause)}</p>
+                     </div>
+                   )}
+                   {s(m.correction) && (
+                     <div className="rounded-lg border border-green-200 bg-green-50 p-2.5">
+-                      <div className="text-[11px] font-semibold text-green-700">Correction</div>
+-                      <p className="text-sm text-green-900/90">{s(m.correction)}</p>
++                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-green-700">
++                        How to put it right
++                        <InfoHint text={FIELD_GUIDE['misconception.correction']} label="how to put it right" />
++                      </div>
++                      <p className="mt-0.5 text-sm text-green-900/90">{s(m.correction)}</p>
+                     </div>
+                   )}
+                 </div>
+@@ -472,10 +681,22 @@ export function ConceptIntelligenceTabs({
+             {realWorld.map((r, i) => (
+               <div key={i} className={`${CARD} border-emerald-100 bg-emerald-50/40`}>
+                 {s(r.application_type) && (
+-                  <Chip className="mb-2 bg-emerald-100 text-emerald-700">{s(r.application_type)}</Chip>
++                  <MetaChip
++                    label="Where"
++                    value={s(r.application_type)}
++                    hint={FIELD_GUIDE['realworld.type']}
++                    className="mb-2 bg-emerald-100 text-emerald-700"
++                  />
+                 )}
+                 <p className="text-sm leading-6 text-slate-700">{s(r.example) || s(r.application)}</p>
+-                {s(r.relevance) && <p className="mt-2 text-xs text-emerald-700/80">{s(r.relevance)}</p>}
++                {s(r.relevance) && (
++                  <p className="mt-2 text-xs leading-5 text-emerald-700/90">
++                    <span className="font-semibold">Link to the concept: {s(r.relevance)}</span>
++                    {explainValue('relevance', s(r.relevance)) && (
++                      <span className="text-slate-500"> ΓÇö {explainValue('relevance', s(r.relevance))}</span>
++                    )}
++                  </p>
++                )}
+               </div>
+             ))}
+           </div>
+@@ -487,12 +708,24 @@ export function ConceptIntelligenceTabs({
+             {pedagogy.map((p, i) => (
+               <div key={i} className={`${CARD} border-slate-200 bg-white`}>
+                 <p className="text-[15px] font-semibold text-slate-900">{s(p.strategy)}</p>
+-                {s(p.why_effective) && <p className="mt-2 text-sm leading-6 text-slate-600">{s(p.why_effective)}</p>}
++                {s(p.why_effective) && (
++                  <div className="mt-2">
++                    <SectionLabel hint={FIELD_GUIDE['pedagogy.why']}>
++                      Why it works for this concept
++                    </SectionLabel>
++                    <p className="text-sm leading-6 text-slate-600">{s(p.why_effective)}</p>
++                  </div>
++                )}
+                 {toStrList(p.concept_characteristics).length > 0 && (
+-                  <div className="mt-2 flex flex-wrap gap-1.5">
+-                    {toStrList(p.concept_characteristics).map((char, idx) => (
+-                      <Chip key={idx} className="bg-slate-100 text-slate-600">{char}</Chip>
+-                    ))}
++                  <div className="mt-3">
++                    <SectionLabel hint={FIELD_GUIDE['pedagogy.characteristics']}>
++                      What makes it a good fit
++                    </SectionLabel>
++                    <div className="flex flex-wrap gap-1.5">
++                      {toStrList(p.concept_characteristics).map((char, idx) => (
++                        <Chip key={idx} className="bg-slate-100 text-slate-600">{char}</Chip>
++                      ))}
++                    </div>
+                   </div>
+                 )}
+               </div>
+@@ -511,9 +744,29 @@ export function ConceptIntelligenceTabs({
+                     {getDisplayTitle(o, ['objective', 'statement', 'description'])}
+                   </p>
+                   <div className="mt-2 flex flex-wrap gap-1.5">
+-                    {hasTruthy(o.objective_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.objective_type)}</Chip>}
+-                    {hasTruthy(o.priority) && <Chip className="bg-blue-100 text-blue-700">{s(o.priority)} priority</Chip>}
+-                    {hasTruthy(o.concept_name) && <Chip className="bg-slate-100 text-slate-500">Concept: {s(o.concept_name)}</Chip>}
++                    {hasTruthy(o.objective_type) && (
++                      <MetaChip
++                        label="Aims at"
++                        value={s(o.objective_type)}
++                        hint={FIELD_GUIDE['objective.type']}
++                        className="bg-slate-100 text-slate-600"
++                      />
++                    )}
++                    {hasTruthy(o.priority) && (
++                      <MetaChip
++                        label="Priority"
++                        value={s(o.priority)}
++                        hint={explainValue('priority', s(o.priority)) || FIELD_GUIDE['objective.priority']}
++                        className="bg-blue-100 text-blue-700"
++                      />
++                    )}
++                    {hasTruthy(o.concept_name) && (
++                      <MetaChip
++                        label="Concept"
++                        value={s(o.concept_name)}
++                        className="bg-slate-100 text-slate-500"
++                      />
++                    )}
+                   </div>
+                 </div>
+               </div>
+@@ -534,14 +787,35 @@ export function ConceptIntelligenceTabs({
+                     {getDisplayTitle(o, ['outcome', 'statement', 'description'])}
+                   </p>
+                   <div className="mt-2 flex flex-wrap gap-1.5">
+-                    {hasTruthy(o.outcome_type) && <Chip className="bg-slate-100 text-slate-600">{s(o.outcome_type)}</Chip>}
++                    {hasTruthy(o.outcome_type) && (
++                      <MetaChip
++                        label="Shows"
++                        value={s(o.outcome_type)}
++                        hint={FIELD_GUIDE['outcome.type']}
++                        className="bg-slate-100 text-slate-600"
++                      />
++                    )}
+                     {boolish(o.measurable) && (
+-                      <Chip className="bg-emerald-100 text-emerald-700">Measurable</Chip>
++                      <MetaChip
++                        value="Can be measured"
++                        hint={FIELD_GUIDE['outcome.measurable']}
++                        className="bg-emerald-100 text-emerald-700"
++                      />
+                     )}
+                     {boolish(o.assessment_ready) && (
+-                      <Chip className="bg-emerald-100 text-emerald-700">Assessment ready</Chip>
++                      <MetaChip
++                        value="Ready to use as an exam question"
++                        hint={FIELD_GUIDE['outcome.assessmentReady']}
++                        className="bg-emerald-100 text-emerald-700"
++                      />
++                    )}
++                    {hasTruthy(o.concept_name) && (
++                      <MetaChip
++                        label="Concept"
++                        value={s(o.concept_name)}
++                        className="bg-white text-slate-500 ring-1 ring-slate-200"
++                      />
+                     )}
+-                    {hasTruthy(o.concept_name) && <Chip className="bg-white text-slate-500 ring-1 ring-slate-200">Concept: {s(o.concept_name)}</Chip>}
+                   </div>
+                 </div>
+               </div>
+@@ -556,19 +830,50 @@ export function ConceptIntelligenceTabs({
+               <div key={i} className={`${CARD} border-amber-100 bg-amber-50/40`}>
+                 <div className="flex items-start justify-between gap-3">
+                   {s(ab.recommended_question) && (
+-                    <p className="text-sm italic leading-6 text-slate-800">ΓÇ£{s(ab.recommended_question)}ΓÇ¥</p>
++                    <div className="min-w-0">
++                      <SectionLabel>Suggested question</SectionLabel>
++                      <p className="text-sm italic leading-6 text-slate-800">ΓÇ£{s(ab.recommended_question)}ΓÇ¥</p>
++                    </div>
+                   )}
+                   {s(ab.marks) && (
+                     <span className="shrink-0 rounded-md bg-amber-100 px-2 py-1 text-sm font-bold text-amber-700">
+-                      {s(ab.marks)} Marks
++                      {marksLabel(s(ab.marks))}
+                     </span>
+                   )}
+                 </div>
+                 <div className="mt-3 flex flex-wrap gap-1.5">
+-                  {s(ab.assessment_type) && <Chip className="bg-white text-slate-600 ring-1 ring-slate-200">{s(ab.assessment_type)}</Chip>}
+-                  {s(ab.difficulty) && <Chip className="bg-white text-slate-600 ring-1 ring-slate-200">Difficulty: {s(ab.difficulty)}</Chip>}
+-                  {s(ab.bloom_level) && <Chip className="bg-white text-slate-600 ring-1 ring-slate-200">Bloom: {s(ab.bloom_level)}</Chip>}
+-                  {s(ab.dok_level) && <Chip className="bg-white text-slate-600 ring-1 ring-slate-200">DOK {s(ab.dok_level)}</Chip>}
++                  {s(ab.assessment_type) && (
++                    <MetaChip
++                      label="Format"
++                      value={s(ab.assessment_type)}
++                      hint={FIELD_GUIDE['assessment.type']}
++                      className="bg-white text-slate-600 ring-1 ring-slate-200"
++                    />
++                  )}
++                  {s(ab.difficulty) && (
++                    <MetaChip
++                      label="Difficulty"
++                      value={s(ab.difficulty)}
++                      hint={FIELD_GUIDE['assessment.difficulty']}
++                      className="bg-white text-slate-600 ring-1 ring-slate-200"
++                    />
++                  )}
++                  {s(ab.bloom_level) && (
++                    <MetaChip
++                      label="Thinking needed"
++                      value={s(ab.bloom_level)}
++                      hint={explainValue('bloom', s(ab.bloom_level)) || FIELD_GUIDE['assessment.bloom']}
++                      className="bg-white text-slate-600 ring-1 ring-slate-200"
++                    />
++                  )}
++                  {s(ab.dok_level) && (
++                    <MetaChip
++                      label="Depth"
++                      value={`Level ${s(ab.dok_level)} of 4`}
++                      hint={explainValue('dok', s(ab.dok_level)) || FIELD_GUIDE['assessment.dok']}
++                      className="bg-white text-slate-600 ring-1 ring-slate-200"
++                    />
++                  )}
+                 </div>
+               </div>
+             ))}
+@@ -578,10 +883,26 @@ export function ConceptIntelligenceTabs({
+       case 'rubrics':
+         return (
+           <div className="space-y-3">
+-            {s(rubrics?.teaching_notes) && (
++            {teachingNoteGroups.length > 0 && (
+               <div className={`${CARD} border-slate-200 bg-slate-50`}>
+-                <SectionLabel>Teaching notes</SectionLabel>
+-                <p className="text-sm leading-6 text-slate-600">{s(rubrics?.teaching_notes)}</p>
++                <SectionLabel hint={FIELD_GUIDE['rubric.teachingNotes']}>
++                  Notes for teaching and marking
++                </SectionLabel>
++                <div className="space-y-3">
++                  {teachingNoteGroups.map((group) => (
++                    <div key={group.key}>
++                      <p className="text-[13px] font-semibold text-slate-700">{group.title}</p>
++                      <ul className="mt-1 space-y-1 text-sm text-slate-600">
++                        {group.items.map((item, idx) => (
++                          <li key={idx} className="flex gap-2">
++                            <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
++                            <span className="leading-6">{item}</span>
++                          </li>
++                        ))}
++                      </ul>
++                    </div>
++                  ))}
++                </div>
+               </div>
+             )}
+             {rubricItems.map((it, i) => (
+@@ -590,23 +911,59 @@ export function ConceptIntelligenceTabs({
+                   <p className="text-[15px] font-semibold text-slate-900">{s(it.question)}</p>
+                   {s(it.marks) && (
+                     <span className="shrink-0 rounded-md bg-violet-100 px-2 py-1 text-sm font-bold text-violet-700">
+-                      {s(it.marks)} Marks
++                      {marksLabel(s(it.marks))}
+                     </span>
+                   )}
+                 </div>
+                 <div className="mt-2 flex flex-wrap gap-1.5">
+-                  {s(it.assessment_type) && <Chip className="bg-violet-100 text-violet-700">{s(it.assessment_type)}</Chip>}
+-                  {s(it.difficulty) && <Chip className="bg-white text-slate-600 ring-1 ring-slate-200">{s(it.difficulty)}</Chip>}
+-                  {s(it.bloom_level) && <Chip className="bg-white text-slate-600 ring-1 ring-slate-200">Bloom: {s(it.bloom_level)}</Chip>}
+-                  {s(it.dok_level) && <Chip className="bg-white text-slate-600 ring-1 ring-slate-200">DOK {s(it.dok_level)}</Chip>}
++                  {s(it.assessment_type) && (
++                    <MetaChip
++                      label="Format"
++                      value={s(it.assessment_type)}
++                      hint={FIELD_GUIDE['assessment.type']}
++                      className="bg-violet-100 text-violet-700"
++                    />
++                  )}
++                  {s(it.difficulty) && (
++                    <MetaChip
++                      label="Difficulty"
++                      value={s(it.difficulty)}
++                      hint={FIELD_GUIDE['assessment.difficulty']}
++                      className="bg-white text-slate-600 ring-1 ring-slate-200"
++                    />
++                  )}
++                  {s(it.bloom_level) && (
++                    <MetaChip
++                      label="Thinking needed"
++                      value={s(it.bloom_level)}
++                      hint={explainValue('bloom', s(it.bloom_level)) || FIELD_GUIDE['assessment.bloom']}
++                      className="bg-white text-slate-600 ring-1 ring-slate-200"
++                    />
++                  )}
++                  {s(it.dok_level) && (
++                    <MetaChip
++                      label="Depth"
++                      value={`Level ${s(it.dok_level)} of 4`}
++                      hint={explainValue('dok', s(it.dok_level)) || FIELD_GUIDE['assessment.dok']}
++                      className="bg-white text-slate-600 ring-1 ring-slate-200"
++                    />
++                  )}
+                   {toStrList(it.assessment_objectives).length > 0 && (
+-                    <Chip className="bg-white text-slate-600 ring-1 ring-slate-200">{toStrList(it.assessment_objectives).join(', ')}</Chip>
++                    <MetaChip
++                      label="Tests objective"
++                      value={toStrList(it.assessment_objectives).join(', ')}
++                      hint={FIELD_GUIDE['assessment.objectives']}
++                      className="bg-white text-slate-600 ring-1 ring-slate-200"
++                    />
+                   )}
+                 </div>
+ 
+                 {/* MCQ answer key */}
+                 {toArr(it.answer_key).length > 0 && (
+                   <div className="mt-3 space-y-1.5">
++                    <SectionLabel hint={FIELD_GUIDE['rubric.answerKey']}>
++                      Answer key ΓÇö the correct option is marked in green
++                    </SectionLabel>
+                     {toArr(it.answer_key).map((opt, oi) => {
+                       const correct = opt.is_correct === true || s(opt.is_correct) === 'true';
+                       return (
+@@ -623,9 +980,20 @@ export function ConceptIntelligenceTabs({
+                             <span className="font-medium text-slate-800">{s(opt.option_text)}</span>
+                             {correct && <CheckCircle2 size={14} className="text-green-500" />}
+                           </div>
+-                          {s(opt.rationale) && <p className="mt-1 pl-7 text-xs text-slate-500">{s(opt.rationale)}</p>}
++                          {s(opt.rationale) && (
++                            <p className="mt-1 pl-7 text-xs leading-5 text-slate-500">
++                              <span className="font-semibold">
++                                {correct ? 'Why this is right: ' : 'Why students pick this: '}
++                              </span>
++                              {s(opt.rationale)}
++                            </p>
++                          )}
+                           {s(opt.misconception_tested) && (
+-                            <p className="mt-1 pl-7 text-xs text-red-500">Tests misconception: {s(opt.misconception_tested)}</p>
++                            <p className="mt-1 flex flex-wrap items-center gap-1 pl-7 text-xs leading-5 text-red-500">
++                              <span className="font-semibold">Picking this suggests the student believes:</span>
++                              <span>{s(opt.misconception_tested)}</span>
++                              <InfoHint text={FIELD_GUIDE['rubric.misconceptionTested']} label="misconception tested" />
++                            </p>
+                           )}
+                         </div>
+                       );
+@@ -636,18 +1004,18 @@ export function ConceptIntelligenceTabs({
+                 {/* Point-based marking */}
+                 {toArr(it.acceptable_points).length > 0 && (
+                   <div className="mt-3 space-y-1.5">
+-                    <SectionLabel>Acceptable points</SectionLabel>
++                    <SectionLabel hint={FIELD_GUIDE['rubric.acceptablePoints']}>Points that earn marks</SectionLabel>
+                     {toArr(it.acceptable_points).map((p, pi) => (
+                       <div key={pi} className="flex items-start gap-2 rounded-lg bg-white p-2.5 ring-1 ring-slate-200">
+                         {s(p.marks) && (
+-                          <span className="mt-0.5 shrink-0 rounded bg-violet-100 px-1.5 text-xs font-semibold text-violet-700">
+-                            {s(p.marks)}m
++                          <span className="mt-0.5 shrink-0 whitespace-nowrap rounded bg-violet-100 px-1.5 text-xs font-semibold text-violet-700">
++                            {marksLabel(s(p.marks))}
+                           </span>
+                         )}
+                         <div>
+                           <p className="text-sm text-slate-700">{s(p.point)}</p>
+                           {toStrList(p.alternatives).length > 0 && (
+-                            <p className="mt-0.5 text-xs text-slate-400">alt: {toStrList(p.alternatives).join('; ')}</p>
++                            <p className="mt-0.5 text-xs text-slate-500">Also accept: {toStrList(p.alternatives).join('; ')}</p>
+                           )}
+                         </div>
+                       </div>
+@@ -658,7 +1026,7 @@ export function ConceptIntelligenceTabs({
+                 {/* Levels of response */}
+                 {toStrList(it.indicative_content).length > 0 && (
+                   <div className="mt-3">
+-                    <SectionLabel>Indicative content</SectionLabel>
++                    <SectionLabel hint={FIELD_GUIDE['rubric.indicativeContent']}>What a good answer draws on</SectionLabel>
+                     <ul className="space-y-1 text-sm text-slate-600">
+                       {toStrList(it.indicative_content).map((pt, ci) => (
+                         <li key={ci} className="flex gap-2">
+@@ -671,7 +1039,7 @@ export function ConceptIntelligenceTabs({
+                 )}
+                 {toArr(it.level_descriptors).length > 0 && (
+                   <div className="mt-3 space-y-1.5">
+-                    <SectionLabel>Level descriptors</SectionLabel>
++                    <SectionLabel hint={FIELD_GUIDE['rubric.levelDescriptors']}>Mark bands ΓÇö what an answer looks like at each level</SectionLabel>
+                     {toArr(it.level_descriptors).map((ld, li) => (
+                       <div key={li} className="rounded-lg bg-white p-2.5 ring-1 ring-slate-200">
+                         <div className="mb-1 flex items-center gap-1.5">
+@@ -680,8 +1048,9 @@ export function ConceptIntelligenceTabs({
+                           </span>
+                           {(s(ld.mark_low) || s(ld.mark_high)) && (
+                             <Chip className="bg-violet-100 text-violet-700">
+-                              {s(ld.mark_low)}
+-                              {s(ld.mark_high) && s(ld.mark_high) !== s(ld.mark_low) ? `ΓÇô${s(ld.mark_high)}` : ''} marks
++                              {s(ld.mark_high) && s(ld.mark_high) !== s(ld.mark_low)
++                                ? `${s(ld.mark_low)}ΓÇô${s(ld.mark_high)} marks`
++                                : marksLabel(s(ld.mark_low))}
+                             </Chip>
+                           )}
+                         </div>
+@@ -701,7 +1070,7 @@ export function ConceptIntelligenceTabs({
+                 )}
+                 {toStrList(it.threshold_conditions).length > 0 && (
+                   <div className="mt-3">
+-                    <SectionLabel>Threshold conditions</SectionLabel>
++                    <SectionLabel hint={FIELD_GUIDE['rubric.thresholdConditions']}>Conditions an answer must meet</SectionLabel>
+                     <ul className="space-y-1 text-sm text-slate-600">
+                       {toStrList(it.threshold_conditions).map((tc, ti) => (
+                         <li key={ti} className="flex gap-2">
+@@ -714,7 +1083,7 @@ export function ConceptIntelligenceTabs({
+                 )}
+                 {toStrList(it.common_errors).length > 0 && (
+                   <div className="mt-3">
+-                    <SectionLabel>Common errors</SectionLabel>
++                    <SectionLabel hint={FIELD_GUIDE['rubric.commonErrors']}>Mistakes to expect while marking</SectionLabel>
+                     <div className="flex flex-wrap gap-1.5">
+                       {toStrList(it.common_errors).map((e, ei) => (
+                         <Chip key={ei} className="bg-red-50 text-red-600 ring-1 ring-red-100">{e}</Chip>
+@@ -732,12 +1101,19 @@ export function ConceptIntelligenceTabs({
+           <div className="grid grid-cols-1 gap-3">
+             {relationships.map((r, i) => (
+               <div key={i} className={`${CARD} border-cyan-100 bg-cyan-50/40`}>
++                {/* Read as a sentence: "Photosynthesis needs this first Sunlight"
++                    tells a teacher nothing, so the raw `depends_on` relation code
++                    is swapped for the phrase it stands for. */}
+                 <div className="flex flex-wrap items-center gap-2 text-sm">
+                   <span className="font-semibold text-cyan-800">
+                     {getDisplayTitle(r, ['source_concept', 'concept_name', 'title'])}
+                   </span>
+                   {hasTruthy(r.relation_type) && (
+-                    <Chip className="bg-cyan-100 text-cyan-700">{s(r.relation_type)}</Chip>
++                    <MetaChip
++                      value={explainValue('relation', s(r.relation_type)) || s(r.relation_type).replace(/_/g, ' ')}
++                      hint={FIELD_GUIDE['relationship.type']}
++                      className="bg-cyan-100 text-cyan-700"
++                    />
+                   )}
+                   <span className="font-semibold text-cyan-800">
+                     {getDisplayTitle(r, ['target_concept', 'related_concept', 'concept_name'])}
+@@ -757,9 +1133,18 @@ export function ConceptIntelligenceTabs({
+             {evidence.map((e, i) => (
+               <div key={i} className={`${CARD} border-slate-200 bg-white`}>
+                 {s(e.source_type) && (
+-                  <Chip className="mb-2 bg-slate-100 text-slate-600">{s(e.source_type)}</Chip>
++                  <MetaChip
++                    label="Source"
++                    value={s(e.source_type)}
++                    className="mb-2 bg-slate-100 text-slate-600"
++                  />
+                 )}
+                 <p className="text-sm italic leading-6 text-slate-600">ΓÇ£{s(e.source_text)}ΓÇ¥</p>
++                {explainValue('sourceType', s(e.source_type)) && (
++                  <p className="mt-2 text-xs leading-5 text-slate-500">
++                    {explainValue('sourceType', s(e.source_type))}
++                  </p>
++                )}
+               </div>
+             ))}
+           </div>
+@@ -768,9 +1153,16 @@ export function ConceptIntelligenceTabs({
+       case 'reasoning':
+         return (
+           <div className="space-y-3">
++            {/* The raw keys are agent names (cognitive, pedagogy, assessment,
++                rubrics). Say which tabs each one produced instead. */}
+             {reasoningSections.map(([key, val]) => (
+               <div key={key} className={`${CARD} border-slate-200 bg-white`}>
+-                <SectionLabel>{key.replace(/_/g, ' ')}</SectionLabel>
++                <SectionLabel hint={FIELD_GUIDE['reasoning.section']}>
++                  {REASONING_TITLES[key] ?? key.replace(/_/g, ' ')}
++                </SectionLabel>
++                {explainValue('reasoning', key) && (
++                  <p className="mb-2 text-[13px] leading-5 text-slate-500">{explainValue('reasoning', key)}</p>
++                )}
+                 <p className="text-sm leading-6 text-slate-600">{s(val)}</p>
+               </div>
+             ))}
+@@ -778,7 +1170,7 @@ export function ConceptIntelligenceTabs({
+         );
+ 
+       default:
+-        return <div className={EMPTY}>Nothing to show here.</div>;
++        return <NothingHere what="details for this section" />;
+     }
+   };
+ 
+@@ -835,7 +1227,9 @@ export function ConceptIntelligenceTabs({
+                 type="button"
+                 onClick={() => setActive(tab.id)}
+                 onDoubleClick={() => beginEdit(tab.id, label)}
+-                title={`${label} ΓÇö double-click to rename`}
++                // The purpose comes first: hovering a tab should answer "what is
++                // this?" before it mentions that the name can be changed.
++                title={`${label} ΓÇö ${TAB_GUIDE[tab.id]?.what ?? ''}\n\nDouble-click to rename this tab.`}
+                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${
+                   isActive
+                     ? 'bg-[#4f46e5] text-white shadow-[0_6px_14px_rgba(79,70,229,0.25)]'
+@@ -863,12 +1257,21 @@ export function ConceptIntelligenceTabs({
+         )}
+       </div>
+ 
+-      {/* Active tab content ΓÇö the only scrolling region */}
+-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-5 sm:px-6">{renderActive()}</div>
++      {/* Active tab content ΓÇö the only scrolling region. Every tab opens with a
++          plain-English statement of what it holds and what to do with it, so no
++          part of the panel depends on the reader already knowing the vocabulary. */}
++      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-5 sm:px-6">
++        <TabIntro
++          label={labelFor(activeTab, DEFAULT_TAB_LABELS[activeTab] ?? activeTab)}
++          guide={TAB_GUIDE[activeTab]}
++        />
++        {renderActive()}
++      </div>
+ 
+       {/* Footer ΓÇö pinned card footer */}
+-      <p className="shrink-0 border-t border-slate-200/80 bg-slate-50/60 px-6 py-3 text-center text-[11px] text-slate-400">
+-        Concept intelligence for {chapterTitle}
++      <p className="shrink-0 border-t border-slate-200/80 bg-slate-50/60 px-6 py-3 text-center text-[11px] leading-5 text-slate-400">
++        AI wrote all of this by reading the textbook and syllabus for {chapterTitle}. Please check it
++        on the Evidence tab before you use it for marks.
+       </p>
+     </div>
+   );

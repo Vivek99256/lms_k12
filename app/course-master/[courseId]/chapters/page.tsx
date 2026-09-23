@@ -3,10 +3,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { usePermission } from '@/app/hooks/usePermission';
 import {
   ArrowLeft,
   Download,
+  Network,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
@@ -33,19 +35,23 @@ import {
   ClipboardList,
   Orbit,
   WandSparkles,
-  Eye,
   Play,
   FolderOpen,
   Database,
   Layers3,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+<<<<<<< HEAD
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+=======
+import { ContentCard } from './ContentCard';
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
 import { extractGeneratedBodyHtml, sanitizeGeneratedHtml } from '@/app/course-master/data/generated-html';
@@ -100,6 +106,15 @@ import { QuestionBankQuestionCard } from '@/app/components/questionBank/Question
 import { QuestionBankFilterBar } from '@/app/components/questionBank/QuestionBankFilterBar';
 import { groupConceptsByTopic, type TopicGroup } from '../../data/chapterTopics';
 import { ConceptIntelligenceTabs } from './ConceptIntelligenceTabs';
+import {
+  GroundingPanel,
+  PipelineStream,
+  RunTelemetryStrip,
+  useStaggeredReveal,
+  type GroundingSource,
+  type RunTelemetry,
+  type StreamPhase,
+} from './GenerationPipeline';
 import { getRequestContext, getSyear } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
@@ -108,6 +123,24 @@ import type { Chapter } from '../../data/chapters';
 import type { LmsSubject } from '../../data/lmsCourses';
 import { GeneratePresentationDrawer } from './sideDrawer';
 import { persistPalConceptContext } from '@/app/pal/_components/PalContextBootstrap';
+
+/**
+ * Loaded on demand: the map pulls in @xyflow/react, which no other view on this
+ * page needs. `ssr: false` because the canvas measures the DOM on mount and this
+ * page is client-rendered anyway.
+ *
+ * The folder is underscore-prefixed so the App Router treats it as colocated files
+ * rather than a `/coherence-map` route segment — without that, its `graphLayout`
+ * module was being validated as a route layout.
+ */
+const CoherenceMapView = dynamic(() => import('./_coherence-map/CoherenceMapView'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[480px] items-center justify-center rounded-[14px] border border-slate-200 bg-white text-sm text-slate-500">
+      Loading the coherence map…
+    </div>
+  ),
+});
 
 const EMPTY_CHAPTER_FORM = {
   chapterName: '',
@@ -200,6 +233,15 @@ function suggestedBloomCounts(total: number): BloomCounts {
   return counts;
 }
 const QUESTION_OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
+/** One-line explanation of what each type produces, shown on the type cards. */
+const QUESTION_TYPE_BLURBS: Record<(typeof QUESTION_TYPE_OPTIONS)[number], string> = {
+  MCQ: 'Four options with one correct answer. Distractors are built from the concept’s recorded misconceptions.',
+  Narrative: 'Open-response items with a model answer and marking points, weighted per Bloom level.',
+};
+
+/** Common run sizes, offered as chips beside the free-text total. */
+const QUESTION_COUNT_PRESETS = [5, 10, 15, 20] as const;
+
 const QUESTION_TYPE_API_CONFIG: Record<
   (typeof QUESTION_TYPE_OPTIONS)[number],
   { question_type: 'mcq' | 'narrative'; question_type_id: number }
@@ -220,8 +262,48 @@ const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 
 const CONTENT_CREATE_DENIED_HINT =
   'Your role does not include content creation rights. Ask an administrator to enable them.';
 
-const CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'Videos', 'Revision notes', 'Classroom activity', 'H5P Interactive'] as const;
-const TEACHER_CONTENT_LIBRARY_TABS = ['All content', 'Presentations', 'H5P Interactive'] as const;
+/**
+ * Tabs for the two library lanes.
+ *
+ * Both lanes were narrower than the data: Classroom had six tabs and Teacher
+ * three, while content_master holds Remedial Class, Worksheet, Lesson Plan and
+ * My Course rows with no tab to appear under - and Teacher Training alone is
+ * 2,450 rows. Tabs whose count is zero for the chapter in view are hidden, so a
+ * longer list does not mean more dead ends.
+ */
+const CONTENT_LIBRARY_TABS = [
+  'All content',
+  'Presentations',
+  'Videos',
+  'Revision notes',
+  'Classroom activity',
+  'Remedial class',
+  'Worksheet',
+  'Lesson plan',
+  'My course',
+  'H5P Interactive',
+] as const;
+/**
+ * Teacher Workspace tabs.
+ *
+ * Shorter than the Classroom list on purpose. This lane only ever shows
+ * teacher-training content, so of the eleven content types only 'Teacher
+ * training' (2,450 rows), 'Teacher training presentation' (5) and the
+ * audience-neutral H5P items can reach it. A Worksheet or Lesson plan tab here
+ * would be permanently empty, so the missing tab this lane actually needed is
+ * 'Teacher training' - 2,450 rows that previously had no tab of their own.
+ */
+const TEACHER_CONTENT_LIBRARY_TABS = [
+  'All content',
+  'Presentations',
+  'Teacher training',
+  'H5P Interactive',
+] as const;
+
+/** Any tab either lane can show. */
+type ContentLibraryTab =
+  | (typeof CONTENT_LIBRARY_TABS)[number]
+  | (typeof TEACHER_CONTENT_LIBRARY_TABS)[number];
 
 const UPLOAD_TYPE_CONFIG: Record<
   (typeof UPLOAD_CONTENT_TYPES)[number],
@@ -280,7 +362,19 @@ const UPLOAD_TYPE_CONFIG: Record<
   },
 };
 
-type ChapterContentType = 'Classroom presentation' | 'Teacher training presentation' | 'Revision notes' | 'Video' | 'PDF' | 'Classroom activity' | 'H5P Interactive';
+type ChapterContentType =
+  | 'Classroom presentation'
+  | 'Teacher training presentation'
+  | 'Teacher training'
+  | 'Revision notes'
+  | 'Video'
+  | 'PDF'
+  | 'Classroom activity'
+  | 'Remedial class'
+  | 'Worksheet'
+  | 'Lesson plan'
+  | 'My course'
+  | 'H5P Interactive';
 type ChapterContentSource = 'Gamma AI' | 'Claude AI' | 'Uploaded';
 
 /**
@@ -357,6 +451,21 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   const contentCategory = (asset.content_category ?? '').toLowerCase().replace(/[_\s]+/g, ' ').trim();
   const contentLabel = `${normalizedCategory} ${contentCategory} ${asset.file_type ?? ''} ${asset.title}`.toLowerCase();
 
+  // The category is authoritative when it names a type outright, so it is tested
+  // before anything that sniffs a filename or a title. These four categories had
+  // no case at all and fell through to the 'Revision notes' default, which
+  // mislabelled 12,965 rows - every Remedial Class, Worksheet, Lesson Plan and
+  // My Course row in the table - and left them with no tab to appear under.
+  if (contentCategory === 'remedial class') return 'Remedial class';
+  if (contentCategory === 'worksheet') return 'Worksheet';
+  if (contentCategory === 'lesson plan') return 'Lesson plan';
+  if (contentCategory === 'my course') return 'My course';
+  // 'Teacher Training' is the bulk category (2,450 rows) and is distinct from
+  // 'Teacher training presentation' (4 rows). Matched here rather than inside the
+  // presentation branch below, because most of these rows are PDFs, not decks,
+  // and would otherwise be classified as revision notes.
+  if (contentCategory === 'teacher training') return 'Teacher training';
+
   if (contentLabel.includes('video') || /\.(mp4|mov|webm)(?:$|\?)/.test(asset.filename ?? '')) return 'Video';
   if (contentLabel.includes('presentation') || /\.(ppt|pptx)(?:$|\?)/.test(asset.filename ?? '')) {
     if (contentLabel.includes('teacher training')) return 'Teacher training presentation';
@@ -366,6 +475,9 @@ function getApiContentType(category: string, asset: ChapterContentAsset): Chapte
   // category, so they are identified by that rather than by guessing from a filename.
   if (asset.format === 'h5p' || contentCategory === 'h5p interactive') return 'H5P Interactive';
   if (contentLabel.includes('classroom activity')) return 'Classroom activity';
+  if (contentLabel.includes('remedial')) return 'Remedial class';
+  if (contentLabel.includes('worksheet')) return 'Worksheet';
+  if (contentLabel.includes('lesson plan')) return 'Lesson plan';
   if (contentLabel.includes('pdf')) return 'PDF';
   return 'Revision notes';
 }
@@ -432,6 +544,12 @@ interface ConceptIntelligenceDetails {
 function asText(value: unknown): string {
   if (value === null || value === undefined) return '';
   return String(value).trim();
+}
+
+/** Narrow a loosely-typed API field to a number, or drop it. */
+function asOptionalNumber(value: unknown): number | undefined {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
 }
 
 function getConceptIntelligence(chapter: Chapter, conceptTitle: string): ConceptIntelligenceDetails {
@@ -644,6 +762,10 @@ function getChapterContentPreview(type: ChapterContentType): ChapterContentPrevi
   if (type === 'Revision notes') return 'notes';
   if (type === 'PDF') return 'pdf';
   if (type === 'Classroom activity') return 'activity';
+  // Worksheets and remedial packs are things a class works through, so they
+  // preview as activities; a lesson plan is a document.
+  if (type === 'Worksheet' || type === 'Remedial class') return 'activity';
+  if (type === 'Lesson plan' || type === 'Teacher training') return 'notes';
   return 'presentation';
 }
 
@@ -752,31 +874,62 @@ function buildChapterContentItems(
   });
 }
 
-function getContentPreviewIcon(preview: ChapterContentPreview) {
-  if (preview === 'video') {
-    return Upload;
-  }
-
-  if (preview === 'notes' || preview === 'pdf') {
-    return FileText;
-  }
-
-  if (preview === 'activity') {
-    return ClipboardList;
-  }
-
-  return BookOpen;
-}
+// getContentPreviewIcon lived here. The card now picks its icon from the content
+// type rather than from the coarse `preview` bucket, so five content types no
+// longer share one icon - which was half of why the cards looked identical.
 
 function isTeacherTrainingContent(item: ChapterContentItem): boolean {
   return `${item.contentCategory ?? ''} ${item.type}`.toLowerCase().includes('teacher');
 }
 
-function truncateToWords(value: string, maxWords = 150): string {
-  const words = value.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return value;
-  return words.slice(0, maxWords).join(' ') + 'â€¦';
+/**
+ * Does an item belong under a library tab?
+ *
+ * Module-level and exported to the count logic so the tab strip's numbers and
+ * the grid below it cannot disagree. Previously this lived inline in the filter
+ * callback, which meant a tab count could only be had by duplicating the rules.
+ *
+ * Teacher Workspace once short-circuited this to `true`, so its tab strip
+ * rendered but filtered nothing - "All content" and "Presentations" returned an
+ * identical list. Presentations means presentations on both surfaces.
+ */
+function contentMatchesTab(item: ChapterContentItem, tab: string): boolean {
+  switch (tab) {
+    case 'All content':
+      return true;
+    case 'Presentations':
+      return (
+        item.type === 'Classroom presentation' || item.type === 'Teacher training presentation'
+      );
+    case 'Videos':
+      return item.type === 'Video';
+    case 'Revision notes':
+      return item.type === 'Revision notes' || item.type === 'PDF';
+    case 'Classroom activity':
+      return item.type === 'Classroom activity';
+    case 'Remedial class':
+      return item.type === 'Remedial class';
+    case 'Worksheet':
+      return item.type === 'Worksheet';
+    case 'Lesson plan':
+      return item.type === 'Lesson plan';
+    case 'My course':
+      return item.type === 'My course';
+    // The Teacher Workspace tab for the bulk 'Teacher Training' category. It
+    // deliberately also catches the 4 'Teacher training presentation' rows, so
+    // no teacher-training row is unreachable from this lane.
+    case 'Teacher training':
+      return item.type === 'Teacher training' || item.type === 'Teacher training presentation';
+    case 'H5P Interactive':
+      return item.type === 'H5P Interactive';
+    default:
+      return true;
+  }
 }
+
+// truncateToWords lived here, used only to cap the header pill at 150 words. A
+// pill allowed to hold 150 words is what let the header stretch unpredictably;
+// the pill now holds the content type, which is a short fixed label.
 
 /**
  * Concepts a question can be filed under. These are the chapter's own concept
@@ -991,8 +1144,10 @@ export default function ChapterListPage() {
   const [manualModelAnswer, setManualModelAnswer] = useState('');
   const [manualQuestionError, setManualQuestionError] = useState('');
   const [selectedLibraryChapterId, setSelectedLibraryChapterId] = useState('');
-  const [contentLibraryTab, setContentLibraryTab] =
-    useState<(typeof CONTENT_LIBRARY_TABS)[number]>('All content');
+  // Typed as the union of BOTH tab lists. The two lanes no longer offer the same
+  // tabs - 'Teacher training' exists only on the Teacher lane - so typing this
+  // off the Classroom list alone makes the Teacher lane's own tabs unassignable.
+  const [contentLibraryTab, setContentLibraryTab] = useState<ContentLibraryTab>('All content');
   // Grouping follows the resource type: Classroom Resources is chapter-wise,
   // Teacher Workspace is concept-wise. Derived instead of stored, so the two can
   // never drift out of step and there is no toggle to leave in the wrong state.
@@ -1024,6 +1179,14 @@ export default function ChapterListPage() {
   const [questionGenerationError, setQuestionGenerationError] = useState('');
   const [questionGenerationSuccess, setQuestionGenerationSuccess] = useState('');
   const [generatedQuestionPreviews, setGeneratedQuestionPreviews] = useState<GeneratedQuestionPreview[]>([]);
+  // Real per-run numbers off the generation response (model, batches, tokens,
+  // duplicates dropped). The API already returned these; they were being
+  // discarded before the pipeline panel had somewhere to show them.
+  const [questionRunTelemetry, setQuestionRunTelemetry] = useState<RunTelemetry | null>(null);
+  // Bumped once per generation. Remounts the stage stream so a second run starts
+  // from the top, and keys the result reveal so a previous run's progress is
+  // never reused.
+  const [questionRunId, setQuestionRunId] = useState(0);
   // Lazy-loaded, per-chapter semantic intelligence (the heavy full_intelegance_json
   // blob). Fetched on first Concept Intelligence click and cached by chapter id so a
   // chapter is only ever fetched once.
@@ -1505,6 +1668,198 @@ export default function ChapterListPage() {
   const canGenerateQuestions =
     questionType !== '' && isTotalQuestionsValid && isQuotaValid && !isGeneratingQuestions;
 
+  /* ------------------------------------------------------------------ *
+   * Generator transparency
+   *
+   * The grounding panel reads the SAME concept intelligence the server slices
+   * for the prompt (`QuestionGenerationService::buildConceptSlice`), so what the
+   * teacher sees listed is what the model is actually handed. Signals the server
+   * does not send - skills, pedagogy - are deliberately left out.
+   * ------------------------------------------------------------------ */
+
+  const questionModalChapter = useMemo(() => {
+    if (!questionModalConcept) return null;
+    const fetched = chapterIntelligence[questionModalConcept.chapter.id];
+    return fetched
+      ? { ...questionModalConcept.chapter, semantic: fetched }
+      : questionModalConcept.chapter;
+  }, [chapterIntelligence, questionModalConcept]);
+
+  const isQuestionIntelLoading =
+    questionModalConcept !== null &&
+    intelligenceLoadingId === questionModalConcept.chapter.id &&
+    !chapterIntelligence[questionModalConcept.chapter.id];
+
+  const questionGroundingSources = useMemo<GroundingSource[]>(() => {
+    if (!questionModalChapter || !questionModalConcept) return [];
+
+    const details = getConceptIntelligence(
+      questionModalChapter,
+      questionModalConcept.conceptTitle
+    );
+    // getConceptIntelligence() defaults the DOK label to "DOK 2" when nothing was
+    // extracted, so read the raw rows instead - an absent ladder has to read as
+    // absent here, not as a level the extraction never produced.
+    const rawIntel = getConceptIntelligenceData(
+      questionModalChapter,
+      questionModalConcept.conceptTitle
+    );
+    const dokItems = Array.from(
+      new Set(
+        (rawIntel.dok ?? [])
+          .map((entry) =>
+            [asText(entry?.level) && `DOK ${asText(entry.level)}`, asText(entry?.description)]
+              .filter(Boolean)
+              .join(' - ')
+          )
+          .filter(Boolean)
+      )
+    );
+
+    /** 3+ signals is enough to write a spread of items against; 1-2 is thin. */
+    const gauge = (items: string[]): GroundingSource['state'] =>
+      items.length >= 3 ? 'rich' : items.length > 0 ? 'thin' : 'missing';
+
+    const objectives = Array.from(
+      new Set([...details.learningOutcomes, ...details.learningObjectives])
+    );
+    const capabilities = Array.from(new Set([...details.abilities, ...details.competencies]));
+
+    const measured: Array<Omit<GroundingSource, 'state'>> = [
+      {
+        id: 'knowledge',
+        label: 'Knowledge items',
+        role: 'The factual spine every stem is written from.',
+        icon: BookOpen,
+        items: details.knowledge,
+      },
+      {
+        id: 'capabilities',
+        label: 'Abilities & competencies',
+        role: 'What a learner must be able to do - drives the Apply and Analyze items.',
+        icon: Lightbulb,
+        items: capabilities,
+      },
+      {
+        id: 'outcomes',
+        label: 'Learning outcomes & objectives',
+        role: 'Each generated item is tagged back to one of these.',
+        icon: Target,
+        items: objectives,
+      },
+      {
+        id: 'misconceptions',
+        label: 'Misconceptions',
+        role: 'Become the plausible wrong options, each with its own rationale.',
+        icon: TriangleAlert,
+        items: details.misconceptions,
+      },
+      {
+        id: 'prerequisites',
+        label: 'Prerequisites',
+        role: 'Keeps items inside the prior knowledge the concept assumes.',
+        icon: Orbit,
+        items: details.prerequisites,
+      },
+      {
+        id: 'applications',
+        label: 'Real-world applications',
+        role: 'Grounds context, scenario and case-study stems.',
+        icon: GraduationCap,
+        items: details.realWorldApplications,
+      },
+      {
+        id: 'dok',
+        label: 'Depth-of-knowledge ladder',
+        role: 'Caps how deep an item may be pitched; the Bloom spread is clamped to it.',
+        icon: Layers3,
+        items: dokItems,
+      },
+    ];
+
+    const sources: GroundingSource[] = measured.map((source) => ({
+      ...source,
+      state: gauge(source.items),
+    }));
+
+    sources.push(
+      {
+        id: 'curriculum',
+        label: 'Curriculum anchor',
+        role: 'Concept is pinned to its chapter, subject and standard before anything is written.',
+        icon: Database,
+        items: [
+          `${subjectData?.subject?.subject_name ?? 'Subject'} / Class ${
+            subjectData?.subject?.standard_name ?? '-'
+          }`,
+          questionModalChapter.title,
+          questionModalConcept.conceptTitle,
+        ].filter(Boolean),
+        state: 'rich',
+      },
+      {
+        id: 'dedup',
+        label: 'Duplicate guard',
+        role: 'Existing stems for this concept are sent along so new items must be distinct.',
+        icon: ClipboardList,
+        items: [],
+        state: 'server',
+        note: 'checked on save',
+      }
+    );
+
+    return sources;
+  }, [questionModalChapter, questionModalConcept, subjectData?.subject]);
+
+  /** The Bloom spread this run will ask for - auto split, or the teacher's own. */
+  const questionBlueprint = useMemo(() => {
+    const counts = useAutoQuota
+      ? suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
+      : bloomCounts;
+
+    return BLOOM_LEVEL_META.map((meta) => ({
+      level: meta.level,
+      count: counts[meta.level] ?? 0,
+      difficulty: useAutoQuota ? meta.difficulty : bloomDifficulties[meta.level],
+    }));
+  }, [bloomCounts, bloomDifficulties, isTotalQuestionsValid, totalQuestionsNumber, useAutoQuota]);
+
+  const questionStreamPhase: StreamPhase = isGeneratingQuestions
+    ? 'running'
+    : questionGenerationError
+      ? 'error'
+      : generatedQuestionPreviews.length > 0 || questionGenerationSuccess
+        ? 'success'
+        : 'idle';
+
+  const revealedQuestionCount = useStaggeredReveal(
+    generatedQuestionPreviews.length,
+    questionStreamPhase === 'success',
+    questionRunId
+  );
+
+  const generationBatchLabel = `${isTotalQuestionsValid ? totalQuestionsNumber : 0} ${
+    questionType || 'item'
+  } item${totalQuestionsNumber === 1 ? '' : 's'}`;
+
+  const generationSummaryLabel = !questionType
+    ? 'Pick a question type to begin.'
+    : !isTotalQuestionsValid
+      ? 'Enter how many questions to generate (1-50).'
+      : `${totalQuestionsNumber} ${questionType} question${
+          totalQuestionsNumber === 1 ? '' : 's'
+        } · ${useAutoQuota ? 'auto' : 'custom'} Bloom mix · saved to this concept’s bank`;
+
+  const groundingCoverageLabel = useMemo(() => {
+    const measurable = questionGroundingSources.filter((source) => source.state !== 'server');
+    const present = measurable.filter((source) => source.state !== 'missing');
+    if (measurable.length === 0) return 'No intelligence signals available yet.';
+    if (present.length === 0) {
+      return 'No intelligence extracted for this concept - the model will work best-effort from its name.';
+    }
+    return `${present.length} of ${measurable.length} intelligence signals available for this concept.`;
+  }, [questionGroundingSources]);
+
   /** Seed the table from the server's own default split the first time it is shown. */
   const handleToggleAutoQuota = (nextAuto: boolean) => {
     setUseAutoQuota(nextAuto);
@@ -1646,7 +2001,13 @@ export default function ChapterListPage() {
     };
   }, [activeContentLibraryTab, activeLibraryChapter, contentGroupBy, contentResourceType, view, chapterContentCategories]);
 
-  const filteredChapterContentItems = useMemo(() => {
+  /**
+   * Everything the current search, source and lane allow - before the tab
+   * filter. Split out from the filter below so the tab counts are computed from
+   * exactly the rows the grid would show, and so the counts and the grid cannot
+   * drift apart.
+   */
+  const contentItemsForActiveLane = useMemo(() => {
     return chapterContentItems.filter((item) => {
       const matchesSearch =
         !contentSearch ||
@@ -1666,32 +2027,44 @@ export default function ChapterListPage() {
       const matchesResourceType =
         isAudienceNeutral || (contentResourceType === 'teacher' ? isTeacherTraining : !isTeacherTraining);
 
-      // One tab predicate for both surfaces.
-      //
-      // Teacher Workspace previously short-circuited to `true`, so its tab strip
-      // rendered but filtered nothing - "All content" and "Presentations" returned
-      // an identical list. That was invisible while both tabs were near-synonyms,
-      // but it silently breaks the H5P tab, which has to actually filter to be worth
-      // anything. Presentations therefore now means presentations on both surfaces.
-      const matchesTab =
-        activeContentLibraryTab === 'All content' ||
-        (activeContentLibraryTab === 'Presentations' &&
-          (item.type === 'Classroom presentation' || item.type === 'Teacher training presentation')) ||
-        (activeContentLibraryTab === 'Videos' && item.type === 'Video') ||
-        (activeContentLibraryTab === 'Revision notes' &&
-          (item.type === 'Revision notes' || item.type === 'PDF')) ||
-        (activeContentLibraryTab === 'Classroom activity' && item.type === 'Classroom activity') ||
-        (activeContentLibraryTab === 'H5P Interactive' && item.type === 'H5P Interactive');
-
-      return matchesSearch && matchesSource && matchesResourceType && matchesTab;
+      return matchesSearch && matchesSource && matchesResourceType;
     });
-  }, [
-    chapterContentItems,
-    activeContentLibraryTab,
-    contentResourceType,
-    contentSearch,
-    contentSourceFilter,
-  ]);
+  }, [chapterContentItems, contentResourceType, contentSearch, contentSourceFilter]);
+
+  const filteredChapterContentItems = useMemo(
+    () =>
+      contentItemsForActiveLane.filter((item) =>
+        contentMatchesTab(item, activeContentLibraryTab)
+      ),
+    [contentItemsForActiveLane, activeContentLibraryTab]
+  );
+
+  /**
+   * How many items each tab would show for the chapter in view.
+   *
+   * Drives both the count on the tab and whether the tab appears at all: a tab
+   * leading to an empty grid is worse than no tab, and with eleven possible
+   * types most chapters only hold a few. The active tab is always kept, so the
+   * strip cannot remove the tab the user is standing on and strand them.
+   */
+  const contentLibraryTabCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    availableContentLibraryTabs.forEach((tab) => {
+      counts[tab] = contentItemsForActiveLane.filter((item) => contentMatchesTab(item, tab)).length;
+    });
+    return counts;
+  }, [availableContentLibraryTabs, contentItemsForActiveLane]);
+
+  const visibleContentLibraryTabs = useMemo(
+    () =>
+      availableContentLibraryTabs.filter(
+        (tab) =>
+          tab === 'All content' ||
+          tab === activeContentLibraryTab ||
+          (contentLibraryTabCounts[tab] ?? 0) > 0
+      ),
+    [availableContentLibraryTabs, activeContentLibraryTab, contentLibraryTabCounts]
+  );
 
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const presentationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2100,6 +2473,11 @@ export default function ChapterListPage() {
   };
 
   const openGenerateQuestionsModal = (chapter: Chapter, conceptTitle: string, conceptIndex: number) => {
+    // Same lazy fetch Concept Intelligence uses. The generator's grounding panel
+    // reads the identical blob the server slices for the prompt, so without this
+    // the panel would report "not extracted" for a chapter that simply had not
+    // been opened yet.
+    loadChapterIntelligence(chapter.id);
     setQuestionModalConcept({
       chapter,
       conceptTitle,
@@ -2110,6 +2488,7 @@ export default function ChapterListPage() {
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setQuestionRunTelemetry(null);
     resetQuestionMix();
   };
 
@@ -2180,6 +2559,7 @@ export default function ChapterListPage() {
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setQuestionRunTelemetry(null);
     resetQuestionMix();
   };
 
@@ -2481,6 +2861,8 @@ export default function ChapterListPage() {
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setQuestionRunTelemetry(null);
+    setQuestionRunId((current) => current + 1);
 
     try {
       const response = await generateIntelligenceQuestions({
@@ -2511,13 +2893,26 @@ export default function ChapterListPage() {
             }),
       });
 
-      const inserted = response.data?.inserted;
+      const data = response.data;
+      const inserted = data?.inserted;
       setQuestionGenerationSuccess(
         inserted != null
           ? `${response.message} ${inserted} question${inserted === 1 ? '' : 's'} saved.`
           : response.message
       );
-      setGeneratedQuestionPreviews(response.data?.questions ?? []);
+      setGeneratedQuestionPreviews(data?.questions ?? []);
+      // Straight passthrough of what the service reports for this run - nothing
+      // here is estimated on the client.
+      setQuestionRunTelemetry({
+        requested: asOptionalNumber(data?.requested),
+        generated: asOptionalNumber(data?.generated),
+        inserted: asOptionalNumber(inserted),
+        skippedDuplicate: asOptionalNumber(data?.skipped_duplicate),
+        skippedInvalid: asOptionalNumber(data?.skipped_invalid),
+        batches: asOptionalNumber(data?.batches),
+        inputTokens: asOptionalNumber(data?.input_tokens),
+        outputTokens: asOptionalNumber(data?.output_tokens),
+      });
     } catch (error: unknown) {
       setQuestionGenerationError(
         error instanceof Error ? error.message : 'Failed to generate questions.'
@@ -2911,21 +3306,6 @@ export default function ChapterListPage() {
       </article>
     );
   };
-
-  /**
-   * Chapter and concept line on a content card. The concept comes from the
-   * lms_concept mapping on the content row; content that has not been mapped to a
-   * concept shows the chapter alone rather than an empty pill.
-   */
-  const renderContentChapterConcept = (item: ChapterContentItem) => (
-    <div className="mb-3 flex flex-wrap items-center gap-1.5">
-      <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-medium text-[#4f46e5]">
-        <BookOpen size={11} className="shrink-0" />
-        {item.chapterTitle}
-      </span>
-    
-    </div>
-  );
 
   /**
    * Delete a Question Bank question. API-backed questions (numeric id) are
@@ -3361,254 +3741,377 @@ export default function ChapterListPage() {
 
   const generateQuestionsModal = questionModalConcept ? (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-[3px]"
       onClick={closeGenerateQuestionsModal}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="generate-ai-questions-title"
-        className="relative max-h-[90vh] w-full max-w-[800px] overflow-hidden rounded-[20px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
+        className="relative flex max-h-[92vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-[20px] border border-white/80 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.32)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="max-h-[90vh] overflow-y-auto px-6 pb-6 pt-6 sm:px-8">
+        {/* ---------------------------------------------------------- Header */}
+        <header className="relative shrink-0 overflow-hidden border-b border-slate-200 bg-gradient-to-r from-[#eef2ff] via-white to-[#faf5ff] px-6 py-5 sm:px-8">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-1.5 text-[12px] font-medium text-slate-500">
+                <span className="truncate">{questionModalConcept.chapter.title}</span>
+                <ChevronRight size={13} className="shrink-0 text-slate-400" />
+                <span className="truncate font-semibold text-slate-700">
+                  {questionModalConcept.conceptTitle}
+                </span>
+              </p>
               <h2
                 id="generate-ai-questions-title"
-                className="text-[24px] font-bold tracking-tight text-slate-950"
+                className="mt-1.5 text-[23px] font-bold tracking-tight text-slate-950"
               >
                 Generate AI questions
               </h2>
-              <p className="mt-1 text-[15px] text-slate-600">
-                Concept: {questionModalConcept.conceptTitle}
+              <p className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-600">
+                <Brain size={14} className="text-[#4f46e5]" />
+                Written against this concept&apos;s intelligence and saved straight to the question
+                bank.
               </p>
             </div>
+
             <button
               type="button"
               onClick={closeGenerateQuestionsModal}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
               aria-label="Close dialog"
             >
               <X size={20} />
             </button>
           </div>
+        </header>
 
-          <div className="mt-6 space-y-5">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Question Type <span className="text-rose-500">*</span>
-              </Label>
-              <Select value={questionType} onValueChange={(value) => setQuestionType(value ?? '')}>
-                <SelectTrigger className="h-12 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none">
-                  <SelectValue placeholder="Select question type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {QUESTION_TYPE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="total-questions" className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Total Questions <span className="text-rose-500">*</span>
-              </Label>
-              <Input
-                id="total-questions"
-                inputMode="numeric"
-                value={totalQuestions}
-                onChange={(event) => setTotalQuestions(event.target.value.replace(/[^\d]/g, ''))}
-                placeholder="Enter a number"
-                className="h-12 rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none"
-              />
-              <p className="text-sm text-slate-500">Between 1 and 50</p>
-            </div>
-
-            <div className="space-y-3 rounded-[12px] border border-slate-200 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Question mix
-                  </Label>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {useAutoQuota
-                      ? 'The generator chooses the spread across Bloom levels.'
-                      : 'You decide how many questions sit at each Bloom level.'}
-                  </p>
-                </div>
-                <div className="inline-flex overflow-hidden rounded-full border border-slate-300 text-sm font-semibold">
-                  {[
-                    { label: 'Auto', value: true },
-                    { label: 'Custom', value: false },
-                  ].map((option) => (
-                    <button
-                      key={option.label}
-                      type="button"
-                      onClick={() => handleToggleAutoQuota(option.value)}
-                      className={
-                        useAutoQuota === option.value
-                          ? 'bg-[#aea8ff] px-4 py-1.5 text-white'
-                          : 'bg-white px-4 py-1.5 text-slate-600 hover:bg-slate-50'
-                      }
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+        {/* ------------------------------------------------- Body: two panes */}
+        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_378px] lg:overflow-hidden">
+          {/* ------------------------------------------------ Left: setup */}
+          <section className="px-6 py-6 sm:px-8 lg:min-h-0 lg:overflow-y-auto">
+            <div className="space-y-6">
+              <div className="space-y-2.5">
+                <Label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Question type <span className="text-rose-500">*</span>
+                </Label>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  {QUESTION_TYPE_OPTIONS.map((option) => {
+                    const selected = questionType === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setQuestionType(option)}
+                        aria-pressed={selected}
+                        className={cn(
+                          'rounded-[12px] border px-4 py-3 text-left transition-all',
+                          selected
+                            ? 'border-[#4f46e5] bg-[#eef2ff] shadow-[0_4px_14px_rgba(79,70,229,0.14)]'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        )}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-[14px] font-semibold text-slate-900">{option}</span>
+                          {selected ? (
+                            <CheckCircle2 size={16} className="shrink-0 text-[#4f46e5]" />
+                          ) : null}
+                        </span>
+                        <span className="mt-1 block text-[12px] leading-[18px] text-slate-500">
+                          {QUESTION_TYPE_BLURBS[option]}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {useAutoQuota ? null : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[440px] text-sm">
-                      <thead>
-                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          <th className="pb-2 pr-3">Bloom level</th>
-                          <th className="pb-2 pr-3">Difficulty</th>
-                          <th className="pb-2 pr-3 text-right">Questions</th>
-                          {questionType === 'Narrative' ? (
-                            <th className="pb-2 text-right">Marks each</th>
-                          ) : null}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {BLOOM_LEVEL_META.map((meta) => (
-                          <tr key={meta.level}>
-                            <td className="py-2 pr-3 font-medium text-slate-900">{meta.level}</td>
-                            <td className="py-2 pr-3">
-                              <select
-                                aria-label={`Difficulty for ${meta.level}`}
-                                value={bloomDifficulties[meta.level]}
-                                onChange={(event) =>
-                                  setBloomDifficulties((current) => ({
-                                    ...current,
-                                    [meta.level]: event.target.value,
-                                  }))
-                                }
-                                className="h-9 w-full rounded-[8px] border border-slate-300 bg-white px-2 text-sm text-slate-700 outline-none focus:border-[#aea8ff]"
-                              >
-                                {DIFFICULTY_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 pr-3 text-right">
-                              <input
-                                aria-label={`Number of ${meta.level} questions`}
-                                inputMode="numeric"
-                                value={String(bloomCounts[meta.level] ?? 0)}
-                                onChange={(event) => handleBloomCountChange(meta.level, event.target.value)}
-                                className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#aea8ff]"
-                              />
-                            </td>
+              <div className="space-y-2.5">
+                <Label
+                  htmlFor="total-questions"
+                  className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"
+                >
+                  Total questions <span className="text-rose-500">*</span>
+                </Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    id="total-questions"
+                    inputMode="numeric"
+                    value={totalQuestions}
+                    onChange={(event) =>
+                      setTotalQuestions(event.target.value.replace(/[^\d]/g, ''))
+                    }
+                    placeholder="Enter a number"
+                    className="h-11 w-[150px] rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {QUESTION_COUNT_PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setTotalQuestions(String(preset))}
+                        className={cn(
+                          'h-8 rounded-full border px-3 text-[13px] font-semibold transition-colors',
+                          totalQuestions === String(preset)
+                            ? 'border-[#4f46e5] bg-[#eef2ff] text-[#4338ca]'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        )}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[12px] text-slate-500">Between 1 and 50 per run.</p>
+              </div>
+
+              <div className="space-y-3 rounded-[14px] border border-slate-200 bg-slate-50/50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <Label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Question mix
+                    </Label>
+                    <p className="mt-1 text-[12px] leading-[18px] text-slate-500">
+                      {useAutoQuota
+                        ? 'The generator weights Bloom levels from the concept intelligence.'
+                        : 'You decide how many questions sit at each Bloom level.'}
+                    </p>
+                  </div>
+                  <div className="inline-flex overflow-hidden rounded-full border border-slate-300 bg-white text-[13px] font-semibold">
+                    {[
+                      { label: 'Auto', value: true },
+                      { label: 'Custom', value: false },
+                    ].map((option) => (
+                      <button
+                        key={option.label}
+                        type="button"
+                        onClick={() => handleToggleAutoQuota(option.value)}
+                        className={
+                          useAutoQuota === option.value
+                            ? 'bg-[#4f46e5] px-4 py-1.5 text-white'
+                            : 'bg-white px-4 py-1.5 text-slate-600 hover:bg-slate-50'
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {useAutoQuota ? null : (
+                  <>
+                    <div className="overflow-x-auto rounded-[10px] border border-slate-200 bg-white">
+                      <table className="w-full min-w-[440px] text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <th className="px-3 py-2">Bloom level</th>
+                            <th className="px-3 py-2">Difficulty</th>
+                            <th className="px-3 py-2 text-right">Questions</th>
                             {questionType === 'Narrative' ? (
-                              <td className="py-2 text-right">
-                                <input
-                                  aria-label={`Marks per ${meta.level} question`}
-                                  inputMode="numeric"
-                                  value={String(bloomPoints[meta.level] ?? 0)}
-                                  onChange={(event) =>
-                                    setBloomPoints((current) => ({
-                                      ...current,
-                                      [meta.level]: Number(event.target.value.replace(/[^\d]/g, '') || 0),
-                                    }))
-                                  }
-                                  className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#aea8ff]"
-                                />
-                              </td>
+                              <th className="px-3 py-2 text-right">Marks each</th>
                             ) : null}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {BLOOM_LEVEL_META.map((meta) => (
+                            <tr key={meta.level}>
+                              <td className="px-3 py-2 font-medium text-slate-900">{meta.level}</td>
+                              <td className="px-3 py-2">
+                                <select
+                                  aria-label={`Difficulty for ${meta.level}`}
+                                  value={bloomDifficulties[meta.level]}
+                                  onChange={(event) =>
+                                    setBloomDifficulties((current) => ({
+                                      ...current,
+                                      [meta.level]: event.target.value,
+                                    }))
+                                  }
+                                  className="h-9 w-full rounded-[8px] border border-slate-300 bg-white px-2 text-sm text-slate-700 outline-none focus:border-[#4f46e5]"
+                                >
+                                  {DIFFICULTY_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <input
+                                  aria-label={`Number of ${meta.level} questions`}
+                                  inputMode="numeric"
+                                  value={String(bloomCounts[meta.level] ?? 0)}
+                                  onChange={(event) =>
+                                    handleBloomCountChange(meta.level, event.target.value)
+                                  }
+                                  className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#4f46e5]"
+                                />
+                              </td>
+                              {questionType === 'Narrative' ? (
+                                <td className="px-3 py-2 text-right">
+                                  <input
+                                    aria-label={`Marks per ${meta.level} question`}
+                                    inputMode="numeric"
+                                    value={String(bloomPoints[meta.level] ?? 0)}
+                                    onChange={(event) =>
+                                      setBloomPoints((current) => ({
+                                        ...current,
+                                        [meta.level]: Number(
+                                          event.target.value.replace(/[^\d]/g, '') || 0
+                                        ),
+                                      }))
+                                    }
+                                    className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#4f46e5]"
+                                  />
+                                </td>
+                              ) : null}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p
-                      className={
-                        isQuotaValid
-                          ? 'text-sm font-medium text-emerald-700'
-                          : 'text-sm font-medium text-rose-700'
-                      }
-                    >
-                      {bloomCountTotal} of {isTotalQuestionsValid ? totalQuestionsNumber : 0} questions
-                      allocated
-                      {isQuotaValid ? '' : ' - the mix must add up to the total before you can generate.'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setBloomCounts(
-                          suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
-                        )
-                      }
-                      className="text-sm font-semibold text-[#6c63ff] hover:text-[#554dd6]"
-                    >
-                      Reset to suggested split
-                    </button>
-                  </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p
+                        className={cn(
+                          'text-[13px] font-medium',
+                          isQuotaValid ? 'text-emerald-700' : 'text-rose-700'
+                        )}
+                      >
+                        {bloomCountTotal} of {isTotalQuestionsValid ? totalQuestionsNumber : 0}{' '}
+                        questions allocated
+                        {isQuotaValid
+                          ? ''
+                          : ' - the mix must add up to the total before you can generate.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBloomCounts(
+                            suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
+                          )
+                        }
+                        className="text-[13px] font-semibold text-[#4f46e5] hover:text-[#4338ca]"
+                      >
+                        Reset to suggested split
+                      </button>
+                    </div>
 
-                  {questionType === 'MCQ' ? (
-                    <p className="text-xs text-slate-500">
-                      MCQs are always scored at 1 mark each, so marks are not editable for this type.
+                    {questionType === 'MCQ' ? (
+                      <p className="text-[11px] text-slate-500">
+                        MCQs are always scored at 1 mark each, so marks are not editable for this
+                        type.
+                      </p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+
+              {questionGenerationError && questionStreamPhase !== 'error' ? (
+                <p className="rounded-[10px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-medium text-rose-700">
+                  {questionGenerationError}
+                </p>
+              ) : null}
+
+              {questionGenerationSuccess ? (
+                <p className="flex items-start gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] font-medium text-emerald-700">
+                  <CheckCircle2 size={15} className="mt-px shrink-0" />
+                  <span>{questionGenerationSuccess}</span>
+                </p>
+              ) : null}
+
+              {generatedQuestionPreviews.length > 0 ? (
+                <div className="rounded-[14px] border border-slate-200 bg-slate-50/60 p-3">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Generated questions
                     </p>
-                  ) : null}
-                </>
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
+                      {revealedQuestionCount} of {generatedQuestionPreviews.length} shown
+                    </span>
+                  </div>
+                  <div className="max-h-[440px] space-y-3 overflow-y-auto pr-1">
+                    {generatedQuestionPreviews
+                      .slice(0, revealedQuestionCount)
+                      .map((question, index) => (
+                        <div
+                          key={`${question.id}-${index}`}
+                          className="animate-in fade-in slide-in-from-bottom-2 duration-300"
+                        >
+                          {renderGeneratedQuestionPreview(question, index)}
+                        </div>
+                      ))}
+                    {revealedQuestionCount < generatedQuestionPreviews.length ? (
+                      <div className="flex items-center gap-2 px-1 py-2 text-[12px] font-medium text-slate-400">
+                        <Loader2 size={13} className="animate-spin" />
+                        Loading the rest...
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </section>
+
+          {/* -------------------------------- Right: pipeline transparency */}
+          <aside className="border-slate-200 bg-slate-50/70 px-5 py-6 max-lg:border-t lg:min-h-0 lg:overflow-y-auto lg:border-l">
+            <div className="space-y-4">
+              {questionStreamPhase !== 'idle' ? (
+                <PipelineStream
+                  key={questionRunId}
+                  phase={questionStreamPhase}
+                  errorMessage={questionGenerationError}
+                  batchLabel={generationBatchLabel}
+                />
+              ) : null}
+
+              {questionRunTelemetry ? (
+                <RunTelemetryStrip telemetry={questionRunTelemetry} />
+              ) : null}
+
+              {isQuestionIntelLoading ? (
+                <div className="flex items-center gap-2 rounded-[12px] border border-slate-200 bg-white px-4 py-6 text-[13px] font-medium text-slate-500">
+                  <Loader2 size={15} className="animate-spin text-[#4f46e5]" />
+                  Reading this concept&apos;s intelligence...
+                </div>
+              ) : (
+                <GroundingPanel
+                  sources={questionGroundingSources}
+                  coverageLabel={groundingCoverageLabel}
+                  blueprint={questionBlueprint}
+                  footnote="The AI writes the items; the concept slice, Bloom x DOK blueprint and duplicate guard are all built by the server before the model is called."
+                />
               )}
             </div>
-            {questionGenerationError ? (
-              <p className="rounded-[10px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                {questionGenerationError}
-              </p>
-            ) : null}
-            {questionGenerationSuccess ? (
-              <p className="rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                {questionGenerationSuccess}
-              </p>
-            ) : null}
-            {generatedQuestionPreviews.length > 0 ? (
-              <div className="rounded-[12px] border border-slate-200 bg-slate-50 p-3">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Generated questions
-                  </p>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                    {generatedQuestionPreviews.length} saved
-                  </span>
-                </div>
-                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
-                  {generatedQuestionPreviews.map(renderGeneratedQuestionPreview)}
-                </div>
-              </div>
-            ) : null}
-          </div>
+          </aside>
+        </div>
 
-          <div className="mt-6 flex items-center justify-end gap-4 border-t border-slate-200/80 pt-4">
+        {/* ---------------------------------------------------------- Footer */}
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-6 py-4 sm:px-8">
+          <p className="text-[12px] font-medium text-slate-500">{generationSummaryLabel}</p>
+          <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={closeGenerateQuestionsModal}
-              className="text-[15px] font-medium text-slate-600 transition-colors hover:text-slate-900"
+              className="text-[14px] font-medium text-slate-600 transition-colors hover:text-slate-900"
             >
-              Cancel
+              {generatedQuestionPreviews.length > 0 ? 'Done' : 'Cancel'}
             </button>
             <Button
               type="button"
               onClick={submitGenerateQuestions}
               disabled={!canGenerateQuestions}
               aria-busy={isGeneratingQuestions}
-              className="h-10 rounded-xl bg-[#aea8ff] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(99,91,255,0.28)] hover:bg-[#978fff] disabled:bg-[#d7d2ff] disabled:text-white/85 disabled:shadow-none"
+              className="h-10 rounded-xl bg-[#4f46e5] px-5 text-[14px] font-semibold text-white shadow-[0_8px_18px_rgba(79,70,229,0.24)] transition-colors hover:bg-[#4338ca] disabled:bg-[#c7d2fe] disabled:text-white/90 disabled:shadow-none"
             >
-              <Sparkles size={16} className="mr-2" />
+              {isGeneratingQuestions ? (
+                <Loader2 size={16} className="mr-2 animate-spin" />
+              ) : (
+                <Sparkles size={16} className="mr-2" />
+              )}
               {isGeneratingQuestions ? 'Generating...' : 'Generate questions'}
             </Button>
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   ) : null;
@@ -4318,6 +4821,41 @@ export default function ChapterListPage() {
     );
   }
 
+  if (view === 'coherence-map') {
+    return (
+      <div className="min-h-screen rounded-t-3xl">
+        <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8">
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <button
+              type="button"
+              onClick={() => router.push('/course-master')}
+              className="font-medium transition-colors hover:text-slate-900"
+            >
+              Teach / learn
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <button
+              type="button"
+              onClick={() => router.push(`/course-master/${courseId}/chapters`)}
+              className="font-medium transition-colors hover:text-slate-900"
+            >
+              {course.subject} - {getCourseGradeLabel(course.classGrade)}
+            </button>
+            <ChevronRight size={14} className="text-slate-400" />
+            <span className="font-semibold text-slate-900">Coherence map</span>
+          </div>
+
+          <CoherenceMapView
+            subjectId={subjectId}
+            standardId={standardId}
+            title={`${course.subject} - ${getCourseGradeLabel(course.classGrade)}`}
+            onClose={() => router.push(`/course-master/${courseId}/chapters`)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (view === 'concept-intelligence') {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const intelChapter = allChapters.find((chapter) => chapter.id === activeChapterId) ?? null;
@@ -4746,20 +5284,31 @@ export default function ChapterListPage() {
 
           <div className="mb-4 border-b border-slate-200/80">
             <div className="flex flex-wrap items-center gap-6 text-[15px]">
-              {availableContentLibraryTabs.map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setContentLibraryTab(tab)}
-                  className={`inline-flex items-center border-b-2 px-1 py-3 font-medium transition-colors ${
-                    activeContentLibraryTab === tab
-                      ? 'border-[#4f46e5] text-[#4f46e5]'
-                      : 'border-transparent text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
+              {visibleContentLibraryTabs.map((tab) => {
+                const count = contentLibraryTabCounts[tab] ?? 0;
+                const isActive = activeContentLibraryTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setContentLibraryTab(tab)}
+                    className={`inline-flex items-center gap-2 border-b-2 px-1 py-3 font-medium transition-colors ${
+                      isActive
+                        ? 'border-[#4f46e5] text-[#4f46e5]'
+                        : 'border-transparent text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab}
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+                        isActive ? 'bg-[#eef2ff] text-[#4f46e5]' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -4839,58 +5388,16 @@ export default function ChapterListPage() {
                         </span>
                       </div>
                       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        {group.items.map((item) => {
-                          const PreviewIcon = getContentPreviewIcon(item.preview);
-                          return (
-                            <article
-                              key={item.id}
-                              className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
-                            >
-                              <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
-                                <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
-                                  {truncateToWords(item.subtitle, 150)}
-                                </span>
-                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                                  {isGeneratedContent(item.source) ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
-                                  {item.source}
-                                </span>
-                              </div>
-                              <div className="-mt-[74px] flex justify-center px-4">
-                                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
-                                  <PreviewIcon size={28} />
-                                </div>
-                              </div>
-                              <div className="px-4 pb-4 pt-3">
-                                {renderContentChapterConcept(item)}
-                                <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-                                <div>{item.conceptName ? (
-        <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#f1f5f9] px-3 py-1 text-[11px] font-medium text-slate-600">
-          <Brain size={11} className="shrink-0 text-[#4f46e5]" />
-          {item.conceptName}
-        </span>
-      ) : null}</div>
-                                <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      handleOpenContent(item);
-                                    }}
-                                    className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
-                                  >
-                                    {item.actionLabel === 'Play' ? (
-                                      <Play size={14} className="mr-2" />
-                                    ) : (
-                                      <Eye size={14} className="mr-2" />
-                                    )}
-                                    {item.actionLabel}
-                                  </Button>
-                                </div>
-                              </div>
-                            </article>
-                          );
-                        })}
+                        {group.items.map((item) => (
+                          // hideChapter: the group heading above this grid already
+                          // names it, so a chapter pill on each card is noise.
+                          <ContentCard
+                            key={item.id}
+                            item={item}
+                            onOpen={() => handleOpenContent(item)}
+                            hideChapter
+                          />
+                        ))}
                       </div>
                     </section>
                   ))}
@@ -4898,57 +5405,13 @@ export default function ChapterListPage() {
               );
             })() : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {filteredChapterContentItems.map((item) => {
-                  const PreviewIcon = getContentPreviewIcon(item.preview);
-
-                  return (
-                    <article
-                      key={item.id}
-                      className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_6px_22px_rgba(15,23,42,0.05)]"
-                    >
-                      <div className="flex h-[132px] items-start justify-between border-b border-slate-200/70 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-3">
-                        <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4f46e5]">
-                          {truncateToWords(item.subtitle, 150)}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                          {isGeneratedContent(item.source) ? <Sparkles size={12} className="text-[#4f46e5]" /> : <Upload size={12} />}
-                          {item.source}
-                        </span>
-                      </div>
-
-                      <div className="-mt-[74px] flex justify-center px-4">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#dbe3ff] bg-white text-[#4f46e5] shadow-sm">
-                          <PreviewIcon size={28} />
-                        </div>
-                      </div>
-
-                      <div className="px-4 pb-4 pt-3">
-                        {renderContentChapterConcept(item)}
-                        <h3 className="text-[19px] font-semibold leading-7 text-slate-950">{item.title}</h3>
-
-                        <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4">
-                          
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleOpenContent(item);
-                            }}
-                            className="h-9 rounded-full bg-[#eef2ff] px-4 text-sm font-semibold text-[#4f46e5] hover:bg-[#e3e9ff] hover:text-[#4338ca]"
-                          >
-                            {item.actionLabel === 'Play' ? (
-                              <Play size={14} className="mr-2" />
-                            ) : (
-                              <Eye size={14} className="mr-2" />
-                            )}
-                            {item.actionLabel}
-                          </Button>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                {filteredChapterContentItems.map((item) => (
+                  <ContentCard
+                    key={item.id}
+                    item={item}
+                    onOpen={() => handleOpenContent(item)}
+                  />
+                ))}
               </div>
             )}
 
@@ -5181,6 +5644,15 @@ export default function ChapterListPage() {
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+            className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-[#c7d2fe] bg-white px-3.5 py-2 text-[14px] font-medium text-[#4338ca] shadow-sm transition-colors hover:bg-[#eef2ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+          >
+            <Network size={16} strokeWidth={1.9} />
+            Coherence map
+          </button>
         </div>
 
         <div className="mb-6 border-b border-slate-200/80">
@@ -5207,6 +5679,14 @@ export default function ChapterListPage() {
             >
               <BookOpen size={16} />
               Chapters
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+              className="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 font-medium text-slate-600 transition-colors hover:text-slate-900"
+            >
+              <Network size={16} />
+              Coherence map
             </button>
           </div>
         </div>
