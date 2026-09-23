@@ -29,12 +29,20 @@ const ALLOWED_TAGS = [
  *  linking out, and an <img> would be an unreviewed remote fetch. */
 const ALLOWED_ATTRS = ['colspan', 'rowspan', 'align', 'valign'];
 
-function sanitizeHtml(dirty: string): string {
+/** Opt-in extras for printed question papers, where a diagram or map *is* the
+ *  question. Still no href, and `src` is held to images the sanitiser can see
+ *  are images -- an http(s) URL or an inline data: image. */
+const IMAGE_TAGS = [...ALLOWED_TAGS, 'img', 'figure', 'figcaption'];
+const IMAGE_ATTRS = [...ALLOWED_ATTRS, 'src', 'alt', 'width', 'height'];
+const IMAGE_URI_RE = /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp|svg\+xml);base64,)/i;
+
+function sanitizeHtml(dirty: string, allowImages: boolean): string {
   // isomorphic-dompurify carries its own DOM, so this is the same allow-list
   // on the server as in the browser -- no escaped-text fallback during SSR.
   return DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR: ALLOWED_ATTRS,
+    ALLOWED_TAGS: allowImages ? IMAGE_TAGS : ALLOWED_TAGS,
+    ALLOWED_ATTR: allowImages ? IMAGE_ATTRS : ALLOWED_ATTRS,
+    ...(allowImages ? { ALLOWED_URI_REGEXP: IMAGE_URI_RE } : {}),
   });
 }
 
@@ -66,7 +74,7 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
-const HTML_HINT_RE = /<\/?(?:table|tbody|thead|tr|td|th|b|strong|i|em|u|sub|sup|br|p|div|ul|ol|li)\b/i;
+const HTML_HINT_RE = /<\/?(?:table|tbody|thead|tr|td|th|b|strong|i|em|u|sub|sup|br|p|div|ul|ol|li|img|figure)\b/i;
 
 /**
  * Turn stored question text into display HTML.
@@ -76,7 +84,7 @@ const HTML_HINT_RE = /<\/?(?:table|tbody|thead|tr|td|th|b|strong|i|em|u|sub|sup|
  * KaTeX markup is spliced back in afterwards so the sanitiser does not strip
  * its spans.
  */
-function toDisplayHtml(raw: string): string {
+function toDisplayHtml(raw: string, allowImages: boolean): string {
   const slots: string[] = [];
 
   const withPlaceholders = raw.replace(MATH_RE, (_match, display1, display2, inline1, inline2) => {
@@ -87,7 +95,7 @@ function toDisplayHtml(raw: string): string {
   });
 
   const body = HTML_HINT_RE.test(withPlaceholders)
-    ? sanitizeHtml(withPlaceholders)
+    ? sanitizeHtml(withPlaceholders, allowImages)
     : escapeHtml(withPlaceholders).replace(/\n/g, '<br />');
 
   return body.replace(/@@MATH(\d+)@@/g, (_m, index) => slots[Number(index)] ?? '');
@@ -97,12 +105,15 @@ export function RichText({
   value,
   className,
   as: Tag = 'div',
+  allowImages = false,
 }: {
   value: string | null | undefined;
   className?: string;
   as?: 'div' | 'span';
+  /** Keep diagrams, maps and figures — for printed question papers. */
+  allowImages?: boolean;
 }) {
-  const html = useMemo(() => (value ? toDisplayHtml(value) : ''), [value]);
+  const html = useMemo(() => (value ? toDisplayHtml(value, allowImages) : ''), [value, allowImages]);
 
   if (!value) return null;
 

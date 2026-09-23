@@ -8,6 +8,10 @@ import {
   type ApiEnvelope,
   type SessionContext,
 } from "@/lib/erp-client";
+import {
+  fetchExamPapers,
+  fetchPaperContext,
+} from "@/app/lms/exam/_question-paper-templates/api";
 
 // ---------------------------------------------------------------------------
 // Shared types (mirror the Laravel `homework` table / StudentHomeworkApiController)
@@ -135,9 +139,17 @@ export type HomeworkSubmissionRecord = {
   /** "" | "Checking" | "Evaluated" | "OCR Failed" | "Evaluation Failed" | "Failed" */
   aiStatus: string;
   aiFailureReason: string;
+  /** Questions answered correctly — a COUNT, not marks. */
   aiScore: number | null;
   aiTotalQuestions: number | null;
   aiPercentage: number | null;
+  /** Marks the AI proposed. Null on submissions evaluated before marks existed. */
+  aiMarks: number | null;
+  /** Marks the teacher settled on. Only this reaches a report card. */
+  teacherMarks: number | null;
+  maxMarks: number | null;
+  /** "answer_key" when the homework carried real questions, else "free_form". */
+  evaluationMode: string;
   reviewedPdfPath: string;
   evaluatedAt: string;
   feedbackPublished: boolean;
@@ -184,9 +196,9 @@ export type HomeworkDetailInfo = {
   submissionDateFmt: string;
   teacherName: string;
   referenceFileUrl: string;
-  /** "question_bank" when this homework was assigned from the question bank, otherwise the default attachment flow. */
+  /** "question_bank" or "exam_paper" when this homework carries questions, otherwise the default attachment flow. */
   sourceType?: string;
-  /** Present only for `sourceType === "question_bank"` homework. */
+  /** Present only for question-carrying homework ("question_bank" / "exam_paper"). */
   questions?: HomeworkQuestion[];
 };
 
@@ -204,11 +216,23 @@ export type HomeworkQuestionType = {
   label: string;
 };
 
+/**
+ * Where a homework's content comes from: an uploaded file, questions picked
+ * chapter-by-chapter out of the question bank, or an existing homework exam
+ * paper whose question mapping is reused as-is.
+ */
+export type HomeworkSourceType = "attachment" | "question_bank" | "exam_paper";
+
 export type HomeworkQuestion = {
   id: number;
   title: string;
   description: string;
   questionTypeId: number;
+  /**
+   * The type's own label, when the source already names it (an exam paper's
+   * questions do). Empty when it has to be resolved from the question-type list.
+   */
+  questionTypeLabel: string;
   points: number;
   chapterId: number;
 };
@@ -244,11 +268,44 @@ export type ReviewPreviousAttempt = {
   submittedAtFmt: string;
 };
 
+/**
+ * One question on one submission, as the teacher reviews it.
+ *
+ * `aiMarks` is a proposal and `teacherMarks` is the number that counts — the
+ * same rule the Exam Evaluation review screen follows. A question the teacher
+ * has not touched has `teacherMarks: null` and falls back to the AI's figure
+ * until the submission is marked Reviewed, which copies it across for good.
+ */
+export type ReviewAnswer = {
+  id: number;
+  questionNo: number;
+  questionId: number | null;
+  questionTitle: string;
+  questionType: string;
+  /** Scored against the answer key in PHP rather than judged by a model. */
+  isObjective: boolean;
+  detectedAnswer: string;
+  selectedOptions: string[];
+  expectedAnswer: string;
+  maxMarks: number;
+  aiMarks: number | null;
+  teacherMarks: number | null;
+  /** "correct" | "partially_correct" | "wrong" | "unattempted" */
+  status: string;
+  aiConfidence: number | null;
+  aiRemark: string;
+  /** The server's own call on whether this one wants a human first. */
+  needsAttention: boolean;
+  page: number;
+};
+
 export type ReviewDetail = {
   homework: HomeworkDetailInfo;
   submission: HomeworkSubmissionRecord;
   files: HomeworkSubmissionFile[];
   previousAttempts: ReviewPreviousAttempt[];
+  /** Empty for a submission evaluated before per-question marks existed. */
+  answers: ReviewAnswer[];
 };
 
 // ---------------------------------------------------------------------------
@@ -498,12 +555,40 @@ function toHomeworkSubmissionRecord(row: UnknownRecord): HomeworkSubmissionRecor
     aiScore: readNullableNumber(row.ai_score),
     aiTotalQuestions: readNullableNumber(row.ai_total_questions),
     aiPercentage: readNullableNumber(row.ai_percentage),
+    aiMarks: readNullableNumber(row.ai_marks),
+    teacherMarks: readNullableNumber(row.teacher_marks),
+    maxMarks: readNullableNumber(row.max_marks),
+    evaluationMode: readString(row.evaluation_mode),
     reviewedPdfPath: readString(row.reviewed_pdf_path),
     evaluatedAt: readString(row.evaluated_at),
     feedbackPublished: Boolean(row.feedback_published) && row.feedback_published !== "0",
     submittedAt: readString(row.submitted_at),
     submittedAtFmt: readString(row.submitted_at_fmt),
     files: records(row.files).map(toSubmissionFile),
+  };
+}
+
+function toReviewAnswer(row: UnknownRecord): ReviewAnswer {
+  return {
+    id: readNumber(row.id),
+    questionNo: readNumber(row.question_no),
+    questionId: readNullableNumber(row.question_id),
+    questionTitle: readString(row.question_title),
+    questionType: readString(row.question_type),
+    isObjective: Boolean(row.is_objective) && row.is_objective !== "0",
+    detectedAnswer: readString(row.detected_answer),
+    selectedOptions: Array.isArray(row.selected_options)
+      ? row.selected_options.map((option) => readString(option)).filter(Boolean)
+      : [],
+    expectedAnswer: readString(row.expected_answer),
+    maxMarks: readNumber(row.max_marks),
+    aiMarks: readNullableNumber(row.ai_marks),
+    teacherMarks: readNullableNumber(row.teacher_marks),
+    status: readString(row.status),
+    aiConfidence: readNullableNumber(row.ai_confidence),
+    aiRemark: readString(row.ai_remark),
+    needsAttention: Boolean(row.needs_attention) && row.needs_attention !== "0",
+    page: readNumber(row.page),
   };
 }
 
@@ -552,6 +637,9 @@ function toHomeworkQuestion(row: UnknownRecord): HomeworkQuestion {
     title: readString(row.question_title ?? row.title),
     description: readString(row.description),
     questionTypeId: readNumber(row.question_type_id),
+    questionTypeLabel: readString(
+      row.question_type_label ?? row.question_type ?? ""
+    ),
     points: readNumber(row.points),
     chapterId: readNumber(row.chapter_id),
   };
@@ -632,10 +720,25 @@ export async function assignHomework(input: {
   subjectId: string;
   prompt?: string;
   image?: File | null;
-  /** Optional: assigns homework from the question bank instead of an uploaded attachment. */
-  sourceType?: "attachment" | "question_bank";
-  /** Optional: question-bank question ids, required when `sourceType === "question_bank"`. */
+  /** Optional: where the homework's questions come from. Defaults to the uploaded attachment. */
+  sourceType?: HomeworkSourceType;
+  /**
+   * Optional: question ids, required when `sourceType` is "question_bank" or
+   * "exam_paper". Exam-paper homework sends the ids the paper already maps, so
+   * the questions are referenced, never copied.
+   */
   questionIds?: number[];
+  /** Optional: the `question_paper` row, required when `sourceType === "exam_paper"`. */
+  examPaperId?: number;
+  /**
+   * Who the homework is for. "selected" (the default) sends `studentIds` and is
+   * the screen's original behaviour. "all" tells the backend to resolve the
+   * whole class from `grade`/`standardId`/`divisionId` itself, so no student
+   * ids are sent and none are trusted.
+   */
+  assignMode?: "selected" | "all";
+  /** The section (academic grade) id, sent so "all" can scope the class. */
+  grade?: string;
 }): Promise<number> {
   const payload = await postMultipart("lms-homework/store", (form) => {
     form.append("students", input.studentIds.join(","));
@@ -648,8 +751,13 @@ export async function assignHomework(input: {
     if (input.prompt) form.append("prompt", input.prompt);
     if (input.image) form.append("image", input.image);
     if (input.sourceType) form.append("source_type", input.sourceType);
+    if (input.examPaperId) form.append("exam_paper_id", String(input.examPaperId));
     if (input.questionIds) {
       input.questionIds.forEach((id) => form.append("question_ids[]", String(id)));
+    }
+    if (input.assignMode === "all") {
+      form.append("assign_mode", "all");
+      if (input.grade) form.append("grade", input.grade);
     }
   });
   return records(payload.homework_ids).length || input.studentIds.length;
@@ -687,6 +795,69 @@ export async function listHomeworkQuestions(params: {
     question_type_id: params.questionTypeIds,
   });
   return dataRows(payload).map(toHomeworkQuestion);
+}
+
+// ---------------------------------------------------------------------------
+// Feature 7 — Homework from an existing homework exam paper
+//
+// The papers and their questions are NOT fetched again here: both come from the
+// Exam module's own `/api/question-paper` endpoints, the same ones the question
+// paper templates screen reads. Homework only narrows the listing to
+// `exam_type = 'homework'` and reshapes the rows into the shapes this module
+// already renders, so the picker can never drift from the Exam module's data.
+// ---------------------------------------------------------------------------
+
+/** The `question_paper.exam_type` slug a homework paper is stored under. */
+export const HOMEWORK_EXAM_TYPE = "homework";
+
+export type HomeworkExamPaper = {
+  id: number;
+  /** `paper_name`, with `paper_desc` appended when the paper carries one. */
+  title: string;
+  subjectName: string;
+  standardName: string;
+  totalMarks: number;
+  totalQuestions: number;
+};
+
+/**
+ * Homework question papers only — term, formative, summative, offline and
+ * online papers are excluded by `fetchExamPapers`' exam-type pin. Sorted by
+ * title so the dropdown reads the same way on every load.
+ */
+export async function listHomeworkExamPapers(): Promise<HomeworkExamPaper[]> {
+  const rows = await fetchExamPapers(HOMEWORK_EXAM_TYPE);
+  return rows
+    .map((row) => ({
+      id: row.id,
+      title: [row.paperName, row.paperDesc].filter(Boolean).join(" ").trim(),
+      subjectName: row.subjectName,
+      standardName: row.standardName,
+      totalMarks: row.totalMarks,
+      totalQuestions: row.totalQuestions,
+    }))
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+/**
+ * The questions a homework paper already maps, in the shape the homework screens
+ * render. Nothing is duplicated: these are `lms_question_master` rows reached
+ * through the paper's existing mapping, and assigning the homework stores their
+ * ids — the same ids the question-bank flow stores.
+ */
+export async function listExamPaperQuestions(
+  paperId: number
+): Promise<HomeworkQuestion[]> {
+  const context = await fetchPaperContext(paperId);
+  return context.questions.map((question) => ({
+    id: question.id,
+    title: question.question_title,
+    description: "",
+    questionTypeId: question.question_type_id,
+    questionTypeLabel: question.question_type_label || question.question_type,
+    points: question.points,
+    chapterId: question.chapter_id ?? 0,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -893,6 +1064,21 @@ export async function getReviewDetail(submissionId: number): Promise<ReviewDetai
     submission: toHomeworkSubmissionRecord(submission),
     files: records(data.files).map(toSubmissionFile),
     previousAttempts: records(data.previous_attempts).map(toReviewPreviousAttempt),
+    answers: records(data.answers).map(toReviewAnswer),
+  };
+}
+
+/** Re-runs the AI marking. Refused by the server once the review is signed off. */
+export async function reprocessReview(
+  submissionId: number
+): Promise<{ submission: HomeworkSubmissionRecord; answers: ReviewAnswer[] }> {
+  const payload = await postJson(`lms-homework/review-reprocess/${submissionId}`, {});
+  const data = isRecord(payload.data) ? payload.data : {};
+  const submission = isRecord(data.submission) ? data.submission : {};
+
+  return {
+    submission: toHomeworkSubmissionRecord(submission),
+    answers: records(data.answers).map(toReviewAnswer),
   };
 }
 
@@ -902,12 +1088,18 @@ export async function submitReview(params: {
   teacherRemarks: string;
   status: string;
   publish: boolean;
+  /** Per-question marks. null on one means "keep taking the AI's figure". */
+  marks?: Array<{ questionNo: number; teacherMarks: number | null }>;
 }): Promise<HomeworkSubmissionRecord> {
   const payload = await postJson("lms-homework/review-store", {
     submission_id: params.submissionId,
     teacher_remarks: params.teacherRemarks,
     status: params.status,
     publish: params.publish,
+    marks: params.marks?.map((mark) => ({
+      question_no: mark.questionNo,
+      teacher_marks: mark.teacherMarks,
+    })),
   });
   const data = isRecord(payload.data) ? payload.data : {};
   return toHomeworkSubmissionRecord(data);
