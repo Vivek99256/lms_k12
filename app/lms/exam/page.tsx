@@ -999,7 +999,28 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
 }
 
 
-export default function StudentHomeworkIndexPage() {
+/**
+ * Worksheet and Project are the same question_paper rows this screen lists,
+ * restricted to one exam_type — see ExamOperationsScreen's `scopedExamType`.
+ */
+export type ExamOperationsScope = 'worksheet' | 'project';
+
+interface ExamOperationsScreenProps {
+  scopedExamType?: ExamOperationsScope;
+}
+
+/**
+ * The Exam Operations screen. `/lms/exam` mounts it unscoped, showing every
+ * exam_type; `/lms/worksheet` and `/lms/project` mount it pinned to their own
+ * exam_type via `scopedExamType`, which pins the create-exam form's Exam Type
+ * field, filters the grid, and hides the Results dashboard tab (which is not
+ * scoped by exam_type and would otherwise mix worksheet/project results in
+ * with everything else).
+ */
+export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenProps = {}) {
+  const isScopedToOneType = Boolean(scopedExamType);
+  const scopedNoun =
+    scopedExamType === 'worksheet' ? 'worksheets' : scopedExamType === 'project' ? 'projects' : 'exams';
   const { isChatbotOpen } = useContext(ChatbotLayoutContext);
   // Follows the signed-in profile and is not switchable. The Viewing-as toggle is
   // gone, so a stored 'Student' preference would otherwise have left a teacher in
@@ -1090,7 +1111,7 @@ export default function StudentHomeworkIndexPage() {
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [examName, setExamName] = useState('');
   const [examDescription, setExamDescription] = useState('');
-  const [examType, setExamType] = useState('');
+  const [examType, setExamType] = useState(scopedExamType ?? '');
   const [attemptsAllowed, setAttemptsAllowed] = useState('');
   const [openDate, setOpenDate] = useState('');
   const [closeDate, setCloseDate] = useState('');
@@ -1496,8 +1517,17 @@ export default function StudentHomeworkIndexPage() {
   }, [fetchOfflineExams]);
  
 
+  // Worksheet/Project pin the grid to one exam_type before any of the other
+  // filters apply, so their "N of M" count and empty states read against
+  // their own rows rather than every exam.
+  const scopedExams = useMemo(() => {
+    if (!scopedExamType) return exams;
+
+    return exams.filter((exam) => exam.type.toLowerCase() === scopedExamType);
+  }, [exams, scopedExamType]);
+
   const filteredExams = useMemo(() => {
-    return exams.filter((exam) => {
+    return scopedExams.filter((exam) => {
       const matchesSearch =
         exam.name.toLowerCase().includes(search.toLowerCase()) ||
         exam.id.toLowerCase().includes(search.toLowerCase()) ||
@@ -1510,7 +1540,7 @@ export default function StudentHomeworkIndexPage() {
 
       return matchesSearch && matchesStatus && matchesType;
     });
-  }, [exams, search, statusFilter, typeFilter]);
+  }, [scopedExams, search, statusFilter, typeFilter]);
 
   const chapterOptions = useMemo(() => {
     if (selectedStandardId == null || selectedSubjectId == null) return [];
@@ -1684,7 +1714,7 @@ export default function StudentHomeworkIndexPage() {
     setOpenLevelDropdown(null);
     setExamName('');
     setExamDescription('');
-    setExamType('');
+    setExamType(scopedExamType ?? '');
     setAttemptsAllowed('');
     setOpenDate('');
     setCloseDate('');
@@ -2519,30 +2549,32 @@ export default function StudentHomeworkIndexPage() {
 
             {audienceMode === 'Teacher' && !isStudentProfile ? (
               <div className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-center gap-5">
-                  {innerTabs.map((tab) => {
-                    const TabIcon = tab.icon;
-                    const isActive = examInnerTab === tab.label;
+                {!isScopedToOneType ? (
+                  <div className="flex flex-wrap items-center gap-5">
+                    {innerTabs.map((tab) => {
+                      const TabIcon = tab.icon;
+                      const isActive = examInnerTab === tab.label;
 
-                    return (
-                      <button
-                        key={tab.label}
-                        type="button"
-                        onClick={() => setExamInnerTab(tab.label)}
-                        className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
-                          isActive
-                            ? 'border-[#5846EA] text-[#5846EA]'
-                            : 'border-transparent text-[#5F7087] hover:text-[#334155]'
-                        }`}
-                      >
-                        <TabIcon size={16} />
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                      return (
+                        <button
+                          key={tab.label}
+                          type="button"
+                          onClick={() => setExamInnerTab(tab.label)}
+                          className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
+                            isActive
+                              ? 'border-[#5846EA] text-[#5846EA]'
+                              : 'border-transparent text-[#5F7087] hover:text-[#334155]'
+                          }`}
+                        >
+                          <TabIcon size={16} />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
 
-                {examInnerTab === 'Results dashboard' ? (
+                {!isScopedToOneType && examInnerTab === 'Results dashboard' ? (
                   <ExamResultDashboard />
                 ) : (
                   <>
@@ -2556,7 +2588,7 @@ export default function StudentHomeworkIndexPage() {
                           type="text"
                           value={search}
                           onChange={(event) => setSearch(event.target.value)}
-                          placeholder="Search exams..."
+                          placeholder={`Search ${scopedNoun}...`}
                           className="h-10 w-full rounded-[10px] border border-[#CFD9E6] bg-white pl-10 pr-4 text-[14px] text-[#172554] outline-none placeholder:text-[#94A3B8] focus:border-[#7C6CF4]"
                         />
                       </div>
@@ -2577,43 +2609,47 @@ export default function StudentHomeworkIndexPage() {
                           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8798]" />
                         </div>
 
-                        <div className="relative">
-                          <select
-                            value={typeFilter}
-                            onChange={(event) => setTypeFilter(event.target.value)}
-                            className="h-10 min-w-[130px] appearance-none rounded-[10px] border border-[#CFD9E6] bg-white px-3.5 pr-9 text-[14px] text-[#24324A] outline-none focus:border-[#7C6CF4]"
-                          >
-                            <option>All types</option>
-                            <option value="online">Online</option>
-                            <option value="offline">Offline</option>
-                          </select>
-                          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8798]" />
-                        </div>
+                        {!isScopedToOneType ? (
+                          <div className="relative">
+                            <select
+                              value={typeFilter}
+                              onChange={(event) => setTypeFilter(event.target.value)}
+                              className="h-10 min-w-[130px] appearance-none rounded-[10px] border border-[#CFD9E6] bg-white px-3.5 pr-9 text-[14px] text-[#24324A] outline-none focus:border-[#7C6CF4]"
+                            >
+                              <option>All types</option>
+                              <option value="online">Online</option>
+                              <option value="offline">Offline</option>
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8798]" />
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 self-start">
-                    <Link
-                      href="/exam/exam-creation"
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[#5846EA] bg-white px-4 text-[14px] font-semibold text-[#5846EA] transition hover:bg-[#EEEBFF]"
-                    >
-                      <Sparkles size={18} />
-                      AI generated exam
-                    </Link>
+                    {!isScopedToOneType ? (
+                      <Link
+                        href="/exam/exam-creation"
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[#5846EA] bg-white px-4 text-[14px] font-semibold text-[#5846EA] transition hover:bg-[#EEEBFF]"
+                      >
+                        <Sparkles size={18} />
+                        AI generated exam
+                      </Link>
+                    ) : null}
                     <button
                       type="button"
                       onClick={openCreateExamModal}
                       className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[#5846EA] px-4 text-[14px] font-semibold text-white"
                     >
                       <Plus size={18} />
-                      Create exam
+                      {scopedExamType ? `Create ${scopedExamType}` : 'Create exam'}
                     </button>
                   </div>
                 </div>
 
                 <p className="text-[14px] font-medium text-[#5F7087]">
-                  {filteredExams.length} of {exams.length} exams
+                  {filteredExams.length} of {scopedExams.length} {scopedNoun}
                 </p>
 
                 {publishSuccessMessage ? (
@@ -4155,21 +4191,27 @@ export default function StudentHomeworkIndexPage() {
                           <span className="mb-2.5 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
                             Exam Type
                           </span>
-                          <div className="relative">
-                            <select
-                              value={examType}
-                              onChange={(event) => setExamType(event.target.value)}
-                              className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
-                            >
-                              <option value="">Select exam type</option>
-                              {examTypeOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                          </div>
+                          {scopedExamType ? (
+                            <div className="flex h-12 w-full items-center rounded-[12px] border border-[#C9D4E5] bg-[#F8FAFC] px-4 text-[15px] font-medium capitalize text-[#0F172A]">
+                              {scopedExamType}
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <select
+                                value={examType}
+                                onChange={(event) => setExamType(event.target.value)}
+                                className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
+                              >
+                                <option value="">Select exam type</option>
+                                {examTypeOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                            </div>
+                          )}
                         </label>
 
                         <label className="block">
@@ -4436,4 +4478,8 @@ export default function StudentHomeworkIndexPage() {
       `}</style>
     </>
   );
+}
+
+export default function StudentHomeworkIndexPage() {
+  return <ExamOperationsScreen />;
 }
