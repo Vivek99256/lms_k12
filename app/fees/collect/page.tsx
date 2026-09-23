@@ -150,6 +150,9 @@ export default function FeesCollectPage() {
   const [collectingStudentId, setCollectingStudentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dashboardSnapshot, setDashboardSnapshot] = useState<DashboardSnapshot>({});
+  // Nothing is fetched until the user applies filters — the unfiltered student
+  // list is slow enough that loading it on mount stalls the page.
+  const [hasSearched, setHasSearched] = useState(false);
   const [session] = useState(getSessionContext);
 
   const clearStudentData = useCallback((message: string) => {
@@ -394,11 +397,6 @@ export default function FeesCollectPage() {
     }
   }, [clearStudentData, fetchDashboardRows, includeInactive, session]);
 
-  useEffect(() => {
-    // The collect dashboard loads the current dues once the browser session is available.
-    void fetchStudents();
-  }, [fetchStudents]);
-
   const handleCollectFees = useCallback(async (studentId: string) => {
     const currentSession = getSessionContext();
     const hostName = currentSession.hostName.replace(/\/$/, '');
@@ -583,6 +581,7 @@ export default function FeesCollectPage() {
               className="space-y-4"
               onSubmit={(event) => {
                 event.preventDefault();
+                setHasSearched(true);
                 fetchStudents({
                   query: searchTerm,
                   selectedSection: getSingleDropdownValue(academicFilters.section),
@@ -686,9 +685,15 @@ export default function FeesCollectPage() {
               </div>
             ) : (
               <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 text-center">
-                <p className="text-sm font-medium text-slate-700">No collection transactions found for the selected filters</p>
+                <p className="text-sm font-medium text-slate-700">
+                  {hasSearched
+                    ? 'No collection transactions found for the selected filters'
+                    : 'Select your filters and click Apply filters'}
+                </p>
                 <p className="mt-1 max-w-xl text-sm text-slate-500">
-                  We could not find usable fee collection or pending fee records for the current filter combination.
+                  {hasSearched
+                    ? 'We could not find usable fee collection or pending fee records for the current filter combination.'
+                    : 'Student dues and collection summaries load only after you apply filters, so this page opens instantly.'}
                 </p>
               </div>
             )}
@@ -807,7 +812,9 @@ export default function FeesCollectPage() {
                 ) : (
                   <tr>
                     <td colSpan={8} className="px-5 py-14 text-center text-sm text-slate-500">
-                      No dues found for the selected filters.
+                      {hasSearched
+                        ? 'No dues found for the selected filters.'
+                        : 'Apply filters above to load student dues.'}
                     </td>
                   </tr>
                 )}

@@ -17,10 +17,18 @@ export interface AiPolicyRuleCatalogItem {
 export interface AiPolicyAssignment {
   id: number;
   policy_id: number;
+  /** `module` means `scope_id` is an `ai_modules` row id. See AiPolicyController. */
   scope_type: string;
   scope_id: number | null;
   sub_institute_id: number | null;
   status: number;
+}
+
+/** A module a policy can be scoped to. The id is what an assignment stores. */
+export interface AiPolicyModuleOption {
+  id: number;
+  key: string;
+  label: string;
 }
 
 export interface AiPolicyRow {
@@ -39,16 +47,24 @@ export interface AiPolicyRow {
   detection_threshold: number | null;
   rules: Record<string, boolean>;
   assignments: AiPolicyAssignment[];
+  /** Module keys this policy governs, resolved from its `module` assignments. */
+  module_keys?: string[];
 }
 
 export interface AiPolicyOptions {
   policy_types: AiPolicyOption[];
   rule_catalogue: AiPolicyRuleCatalogItem[];
   scope_types: AiPolicyOption[];
+  /** Absent on a backend that predates module-scoped policies. */
+  modules?: AiPolicyModuleOption[];
 }
 
 export interface AiPolicyIndex {
   sub_institute_id: string | number;
+  /** The module the list was narrowed to, or null for every policy. */
+  module_key?: string | null;
+  /** The `ai_modules` ids that key resolved to — what a new assignment must name. */
+  module_ids?: number[];
   policies: AiPolicyRow[];
 }
 
@@ -135,8 +151,17 @@ export function fetchAiPolicyOptions(): Promise<AiPolicyOptions> {
   return call<AiPolicyOptions>('/policies/options');
 }
 
-export function fetchAiPolicies(): Promise<AiPolicyIndex> {
-  return call<AiPolicyIndex>('/policies');
+/**
+ * Policies this school can see.
+ *
+ * `moduleKey` narrows the list to the policies that govern one module, so a module's
+ * own screen cannot show — or edit — another module's configuration. Omit it for the
+ * central console's view of everything.
+ */
+export function fetchAiPolicies(moduleKey?: string | null): Promise<AiPolicyIndex> {
+  const query = moduleKey ? `?module_key=${encodeURIComponent(moduleKey)}` : '';
+
+  return call<AiPolicyIndex>(`/policies${query}`);
 }
 
 export function createAiPolicy(payload: AiPolicyPayload): Promise<{ policy: AiPolicyRow }> {

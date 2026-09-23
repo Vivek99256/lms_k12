@@ -7,7 +7,7 @@ import {
   BookOpen,
   Brain,
   ChevronDown,
-  ChevronRight,
+  ClipboardCheck,
   ExternalLink,
   GraduationCap,
   Info,
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   buildQuizStartQuery,
   fetchMisconceptions,
@@ -44,7 +45,6 @@ import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import { getViewAsStudent, setViewAsStudent } from '@/app/pal/data/pal-view-as';
 import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
-import { DiagnosticButton } from '@/app/pal/_components/DiagnosticPanel';
 import { AdaptiveLearningButton } from '@/app/pal/_components/AdaptiveLearningButton';
 import { PracticePanel } from '@/app/pal/_components/PracticePanel';
 import {
@@ -236,7 +236,13 @@ function PalEntryPageContent() {
   );
 
   return (
-    <div className="min-h-full px-4 py-5 sm:px-6">
+    // No min-h-full here. This div is a direct child of DashboardShell's
+    // scrolling <main>, which HAS a definite height, so `min-height: 100%`
+    // resolved to the full scroll viewport - and the Level 3 subheader rendered
+    // above it added its own height on top. The page was therefore always
+    // taller than the viewport by about the subheader's height, leaving a dead
+    // scroll gap below the last subject card however short the list was.
+    <div className="px-4 py-5 sm:px-6">
       <div className="mx-auto w-full max-w-[1800px] space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
@@ -338,9 +344,10 @@ function PalEntryPageContent() {
                 {totalChapters} chapter{totalChapters === 1 ? '' : 's'}
               </div>
               <div className="space-y-3">
-                {data.subjects.map((subject) => (
+                {data.subjects.map((subject, subjectIndex) => (
                   <SubjectCard
                     key={subject.id}
+                    index={subjectIndex}
                     subject={subject}
                     expanded={Boolean(openSubjects[subject.id])}
                     onToggle={() => toggleSubject(subject.id)}
@@ -381,6 +388,7 @@ function SubjectCard({
   studentId,
   getContext,
   isStaff,
+  index,
 }: {
   subject: PalSubject;
   expanded: boolean;
@@ -391,13 +399,18 @@ function SubjectCard({
   studentId: string;
   getContext: (chapter: PalChapter) => PalChapterContext;
   isStaff: boolean;
+  index?: number;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none"
+      // Capped so a long subject list does not make the last card feel late.
+      style={{ animationDelay: `${Math.min(index ?? 0, 5) * 40}ms`, animationFillMode: 'backwards' }}
+    >
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50"
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors duration-150 hover:bg-slate-50 motion-reduce:transition-none"
         aria-expanded={expanded}
       >
         <span className="flex items-center gap-3">
@@ -411,15 +424,17 @@ function SubjectCard({
             </span>
           </span>
         </span>
-        {expanded ? (
-          <ChevronDown className="h-5 w-5 text-slate-400" />
-        ) : (
-          <ChevronRight className="h-5 w-5 text-slate-400" />
-        )}
+        <ChevronDown
+          aria-hidden
+          className={cn(
+            'h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200 motion-reduce:transition-none',
+            expanded ? 'rotate-0' : '-rotate-90'
+          )}
+        />
       </button>
 
       {expanded && (
-        <div className="divide-y divide-slate-100 border-t border-slate-100">
+        <div className="divide-y divide-slate-100 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none">
           {subject.chapters.length === 0 ? (
             <p className="px-5 py-4 text-sm text-slate-500">No chapters mapped for this subject.</p>
           ) : (
@@ -498,7 +513,7 @@ function ChapterRow({
   );
 
   return (
-    <div className="px-5 py-4">
+    <div className="px-5 py-4 transition-colors duration-150 hover:bg-slate-50/60 motion-reduce:transition-none">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -544,7 +559,7 @@ function ChapterRow({
             <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Master {unmasteredNames.join(', ')} first — take the diagnostic to check where
+                Master {unmasteredNames.join(', ')} first — take the chapter diagnostic to check where
                 you stand, then come back here.
               </span>
             </div>
@@ -590,6 +605,7 @@ function ChapterRow({
               `isStaff` is still used elsewhere on this page, so nothing else
               changes with it. */}
 
+<<<<<<< HEAD
           {/* A completed chapter keeps one route, and it leads to a read-only
               record. Every control that would start a quiz, draw a diagnostic
               or open the engine is gone — not disabled, gone — so there is
@@ -669,6 +685,74 @@ function ChapterRow({
               </Button>
             </div>
           )}
+=======
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            {/* The primary route in. The plan page is the stage router: it reads
+                the learner's stored evidence and opens on whatever they should
+                do next — take the diagnostic, practise a weak concept, or go to
+                Learn and Check. That keeps the decision server-side instead of
+                asking every chapter row to work it out for itself. */}
+            {!isStaff && (
+              <Button size="sm" onClick={() => router.push(`/pal/plan/chapter/${context.chapterId}`)}>
+                <Route className="h-3.5 w-3.5" />
+                Learning journey
+              </Button>
+            )}
+
+            {/* Straight to the 15-question chapter paper, for a learner who
+                knows that is what they want. */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => router.push(`/pal/diagnostic/chapter/${context.chapterId}`)}
+              className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" />
+              Take chapter diagnostic
+            </Button>
+
+            {/* Adaptive Learning is a learner-facing feature: a student may only
+                ever start their own session, never a teacher/staff/admin acting
+                as (or "viewing as") a student — enforced independently on the
+                backend by the eso.student route middleware regardless of what
+                renders here, but the entry point itself must not offer a
+                staff-facing way to start it either. */}
+            {!isStaff && <AdaptiveLearningButton chapterId={context.chapterId} />}
+            {hasAttempts && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onOpenModal('pedagogy')}
+                  className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Suggested content
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onOpenModal('misconception')}
+                  className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Misconception
+                </Button>
+                <PracticePanel studentId={studentId} context={context} />
+              </>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onStartQuiz}
+              disabled={locked}
+              title={locked ? 'Master the prerequisite concept(s) above first' : undefined}
+            >
+              {locked ? <Lock className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              {locked ? 'Locked' : hasAttempts ? 'Next quiz' : 'Start quiz'}
+            </Button>
+          </div>
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
         </div>
       </div>
     </div>

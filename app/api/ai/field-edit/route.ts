@@ -173,6 +173,21 @@ function isQuotaExceededError(message: string) {
   );
 }
 
+/**
+ * A provider that rejected the credential rather than the request.
+ *
+ * Worth telling apart from every other failure because it is the one a teacher
+ * can do nothing about and an administrator can fix in a minute — and because
+ * the runtime's own wording for it, a raw `The AI provider returned 401:
+ * {"error":{"message":"User not found."}}`, reads as a bug in the assistant
+ * when it is a key that is missing, disabled or revoked.
+ */
+function isProviderCredentialError(message: string) {
+  return /returned 40[13]\b|invalid[_ ]api[_ ]key|api key not valid|user not found|unauthorized|permission denied/i.test(
+    message
+  );
+}
+
 export async function POST(request: Request) {
   let body: z.infer<typeof requestSchema>;
 
@@ -275,6 +290,22 @@ export async function POST(request: Request) {
           status: 429,
           headers: retryAfterSeconds ? { "Retry-After": String(retryAfterSeconds) } : undefined,
         }
+      );
+    }
+
+    // Quota is checked first: a 429 can also read as "rate limit", and a
+    // throttled provider is a wait, not a misconfiguration.
+    if (isProviderCredentialError(message)) {
+      return NextResponse.json(
+        {
+          error:
+            'The AI provider rejected the configured credential, so the assistant could not run. '
+            + 'An administrator can fix this in AI & Intelligence → AI Providers: the key for this '
+            + 'module is missing, disabled or no longer valid.',
+          detail: message,
+          code: 'AI_PROVIDER_CREDENTIAL_REJECTED',
+        },
+        { status: 502 }
       );
     }
 

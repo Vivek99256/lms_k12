@@ -1,11 +1,19 @@
 'use client';
 
+<<<<<<< HEAD
 import { Check, Lock, Minus } from 'lucide-react';
+=======
+import { Check, Lock } from 'lucide-react';
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 
 import { cn } from '@/lib/utils';
 
 /**
+<<<<<<< HEAD
  * The ten stages of the PAL journey, two of them conditional, as a stepper.
+=======
+ * The seven stages of the PAL journey, as a stepper.
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
  *
  * ---------------------------------------------------------------------------
  * WHY THIS EXISTS AS A SHARED COMPONENT
@@ -13,8 +21,13 @@ import { cn } from '@/lib/utils';
  * The journey spans four different screens - the chapter list, the diagnostic,
  * its result, and the concept flow - and a learner has to be able to tell where
  * they are on all of them. Before this, the only stage indicator lived inside
+<<<<<<< HEAD
  * app/pal/eso/page.tsx as text pills joined by a chevron character, so every
  * other screen showed nothing at all.
+=======
+ * app/pal/eso/page.tsx as seven text pills joined by a chevron character, so
+ * every other screen showed nothing at all.
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
  *
  * ---------------------------------------------------------------------------
  * WHY IT SHOWS PROGRESS RATHER THAN DECORATION
@@ -32,9 +45,13 @@ export type JourneyStageKey =
   | 'plan'
   | 'learn'
   | 'practice'
+<<<<<<< HEAD
   | 'feedback'
   | 'check'
   | 'intervention'
+=======
+  | 'check'
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   | 'mastery'
   | 'recall';
 
@@ -62,6 +79,7 @@ export const JOURNEY_STAGES: JourneyStage[] = [
   { key: 'plan', label: 'Plan' },
   { key: 'learn', label: 'Learn' },
   { key: 'practice', label: 'Practice' },
+<<<<<<< HEAD
   // Between Practice and Check because that is the order a learner needs it
   // in: a formative read of the set they just did, BEFORE the consequential
   // gate. After the Check it would be a post-mortem of a decision already
@@ -81,10 +99,14 @@ export const JOURNEY_STAGES: JourneyStage[] = [
   // and the route say intervention, matching SOP 6.13; a learner reading
   // their own rail gets the plain word. Same record, two registers.
   { key: 'intervention', label: 'Extra support' },
+=======
+  { key: 'check', label: 'Check' },
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   { key: 'mastery', label: 'Mastery' },
   { key: 'recall', label: 'Recall' },
 ];
 
+<<<<<<< HEAD
 /**
  * Stages nobody is guaranteed to pass through.
  *
@@ -119,6 +141,8 @@ export const COMPLETED_THROUGH_CHECK: readonly JourneyStageKey[] = stagesBefore(
 /** ...and Mastery too. The recall screen's seven-key literal. */
 export const COMPLETED_THROUGH_MASTERY: readonly JourneyStageKey[] = stagesBefore('recall');
 
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 export interface JourneyRailProps {
   /** The stage the learner is on now. */
   current: JourneyStageKey;
@@ -127,12 +151,17 @@ export interface JourneyRailProps {
    * only needed when a later stage is already done - a re-taken diagnostic, for
    * instance, where mastery was reached on a previous pass.
    */
+<<<<<<< HEAD
   completed?: readonly JourneyStageKey[];
+=======
+  completed?: JourneyStageKey[];
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   /**
    * Stages the learner cannot reach yet, shown with a padlock instead of being
    * hidden. An absent stage reads as a missing feature; a locked one reads as
    * "not yet", which is the truth.
    */
+<<<<<<< HEAD
   locked?: readonly JourneyStageKey[];
   /**
    * Stages this learner did not need, shown as "Not needed" rather than
@@ -143,6 +172,9 @@ export interface JourneyRailProps {
    * sitting before `current` must NOT tick, because a tick asserts evidence.
    */
   bypassed?: readonly JourneyStageKey[];
+=======
+  locked?: JourneyStageKey[];
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   /** Optional per-stage navigation. Stages without a handler are not buttons. */
   onSelect?: (stage: JourneyStageKey) => void;
   className?: string;
@@ -161,7 +193,10 @@ export function JourneyRail({
   current,
   completed = [],
   locked = [],
+<<<<<<< HEAD
   bypassed = [],
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   onSelect,
   className,
   compact = false,
@@ -171,6 +206,7 @@ export function JourneyRail({
   const currentIndex = JOURNEY_STAGES.findIndex((stage) => stage.key === current);
   const doneSet = new Set(completed);
   const lockedSet = new Set(locked);
+<<<<<<< HEAD
   const bypassedSet = new Set(bypassed);
 
   const stageCount = JOURNEY_STAGES.length;
@@ -186,6 +222,11 @@ export function JourneyRail({
     (stage) => stage.key === current || !bypassedSet.has(stage.key)
   );
   const reached = Math.max(walked.findIndex((stage) => stage.key === current) + 1, 0);
+=======
+
+  const total = JOURNEY_STAGES.length;
+  const reached = Math.max(currentIndex + 1, 0);
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 
   return (
     <nav
@@ -196,7 +237,11 @@ export function JourneyRail({
       {/* A stepper is a picture; this sentence is the same fact for a screen
           reader, and for anyone scanning rather than reading the pills. */}
       <p className="sr-only">
+<<<<<<< HEAD
         Stage {reached} of {walked.length}: {JOURNEY_STAGES[currentIndex]?.label ?? current}
+=======
+        Stage {reached} of {total}: {JOURNEY_STAGES[currentIndex]?.label ?? current}
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
       </p>
 
       <ol
@@ -208,6 +253,7 @@ export function JourneyRail({
         )}
       >
         {JOURNEY_STAGES.map((stage, index) => {
+<<<<<<< HEAD
           // Order matters. `bypassed` beats the implied-done rule below,
           // because a tick asserts the learner did something and a bypassed
           // stage is precisely one they were never asked to do.
@@ -239,6 +285,24 @@ export function JourneyRail({
                 isAhead && 'text-slate-600',
                 isLocked && 'text-slate-400',
                 isBypassed && 'text-slate-400',
+=======
+          const isCurrent = stage.key === current;
+          const isLocked = lockedSet.has(stage.key);
+          const isDone = !isCurrent && (doneSet.has(stage.key) || (index < currentIndex && !isLocked));
+          const selectable = Boolean(onSelect) && !isLocked && (isDone || isCurrent);
+
+          const content = vertical ? (
+            // A row, not a pill: in a 320px rail the same rounded chrome
+            // repeated eight times is noise, and a left-aligned list scans as
+            // the ordered sequence it actually is.
+            <span
+              className={cn(
+                'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors',
+                isCurrent && 'bg-indigo-50 font-semibold text-indigo-900',
+                isDone && 'text-emerald-700',
+                !isCurrent && !isDone && !isLocked && 'text-slate-600',
+                isLocked && 'text-slate-400',
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
                 selectable && !isCurrent && 'hover:bg-slate-50'
               )}
             >
@@ -248,23 +312,32 @@ export function JourneyRail({
                   'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold',
                   isCurrent && 'border-indigo-600 bg-indigo-600 text-white',
                   isDone && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+<<<<<<< HEAD
                   isAhead && 'border-slate-200 bg-white text-slate-400',
                   isLocked && 'border-slate-200 bg-slate-50 text-slate-300',
                   // Dashed is the second non-colour cue, after the dash glyph.
                   isBypassed && 'border-dashed border-slate-300 bg-white text-slate-400'
+=======
+                  !isCurrent && !isDone && !isLocked && 'border-slate-200 bg-white text-slate-400',
+                  isLocked && 'border-slate-200 bg-slate-50 text-slate-300'
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
                 )}
               >
                 {isDone ? (
                   <Check className="h-3 w-3" />
                 ) : isLocked ? (
                   <Lock className="h-2.5 w-2.5" />
+<<<<<<< HEAD
                 ) : isBypassed ? (
                   <Minus className="h-2.5 w-2.5" />
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
                 ) : (
                   index + 1
                 )}
               </span>
               <span className="truncate">{stage.label}</span>
+<<<<<<< HEAD
               {/* The third cue, and the only one that survives a screen
                   reader: the state is a word, not a shape or a hue. */}
               {isBypassed && <span className="sr-only">, not needed</span>}
@@ -276,6 +349,11 @@ export function JourneyRail({
                   Not needed
                 </span>
               )}
+=======
+              {isCurrent && (
+                <span className="ml-auto text-[11px] font-medium text-indigo-600">Now</span>
+              )}
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
             </span>
           ) : (
             <span
@@ -284,26 +362,39 @@ export function JourneyRail({
                 compact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs',
                 isCurrent && 'border-indigo-300 bg-indigo-50 text-indigo-800',
                 isDone && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+<<<<<<< HEAD
                 isAhead && 'border-slate-200 bg-white text-slate-500',
                 isLocked && 'border-slate-200 bg-slate-50 text-slate-400',
                 isBypassed && 'border-dashed border-slate-300 bg-white text-slate-400',
+=======
+                !isCurrent && !isDone && !isLocked && 'border-slate-200 bg-white text-slate-500',
+                isLocked && 'border-slate-200 bg-slate-50 text-slate-400',
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
                 selectable && 'hover:border-indigo-300 hover:bg-indigo-50'
               )}
             >
               {isDone && <Check aria-hidden className="h-3 w-3" />}
               {isLocked && <Lock aria-hidden className="h-3 w-3" />}
+<<<<<<< HEAD
               {isBypassed && <Minus aria-hidden className="h-3 w-3" />}
               {stage.label}
               {isBypassed && <span className="sr-only">, not needed</span>}
+=======
+              {stage.label}
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
             </span>
           );
 
           return (
+<<<<<<< HEAD
             <li
               key={stage.key}
               data-pal-journey-bypassed={isBypassed || undefined}
               className={cn(vertical ? 'flex flex-col' : 'flex items-center')}
             >
+=======
+            <li key={stage.key} className={cn(vertical ? 'flex flex-col' : 'flex items-center')}>
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
               {selectable ? (
                 <button
                   type="button"
@@ -319,10 +410,13 @@ export function JourneyRail({
               ) : (
                 <span
                   aria-current={isCurrent ? 'step' : undefined}
+<<<<<<< HEAD
                   // Only for locked. A bypassed stage is not something the
                   // learner is being stopped from doing, so aria-disabled
                   // would say the wrong thing; its sr-only word says the
                   // right one.
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
                   aria-disabled={isLocked || undefined}
                   className={cn(vertical && 'block w-full')}
                 >
@@ -330,6 +424,7 @@ export function JourneyRail({
                 </span>
               )}
 
+<<<<<<< HEAD
               {index < stageCount - 1 &&
                 (vertical ? (
                   // Sits under the numbered marker so the sequence reads as one
@@ -339,6 +434,17 @@ export function JourneyRail({
                     className={cn(
                       'ml-[1.4rem] h-1.5 w-px shrink-0',
                       connectorDone ? 'bg-emerald-300' : 'bg-slate-200'
+=======
+              {index < total - 1 &&
+                (vertical ? (
+                  // Sits under the numbered marker so the sequence reads as one
+                  // connected column rather than eight loose rows.
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'ml-[1.4rem] h-2 w-px shrink-0',
+                      index < currentIndex ? 'bg-emerald-300' : 'bg-slate-200'
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
                     )}
                   />
                 ) : (
@@ -347,7 +453,11 @@ export function JourneyRail({
                       aria-hidden
                       className={cn(
                         'mx-1 h-px w-3 shrink-0',
+<<<<<<< HEAD
                         connectorDone ? 'bg-emerald-300' : 'bg-slate-200'
+=======
+                        index < currentIndex ? 'bg-emerald-300' : 'bg-slate-200'
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
                       )}
                     />
                   )
@@ -366,29 +476,38 @@ export function JourneyRail({
  * Deliberately derived rather than stored: every input is persisted evidence,
  * so a stage computed here can never disagree with the data it came from, and
  * there is no extra field to keep in sync.
+<<<<<<< HEAD
  *
  * There is no `feedback` branch on purpose. Feedback lives for one screen,
  * between one practice set and one check; a chapter-level rollup that reported
  * it would be wrong the moment the learner navigated away.
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
  */
 export function resolveChapterStage(input: {
   hasDiagnostic: boolean;
   practiceAttempts: number;
   mastered: number;
   conceptsServable: number;
+<<<<<<< HEAD
   /**
    * Support cases open against this chapter. Optional: a caller with no
    * intervention data omits it and gets exactly the old answer, rather than
    * having to pass a zero it cannot vouch for.
    */
   openInterventions?: number;
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
 }): JourneyStageKey {
   if (!input.hasDiagnostic) return 'diagnostic';
   if (input.practiceAttempts === 0) return 'adaptive';
   if (input.conceptsServable > 0 && input.mastered >= input.conceptsServable) return 'recall';
+<<<<<<< HEAD
   // After the completion check on purpose: a learner who has finished the
   // chapter is not "being supported", whatever is still open on a record.
   if ((input.openInterventions ?? 0) > 0) return 'intervention';
+=======
+>>>>>>> parent of 1c474ef (Merge pull request #297 from Vivek99256/harshit1)
   if (input.mastered > 0) return 'mastery';
   return 'plan';
 }

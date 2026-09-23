@@ -7,8 +7,10 @@ import {
   convertSopProcedure,
   findModule,
   toIntakeText,
+  vocabularyFor,
   type ParseIssue,
   type ProcessSpec,
+  type SopModule,
 } from "@/lib/process";
 
 /**
@@ -179,7 +181,7 @@ export async function POST(request: Request) {
       model,
       schema: proposalSchema,
       system: SYSTEM_PROMPT,
-      prompt: buildPrompt(body, sopModule.name),
+      prompt: buildPrompt(body, sopModule),
       temperature: 0,
     });
 
@@ -255,10 +257,24 @@ export async function POST(request: Request) {
   }
 }
 
-function buildPrompt(body: z.infer<typeof requestSchema>, moduleName: string) {
+function buildPrompt(body: z.infer<typeof requestSchema>, sopModule: SopModule) {
+  const { actorLabels } = vocabularyFor(sopModule);
+
   return [
-    `Module: ${moduleName}`,
+    `Module: ${sopModule.name}`,
     body.procedureRef ? `Procedure reference: ${body.procedureRef}` : "",
+    // The schema only accepts the five canonical acting modes, but a module's
+    // SOP need not use those words for them - a fees procedure says
+    // "Accountant" and "Parent". Naming the mapping here is what stops the
+    // model from guessing it, or from refusing a role it does not recognise.
+    "",
+    "This module's SOP writes the five acting modes as:",
+    `- Teacher = ${actorLabels.teacher}`,
+    `- Teacher + AI = ${actorLabels.teacher_ai}`,
+    `- AI = ${actorLabels.ai}`,
+    `- Student = ${actorLabels.student}`,
+    `- Student + AI = ${actorLabels.student_ai}`,
+    "Emit the canonical name on the left, whichever wording the source uses.",
     "",
     "SOP procedure text:",
     body.text,
