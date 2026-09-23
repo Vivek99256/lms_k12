@@ -77,6 +77,8 @@ export type DynamicFieldOption = {
   label: string;
   fieldType: string;
   displayKey: string | null;
+  /** Set on the registry entry, not admin-editable -- see api.ts's class doc. */
+  drillEndpoint: string | null;
 };
 
 export type DynamicPageField = {
@@ -87,6 +89,8 @@ export type DynamicPageField = {
   fieldType: string;
   sortOrder: number;
   status: string;
+  /** Whether this tile opens a list on tap in the K12 app, and which ERP API supplies it. */
+  drillEndpoint: string | null;
 };
 
 export type DynamicPage = {
@@ -100,22 +104,26 @@ export type DynamicPage = {
 
 function fieldOption(row: RecordValue): DynamicFieldOption {
   const displayKey = readString(row.display_key).trim();
+  const drillEndpoint = readString(row.drill_endpoint).trim();
   return {
     fieldKey: readString(row.field_key).trim(),
     label: readString(row.label).trim(),
     fieldType: readString(row.field_type).trim(),
     displayKey: displayKey ? displayKey : null,
+    drillEndpoint: drillEndpoint ? drillEndpoint : null,
   };
 }
 
 function pageField(row: RecordValue): DynamicPageField {
   const displayKey = readString(row.display_key).trim();
+  const drillEndpoint = readString(row.drill_endpoint).trim();
   return {
     id: readNumber(row.id),
     fieldKey: readString(row.field_key).trim(),
     displayKey: displayKey ? displayKey : null,
     label: readString(row.label).trim(),
     fieldType: readString(row.field_type).trim(),
+    drillEndpoint: drillEndpoint ? drillEndpoint : null,
     sortOrder: readNumber(row.sort_order),
     status: readString(row.status).trim(),
   };
