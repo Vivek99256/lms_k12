@@ -1,21 +1,21 @@
 'use client';
 
-import { BookMarked, Cpu, FileText, Gauge, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
+import { BookMarked, Cpu, FileText, Gauge, History, ShieldAlert, Terminal, Workflow } from 'lucide-react';
 
-import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
+import type { ModuleStaticScreen } from '@/app/modules/_components/module-category-page';
 import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-screen';
-import { ComingSoonPanel, ComingSoonToggle } from '@/components/ui/coming-soon';
 import { FeesAutomationsScreen } from '@/app/fees/ai-stack/_screens/fees-automations-screen';
+import { FeesModelsScreen } from '@/app/fees/ai-stack/_screens/fees-models-screen';
 import { FeesTemplatesScreen } from '@/app/fees/ai-stack/_screens/fees-templates-screen';
 
 /**
  * Fees → AI Stack tabs.
  *
- * Scaffolding for the AI services and automation behind the Fees module. This
- * is the plumbing view — what the module runs on — as distinct from
- * Intelligence, which is what that plumbing produces. Nothing is wired up yet,
- * and nothing here touches the separate AI Administration module; each tab
- * renders the shared placeholder.
+ * The AI services and automation behind the Fees module. This is the plumbing view —
+ * what the module runs on — as distinct from Intelligence, which is what that plumbing
+ * produces. Nothing here touches the separate AI Administration module.
+ *
+ * ALL NINE TABS ARE LIVE, AND ALL NINE ARE FEES-ONLY
  *
  * The Policies tab holds the module-scoped settings the architecture review
  * approved for a module's AI Stack tab: whether the Recommendation Engine and
@@ -24,70 +24,71 @@ import { FeesTemplatesScreen } from '@/app/fees/ai-stack/_screens/fees-templates
  * locked rather than hidden — a visible, disabled control says the capability is
  * designed and coming, where a missing row just reads as absent.
  *
- * NOTE for whoever wires this up: the Models and Prompts tabs below are
- * engine-level concerns (model management, prompt management). The same review
- * ruled those stay central and must not be re-implemented per module, so they
- * likely want to become links into the central AI console rather than editable
- * screens here.
- * Intelligence, which is what that plumbing produces. Automations is live — it
- * runs on the central Agent Management engine (lib/agents), scoped to Fees.
- * The other tabs are not wired up yet and render the shared placeholder;
- * nothing here touches the separate AI Administration module.
+ * DECENTRALISED IS NOT DUPLICATED
+ *
+ * There is no second AI stack under Fees. Every screen calls the same client, the same
+ * endpoint and the same table as the central AI console, scoped to Fees:
+ *
+ *   Prompts        → ai_templates, module_key = fees, kind = prompt
+ *   Templates      → ai_templates, module_key = fees, kind = report
+ *   Knowledge Base → the read-only Fees MCP tools, from the backend tool registry
+ *   Automations    → the central Agent Management engine (lib/agents), module = fees
+ *   Usage & Cost   → ai_conversations.module_key, Fees template generations, the quota
+ *   Guardrails     → the four places a Fees guardrail is actually enforced
+ *   Activity       → ai_audit_logs rows under `module.fees.*`, written by Fees screens
+ *
+ * So a change to any of those contracts breaks both the central screen and this one at
+ * compile time, rather than leaving this one quietly wrong. No table, column or store
+ * was added to make these tabs Fees-specific — every module filter is a column the
+ * schema already had.
+ *
+ * NO TAB DOES ANOTHER TAB'S JOB. Prompts and Templates are both `ai_templates` rows and
+ * are split by `kind`, because a prompt is text sent to a model and a report is a layout
+ * filled from fee records. Guardrails reads what the other tabs configure and offers no
+ * second place to change it.
  */
-export const FEES_AI_STACK_SCREENS: FeesStaticScreen[] = [
+export const FEES_AI_STACK_SCREENS: ModuleStaticScreen[] = [
+  /*
+   * Policies is deliberately absent.
+   *
+   * It is an estate-wide setting with one central console — AI & Intelligence →
+   * Policies — writing the very same `ai_policies` rows this module would have shown.
+   * Two screens onto one row is not configurability, it is two places to look when the
+   * answer disagrees. Removing the tab changes no data and no behaviour: Fees resolves
+   * its policy through `AiPolicyResolver`, which reads the central table and never
+   * consulted this screen. The component remains in the tree, unrouted, so restoring
+   * the tab is one entry here.
+   */
   {
-    id: 'policies',
-    label: 'Policies',
-    icon: SlidersHorizontal,
-    render: () => (
-      <ComingSoonPanel
-        title="Fees AI policies"
-        summary="What the central AI engines are allowed to do for Fees. The switches are shown locked until each engine is wired to this module — the setting exists, it is just not connected yet."
-      >
-        <div className="space-y-3">
-          <ComingSoonToggle
-            roadmapId="fees.ai-stack.recommendation-engine"
-            label="Recommendation engine"
-            description="Rank collection actions and flag likely defaulters for this module."
-            hint="Will carry a confidence threshold below which a recommendation is not shown."
-          />
-          <ComingSoonToggle
-            roadmapId="fees.ai-stack.agent"
-            label="Fees agent"
-            description="Let an agent carry out fees tasks on a person's behalf."
-            hint="Will carry an approval threshold above which a person must confirm before anything runs."
-          />
-          <ComingSoonToggle
-            roadmapId="fees.ai-stack.knowledge-source"
-            label="Knowledge sources"
-            description="Point the knowledge and retrieval layer at fees policies, circulars and structures."
-          />
-          <ComingSoonToggle
-            roadmapId="fees.ai-stack.usage-audit"
-            label="Usage and audit view"
-            description="See what the AI did in Fees, what it cost, and who approved it."
-          />
-        </div>
-      </ComingSoonPanel>
-    ),
-  },
-  {
+    /*
+     * Live, and it writes — which is a reversal of the reasoning above, on purpose.
+     *
+     * Models was dropped alongside Policies for the same stated reason: one estate-wide
+     * setting should not have two editors, and a per-module binding "invites a school to
+     * run Fees on a model nobody else is using without meaning to." The first half was
+     * wrong about what this tab edits. A module choosing its own model is not a second
+     * way to write `ai_models` / `ai_api_keys`; it is a different setting with a
+     * different scope, and it is stored in a different table —
+     * `ai_module_model_bindings`, keyed by product module × capability — which the
+     * central console does not touch. Neither screen can move the other's row.
+     *
+     * The second half was a real risk and is answered by the screen rather than by the
+     * tab's absence: a module with no binding inherits the estate default, every row
+     * says plainly whether it is on the module's own choice or the estate's, and one
+     * button puts it back. Nothing is bound by opening the tab.
+     *
+     * Without it, Fees → AI Stack → Models had nowhere to go but AI & Intelligence,
+     * which is the module's AI Stack sending you out of the module to configure the
+     * module.
+     */
     id: 'models',
     label: 'Models',
     icon: Cpu,
-    render: () => (
-      <FeesPlaceholderScreen
-        title="Models"
-        summary="The models Fees calls, and which task each one serves."
-        points={[
-          'Model per task — forecasting, classification, summarisation.',
-          'Version in use, and what it replaced.',
-          'Fallback model when the primary is unavailable.',
-        ]}
-      />
-    ),
+    render: () => <FeesModelsScreen />,
   },
   {
+    // Live. `ai_templates` rows for Fees with `kind = 'prompt'` — the other half of
+    // the store Templates reads. See fees-prompts-screen.tsx.
     id: 'prompts',
     label: 'Prompts',
     icon: Terminal,

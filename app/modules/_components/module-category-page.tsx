@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, type LucideIcon } from 'lucide-react';
 
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { PageFrame, PageHeader } from '@/app/fees/_components/fees-shared';
@@ -43,6 +43,10 @@ import {
 export type ModuleStaticScreen = {
   id: string;
   label: string;
+  /** Not yet rendered by this page — `staticScreens` render stacked, not as switchable
+   * tabs — but carried on the type so a caller that builds a tab strip elsewhere (or a
+   * future one here) has it without changing every screen's declaration. */
+  icon?: LucideIcon;
   render: () => ReactNode;
 };
 

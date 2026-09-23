@@ -369,7 +369,20 @@ export function listAgents(context: IntelligenceContext, domain?: string) {
 export function runAgent(
   context: IntelligenceContext,
   agentKey: string,
-  input: { subject_id?: number; student_ids?: number[]; limit?: number } = {}
+  input: {
+    subject_id?: number;
+    student_ids?: number[];
+    limit?: number;
+    days?: number;
+    standard_id?: number;
+    division_id?: number;
+    min_attendance_rate?: number;
+    // Admissions filters, added with the matching nullable rules on AgentController.
+    // Optional like the rest, so every existing caller is unaffected.
+    enquiry_id?: number;
+    overdue_days?: number;
+    search_text?: string;
+  } = {}
 ) {
   return post<AgentRunResult>(context, `/agents/${agentKey}/run`, input);
 }

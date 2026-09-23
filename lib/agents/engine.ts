@@ -200,7 +200,7 @@ export async function runAgent(context: EngineContext, agentId: string, input: R
   }
 
   try {
-    const { output } = executeTool(toolKey, args);
+    const { output } = await executeTool(toolKey, args);
     const run = await context.store.appendRun(finish({ status: 'success', output, tools_used: [toolKey], error: null }));
     return { run };
   } catch (error) {
