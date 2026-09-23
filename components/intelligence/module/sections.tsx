@@ -800,3 +800,9 @@ export function LearningSection({
     </Section>
   );
 }
+
+/* ======================================================= 9. & 10. integration & workflow */
+
+export { ModuleIntegrationSection } from './sections/ModuleIntegrationSection';
+export { CrossModuleWorkflowSection } from './sections/CrossModuleWorkflowSection';
+

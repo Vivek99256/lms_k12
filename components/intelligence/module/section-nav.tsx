@@ -57,6 +57,8 @@ export const SECTION_NAV_LABELS: Record<SectionKey, string> = {
   decisions: 'Decisions',
   dataQuality: 'Data quality',
   learning: 'Learning',
+  integration: 'Module Integration',
+  workflow: 'Cross-Module Workflow',
 };
 
 /** Fees' accent, and the default for a caller that has no accent of its own. */
@@ -105,13 +107,7 @@ export function IntelligenceSectionNav({
       aria-label={`${label} sections`}
       className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
     >
-      <div className="flex items-center gap-3">
-        <span className="hidden shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--intel-nav-accent)] lg:inline-flex">
-          <Brain className="h-3.5 w-3.5" />
-          {label}
-        </span>
-        <span aria-hidden className="hidden h-5 w-px shrink-0 bg-slate-200 lg:block" />
-
+      <div className="flex items-center">
         <div
           role="tablist"
           aria-orientation="horizontal"
