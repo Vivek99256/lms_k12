@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Lock, Sparkles, Target } from 'lucide-react';
 
@@ -33,6 +33,8 @@ import {
   type PracticeItem,
 } from '@/app/pal/data/pal-eso';
 import { useViewAsStudent } from '@/app/pal/data/pal-view-as';
+import { fetchConceptResult } from '@/app/pal/data/pal-diagnostic';
+import { buildConceptFeedback, type ConceptFeedback } from '@/app/pal/data/pal-feedback';
 import AiTutorPanel from '@/app/pal/eso/_components/AiTutorPanel';
 
 /**
@@ -94,29 +96,68 @@ function EsoConceptFlow() {
   // so it can never be mistaken for learner evidence.
   const [planPending, setPlanPending] = useState(false);
 
+  // The Feedback step, on exactly the same terms as Plan: no engine action, no
+  // D1-D5 change, held in UI state so it can never be mistaken for evidence.
+  // It runs when the practice phase ends, so the learner reads what the set
+  // showed BEFORE the check rather than after it.
+  const [feedbackPending, setFeedbackPending] = useState(false);
+
+  /**
+   * Put a newly resolved action on screen.
+   *
+   * The single place `action` is set, so the step-sequence bump can never be
+   * forgotten on one path and not another. Still no interpretation of the
+   * engine's decision here - the action is applied exactly as received.
+   */
+  const applyAction = useCallback((next: EsoAction) => {
+    setAction((previous) => {
+      // Diagnostic just finished: show the Plan before the first teaching
+      // step, so the learner sees where they stand before being taught.
+      // Never skipped by the UI — only the engine skips steps, and only when
+      // its own policy says the step does not apply.
+      if (previous?.action === 'diagnostic' && next.action !== 'diagnostic') {
+        setPlanPending(true);
+      }
+      // The practice phase has just ended. Show the synthesis before the
+      // consequential check, never after it - after it, it would be a
+      // post-mortem of a decision already taken.
+      if (
+        previous &&
+        PRACTICE_ACTIONS.includes(previous.action) &&
+        !PRACTICE_ACTIONS.includes(next.action)
+      ) {
+        setFeedbackPending(true);
+      }
+      return next;
+    });
+  }, []);
+
+  /**
+   * Is a resolve already in flight?
+   *
+   * nextAction() is not a read. It stamps `taught_at`, it writes an
+   * eso_decision_log row, and — because the first call has already moved state
+   * — a second concurrent call can resolve to a DIFFERENT step than the first.
+   * Two overlapping resolves therefore do not merely waste a round trip; they
+   * produce two different answers and the slower one wins, which is what put a
+   * practice question on screen a second or two after the Learn card appeared.
+   */
+  const resolving = useRef(false);
+
   const refresh = useCallback(async () => {
     if (!conceptId || !learnerId) return;
     setRefreshing(true);
     setError(null);
     try {
       const next = await fetchNextAction(learnerId, conceptId);
-      setAction((previous) => {
-        // Diagnostic just finished: show the Plan before the first teaching
-        // step, so the learner sees where they stand before being taught.
-        // Never skipped by the UI — only the engine skips steps, and only when
-        // its own policy says the step does not apply.
-        if (previous?.action === 'diagnostic' && next.action !== 'diagnostic') {
-          setPlanPending(true);
-        }
-        return next;
-      });
+      applyAction(next);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to load the next learning step.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [learnerId, conceptId]);
+  }, [learnerId, conceptId, applyAction]);
 
   useEffect(() => {
     // Deferred to a microtask so the setLoading/setError calls inside
@@ -178,6 +219,12 @@ function EsoConceptFlow() {
 
           {planPending ? (
             <PlanStep action={action} onContinue={() => setPlanPending(false)} />
+          ) : feedbackPending ? (
+            <FeedbackStep
+              conceptId={action.conceptId ?? conceptId}
+              action={action}
+              onContinue={() => setFeedbackPending(false)}
+            />
           ) : (
             <FlowStep
               key={`${action.action}-${action.nodeId ?? ''}-${action.conceptId ?? conceptId}`}
@@ -251,6 +298,100 @@ function ContentUnavailableStep({ action }: { action: EsoAction }) {
  * control back. Duplicating the plan here would put two copies of the same
  * numbers on one screen.
  */
+/**
+ * The in-flow Feedback step.
+ *
+ * Compact on purpose, and it does not navigate. The engine flow is one screen
+ * and has to stay one screen - sending a learner mid-flow to another route and
+ * back would break the step sequence the whole page is built around. The
+ * standalone page at /pal/feedback/concept/[conceptId] serves the ADAPTIVE
+ * practice path, which is a different set of screens entirely.
+ *
+ * The reading itself comes from the same pure module both surfaces use, so the
+ * two can never tell a learner different things about one practice set.
+ */
+function FeedbackStep({
+  conceptId,
+  action,
+  onContinue,
+}: {
+  conceptId: number;
+  action: EsoAction;
+  onContinue: () => void;
+}) {
+  const [feedback, setFeedback] = useState<ConceptFeedback | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const nextLabel =
+    FLOW_STAGES.find((stage) => stage.actions.includes(action.action))?.label ?? 'the next step';
+
+  useEffect(() => {
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      setLoading(true);
+      fetchConceptResult(conceptId, controller.signal)
+        // Swallowed: this is an interstitial between two engine steps. A
+        // failed read must never strand a learner mid-flow, so the step still
+        // renders and still continues - just without the detail.
+        .then((result) => setFeedback(buildConceptFeedback(result)))
+        .catch(() => undefined)
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+    });
+    return () => controller.abort();
+  }, [conceptId]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-indigo-500" />
+          What that practice showed
+        </CardTitle>
+        <CardDescription>
+          A quick read of how that went, before the check.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <p className="text-sm text-slate-500">Working that out…</p>
+        ) : feedback && !feedback.isEmpty ? (
+          <>
+            <p className="text-sm text-slate-700">{feedback.headline}</p>
+
+            {feedback.wentWell[0] && (
+              <p className="text-sm text-slate-700">
+                <span className="font-medium">Going well: </span>
+                {feedback.wentWell[0].claim}
+              </p>
+            )}
+
+            {feedback.toFix[0] && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-slate-800">
+                <span className="font-medium">Worth fixing: </span>
+                {feedback.toFix[0].claim}
+              </p>
+            )}
+
+            <p className="text-sm text-slate-600">{feedback.checkReadiness.reason}</p>
+          </>
+        ) : (
+          <p className="text-sm text-slate-600">
+            Have a look at how that went, then carry on.
+          </p>
+        )}
+
+        <div className="flex justify-end">
+          <Button data-eso-feedback-continue onClick={onContinue}>
+            Continue to {nextLabel.toLowerCase()}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function PlanStep({ action, onContinue }: { action: EsoAction; onContinue: () => void }) {
   const nextLabel =
     FLOW_STAGES.find((stage) => stage.actions.includes(action.action))?.label ?? 'the next step';
@@ -562,6 +703,35 @@ const FLOW_STAGES: Array<{ key: string; label: string; actions: string[] }> = [
   // than by a policy branch, so no D1-D5 rule changes to accommodate it.
   { key: 'plan', label: 'Plan', actions: [] },
   { key: 'learn', label: 'Learn', actions: ['teach', 'reteach'] },
+  // Practice BEFORE check, matching the engine's own phaseFor() order
+  // (Learn -> Practice -> Check). These two were the wrong way round, so the
+  // rail ticked Check off as already passed while the student was still
+  // practising - and since the rail is the only progress indicator on the
+  // screen, it never moved across the three practice questions either.
+  { key: 'practice', label: 'Practice', actions: ['practice', 'continue_practice'] },
+  // Feedback has no engine action, and follows Plan's precedent exactly. The
+  // engine's vocabulary goes straight from practice/continue_practice to
+  // check_understanding; there is no "synthesise the set" action, and adding
+  // one would be a D1-D5 policy change made to serve a screen. It is driven by
+  // `feedbackPending` on the practice -> not-practice edge, the same way
+  // `planPending` runs on the diagnostic -> not-diagnostic edge.
+  { key: 'feedback', label: 'Feedback', actions: [] },
+  { key: 'check', label: 'Check', actions: ['check_understanding'] },
+  // Extra support has no engine action ON PURPOSE, and this is the
+  // load-bearing decision in this list.
+  //
+  // The tempting mapping is remediate_prerequisite / serve_contrast_pair /
+  // reteach. That would be wrong twice. Those are the engine's TIER-1
+  // automatic repair - it fixes the next step by itself, nobody is told and
+  // nothing is escalated - and they are deliberately off-path today, which is
+  // what produces the "Checking a prerequisite first" / "Clearing up a mix-up
+  // first" aside below. Mapping them here would delete that note AND light a
+  // human-escalation stage every time the engine did its ordinary job.
+  //
+  // Extra support is TIER 2: a person opens it and a person closes it. It
+  // lights only from an open intervention record. See
+  // app/pal/data/pal-intervention.ts.
+  { key: 'intervention', label: 'Extra support', actions: [] },
   { key: 'check', label: 'Check', actions: ['check_understanding'] },
   { key: 'practice', label: 'Practice', actions: ['practice', 'continue_practice'] },
   { key: 'mastery', label: 'Mastery', actions: ['mastered_stop_practice'] },
@@ -573,6 +743,21 @@ const FLOW_STAGES: Array<{ key: string; label: string; actions: string[] }> = [
   // and retrieval-check behaviour are untouched either way.
   { key: 'recall', label: 'Recall', actions: ['retrieval_due', 'retained', 'reloop_node'] },
 ];
+
+/**
+ * The actions that mean "still practising".
+ *
+ * Read off FLOW_STAGES rather than written out again, so the edge that fires
+ * the Feedback step can never disagree with the stage the rail is lighting.
+ */
+const PRACTICE_ACTIONS: string[] =
+  FLOW_STAGES.find((stage) => stage.key === 'practice')?.actions ?? [];
+
+/**
+ * Stages that only some learners walk. Kept in step with JourneyRail's
+ * CONDITIONAL_STAGES by hand, exactly as the two stage lists themselves are.
+ */
+const CONDITIONAL_FLOW_STAGES: string[] = ['intervention'];
 
 /**
  * Shape of the step that is coming, shown during the cold start so the first
@@ -600,18 +785,118 @@ function StepSkeleton() {
   );
 }
 
-function LearningFlowRail({ action, stageKey }: { action: string; stageKey?: string }) {
-  // `stageKey` marks a stage the UI owns rather than the engine — currently
-  // only Plan, which has no action of its own. Everything else still derives
-  // from the resolved action, so the rail can never drift from the engine.
+function LearningFlowRail({
+  action,
+  stageKey,
+  orientation = 'horizontal',
+}: {
+  action: string;
+  stageKey?: string;
+  orientation?: 'horizontal' | 'vertical';
+}) {
+  // `stageKey` marks a stage the UI owns rather than the engine — Plan and
+  // Feedback, neither of which has an action of its own. Everything else still
+  // derives from the resolved action, so the rail can never drift from the
+  // engine.
   const activeIndex = stageKey
     ? FLOW_STAGES.findIndex((stage) => stage.key === stageKey)
     : FLOW_STAGES.findIndex((stage) => stage.actions.includes(action));
 
+  /**
+   * Is this a stage the learner was never asked to walk?
+   *
+   * The "everything before the active index is done" shortcut is a lie for
+   * Extra support: a learner on Mastery is past it in the list, and without
+   * this a tick would appear claiming they went through an escalation nobody
+   * ever opened. Mirrors JourneyRail's `bypassed`, for the same reason and
+   * with the same non-colour marker.
+   */
+  const bypassed = (index: number) =>
+    index !== activeIndex && CONDITIONAL_FLOW_STAGES.includes(FLOW_STAGES[index].key);
+
+  const offPath = activeIndex < 0;
+  const asideNote = offPath
+    ? action === 'serve_contrast_pair'
+      ? 'Clearing up a mix-up first'
+      : action === 'remediate_prerequisite' || action === 'prerequisite_quick_probe'
+        ? 'Checking a prerequisite first'
+        : action === 'content_unavailable'
+          ? 'Waiting on content'
+          : 'Getting you set up'
+    : null;
+
+  // Vertical is the side-rail form, matching JourneyRail's so the two read as
+  // one system. The engine still decides which stage is lit; only the axis
+  // changes.
+  if (orientation === 'vertical') {
+    return (
+      <div data-eso-flow-stage={offPath ? 'off-path' : FLOW_STAGES[activeIndex].key}>
+        <ol className="flex flex-col gap-0">
+          {FLOW_STAGES.map((stage, index) => {
+            const skipped = bypassed(index);
+            const done = !offPath && !skipped && index < activeIndex;
+            const current = index === activeIndex;
+            return (
+              <li key={stage.key} data-eso-flow-bypassed={skipped || undefined} className="flex flex-col">
+                <span
+                  aria-current={current ? 'step' : undefined}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm ${
+                    current
+                      ? 'bg-indigo-50 font-semibold text-indigo-900'
+                      : done
+                        ? 'text-emerald-700'
+                        : skipped
+                          ? 'text-slate-400'
+                          : 'text-slate-500'
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
+                      current
+                        ? 'border-indigo-600 bg-indigo-600 text-white'
+                        : done
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : skipped
+                            ? 'border-dashed border-slate-300 bg-white text-slate-400'
+                            : 'border-slate-200 bg-white text-slate-400'
+                    }`}
+                  >
+                    {done ? '✓' : skipped ? '–' : index + 1}
+                  </span>
+                  <span className="truncate">{stage.label}</span>
+                  {skipped && <span className="sr-only">, not needed</span>}
+                  {current && (
+                    <span className="ml-auto text-[11px] font-medium text-indigo-600">Now</span>
+                  )}
+                  {skipped && (
+                    <span aria-hidden className="ml-auto text-[11px] font-medium text-slate-400">
+                      Not needed
+                    </span>
+                  )}
+                </span>
+                {index < FLOW_STAGES.length - 1 && (
+                  <span
+                    aria-hidden
+                    className={`ml-[1.4rem] h-1.5 w-px shrink-0 ${
+                      !offPath && !skipped && index < activeIndex ? 'bg-emerald-300' : 'bg-slate-200'
+                    }`}
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        {asideNote && <p className="mt-2 px-1 text-xs text-amber-700">{asideNote}</p>}
+      </div>
+    );
+  }
+
   return (
     <div data-eso-flow-stage={activeIndex >= 0 ? FLOW_STAGES[activeIndex].key : 'off-path'} className="mb-4 flex flex-wrap items-center gap-1.5">
       {FLOW_STAGES.map((stage, index) => {
-        const done = activeIndex >= 0 && index < activeIndex;
+        const skipped = bypassed(index);
+        const done = !offPath && !skipped && index < activeIndex;
         const current = index === activeIndex;
         return (
           <span key={stage.key} className="flex items-center gap-1.5">
@@ -621,10 +906,13 @@ function LearningFlowRail({ action, stageKey }: { action: string; stageKey?: str
                   ? 'border-violet-400 bg-violet-100 text-violet-800'
                   : done
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 bg-white text-slate-400'
+                    : skipped
+                      ? 'border-dashed border-slate-300 bg-white text-slate-400'
+                      : 'border-slate-200 bg-white text-slate-400'
               }`}
             >
               {stage.label}
+              {skipped && <span className="sr-only">, not needed</span>}
             </span>
             {index < FLOW_STAGES.length - 1 && <span className="text-slate-300">›</span>}
           </span>
@@ -646,7 +934,7 @@ function LearningFlowRail({ action, stageKey }: { action: string; stageKey?: str
   );
 }
 
-function Alert({ children, tone = 'info' }: { children: React.ReactNode; tone?: 'info' | 'error' }) {
+function Alert({ children, tone = 'info' }: { children: ReactNode; tone?: 'info' | 'error' }) {
   return (
     <div
       className={`rounded-lg border px-4 py-3 text-sm ${
