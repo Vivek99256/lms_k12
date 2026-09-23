@@ -97,6 +97,33 @@ export function TextActivityPlayer({
     [type, activity, tokens, selected, responses]
   );
 
+  /**
+   * What the learner answered, in passage order, as one readable line.
+   *
+   * IN PASSAGE ORDER AND NOT INSERTION ORDER. `responses` is keyed by blank
+   * index, and object key order for integer-like keys is ascending anyway --
+   * but relying on that is relying on an engine detail to keep a learner's
+   * answer legible, so the sort is explicit.
+   *
+   * Empty when nothing was entered, which is different from a wrong answer and
+   * reads that way on a result screen.
+   */
+  const learnerAnswer = useCallback((): string => {
+    if (type === 'mark_the_words') {
+      return tokens
+        .filter((token) => selected.has(token.tokenIndex))
+        .map((token) => token.word)
+        .join(', ');
+    }
+
+    return Object.keys(responses)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((index) => responses[index]?.trim() ?? '')
+      .filter((answer) => answer !== '')
+      .join(', ');
+  }, [type, tokens, selected, responses]);
+
   // With instant feedback the learner sees each answer marked as they give it;
   // otherwise nothing is marked until they press Check.
   const showMarks = checked || (activity.instant_feedback && type !== 'mark_the_words');
@@ -129,15 +156,22 @@ export function TextActivityPlayer({
     // The caller's hook, fired where this player already reports completion.
     // It is what lets PAL or homework use this player without the H5P library
     // around it; nothing is persisted here either way.
+    //
+    // `response` is what the learner WROTE, not the score they got for it.
+    // The xAPI statements above keep sending the score, because that is what
+    // the reporting pipeline reads; this field is defined as "what the learner
+    // actually did", and a module storing an attempt needs the words. PAL
+    // stores them and shows them back on its result screen, where a bare "1"
+    // told a learner nothing about what they had answered.
     onResult?.({
       questionId: Number(activity.id),
       score: result.score,
       maxScore: result.maxScore,
       correct: result.scoreable ? result.passed : null,
       durationSeconds: seconds,
-      response: String(result.score),
+      response: learnerAnswer(),
     });
-  }, [ctx, objectId, result, onResult, activity.id]);
+  }, [ctx, objectId, result, onResult, activity.id, learnerAnswer]);
 
   const retry = useCallback(() => {
     setResponses({});

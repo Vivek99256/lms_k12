@@ -310,6 +310,17 @@ function ReviewCard({ question, index }: { question: PalResultQuestion; index: n
             )}
           </div>
 
+          {/* A typed answer has no option to highlight, so what the learner
+              wrote is shown instead of an empty option list. */}
+          {!question.choseOptions && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                Your answer
+              </span>
+              <p className="mt-0.5 text-slate-900">{question.typedAnswer || 'Nothing recorded'}</p>
+            </div>
+          )}
+
           <div className="mt-3 space-y-2">
             {question.options.map((option) => {
               const given = question.givenAnswerIds.includes(option.id);

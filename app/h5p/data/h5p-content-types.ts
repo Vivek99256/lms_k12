@@ -418,6 +418,16 @@ export interface H5pSingleChoiceOption {
   /** What to say to a learner who chose THIS option. */
   feedback: string | null;
   sort_order: number;
+  /**
+   * The `answer_master` row behind this option, for a set built in the
+   * browser from a question bank row rather than read from `h5p_*` tables.
+   *
+   * Always absent on an authored set -- the controller does not select it and
+   * there is nothing to select. Present only on the derived rows
+   * `lib/h5p/question-bank-runtime.ts` builds, so a module recording an
+   * attempt can name the option the learner chose.
+   */
+  source_option_id?: number | null;
 }
 
 export interface H5pSingleChoiceQuestion {

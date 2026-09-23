@@ -129,6 +129,24 @@ async function postBank(body: Record<string, unknown>, signal?: AbortSignal): Pr
 }
 
 /**
+ * Drop rows the bank sent twice.
+ *
+ * `/api/lms-question-bank` joins across institute mappings without a
+ * `DISTINCT`, so a chapter shared by more than one institute can hand back the
+ * same question id more than once -- which React then refuses to key a table
+ * row on. First occurrence wins.
+ */
+function dedupeById(rows: QuestionBankApiQuestion[]): QuestionBankApiQuestion[] {
+  const seen = new Set<number>();
+  return rows.filter((row) => {
+    const id = Number(row.id);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+/**
  * One page of a chapter's questions.
  *
  * SERVER-SIDE FIRST, CLIENT-SIDE ONLY AS A FALLBACK. `page`/`per_page` are sent
@@ -157,7 +175,7 @@ export async function fetchQuestionPage(
     signal
   );
 
-  const rows = ((raw.data as QuestionBankApiQuestion[]) ?? []).filter(Boolean);
+  const rows = dedupeById(((raw.data as QuestionBankApiQuestion[]) ?? []).filter(Boolean));
   const envelope = raw.pagination as PaginationEnvelope | undefined;
 
   if (envelope && typeof envelope.total === 'number') {
@@ -190,7 +208,7 @@ export async function fetchWholeChapter(
   signal?: AbortSignal
 ): Promise<QuestionBankApiQuestion[]> {
   const raw = await postBank({ chapter_id: chapterId }, signal);
-  return ((raw.data as QuestionBankApiQuestion[]) ?? []).filter(Boolean);
+  return dedupeById(((raw.data as QuestionBankApiQuestion[]) ?? []).filter(Boolean));
 }
 
 /**
