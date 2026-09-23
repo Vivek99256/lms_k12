@@ -82,6 +82,18 @@ export interface RuntimeSingleChoiceOption {
   is_correct: boolean;
   feedback: string | null;
   sort_order: number;
+  /**
+   * The `answer_master` row this option was derived from, when the caller's
+   * question carried one.
+   *
+   * `id` above is SYNTHETIC -- it has to be, because a derived activity has
+   * no row of its own and the player needs stable ids inside one attempt. So
+   * `id` identifies the option within this activity and nothing outside it,
+   * and a module recording an attempt against `answer_master` reads this
+   * instead. Null everywhere the question came from the bank endpoint, which
+   * does not return option ids.
+   */
+  source_option_id: number | null;
 }
 
 export interface RuntimeSingleChoiceQuestion {
@@ -568,6 +580,7 @@ export function mapQuestionToPlayerPayload(
                 is_correct: option.is_correct,
                 feedback: option.feedback,
                 sort_order: optionIndex,
+                source_option_id: option.source_option_id,
               })),
             })),
           },

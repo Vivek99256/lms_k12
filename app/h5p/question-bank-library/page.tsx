@@ -26,6 +26,7 @@ import { ChapterStats, TypeCard } from './components/chapter-stats';
 import { LibraryFiltersBar } from './components/library-filters';
 import { PreviewPanel, QuestionRows, type RowAction } from './components/question-rows';
 import { RuntimePlayer, runtimeLibraryName } from './components/runtime-player';
+import { QuizRunner } from './components/quiz-runner';
 import { AssignDialog } from './components/assign-dialog';
 import { debugEnabled, logFunnel } from './debug';
 
@@ -100,6 +101,7 @@ function QuestionBankLibrary() {
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [quiz, setQuiz] = useState<QuestionBankApiQuestion[] | null>(null);
   const [assigning, setAssigning] = useState<number[] | null>(null);
   const [flash, setFlash] = useState<Flash>(null);
 
@@ -425,6 +427,13 @@ function QuestionBankLibrary() {
               <span className="font-semibold">{selected.size} selected</span>
               <button
                 type="button"
+                onClick={() => setQuiz(rows.filter((question) => selected.has(Number(question.id))))}
+                className="rounded-lg bg-white px-2.5 py-1 font-semibold text-indigo-700 transition hover:bg-indigo-100"
+              >
+                Start quiz with these
+              </button>
+              <button
+                type="button"
                 onClick={() => setAssigning([...selected])}
                 className="rounded-lg bg-white px-2.5 py-1 font-semibold text-indigo-700 transition hover:bg-indigo-100"
               >
@@ -449,6 +458,7 @@ function QuestionBankLibrary() {
             onToggle={toggle}
             onToggleAll={toggleAll}
             onAction={onAction}
+            onStartQuiz={() => setQuiz(rows)}
             page={page}
             perPage={perPage}
             total={rowTotal}
@@ -464,6 +474,16 @@ function QuestionBankLibrary() {
           {/* Keyed by the question so switching questions remounts the player
               rather than feeding a new row into a half-finished attempt. */}
           <RuntimePlayer key={preview.question.id} question={preview.question} chapter={chapterQuestions} />
+        </PreviewPanel>
+      ) : null}
+
+      {quiz ? (
+        <PreviewPanel
+          title={`Quiz — ${quiz.length} question${quiz.length === 1 ? '' : 's'}`}
+          library="Sequential quiz"
+          onClose={() => setQuiz(null)}
+        >
+          <QuizRunner questions={quiz} chapter={chapterQuestions} onClose={() => setQuiz(null)} />
         </PreviewPanel>
       ) : null}
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Loader2, Play, Send, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, ListChecks, Loader2, Play, Send, X } from 'lucide-react';
 
 import { plainText } from '@/lib/h5p/true-false';
 import { mappingForQuestion } from '@/lib/h5p/question-bank-h5p-map';
@@ -35,6 +35,8 @@ export interface QuestionRowsProps {
   onToggle: (id: number) => void;
   onToggleAll: () => void;
   onAction: (action: RowAction, question: QuestionBankApiQuestion) => void;
+  /** Run every playable question on this page as one continuous quiz. Omit to hide the button. */
+  onStartQuiz?: () => void;
 
   page: number;
   perPage: number;
@@ -78,6 +80,22 @@ export function QuestionRows(props: QuestionRowsProps) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {props.onStartQuiz ? (
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/60 px-3 py-2.5">
+          <p className="text-xs text-slate-500">
+            Run this list as one quiz — one question at a time, with Next moving through all {questions.length}.
+          </p>
+          <button
+            type="button"
+            onClick={props.onStartQuiz}
+            disabled={questions.length === 0}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+          >
+            <ListChecks className="h-3.5 w-3.5" />
+            Start quiz
+          </button>
+        </div>
+      ) : null}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[860px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">

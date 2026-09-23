@@ -156,7 +156,20 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
   // would keep showing the first one.
   const set = preloaded?.item ?? fetchedSet;
 
-  const [attempt, setAttempt] = useState<Attempt | null>(null);
+  // Seeded straight from `preloaded`, not the derived `set` above, and only
+  // in the lazy initializer -- never from an effect. A caller that embeds
+  // this player hands the row over synchronously (it is built in memory, not
+  // fetched), so there is no async gap where `attempt` would need to catch up
+  // after the first render; an effect that called `setAttempt` here would
+  // just be a same-tick second render for no benefit. This is what skips this
+  // type's own intro card for an embedded caller that already drew its own
+  // "Question X of Y" chrome around it -- PAL, the question bank quiz, the
+  // library's live preview. The standalone `/h5p/h5p_single_choice_set/[id]`
+  // route (no `preloaded`) still starts on the intro, which is the one place
+  // a library preview of "N questions, pass mark X%" is the point.
+  const [attempt, setAttempt] = useState<Attempt | null>(() =>
+    preloaded?.embedded && preloaded.item ? newAttempt(preloaded.item) : null
+  );
   const [chosen, setChosen] = useState<number | null>(null);
   const [showSolution, setShowSolution] = useState(false);
 
@@ -245,6 +258,7 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
         correct: scored.passed,
         durationSeconds: (done.finishedAt - done.startedAt) / 1000,
         response: `${scored.score}/${scored.maxScore}`,
+        choiceIds: chosenSourceOptionIds(done),
       });
     },
     [set, ctx, preloaded]
@@ -398,8 +412,28 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
       const feedback = chosen !== null ? answerFeedback(entry.question, chosen) : null;
 
       return (
-        <div className="h5p-surface h5p-stage p-5 sm:p-8">
-          {set.show_progress ? (
+        // No `h5p-surface` (border, shadow, its own rounded card) when
+        // embedded -- PAL and the question bank quiz already draw ONE
+        // bordered container around the whole run; a bordered, shadowed box
+        // for every question inside it would nest a card inside a card,
+        // exactly the "small widget" look a full assessment layout is not
+        // supposed to have. The standalone route keeps it, where this IS the
+        // only surface on the page.
+        <div
+          className={`h5p-stage ${
+            preloaded?.embedded ? 'p-4 sm:p-5' : 'h5p-surface p-5 sm:p-8'
+          }`}
+        >
+          {/*
+            An embedded caller (PAL, the question bank quiz) already draws its
+            own overall "Question X of N" counter and progress bar around
+            every question in its run. This set's own counter is almost
+            always "Question 1 of 1" in that context, because a bank question
+            is built as a one-item set -- a second, smaller, contradicting
+            progress readout right next to the caller's real one. Shown only
+            for a genuine standalone multi-question set (not embedded).
+          */}
+          {!preloaded?.embedded && set.show_progress ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-medium tabular-nums text-[color:var(--h5p-ink-muted)]">
@@ -416,9 +450,17 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
             </>
           ) : null}
 
+          {/*
+            The `mt-5` above the question text is there to clear the progress
+            block above it -- with nothing rendered there (embedded), it would
+            just be dead space between the box's own top padding and the
+            question, which is exactly the "too much gap" this is fixing.
+          */}
           <Html
             html={entry.question.question_text}
-            className="mt-5 block text-lg font-semibold leading-snug text-[color:var(--h5p-ink)]"
+            className={`block text-lg font-semibold leading-snug text-[color:var(--h5p-ink)] ${
+              !preloaded?.embedded && set.show_progress ? 'mt-5' : ''
+            }`}
           />
 
           <div className="mt-5 space-y-2.5" role="group" aria-label="Answers">
@@ -491,9 +533,14 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
     );
   };
 
+  // The standalone content route reads best at a constrained, article-like
+  // width. An embedded caller (PAL, the question bank quiz) has already
+  // chosen its own width -- a full assessment layout, in PAL's case -- and
+  // capping this player to `max-w-2xl` inside it would put a small centred
+  // box back in the middle of a page that caller deliberately made wide.
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-2xl">
+    <div className={preloaded?.embedded ? '' : 'p-4 sm:p-6'}>
+      <div className={preloaded?.embedded ? '' : 'mx-auto max-w-2xl'}>
         {preloaded?.embedded ? null : (
         <H5pPageHeader
           title={set?.title || 'Single choice set'}
@@ -581,6 +628,35 @@ function Solution({ attempt }: { attempt: Attempt }) {
  * unwrapped `useSearchParams` opts the whole embedding route into client-side
  * rendering.
  */
+/**
+ * The `answer_master` rows this attempt actually chose, in paper order.
+ *
+ * WHY IT IS RESOLVED HERE AND NOT IN THE SCORER. `attempt.answers` holds the
+ * ACTIVITY's option ids, which are synthetic for a set derived from a question
+ * bank row -- they identify an option inside this attempt and mean nothing to
+ * any table. The row the learner picked is on the option object, so the answer
+ * has to be turned back into its option before the id is readable.
+ *
+ * Empty for an authored set, whose options carry no source row, and for any
+ * question the learner did not answer. A caller must treat an empty list as
+ * "no option id available" rather than "answered nothing" -- `answeredCount`
+ * in the score is what distinguishes those.
+ */
+function chosenSourceOptionIds(attempt: Attempt): number[] {
+  const ids: number[] = [];
+
+  for (const entry of attempt.paper) {
+    const given = attempt.answers[entry.index];
+    if (given === null || given === undefined) continue;
+
+    const chosen = entry.options.find((option) => option.id === given);
+    const sourceId = Number(chosen?.source_option_id ?? NaN);
+    if (Number.isFinite(sourceId) && sourceId > 0) ids.push(sourceId);
+  }
+
+  return ids;
+}
+
 export function SingleChoiceSetPlayer({ item, ctx, embedded, onResult }: PreloadedSingleChoiceSet) {
   // Memoised, because this object is the load effect's dependency. Passing a
   // fresh one each render re-ran that effect on every render, and its cleanup
