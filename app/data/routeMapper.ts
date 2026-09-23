@@ -160,6 +160,14 @@ const EXAM_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/question_paper': '/lms/exam',
   'student_homework': '/lms/exam',
   '/student_homework': '/lms/exam',
+  // Worksheet and Project are the exam hub's own screen (ExamOperationsScreen
+  // in app/lms/exam/page.tsx), mounted at their own route and pinned to one
+  // exam_type, rather than a `type` query param on the exam hub itself — that
+  // is what lets ModuleCategoryPage mount them inline instead of navigating.
+  'worksheet.index': '/lms/worksheet',
+  'lms/worksheet': '/lms/worksheet',
+  'project.index': '/lms/project',
+  'lms/project': '/lms/project',
 };
 
 /**
