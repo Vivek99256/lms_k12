@@ -215,7 +215,7 @@ function InteractiveVideoPlayerContent() {
   const isInfoCard = activeInteraction?.interaction_type === 'text_input';
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="flex-1 overflow-auto p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
         <H5pPageHeader
           title={video?.title || 'Interactive video'}

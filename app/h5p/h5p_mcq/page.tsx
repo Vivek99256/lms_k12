@@ -39,6 +39,7 @@ import {
   LoadingState,
   MissingContextNotice,
 } from '../components/shared';
+import { QuestionBankSource } from '../components/question-bank-source';
 
 /**
  * MCQ quiz — mirrors Laravel `GET /h5p/h5p_mcq`
@@ -115,7 +116,7 @@ function LevelPicker({
   onStart,
 }: {
   levels: McqLevel[];
-  startingLevelId: number | null;
+  startingLevelId: string | number | null;
   onStart: (level: McqLevel) => void;
 }) {
   if (levels.length === 0) {
@@ -606,7 +607,7 @@ function McqContent() {
 
   const [levels, setLevels] = useState<McqLevel[]>([]);
   const [levelsLoading, setLevelsLoading] = useState(true);
-  const [startingLevelId, setStartingLevelId] = useState<number | null>(null);
+  const [startingLevelId, setStartingLevelId] = useState<string | number | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<McqLevel | null>(null);
   const [questions, setQuestions] = useState<McqQuestion[]>([]);
   const [answersByQuestion, setAnswersByQuestion] = useState<Record<string, McqAnswer[]>>({});
@@ -615,6 +616,8 @@ function McqContent() {
   const [view, setView] = useState<McqView>('picker');
   const [error, setError] = useState('');
   const [identity, setIdentity] = useState<UserIdentity>({ name: '', schoolName: '', schoolLogo: '' });
+  /** The legacy level-keyed MCQ estate, or the question bank itself. */
+  const [source, setSource] = useState<'levels' | 'bank'>('levels');
 
   // Session identity lives in localStorage — read it after mount only.
   useEffect(() => {
@@ -754,7 +757,7 @@ function McqContent() {
   const quizIsEmpty = selectedLevel !== null && questions.length === 0;
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="flex-1 overflow-auto p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
         <H5pPageHeader
           title="Multiple choice questions"
@@ -773,7 +776,49 @@ function McqContent() {
           <>
             <InlineBanner kind="error" message={error} onDismiss={() => setError('')} />
 
+            {/*
+              The bank tab sits on the LEVEL PICKER only, not over a quiz in
+              progress: switching source mid-attempt would throw away answers a
+              learner has already given.
+
+              The two halves read different tables on purpose. "By level" is
+              the legacy MCQ estate keyed by difficulty; "From the question
+              bank" is `lms_question_master` itself, played one question at a
+              time as a single choice set. Neither is converted into the other.
+            */}
             {view === 'picker' ? (
+              <div
+                role="tablist"
+                aria-label="Question source"
+                className="mb-4 inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1"
+              >
+                {(
+                  [
+                    ['levels', 'By level'],
+                    ['bank', 'From the question bank'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={source === value}
+                    onClick={() => setSource(value)}
+                    className={
+                      source === value
+                        ? 'rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm'
+                        : 'rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-700'
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {view === 'picker' && source === 'bank' ? (
+              <QuestionBankSource kind="single_choice_set" ctx={ctx} noun="multiple choice question" />
+            ) : view === 'picker' ? (
               levelsLoading ? (
                 <LoadingState label="Loading MCQ levels…" />
               ) : (

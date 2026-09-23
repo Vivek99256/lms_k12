@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Clock, RotateCcw } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import {
   h5pContextQuery,
   hasH5pContext,
@@ -19,7 +19,16 @@ import {
   tilesMatch,
   type MemoryTile,
 } from '@/lib/h5p/memory-game';
-import { H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '../../components/shared';
+import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
+import { H5pPageHeader, InlineBanner, MissingContextNotice } from '../../components/shared';
+import {
+  PlayerSkeleton,
+  ProgressRail,
+  ResultScreen,
+  RetryAction,
+  StatRow,
+  deriveAchievements,
+} from '../../components/game';
 
 /**
  * Memory game — player.
@@ -50,25 +59,60 @@ function TileFace({ tile }: { tile: MemoryTile }) {
     return <img src={tile.image} alt="" className="h-full w-full rounded-lg object-cover" />;
   }
   return (
-    <span className="px-1.5 text-center text-xs font-medium leading-tight text-slate-800 sm:text-sm">
+    <span className="px-1.5 text-center text-xs font-medium leading-tight text-[color:var(--h5p-ink)] sm:text-sm">
       {tile.text || tile.alt}
     </span>
   );
 }
 
-function MemoryGamePlayerContent() {
+/**
+ * A row supplied by the caller instead of fetched by id.
+ *
+ * This is what makes the player embeddable. The route below still loads by id
+ * from the URL, but a caller that already HAS the row -- the question bank
+ * library, which builds one in memory from a bank question and never saves it
+ * -- hands it over directly and skips the fetch entirely. `embedded` drops the
+ * page header, because an embedding surface has its own.
+ *
+ * Nothing downstream of here knows the difference: the row shape is identical,
+ * so scoring, feedback, solutions and xAPI behave exactly as they do for a
+ * saved activity.
+ */
+export interface PreloadedMemoryGame {
+  item: H5pMemoryGame;
+  ctx: H5pContext;
+  embedded?: boolean;
+  /**
+   * Fired once, where this player already reports completion over xAPI.
+   *
+   * It is how a module other than the H5P library uses this player: PAL needs
+   * the score to advance its state machine and homework needs it to record an
+   * attempt. The player still persists nothing itself -- the caller decides.
+   */
+  onResult?: (result: PlayerQuestionResult) => void;
+}
+
+function MemoryGamePlayerContent({ preloaded }: { preloaded?: PreloadedMemoryGame }) {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
   const searchParams = useSearchParams();
-  const ctx: H5pContext = useMemo(
+  const routeCtx: H5pContext = useMemo(
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
+  const ctx = preloaded?.ctx ?? routeCtx;
   const contextQuery = h5pContextQuery(ctx);
 
-  const [game, setGame] = useState<H5pMemoryGame | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [fetchedGame, setFetchedGame] = useState<H5pMemoryGame | null>(null);
+  const [loading, setLoading] = useState(!preloaded);
   const [error, setError] = useState('');
+  /** Which preloaded board has had its clock started. */
+  const initialisedFor = useRef<number | null>(null);
+
+  // Derived rather than copied into state: a preloaded row can change between
+  // renders (the library previews a different question), and state seeded once
+  // would keep showing the first one.
+  const game = preloaded?.item ?? fetchedGame;
 
   const [seed, setSeed] = useState(() => newMemorySeed());
   const [turned, setTurned] = useState<Turned>({ first: null, second: null });
@@ -84,6 +128,23 @@ function MemoryGamePlayerContent() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // The caller supplied the row, so there is nothing to fetch -- but the
+    // attempt clock is started BELOW, inside the fetch callback. Leaving it at
+    // zero would measure every preview as having begun in 1970.
+    if (preloaded) {
+      if (initialisedFor.current !== preloaded.item.id) {
+        initialisedFor.current = preloaded.item.id;
+        queueMicrotask(() => {
+          const at = Date.now();
+          setStartedAt(at);
+          setNow(at);
+        });
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
     if (!hasH5pContext(ctx) || !id) {
       queueMicrotask(() => {
         if (!cancelled) setLoading(false);
@@ -97,7 +158,7 @@ function MemoryGamePlayerContent() {
       .get(id, ctx)
       .then((data) => {
         if (cancelled) return;
-        setGame(data);
+        setFetchedGame(data);
         // The attempt starts when the board does, not when the route was
         // entered -- a slow load must not count against the learner.
         const at = Date.now();
@@ -114,7 +175,7 @@ function MemoryGamePlayerContent() {
     return () => {
       cancelled = true;
     };
-  }, [ctx, id]);
+  }, [ctx, id, preloaded]);
 
   const board = useMemo(
     () =>
@@ -165,8 +226,17 @@ function MemoryGamePlayerContent() {
         response: `${scored.matchedPairs}/${scored.totalPairs} pairs in ${moveCount} moves`,
         durationSeconds: (at - startedAt) / 1000,
       });
+
+      preloaded?.onResult?.({
+        questionId: Number(game.id),
+        score: scored.score,
+        maxScore: scored.maxScore,
+        correct: scored.passed,
+        durationSeconds: (at - startedAt) / 1000,
+        response: `${scored.matchedPairs}/${scored.totalPairs} pairs in ${moveCount} moves`,
+      });
     },
-    [game, totalPairs, startedAt, ctx]
+    [game, totalPairs, startedAt, ctx, preloaded]
   );
 
   // One interval drives both the displayed clock and the time limit, for
@@ -266,20 +336,29 @@ function MemoryGamePlayerContent() {
       <>
         {game.task_description ? <p className="mb-4 text-sm text-slate-600">{game.task_description}</p> : null}
 
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-          <span className="tabular-nums">
-            {matched.size} of {totalPairs} pairs · {moves} {moves === 1 ? 'turn' : 'turns'}
-          </span>
-          {game.track_time || limit > 0 ? (
-            <span
-              className={`inline-flex items-center gap-1.5 tabular-nums ${
-                remaining !== null && remaining <= 10 ? 'font-semibold text-red-600' : ''
-              }`}
-            >
-              <Clock className="h-3.5 w-3.5" />
-              {remaining !== null ? formatClock(remaining) : formatClock(elapsed)}
-            </span>
-          ) : null}
+        {/* The scoreboard. Sticky, because on a phone the board is taller than
+            the viewport and a pairs count that scrolls away is a pairs count
+            nobody reads. */}
+        <div className="h5p-surface sticky top-2 z-10 mb-4 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <StatRow
+              items={[
+                { icon: 'target', label: 'Pairs', value: `${matched.size} / ${totalPairs}` },
+                { icon: 'zap', label: 'Turns', value: moves },
+              ]}
+            />
+            {game.track_time || limit > 0 ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-semibold tabular-nums text-[color:var(--h5p-ink-muted)]"
+                style={remaining !== null && remaining <= 10 ? { color: 'var(--h5p-danger)' } : undefined}
+              >
+                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                {remaining !== null ? formatClock(remaining) : formatClock(elapsed)}
+              </span>
+            ) : null}
+          </div>
+
+          <ProgressRail value={matched.size} max={totalPairs} label="Pairs matched" className="mt-2.5" />
         </div>
 
         <div
@@ -300,24 +379,35 @@ function MemoryGamePlayerContent() {
                 onClick={() => flip(tile)}
                 aria-pressed={faceUp}
                 aria-label={faceUp ? tile.alt : `Card ${index + 1}, face down`}
-                className={`flex aspect-square items-center justify-center overflow-hidden rounded-xl border-2 transition ${
+                className={`h5p-flip h5p-focusable h5p-target relative aspect-square rounded-xl ${
                   game.use_grid ? 'w-full' : 'h-20 w-20 sm:h-24 sm:w-24'
-                } ${
-                  isMatched
-                    ? 'border-emerald-300 bg-emerald-50 opacity-70'
-                    : faceUp
-                      ? 'border-indigo-300 bg-white'
-                      : 'border-transparent hover:opacity-90'
-                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2`}
-                style={
-                  faceUp
-                    ? undefined
-                    : game.card_back_image
-                      ? { backgroundImage: `url(${game.card_back_image})`, backgroundSize: 'cover' }
-                      : { backgroundColor: game.theme_color || '#4f46e5' }
-                }
+                } ${faceUp ? 'is-flipped' : ''} ${isMatched ? 'h5p-halo' : ''}`}
               >
-                {faceUp ? <TileFace tile={tile} /> : null}
+                {/* A real two-faced card rather than a swap of contents: the
+                    back stays mounted behind the front, so the turn is one
+                    rotation instead of a flicker, and the tile's accessible
+                    name (on the button) is unaffected by either face. */}
+                <span className="h5p-flip__inner rounded-[inherit]">
+                  <span
+                    className="h5p-flip__face border-2 border-transparent"
+                    aria-hidden="true"
+                    style={
+                      game.card_back_image
+                        ? { backgroundImage: `url(${game.card_back_image})`, backgroundSize: 'cover' }
+                        : { backgroundColor: game.theme_color || 'var(--h5p-accent)' }
+                    }
+                  />
+                  <span
+                    className="h5p-flip__face h5p-flip__face--back border-2"
+                    style={
+                      isMatched
+                        ? { borderColor: 'var(--h5p-success-line)', background: 'var(--h5p-success-soft)' }
+                        : { borderColor: 'var(--h5p-accent-line)', background: 'var(--h5p-surface)' }
+                    }
+                  >
+                    <TileFace tile={tile} />
+                  </span>
+                </span>
               </button>
             );
           })}
@@ -330,36 +420,40 @@ function MemoryGamePlayerContent() {
         </p>
 
         {finished && game.show_completion_screen ? (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              {result.completed ? 'Board cleared' : 'Time'}
-            </p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums text-slate-900">
-              {result.score}
-              <span className="text-xl text-slate-400"> / {result.maxScore}</span>
-            </p>
-            <p className="mt-1 text-sm text-slate-600">
-              {result.matchedPairs} of {result.totalPairs} pairs in {result.moves}{' '}
-              {result.moves === 1 ? 'turn' : 'turns'}
-              {game.scoring_mode === 'moves' ? ` · a perfect run is ${result.perfectMoves}` : ''}
-              {game.track_time ? ` · ${formatClock(elapsed)}` : ''}
-            </p>
-
-            {(() => {
-              const message = memoryFeedback(result.percentage, game.feedback_bands) || game.completion_message;
-              return message ? <p className="mt-3 text-sm text-slate-700">{message}</p> : null;
-            })()}
-
-            {game.allow_retry ? (
-              <button
-                type="button"
-                onClick={reset}
-                className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Play again
-              </button>
-            ) : null}
+          <div className="mt-6">
+            <ResultScreen
+              headline={result.completed ? 'Board cleared' : 'Time'}
+              score={result.score}
+              maxScore={result.maxScore}
+              percentage={result.percentage}
+              passed={result.passed}
+              passLabel={`Pass mark is ${game.pass_percentage}%`}
+              summary={
+                <>
+                  {result.matchedPairs} of {result.totalPairs} pairs in {result.moves}{' '}
+                  {result.moves === 1 ? 'turn' : 'turns'}
+                </>
+              }
+              facts={[
+                ...(game.scoring_mode === 'moves'
+                  ? [{ icon: 'target' as const, label: 'Perfect run', value: `${result.perfectMoves} turns` }]
+                  : []),
+                ...(game.track_time
+                  ? [{ icon: 'timer' as const, label: 'Time', value: formatClock(elapsed) }]
+                  : []),
+              ]}
+              achievements={deriveAchievements({
+                // A board cleared in the theoretical minimum number of turns is
+                // this type's perfect paper — every turn a match — so that, and
+                // not a full score, is what earns the flawless badge here. A
+                // pairs-mode board scores 100% however many turns it took.
+                percentage:
+                  result.completed && result.moves <= result.perfectMoves ? 100 : Math.min(99, result.percentage),
+                passed: result.passed,
+              })}
+              message={memoryFeedback(result.percentage, game.feedback_bands) || game.completion_message}
+              actions={game.allow_retry ? <RetryAction onClick={reset} label="Play again" /> : null}
+            />
           </div>
         ) : null}
       </>
@@ -368,18 +462,20 @@ function MemoryGamePlayerContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto">
+        {preloaded?.embedded ? null : (
         <H5pPageHeader
           title={game?.title || 'Memory game'}
           description={game?.description || undefined}
           ctx={ctx}
           backHref={`/h5p/h5p_memory_game?${contextQuery}`}
         />
+        )}
 
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />
         ) : loading ? (
-          <LoadingState label="Loading game…" />
+          <PlayerSkeleton lines={3} label="Loading game" />
         ) : error ? (
           <InlineBanner kind="error" message={error} />
         ) : (
@@ -390,9 +486,33 @@ function MemoryGamePlayerContent() {
   );
 }
 
+/**
+ * The player as a component, for a caller that already holds the row.
+ *
+ * The Suspense boundary stays, because the body still calls `useSearchParams`
+ * even when it does not read it -- hooks cannot be conditional, and an
+ * unwrapped `useSearchParams` opts the whole embedding route into client-side
+ * rendering.
+ */
+export function MemoryGamePlayer({ item, ctx, embedded, onResult }: PreloadedMemoryGame) {
+  // Memoised, because this object is the load effect's dependency. Passing a
+  // fresh one each render re-ran that effect on every render, and its cleanup
+  // then cancelled the setup the previous run had just scheduled.
+  const preloaded = useMemo(
+    () => ({ item, ctx, embedded, onResult }),
+    [item, ctx, embedded, onResult]
+  );
+
+  return (
+    <Suspense fallback={<PlayerSkeleton lines={3} label="Loading activity" />}>
+      <MemoryGamePlayerContent preloaded={preloaded} />
+    </Suspense>
+  );
+}
+
 export default function MemoryGamePlayerPage() {
   return (
-    <Suspense fallback={<LoadingState label="Loading game…" />}>
+    <Suspense fallback={<PlayerSkeleton lines={3} label="Loading game" />}>
       <MemoryGamePlayerContent />
     </Suspense>
   );

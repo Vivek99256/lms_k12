@@ -31,7 +31,6 @@ import {
   type FeesSession,
   type SelectOption,
 } from '@/app/fees/_lib/fees-api';
-import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -377,21 +376,7 @@ export default function OtherFeesCollectPage() {
                 <Button type="button" variant="outline" onClick={applyBulkAmount}>Apply</Button>
               </div>
             </Field>
-            <Field
-              label="Remarks"
-              assist={
-                <AiFieldAssistant
-                  value={remarks}
-                  onApply={setRemarks}
-                  fieldType="notes"
-                  label="Remarks"
-                  module="fees"
-                  page="Other fees collect"
-                  entityType="fees_other_receipt"
-                  related={{ 'Fee head': selectedTitleName || selectedTitle?.label || '', 'Payment mode': paymentMode }}
-                />
-              }
-            >
+            <Field label="Remarks">
               <Textarea value={remarks} onChange={(event) => setRemarks(event.target.value)} placeholder="Remarks if any" className="min-h-10" />
             </Field>
           </div>

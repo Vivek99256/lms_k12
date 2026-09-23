@@ -26,6 +26,7 @@ import { useBrainResource } from './_components/useBrainResource';
 import { Card, ErrorState, LoadingState } from './_components/primitives';
 import { Delta, EvidenceStrip, HealthDial, IntelligenceCard } from './_components/IntelligenceCard';
 import type { BrainClassIntelligence, BrainExecutivePayload } from '@/lib/brain/api';
+import { INTELLIGENCE_MODULES, intelligenceHrefFor } from '@/components/intelligence/module/registry';
 
 /* ------------------------------------------------------------------ header context */
 
@@ -727,9 +728,91 @@ export default function BrainOverviewPage() {
       {/* ---------------------------------------------------- Priority Actions */}
       <PriorityActions actions={actions} recommendedFocus={intelligence.recommendedFocus} />
 
+      {/* ---------------------------------------------------- Available Module Intelligence */}
+      <ModuleIntelligenceDiscovery />
+
       {/* ---------------------------------------------------- Intelligence Tools */}
       <IntelligenceTools ingestion={ingestion} graph={graph} evidence={evidence} />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ module intelligence discovery */
+
+function ModuleIntelligenceDiscovery() {
+  return (
+    <section className="mb-8" id="module-intelligence">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight text-slate-800">Available Module Intelligence</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Real data-backed intelligence modules running directly on this institute’s live ERP records.
+          </p>
+        </div>
+        <span className="text-xs font-semibold text-slate-600">
+          {INTELLIGENCE_MODULES.filter((m) => m.status === 'live' || m.status === 'partial').length} Active Modules
+        </span>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {INTELLIGENCE_MODULES.map((module) => {
+          // Through the registry, never reconstructed here. Career Intelligence
+          // IS its own route, so `${route}/intelligence` would send this card to
+          // a 404 — the same drift that lost Fees from the nav.
+          const href = intelligenceHrefFor(module);
+          const isLive = module.status === 'live';
+          const isPartial = module.status === 'partial';
+          const isRouted = module.status !== 'planned';
+
+          return (
+            <Card key={module.key} className="flex flex-col justify-between p-4 transition-all hover:border-indigo-200 hover:shadow-sm">
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-[13.5px] font-bold text-slate-900">{module.label}</h3>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider ${
+                      isLive
+                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                        : isPartial
+                        ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        isLive ? 'bg-emerald-500' : isPartial ? 'bg-amber-500' : 'bg-slate-400'
+                      }`}
+                    />
+                    {module.status}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs leading-5 text-slate-600">
+                  {module.note ?? 'Data-backed operational and risk analysis for this module.'}
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                {/* A `planned` module has no screen. Linking to one would be the
+                    same claim the status field exists to avoid making. */}
+                <span className="text-[11px] font-mono text-slate-400">{isRouted ? href : 'Not routed yet'}</span>
+                {isRouted ? (
+                  <Link
+                    href={href}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                  >
+                    Open Module
+                    <ArrowRight size={12} />
+                  </Link>
+                ) : (
+                  <span className="text-xs font-semibold text-slate-400">No screen yet</span>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

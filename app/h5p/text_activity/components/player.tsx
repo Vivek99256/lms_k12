@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Eye, RotateCcw } from 'lucide-react';
+import { Check, Eye } from 'lucide-react';
+import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
 import {
   TEXT_ACTIVITY_LABELS,
   feedbackFor,
@@ -16,6 +17,14 @@ import {
   type TextActivityType,
   type TextAttemptResult,
 } from '../../data/h5p';
+import {
+  Celebration,
+  PrimaryAction,
+  ProgressRail,
+  RetryAction,
+  ScoreCounter,
+  SecondaryAction,
+} from '../../components/game';
 
 /**
  * The learner-facing player for all three text-passage types.
@@ -46,10 +55,13 @@ export function TextActivityPlayer({
   type,
   activity,
   ctx,
+  onResult,
 }: {
   type: TextActivityType;
   activity: H5pTextActivity;
   ctx: H5pContext;
+  /** Fired on Check, where this player already reports completion. */
+  onResult?: (result: PlayerQuestionResult) => void;
 }) {
   const tokens = useMemo(
     () => (type === 'mark_the_words' ? markableTokens(activity.passage) : []),
@@ -113,7 +125,19 @@ export function TextActivityPlayer({
       success: result.passed,
       durationSeconds: seconds,
     });
-  }, [ctx, objectId, result.passed, result.score]);
+
+    // The caller's hook, fired where this player already reports completion.
+    // It is what lets PAL or homework use this player without the H5P library
+    // around it; nothing is persisted here either way.
+    onResult?.({
+      questionId: Number(activity.id),
+      score: result.score,
+      maxScore: result.maxScore,
+      correct: result.scoreable ? result.passed : null,
+      durationSeconds: seconds,
+      response: String(result.score),
+    });
+  }, [ctx, objectId, result, onResult, activity.id]);
 
   const retry = useCallback(() => {
     setResponses({});
@@ -211,61 +235,74 @@ export function TextActivityPlayer({
       </article>
 
       {checked ? (
-        <div
-          className={`rounded-2xl border p-4 ${
-            result.passed
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : 'border-slate-200 bg-slate-50 text-slate-700'
-          }`}
-        >
-          <p className="text-sm font-semibold">
-            You scored {result.score} out of {result.maxScore} ({result.percentage}%)
-          </p>
-          {message ? <p className="mt-1 text-xs">{message}</p> : null}
-          {type === 'mark_the_words' && result.incorrect > 0 ? (
-            <p className="mt-1.5 text-[11px]">
-              {result.incorrect} {result.incorrect === 1 ? 'word was' : 'words were'} marked that should
-              not have been. Wrong marks count against the score.
-            </p>
-          ) : null}
+        <div className="h5p-surface h5p-enter relative overflow-visible p-5">
+          {/* The celebration fires on a pass and nowhere else in this type —
+              a passage marked wrong should not be met with confetti. */}
+          <Celebration show={result.passed} pieces={14} />
+
+          <div className="relative flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="sr-only" aria-live="polite">
+                {`You scored ${result.score} out of ${result.maxScore}, ${result.percentage} percent.`}
+              </p>
+              <p aria-hidden="true">
+                <ScoreCounter value={result.score} max={result.maxScore} size="md" />
+              </p>
+              <p className="mt-0.5 text-xs text-[color:var(--h5p-ink-muted)]">{result.percentage}% of this passage</p>
+            </div>
+
+            <span
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+              style={
+                result.passed
+                  ? { background: 'var(--h5p-success-soft)', color: 'color-mix(in srgb, var(--h5p-success) 80%, #000)' }
+                  : { background: 'var(--h5p-reward-soft)', color: 'color-mix(in srgb, var(--h5p-warning) 84%, #000)' }
+              }
+            >
+              {result.passed ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+              {result.passed ? 'Passed' : 'Not passed yet'}
+            </span>
+          </div>
+
+          <div className="relative">
+            <ProgressRail
+              value={result.score}
+              max={result.maxScore}
+              label="Your score on this passage"
+              className="mt-3"
+            />
+
+            {message ? (
+              <p className="mt-3 text-sm text-[color:var(--h5p-ink-muted)]">{message}</p>
+            ) : null}
+            {type === 'mark_the_words' && result.incorrect > 0 ? (
+              <p className="mt-1.5 text-[11px] text-[color:var(--h5p-ink-faint)]">
+                {result.incorrect} {result.incorrect === 1 ? 'word was' : 'words were'} marked that should not
+                have been. Wrong marks count against the score.
+              </p>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         {activity.enable_check && !checked ? (
-          <button
-            type="button"
-            onClick={check}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#4f46e5] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-[#4338ca]"
-          >
-            <Check className="h-4 w-4" />
+          <PrimaryAction onClick={check} icon={<Check className="h-4 w-4" aria-hidden="true" />}>
             Check
-          </button>
+          </PrimaryAction>
         ) : null}
 
         {checked && activity.enable_retry ? (
-          <button
-            type="button"
-            onClick={retry}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Retry
-          </button>
+          <RetryAction onClick={retry} label="Retry" />
         ) : null}
 
         {checked && activity.enable_show_solution && !revealed ? (
-          <button
-            type="button"
-            onClick={() => setRevealed(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
-          >
-            <Eye className="h-4 w-4" />
+          <SecondaryAction onClick={() => setRevealed(true)} icon={<Eye className="h-4 w-4" aria-hidden="true" />}>
             Show solution
-          </button>
+          </SecondaryAction>
         ) : null}
 
-        <span className="ml-auto text-[11px] text-slate-400">
+        <span className="ml-auto text-[11px] text-[color:var(--h5p-ink-faint)]">
           {TEXT_ACTIVITY_LABELS[type]} · {result.maxScore} {result.maxScore === 1 ? 'point' : 'points'}
         </span>
       </div>
@@ -397,7 +434,6 @@ function DragTextPassage({
             <span key={index}>{segment.text}</span>
           ) : (
             <button
-              key={index}
               type="button"
               disabled={locked && !responses[segment.slot.index]}
               onClick={() => {
@@ -418,7 +454,14 @@ function DragTextPassage({
                   ? `Blank ${segment.slot.index + 1}, holding ${responses[segment.slot.index]}. Select to remove.`
                   : `Blank ${segment.slot.index + 1}, empty.${held ? ` Select to place ${held}.` : ''}`
               }
-              className={`mx-0.5 inline-flex min-w-[88px] items-center justify-center rounded-lg border-2 border-dashed px-2 py-1 align-middle text-sm transition ${
+              // A blank that has just been filled pops; a blank that is
+              // waiting for the word the learner is holding lights up. Both
+              // are `key`ed on their contents below so the animation replays
+              // per placement rather than on every re-render.
+              key={`${index}-${responses[segment.slot.index] ?? ''}`}
+              className={`h5p-focusable h5p-target mx-0.5 inline-flex min-w-[88px] items-center justify-center rounded-lg border-2 border-dashed px-2 py-1 align-middle text-sm transition ${
+                responses[segment.slot.index] ? 'h5p-enter-scale' : ''
+              } ${
                 showMarks
                   ? perBlank[segment.slot.index]
                     ? 'border-emerald-400 bg-emerald-50 font-medium text-emerald-800'
@@ -426,7 +469,7 @@ function DragTextPassage({
                   : responses[segment.slot.index]
                     ? 'border-indigo-300 bg-indigo-50 font-medium text-indigo-800'
                     : held
-                      ? 'border-[#4f46e5] bg-indigo-50/50 text-slate-400'
+                      ? 'border-[color:var(--h5p-accent)] bg-[color:var(--h5p-accent-soft)] text-slate-400 ring-2 ring-[color:var(--h5p-accent-line)]'
                       : 'border-slate-300 bg-slate-50 text-slate-400'
               }`}
             >
@@ -459,12 +502,17 @@ function DragTextPassage({
                   onClick={() => setHeld(held === word ? null : word)}
                   disabled={spent}
                   aria-pressed={held === word}
-                  className={`rounded-lg border px-2.5 py-1.5 text-sm font-medium transition ${
+                  style={
+                    held === word
+                      ? { borderColor: 'var(--h5p-accent)', background: 'var(--h5p-accent)', color: '#fff' }
+                      : undefined
+                  }
+                  className={`h5p-tappable h5p-focusable h5p-target rounded-lg border px-3 py-2 text-sm font-medium ${
                     spent
                       ? 'cursor-default border-slate-200 bg-slate-100 text-slate-300 line-through'
                       : held === word
-                        ? 'border-[#4f46e5] bg-[#4f46e5] text-white'
-                        : 'cursor-grab border-slate-300 bg-white text-slate-700 hover:border-[#4f46e5] hover:text-[#4f46e5]'
+                        ? ''
+                        : 'cursor-grab border-slate-300 bg-white text-slate-700 hover:border-[color:var(--h5p-accent)] hover:text-[color:var(--h5p-accent)]'
                   }`}
                 >
                   {word}

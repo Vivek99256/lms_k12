@@ -241,7 +241,12 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
             >
               {items.map((item, idx) => {
                 const navigateRoute = getNavigationRoute(item);
-                const isActive = navigateRoute ? pathname === navigateRoute.toLowerCase() : false;
+                const normPath = pathname.replace(/\/+$/, '');
+                const normNav = (navigateRoute || '').toLowerCase().replace(/\/+$/, '');
+                const isIntelTab = (item.label || '').trim().toLowerCase() === 'intelligence';
+                const isActive = normNav
+                  ? normPath === normNav || (isIntelTab && normPath.endsWith('/intelligence'))
+                  : false;
 
                 const handleClick = () => {
                   if (navigateRoute) {
@@ -440,3 +445,4 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
     </div>
   );
 }
+

@@ -194,19 +194,6 @@ export default function FeesDefaulterReportPage() {
             onExportExcel={() => exportRowsAsExcel({ filename: 'fees-defaulter-report.xls', title: 'Fees Defaulter Report', columns: exportColumns, rows: exportRows })}
             onExportPdf={() => exportRowsAsPdf({ filename: 'fees-defaulter-report.pdf', title: 'Fees Defaulter Report', subtitle: 'Legacy parity export', columns: exportColumns, rows: exportRows })}
             onPrint={() => openPrintPreview({ title: 'Fees Defaulter Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })}
-            // Records each export in the Fees AI Stack ledger, against the published
-            // Fees defaulter layout. The export itself is unchanged.
-            activity={{
-              operation: 'defaulter_report',
-              label: 'Fees Defaulter Report',
-              rowCount: rows.length,
-              filters: {
-                section: academicFilters.section || null,
-                standard: academicFilters.standard || null,
-                division: academicFilters.division || null,
-                enrollment_no: enrollmentNo || null,
-              },
-            }}
           />
         }
       />

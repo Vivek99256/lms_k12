@@ -6,20 +6,10 @@ import { useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
   Brain,
-  Calculator,
-  CircleCheck,
-  Copy,
-  Crosshair,
-  Presentation,
   HelpCircle,
-  Highlighter,
   Image as ImageIcon,
   Layers3,
-  ListChecks,
-  MousePointerClick,
-  Move,
   Sparkles,
-  TextCursorInput,
   Video,
 } from 'lucide-react';
 import { H5P_ROUTE_MAP, h5pContextQuery, hasH5pContext, readH5pContext } from '../data/h5p';
@@ -44,25 +34,6 @@ const TYPE_ICONS: Record<string, typeof ImageIcon> = {
   interactive_video: Video,
   multiple_choice: HelpCircle,
   flash_cards: Layers3,
-  drag_and_drop: MousePointerClick,
-  drag_text: Move,
-  fill_in_the_blanks: TextCursorInput,
-  mark_the_words: Highlighter,
-
-  // 2026-09-21 vertical. `image_hotspot` above is the older Scenario type;
-  // `image_hotspots` is H5P.ImageHotspots, and they get different glyphs so
-  // the two cards are not mistaken for one another.
-  image_hotspots: Crosshair,
-  memory_game: Copy,
-  course_presentation: Presentation,
-  arithmetic_quiz: Calculator,
-
-  // 2026-09-21, second vertical. `multiple_choice` above is the question
-  // bank's MCQ slice and keeps its own glyph: a set of single-choice
-  // questions and a bank of multiple-choice ones are different cards and
-  // must not look like the same one.
-  single_choice_set: ListChecks,
-  true_false: CircleCheck,
 };
 
 /** Registry route name (`scenario_based.index`) → this app's route. */
@@ -96,10 +67,7 @@ function ModuleCard({ module, contextQuery }: { module: H5pHubModule; contextQue
         </div>
       </div>
 
-      {module.category ? (
-        <p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{module.category}</p>
-      ) : null}
-      <h2 className={`${module.category ? 'mt-1' : 'mt-4'} text-base font-semibold text-slate-900`}>{module.title}</h2>
+      <h2 className="mt-4 text-base font-semibold text-slate-900">{module.title}</h2>
       <p className="mt-1 text-sm text-slate-500">{module.description}</p>
 
       {module.available ? null : (
@@ -191,7 +159,7 @@ function H5pHubContent() {
   const totalNodes = modules.reduce((sum, module) => sum + module.nodeCount, 0);
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="flex-1 overflow-auto p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
         <H5pPageHeader
           title="H5P content"
@@ -231,6 +199,12 @@ function H5pHubContent() {
                 <ModuleCard key={module.h5pType} module={module} contextQuery={contextQuery} />
               ))}
             </div>
+
+            {/* There is no "generate from the question bank" entry any more.
+                Generation was the step this module removed: a question is
+                rendered straight from `lms_question_master` by the shared
+                players in `components/h5p/players`, so there is nothing to
+                generate and nothing to link to. */}
 
             {hasH5pContext(ctx) ? (
               <Link

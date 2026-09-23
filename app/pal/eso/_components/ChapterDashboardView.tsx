@@ -342,7 +342,7 @@ function ChapterSectionsList({
   const router = useRouter();
 
   if (sections.length === 0) {
-    return <EmptyState message="No sections are ready for the concept diagnostic in this chapter yet." />;
+    return <EmptyState message="No sections are ready for adaptive learning in this chapter yet." />;
   }
 
   return (

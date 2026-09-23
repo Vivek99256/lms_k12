@@ -2,7 +2,7 @@
 
 import { BellRing } from 'lucide-react';
 
-import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
+import type { FeesStaticScreen } from '@/app/fees/_components/fees-category-page';
 import { FeesNotificationSettings } from '@/app/fees/communication/_components/FeesNotificationSettings';
 
 /**
@@ -13,7 +13,7 @@ import { FeesNotificationSettings } from '@/app/fees/communication/_components/F
  * screen (which lives under Operations and stays there) or to the institute's
  * SMS/email settings. Each tab renders the shared placeholder.
  */
-export const FEES_COMMUNICATION_SCREENS: ModuleStaticScreen[] = [
+export const FEES_COMMUNICATION_SCREENS: FeesStaticScreen[] = [
   {
     id: 'notification-settings',
     label: 'Notification Settings',

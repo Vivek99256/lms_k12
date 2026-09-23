@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import DOMPurify from 'isomorphic-dompurify';
-import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   h5pContextQuery,
   hasH5pContext,
@@ -26,7 +26,16 @@ import {
   type ScorableSlideElement,
   type SlideResponse,
 } from '@/lib/h5p/course-presentation-scoring';
+import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
 import { H5pPageHeader, InlineBanner, LoadingState, MissingContextNotice } from '../../components/shared';
+import {
+  PrimaryAction,
+  ProgressRail,
+  ResultScreen,
+  RetryAction,
+  SecondaryAction,
+  deriveAchievements,
+} from '../../components/game';
 import { Input } from '@/components/ui/input';
 import { parsePassage, segmentPassage } from '@/lib/h5p/text-activity-markup';
 
@@ -69,21 +78,57 @@ function toScorable(element: H5pSlideElement): ScorableSlideElement {
   };
 }
 
-function CoursePresentationPlayerContent() {
+/**
+ * A row supplied by the caller instead of fetched by id.
+ *
+ * This is what makes the player embeddable. The route below still loads by id
+ * from the URL, but a caller that already HAS the row -- the question bank
+ * library, which builds one in memory from a bank question and never saves it
+ * -- hands it over directly and skips the fetch entirely. `embedded` drops the
+ * page header, because an embedding surface has its own.
+ *
+ * Nothing downstream of here knows the difference: the row shape is identical,
+ * so scoring, feedback, solutions and xAPI behave exactly as they do for a
+ * saved activity.
+ */
+export interface PreloadedCoursePresentation {
+  item: H5pCoursePresentation;
+  ctx: H5pContext;
+  embedded?: boolean;
+  /**
+   * Fired once, where this player already reports completion over xAPI.
+   *
+   * It is how a module other than the H5P library uses this player: PAL needs
+   * the score to advance its state machine and homework needs it to record an
+   * attempt. The player still persists nothing itself -- the caller decides.
+   */
+  onResult?: (result: PlayerQuestionResult) => void;
+}
+
+function CoursePresentationPlayerContent({ preloaded }: { preloaded?: PreloadedCoursePresentation }) {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
   const searchParams = useSearchParams();
-  const ctx: H5pContext = useMemo(
+  const routeCtx: H5pContext = useMemo(
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
+  const ctx = preloaded?.ctx ?? routeCtx;
   const contextQuery = h5pContextQuery(ctx);
 
-  const [deck, setDeck] = useState<H5pCoursePresentation | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [fetchedDeck, setFetchedDeck] = useState<H5pCoursePresentation | null>(null);
+  const [loading, setLoading] = useState(!preloaded);
   const [error, setError] = useState('');
 
+  // Derived rather than copied into state: a preloaded row can change between
+  // renders (the library previews a different question), and state seeded once
+  // would keep showing the first one.
+  const deck = preloaded?.item ?? fetchedDeck;
+
   const [slideId, setSlideId] = useState<number | null>(null);
+  /** Which preloaded deck has had its opening slide set, so a re-render does
+   *  not send the learner back to slide one. */
+  const initialisedFor = useRef<number | null>(null);
   const [visited, setVisited] = useState<Set<number>>(new Set());
   const [responses, setResponses] = useState<Record<number, SlideResponse>>({});
   const [checked, setChecked] = useState<Set<number>>(new Set());
@@ -94,6 +139,27 @@ function CoursePresentationPlayerContent() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // The caller supplied the row, so there is nothing to fetch -- but the
+    // opening slide, the visited set and the clock are set BELOW, inside the
+    // fetch callback, and skipping it left `slideId` null and the stage
+    // rendering nothing at all. The same setup, once per deck.
+    if (preloaded) {
+      if (initialisedFor.current !== preloaded.item.id) {
+        initialisedFor.current = preloaded.item.id;
+        queueMicrotask(() => {
+          startedAt.current = Date.now();
+          const first = (preloaded.item.slides ?? [])[0];
+          if (first) {
+            setSlideId(first.id);
+            setVisited(new Set([first.id]));
+          }
+        });
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
     if (!hasH5pContext(ctx) || !id) {
       queueMicrotask(() => {
         if (!cancelled) setLoading(false);
@@ -107,7 +173,7 @@ function CoursePresentationPlayerContent() {
       .get(id, ctx)
       .then((data) => {
         if (cancelled) return;
-        setDeck(data);
+        setFetchedDeck(data);
         startedAt.current = Date.now();
         const first = (data.slides ?? [])[0];
         if (first) {
@@ -125,7 +191,7 @@ function CoursePresentationPlayerContent() {
     return () => {
       cancelled = true;
     };
-  }, [ctx, id]);
+  }, [ctx, id, preloaded]);
 
   // Memoised rather than derived inline: `deck?.slides ?? []` produces a new
   // array identity on every render when a deck has no slides, which would make
@@ -167,7 +233,16 @@ function CoursePresentationPlayerContent() {
       response: `${result.score}/${result.maxScore}`,
       durationSeconds: (Date.now() - startedAt.current) / 1000,
     });
-  }, [deck, result, ctx]);
+
+    preloaded?.onResult?.({
+      questionId: Number(deck.id),
+      score: result.score,
+      maxScore: result.maxScore,
+      correct: result.maxScore > 0 ? result.passed : null,
+      durationSeconds: (Date.now() - startedAt.current) / 1000,
+      response: `${result.score}/${result.maxScore}`,
+    });
+  }, [deck, result, ctx, preloaded]);
 
   const restart = () => {
     setResponses({});
@@ -477,47 +552,47 @@ function CoursePresentationPlayerContent() {
 
     if (showSummary) {
       const message = presentationFeedback(result.percentage, deck.feedback_bands);
-      return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Summary</p>
-          {result.maxScore > 0 ? (
-            <>
-              <p className="mt-2 text-4xl font-semibold tabular-nums text-slate-900">
-                {result.score}
-                <span className="text-2xl text-slate-400"> / {result.maxScore}</span>
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                {result.answeredCount} of {result.scoredElementCount} questions answered
-              </p>
-              <span
-                className={`mt-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                  result.passed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                }`}
-              >
-                {result.passed ? 'Passed' : `Pass mark is ${deck.pass_percentage}%`}
-              </span>
-            </>
-          ) : (
-            // A lecture deck has no marks, and a big "0 / 0" would read as a
-            // failure rather than as "there was nothing to answer".
-            <p className="mt-2 text-sm text-slate-600">
+      // A lecture deck has no marks. The scored result screen would show it a
+      // big "0 / 0", which reads as a failure rather than as "there was
+      // nothing to answer", so the two cases get different screens.
+      if (result.maxScore === 0) {
+        return (
+          <div className="h5p-surface h5p-stage p-6 text-center sm:p-8">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[color:var(--h5p-ink-faint)]">
+              Summary
+            </p>
+            <p className="mt-3 text-sm text-[color:var(--h5p-ink-muted)]">
               You reached the end of {visited.size} of {slides.length} slides. This presentation has no questions.
             </p>
-          )}
+            <div className="mx-auto mt-4 max-w-xs">
+              <ProgressRail value={visited.size} max={slides.length} label="Slides visited" />
+            </div>
+            {message ? (
+              <p className="mt-4 text-sm text-[color:var(--h5p-ink-muted)]">{message}</p>
+            ) : null}
+            {deck.enable_retry ? (
+              <div className="mt-6 flex justify-center">
+                <RetryAction onClick={restart} label="Start again" />
+              </div>
+            ) : null}
+          </div>
+        );
+      }
 
-          {message ? <p className="mt-4 text-sm text-slate-700">{message}</p> : null}
-
-          {deck.enable_retry ? (
-            <button
-              type="button"
-              onClick={restart}
-              className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Start again
-            </button>
-          ) : null}
-        </div>
+      return (
+        <ResultScreen
+          headline="Summary"
+          score={result.score}
+          maxScore={result.maxScore}
+          percentage={result.percentage}
+          passed={result.passed}
+          passLabel={`Pass mark is ${deck.pass_percentage}%`}
+          summary={`${result.answeredCount} of ${result.scoredElementCount} questions answered`}
+          facts={[{ icon: 'target', label: 'Slides seen', value: `${visited.size} / ${slides.length}` }]}
+          achievements={deriveAchievements({ percentage: result.percentage, passed: result.passed })}
+          message={message}
+          actions={deck.enable_retry ? <RetryAction onClick={restart} label="Start again" /> : null}
+        />
       );
     }
 
@@ -552,23 +627,20 @@ function CoursePresentationPlayerContent() {
 
         <div className="min-w-0 flex-1">
           {deck.show_progress_bar ? (
-            <div
-              className="mb-3 h-1 w-full overflow-hidden rounded-full bg-slate-100"
-              role="progressbar"
-              aria-valuenow={visited.size}
-              aria-valuemin={0}
-              aria-valuemax={slides.length}
-              aria-label="Slides visited"
-            >
-              <div
-                className="h-full rounded-full bg-indigo-500 transition-all"
-                style={{ width: `${(visited.size / slides.length) * 100}%` }}
-              />
+            <div className="mb-3 flex items-center gap-3">
+              <ProgressRail value={visited.size} max={slides.length} label="Slides visited" />
+              <span className="shrink-0 text-xs font-semibold tabular-nums text-[color:var(--h5p-ink-muted)]">
+                {visited.size}/{slides.length}
+              </span>
             </div>
           ) : null}
 
           <div
-            className={`relative w-full overflow-hidden rounded-2xl border border-slate-200 shadow-sm ${
+            // Keyed on the slide, so React replaces the frame instead of
+            // reusing it — that is what makes each slide animate in rather
+            // than its contents swapping silently inside a static box.
+            key={slide.id}
+            className={`h5p-enter relative w-full overflow-hidden rounded-2xl border border-slate-200 shadow-sm ${
               THEME_SURFACE[deck.theme] ?? THEME_SURFACE.default
             }`}
             style={{ aspectRatio: '16 / 9' }}
@@ -587,37 +659,25 @@ function CoursePresentationPlayerContent() {
 
           {!deck.active_surface ? (
             <div className="mt-3 flex items-center justify-between gap-3">
-              <button
-                type="button"
+              <SecondaryAction
                 disabled={position <= 0}
                 onClick={() => goTo(slides[position - 1]?.id ?? null)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+                icon={<ChevronLeft className="h-4 w-4" aria-hidden="true" />}
               >
-                <ChevronLeft className="h-3.5 w-3.5" />
                 Previous
-              </button>
+              </SecondaryAction>
 
-              <span className="text-xs tabular-nums text-slate-500">
+              <span className="text-xs font-medium tabular-nums text-[color:var(--h5p-ink-muted)]">
                 {position + 1} of {slides.length}
               </span>
 
               {next !== null ? (
-                <button
-                  type="button"
-                  onClick={() => goTo(next)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
-                >
+                <PrimaryAction onClick={() => goTo(next)}>
                   Next
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </PrimaryAction>
               ) : deck.show_summary_slide ? (
-                <button
-                  type="button"
-                  onClick={finish}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"
-                >
-                  Finish
-                </button>
+                <PrimaryAction onClick={finish}>Finish</PrimaryAction>
               ) : (
                 <span />
               )}
@@ -645,13 +705,15 @@ function CoursePresentationPlayerContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto">
+        {preloaded?.embedded ? null : (
         <H5pPageHeader
           title={deck?.title || 'Course presentation'}
           description={deck?.description || undefined}
           ctx={ctx}
           backHref={`/h5p/h5p_course_presentation?${contextQuery}`}
         />
+        )}
 
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />
@@ -664,6 +726,30 @@ function CoursePresentationPlayerContent() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The player as a component, for a caller that already holds the row.
+ *
+ * The Suspense boundary stays, because the body still calls `useSearchParams`
+ * even when it does not read it -- hooks cannot be conditional, and an
+ * unwrapped `useSearchParams` opts the whole embedding route into client-side
+ * rendering.
+ */
+export function CoursePresentationPlayer({ item, ctx, embedded, onResult }: PreloadedCoursePresentation) {
+  // Memoised, because this object is the load effect's dependency. Passing a
+  // fresh one each render re-ran that effect on every render, and its cleanup
+  // then cancelled the setup the previous run had just scheduled.
+  const preloaded = useMemo(
+    () => ({ item, ctx, embedded, onResult }),
+    [item, ctx, embedded, onResult]
+  );
+
+  return (
+    <Suspense fallback={<LoadingState label="Loading presentation…" />}>
+      <CoursePresentationPlayerContent preloaded={preloaded} />
+    </Suspense>
   );
 }
 
