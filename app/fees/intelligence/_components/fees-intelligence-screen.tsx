@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -27,10 +27,20 @@ import {
 } from '@/app/fees/intelligence/_lib/fees-intelligence-api';
 import {
   AgingProfile,
+  BankMandatesCard,
+  CancellationReasonsCard,
   ClassBreakdown,
+  CollectionVelocityCard,
   CycleTrend,
+  FeeRevisionsCard,
+  GatewayReconciliationCard,
   HeadBreakdown,
+  LateRulesCard,
+  OtherCollectionsCard,
+  PaymentFailuresCard,
+  PaymentMethodsCard,
   PaymentModeMix,
+  RemindersCard,
 } from '@/app/fees/intelligence/_components/fees-intelligence-charts';
 import {
   ConfidencePill,
@@ -47,6 +57,13 @@ import {
   toneFor,
   Unavailable,
 } from '@/app/fees/intelligence/_components/fees-intelligence-primitives';
+// The section switcher is shared with every other module's Intelligence screen,
+// so Fees and the contract-driven modules cannot drift apart on how it behaves.
+import { IntelligenceSectionNav } from '@/components/intelligence/module/section-nav';
+import {
+  CrossModuleWorkflowSection,
+  ModuleIntegrationSection,
+} from '@/components/intelligence/module/sections';
 
 /**
  * Fees Intelligence — the native LMS screen.
@@ -76,6 +93,8 @@ export function FeesIntelligenceScreen() {
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState('');
   const [drawer, setDrawer] = useState<null | { kind: 'accounts'; title: string; subtitle: string; standardId?: string }>(null);
+  /** Which section is on screen; `null` opens on the first one. */
+  const [openSection, setOpenSection] = useState<string | null>(null);
 
   const recompute = useCallback(async () => {
     setRunning(true);
@@ -121,8 +140,94 @@ export function FeesIntelligenceScreen() {
 
   const { coverage, position } = data;
 
+  /**
+   * The eleven sections this screen has always rendered, now switchable.
+   *
+   * NOTHING IS ADDED OR REMOVED HERE — each entry mounts the very component it
+   * did before, with the same props and the same drill-down handlers. The list
+   * is declared inside the render because every section closes over `data`,
+   * which only exists past the guards above.
+   */
+  const sections: { key: string; label: string; render: () => ReactNode }[] =
+    coverage.available && position
+      ? [
+          { key: 'summary', label: 'Summary', render: () => <ManagementSummary data={data} /> },
+          {
+            key: 'position',
+            label: 'Position',
+            render: () => (
+              <FinancialPosition
+                data={data}
+                onDrillOutstanding={() =>
+                  setDrawer({
+                    kind: 'accounts',
+                    title: 'Accounts in arrears',
+                    subtitle: `${count(position.defaulterAccounts)} of ${count(position.feeAccounts)} fee accounts owe money for ${data.academicYear.syear ?? 'this year'}, largest first.`,
+                  })
+                }
+              />
+            ),
+          },
+          {
+            key: 'findings',
+            label: 'Findings',
+            render: () => <WhatTheBrainSees data={data} onRecompute={recompute} running={running} />,
+          },
+          {
+            key: 'trends',
+            label: 'Trends',
+            render: () => (
+              <Trends
+                data={data}
+                onSelectClass={(row: FeesClass) =>
+                  setDrawer({
+                    kind: 'accounts',
+                    title: `${row.label} — accounts in arrears`,
+                    subtitle: `${row.label} carries ${moneyExact(row.outstandingAmount)} across ${row.defaulterAccounts} of ${row.accounts} accounts, largest first.`,
+                    // The drill-down narrows to this class server-side rather
+                    // than filtering a page the browser happens to hold.
+                    standardId: row.standardId,
+                  })
+                }
+              />
+            ),
+          },
+          {
+            key: 'operations',
+            label: 'Operations & risk',
+            render: () => <OperationalRiskIntelligence data={data} />,
+          },
+          { key: 'priorities', label: 'Priorities', render: () => <PriorityAttention data={data} /> },
+          { key: 'adjustments', label: 'Adjustments', render: () => <CancellationAndRefund data={data} /> },
+          {
+            key: 'recommendations',
+            label: 'Recommendations',
+            render: () => <Recommendations data={data} onDecided={refresh} />,
+          },
+          {
+            key: 'decisions',
+            label: 'Decisions',
+            render: () => <DecisionAndOutcome data={data} onRecorded={refresh} />,
+          },
+          { key: 'dataQuality', label: 'Data quality', render: () => <DataQuality data={data} /> },
+          { key: 'learning', label: 'Learning', render: () => <Learning data={data} /> },
+          {
+            key: 'integration',
+            label: 'Module Integration',
+            render: () => <ModuleIntegrationSection module="fees" />,
+          },
+          {
+            key: 'workflow',
+            label: 'Cross-Module Workflow',
+            render: () => <CrossModuleWorkflowSection module="fees" />,
+          },
+        ]
+      : [];
+
+  const active = sections.find((section) => section.key === openSection) ?? sections[0];
+
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-6 pb-10">
       <Hero data={data} onRecompute={recompute} running={running} refreshing={refreshing} />
 
       {runError ? (
@@ -142,41 +247,13 @@ export function FeesIntelligenceScreen() {
         />
       ) : (
         <>
-          <ManagementSummary data={data} />
-
-          <FinancialPosition
-            data={data}
-            onDrillOutstanding={() =>
-              setDrawer({
-                kind: 'accounts',
-                title: 'Accounts in arrears',
-                subtitle: `${count(position.defaulterAccounts)} of ${count(position.feeAccounts)} fee accounts owe money for ${data.academicYear.syear ?? 'this year'}, largest first.`,
-              })
-            }
+          <IntelligenceSectionNav
+            label="Fees Intelligence"
+            sections={sections.map(({ key, label }) => ({ key, label }))}
+            activeKey={active?.key ?? ''}
+            onSelect={setOpenSection}
           />
-
-          <WhatTheBrainSees data={data} onRecompute={recompute} running={running} />
-
-          <Trends
-            data={data}
-            onSelectClass={(row: FeesClass) =>
-              setDrawer({
-                kind: 'accounts',
-                title: `${row.label} — accounts in arrears`,
-                subtitle: `${row.label} carries ${moneyExact(row.outstandingAmount)} across ${row.defaulterAccounts} of ${row.accounts} accounts, largest first.`,
-                // The drill-down narrows to this class server-side rather than
-                // filtering a page the browser happens to hold.
-                standardId: row.standardId,
-              })
-            }
-          />
-
-          <PriorityAttention data={data} />
-          <CancellationAndRefund data={data} />
-          <Recommendations data={data} onDecided={refresh} />
-          <DecisionAndOutcome data={data} onRecorded={refresh} />
-          <DataQuality data={data} />
-          <Learning data={data} />
+          {active ? active.render() : null}
         </>
       )}
 
@@ -613,7 +690,9 @@ function Trends({ data, onSelectClass }: { data: FeesIntelligencePayload; onSele
     charts.classes.length === 0 &&
     charts.heads.length === 0 &&
     charts.modes.length === 0 &&
-    charts.aging.length === 0;
+    charts.aging.length === 0 &&
+    !(data.velocity?.available && data.velocity.dailyTrend.length > 0) &&
+    !(data.otherCollections?.available && data.otherCollections.receiptsCount > 0);
 
   return (
     <Section
@@ -637,8 +716,43 @@ function Trends({ data, onSelectClass }: { data: FeesIntelligencePayload; onSele
           <HeadBreakdown heads={charts.heads} />
           <AgingProfile bands={charts.aging} />
           <PaymentModeMix modes={charts.modes} />
+          <CollectionVelocityCard data={data.velocity} />
+          <OtherCollectionsCard data={data.otherCollections} />
         </div>
       )}
+    </Section>
+  );
+}
+
+/* ================================= 3.5 operational & risk intelligence */
+
+function OperationalRiskIntelligence({ data }: { data: FeesIntelligencePayload }) {
+  const { paymentFailures, reconciliation, bankMandates, paymentMethods, lateRules, reminders } = data;
+
+  const hasAny =
+    Boolean(paymentFailures?.available && paymentFailures.failureCount > 0) ||
+    Boolean(reconciliation?.available && reconciliation.gatewayTransactions > 0) ||
+    Boolean(bankMandates?.available && bankMandates.registeredMandates > 0) ||
+    Boolean(paymentMethods?.available && paymentMethods.totalMappings > 0) ||
+    Boolean(lateRules?.available && lateRules.rulesCount > 0) ||
+    Boolean(reminders?.available && reminders.remindersSent > 0);
+
+  if (!hasAny) return null;
+
+  return (
+    <Section
+      eyebrow="Operations & Risk"
+      title="Gateway, NACH & Execution Intelligence"
+      description="Live operational health across payment failure rates, gateway settlements, automated mandate readiness, late penalty rules, and collection notice velocity."
+    >
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <PaymentFailuresCard data={paymentFailures} />
+        <GatewayReconciliationCard data={reconciliation} />
+        <BankMandatesCard data={bankMandates} />
+        <PaymentMethodsCard data={paymentMethods} />
+        <LateRulesCard data={lateRules} />
+        <RemindersCard data={reminders} />
+      </div>
     </Section>
   );
 }
@@ -785,6 +899,13 @@ function CancellationAndRefund({ data }: { data: FeesIntelligencePayload }) {
               </div>
             )}
           </Surface>
+
+          {adjustments.cancellationReasons && adjustments.cancellationReasons.length > 0 ? (
+            <CancellationReasonsCard reasons={adjustments.cancellationReasons} />
+          ) : null}
+          {data.feeRevisions?.available && data.feeRevisions.revisionCount > 0 ? (
+            <FeeRevisionsCard data={data.feeRevisions} />
+          ) : null}
         </div>
       )}
     </Section>
@@ -1598,7 +1719,19 @@ function AccountsDrawer({
                 {page?.rows.map((row) => (
                   <tr key={row.studentId} className="border-b border-slate-100 last:border-0">
                     <td className="py-2 pr-3">
-                      <span className="block font-semibold text-slate-800">{row.name}</span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-slate-800">{row.name}</span>
+                        {row.mandateRegistered ? (
+                          <span className="inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                            NACH Active
+                          </span>
+                        ) : null}
+                        {row.failureCount && row.failureCount > 0 ? (
+                          <span className="inline-flex items-center rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
+                            {row.failureCount} {row.failureCount === 1 ? 'bounce' : 'bounces'}
+                          </span>
+                        ) : null}
+                      </div>
                       <span className="block text-[11.5px] text-slate-500">
                         {[row.className, row.enrollmentNo ? `Enrolment ${row.enrollmentNo}` : '']
                           .filter(Boolean)

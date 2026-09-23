@@ -14,13 +14,13 @@ import {
   GraduationCap,
   Hourglass,
   Info,
-  Layers,
   Lock,
   Monitor,
   Plus,
   BookOpen,
   Play,
   Printer,
+  Search,
   Send,
   Sparkles,
   X,
@@ -37,20 +37,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import ExamResultDashboard from '@/app/lms/exam/_result-dashboard/ExamResultDashboard';
-import QuestionPaperTemplates from '@/app/lms/exam/_question-paper-templates/QuestionPaperTemplates';
-import {
-  QuestionPaperTemplateSelect,
-  useExamPaperPdf,
-} from '@/app/lms/exam/_question-paper-templates/ExamPaperPdf';
-import {
-  ALL_QUESTION_PAPER_COLUMNS,
-  QuestionPaperGrid,
-  examTypeLabel,
-  examTypeOptions,
-  getQuestionPaperSession as getCreateExamSession,
-  useQuestionPaperRows,
-} from '@/app/lms/_shared/question-paper-grid';
 
+type ExamStatus = 'Scheduled' | 'Open' | 'Draft' | 'Closed';
 type AudienceMode = 'Teacher' | 'Student';
 type StudentLearningTab = 'PAL' | 'Online Exam' | 'Offline Exam';
 
@@ -106,6 +94,18 @@ type StudentPracticeAssessment = {
   durationMinutes: number;
   masteryTarget: number;
   questions: StudentPracticeQuestion[];
+};
+
+type ExamRecord = {
+  id: string;
+  name: string;
+  classLabel: string;
+  type: string;
+  window: string;
+  attempts: number;
+  questions: number;
+  marks: number;
+  status: ExamStatus;
 };
 
 type ApiQuestionPaperRecord = {
@@ -324,14 +324,31 @@ type QuestionRecord = {
   marks: number;
 };
 
+const statusBadgeClasses: Record<ExamStatus, string> = {
+  Scheduled: 'bg-[#FFF4E8] text-[#A45C14]',
+  Open: 'bg-[#EAF9F1] text-[#14804A]',
+  Draft: 'bg-[#EEF2F7] text-[#64748B]',
+  Closed: 'bg-[#EEF2F7] text-[#475569]',
+};
+
+const statusDotClasses: Record<ExamStatus, string> = {
+  Scheduled: 'bg-[#B96A1F]',
+  Open: 'bg-[#14804A]',
+  Draft: 'bg-[#7C8AA0]',
+  Closed: 'bg-[#64748B]',
+};
+
+const examTypeOptions = [
+  { label: 'Online', value: 'online' },
+  { label: 'Offline', value: 'offline' },
+];
 const attemptsAllowedOptions = ['1 attempt', '2 attempts', '3 attempts'];
 
-type ExamInnerTab = 'Exams' | 'Results dashboard' | 'Question paper templates';
+type ExamInnerTab = 'Exams' | 'Results dashboard';
 
 const innerTabs: Array<{ label: ExamInnerTab; icon: LucideIcon }> = [
   { label: 'Exams', icon: FileText },
   { label: 'Results dashboard', icon: GraduationCap },
-  { label: 'Question paper templates', icon: Layers },
 ];
 
 const studentViewTabs: Array<{ label: StudentLearningTab; icon: LucideIcon; hidden?: boolean }> = [
@@ -384,6 +401,60 @@ function toNumber(value: unknown): number {
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
+function getCreateExamSession() {
+  if (typeof window === 'undefined') {
+    return { token: '', subInstituteId: '', userProfileName: '', userId: '', syear: '' };
+  }
+
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}') as Record<string, unknown>;
+    const menuContext = JSON.parse(localStorage.getItem('menuContext') || '{}') as Record<string, unknown>;
+    const academicYears = userData.academicYears;
+    let syear = readString(localStorage.getItem('selectedAcademicYear'));
+
+    if (!syear && Array.isArray(academicYears) && academicYears.length > 0) {
+      const firstYear = academicYears[0] as Record<string, unknown>;
+      syear = readString(firstYear.syear);
+    }
+
+    if (!syear) {
+      syear = readString(userData.academic_year_id ?? userData.academicYearId ?? menuContext.academic_year_id);
+    }
+
+    return {
+      token: readString(userData.user_token ?? userData.token ?? menuContext.user_token ?? menuContext.token),
+      subInstituteId: readString(userData.sub_institute_id ?? menuContext.sub_institute_id),
+      userProfileName: readString(menuContext.user_profile_name ?? userData.user_profile_name),
+      userId: readString(menuContext.user_id ?? userData.user_id),
+      syear,
+    };
+  } catch {
+    return { token: '', subInstituteId: '', userProfileName: '', userId: '', syear: '' };
+  }
+}
+
+function mapQuestionPaperToExam(row: ApiQuestionPaperRecord): ExamRecord {
+  const paperName = row.paper_name?.trim() ?? '';
+  const paperDesc = row.paper_desc?.trim() ?? '';
+  const examName = [paperName, paperDesc].filter(Boolean).join(' ');
+  const standardName = row.standard_name == null ? '' : String(row.standard_name).trim();
+  const subjectName = row.subject_name?.trim() ?? '';
+  const openDate = row.open_date?.trim() ?? '';
+  const closeDate = row.close_date?.trim() ?? '';
+
+  return {
+    id: `EXM-${row.id}`,
+    name: examName || 'Untitled exam',
+    classLabel: `Grade ${standardName} - ${subjectName}`.trim(),
+    type: row.exam_type?.trim() || '-',
+    window: [openDate, closeDate].filter(Boolean).join(' - '),
+    attempts: toNumber(row.attempt_allowed),
+    questions: toNumber(row.total_ques),
+    marks: toNumber(row.total_marks),
+    status: row.active_exam === 'yes' ? 'Open' : 'Closed',
+  };
 }
 
 // --- PAL mastery map (GET /api/pal/mastery-map/{learnerId}) ---------------
@@ -928,7 +999,28 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
 }
 
 
-export default function StudentHomeworkIndexPage() {
+/**
+ * Worksheet and Project are the same question_paper rows this screen lists,
+ * restricted to one exam_type — see ExamOperationsScreen's `scopedExamType`.
+ */
+export type ExamOperationsScope = 'worksheet' | 'project';
+
+interface ExamOperationsScreenProps {
+  scopedExamType?: ExamOperationsScope;
+}
+
+/**
+ * The Exam Operations screen. `/lms/exam` mounts it unscoped, showing every
+ * exam_type; `/lms/worksheet` and `/lms/project` mount it pinned to their own
+ * exam_type via `scopedExamType`, which pins the create-exam form's Exam Type
+ * field, filters the grid, and hides the Results dashboard tab (which is not
+ * scoped by exam_type and would otherwise mix worksheet/project results in
+ * with everything else).
+ */
+export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenProps = {}) {
+  const isScopedToOneType = Boolean(scopedExamType);
+  const scopedNoun =
+    scopedExamType === 'worksheet' ? 'worksheets' : scopedExamType === 'project' ? 'projects' : 'exams';
   const { isChatbotOpen } = useContext(ChatbotLayoutContext);
   // Follows the signed-in profile and is not switchable. The Viewing-as toggle is
   // gone, so a stored 'Student' preference would otherwise have left a teacher in
@@ -937,22 +1029,17 @@ export default function StudentHomeworkIndexPage() {
     getCreateExamSession().userProfileName.trim().toUpperCase() === 'STUDENT'
       ? 'Student'
       : 'Teacher';
-  // No exam_type is pinned here, so the grid shows every type — Worksheet and
-  // Project are their own screens. Bumping `examReloadToken` re-runs the fetch
-  // after a publish.
-  const [examReloadToken, setExamReloadToken] = useState(0);
-  const {
-    rows: apiExams,
-    isLoading: isLoadingExams,
-    loadError: examLoadError,
-  } = useQuestionPaperRows(undefined, examReloadToken);
+  const [apiExams, setApiExams] = useState<ExamRecord[]>([]);
+  const [isLoadingExams, setIsLoadingExams] = useState(true);
+  const [examLoadError, setExamLoadError] = useState('');
   const [publishSuccessMessage, setPublishSuccessMessage] = useState('');
   const [lmsCourses, setLmsCourses] = useState<LmsCoursesSubjectRecord[]>([]);
   const [isLoadingLmsCourses, setIsLoadingLmsCourses] = useState(false);
   const [lmsCoursesError, setLmsCoursesError] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All statuses');
+  const [typeFilter, setTypeFilter] = useState('All types');
   const [examInnerTab, setExamInnerTab] = useState<ExamInnerTab>('Exams');
-  // Drives the template dropdown in the toolbar and the PDF action on each row.
-  const examPaperPdf = useExamPaperPdf();
   const [studentLearningTab, setStudentLearningTab] = useState<StudentLearningTab>(defaultStudentLearningTab);
   const [examFilters, setExamFilters] = useState({
     grade_id: '',
@@ -1024,7 +1111,7 @@ export default function StudentHomeworkIndexPage() {
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [examName, setExamName] = useState('');
   const [examDescription, setExamDescription] = useState('');
-  const [examType, setExamType] = useState('');
+  const [examType, setExamType] = useState(scopedExamType ?? '');
   const [attemptsAllowed, setAttemptsAllowed] = useState('');
   const [openDate, setOpenDate] = useState('');
   const [closeDate, setCloseDate] = useState('');
@@ -1032,6 +1119,7 @@ export default function StudentHomeworkIndexPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
   const scopeScrollRef = useRef<HTMLDivElement | null>(null);
+  const exams = apiExams;
   const onlineExamSession = getCreateExamSession();
   const isStudentProfile = onlineExamSession.userProfileName.trim().toUpperCase() === 'STUDENT';
   const activeStudentChapter = useMemo(
@@ -1429,6 +1517,31 @@ export default function StudentHomeworkIndexPage() {
   }, [fetchOfflineExams]);
  
 
+  // Worksheet/Project pin the grid to one exam_type before any of the other
+  // filters apply, so their "N of M" count and empty states read against
+  // their own rows rather than every exam.
+  const scopedExams = useMemo(() => {
+    if (!scopedExamType) return exams;
+
+    return exams.filter((exam) => exam.type.toLowerCase() === scopedExamType);
+  }, [exams, scopedExamType]);
+
+  const filteredExams = useMemo(() => {
+    return scopedExams.filter((exam) => {
+      const matchesSearch =
+        exam.name.toLowerCase().includes(search.toLowerCase()) ||
+        exam.id.toLowerCase().includes(search.toLowerCase()) ||
+        exam.classLabel.toLowerCase().includes(search.toLowerCase());
+
+      const matchesStatus =
+        statusFilter === 'All statuses' || exam.status === statusFilter;
+
+      const matchesType = typeFilter === 'All types' || exam.type === typeFilter;
+
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [scopedExams, search, statusFilter, typeFilter]);
+
   const chapterOptions = useMemo(() => {
     if (selectedStandardId == null || selectedSubjectId == null) return [];
 
@@ -1601,7 +1714,7 @@ export default function StudentHomeworkIndexPage() {
     setOpenLevelDropdown(null);
     setExamName('');
     setExamDescription('');
-    setExamType('');
+    setExamType(scopedExamType ?? '');
     setAttemptsAllowed('');
     setOpenDate('');
     setCloseDate('');
@@ -1736,6 +1849,58 @@ export default function StudentHomeworkIndexPage() {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
+  const refreshExamList = useCallback(async (options?: { signal?: AbortSignal; showLoading?: boolean }) => {
+    const { signal, showLoading = true } = options ?? {};
+    const session = getCreateExamSession();
+
+    if (showLoading) {
+      setIsLoadingExams(true);
+    }
+    setExamLoadError('');
+
+    if (!session.subInstituteId || !session.userProfileName || !session.userId || !session.syear) {
+      setApiExams([]);
+      setExamLoadError('Exam session data is missing.');
+      if (showLoading) {
+        setIsLoadingExams(false);
+      }
+      return;
+    }
+
+    try {
+      const url = new URL(`${API_BASE_URL}/api/question-paper`);
+      url.searchParams.set('sub_institute_id', session.subInstituteId);
+      url.searchParams.set('syear', session.syear);
+      url.searchParams.set('user_profile_name', session.userProfileName);
+      url.searchParams.set('user_id', session.userId);
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        signal,
+        headers: {
+          Accept: 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
+      });
+      const payload = (await response.json()) as QuestionPaperApiResponse;
+
+      if (!response.ok || payload.status_code !== 1) {
+        throw new Error(payload.message || 'Failed to load exams');
+      }
+
+      const mappedExams = Array.isArray(payload.data) ? payload.data.map(mapQuestionPaperToExam) : [];
+      setApiExams(mappedExams);
+    } catch (error) {
+      if (signal?.aborted) return;
+      setApiExams([]);
+      setExamLoadError(error instanceof Error ? error.message : 'Failed to load exams');
+    } finally {
+      if (!signal?.aborted && showLoading) {
+        setIsLoadingExams(false);
+      }
+    }
+  }, []);
+
   const goToNextExamStep = () => {
     if (createExamStep === 1) {
       const gradeId = Array.isArray(createExamFilters.section)
@@ -1865,7 +2030,7 @@ export default function StudentHomeworkIndexPage() {
       setPublishSuccessMessage(successMessage);
       setIsCreateExamOpen(false);
       resetCreateExamForm();
-      setExamReloadToken((token) => token + 1);
+      await refreshExamList({ showLoading: false });
     } catch (error) {
       console.error('Publish exam error:', error);
 
@@ -1969,6 +2134,22 @@ export default function StudentHomeworkIndexPage() {
       setIsPracticeLoading(false);
     }
   };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      refreshExamList({ signal: controller.signal }).catch((error) => {
+        if (!controller.signal.aborted) {
+          console.error('Exam list refresh error:', error);
+        }
+      });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [refreshExamList]);
 
   useEffect(() => {
     if (!isStudentProfile) return;
@@ -2368,68 +2549,189 @@ export default function StudentHomeworkIndexPage() {
 
             {audienceMode === 'Teacher' && !isStudentProfile ? (
               <div className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-center gap-5">
-                  {innerTabs.map((tab) => {
-                    const TabIcon = tab.icon;
-                    const isActive = examInnerTab === tab.label;
+                {!isScopedToOneType ? (
+                  <div className="flex flex-wrap items-center gap-5">
+                    {innerTabs.map((tab) => {
+                      const TabIcon = tab.icon;
+                      const isActive = examInnerTab === tab.label;
 
-                    return (
-                      <button
-                        key={tab.label}
-                        type="button"
-                        onClick={() => setExamInnerTab(tab.label)}
-                        className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
-                          isActive
-                            ? 'border-[#5846EA] text-[#5846EA]'
-                            : 'border-transparent text-[#5F7087] hover:text-[#334155]'
-                        }`}
-                      >
-                        <TabIcon size={16} />
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                      return (
+                        <button
+                          key={tab.label}
+                          type="button"
+                          onClick={() => setExamInnerTab(tab.label)}
+                          className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
+                            isActive
+                              ? 'border-[#5846EA] text-[#5846EA]'
+                              : 'border-transparent text-[#5F7087] hover:text-[#334155]'
+                          }`}
+                        >
+                          <TabIcon size={16} />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
 
-                {examInnerTab === 'Results dashboard' ? (
+                {!isScopedToOneType && examInnerTab === 'Results dashboard' ? (
                   <ExamResultDashboard />
-                ) : examInnerTab === 'Question paper templates' ? (
-                  <QuestionPaperTemplates />
                 ) : (
                   <>
-                  <QuestionPaperGrid
-                    rows={apiExams}
-                    isLoading={isLoadingExams}
-                    loadError={examLoadError}
-                    columns={ALL_QUESTION_PAPER_COLUMNS}
-                    pdfController={examPaperPdf}
-                    toolbarActions={
-                      <>
-                        <QuestionPaperTemplateSelect controller={examPaperPdf} />
-                        <Link
-                          href="/exam/exam-creation"
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[#5846EA] bg-white px-4 text-[14px] font-semibold text-[#5846EA] transition hover:bg-[#EEEBFF]"
-                        >
-                          <Sparkles size={18} />
-                          AI generated exam
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={openCreateExamModal}
-                          className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[#5846EA] px-4 text-[14px] font-semibold text-white"
-                        >
-                          <Plus size={18} />
-                          Create exam
-                        </button>
-                      </>
-                    }
-                  >
-                    {publishSuccessMessage ? (
-                      <div className="rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-[14px] font-medium text-[#166534]">
-                        {publishSuccessMessage}
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="flex flex-col gap-4">
+
+                    <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+                      <div className="relative w-full max-w-[320px]">
+                        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                        <input
+                          type="text"
+                          value={search}
+                          onChange={(event) => setSearch(event.target.value)}
+                          placeholder={`Search ${scopedNoun}...`}
+                          className="h-10 w-full rounded-[10px] border border-[#CFD9E6] bg-white pl-10 pr-4 text-[14px] text-[#172554] outline-none placeholder:text-[#94A3B8] focus:border-[#7C6CF4]"
+                        />
                       </div>
+
+                      <div className="flex flex-col gap-2.5 sm:flex-row">
+                        <div className="relative">
+                          <select
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value)}
+                            className="h-10 min-w-[140px] appearance-none rounded-[10px] border border-[#CFD9E6] bg-white px-3.5 pr-9 text-[14px] text-[#24324A] outline-none focus:border-[#7C6CF4]"
+                          >
+                            <option>All statuses</option>
+                            <option>Scheduled</option>
+                            <option>Open</option>
+                            <option>Draft</option>
+                            <option>Closed</option>
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8798]" />
+                        </div>
+
+                        {!isScopedToOneType ? (
+                          <div className="relative">
+                            <select
+                              value={typeFilter}
+                              onChange={(event) => setTypeFilter(event.target.value)}
+                              className="h-10 min-w-[130px] appearance-none rounded-[10px] border border-[#CFD9E6] bg-white px-3.5 pr-9 text-[14px] text-[#24324A] outline-none focus:border-[#7C6CF4]"
+                            >
+                              <option>All types</option>
+                              <option value="online">Online</option>
+                              <option value="offline">Offline</option>
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8798]" />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 self-start">
+                    {!isScopedToOneType ? (
+                      <Link
+                        href="/exam/exam-creation"
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] border border-[#5846EA] bg-white px-4 text-[14px] font-semibold text-[#5846EA] transition hover:bg-[#EEEBFF]"
+                      >
+                        <Sparkles size={18} />
+                        AI generated exam
+                      </Link>
                     ) : null}
-                  </QuestionPaperGrid>
+                    <button
+                      type="button"
+                      onClick={openCreateExamModal}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-[12px] bg-[#5846EA] px-4 text-[14px] font-semibold text-white"
+                    >
+                      <Plus size={18} />
+                      {scopedExamType ? `Create ${scopedExamType}` : 'Create exam'}
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[14px] font-medium text-[#5F7087]">
+                  {filteredExams.length} of {scopedExams.length} {scopedNoun}
+                </p>
+
+                {publishSuccessMessage ? (
+                  <div className="rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-[14px] font-medium text-[#166534]">
+                    {publishSuccessMessage}
+                  </div>
+                ) : null}
+
+                <div className="overflow-hidden rounded-[18px] border border-[#D9E3F0] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[1040px] border-separate border-spacing-0">
+                      <thead>
+                        <tr className="bg-[#F6F8FC]">
+                          {['Exam', 'Class', 'Type', 'Window', 'Attempts', 'Questions', 'Marks', 'Status'].map((heading) => (
+                            <th
+                              key={heading}
+                              className="border-b border-[#D9E3F0] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5F7087]"
+                            >
+                              {heading}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredExams.map((exam) => (
+                          <tr key={exam.id} className="bg-white">
+                            <td className="border-b border-[#E6EDF5] px-4 py-3 align-top">
+                              <div className="min-w-[240px]">
+                                <p className="text-[14px] font-semibold text-[#1E293B]">{exam.name}</p>
+                                <p className="mt-0.5 text-[12px] text-[#7B8798]">{exam.id}</p>
+                              </div>
+                            </td>
+                            <td className="border-b border-[#E6EDF5] px-4 py-3 text-[14px] text-[#334155]">
+                              {exam.classLabel}
+                            </td>
+                            <td className="border-b border-[#E6EDF5] px-4 py-3 text-[14px] text-[#334155]">
+                              {exam.type}
+                            </td>
+                          <td className="border-b border-[#E6EDF5] px-4 py-3 text-[14px] text-[#334155]">
+                            {exam.window}
+                          </td>
+                          <td className="border-b border-[#E6EDF5] px-4 py-3 text-right text-[14px] text-[#334155]">
+                            {exam.attempts}
+                          </td>
+                          <td className="border-b border-[#E6EDF5] px-4 py-3 text-right text-[14px] text-[#334155]">
+                            {exam.questions}
+                          </td>
+                          <td className="border-b border-[#E6EDF5] px-4 py-3 text-right text-[14px] text-[#334155]">
+                            {exam.marks}
+                          </td>
+                          <td className="border-b border-[#E6EDF5] px-4 py-3">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[12px] font-semibold ${statusBadgeClasses[exam.status]}`}
+                            >
+                              <span className={`h-2 w-2 rounded-full ${statusDotClasses[exam.status]}`} />
+                              {exam.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {isLoadingExams ? (
+                  <div className="px-6 py-12 text-center text-[14px] text-[#6B7B91]">
+                    Loading exams...
+                  </div>
+                ) : null}
+
+                {!isLoadingExams && examLoadError ? (
+                  <div className="px-6 py-12 text-center text-[14px] text-[#B45309]">
+                    {examLoadError}
+                  </div>
+                ) : null}
+
+                {!isLoadingExams && !examLoadError && filteredExams.length === 0 ? (
+                  <div className="px-6 py-12 text-center text-[14px] text-[#6B7B91]">
+                    No exams match the current search and filters.
+                  </div>
+                ) : null}
+              </div>
                   </>
                 )}
               </div>
@@ -3889,21 +4191,27 @@ export default function StudentHomeworkIndexPage() {
                           <span className="mb-2.5 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
                             Exam Type
                           </span>
-                          <div className="relative">
-                            <select
-                              value={examType}
-                              onChange={(event) => setExamType(event.target.value)}
-                              className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
-                            >
-                              <option value="">Select exam type</option>
-                              {examTypeOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                          </div>
+                          {scopedExamType ? (
+                            <div className="flex h-12 w-full items-center rounded-[12px] border border-[#C9D4E5] bg-[#F8FAFC] px-4 text-[15px] font-medium capitalize text-[#0F172A]">
+                              {scopedExamType}
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <select
+                                value={examType}
+                                onChange={(event) => setExamType(event.target.value)}
+                                className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
+                              >
+                                <option value="">Select exam type</option>
+                                {examTypeOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                            </div>
+                          )}
                         </label>
 
                         <label className="block">
@@ -4002,7 +4310,7 @@ export default function StudentHomeworkIndexPage() {
                     </div>
                     <div>
                       <p className="text-[14px] text-[#64748B]">Type</p>
-                      <p className="mt-1 text-[16px] font-semibold text-[#1E293B]">{examTypeLabel(examType)}</p>
+                      <p className="mt-1 text-[16px] font-semibold text-[#1E293B]">{examType || '-'}</p>
                     </div>
                     <div>
                       <p className="text-[14px] text-[#64748B]">Standard</p>
@@ -4170,4 +4478,8 @@ export default function StudentHomeworkIndexPage() {
       `}</style>
     </>
   );
+}
+
+export default function StudentHomeworkIndexPage() {
+  return <ExamOperationsScreen />;
 }

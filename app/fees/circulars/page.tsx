@@ -16,12 +16,10 @@ import {
 } from 'lucide-react';
 
 import { API_BASE_URL } from '@/app/components/utils/api_url';
-import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { logFeesOperation } from '@/lib/fees/fees-ai-stack';
 import {
   Table,
   TableBody,
@@ -440,20 +438,6 @@ export default function FeesCircularsPage() {
           ? result.message || 'Fee circulars generated successfully.'
           : 'Fee circular records were generated, but the Laravel JSON response did not include printable circular HTML.',
       });
-
-      // Recorded in the Fees AI Stack ledger after the circulars exist. Fire-and-forget:
-      // the circulars are already generated and must not depend on the ledger write.
-      logFeesOperation('circular_drafted', {
-        status: 'completed',
-        message: `Generated fee circulars for ${selectedSet.size} student${selectedSet.size === 1 ? '' : 's'}.`,
-        reference: selectedReceiptBook?.line2 ?? null,
-        result: {
-          students: selectedSet.size,
-          months: selectedMonthIds.length,
-          receipt_book_id: selectedReceiptId || null,
-          printable_html: Boolean(result.html),
-        },
-      });
     } catch (error) {
       setMessage({ type: 'error', text: toErrorMessage(error, 'Unable to generate fee circulars.') });
     } finally {
@@ -654,33 +638,13 @@ export default function FeesCircularsPage() {
                                 />
                               </TableCell>
                               <TableCell className="min-w-56">
-                                <div className="space-y-1">
-                                  <Textarea
-                                    value={circularInput.remarks}
-                                    onChange={(event) => updateStudentInput(student.studentId, 'remarks', event.target.value)}
-                                    disabled={!selected}
-                                    placeholder="Remarks"
-                                    className="min-h-8"
-                                  />
-                                  <div className="flex justify-end">
-                                    <AiFieldAssistant
-                                      value={circularInput.remarks}
-                                      onApply={(next) => updateStudentInput(student.studentId, 'remarks', next)}
-                                      fieldType="announcement"
-                                      label="Fees circular remarks"
-                                      module="fees"
-                                      page="Fees circular"
-                                      entityType="fees_circular"
-                                      disabled={!selected}
-                                      triggerLabel={`Draft the circular remark for ${student.studentName}`}
-                                      related={{
-                                        Student: student.studentName,
-                                        Class: student.standardDivision,
-                                        'Pending amount': currencyFormatter.format(student.pendingAmount),
-                                      }}
-                                    />
-                                  </div>
-                                </div>
+                                <Textarea
+                                  value={circularInput.remarks}
+                                  onChange={(event) => updateStudentInput(student.studentId, 'remarks', event.target.value)}
+                                  disabled={!selected}
+                                  placeholder="Remarks"
+                                  className="min-h-8"
+                                />
                               </TableCell>
                             </>
                           )}

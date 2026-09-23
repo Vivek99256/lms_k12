@@ -15,7 +15,7 @@
  * never stated.
  */
 
-import { findProcedure, rulesFor, vocabularyFor, type ModuleVocabulary, type SopModule } from './sop-catalog'
+import { findProcedure, rulesFor, type SopModule } from './sop-catalog'
 import {
   executionFor,
   parseActor,
@@ -173,24 +173,18 @@ function sectionise(text: string): Sections {
   return { attributes, stepRows, outputs }
 }
 
-/** The five acting modes as this module writes them, for an error message. */
-function actorNames(vocabulary: ModuleVocabulary): string {
-  const { teacher, ai, teacher_ai, student, student_ai } = vocabulary.actorLabels
-  return [teacher, ai, teacher_ai, student, student_ai].join(', ')
-}
-
-function toStep(cells: string[], issues: ParseIssue[], vocabulary: ModuleVocabulary): WorkflowStep | null {
+function toStep(cells: string[], issues: ParseIssue[]): WorkflowStep | null {
   const [rawNo, rawActor, rawUser, rawSystem, rawDecision, rawResult] = cells
   const no = Number(clean(rawNo ?? ''))
   if (!Number.isFinite(no) || no <= 0) return null
 
   const actorText = clean(rawActor ?? '')
-  const actor = parseActor(actorText, vocabulary.actorAliases)
+  const actor = parseActor(actorText)
   if (!actor) {
     issues.push({
       level: 'error',
       field: `step-${no}`,
-      message: `Step ${no}: "${actorText || 'blank'}" is not one of the five SOP actors (${actorNames(vocabulary)}).`,
+      message: `Step ${no}: "${actorText || 'blank'}" is not one of the five SOP actors (Teacher, AI, Teacher + AI, Student, Student + AI).`,
     })
     return null
   }
@@ -225,7 +219,6 @@ export function parseSopProcedure(
   options: ParseOptions = {}
 ): ParseResult {
   const issues: ParseIssue[] = []
-  const vocabulary = vocabularyFor(module)
   const { attributes, stepRows, outputs } = sectionise(text)
 
   const procedureLine = attributes.procedure ?? ''
@@ -259,7 +252,7 @@ export function parseSopProcedure(
   }
 
   const steps = stepRows
-    .map((cells) => toStep(cells, issues, vocabulary))
+    .map((cells) => toStep(cells, issues))
     .filter((step): step is WorkflowStep => step !== null)
     .sort((left, right) => left.no - right.no)
 
@@ -272,14 +265,12 @@ export function parseSopProcedure(
     return { spec: null, issues }
   }
 
-  const declaredActor = attributes.primaryActor
-    ? parseActor(attributes.primaryActor, vocabulary.actorAliases)
-    : null
+  const declaredActor = attributes.primaryActor ? parseActor(attributes.primaryActor) : null
   if (attributes.primaryActor && !declaredActor) {
     issues.push({
       level: 'warning',
       field: 'primaryActor',
-      message: `"${attributes.primaryActor}" is not one of the five SOP actors (${actorNames(vocabulary)}); the indexed actor was used instead.`,
+      message: `"${attributes.primaryActor}" is not one of the five SOP actors; the indexed actor was used instead.`,
     })
   }
   const primaryActor: ActorMode =

@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 
 import { API_BASE_URL } from '@/app/components/utils/api_url';
-import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -363,6 +362,10 @@ function validateForm(form: FeeConfigForm): FormErrors {
       'Fees bank challan template is required';
   }
 
+  if (!form.fees_receipt_note.trim()) {
+    errors.fees_receipt_note = 'Fees receipt note is required';
+  }
+
   if (!form.institute_name.trim()) {
     errors.institute_name = 'Institute name is required';
   }
@@ -470,43 +473,23 @@ function getPageNumbers(currentPage: number, totalPages: number): number[] {
   return [1, currentPage - 1, currentPage, currentPage + 1, totalPages];
 }
 
-/**
- * A labelled control in the config drawer.
- *
- * `assist` is an optional slot at the end of the label row, used for the generative-AI
- * trigger. Rendered as a flex row only when something is passed, so every existing
- * `<DrawerField>` keeps exactly the markup it had.
- */
 function DrawerField({
   label,
   required = false,
   error,
   children,
-  assist,
 }: {
   label: string;
   required?: boolean;
   error?: string;
   children: React.ReactNode;
-  assist?: React.ReactNode;
 }) {
-  const labelNode = (
-    <Label className="text-[11px] font-medium text-slate-700">
-      {label}
-      {required ? <span className="text-rose-500">*</span> : null}
-    </Label>
-  );
-
   return (
     <div className="space-y-1.5">
-      {assist ? (
-        <div className="flex items-center justify-between gap-2">
-          {labelNode}
-          {assist}
-        </div>
-      ) : (
-        labelNode
-      )}
+      <Label className="text-[11px] font-medium text-slate-700">
+        {label}
+        {required ? <span className="text-rose-500">*</span> : null}
+      </Label>
       {children}
       {error ? <p className="text-[11px] text-rose-600">{error}</p> : null}
     </div>
@@ -1347,7 +1330,6 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.send_sms}
                     >
                       <Select
-                        items={yesNoOptions}
                         value={form.send_sms}
                         onValueChange={(value) =>
                           updateField('send_sms', value ?? '')
@@ -1376,7 +1358,6 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.send_email}
                     >
                       <Select
-                        items={yesNoOptions}
                         value={form.send_email}
                         onValueChange={(value) =>
                           updateField('send_email', value ?? '')
@@ -1405,7 +1386,6 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.fees_receipt_template}
                     >
                       <Select
-                        items={receiptTemplateOptions}
                         value={form.fees_receipt_template}
                         onValueChange={(value) =>
                           updateField('fees_receipt_template', value ?? '')
@@ -1434,7 +1414,6 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.fees_bank_challan_template}
                     >
                       <Select
-                        items={bankChallanTemplateOptions}
                         value={form.fees_bank_challan_template}
                         onValueChange={(value) =>
                           updateField(
@@ -1463,18 +1442,8 @@ export default function FeesConfigMasterPage() {
                     <div className="sm:col-span-2">
                       <DrawerField
                         label="Fees Receipt Note"
+                        required
                         error={formErrors.fees_receipt_note}
-                        assist={
-                          <AiFieldAssistant
-                            value={form.fees_receipt_note}
-                            onApply={(next) => updateField('fees_receipt_note', next)}
-                            fieldType="notes"
-                            label="Fees receipt note"
-                            module="fees"
-                            page="Fees config master"
-                            entityType="fees_config"
-                          />
-                        }
                       >
                         <Textarea
                           value={form.fees_receipt_note}
@@ -1547,7 +1516,6 @@ export default function FeesConfigMasterPage() {
                       error={formErrors.auto_head_counting}
                     >
                       <Select
-                        items={yesNoOptions}
                         value={form.auto_head_counting}
                         onValueChange={(value) =>
                           updateField('auto_head_counting', value ?? '')
@@ -1572,7 +1540,6 @@ export default function FeesConfigMasterPage() {
 
                     <DrawerField label="NACH Account Type" required error={formErrors.nach_account_type}>
                       <Select
-                        items={nachAccountTypeOptions}
                         value={form.nach_account_type}
                         onValueChange={(value) =>
                           updateField('nach_account_type', value ?? '')

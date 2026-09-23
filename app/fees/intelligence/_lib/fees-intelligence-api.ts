@@ -38,6 +38,14 @@ export interface FeesCoverage {
   hasOtherFees: boolean;
   hasCycleMap: boolean;
   hasHeads: boolean;
+  hasPaymentFailures?: boolean;
+  hasPaymentMethods?: boolean;
+  hasReconciliation?: boolean;
+  hasBankMandates?: boolean;
+  hasLateRules?: boolean;
+  hasReminders?: boolean;
+  hasOtherCollections?: boolean;
+  hasFeeRevisions?: boolean;
   demandRows: number;
   receiptRows: number;
   enrolledStudents: number;
@@ -107,6 +115,7 @@ export interface FeesClass {
   outstandingAmount: number;
   defaulterAccounts: number;
   collectionRate: number | null;
+  failureCount?: number;
 }
 
 export interface FeesPaymentMode {
@@ -253,6 +262,104 @@ export interface FeesAdjustments {
   refundedAmount: number;
   /** Null when nothing was collected to compare against — not zero. */
   cancelledShareOfCollection: number | null;
+  cancellationReasons?: Array<{
+    reason: string;
+    type: string;
+    count: number;
+    amount: number;
+  }>;
+  refundPaymentModes?: Array<{
+    mode: string;
+    count: number;
+    amount: number;
+  }>;
+}
+
+export interface FeesPaymentFailures {
+  available: boolean;
+  reason: string | null;
+  failureCount: number;
+  failedAmount: number;
+  affectedAccounts: number;
+  repeatFailureAccounts: number;
+  reasons: Array<{ reason: string; count: number; amount: number }>;
+  monthlyTrend: Array<{ monthId: string; label: string; count: number; amount: number }>;
+  classBreakdown: Array<{ standardId: string; standardLabel: string; count: number; amount: number }>;
+}
+
+export interface FeesPaymentMethods {
+  available: boolean;
+  reason: string | null;
+  totalMappings: number;
+  methods: Array<{ method: string; count: number; sharePercent: number }>;
+  topMethod: string | null;
+}
+
+export interface FeesReconciliation {
+  available: boolean;
+  reason: string | null;
+  gatewayTransactions: number;
+  gatewayTotalAmount: number;
+  erpRecordedAmount: number;
+  reconciliationGapAmount: number;
+  unmatchedCount: number;
+  statusBreakdown: Array<{ status: string; count: number; amount: number }>;
+}
+
+export interface FeesBankMandates {
+  available: boolean;
+  reason: string | null;
+  registeredMandates: number;
+  pendingMandates: number;
+  rejectedMandates: number;
+  totalEligible: number;
+  coveragePercent: number | null;
+  rejectionReasons: Array<{ reason: string; count: number }>;
+}
+
+export interface FeesLateRules {
+  available: boolean;
+  reason: string | null;
+  rulesCount: number;
+  rules: Array<{ standardId: string; standardLabel: string; monthId: string; lateDate: string; fineType: string | null }>;
+  overdueAccountsPastConfiguredDate: number;
+  overdueAmountPastConfiguredDate: number;
+}
+
+export interface FeesReminders {
+  available: boolean;
+  reason: string | null;
+  remindersSent: number;
+  accountsReminded: number;
+  totalRemindedAmount: number;
+  subsequentPayingAccounts: number;
+  subsequentCollectionConversionRate: number | null;
+}
+
+export interface FeesVelocity {
+  available: boolean;
+  reason: string | null;
+  dailyTrend: Array<{ date: string; receipts: number; amount: number }>;
+  peakDay: { date: string; amount: number; receipts: number } | null;
+  receiptDays: number;
+  averageDailyCollection: number | null;
+}
+
+export interface FeesOtherCollections {
+  available: boolean;
+  reason: string | null;
+  receiptsCount: number;
+  totalAmount: number;
+  heads: Array<{ headId: string; amount: number; count: number }>;
+  paymentModes: Array<{ mode: string; count: number; amount: number }>;
+}
+
+export interface FeesFeeRevisions {
+  available: boolean;
+  reason: string | null;
+  revisionCount: number;
+  affectedStandardsCount: number;
+  recentRevisions: Array<{ standardId: string; standardLabel: string; feeTypeId: string; amount: number; modifiedAt: string }>;
 }
 
 export interface FeesDataQualityCheck {
@@ -309,6 +416,15 @@ export interface FeesIntelligencePayload {
     classes: FeesClass[];
     paymentModes: FeesPaymentMode[];
   };
+  paymentFailures?: FeesPaymentFailures;
+  paymentMethods?: FeesPaymentMethods;
+  reconciliation?: FeesReconciliation;
+  bankMandates?: FeesBankMandates;
+  lateRules?: FeesLateRules;
+  reminders?: FeesReminders;
+  velocity?: FeesVelocity;
+  otherCollections?: FeesOtherCollections;
+  feeRevisions?: FeesFeeRevisions;
   findings: FeesFinding[];
   priorities: FeesPriority[];
   recommendations: FeesRecommendation[];
@@ -339,6 +455,8 @@ export interface FeesAccountsPage {
     collectedAmount: number;
     concessionAmount: number;
     outstandingAmount: number;
+    failureCount?: number;
+    mandateRegistered?: boolean;
   }>;
 }
 

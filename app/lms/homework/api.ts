@@ -139,9 +139,17 @@ export type HomeworkSubmissionRecord = {
   /** "" | "Checking" | "Evaluated" | "OCR Failed" | "Evaluation Failed" | "Failed" */
   aiStatus: string;
   aiFailureReason: string;
+  /** Questions answered correctly — a COUNT, not marks. */
   aiScore: number | null;
   aiTotalQuestions: number | null;
   aiPercentage: number | null;
+  /** Marks the AI proposed. Null on submissions evaluated before marks existed. */
+  aiMarks: number | null;
+  /** Marks the teacher settled on. Only this reaches a report card. */
+  teacherMarks: number | null;
+  maxMarks: number | null;
+  /** "answer_key" when the homework carried real questions, else "free_form". */
+  evaluationMode: string;
   reviewedPdfPath: string;
   evaluatedAt: string;
   feedbackPublished: boolean;
@@ -260,11 +268,44 @@ export type ReviewPreviousAttempt = {
   submittedAtFmt: string;
 };
 
+/**
+ * One question on one submission, as the teacher reviews it.
+ *
+ * `aiMarks` is a proposal and `teacherMarks` is the number that counts — the
+ * same rule the Exam Evaluation review screen follows. A question the teacher
+ * has not touched has `teacherMarks: null` and falls back to the AI's figure
+ * until the submission is marked Reviewed, which copies it across for good.
+ */
+export type ReviewAnswer = {
+  id: number;
+  questionNo: number;
+  questionId: number | null;
+  questionTitle: string;
+  questionType: string;
+  /** Scored against the answer key in PHP rather than judged by a model. */
+  isObjective: boolean;
+  detectedAnswer: string;
+  selectedOptions: string[];
+  expectedAnswer: string;
+  maxMarks: number;
+  aiMarks: number | null;
+  teacherMarks: number | null;
+  /** "correct" | "partially_correct" | "wrong" | "unattempted" */
+  status: string;
+  aiConfidence: number | null;
+  aiRemark: string;
+  /** The server's own call on whether this one wants a human first. */
+  needsAttention: boolean;
+  page: number;
+};
+
 export type ReviewDetail = {
   homework: HomeworkDetailInfo;
   submission: HomeworkSubmissionRecord;
   files: HomeworkSubmissionFile[];
   previousAttempts: ReviewPreviousAttempt[];
+  /** Empty for a submission evaluated before per-question marks existed. */
+  answers: ReviewAnswer[];
 };
 
 // ---------------------------------------------------------------------------
@@ -514,12 +555,40 @@ function toHomeworkSubmissionRecord(row: UnknownRecord): HomeworkSubmissionRecor
     aiScore: readNullableNumber(row.ai_score),
     aiTotalQuestions: readNullableNumber(row.ai_total_questions),
     aiPercentage: readNullableNumber(row.ai_percentage),
+    aiMarks: readNullableNumber(row.ai_marks),
+    teacherMarks: readNullableNumber(row.teacher_marks),
+    maxMarks: readNullableNumber(row.max_marks),
+    evaluationMode: readString(row.evaluation_mode),
     reviewedPdfPath: readString(row.reviewed_pdf_path),
     evaluatedAt: readString(row.evaluated_at),
     feedbackPublished: Boolean(row.feedback_published) && row.feedback_published !== "0",
     submittedAt: readString(row.submitted_at),
     submittedAtFmt: readString(row.submitted_at_fmt),
     files: records(row.files).map(toSubmissionFile),
+  };
+}
+
+function toReviewAnswer(row: UnknownRecord): ReviewAnswer {
+  return {
+    id: readNumber(row.id),
+    questionNo: readNumber(row.question_no),
+    questionId: readNullableNumber(row.question_id),
+    questionTitle: readString(row.question_title),
+    questionType: readString(row.question_type),
+    isObjective: Boolean(row.is_objective) && row.is_objective !== "0",
+    detectedAnswer: readString(row.detected_answer),
+    selectedOptions: Array.isArray(row.selected_options)
+      ? row.selected_options.map((option) => readString(option)).filter(Boolean)
+      : [],
+    expectedAnswer: readString(row.expected_answer),
+    maxMarks: readNumber(row.max_marks),
+    aiMarks: readNullableNumber(row.ai_marks),
+    teacherMarks: readNullableNumber(row.teacher_marks),
+    status: readString(row.status),
+    aiConfidence: readNullableNumber(row.ai_confidence),
+    aiRemark: readString(row.ai_remark),
+    needsAttention: Boolean(row.needs_attention) && row.needs_attention !== "0",
+    page: readNumber(row.page),
   };
 }
 
@@ -995,6 +1064,21 @@ export async function getReviewDetail(submissionId: number): Promise<ReviewDetai
     submission: toHomeworkSubmissionRecord(submission),
     files: records(data.files).map(toSubmissionFile),
     previousAttempts: records(data.previous_attempts).map(toReviewPreviousAttempt),
+    answers: records(data.answers).map(toReviewAnswer),
+  };
+}
+
+/** Re-runs the AI marking. Refused by the server once the review is signed off. */
+export async function reprocessReview(
+  submissionId: number
+): Promise<{ submission: HomeworkSubmissionRecord; answers: ReviewAnswer[] }> {
+  const payload = await postJson(`lms-homework/review-reprocess/${submissionId}`, {});
+  const data = isRecord(payload.data) ? payload.data : {};
+  const submission = isRecord(data.submission) ? data.submission : {};
+
+  return {
+    submission: toHomeworkSubmissionRecord(submission),
+    answers: records(data.answers).map(toReviewAnswer),
   };
 }
 
@@ -1004,12 +1088,18 @@ export async function submitReview(params: {
   teacherRemarks: string;
   status: string;
   publish: boolean;
+  /** Per-question marks. null on one means "keep taking the AI's figure". */
+  marks?: Array<{ questionNo: number; teacherMarks: number | null }>;
 }): Promise<HomeworkSubmissionRecord> {
   const payload = await postJson("lms-homework/review-store", {
     submission_id: params.submissionId,
     teacher_remarks: params.teacherRemarks,
     status: params.status,
     publish: params.publish,
+    marks: params.marks?.map((mark) => ({
+      question_no: mark.questionNo,
+      teacher_marks: mark.teacherMarks,
+    })),
   });
   const data = isRecord(payload.data) ? payload.data : {};
   return toHomeworkSubmissionRecord(data);

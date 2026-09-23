@@ -73,9 +73,6 @@ const FEES_SCREENS: Record<string, ScreenComponent> = {
   '/fees/reports/fees-type-wise': screen(() => import('@/app/fees/reports/fees-type-wise/page')),
   '/fees/reports/fees-defaulter': screen(() => import('@/app/fees/reports/fees-defaulter/page')),
   '/fees/reports/student-breakoff': screen(() => import('@/app/fees/reports/student-breakoff/page')),
-
-  // Audit trail — Fees-only slice of the user access log.
-  '/fees/audit-trail': screen(() => import('@/app/fees/audit-trail/page')),
 };
 
 /** Route keys are lower-cased and query/trailing slash stripped, as above. */
