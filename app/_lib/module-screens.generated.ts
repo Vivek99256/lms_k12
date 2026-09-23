@@ -15,7 +15,7 @@ function screen(loader: () => Promise<{ default: ScreenComponent }>): ScreenComp
 
 /**
  * Route -> page component, for every page in this app that can be mounted
- * inside a category tab. 510 entries.
+ * inside a category tab. 512 entries.
  */
 export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/academic_setup/create_batch': screen(() => import('@/app/academic_setup/create_batch/page')),
@@ -369,6 +369,7 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/pal/eso/learning-path': screen(() => import('@/app/pal/eso/learning-path/page')),
   '/pal/exam': screen(() => import('@/app/pal/exam/page')),
   '/pal/intelligence': screen(() => import('@/app/pal/intelligence/page')),
+  '/pal/intervention': screen(() => import('@/app/pal/intervention/page')),
   '/pal/new': screen(() => import('@/app/pal/new/page')),
   '/pal/new/administration': screen(() => import('@/app/pal/new/administration/page')),
   '/pal/new/coherence-map': screen(() => import('@/app/pal/new/coherence-map/page')),
@@ -387,6 +388,7 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/pal/new/gamification/streaks': screen(() => import('@/app/pal/new/gamification/streaks/page')),
   '/pal/new/gamification/team-challenges': screen(() => import('@/app/pal/new/gamification/team-challenges/page')),
   '/pal/personalize-marks': screen(() => import('@/app/pal/personalize-marks/page')),
+  '/pal/recall': screen(() => import('@/app/pal/recall/page')),
   '/pal/report': screen(() => import('@/app/pal/report/page')),
   '/pal/reports/attainment': screen(() => import('@/app/pal/reports/attainment/page')),
   '/pal/result': screen(() => import('@/app/pal/result/page')),
