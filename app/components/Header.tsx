@@ -23,7 +23,7 @@ const platformServicesItems = [
   'RBAC',
   'Workflow',
   'Notification',
-  'Template',
+  // 'Template',
   'Scheduler',
   'Document',
   'Integration',
@@ -132,7 +132,7 @@ function LogoImage({ url, fallback }: { url: string; fallback: React.ReactNode }
  * taxonomy.
  */
 const platformSetupItems = [
-  'Implementation',
+  // 'Implementation',
   'Onboarding',
   'Add Process',
   'Fields Configuration',

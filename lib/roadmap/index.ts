@@ -92,7 +92,25 @@ export function roadmapTooltip(item: { phase?: RoadmapPhase; status: RoadmapStat
   if (!item.phase || item.phase === 'Exploring') {
     return 'On the roadmap — ask us about your timeline.';
   }
-  return `Coming in ${item.phase} — ask us about your timeline.`;
+  return 'Enabled on school demand — ask us about your timeline.';
+}
+
+/**
+ * What a status chip prints.
+ *
+ * A planned tier is worded as something the school can ask for rather than as a
+ * dated promise: the phases are our internal build order, and printing them on
+ * a customer screen turns an ordering into a delivery commitment nobody made to
+ * that school. `On school demand` says the same thing honestly — it exists, and
+ * it is switched on when they want it.
+ *
+ * Kept beside `roadmapTooltip` so the chip and its tooltip can never drift.
+ */
+export function roadmapChipLabel(item: { phase?: RoadmapPhase; status: RoadmapStatus }): string {
+  if (item.status === 'coming-soon' && item.phase && item.phase !== 'Exploring') {
+    return 'On school demand';
+  }
+  return roadmapStatusLabel(item.status);
 }
 
 // Aliases resolve to the same plan as the canonical spelling, so a tier stored

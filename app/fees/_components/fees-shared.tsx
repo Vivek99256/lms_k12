@@ -6,14 +6,19 @@ import { AlertCircle, CheckCircle2, Loader2, Printer, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
+/**
+ * The page body, inside the shell's scroll region.
+ *
+ * Its height is its content's. It used to carry `min-h-screen`, which forced
+ * every page to a full 100vh inside a <main> that is already shorter than the
+ * viewport — the shell spends height on the header, the level-3 subheader and
+ * its own padding — so a short page ended in a band of empty canvas and
+ * scrolled for no reason. A category page nests this frame inside the mounted
+ * screen's own, which doubled it. The shell owns the viewport and the
+ * scrolling; this owns neither.
+ */
 export function PageFrame({ children }: { children: ReactNode }) {
-  return (
-    <div className="min-h-screen">
-      <div className="mx-auto  space-y-4 ">
-        {children}
-      </div>
-    </div>
-  );
+  return <div className="mx-auto space-y-4">{children}</div>;
 }
 
 export function PageHeader({
@@ -63,10 +68,34 @@ export function SectionPanel({
   );
 }
 
-export function Field({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * A labelled form control, optionally with something sitting at the end of its label row.
+ *
+ * `assist` exists for the generative-AI trigger, and is deliberately a plain slot rather
+ * than anything AI-aware: this file is the Fees form furniture and should not know that
+ * `AiFieldAssistant` exists. It renders the label row as a flex row only when something
+ * was passed, so every existing `<Field label=… >` call renders exactly the markup it
+ * did before — the same `<Label>` with the same classes, in the same place.
+ */
+export function Field({
+  label,
+  children,
+  assist,
+}: {
+  label: string;
+  children: ReactNode;
+  assist?: ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-semibold text-slate-700">{label}</Label>
+      {assist ? (
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-xs font-semibold text-slate-700">{label}</Label>
+          {assist}
+        </div>
+      ) : (
+        <Label className="text-xs font-semibold text-slate-700">{label}</Label>
+      )}
       {children}
     </div>
   );

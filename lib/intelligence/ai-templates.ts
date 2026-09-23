@@ -295,6 +295,14 @@ export function previewTemplate(input: {
   system_prompt?: string | null;
   user_prompt: string;
   values?: Record<string, string>;
+  /**
+   * Which module's sample rows to render with.
+   *
+   * Optional, and omitting it gives the sample set this endpoint has always returned, so
+   * every existing caller is unaffected. A caller that sends it gets rows shaped like its
+   * own module's — an admission prompt previewed against enquiries rather than fees.
+   */
+  module_key?: string;
 }): Promise<TemplatePreview> {
   return call<TemplatePreview>('/templates/preview', 'POST', input);
 }
