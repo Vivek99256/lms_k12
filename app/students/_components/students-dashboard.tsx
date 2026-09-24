@@ -8,27 +8,39 @@ import type {
   StudentsByClassRow,
 } from '@/app/students/_lib/students-dashboard-api';
 
+/** These cards' ids in the page's Customize registry — stored per user, don't rename them. */
+type StudentsKpiId = 'kpi.active_students' | 'kpi.classes' | 'kpi.left_this_year' | 'kpi.retention';
+
 export interface StudentsDashboardProps {
   totalStudents: number;
   inactiveThisYear: number;
   totalClasses: number;
+  /** The signed-in user's show/hide choice per card (useDashboardPreferences). Every card shows when omitted. */
+  isVisible?: (id: StudentsKpiId) => boolean;
 }
 
-export function StudentsDashboard({ totalStudents, inactiveThisYear, totalClasses }: StudentsDashboardProps) {
+export function StudentsDashboard({
+  totalStudents,
+  inactiveThisYear,
+  totalClasses,
+  isVisible = () => true,
+}: StudentsDashboardProps) {
   return (
     <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Active students" value={totalStudents} />
-      <StatCard label="Classes" value={totalClasses} />
-      <StatCard label="Left this year" value={inactiveThisYear} />
-      <StatCard
-        label="Retention"
-        value={
-          totalStudents + inactiveThisYear > 0
-            ? `${Math.round((totalStudents / (totalStudents + inactiveThisYear)) * 100)}%`
-            : '—'
-        }
-        hint="Active vs. total enrolled"
-      />
+      {isVisible('kpi.active_students') && <StatCard label="Active students" value={totalStudents} />}
+      {isVisible('kpi.classes') && <StatCard label="Classes" value={totalClasses} />}
+      {isVisible('kpi.left_this_year') && <StatCard label="Left this year" value={inactiveThisYear} />}
+      {isVisible('kpi.retention') && (
+        <StatCard
+          label="Retention"
+          value={
+            totalStudents + inactiveThisYear > 0
+              ? `${Math.round((totalStudents / (totalStudents + inactiveThisYear)) * 100)}%`
+              : '—'
+          }
+          hint="Active vs. total enrolled"
+        />
+      )}
     </div>
   );
 }

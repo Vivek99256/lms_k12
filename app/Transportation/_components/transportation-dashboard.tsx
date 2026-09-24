@@ -3,11 +3,16 @@
 import { StatCard } from '@/components/ui/stat-card';
 import type { VanSummaryRow } from '@/app/Transportation/_lib/transportation-dashboard-api';
 
+/** These cards' ids in the page's Customize registry — stored per user, don't rename them. */
+type TransportationKpiId = 'kpi.routes' | 'kpi.vehicles' | 'kpi.students_mapped' | 'kpi.capacity_utilization';
+
 export interface TransportationDashboardProps {
   totalRoutes: number;
   totalVehicles: number;
   totalStudentsMapped: number;
   capacityUtilization: number;
+  /** The signed-in user's show/hide choice per card (useDashboardPreferences). Every card shows when omitted. */
+  isVisible?: (id: TransportationKpiId) => boolean;
 }
 
 export function TransportationDashboard({
@@ -15,13 +20,16 @@ export function TransportationDashboard({
   totalVehicles,
   totalStudentsMapped,
   capacityUtilization,
+  isVisible = () => true,
 }: TransportationDashboardProps) {
   return (
     <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Routes" value={totalRoutes} />
-      <StatCard label="Vehicles" value={totalVehicles} />
-      <StatCard label="Students mapped" value={totalStudentsMapped} />
-      <StatCard label="Capacity utilization" value={`${capacityUtilization}%`} hint="Mapped students vs. total seats" />
+      {isVisible('kpi.routes') && <StatCard label="Routes" value={totalRoutes} />}
+      {isVisible('kpi.vehicles') && <StatCard label="Vehicles" value={totalVehicles} />}
+      {isVisible('kpi.students_mapped') && <StatCard label="Students mapped" value={totalStudentsMapped} />}
+      {isVisible('kpi.capacity_utilization') && (
+        <StatCard label="Capacity utilization" value={`${capacityUtilization}%`} hint="Mapped students vs. total seats" />
+      )}
     </div>
   );
 }

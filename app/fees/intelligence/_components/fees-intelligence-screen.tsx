@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -52,6 +52,29 @@ import {
   CrossModuleWorkflowSection,
   ModuleIntegrationSection,
 } from '@/components/intelligence/module/sections';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const FEES_INTELLIGENCE_WIDGETS = [
+  { id: 'panel.management_summary', label: 'Management summary', group: 'panel' },
+  { id: 'panel.financial_position', label: 'Financial position', group: 'panel' },
+  { id: 'panel.what_the_brain_sees', label: 'What the Brain sees', group: 'panel' },
+  { id: 'chart.cycle_trend', label: 'Collection against what was billed', group: 'chart' },
+  { id: 'chart.class_breakdown', label: 'Outstanding by class', group: 'chart' },
+  { id: 'chart.head_breakdown', label: 'Collection by fee head', group: 'chart' },
+  { id: 'chart.aging_profile', label: 'How long fees have been overdue', group: 'chart' },
+  { id: 'chart.payment_mode_mix', label: 'How fee money arrives', group: 'chart' },
+  { id: 'panel.priority_attention', label: 'Priority attention', group: 'panel' },
+  { id: 'panel.cancellation_and_refund', label: 'Cancellation & refund intelligence', group: 'panel' },
+  { id: 'panel.recommendations', label: 'What to consider doing', group: 'panel' },
+  { id: 'panel.decision_and_outcome', label: 'Decisions and outcomes', group: 'panel' },
+  { id: 'panel.data_quality', label: 'Data quality', group: 'panel' },
+  { id: 'panel.learning', label: 'Organizational learning', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
+
+type FeesIntelligenceWidgetId = (typeof FEES_INTELLIGENCE_WIDGETS)[number]['id'];
 
 /**
  * Fees Intelligence — the native LMS screen.
@@ -81,6 +104,8 @@ export function FeesIntelligenceScreen() {
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState('');
   const [drawer, setDrawer] = useState<null | { kind: 'accounts'; title: string; subtitle: string; standardId?: string }>(null);
+  const prefs = useDashboardPreferences('fees.intelligence', FEES_INTELLIGENCE_WIDGETS);
+  const show = prefs.isVisible;
 
   const recompute = useCallback(async () => {
     setRunning(true);
@@ -95,7 +120,8 @@ export function FeesIntelligenceScreen() {
     }
   }, [refresh]);
 
-  if (loading && !data) {
+  // Wait for the user's layout too, so hidden sections never flash in.
+  if ((loading && !data) || !prefs.ready) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-8 text-[13px] text-slate-500">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -128,7 +154,13 @@ export function FeesIntelligenceScreen() {
 
   return (
     <div className="space-y-8 pb-10">
-      <Hero data={data} onRecompute={recompute} running={running} refreshing={refreshing} />
+      <Hero
+        data={data}
+        onRecompute={recompute}
+        running={running}
+        refreshing={refreshing}
+        customize={<CustomizeDashboard widgets={FEES_INTELLIGENCE_WIDGETS} {...prefs.customizeProps} size="lg" />}
+      />
 
       {runError ? (
         <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-medium text-red-800">
@@ -145,43 +177,53 @@ export function FeesIntelligenceScreen() {
             'There are no fee records for the year selected in the header. Choose another academic year to see its position.'
           }
         />
+      ) : !prefs.hasVisible() ? (
+        <AllWidgetsHiddenNotice />
       ) : (
         <>
-          <ManagementSummary data={data} />
+          {show('panel.management_summary') ? <ManagementSummary data={data} /> : null}
 
-          <FinancialPosition
-            data={data}
-            onDrillOutstanding={() =>
-              setDrawer({
-                kind: 'accounts',
-                title: 'Accounts in arrears',
-                subtitle: `${count(position.defaulterAccounts)} of ${count(position.feeAccounts)} fee accounts owe money for ${data.academicYear.syear ?? 'this year'}, largest first.`,
-              })
-            }
-          />
+          {show('panel.financial_position') ? (
+            <FinancialPosition
+              data={data}
+              onDrillOutstanding={() =>
+                setDrawer({
+                  kind: 'accounts',
+                  title: 'Accounts in arrears',
+                  subtitle: `${count(position.defaulterAccounts)} of ${count(position.feeAccounts)} fee accounts owe money for ${data.academicYear.syear ?? 'this year'}, largest first.`,
+                })
+              }
+            />
+          ) : null}
 
-          <WhatTheBrainSees data={data} onRecompute={recompute} running={running} />
+          {show('panel.what_the_brain_sees') ? (
+            <WhatTheBrainSees data={data} onRecompute={recompute} running={running} />
+          ) : null}
 
-          <Trends
-            data={data}
-            onSelectClass={(row: FeesClass) =>
-              setDrawer({
-                kind: 'accounts',
-                title: `${row.label} — accounts in arrears`,
-                subtitle: `${row.label} carries ${moneyExact(row.outstandingAmount)} across ${row.defaulterAccounts} of ${row.accounts} accounts, largest first.`,
-                // The drill-down narrows to this class server-side rather than
-                // filtering a page the browser happens to hold.
-                standardId: row.standardId,
-              })
-            }
-          />
+          {/* Its five charts are hidden one by one; with all of them hidden the section goes too. */}
+          {prefs.hasVisible('chart') ? (
+            <Trends
+              data={data}
+              show={show}
+              onSelectClass={(row: FeesClass) =>
+                setDrawer({
+                  kind: 'accounts',
+                  title: `${row.label} — accounts in arrears`,
+                  subtitle: `${row.label} carries ${moneyExact(row.outstandingAmount)} across ${row.defaulterAccounts} of ${row.accounts} accounts, largest first.`,
+                  // The drill-down narrows to this class server-side rather than
+                  // filtering a page the browser happens to hold.
+                  standardId: row.standardId,
+                })
+              }
+            />
+          ) : null}
 
-          <PriorityAttention data={data} />
-          <CancellationAndRefund data={data} />
-          <Recommendations data={data} onDecided={refresh} />
-          <DecisionAndOutcome data={data} onRecorded={refresh} />
-          <DataQuality data={data} />
-          <Learning data={data} />
+          {show('panel.priority_attention') ? <PriorityAttention data={data} /> : null}
+          {show('panel.cancellation_and_refund') ? <CancellationAndRefund data={data} /> : null}
+          {show('panel.recommendations') ? <Recommendations data={data} onDecided={refresh} /> : null}
+          {show('panel.decision_and_outcome') ? <DecisionAndOutcome data={data} onRecorded={refresh} /> : null}
+          {show('panel.data_quality') ? <DataQuality data={data} /> : null}
+          {show('panel.learning') ? <Learning data={data} /> : null}
         </>
       )}
 
@@ -204,11 +246,13 @@ function Hero({
   onRecompute,
   running,
   refreshing,
+  customize,
 }: {
   data: FeesIntelligencePayload;
   onRecompute: () => void;
   running: boolean;
   refreshing: boolean;
+  customize: ReactNode;
 }) {
   const { coverage, freshness, academicYear } = data;
 
@@ -225,19 +269,22 @@ function Hero({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onRecompute}
-          disabled={running}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#5846EA] px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#4B3AD6] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {running || refreshing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          {running ? 'Analysing…' : 'Recompute findings'}
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {customize}
+          <button
+            type="button"
+            onClick={onRecompute}
+            disabled={running}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#5846EA] px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#4B3AD6] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {running || refreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {running ? 'Analysing…' : 'Recompute findings'}
+          </button>
+        </div>
       </div>
 
       <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-[#E3E0FB] pt-5 lg:grid-cols-4">
@@ -599,7 +646,15 @@ function RuleStatusPanel({ ruleStatus }: { ruleStatus: FeesIntelligencePayload['
 
 /* ========================================================== 3. trends */
 
-function Trends({ data, onSelectClass }: { data: FeesIntelligencePayload; onSelectClass: (row: FeesClass) => void }) {
+function Trends({
+  data,
+  show,
+  onSelectClass,
+}: {
+  data: FeesIntelligencePayload;
+  show: (id: FeesIntelligenceWidgetId) => boolean;
+  onSelectClass: (row: FeesClass) => void;
+}) {
   const { trends, position, coverage } = data;
 
   const charts = useMemo(
@@ -620,6 +675,26 @@ function Trends({ data, onSelectClass }: { data: FeesIntelligencePayload; onSele
     charts.modes.length === 0 &&
     charts.aging.length === 0;
 
+  const shown = {
+    cycles: show('chart.cycle_trend'),
+    classes: show('chart.class_breakdown'),
+    heads: show('chart.head_breakdown'),
+    aging: show('chart.aging_profile'),
+    modes: show('chart.payment_mode_mix'),
+  };
+  const shownCount = Object.values(shown).filter(Boolean).length;
+
+  // A chart draws nothing without data (these are the charts' own checks). If
+  // only the charts this user hid have any, drop the section rather than head
+  // an empty grid.
+  const anyShownDraws =
+    (shown.cycles && charts.cycles.length >= 2) ||
+    (shown.classes && charts.classes.length > 0) ||
+    (shown.heads && charts.heads.length > 0) ||
+    (shown.aging && charts.aging.some((band) => band.amount > 0)) ||
+    (shown.modes && charts.modes.length > 0);
+  if (!nothing && !anyShownDraws) return null;
+
   return (
     <Section
       eyebrow="Trends"
@@ -636,12 +711,15 @@ function Trends({ data, onSelectClass }: { data: FeesIntelligencePayload; onSele
           }
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <CycleTrend cycles={charts.cycles} />
-          <ClassBreakdown classes={charts.classes} baseline={position?.collectionRate ?? null} onSelect={onSelectClass} />
-          <HeadBreakdown heads={charts.heads} />
-          <AgingProfile bands={charts.aging} />
-          <PaymentModeMix modes={charts.modes} />
+        // A lone remaining chart takes the full row instead of leaving a gap.
+        <div className={`grid grid-cols-1 gap-4 ${shownCount > 1 ? 'xl:grid-cols-2' : ''}`}>
+          {shown.cycles ? <CycleTrend cycles={charts.cycles} /> : null}
+          {shown.classes ? (
+            <ClassBreakdown classes={charts.classes} baseline={position?.collectionRate ?? null} onSelect={onSelectClass} />
+          ) : null}
+          {shown.heads ? <HeadBreakdown heads={charts.heads} /> : null}
+          {shown.aging ? <AgingProfile bands={charts.aging} /> : null}
+          {shown.modes ? <PaymentModeMix modes={charts.modes} /> : null}
         </div>
       )}
     </Section>
