@@ -294,6 +294,12 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   'lms/lmsassignment_submission': '/lms/lmsAssignment_submission',
   'lmsannotate_assignment.index': '/lms/lmsAnnotate_assignment',
   'lms/lmsannotate_assignment': '/lms/lmsAnnotate_assignment',
+  // Send Worksheet / Send Project — same AssignWorkPanel as Assignment above,
+  // given their own work type. See app/lms/lmsWorksheet, app/lms/lmsProject.
+  'lmsworksheet.index': '/lms/lmsWorksheet',
+  'lms/lmsworksheet': '/lms/lmsWorksheet',
+  'lmsproject.index': '/lms/lmsProject',
+  'lms/lmsproject': '/lms/lmsProject',
 };
 
 /**
