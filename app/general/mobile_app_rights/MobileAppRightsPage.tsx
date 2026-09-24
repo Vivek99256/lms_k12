@@ -18,6 +18,7 @@ import { RecordTable, type RecordColumn } from "@/components/erp/RecordTable";
 import { errorMessage } from "@/lib/erp-legacy";
 import { Modal } from "@/components/result/primitives";
 import {
+  createMobileConfig,
   loadMobileAppRightsBootstrap,
   loadMobileConfig,
   loadMobileRights,
@@ -59,6 +60,269 @@ function emptyConfigInput(profileName: MobileConfigProfile): MobileConfigUpdateI
   };
 }
 
+type ConfigFieldsProps = {
+  idPrefix: string;
+  input: MobileConfigUpdateInput;
+  onChange: (updater: (current: MobileConfigUpdateInput) => MobileConfigUpdateInput) => void;
+  mobilePages: MobilePageSummary[];
+  mainTitleOptions: string[];
+};
+
+// Shared by the Edit and Add Menu Item modals so a brand-new icon behaves
+// identically to an edited one from the moment it's created.
+function ConfigFields({ idPrefix, input, onChange, mobilePages, mainTitleOptions }: ConfigFieldsProps) {
+  return (
+    <>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}_main_title`}>Main Title</Label>
+          <Input
+            id={`${idPrefix}_main_title`}
+            list={`${idPrefix}_main_title_options`}
+            value={input.mainTitle}
+            onChange={(event) => onChange((current) => ({ ...current, mainTitle: event.target.value }))}
+            placeholder="e.g. Admissions"
+          />
+          <datalist id={`${idPrefix}_main_title_options`}>
+            {mainTitleOptions.map((title) => (
+              <option key={title} value={title} />
+            ))}
+          </datalist>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}_main_title_color_code`}>Main Title Color Code</Label>
+          <div className="flex gap-2">
+            <Input
+              id={`${idPrefix}_main_title_color_code`}
+              type="color"
+              value={input.mainTitleColorCode || "#000000"}
+              onChange={(event) => onChange((current) => ({ ...current, mainTitleColorCode: event.target.value }))}
+              className="h-11 w-20 p-1"
+            />
+            <Input
+              value={input.mainTitleColorCode}
+              onChange={(event) => onChange((current) => ({ ...current, mainTitleColorCode: event.target.value }))}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor={`${idPrefix}_main_title_background_image`}>Main Title Background Image</Label>
+          <Input
+            id={`${idPrefix}_main_title_background_image`}
+            value={input.mainTitleBackgroundImage}
+            onChange={(event) =>
+              onChange((current) => ({ ...current, mainTitleBackgroundImage: event.target.value }))
+            }
+          />
+          <div>{previewImage(input.mainTitleBackgroundImage, "Background preview")}</div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}_main_sort_order`}>Main Sort Order</Label>
+          <select
+            id={`${idPrefix}_main_sort_order`}
+            className={erpSelectClass}
+            value={input.mainSortOrder}
+            onChange={(event) => onChange((current) => ({ ...current, mainSortOrder: Number(event.target.value) }))}
+          >
+            {sortOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}_sub_title_of_main`}>Sub Title of Main</Label>
+          <Input
+            id={`${idPrefix}_sub_title_of_main`}
+            value={input.subTitleOfMain}
+            onChange={(event) => onChange((current) => ({ ...current, subTitleOfMain: event.target.value }))}
+            placeholder="e.g. Admission Enquiry"
+          />
+        </div>
+
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor={`${idPrefix}_sub_title_icon`}>Sub Title Icon</Label>
+          <Input
+            id={`${idPrefix}_sub_title_icon`}
+            value={input.subTitleIcon}
+            onChange={(event) => onChange((current) => ({ ...current, subTitleIcon: event.target.value }))}
+          />
+          <div>{previewImage(input.subTitleIcon, "Icon preview")}</div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}_sub_title_sort_order`}>Sub Title Sort Order</Label>
+          <select
+            id={`${idPrefix}_sub_title_sort_order`}
+            className={erpSelectClass}
+            value={input.subTitleSortOrder}
+            onChange={(event) =>
+              onChange((current) => ({ ...current, subTitleSortOrder: Number(event.target.value) }))
+            }
+          >
+            {sortOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}_status`}>Status</Label>
+          <select
+            id={`${idPrefix}_status`}
+            className={erpSelectClass}
+            value={input.status}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                status: event.target.value === "No" ? "No" : "Yes",
+              }))
+            }
+          >
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}_render_type`}>Render Type</Label>
+          <select
+            id={`${idPrefix}_render_type`}
+            className={erpSelectClass}
+            value={input.renderType}
+            onChange={(event) =>
+              onChange((current) => ({ ...current, renderType: event.target.value as MobileConfigUpdateInput["renderType"] }))
+            }
+          >
+            <option value="native">Native</option>
+            <option value="webview">WebView</option>
+            <option value="native_dynamic">Native Dynamic</option>
+          </select>
+        </div>
+
+        {input.renderType === "webview" ? (
+          <>
+            <div className="space-y-2">
+              <Label>Page Source</Label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="radio"
+                    name={`${idPrefix}_page_source`}
+                    checked={input.pageSource === "external"}
+                    onChange={() => onChange((current) => ({ ...current, pageSource: "external" }))}
+                  />
+                  Existing Web Page
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="radio"
+                    name={`${idPrefix}_page_source`}
+                    checked={input.pageSource === "custom"}
+                    onChange={() => onChange((current) => ({ ...current, pageSource: "custom" }))}
+                  />
+                  Custom Mobile Page
+                </label>
+              </div>
+            </div>
+
+            {input.pageSource === "custom" ? (
+              <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}_custom_page_id`}>Custom Page</Label>
+                <div className="flex gap-2">
+                  <select
+                    id={`${idPrefix}_custom_page_id`}
+                    className={erpSelectClass}
+                    value={input.customPageId ?? ""}
+                    onChange={(event) =>
+                      onChange((current) => ({ ...current, customPageId: event.target.value ? Number(event.target.value) : null }))
+                    }
+                  >
+                    <option value="">Select a page…</option>
+                    {mobilePages.map((page) => (
+                      <option key={page.id} value={page.id}>
+                        {page.name} ({page.status})
+                      </option>
+                    ))}
+                  </select>
+                  <Link href="/general/mobile_page_builder" target="_blank">
+                    <Button type="button" variant="outline" size="sm">
+                      <Plus className="size-3.5" />
+                      New
+                    </Button>
+                  </Link>
+                </div>
+                {input.customPageId ? (
+                  <Link
+                    href={`/general/mobile_page_builder/${input.customPageId}/editor`}
+                    target="_blank"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+                  >
+                    Edit Design <ExternalLink className="size-3" />
+                  </Link>
+                ) : null}
+                {input.customPageId && mobilePages.find((p) => p.id === input.customPageId)?.status !== "published" ? (
+                  <p className="text-xs text-amber-700">
+                    This page has not been published yet -- mobile users will see native fallback until it is.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}_web_url`}>Web URL</Label>
+                <Input
+                  id={`${idPrefix}_web_url`}
+                  value={input.webUrl}
+                  onChange={(event) => onChange((current) => ({ ...current, webUrl: event.target.value }))}
+                  placeholder="/fees/fees_collection"
+                />
+              </div>
+            )}
+
+            {input.pageSource === "external" ? (
+              <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}_open_mode`}>Open Mode</Label>
+                <select
+                  id={`${idPrefix}_open_mode`}
+                  className={erpSelectClass}
+                  value={input.openMode}
+                  onChange={(event) =>
+                    onChange((current) => ({ ...current, openMode: event.target.value as MobileConfigUpdateInput["openMode"] }))
+                  }
+                >
+                  <option value="in_app">In App</option>
+                  <option value="external">External</option>
+                </select>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {input.renderType === "native_dynamic" ? (
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}_web_url_page_key`}>Page Key</Label>
+            <Input
+              id={`${idPrefix}_web_url_page_key`}
+              value={input.webUrl}
+              onChange={(event) => onChange((current) => ({ ...current, webUrl: event.target.value }))}
+              placeholder="fees_collect_summary"
+            />
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
 export function MobileAppRightsPage() {
   const [profiles, setProfiles] = useState<MobileAppRightsProfile[]>([]);
   const [configProfiles, setConfigProfiles] = useState<MobileConfigProfile[]>(["Admin", "Teacher", "Student"]);
@@ -89,6 +353,10 @@ export function MobileAppRightsPage() {
   const [editSaving, setEditSaving] = useState(false);
 
   const [mobilePages, setMobilePages] = useState<MobilePageSummary[]>([]);
+
+  const [creating, setCreating] = useState(false);
+  const [createInput, setCreateInput] = useState<MobileConfigUpdateInput>(emptyConfigInput("Student"));
+  const [createSaving, setCreateSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -229,6 +497,34 @@ export function MobileAppRightsPage() {
       setEditSaving(false);
     }
   }
+
+  function openCreate() {
+    setCreateInput(emptyConfigInput(configProfile));
+    setCreating(true);
+  }
+
+  async function saveCreate() {
+    setCreateSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await createMobileConfig(createInput);
+      setNotice(result.message);
+      setCreating(false);
+      if (configSearched && createInput.profileName === configProfile) {
+        await searchConfig();
+      }
+    } catch (value: unknown) {
+      setError(errorMessage(value, "The mobile app menu item could not be created."));
+    } finally {
+      setCreateSaving(false);
+    }
+  }
+
+  const mainTitleOptions = useMemo(
+    () => Array.from(new Set(configRows.map((row) => row.mainTitle).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [configRows]
+  );
 
   const configColumns: Array<RecordColumn<MobileConfigRecord>> = useMemo(
     () => [
@@ -407,6 +703,13 @@ export function MobileAppRightsPage() {
           <ErpLoading label="Loading configuration filters..." />
         ) : (
           <div className="space-y-4">
+            <div className="flex justify-end">
+              <Button type="button" onClick={openCreate} disabled={!permissions.add}>
+                <Plus className="size-4" />
+                Add Menu Item
+              </Button>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-[minmax(0,240px)_minmax(0,200px)_auto] md:items-end">
               <div className="space-y-2">
                 <Label htmlFor="config_profile">User Profile</Label>
@@ -498,251 +801,64 @@ export function MobileAppRightsPage() {
           </>
         }
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="main_title">Main Title</Label>
-            <Input
-              id="main_title"
-              value={editInput.mainTitle}
-              onChange={(event) => setEditInput((current) => ({ ...current, mainTitle: event.target.value }))}
-            />
-          </div>
+        <ConfigFields
+          idPrefix="edit"
+          input={editInput}
+          onChange={setEditInput}
+          mobilePages={mobilePages}
+          mainTitleOptions={mainTitleOptions}
+        />
+      </Modal>
 
-          <div className="space-y-2">
-            <Label htmlFor="main_title_color_code">Main Title Color Code</Label>
-            <div className="flex gap-2">
-              <Input
-                id="main_title_color_code"
-                type="color"
-                value={editInput.mainTitleColorCode || "#000000"}
-                onChange={(event) =>
-                  setEditInput((current) => ({ ...current, mainTitleColorCode: event.target.value }))
-                }
-                className="h-11 w-20 p-1"
-              />
-              <Input
-                value={editInput.mainTitleColorCode}
-                onChange={(event) =>
-                  setEditInput((current) => ({ ...current, mainTitleColorCode: event.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="main_title_background_image">Main Title Background Image</Label>
-            <Input
-              id="main_title_background_image"
-              value={editInput.mainTitleBackgroundImage}
-              onChange={(event) =>
-                setEditInput((current) => ({ ...current, mainTitleBackgroundImage: event.target.value }))
-              }
-            />
-            <div>{previewImage(editInput.mainTitleBackgroundImage, "Background preview")}</div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="main_sort_order">Main Sort Order</Label>
-            <select
-              id="main_sort_order"
-              className={erpSelectClass}
-              value={editInput.mainSortOrder}
-              onChange={(event) =>
-                setEditInput((current) => ({ ...current, mainSortOrder: Number(event.target.value) }))
-              }
+      <Modal
+        open={creating}
+        onClose={() => {
+          if (!createSaving) setCreating(false);
+        }}
+        title="Add Menu Item"
+        description="Creates a brand-new home screen icon -- use this when the menu you want isn't in the list below yet."
+        size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setCreating(false)} disabled={createSaving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void saveCreate()}
+              disabled={createSaving || !createInput.mainTitle || !createInput.subTitleOfMain}
             >
-              {sortOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="sub_title_of_main">Sub Title of Main</Label>
-            <Input
-              id="sub_title_of_main"
-              value={editInput.subTitleOfMain}
-              onChange={(event) =>
-                setEditInput((current) => ({ ...current, subTitleOfMain: event.target.value }))
-              }
-            />
-          </div>
-
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="sub_title_icon">Sub Title Icon</Label>
-            <Input
-              id="sub_title_icon"
-              value={editInput.subTitleIcon}
-              onChange={(event) => setEditInput((current) => ({ ...current, subTitleIcon: event.target.value }))}
-            />
-            <div>{previewImage(editInput.subTitleIcon, "Icon preview")}</div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="sub_title_sort_order">Sub Title Sort Order</Label>
-            <select
-              id="sub_title_sort_order"
-              className={erpSelectClass}
-              value={editInput.subTitleSortOrder}
-              onChange={(event) =>
-                setEditInput((current) => ({ ...current, subTitleSortOrder: Number(event.target.value) }))
-              }
-            >
-              {sortOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <select
-              id="status"
-              className={erpSelectClass}
-              value={editInput.status}
-              onChange={(event) =>
-                setEditInput((current) => ({
-                  ...current,
-                  status: event.target.value === "No" ? "No" : "Yes",
-                }))
-              }
-            >
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          </div>
+              {createSaving ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}
+              Create
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-2">
+          <Label htmlFor="create_profile_name">User Profile</Label>
+          <select
+            id="create_profile_name"
+            className={erpSelectClass}
+            value={createInput.profileName}
+            onChange={(event) =>
+              setCreateInput((current) => ({ ...current, profileName: event.target.value as MobileConfigProfile }))
+            }
+          >
+            {configProfiles.map((profile) => (
+              <option key={profile} value={profile}>
+                {profile}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="mt-4 space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="space-y-2">
-            <Label htmlFor="render_type">Render Type</Label>
-            <select
-              id="render_type"
-              className={erpSelectClass}
-              value={editInput.renderType}
-              onChange={(event) =>
-                setEditInput((current) => ({ ...current, renderType: event.target.value as MobileConfigUpdateInput["renderType"] }))
-              }
-            >
-              <option value="native">Native</option>
-              <option value="webview">WebView</option>
-              <option value="native_dynamic">Native Dynamic</option>
-            </select>
-          </div>
-
-          {editInput.renderType === "webview" ? (
-            <>
-              <div className="space-y-2">
-                <Label>Page Source</Label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input
-                      type="radio"
-                      name="page_source"
-                      checked={editInput.pageSource === "external"}
-                      onChange={() => setEditInput((current) => ({ ...current, pageSource: "external" }))}
-                    />
-                    Existing Web Page
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input
-                      type="radio"
-                      name="page_source"
-                      checked={editInput.pageSource === "custom"}
-                      onChange={() => setEditInput((current) => ({ ...current, pageSource: "custom" }))}
-                    />
-                    Custom Mobile Page
-                  </label>
-                </div>
-              </div>
-
-              {editInput.pageSource === "custom" ? (
-                <div className="space-y-2">
-                  <Label htmlFor="custom_page_id">Custom Page</Label>
-                  <div className="flex gap-2">
-                    <select
-                      id="custom_page_id"
-                      className={erpSelectClass}
-                      value={editInput.customPageId ?? ""}
-                      onChange={(event) =>
-                        setEditInput((current) => ({ ...current, customPageId: event.target.value ? Number(event.target.value) : null }))
-                      }
-                    >
-                      <option value="">Select a page…</option>
-                      {mobilePages.map((page) => (
-                        <option key={page.id} value={page.id}>
-                          {page.name} ({page.status})
-                        </option>
-                      ))}
-                    </select>
-                    <Link href="/general/mobile_page_builder" target="_blank">
-                      <Button type="button" variant="outline" size="sm">
-                        <Plus className="size-3.5" />
-                        New
-                      </Button>
-                    </Link>
-                  </div>
-                  {editInput.customPageId ? (
-                    <Link
-                      href={`/general/mobile_page_builder/${editInput.customPageId}/editor`}
-                      target="_blank"
-                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-                    >
-                      Edit Design <ExternalLink className="size-3" />
-                    </Link>
-                  ) : null}
-                  {editInput.customPageId && mobilePages.find((p) => p.id === editInput.customPageId)?.status !== "published" ? (
-                    <p className="text-xs text-amber-700">
-                      This page has not been published yet -- mobile users will see native fallback until it is.
-                    </p>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="web_url">Web URL</Label>
-                  <Input
-                    id="web_url"
-                    value={editInput.webUrl}
-                    onChange={(event) => setEditInput((current) => ({ ...current, webUrl: event.target.value }))}
-                    placeholder="/fees/fees_collection"
-                  />
-                </div>
-              )}
-
-              {editInput.pageSource === "external" ? (
-                <div className="space-y-2">
-                  <Label htmlFor="open_mode">Open Mode</Label>
-                  <select
-                    id="open_mode"
-                    className={erpSelectClass}
-                    value={editInput.openMode}
-                    onChange={(event) =>
-                      setEditInput((current) => ({ ...current, openMode: event.target.value as MobileConfigUpdateInput["openMode"] }))
-                    }
-                  >
-                    <option value="in_app">In App</option>
-                    <option value="external">External</option>
-                  </select>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-
-          {editInput.renderType === "native_dynamic" ? (
-            <div className="space-y-2">
-              <Label htmlFor="web_url_page_key">Page Key</Label>
-              <Input
-                id="web_url_page_key"
-                value={editInput.webUrl}
-                onChange={(event) => setEditInput((current) => ({ ...current, webUrl: event.target.value }))}
-                placeholder="fees_collect_summary"
-              />
-            </div>
-          ) : null}
+        <div className="mt-4">
+          <ConfigFields
+            idPrefix="create"
+            input={createInput}
+            onChange={setCreateInput}
+            mobilePages={mobilePages}
+            mainTitleOptions={mainTitleOptions}
+          />
         </div>
       </Modal>
     </main>
