@@ -42,6 +42,7 @@ function FlashcardCreateContent() {
   const [error, setError] = useState('');
 
   const contextQuery = h5pContextQuery(ctx);
+  const returnTo = searchParams?.get('return_to') || null;
 
   const updateCard = (index: number, patch: Partial<FlashcardInput>) => {
     setCards((prev) => prev.map((card, i) => (i === index ? { ...card, ...patch } : card)));
@@ -102,7 +103,7 @@ function FlashcardCreateContent() {
           title="Add flash cards"
           description="Create one or more flash cards for this chapter"
           ctx={ctx}
-          backHref={`/h5p/h5p_flashacard?${contextQuery}`}
+          backHref={returnTo ?? `/h5p/h5p_flashacard?${contextQuery}`}
         />
 
         {!hasH5pContext(ctx) ? (
