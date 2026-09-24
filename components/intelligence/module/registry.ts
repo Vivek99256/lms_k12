@@ -100,6 +100,20 @@ export interface RegisteredIntelligenceModule {
   moduleSlug?: string;
 
   /**
+   * Every OTHER `fees_menu_categories.module_name` this one screen serves.
+   *
+   * One Intelligence screen frequently serves several menu modules — the staff
+   * domain is six of them — and `moduleSlug` can only name the canonical one.
+   * Without this list the others fall through to label guessing, which is how
+   * the "Users" bar (module_name `user-i-card`) reached the Enterprise Brain
+   * fallback: de-slugifying gave "user i card" and the matcher wanted
+   * "user i-card".
+   *
+   * Declared from the live `fees_menu_categories` rows, never guessed.
+   */
+  moduleSlugs?: string[];
+
+  /**
    * How to recognise this module in the LMS's own menu.
    *
    * ── WHY THE MATCHER LIVES HERE ──────────────────────────────────────────
@@ -330,12 +344,20 @@ export const INTELLIGENCE_MODULES: RegisteredIntelligenceModule[] = [
     loadContract: async () => (await import('./contracts/result')).resultIntelligenceContract,
     note: 'Built on result_personalize_marks (1.3M rows), NOT result_marks (12 rows) — the profiler found that, and the consolidate report was fixed to read the same table. Six rules run per request; the L5 loop is wired.',
     nav: (label, link, hrefs) =>
-      label === 'result' ||
-      label === 'result template' ||
-      label === 'hpc skillset' ||
-      label === 'hpc activity' ||
-      link.includes('result') ||
-      hrefs.some((h) => h.toLowerCase().includes('/result/')),
+      // Document Templates is NOT Result, however much its routes look like it.
+      // Its screens live under `/result/templates`, so both the `link` test and
+      // the `/result/` route family below claimed it — and because this entry
+      // sits earlier in the array than the document-templates one, `find()`
+      // returned Result first. A bursar opening the template library was shown
+      // marks. The guard is an exact label match, so a genuine Result menu is
+      // untouched.
+      label !== 'document templates' &&
+      (label === 'result' ||
+        label === 'result template' ||
+        label === 'hpc skillset' ||
+        label === 'hpc activity' ||
+        link.includes('result') ||
+        hrefs.some((h) => h.toLowerCase().includes('/result/'))),
   },
   {
     key: 'attendance',
@@ -541,6 +563,10 @@ export const INTELLIGENCE_MODULES: RegisteredIntelligenceModule[] = [
     label: 'HR & Staff Intelligence',
     route: '/user',
     status: 'live',
+    // The six staff menu modules this one screen serves, taken from their live
+    // `fees_menu_categories` rows. `user-i-card` is the level-2 row labelled
+    // "Users" (tblmenumaster 105) — the bar a person actually clicks.
+    moduleSlugs: ['user', 'user-i-card', 'user-attendance', 'leave', 'payroll', 'hrms-report', 'hrit-management'],
     ladder: 'L5',
     loadContract: async () => (await import('./contracts/hr')).hrIntelligenceContract,
     note:
@@ -899,6 +925,88 @@ export const INTELLIGENCE_MODULES: RegisteredIntelligenceModule[] = [
     // was verified against the live menu row and is not used as a label by
     // any other registered module, is the only safe signal.
     nav: (label) => label === 'lms',
+  },
+
+  /*
+   * ââ FOUR MODULES THAT USED TO ANSWER "The Brain does not watch this menu" ââ
+   *
+   * Each declares `moduleSlug`, so `intelligenceEntryFor` matches it by exact
+   * equality against `fees_menu_categories.module_name` and never has to guess
+   * from a label. That is deliberate: label guessing is what once gave
+   * document-templates the RESULT contract, so a bursar opening the template
+   * library was shown marks.
+   *
+   * `nav` is still declared for the sidebar path, which resolves by label and
+   * route family rather than by slug.
+   */
+  {
+    key: 'petty-cash',
+    label: 'Petty Cash Intelligence',
+    route: '/modules/petty-cash',
+    status: 'live',
+    ladder: 'L3',
+    moduleSlug: 'petty-cash',
+    loadContract: async () => (await import('./contracts/petty-cash')).pettyCashIntelligenceContract,
+    note:
+      'Built on petty_cash (215 rows) and petty_cash_master. There is no approval or payment column on the ' +
+      'claims table, so the screen reports spending and evidence, never approval status. No syear: figures are ' +
+      'all-time per institute.',
+    nav: (label, link, hrefs) =>
+      label === 'petty cash' ||
+      link === 'petty_cash' ||
+      hrefs.some((h) => h.toLowerCase().includes('/petty-cash/') || h.toLowerCase().includes('/petty_cash/')),
+  },
+  {
+    key: 'document-templates',
+    label: 'Document Templates Intelligence',
+    route: '/modules/document-templates',
+    status: 'live',
+    ladder: 'L3',
+    moduleSlug: 'document-templates',
+    loadContract: async () =>
+      (await import('./contracts/document-templates')).documentTemplatesIntelligenceContract,
+    note:
+      'Built on template_master and result_template_master, both tenant-scoped. ai_templates is EXCLUDED: all 143 ' +
+      'rows leave sub_institute_id empty because they are product-shipped prompt templates, not an instituteâs ' +
+      'documents. Previously mis-resolved to the Result contract.',
+    nav: (label, link, hrefs) =>
+      label === 'document templates' ||
+      link === 'document_templates' ||
+      hrefs.some((h) => h.toLowerCase().includes('/document-templates/')),
+  },
+  {
+    key: 'ptm',
+    label: 'PTM Intelligence',
+    route: '/modules/ptm',
+    status: 'live',
+    ladder: 'L3',
+    moduleSlug: 'ptm',
+    loadContract: async () => (await import('./contracts/ptm')).ptmIntelligenceContract,
+    note:
+      'Built on ptm_time_slots_master (syear + sub_institute_id) and ptm_booking_master (SUB_INSTITUTE_ID, no ' +
+      'syear) â bookings are year-scoped through their slot. PTM_ATTENDED_STATUS holds the words Yes/No plus a ' +
+      '"--Select Status--" placeholder, which counts as unmarked rather than absent.',
+    nav: (label, link, hrefs) =>
+      label === 'ptm' ||
+      link === 'ptm' ||
+      hrefs.some((h) => h.toLowerCase().includes('/ptm/')),
+  },
+  {
+    key: 'consent',
+    label: 'Consent Intelligence',
+    route: '/modules/consent',
+    status: 'live',
+    ladder: 'L3',
+    moduleSlug: 'consent',
+    loadContract: async () => (await import('./contracts/consent')).consentIntelligenceContract,
+    note:
+      'Built on consent_master (sub_institute_id + syear). Rows carry an amount and an imprest head, so this is ' +
+      'consent with money attached. The status integer is grouped but never translated: its meaning is set by the ' +
+      'instituteâs own screens.',
+    nav: (label, link, hrefs) =>
+      label === 'consent' ||
+      link === 'consent' ||
+      hrefs.some((h) => h.toLowerCase().includes('/consent/')),
   },
 ];
 

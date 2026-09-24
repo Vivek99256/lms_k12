@@ -102,9 +102,18 @@ test('the canonical Intelligence route is /modules/<slug>/intelligence', () => {
 });
 
 test('both canonical module routes have a page', () => {
-  for (const route of ['modules/[module]/intelligence', 'modules/[module]/[category]']) {
-    const page = path.join(APP_DIR, route, 'page.tsx');
-    assert.ok(existsSync(page), `${route} has no page.tsx — its URLs would 404`);
+  /*
+   * ASSERTED AS URLs, NOT AS FOLDER NAMES.
+   *
+   * This test used to name the directories directly — `modules/[module]/…`.
+   * They were later renamed to `[moduleKey]`/`[categoryKey]`, and the test then
+   * failed while every URL it protects still resolved perfectly: it was
+   * reporting a rename as a 404. What actually has to hold is that a canonical
+   * module URL reaches a page, whatever the segments are spelled, so that is
+   * what is asserted. It still fails if either route is genuinely deleted.
+   */
+  for (const url of ['/modules/student/intelligence', '/modules/student/reports']) {
+    assert.ok(pageExistsForHref(url), `${url} resolves to no page — it would 404`);
   }
 });
 

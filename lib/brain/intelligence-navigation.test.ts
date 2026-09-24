@@ -172,6 +172,13 @@ test('a module that appears in the LMS menu gets an Intelligence item beneath it
     // (230); the label alone must resolve it, because its own children
     // resolve to route-name identifiers rather than real paths.
     'lms-activity': 'LMS',
+
+    // Added with their contracts. Each matches on its own bare label, which is
+    // what the module's level-2 row actually carries.
+    'petty-cash': 'Petty Cash',
+    'document-templates': 'Document Templates',
+    ptm: 'PTM',
+    consent: 'Consent',
   };
 
   // task-management is deliberately NOT label-matched (an unrelated legacy

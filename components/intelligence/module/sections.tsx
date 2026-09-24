@@ -14,6 +14,7 @@ import {
   SeverityChip,
   SeverityRail,
   Surface,
+  NoData,
   Unavailable,
   toneFor,
   toneForResult,
@@ -56,7 +57,21 @@ export function SummarySection({
   summary: SummaryBlock;
   metrics: MetricGroup['metrics'];
 }) {
-  if (!summary?.available) return null;
+  // A screen whose summary has nothing to say still renders the summary. Returning
+  // null here was what made a data-poor tenant look like a half-built product:
+  // the section nav pointed at "Summary" and selecting it produced nothing at all.
+  if (!summary?.available) {
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--intel-accent)]">
+          {copy.eyebrow}
+        </p>
+        <h2 className="mt-1.5 text-[17px] font-bold leading-snug tracking-tight text-slate-950">{copy.title}</h2>
+        {/* `bare`: the summary panel around this is already a card. */}
+        <NoData bare reason={summary?.reason} />
+      </section>
+    );
+  }
 
   const sentences = summary.sentences ?? [];
 
