@@ -91,7 +91,7 @@ export default function StudentDashboard() {
           <h1 className="text-2xl font-bold text-slate-900">Hello, {user?.name || 'Student'}</h1>
           <p className="mt-1 text-sm text-slate-500">This page shows where you are, and all students start from the same concept.</p>
           <div className="mt-6">
-            <EmptyState message="Adaptive learning content isn't available for your subjects yet. Check back soon." />
+            <EmptyState message="Concept diagnostic content isn't available for your subjects yet. Check back soon." />
           </div>
         </>
       )}

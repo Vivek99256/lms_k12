@@ -31,6 +31,12 @@ export type AssignmentSubmissionRow = {
   studentId: number;
   /** "Checking" | "Evaluated" | "OCR Failed" | "Evaluation Failed" | "Failed" | "" (not yet submitted) */
   aiStatus: string;
+  /**
+   * "assignment" | "worksheet" | "project" — worksheets and projects are the
+   * same row, assigned and submitted the same way, so the student's list holds
+   * all three. Rows written before the column existed read as "assignment".
+   */
+  workType: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -174,6 +180,7 @@ function toSubmission(row: UnknownRecord): AssignmentSubmissionRow {
     examId: readNumber(row.exam_id),
     studentId: readNumber(row.student_id),
     aiStatus: readString(row.ai_status),
+    workType: readString(row.work_type) || "assignment",
   };
 }
 

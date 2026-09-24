@@ -57,6 +57,9 @@ function formatBytes(bytes: number): string {
 
 const BLOCKING_STATUSES = new Set(["under review", "reviewed"]);
 
+/** The homework sources that carry questions rather than an attachment. */
+const QUESTION_SOURCE_TYPES = ["question_bank", "exam_paper"];
+
 export default function HomeworkDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -195,7 +198,10 @@ export default function HomeworkDetailPage() {
                 </div>
               </dl>
 
-              {detail.homework.sourceType === "question_bank" &&
+              {/* Both question-carrying sources render the same list: the
+                  question bank picks them chapter by chapter, an exam paper
+                  brings its own. */}
+              {QUESTION_SOURCE_TYPES.includes(detail.homework.sourceType ?? "") &&
               detail.homework.questions?.length ? (
                 <div className="space-y-2 border-t border-slate-100 pt-4">
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
@@ -215,7 +221,8 @@ export default function HomeworkDetailPage() {
                         </span>
                         <span className="flex shrink-0 items-center gap-2">
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                            Type {question.questionTypeId}
+                            {question.questionTypeLabel ||
+                              `Type ${question.questionTypeId}`}
                           </span>
                           <span className="text-xs text-slate-400">
                             {question.points} pts

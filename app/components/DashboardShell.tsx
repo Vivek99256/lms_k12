@@ -20,9 +20,7 @@ import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/
 import { canSeeInternalItems } from '@/lib/roadmap';
 import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
-import { useFeesLevel3Nav } from '@/app/fees/_lib/use-fees-level3-nav';
-import { useTeachLearnLevel3Nav } from '@/app/teach-learn/_lib/use-teach-learn-level3-nav';
-import { useModuleLevel3Nav } from '@/app/modules/_lib/use-module-level3-nav';
+import { useModuleLevel3Nav } from '@/app/_lib/use-module-level3-nav';
 
 interface SelectedBranch {
   level1Key: string;
@@ -165,6 +163,11 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
     label: 'Gamification',
     href: '/pal/new/gamification',
   },
+  {
+    id: 'pal-ai-stack',
+    label: 'AI Stack',
+    href: '/pal/new/ai-stack',
+  },
 ];
 
 /** `href` itself, or a page nested under it — never a sibling that merely shares a prefix. */
@@ -240,6 +243,35 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [userProfileName, setUserProfileName] = useState('');
   const [hasBrainAccess, setHasBrainAccess] = useState(() => isBrainVisibleByLmsSession());
   const [isStudent, setIsStudent] = useState(() => isStudentSession());
+
+  /*
+    The shell is a fixed-viewport app: it is exactly 100vh, it clips its own
+    overflow, and the page scrolls inside <main> — which wears .scrollbar-hide,
+    so its scrollbar is deliberately invisible.
+
+    That makes any scrollbar on the document itself both a bug and a trap: what
+    it scrolls to is the clipped area below the shell, an empty band of canvas
+    with the sidebar and header dragged off-screen above it, and because the
+    page's own scrollbar is hidden, that stray bar is the only one a user can
+    see or grab. Anything that lands in <body> outside the shell — a portalled
+    popover left behind, an absolutely positioned stray — grows the document
+    that way without ever growing the page.
+
+    Nothing reachable lives there, so the document does not scroll while the
+    shell is mounted. Restored on unmount, because the routes that render
+    outside the shell (login, the full-bleed template editor) get the document
+    back as they found it.
+  */
+  useEffect(() => {
+    const { body } = document;
+    const previous = body.style.overflow;
+
+    body.style.overflow = 'hidden';
+
+    return () => {
+      body.style.overflow = previous;
+    };
+  }, []);
 
   useEffect(() => {
     const ctx = getStoredMenuContext();
@@ -329,12 +361,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const isKnownMenuPath = useCallback((checkPath: string): boolean => {
     const lower = (checkPath || '').toLowerCase();
-    // `/modules/**` is the canonical module namespace — every category page and
-    // every Intelligence screen lives there. Those routes are configuration
-    // rows rather than tblmenumaster links, so the scan below can never find
-    // them; treating them as unknown would bounce a deep link or a refresh
-    // back to the module's first level-3 screen.
-    if (!lower || lower === '/dashboard' || lower === '/' || lower.endsWith('/intelligence') || lower.startsWith('/modules/')) return true;
+    if (!lower || lower === '/dashboard' || lower === '/') return true;
 
     for (const item of displayedMenuItems) {
       // Check link field first (from API), then fallback to href
@@ -359,7 +386,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   useEffect(() => {
     if (!displayedMenuItems.length || selectedBranch) return;
 
-    const currentPath = pathname.toLowerCase().replace(/\/+$/, '');
+    const currentPath = pathname.toLowerCase();
     // Most specific branch wins. Enterprise Brain's Overview section is routed
     // at /enterprise-brain, a prefix of every other Brain route, so a
     // first-match scan would select Overview for all of them.
@@ -371,38 +398,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         const level2Route = level2.link ? mapApiLinkToRoute(level2.link) : level2.href;
         const level3Route = level2.submenus
           ?.map((level3) => (level3.link ? mapApiLinkToRoute(level3.link) : level3.href))
-          .find((route) => {
-            if (!route || route === '#') return false;
-            const r = route.toLowerCase().replace(/\/+$/, '');
-            if (currentPath === r) return true;
-            // Any page in the canonical module namespace belongs to the module
-            // whose Intelligence route carries the same slug — that item is the
-            // one `/modules/<slug>/...` route the menu tree knows about, so it
-            // is what ties /modules/student/reports back to the Student branch
-            // on a refresh or a deep link.
-            if (currentPath.startsWith('/modules/') && r.startsWith('/modules/')) {
-              const slug = currentPath.split('/')[2];
-              if (slug && slug === r.split('/')[2]) return true;
-            }
-            if (currentPath.endsWith('/intelligence') && r.endsWith('/intelligence')) {
-              const cMod = currentPath.split('/')[1];
-              const rMod = r.split('/')[1];
-              if (
-                cMod === rMod ||
-                (cMod.startsWith('student') && rMod.startsWith('student')) ||
-                (cMod === 'hr' && rMod === 'user') ||
-                (cMod === 'user' && rMod === 'hr') ||
-                (cMod.startsWith('transport') && rMod.startsWith('transport')) ||
-                (cMod.startsWith('inventor') && rMod.startsWith('inventor')) ||
-                (cMod.startsWith('communication') && rMod.startsWith('easy_com')) ||
-                (cMod.startsWith('easy_com') && rMod.startsWith('communication')) ||
-                (cMod.startsWith('homework') && r.includes('homework'))
-              ) {
-                return true;
-              }
-            }
-            return false;
-          });
+          .find((route) => route !== '#' && currentPath === route.toLowerCase());
         const level2Match = level2Route !== '#' && currentPath.startsWith(level2Route.toLowerCase());
         const dashboardRoute = resolveModuleDashboardRoute(level2.label);
         const dashboardMatch = Boolean(dashboardRoute && currentPath.startsWith(dashboardRoute.toLowerCase()));
@@ -685,38 +681,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     return selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key) ?? null;
   }, [selectedBranch, selectedL1]);
 
-  const feesLevel3Menu = useFeesLevel3Nav({
-    selectedLevel2Label: selectedL2?.label,
-    pathname,
-  });
-
-  const teachLearnLevel3Menu = useTeachLearnLevel3Nav({
-    selectedLevel2Label: selectedL2?.label,
-    pathname,
-  });
-
-  // New PAL's sub-nav is a pure function of the route and the menu tree, so it
-  // is resolved here rather than inside the level3Menu block below — the
-  // module hook underneath has to know whether it has already been claimed,
-  // and a hook cannot be called conditionally.
-  const newPalItems = newPalLevel3Items(pathname, displayedMenuItems);
-
   /**
-   * Every other module's category bar — Onboarding, Process Builder, Master
-   * Setup, Operations, Reports, Intelligence, Help Guide/Support,
-   * Communication, AI Stack — from the same configuration rows Fees and
-   * Teach/Learn read above, keyed by the level-2 menu row the user selected or
-   * by the `/modules/<slug>/…` path they are standing on.
-   *
-   * It stands down for the three navigations resolved before it, and returns
-   * null for any module with no configured categories, so nothing that has its
-   * own navigation today is touched.
+   * Every module's category bar comes from here — Fees and Teach/Learn
+   * included, which used to have a hook each. The module is resolved from the
+   * selected level-2 menu's id rather than its label, because two active
+   * level-2 menus are both named "Task Management".
    */
   const moduleLevel3Menu = useModuleLevel3Nav({
     selectedLevel2Id: selectedL2?.id,
-    selectedLevel2Label: selectedL2?.label,
     pathname,
-    disabled: Boolean(newPalItems || feesLevel3Menu || teachLearnLevel3Menu.navigation),
   });
 
   const searchLevel3FromMenu = (items: MenuItem[], path: string): { parentLabel: string; items: Level3Item[] } | null => {
@@ -755,28 +728,19 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // New PAL brings its own sub-nav. Every other route — including the legacy
     // PAL workspace under LMS + PAL → Test → PAL — falls through to the normal
     // menu-driven resolution below and gets whatever its own menu defines.
+    const newPalItems = newPalLevel3Items(pathname, displayedMenuItems);
     if (newPalItems) {
       return { parentLabel: 'New PAL', items: newPalItems };
     }
-    // Fees shows its seven categories here; each links to its own page, which
-    // carries that category's menus as its own tab bar. The hook returns null
-    // for every non-Fees context, so no other module's navigation is affected.
-    // For Fees it never returns null — it holds a loading placeholder instead —
-    // so the old Fees level-3 list below is unreachable, even for one frame.
-    if (feesLevel3Menu) {
-      return feesLevel3Menu;
-    }
-    // Teach/Learn shows its category tabs here, the same way Fees does above;
-    // the hook returns null for every non-Teach/Learn context, so no other
-    // module's navigation is affected.
-    if (teachLearnLevel3Menu.navigation) {
-      return teachLearnLevel3Menu.navigation;
-    }
-    // Every other configured module's category bar. Null until its categories
-    // are known, and null for good if the module has none — the module then
-    // keeps the flat level-3 list resolved below, exactly as before.
-    if (moduleLevel3Menu) {
-      return moduleLevel3Menu;
+    // A module with a seeded category bar shows its categories here; each
+    // links to its own page, which carries that category's menus as its own
+    // tab bar. The hook returns null for every module without a bar, so those
+    // fall through to the menu-driven resolution below and are unaffected. For
+    // a module that has one it never returns null — it holds a loading
+    // placeholder instead — so that module's old flat level-3 list is
+    // unreachable, even for one frame.
+    if (moduleLevel3Menu.navigation) {
+      return moduleLevel3Menu.navigation;
     }
     if (selectedL2?.submenus?.length) {
       return { parentLabel: selectedL2.label, items: selectedL2.submenus as Level3Item[] };
@@ -801,7 +765,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         loading={loading}
         error={error}
         refetch={refetch}
-        dynamicLevel2Counts={{ 'teach/learn': teachLearnLevel3Menu.categoryCount }}
+        dynamicLevel2Counts={moduleLevel3Menu.level2Counts}
         onLevel1Select={handleLevel1Select}
         onLevel2Select={handleLevel2Select}
       />
@@ -880,4 +844,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     </PageAiContextProvider>
   );
 }
+
+
+
+
+
+
 

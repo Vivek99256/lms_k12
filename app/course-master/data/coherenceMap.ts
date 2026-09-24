@@ -71,23 +71,25 @@ export type CoherenceEdge = {
   tagged_by: string;
   /** Row id in its own table; null for hierarchy edges, which are derived not stored. */
   relation_id: number | null;
-  /**
-   * Which store the row lives in.
-   *
-   * 'concept' and 'learning' are the reviewable ones - the PATCH and DELETE routes
-   * address those two and only those two.
-   *
-   * 'expert' is `concept_prerequisite`, the map the curriculum team authored and
-   * imported. It arrives already approved, it carries the author's `note`, and it has
-   * no review workflow behind it - so the UI must render it read-only rather than
-   * offering Approve / Dismiss / Remove buttons that would 404.
-   */
+  /** Which table the row lives in. Needed to address it for review or delete. */
   source_table: 'concept' | 'learning' | 'expert' | null;
   relation_type: string | null;
   link_type: string | null;
   confidence: number | null;
   note: string | null;
 };
+
+/**
+ * Whether an edge can be reviewed or deleted through `reviewRelation` /
+ * `deleteRelation` — both take `sourceTable` and `relationId`, so an edge
+ * needs both to be addressable. Hierarchy edges are derived, not stored, and
+ * carry neither.
+ */
+export function isReviewableEdge(
+  edge: CoherenceEdge
+): edge is CoherenceEdge & { source_table: 'concept' | 'learning'; relation_id: number } {
+  return edge.relation_id !== null && (edge.source_table === 'concept' || edge.source_table === 'learning');
+}
 
 export type CoherenceMeta = {
   sub_institute_id: number;
@@ -105,14 +107,6 @@ export type CoherenceMeta = {
    * cannot honour.
    */
   topic_level_available: boolean;
-  /**
-   * Academic years this subject+grade does have chapters for.
-   *
-   * Only sent when the requested year returned none. It is what separates "this
-   * subject has no curriculum" from "the app is pointed at the wrong year", which
-   * look identical on screen and have completely different fixes.
-   */
-  available_syears?: number[];
 };
 
 export type CoherenceStats = {
@@ -131,27 +125,11 @@ export type CoherenceStats = {
   cycle_nodes: string[];
 };
 
-/**
- * Which concept the server says to centre on.
- *
- * Only present on the concept-located fetch. The caller asked by entity id; the graph
- * speaks in typed refs, so the server hands back the ref rather than making the client
- * rebuild the string.
- */
-export type CoherenceFocus = {
-  ref: string;
-  entity_id: number;
-  label: string;
-  subject_id: number;
-  standard_id: number;
-};
-
 export type CoherenceMap = {
   meta: CoherenceMeta;
   nodes: CoherenceNode[];
   edges: CoherenceEdge[];
   stats: CoherenceStats;
-  focus?: CoherenceFocus;
 };
 
 type Envelope<T> = { status: boolean; message?: string; data?: T; errors?: unknown };
@@ -201,7 +179,7 @@ export async function fetchCoherenceMap(
   session: CurriculumSession,
   subjectId: string | number,
   standardId: string | number,
-  options: { includeSuggested?: boolean; includeCrossGrade?: boolean; syear?: string | number } = {}
+  options: { includeSuggested?: boolean; includeCrossGrade?: boolean } = {}
 ): Promise<CoherenceMap> {
   const query = new URLSearchParams({
     subject_id: String(subjectId),
@@ -212,11 +190,7 @@ export async function fetchCoherenceMap(
 
   // syear is optional server-side: omitted, the backend takes the newest
   // curriculum for the subject rather than guessing a year the tenant is not on.
-  // An explicit `options.syear` overrides the session's, which is how the empty
-  // state offers "show me the year that does have curriculum" without making the
-  // teacher go and change the global academic-year selector first.
-  const syear = options.syear ?? session.academicYearId;
-  if (syear) query.set('syear', String(syear));
+  if (session.academicYearId) query.set('syear', session.academicYearId);
 
   const response = await fetch(`${baseUrl(session)}/api/lms/coherence-map?${query.toString()}`, {
     method: 'GET',
@@ -224,60 +198,6 @@ export async function fetchCoherenceMap(
   });
 
   return unwrap<CoherenceMap>(response);
-}
-
-/**
- * The map located by a concept instead of by a subject and grade.
- *
- * This is what makes the map walkable across classes 6-10. A prerequisite from a lower
- * grade arrives as an `off_map` node; centring on it needs that concept's OWN subject
- * and grade, which the client has no way to name in advance. Sending the concept id and
- * letting the server resolve the scope avoids inventing a client-side lookup for
- * something the concept row already knows.
- *
- * Returns the same shape as `fetchCoherenceMap`, plus `focus` naming the node to centre.
- */
-export async function fetchCoherenceMapForConcept(
-  session: CurriculumSession,
-  conceptEntityId: string | number,
-  options: { includeSuggested?: boolean; includeCrossGrade?: boolean } = {}
-): Promise<CoherenceMap> {
-  const query = new URLSearchParams({
-    include_suggested: options.includeSuggested === false ? '0' : '1',
-    include_cross_grade: options.includeCrossGrade === false ? '0' : '1',
-  });
-
-  const response = await fetch(
-    `${baseUrl(session)}/api/lms/coherence-map/concept/${encodeURIComponent(String(conceptEntityId))}?${query.toString()}`,
-    { method: 'GET', headers: headers(session) }
-  );
-
-  return unwrap<CoherenceMap>(response);
-}
-
-/**
- * Whether this edge can be reviewed or deleted.
- *
- * Two kinds of edge cannot, and both reach the UI looking much like one that can:
- *
- * - **expert** rows come from `concept_prerequisite`. They are authored by the
- *   curriculum team, arrive already approved, and the PATCH / DELETE routes do not
- *   address that table - the route constraint is literally `concept|learning`.
- * - **hierarchy** edges are derived from `parent_id`, not stored, so they carry
- *   `relation_id: null` and there is no row to address.
- *
- * Offering Approve / Dismiss / Remove on either produces a request to
- * `/relations/expert/12` or `/relations/null/null`. Call this before rendering those
- * buttons AND before firing the handler, because a card that lists every incident edge
- * makes it easy to lose the check in one place but not the other.
- */
-export function isReviewableEdge(
-  edge: CoherenceEdge
-): edge is CoherenceEdge & { source_table: 'concept' | 'learning'; relation_id: number } {
-  return (
-    (edge.source_table === 'concept' || edge.source_table === 'learning') &&
-    edge.relation_id !== null
-  );
 }
 
 export type RelationMutationResult = {
@@ -370,20 +290,11 @@ export function useCoherenceMap(
   loading: boolean;
   error: string | null;
   reload: () => void;
-  /**
-   * Refetch against a different academic year.
-   *
-   * The map is scoped by year, and the year comes from a selector that lives on
-   * another screen. When the chosen one has no curriculum but another does, this is
-   * what lets the teacher see it from here instead of hunting for the selector.
-   */
-  viewYear: (syear: number) => void;
   /** Apply a mutation result locally so an approval shows instantly, without a refetch. */
   applyEdge: (edge: CoherenceEdge) => void;
   removeEdge: (edgeId: string) => void;
 } {
-  const [syearOverride, setSyearOverride] = useState<number | null>(null);
-  const key = `${subjectId}|${standardId ?? ''}|${syearOverride ?? ''}`;
+  const key = `${subjectId}|${standardId ?? ''}`;
 
   /**
    * One piece of state for the whole request, stamped with the scope it answers.
@@ -409,9 +320,7 @@ export function useCoherenceMap(
 
     let cancelled = false;
 
-    fetchCoherenceMap(session, subjectId, standardId ?? subjectId, {
-      ...(syearOverride === null ? {} : { syear: syearOverride }),
-    })
+    fetchCoherenceMap(session, subjectId, standardId ?? subjectId)
       .then((data) => {
         if (!cancelled) setResult({ key, map: data, error: null });
       })
@@ -428,11 +337,9 @@ export function useCoherenceMap(
     return () => {
       cancelled = true;
     };
-  }, [key, subjectId, standardId, nonce, session, syearOverride]);
+  }, [key, subjectId, standardId, nonce, session]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
-
-  const viewYear = useCallback((syear: number) => setSyearOverride(syear), []);
 
   const applyEdge = useCallback((edge: CoherenceEdge) => {
     setResult((current) => {
@@ -440,15 +347,19 @@ export function useCoherenceMap(
 
       // A rejected edge leaves the map entirely — it is a decision to stop showing
       // the suggestion, not a state to render.
-      return { ...current, map: applyEdgeTo(current.map, edge) };
+      const others = current.map.edges.filter((e) => e.id !== edge.id);
+      const edges = edge.status === 'rejected' ? others : [...others, edge];
+
+      return { ...current, map: { ...current.map, edges, stats: recount(current.map, edges) } };
     });
   }, []);
 
   const removeEdge = useCallback((edgeId: string) => {
     setResult((current) => {
       if (!current?.map) return current;
+      const edges = current.map.edges.filter((e) => e.id !== edgeId);
 
-      return { ...current, map: removeEdgeFrom(current.map, edgeId) };
+      return { ...current, map: { ...current.map, edges, stats: recount(current.map, edges) } };
     });
   }, []);
 
@@ -464,7 +375,6 @@ export function useCoherenceMap(
     loading: sessionError === null && !settled,
     error: sessionError ?? (settled ? result.error : null),
     reload,
-    viewYear,
     applyEdge,
     removeEdge,
   };
@@ -478,27 +388,6 @@ export function useCoherenceMap(
  * the browser would be a second implementation of the traversal and the two would
  * eventually disagree.
  */
-/**
- * Apply a mutation result to a map, returning a new one.
- *
- * Exported because the focus view can be looking at a map fetched for ANOTHER scope -
- * the one it walked into when following a prerequisite across grades - which this
- * hook does not own. Both paths have to agree that a rejected edge leaves the map
- * entirely, so the rule lives in one place rather than being written twice.
- */
-export function applyEdgeTo(map: CoherenceMap, edge: CoherenceEdge): CoherenceMap {
-  const others = map.edges.filter((e) => e.id !== edge.id);
-  const edges = edge.status === 'rejected' ? others : [...others, edge];
-
-  return { ...map, edges, stats: recount(map, edges) };
-}
-
-export function removeEdgeFrom(map: CoherenceMap, edgeId: string): CoherenceMap {
-  const edges = map.edges.filter((e) => e.id !== edgeId);
-
-  return { ...map, edges, stats: recount(map, edges) };
-}
-
 function recount(map: CoherenceMap, edges: CoherenceEdge[]): CoherenceStats {
   let approved = 0;
   let draft = 0;

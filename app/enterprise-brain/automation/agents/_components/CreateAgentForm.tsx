@@ -7,6 +7,7 @@ import { usePermission } from '@/app/hooks/usePermission';
 import { createAgent } from '@/lib/agents/client';
 import { AGENT_MODULES, findModule, rbacModuleKey, toolsForModule, type AgentTool } from '@/lib/agents/registry';
 import type { Agent } from '@/lib/agents/types';
+import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 
 import { Card } from '../../../_components/primitives';
 
@@ -111,14 +112,49 @@ export function CreateAgentForm({
             <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} placeholder="Fee reminder drafter" className={inputClass} />
           </label>
 
-          <label className="block">
-            <span className={labelClass}>Description</span>
-            <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What this agent is for, in one line" className={inputClass} />
-          </label>
+          <div className="block">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="create-agent-description" className={labelClass}>
+                Description
+              </label>
+              <AiFieldAssistant
+                value={description}
+                onApply={setDescription}
+                fieldType="description"
+                label="Description"
+                module={module}
+                page="Automation — Create Agent"
+                entityType="agent"
+                related={name.trim() ? { Agent: name } : undefined}
+              />
+            </div>
+            <input
+              id="create-agent-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="What this agent is for, in one line"
+              className={inputClass}
+            />
+          </div>
 
-          <label className="block sm:col-span-2">
-            <span className={labelClass}>Instructions</span>
+          <div className="block sm:col-span-2">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="create-agent-instructions" className={labelClass}>
+                Instructions
+              </label>
+              <AiFieldAssistant
+                value={instructions}
+                onApply={setInstructions}
+                fieldType="instructions"
+                label="Instructions"
+                module={module}
+                page="Automation — Create Agent"
+                entityType="agent"
+                related={name.trim() ? { Agent: name } : undefined}
+              />
+            </div>
             <textarea
+              id="create-agent-instructions"
               value={instructions}
               onChange={(event) => setInstructions(event.target.value)}
               rows={3}
@@ -126,7 +162,7 @@ export function CreateAgentForm({
               className={inputClass}
             />
             <span className="mt-1 block text-[11px] text-slate-400">Kept with the agent and shown to whoever runs it. Not sent to a model in v1.</span>
-          </label>
+          </div>
         </div>
 
         <fieldset className="mt-5">

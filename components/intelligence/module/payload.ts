@@ -1,215 +1,108 @@
-/**
- * The canonical payload every module's Intelligence endpoint speaks.
- *
- * WHY THIS EXISTS. Fees Intelligence proved the shape of a useful intelligence
- * screen, but it proved it in fee-specific types — `demandAmount`,
- * `collectionRate`, `cycles`, `heads`. Reproducing that per module would give
- * forty payloads, forty screens and forty places for the same bug. This file is
- * the same eight ideas with the fee nouns removed, so one renderer can serve
- * every module.
- *
- * ── The split between this file and contract.ts ──────────────────────────────
- *
- * THE PAYLOAD CARRIES FACTS AND THEIR UNITS. Whether a column is money or a
- * head-count is a property of the data, not a design choice, so the backend
- * says it here and no screen can render marks with a rupee sign.
- *
- * THE CONTRACT CARRIES PRESENTATION — which sections appear, in what order,
- * with what wording. That is a product decision and lives in the frontend.
- *
- * ── The honesty rules this shape enforces ────────────────────────────────────
- *
- *  1. `available` + `reason` on every block. A block with nothing to show says
- *     WHY in the backend's own words. "No students are enrolled this year" and
- *     "marks have not been entered" are different problems with different
- *     answers, and a generic "No data" erases that difference.
- *
- *  2. NULL IS NOT ZERO, everywhere. A pass rate over no candidates is
- *     undefined, not 0%. Every numeric field is nullable for exactly this
- *     reason, and the formatter renders null as an em dash.
- *
- *  3. Nothing reaches `findings` without `evidence`. That is the line between
- *     intelligence and a chart caption.
- */
-
-/* --------------------------------------------------------------- vocabulary */
+import type { MetricFormat } from './format';
+import type { Tone } from './primitives';
 
 /**
- * Presentation tone. Colour is never the only carrier — every tone is rendered
- * beside a word at the call site, and red is reserved for genuine risk.
+ * The canonical Intelligence payload — the generalised form of
+ * `app/fees/intelligence/_lib/fees-intelligence-api.ts`'s `FeesIntelligencePayload`
+ * with the fee nouns removed: money becomes a metric with `format: 'money'`,
+ * "trends" becomes `breakdowns` (a labelled table instead of four named
+ * arrays), everything else keeps its shape. A module's `load()` (see
+ * `./contract.ts`) is responsible for shaping its own endpoint's response into
+ * this, once, so every section renderer here can stay ignorant of which module
+ * it is drawing.
+ *
+ * NOTHING HERE INVENTS A NUMBER — every field is either a value the backend
+ * sent or a string the backend composed. Absence is always distinguished from
+ * zero: a rate over no denominator, an amount nobody measured, and a check
+ * that never ran are three different facts, not one blank.
  */
-export type Tone =
-  | 'critical'
-  | 'high'
-  | 'medium'
-  | 'low'
-  | 'positive'
-  | 'neutral'
-  | 'info'
-  | 'warning'
-  | 'attention'
-  | 'good';
 
-/**
- * How a number should be read. Set by the backend, because it is a fact about
- * the column rather than a styling preference.
- */
-export type ValueFormat =
-  | 'currency'
-  | 'currencyExact'
-  | 'count'
-  | 'percent'
-  | 'decimal'
-  | 'duration'
-  | 'text';
+/* ------------------------------------------------------------------ metrics */
 
-/** Confidence always travels with its word — "High", never a bare 0.85. */
-export interface Confidence {
-  band: string;
-  value: number;
+export interface MetricValue {
+  key: string;
+  label: string;
+  value: number | string | null;
+  format?: MetricFormat;
+  currency?: string;
+  /** Pre-formatted by the backend; used instead of `formatValue(value, format, currency)` when present. */
+  display?: string | null;
+  hint?: string | null;
+  tone?: Tone;
 }
 
-/** One figure a finding rests on. */
+/** A group of metric tiles with one shared availability — a module's Position, or its summary strip. */
+export interface MetricGroup {
+  available: boolean;
+  reason?: string | null;
+  metrics: MetricValue[];
+}
+
+/* --------------------------------------------------------------- breakdowns */
+
+export interface BreakdownColumn {
+  key: string;
+  label: string;
+  format?: MetricFormat;
+  currency?: string;
+}
+
+export interface BreakdownRow {
+  key: string;
+  label: string;
+  note?: string | null;
+  values: Record<string, number | null>;
+}
+
+/** One slice of the module, as a table — Fees' cycles/heads/classes/payment-modes, generalised to one shape. */
+export interface Breakdown {
+  key: string;
+  label: string;
+  description?: string | null;
+  available: boolean;
+  reason?: string | null;
+  /** The column whose value sizes each row's inline bar. */
+  primaryColumn?: string | null;
+  columns: BreakdownColumn[];
+  rows: BreakdownRow[];
+}
+
+/* ----------------------------------------------------------------- shared bits */
+
 export interface EvidencePoint {
   label: string;
   value: string;
   note?: string | null;
 }
 
-/**
- * An impact figure, pre-formatted by the backend.
- *
- * Generic on purpose: Fees measures impact in rupees, Result in students,
- * Attendance in sessions. The screen only needs the string and its noun.
- */
+export interface Confidence {
+  band: string;
+  value: number;
+}
+
+/** Phrased as exposure, never as a claimed recovery — "₹38.3L in play", not "₹38.3L saved". */
 export interface Impact {
-  value: number | null;
   display: string;
-  /** "in play", "students affected", "sessions missed". */
   label: string;
 }
 
-/* ------------------------------------------------------------- L0: coverage */
-
-/**
- * What this institute-year actually holds. READ THIS BEFORE ANY FIGURE.
- *
- * Every empty state on the screen keys off `sources`, so a module can say
- * "co-scholastic marks were never entered" rather than drawing a flat line
- * through nothing.
- */
-export interface Coverage {
-  available: boolean;
-  reason: string | null;
-  syear: string | null;
-  /** Source key → does this institute-year genuinely have those rows. */
-  sources: Record<string, boolean>;
-  /** Source key → row count, for copy that cites a number. */
-  counts: Record<string, number>;
-}
-
-/* ------------------------------------------------------------- L1: position */
-
-export interface Metric {
-  key: string;
-  label: string;
-  /** Null means unknown, and renders as an em dash. Never coerce it to 0. */
-  value: number | null;
-  format: ValueFormat;
-  /** Backend-rendered string, used verbatim when present. */
-  display?: string | null;
-  hint?: string | null;
-  tone?: Tone;
-  currency?: string | null;
-}
-
-export interface MetricGroup {
-  available: boolean;
-  reason: string | null;
-  metrics: Metric[];
-}
-
-/* --------------------------------------------------------- L2: distribution */
-
-export interface BreakdownColumn {
-  key: string;
-  label: string;
-  format: ValueFormat;
-  currency?: string | null;
-}
-
-export interface BreakdownRow {
-  key: string;
-  label: string;
-  /** Keyed by column key. A missing key renders as an em dash, not a zero. */
-  values: Record<string, number | null>;
-  tone?: Tone;
-  note?: string | null;
-}
-
-/**
- * One way of slicing the module — by class, by subject, by cycle, by head.
- *
- * `primaryColumn` is what a bar would plot and what the table sorts by; the
- * rest are context. A breakdown with no `primaryColumn` renders as a plain
- * table, which is the right answer for a mix with no natural magnitude.
- */
-export interface Breakdown {
-  key: string;
-  label: string;
-  description?: string | null;
-  available: boolean;
-  reason: string | null;
-  columns: BreakdownColumn[];
-  primaryColumn?: string | null;
-  rows: BreakdownRow[];
-}
-
-/* -------------------------------------------------------------- L3: signals */
+/* ------------------------------------------------------------------ findings */
 
 export interface Finding {
   id: string;
   severity: string;
-  severityLabel: string;
+  severityLabel?: string | null;
   title: string;
   whatHappened: string;
-  whyItMatters: string | null;
-  /** Never empty for a raised finding. An assertion without figures is a caption. */
-  evidence: EvidencePoint[];
-  likelyCause: string | null;
-  causeConfirmed: boolean;
-  recommendation: string | null;
-  owner: string;
-  priority: string;
-  confidence: Confidence;
-  affected: { count: number | null; total: number | null; unit: string | null };
-  raisedAt: string;
-  impact: Impact | null;
-  syear: number | string | null;
-  status: string;
+  whyItMatters?: string | null;
+  evidence?: EvidencePoint[];
+  /** A cause the engine has not confirmed is labelled as a candidate, never presented as a conclusion. */
+  likelyCause?: string | null;
+  causeConfirmed?: boolean;
+  confidence?: Confidence;
+  impact?: Impact | null;
 }
 
-/** The subset of findings a person should look at first. */
-export interface Priority {
-  id: string;
-  severity: string;
-  severityLabel: string;
-  title: string;
-  whatHappened: string;
-  whyItMatters: string | null;
-  evidence: EvidencePoint[];
-  impact: Impact | null;
-  nextStep: string | null;
-  owner: string;
-  confidence: Confidence;
-}
-
-/**
- * Which checks ran, and which fired.
- *
- * MAKES SILENCE READABLE. Without it, "two findings" looks identical whether
- * the other twenty-four checks passed or never ran at all.
- */
 export interface RuleStatus {
   key: string;
   label: string;
@@ -217,31 +110,34 @@ export interface RuleStatus {
   raised: boolean;
 }
 
-/* ------------------------------------------------------- L5: the action loop */
+export interface Priority extends Omit<Finding, 'severityLabel'> {
+  severityLabel?: string | null;
+  owner: string;
+  nextStep?: string | null;
+}
+
+/* ------------------------------------------------------------ recommendations */
 
 export interface Recommendation {
   id: string;
   title: string;
   description: string;
   category: string;
-  priority: string;
-  urgency: string;
-  confidence: Confidence;
-  status: string;
-  syear: number | string | null;
-  expectedImpact: { display: string; basis: string; wording: string } | null;
-  finding: { signalId: string; title: string; severity: string };
-  why: string | null;
+  priority?: string;
+  confidence?: Confidence;
   /** False ⇒ nothing executable is attached, so the card is review-only. */
   actionable: boolean;
-  decision: {
-    id: string;
+  finding: { title: string };
+  expectedImpact?: { wording: string; basis: string } | null;
+  decision?: {
     status: string;
-    rationale: string;
     decidedBy: string;
     decidedAt: string;
+    rationale?: string | null;
   } | null;
 }
+
+/* ------------------------------------------------------------------ decisions */
 
 export type OutcomeState =
   | 'resolved'
@@ -251,126 +147,110 @@ export type OutcomeState =
   | 'awaiting_outcome'
   | 'no_action_queued';
 
-/** Recorded by the person reporting back; absent when nobody measured it. */
 export interface MeasuredOutcome {
+  basis: string;
   before: number;
   after: number;
   change: number;
-  unitsAffected: number | null;
-  basis: string;
+  /** Generic count of whatever this module's grain is — accounts, students, rows. */
+  accountsAffected?: number | null;
 }
 
 export interface DecisionTrailEntry {
   decisionId: string;
   status: string;
-  rationale: string;
   decidedBy: string;
   decidedAt: string;
-  syear: number | string | null;
-  recommendation: { id: string; title: string; category: string };
+  outcomeState: OutcomeState;
+  recommendation: { title: string };
+  /** The finding's title, already resolved to a string by the backend. */
   finding: string;
-  expectedImpact: Impact | null;
-  execution: {
-    id: string;
-    status: string;
-    /** The procedure a person is carrying out — never an internal id. */
+  rationale?: string | null;
+  expectedImpact?: number | null;
+  execution?: {
     action: string;
     owner: string;
-    executorType: string;
-    queuedAt: string;
-    startedAt: string | null;
-    completedAt: string | null;
+    status: string;
   } | null;
-  outcome: {
-    id: string;
+  outcome?: {
     result: string;
     feedback: string;
-    recordedAt: string;
-    measured: MeasuredOutcome | null;
+    measured?: MeasuredOutcome | null;
   } | null;
-  outcomeState: OutcomeState;
 }
 
-export interface Learning {
-  available: boolean;
-  reason: string | null;
-  entries: Array<{
-    finding: string;
-    action: string;
-    rationale: string;
-    result: string;
-    feedback: string;
-    syear: number | string | null;
-    recordedAt: string;
-    measured: MeasuredOutcome | null;
-    appliesToThisYear: boolean;
-  }>;
-}
-
-/* --------------------------------------------------------- L0 again: ledger */
+/* --------------------------------------------------------------- data quality */
 
 export interface DataQualityCheck {
   key: string;
   label: string;
-  value: number | null;
-  format: ValueFormat;
-  secondary?: { value: number | null; format: ValueFormat; currency?: string | null } | null;
-  sharePercent: number | null;
-  shareLabel?: string | null;
   state: 'ok' | 'attention';
-  note: string;
+  value: number | string | null;
+  format?: MetricFormat;
+  secondary?: { value: number | string | null; format?: MetricFormat; currency?: string } | null;
+  sharePercent?: number | null;
+  shareLabel?: string | null;
+  note?: string | null;
 }
 
 export interface DataQuality {
   available: boolean;
-  reason: string | null;
+  reason?: string | null;
   checks: DataQualityCheck[];
 }
 
-/* ------------------------------------------------------------- the envelope */
+/* -------------------------------------------------------------------- learning */
 
-/**
- * "What is happening", composed server-side from the same figures the cards
- * below show. DETERMINISTIC, NEVER MODEL OUTPUT — styling it like an assistant
- * would imply a model wrote it and invite the reader to discount it.
- */
+export interface LearningEntry {
+  recordedAt: string;
+  result: string;
+  syear?: string | number | null;
+  /** False for a lesson carried forward from an earlier year, kept for context rather than for this year's decision. */
+  appliesToThisYear?: boolean;
+  action: string;
+  finding: string;
+  feedback?: string | null;
+}
+
+export interface Learning {
+  available: boolean;
+  reason?: string | null;
+  entries: LearningEntry[];
+}
+
+/** "What is happening", composed server-side from the figures below it — never model output. */
 export interface SummaryBlock {
   available: boolean;
-  reason: string | null;
-  headline: string | null;
+  reason?: string | null;
+  headline?: string | null;
   sentences: string[];
 }
 
+/* -------------------------------------------------------------------- payload */
+
 export interface ModuleIntelligencePayload {
-  tenantId: string;
   organization: string;
+  /** One row of this module's grain, read out for the footer — "one student's fee account". */
   source: string;
   academicYear: { syear: string | null };
-  coverage: Coverage;
+  coverage: { available: boolean; reason?: string | null };
   freshness: {
+    /** The position is read live on every request; only the findings are as fresh as the last rule run. */
     positionLabel: string;
     findingsRefreshedAt: string | null;
-    findingsLabel: string;
+    findingsLabel?: string;
   };
-  execution: { automated: boolean; note: string };
+  execution?: { automated?: boolean; note?: string } | null;
   summary: SummaryBlock;
   position: MetricGroup | null;
   breakdowns: Breakdown[];
   findings: Finding[];
+  ruleStatus: RuleStatus[];
   priorities: Priority[];
   recommendations: Recommendation[];
   decisionTrail: DecisionTrailEntry[];
-  learning: Learning;
   dataQuality: DataQuality;
-  ruleStatus: RuleStatus[];
-  /**
-   * The escape hatch, and it is deliberately narrow.
-   *
-   * A module may attach data for its own bespoke cards here — Fees' gateway
-   * reconciliation and NACH mandates are the motivating case. The contract caps
-   * this at three cards (see contract.ts): without a cap, "escape hatch"
-   * quietly becomes "bespoke screen" again and the shared renderer stops being
-   * shared.
-   */
+  learning: Learning;
+  /** Raw data an `ExtraCard` needs that no generic section carries — passed through untouched. */
   extras?: Record<string, unknown>;
 }

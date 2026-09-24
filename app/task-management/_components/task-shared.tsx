@@ -5,14 +5,9 @@ import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Label } from '@/components/ui/label';
 
+/** Content height, like the other modules' frames — the shell owns the viewport. */
 export function PageFrame({ children }: { children: ReactNode }) {
-  return (
-    <div className="min-h-screen">
-      <div className="mx-auto space-y-4 p-3 sm:p-4 lg:p-5">
-        {children}
-      </div>
-    </div>
-  );
+  return <div className="mx-auto space-y-4 p-3 sm:p-4 lg:p-5">{children}</div>;
 }
 
 export function PageHeader({
