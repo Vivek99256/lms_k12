@@ -3,10 +3,10 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Circle, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Circle, Clock, Loader2 } from 'lucide-react';
 
 import { DashboardError } from '@/app/dashboard/_components/DashboardPrimitives';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { isConceptCompleted, signalsFromChapterSection } from '@/app/pal/data/pal-completion';
 import { CompletedBadge, ReadOnlyBadge } from '@/app/pal/_components/CompletionState';
 import {
@@ -291,6 +291,15 @@ function MasteryDetailsContent({
               ` · next check ${new Date(details.retention.nextReviewAt).toLocaleDateString()}`}
             {details.retention.nodesRetained > 0 && ` · ${details.retention.nodesRetained} already re-verified`}
           </p>
+          {details.retention.dueNow && (
+            <Link
+              href={`/pal/recall?chapterId=${details.chapterId}`}
+              className={`mt-2 ${buttonVariants({ variant: 'outline', size: 'sm' })}`}
+            >
+              <Clock aria-hidden className="mr-1.5 h-3.5 w-3.5" />
+              Go to review
+            </Link>
+          )}
         </div>
       )}
 

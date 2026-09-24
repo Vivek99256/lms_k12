@@ -111,6 +111,11 @@ function CreateInner<TRow extends H5pContentRow, TState, TPayload>(spec: Content
     [searchParams]
   );
   const contextQuery = h5pContextQuery(ctx);
+  // Set when this create screen was opened from somewhere other than this
+  // type's own list -- the Question Bank's "Create H5P content" menu, for
+  // one -- so Back returns there instead of to a list the author never came
+  // from.
+  const returnTo = searchParams?.get('return_to') || null;
 
   const [state, setState] = useState<TState>(spec.emptyState);
   const [saving, setSaving] = useState(false);
@@ -155,7 +160,7 @@ function CreateInner<TRow extends H5pContentRow, TState, TPayload>(spec: Content
           title={spec.createTitle}
           description={spec.createDescription}
           ctx={ctx}
-          backHref={`/h5p/${spec.path}?${contextQuery}`}
+          backHref={returnTo ?? `/h5p/${spec.path}?${contextQuery}`}
         />
 
         {!hasH5pContext(ctx) ? (

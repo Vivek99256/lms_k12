@@ -3,20 +3,33 @@
 import { StatCard } from '@/components/ui/stat-card';
 import type { CategoryCountRow, HostelCountRow } from '@/app/hostel/_lib/hostel-dashboard-api';
 
+/** These cards' ids in the page's Customize registry — stored per user, don't rename them. */
+type HostelKpiId = 'kpi.hostels' | 'kpi.rooms' | 'kpi.allocations' | 'kpi.occupancy_rate';
+
 export interface HostelDashboardProps {
   totalHostels: number;
   totalRooms: number;
   totalAllocations: number;
   occupancyRate: number;
+  /** The signed-in user's show/hide choice per card (useDashboardPreferences). Every card shows when omitted. */
+  isVisible?: (id: HostelKpiId) => boolean;
 }
 
-export function HostelDashboard({ totalHostels, totalRooms, totalAllocations, occupancyRate }: HostelDashboardProps) {
+export function HostelDashboard({
+  totalHostels,
+  totalRooms,
+  totalAllocations,
+  occupancyRate,
+  isVisible = () => true,
+}: HostelDashboardProps) {
   return (
     <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Hostels" value={totalHostels} />
-      <StatCard label="Rooms" value={totalRooms} />
-      <StatCard label="Allocations" value={totalAllocations} />
-      <StatCard label="Occupancy rate" value={`${occupancyRate}%`} hint="Allocations vs. total rooms" />
+      {isVisible('kpi.hostels') && <StatCard label="Hostels" value={totalHostels} />}
+      {isVisible('kpi.rooms') && <StatCard label="Rooms" value={totalRooms} />}
+      {isVisible('kpi.allocations') && <StatCard label="Allocations" value={totalAllocations} />}
+      {isVisible('kpi.occupancy_rate') && (
+        <StatCard label="Occupancy rate" value={`${occupancyRate}%`} hint="Allocations vs. total rooms" />
+      )}
     </div>
   );
 }

@@ -42,8 +42,9 @@ export const NEW_PAL_AI_STACK: AiStackModule = {
     reportCanPrint: 'the figures come from New PAL’s own content-model, gamification and coherence records rather than from a model.',
     groundedOn: 'the recorded content-model, gamification and coherence data above, which is the stronger ground of the two.',
     capabilityAgent:
-      'No agent manifest is bound to New PAL, so nothing here opens a case or drafts a recommendation. The tool agents on the Automations tab still read New PAL’s own records.',
-    capabilityWorkflow: 'No workflow is bound to New PAL, so nothing in this module pauses for an approval.',
+      'The New PAL Agent may open a case for a learner whose practised concepts remain mostly at the Stream tier, cite the recorded concepts as evidence, and draft a review. It may not contact a family or change a mastery record itself, and it never reads the older pal module’s tables.',
+    capabilityWorkflow:
+      'A drafted review must be approved by a person through the pal_intervention_followup workflow before any intervention is agreed.',
   },
 
   report: {
@@ -86,9 +87,21 @@ export const NEW_PAL_AI_STACK: AiStackModule = {
     },
   ],
 
-  boundAgent: null,
-  noAgentReason:
-    'New PAL has no case-opening agent yet; reports and conversational answers are grounded directly on its own content-model, gamification and coherence records.',
+  // Registered by 2026_09_29_100100_register_new_pal_agent_signal_and_workflow.php. Reads
+  // only New PAL's own gamification records through LearnerActivitySource — the same
+  // building block new_pal.gamification_summary uses — and never the older pal module's
+  // tables.
+  boundAgent: {
+    agentKey: 'k12_new_pal',
+    workflowKey: 'pal_intervention_followup',
+    fallbackName: 'New PAL Agent',
+    filters: [
+      { key: 'subject_id', label: 'Student id', placeholder: 'all' },
+      { key: 'limit', label: 'Learners scanned', placeholder: '60' },
+    ],
+    sweepDescription:
+      'Reads recorded concept mastery and opens a case for each learner whose practised concepts remain mostly at the Stream tier, citing the concepts behind it.',
+  },
 
   operations: {
     new_pal_content_model_report: {

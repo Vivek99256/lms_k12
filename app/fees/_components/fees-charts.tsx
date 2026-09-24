@@ -567,17 +567,31 @@ function paymentModeTable(rows: PaymentModeRow[]) {
 
 /* ------------------------------------------------------------ the section */
 
+/** These charts' ids in the page's Customize registry — stored per user, don't rename them. */
+type FeesChartId = 'chart.collection_vs_target' | 'chart.headwise' | 'chart.payment_mode_mix';
+
+/** Columns by visible chart count, so a hidden chart never leaves a hole in the row. */
+const CHART_COLUMNS: Record<number, string> = {
+  0: '',
+  1: '',
+  2: 'xl:grid-cols-2',
+  3: 'xl:grid-cols-3',
+};
+
 export function FeesCharts({
   collectionVsTarget,
   headwise,
   paymentModeMix,
   stale = false,
+  isVisible = () => true,
 }: {
   collectionVsTarget: CollectionVsTargetRow[];
   headwise: HeadwiseRow[];
   paymentModeMix: PaymentModeRow[];
   /** Refetching — hold the previous render at reduced opacity, never a skeleton. */
   stale?: boolean;
+  /** The signed-in user's show/hide choice per chart (useDashboardPreferences). Every chart shows when omitted. */
+  isVisible?: (id: FeesChartId) => boolean;
 }) {
   const [showTable, setShowTable] = useState(false);
   const panelId = useId();
@@ -585,6 +599,11 @@ export function FeesCharts({
   const collectionTable = collectionVsTargetTable(collectionVsTarget);
   const headTable = headwiseTable(headwise);
   const modeTable = paymentModeTable(paymentModeMix);
+
+  const showCollection = isVisible('chart.collection_vs_target');
+  const showHeadwise = isVisible('chart.headwise');
+  const showModes = isVisible('chart.payment_mode_mix');
+  const columns = CHART_COLUMNS[[showCollection, showHeadwise, showModes].filter(Boolean).length];
 
   return (
     <section className="fees-viz space-y-3">
@@ -629,33 +648,39 @@ export function FeesCharts({
 
       <div
         id={panelId}
-        className={`grid grid-cols-1 gap-4 transition-opacity xl:grid-cols-3 ${
+        className={`grid grid-cols-1 gap-4 transition-opacity ${columns} ${
           stale ? 'opacity-60' : 'opacity-100'
         }`}
       >
         {showTable ? (
           <>
-            <ChartCard
-              title="Collection vs target"
-              caption="Received against demand for each fee-month bucket."
-            >
-              <DataTable head={collectionTable.head} rows={collectionTable.rows} />
-            </ChartCard>
-            <ChartCard
-              title="Head-wise collected vs pending"
-              caption="Each fee head's demand, collected and pending."
-            >
-              <DataTable head={headTable.head} rows={headTable.rows} />
-            </ChartCard>
-            <ChartCard title="Payment mode mix" caption="Share of collected value by payment mode.">
-              <DataTable head={modeTable.head} rows={modeTable.rows} />
-            </ChartCard>
+            {showCollection ? (
+              <ChartCard
+                title="Collection vs target"
+                caption="Received against demand for each fee-month bucket."
+              >
+                <DataTable head={collectionTable.head} rows={collectionTable.rows} />
+              </ChartCard>
+            ) : null}
+            {showHeadwise ? (
+              <ChartCard
+                title="Head-wise collected vs pending"
+                caption="Each fee head's demand, collected and pending."
+              >
+                <DataTable head={headTable.head} rows={headTable.rows} />
+              </ChartCard>
+            ) : null}
+            {showModes ? (
+              <ChartCard title="Payment mode mix" caption="Share of collected value by payment mode.">
+                <DataTable head={modeTable.head} rows={modeTable.rows} />
+              </ChartCard>
+            ) : null}
           </>
         ) : (
           <>
-            <CollectionVsTargetChart rows={collectionVsTarget} />
-            <HeadwiseChart rows={headwise} />
-            <PaymentModeMixChart rows={paymentModeMix} />
+            {showCollection ? <CollectionVsTargetChart rows={collectionVsTarget} /> : null}
+            {showHeadwise ? <HeadwiseChart rows={headwise} /> : null}
+            {showModes ? <PaymentModeMixChart rows={paymentModeMix} /> : null}
           </>
         )}
       </div>

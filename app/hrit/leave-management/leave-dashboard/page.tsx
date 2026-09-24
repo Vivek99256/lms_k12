@@ -20,6 +20,43 @@ import {
   mapUpcomingLeaves,
 } from '@/app/hrit/_lib/leave-mappers'
 import type { LeaveQuickAction, LeaveRequest } from '@/app/hrit/_lib/hrit-types'
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard'
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences'
+import { toWidgetId, type DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences'
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const LEAVE_WIDGETS = [
+  // KPI ids are toWidgetId('kpi', stat.id) over the stat ids from mapDashboardStats.
+  { id: 'kpi.total-requests', label: 'Total leave requests', group: 'kpi' },
+  { id: 'kpi.pending-requests', label: 'Pending requests', group: 'kpi' },
+  { id: 'kpi.approved-requests', label: 'Approved requests', group: 'kpi' },
+  { id: 'kpi.rejected-requests', label: 'Rejected requests', group: 'kpi' },
+  { id: 'kpi.on-leave-today', label: 'Employees on leave today', group: 'kpi' },
+  { id: 'kpi.available-balance', label: 'Available leave balance', group: 'kpi' },
+  { id: 'chart.department-distribution', label: 'Department distribution', group: 'chart' },
+  { id: 'chart.leave-type-distribution', label: 'Leave type distribution', group: 'chart' },
+  { id: 'panel.pending-approvals', label: 'Pending approvals', group: 'panel' },
+  { id: 'panel.leave-balance', label: 'Leave balance snapshot', group: 'panel' },
+  { id: 'panel.holidays', label: 'Upcoming holidays', group: 'panel' },
+  { id: 'panel.quick-actions', label: 'Quick actions', group: 'panel' },
+  { id: 'panel.recent-requests', label: 'Recent leave requests', group: 'panel' },
+  { id: 'panel.recent-activity', label: 'Recent activity', group: 'panel' },
+] as const satisfies readonly DashboardWidget[]
+
+const SUMMARY_PANELS = [
+  'panel.pending-approvals',
+  'panel.leave-balance',
+  'panel.holidays',
+  'panel.quick-actions',
+] as const
+
+// The summary panels share one row; however many are left fill it.
+const SUMMARY_PANEL_COLUMNS: Record<number, string> = {
+  1: '',
+  2: 'md:grid-cols-2',
+  3: 'md:grid-cols-2 xl:grid-cols-3',
+  4: 'md:grid-cols-2 xl:grid-cols-4',
+}
 
 const DashboardHeader = lazy(() =>
   import('./components/DashboardHeader').then((m) => ({
@@ -131,7 +168,17 @@ export default function DashboardPage() {
 
   const { detail } = useLeaveRequestDetail(drawerOpen ? selectedRequestId : null)
 
+  const prefs = useDashboardPreferences('hr.leave-dashboard', LEAVE_WIDGETS)
+  const show = prefs.isVisible
+  const bothCharts = show('chart.department-distribution') && show('chart.leave-type-distribution')
+  const bothRecent = show('panel.recent-requests') && show('panel.recent-activity')
+  const summaryPanelCount = SUMMARY_PANELS.filter((id) => show(id)).length
+
   const stats = useMemo(() => mapDashboardStats(summary), [summary])
+  const visibleStats = useMemo(
+    () => stats.filter((stat) => !prefs.hidden.has(toWidgetId('kpi', stat.id))),
+    [stats, prefs.hidden],
+  )
   const departmentData = useMemo(() => mapDepartmentSummary(departments), [departments])
   const leaveTypeData = useMemo(() => mapTypeDistribution(leaveTypes), [leaveTypes])
   const holidayData = useMemo(() => mapHolidays(holidays), [holidays])
@@ -172,7 +219,8 @@ export default function DashboardPage() {
     [navigate],
   )
 
-  if (loading) {
+  // Wait for the user's layout too, so hidden widgets never flash in.
+  if (loading || !prefs.ready) {
     return <DashboardSkeleton />
   }
 
@@ -198,57 +246,85 @@ export default function DashboardPage() {
           userName={user?.name ?? 'there'}
           currentDate={currentDate}
           upcomingLeaves={upcomingLeaves}
+          actions={<CustomizeDashboard widgets={LEAVE_WIDGETS} {...prefs.customizeProps} size="lg" />}
         />
       </Suspense>
 
-      <Suspense fallback={<Skeleton className="h-28 rounded-2xl" />}>
-        <DashboardStats stats={stats} />
-      </Suspense>
+      {!prefs.hasVisible() && <AllWidgetsHiddenNotice />}
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-        <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
-          <DepartmentChart data={departmentData} />
+      {prefs.hasVisible('kpi') && (
+        <Suspense fallback={<Skeleton className="h-28 rounded-2xl" />}>
+          <DashboardStats stats={visibleStats} />
         </Suspense>
-        <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
-          <LeaveTypeChart data={leaveTypeData} />
-        </Suspense>
-      </section>
+      )}
 
-      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>
-          <PendingApprovalsCard
-            requests={pendingRequests}
-            onViewDetails={handleViewDetails}
-            onViewAll={() => navigate('leave-requests', '?status=pending')}
-            onDecision={(request, status) => void decide(request.id, status)}
-            processingRequestId={processingRequestId}
-          />
-        </Suspense>
-        <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>
-          <LeaveBalanceSnapshotCard
-            balances={balanceData}
-            onViewAll={() => navigate('leave-reports', '?report=leave-balance')}
-          />
-        </Suspense>
-        <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>
-          <HolidayCard
-            holidays={holidayData}
-            onViewAll={() => navigate('leave-configuration', '?tab=holiday-calendar')}
-          />
-        </Suspense>
-        <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>
-          <LeaveQuickActionsCard actions={quickActions} onAction={handleQuickAction} />
-        </Suspense>
-      </section>
+      {prefs.hasVisible('chart') && (
+        // A lone remaining chart takes the full row instead of leaving a gap.
+        <section className={`grid gap-6 ${bothCharts ? 'xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]' : ''}`}>
+          {show('chart.department-distribution') && (
+            <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
+              <DepartmentChart data={departmentData} />
+            </Suspense>
+          )}
+          {show('chart.leave-type-distribution') && (
+            <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
+              <LeaveTypeChart data={leaveTypeData} />
+            </Suspense>
+          )}
+        </section>
+      )}
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>
-          <RecentLeaveRequests requests={recentRequests} />
-        </Suspense>
-        <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>
-          <RecentActivity activities={activityData} />
-        </Suspense>
-      </section>
+      {summaryPanelCount > 0 && (
+        <section className={`grid gap-6 ${SUMMARY_PANEL_COLUMNS[summaryPanelCount]}`}>
+          {show('panel.pending-approvals') && (
+            <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>
+              <PendingApprovalsCard
+                requests={pendingRequests}
+                onViewDetails={handleViewDetails}
+                onViewAll={() => navigate('leave-requests', '?status=pending')}
+                onDecision={(request, status) => void decide(request.id, status)}
+                processingRequestId={processingRequestId}
+              />
+            </Suspense>
+          )}
+          {show('panel.leave-balance') && (
+            <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>
+              <LeaveBalanceSnapshotCard
+                balances={balanceData}
+                onViewAll={() => navigate('leave-reports', '?report=leave-balance')}
+              />
+            </Suspense>
+          )}
+          {show('panel.holidays') && (
+            <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>
+              <HolidayCard
+                holidays={holidayData}
+                onViewAll={() => navigate('leave-configuration', '?tab=holiday-calendar')}
+              />
+            </Suspense>
+          )}
+          {show('panel.quick-actions') && (
+            <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>
+              <LeaveQuickActionsCard actions={quickActions} onAction={handleQuickAction} />
+            </Suspense>
+          )}
+        </section>
+      )}
+
+      {(show('panel.recent-requests') || show('panel.recent-activity')) && (
+        <section className={`grid grid-cols-1 gap-6 ${bothRecent ? 'xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}`}>
+          {show('panel.recent-requests') && (
+            <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>
+              <RecentLeaveRequests requests={recentRequests} />
+            </Suspense>
+          )}
+          {show('panel.recent-activity') && (
+            <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>
+              <RecentActivity activities={activityData} />
+            </Suspense>
+          )}
+        </section>
+      )}
 
       <Suspense fallback={null}>
         <LeaveRequestDetailsDrawer

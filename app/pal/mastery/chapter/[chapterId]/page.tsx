@@ -430,7 +430,7 @@ function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
               href={`/pal/adaptive/concept/${concept.conceptId}`}
               className={buttonVariants({ variant: 'outline', size: 'sm' })}
             >
-              Practise
+              Concept diagnostic
             </Link>
           ) : (
             <span className="text-[11px] text-slate-400">Not ready</span>

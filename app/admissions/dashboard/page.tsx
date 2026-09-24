@@ -16,6 +16,20 @@ import {
   type AdmissionsDashboardPayload,
 } from '@/app/admissions/_lib/admissions-dashboard-api';
 import { Button } from '@/components/ui/button';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const ADMISSIONS_WIDGETS = [
+  { id: 'kpi.enquiries', label: 'Enquiries', group: 'kpi' },
+  { id: 'kpi.applications', label: 'Applications', group: 'kpi' },
+  { id: 'kpi.registrations', label: 'Registrations', group: 'kpi' },
+  { id: 'kpi.conversion_rate', label: 'Conversion rate', group: 'kpi' },
+  { id: 'chart.enquiries_by_grade', label: 'Enquiries by grade', group: 'chart' },
+  { id: 'chart.registrations_by_status', label: 'Registrations by status', group: 'chart' },
+  { id: 'panel.recent_enquiries', label: 'Recent enquiries', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
 
 /**
  * Admissions dashboard — the module landing page (Main dashboard → Admissions
@@ -30,8 +44,12 @@ export default function AdmissionsDashboardPage() {
   const [payload, setPayload] = useState<AdmissionsDashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const prefs = useDashboardPreferences('module.admissions', ADMISSIONS_WIDGETS);
+  const show = prefs.isVisible;
+  const bothCharts = show('chart.enquiries_by_grade') && show('chart.registrations_by_status');
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession(getFeesSession());
   }, []);
 
@@ -73,6 +91,7 @@ export default function AdmissionsDashboardPage() {
     if (!session) return;
 
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(session, controller.signal);
 
     return () => controller.abort();
@@ -86,48 +105,58 @@ export default function AdmissionsDashboardPage() {
         title="Admissions dashboard"
         description="Enquiries, applications and registrations for the current academic year."
         action={
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading || !session}
-            onClick={() => session && void load(session)}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {prefs.ready ? <CustomizeDashboard widgets={ADMISSIONS_WIDGETS} {...prefs.customizeProps} /> : null}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading || !session}
+              onClick={() => session && void load(session)}
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Refresh
+            </Button>
+          </div>
         }
       />
 
       {error ? <InlineMessage type="error" text={error} /> : null}
 
-      {loading && !summary ? (
+      {/* Wait for the user's layout too, so hidden widgets never flash in. */}
+      {(loading && !summary) || (!prefs.ready && !error) ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading admissions summary…
         </div>
       ) : null}
 
-      {summary ? (
+      {payload && prefs.ready && !prefs.hasVisible() ? <AllWidgetsHiddenNotice /> : null}
+
+      {summary && prefs.ready && prefs.hasVisible('kpi') ? (
         <AdmissionsDashboard
           totalEnquiries={summary.total_enquiries}
           totalApplications={summary.total_applications}
           totalRegistrations={summary.total_registrations}
           conversionRate={summary.conversion_rate}
+          isVisible={show}
         />
       ) : null}
 
-      {payload ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <EnquiriesByStandardPanel rows={payload.enquiries_by_standard ?? []} />
-          <AdmissionsFunnelPanel rows={payload.registrations_by_status ?? []} />
+      {payload && prefs.ready && prefs.hasVisible('chart') ? (
+        // A lone remaining chart takes the full row instead of leaving a gap.
+        <div className={`grid grid-cols-1 gap-4 ${bothCharts ? 'xl:grid-cols-2' : ''}`}>
+          {show('chart.enquiries_by_grade') ? <EnquiriesByStandardPanel rows={payload.enquiries_by_standard ?? []} /> : null}
+          {show('chart.registrations_by_status') ? <AdmissionsFunnelPanel rows={payload.registrations_by_status ?? []} /> : null}
         </div>
       ) : null}
 
-      {payload ? <RecentEnquiriesPanel rows={payload.recent_enquiries ?? []} /> : null}
+      {payload && prefs.ready && show('panel.recent_enquiries') ? (
+        <RecentEnquiriesPanel rows={payload.recent_enquiries ?? []} />
+      ) : null}
     </PageFrame>
   );
 }

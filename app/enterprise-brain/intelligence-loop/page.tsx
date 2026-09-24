@@ -9,10 +9,33 @@ import {
   type BrainFinding,
   type BrainSignalDetail,
 } from '@/lib/brain/api';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 import { useBrainResource } from '../_components/useBrainResource';
 import { Card, ErrorState, LoadingState, MetricTiles, HeroHeader } from '../_components/primitives';
 import { BarSeries, ChartCard, ConfidenceMeter, LoopStrip } from '../_components/charts';
 import { EvidenceStrip, IntelligenceCard, SeverityChip } from '../_components/IntelligenceCard';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const LOOP_WIDGETS = [
+  { id: 'panel.loop_stages', label: 'Loop stages', group: 'panel' },
+  { id: 'chart.signals_by_severity', label: 'How serious', group: 'chart' },
+  { id: 'chart.signals_by_classification', label: 'What kind of finding', group: 'chart' },
+  { id: 'chart.root_cause_families', label: 'Why they happen', group: 'chart' },
+  { id: 'chart.recommendations_by_category', label: 'What they ask for', group: 'chart' },
+  { id: 'panel.signal_stream', label: 'Signal stream', group: 'panel' },
+  { id: 'panel.checks_failing', label: 'Checks currently failing', group: 'panel' },
+  { id: 'panel.checks_passing', label: 'Checks that found nothing', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
+
+/** Chart-row columns by how many charts are still shown, so they fill the row. Literal classes for Tailwind. */
+const CHART_ROW_COLS: Record<number, string> = {
+  1: 'lg:grid-cols-1',
+  2: 'lg:grid-cols-2',
+  3: 'lg:grid-cols-3',
+  4: 'lg:grid-cols-4',
+};
 
 /**
  * The Intelligence Loop, end to end.
@@ -35,6 +58,11 @@ export default function IntelligenceLoopPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [runNote, setRunNote] = useState<string | null>(null);
+  const prefs = useDashboardPreferences('brain.intelligence-loop', LOOP_WIDGETS);
+  const show = prefs.isVisible;
+  const visibleCharts = LOOP_WIDGETS.filter((w) => w.group === 'chart' && show(w.id)).length;
+  // The two check tables share a row; a lone one takes the full width.
+  const bothRuleTables = show('panel.checks_failing') && show('panel.checks_passing');
 
   const open = useCallback(async (signal: BrainFinding) => {
     setDetailLoading(true);
@@ -70,7 +98,8 @@ export default function IntelligenceLoopPage() {
     }
   }, [refresh]);
 
-  if (loading && !data) return <LoadingState label="Reading the intelligence loop" />;
+  // Wait for the user's layout too, so hidden widgets never flash in.
+  if ((loading && !data) || !prefs.ready) return <LoadingState label="Reading the intelligence loop" />;
   if (error && !data) return <ErrorState message={error} onRetry={refresh} />;
   if (!data) return null;
 
@@ -103,6 +132,11 @@ export default function IntelligenceLoopPage() {
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               Refresh
             </button>
+            <CustomizeDashboard
+              widgets={LOOP_WIDGETS}
+              {...prefs.customizeProps}
+              className="h-auto rounded-xl border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 hover:border-slate-500 hover:bg-slate-800 hover:text-white"
+            />
           </div>
         }
       />
@@ -111,97 +145,120 @@ export default function IntelligenceLoopPage() {
         <div className="mb-5 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900">{runNote}</div>
       )}
 
-      <div className="mb-6">
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-gray-400">Loop stages</p>
-        <LoopStrip stages={data.stages} />
-        {data.lastRun && (
-          <p className="mt-2 text-[11px] text-slate-400">Last run {new Date(data.lastRun.at).toLocaleString()}.</p>
-        )}
-      </div>
+      {!prefs.hasVisible() && <AllWidgetsHiddenNotice />}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <ChartCard title="How serious">
-          <BarSeries data={data.signalsBySeverity} bySeverity />
-        </ChartCard>
-        <ChartCard title="What kind of finding">
-          <BarSeries data={data.signalsByClassification} max={8} />
-        </ChartCard>
-        <ChartCard title="Why they happen">
-          <BarSeries data={data.rootCauseFamilies} max={8} />
-        </ChartCard>
-        <ChartCard title="What they ask for">
-          <BarSeries data={data.recommendationsByCategory} />
-        </ChartCard>
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <Card className="overflow-hidden">
-          <div className="border-b border-gray-100 px-5 py-3.5">
-            <p className="text-sm font-semibold text-slate-900">Signal stream</p>
-            <p className="text-xs text-slate-400">{data.signals.length} signals — select one to see the reasoning behind it.</p>
-          </div>
-          <div className="max-h-[36rem] divide-y divide-gray-100 overflow-auto">
-            {data.signals.map((signal) => (
-              <button
-                key={signal.id}
-                type="button"
-                onClick={() => open(signal)}
-                className={`flex w-full flex-col gap-1.5 px-5 py-3 text-left transition-colors hover:bg-slate-50 ${
-                  selected?.signal?.id === signal.id ? 'bg-indigo-50/60' : ''
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="text-sm font-medium leading-snug text-slate-800">{signal.title}</span>
-                  <SeverityChip severity={signal.severity} label={signal.severityLabel} />
-                </div>
-                {/* The row shows what a person needs to triage: the movement and
-                    who owns it. The rule key lives behind "Technical detail" on
-                    the card, not on the face of the list. */}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
-                  {signal.headline && (
-                    <span className="font-semibold text-slate-600">
-                      {signal.headline.value} {signal.headline.label}
-                    </span>
-                  )}
-                  {signal.headline?.changeLabel && <span>{signal.headline.changeLabel}</span>}
-                  <span>·</span>
-                  <span>{signal.owner}</span>
-                </div>
-              </button>
-            ))}
-            {!data.signals.length && (
-              <p className="px-5 py-8 text-sm text-slate-400">
-                No signals. Every rule the engine holds found this organization clean — run the loop again after the LMS data changes.
-              </p>
-            )}
-          </div>
-        </Card>
-
-        <div>
-          {detailLoading && <LoadingState label="Opening the reasoning chain" />}
-          {!detailLoading && !selected && (
-            <Card className="flex h-full min-h-[20rem] flex-col items-center justify-center p-8 text-center">
-              <Brain size={28} className="mb-3 text-slate-300" />
-              <p className="text-sm font-medium text-slate-500">Select a signal</p>
-              <p className="mt-1 max-w-sm text-xs text-slate-400">
-                Its evidence, case, hypothesis, reasoning trail and recommendation are shown here — every number traced back to
-                the LMS row it came from.
-              </p>
-            </Card>
+      {show('panel.loop_stages') && (
+        <div className="mb-6">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-gray-400">Loop stages</p>
+          <LoopStrip stages={data.stages} />
+          {data.lastRun && (
+            <p className="mt-2 text-[11px] text-slate-400">Last run {new Date(data.lastRun.at).toLocaleString()}.</p>
           )}
-          {!detailLoading && selected && <SignalDetail detail={selected} />}
         </div>
-      </div>
+      )}
 
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <RuleTable title="Checks currently failing" rules={firing} empty="Every check passes." />
-        <RuleTable
-          title="Checks that found nothing"
-          rules={clean}
-          empty="Every check is currently failing."
-          muted
-        />
-      </div>
+      {visibleCharts > 0 && (
+        // The charts still shown fill the row instead of leaving gaps.
+        <div className={`mb-6 grid grid-cols-1 gap-4 ${CHART_ROW_COLS[visibleCharts]}`}>
+          {show('chart.signals_by_severity') && (
+            <ChartCard title="How serious">
+              <BarSeries data={data.signalsBySeverity} bySeverity />
+            </ChartCard>
+          )}
+          {show('chart.signals_by_classification') && (
+            <ChartCard title="What kind of finding">
+              <BarSeries data={data.signalsByClassification} max={8} />
+            </ChartCard>
+          )}
+          {show('chart.root_cause_families') && (
+            <ChartCard title="Why they happen">
+              <BarSeries data={data.rootCauseFamilies} max={8} />
+            </ChartCard>
+          )}
+          {show('chart.recommendations_by_category') && (
+            <ChartCard title="What they ask for">
+              <BarSeries data={data.recommendationsByCategory} />
+            </ChartCard>
+          )}
+        </div>
+      )}
+
+      {show('panel.signal_stream') && (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          <Card className="overflow-hidden">
+            <div className="border-b border-gray-100 px-5 py-3.5">
+              <p className="text-sm font-semibold text-slate-900">Signal stream</p>
+              <p className="text-xs text-slate-400">{data.signals.length} signals — select one to see the reasoning behind it.</p>
+            </div>
+            <div className="max-h-[36rem] divide-y divide-gray-100 overflow-auto">
+              {data.signals.map((signal) => (
+                <button
+                  key={signal.id}
+                  type="button"
+                  onClick={() => open(signal)}
+                  className={`flex w-full flex-col gap-1.5 px-5 py-3 text-left transition-colors hover:bg-slate-50 ${
+                    selected?.signal?.id === signal.id ? 'bg-indigo-50/60' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-sm font-medium leading-snug text-slate-800">{signal.title}</span>
+                    <SeverityChip severity={signal.severity} label={signal.severityLabel} />
+                  </div>
+                  {/* The row shows what a person needs to triage: the movement and
+                      who owns it. The rule key lives behind "Technical detail" on
+                      the card, not on the face of the list. */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                    {signal.headline && (
+                      <span className="font-semibold text-slate-600">
+                        {signal.headline.value} {signal.headline.label}
+                      </span>
+                    )}
+                    {signal.headline?.changeLabel && <span>{signal.headline.changeLabel}</span>}
+                    <span>·</span>
+                    <span>{signal.owner}</span>
+                  </div>
+                </button>
+              ))}
+              {!data.signals.length && (
+                <p className="px-5 py-8 text-sm text-slate-400">
+                  No signals. Every rule the engine holds found this organization clean — run the loop again after the LMS data changes.
+                </p>
+              )}
+            </div>
+          </Card>
+
+          <div>
+            {detailLoading && <LoadingState label="Opening the reasoning chain" />}
+            {!detailLoading && !selected && (
+              <Card className="flex h-full min-h-[20rem] flex-col items-center justify-center p-8 text-center">
+                <Brain size={28} className="mb-3 text-slate-300" />
+                <p className="text-sm font-medium text-slate-500">Select a signal</p>
+                <p className="mt-1 max-w-sm text-xs text-slate-400">
+                  Its evidence, case, hypothesis, reasoning trail and recommendation are shown here — every number traced back to
+                  the LMS row it came from.
+                </p>
+              </Card>
+            )}
+            {!detailLoading && selected && <SignalDetail detail={selected} />}
+          </div>
+        </div>
+      )}
+
+      {(show('panel.checks_failing') || show('panel.checks_passing')) && (
+        <div className={`mt-6 grid grid-cols-1 gap-5 ${bothRuleTables ? 'lg:grid-cols-2' : ''}`}>
+          {show('panel.checks_failing') && (
+            <RuleTable title="Checks currently failing" rules={firing} empty="Every check passes." />
+          )}
+          {show('panel.checks_passing') && (
+            <RuleTable
+              title="Checks that found nothing"
+              rules={clean}
+              empty="Every check is currently failing."
+              muted
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

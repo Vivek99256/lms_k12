@@ -175,7 +175,7 @@ function AdaptiveConceptsView() {
     <PalWorkspace
       eyebrow={data.chapterName || 'This chapter'}
       title="Concept diagnostic"
-      description="Five questions per round, chosen from how you did."
+      description="Five questions per concept, chosen from your chapter diagnostic. Submit to see where you stand, then go to your plan."
       backHref="/pal"
       backLabel="Back to subjects"
       actions={
@@ -233,8 +233,8 @@ function AdaptiveConceptsView() {
         <Card className="mb-4 border-amber-200 bg-amber-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <p className="text-sm text-amber-900">
-              You have not taken the chapter diagnostic yet, so practice will open at easy
-              and adjust as you go.
+              You have not taken the chapter diagnostic yet, so the concept diagnostic will open
+              at easy.
             </p>
             <Link href={`/pal/diagnostic/chapter/${chapterId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Take chapter diagnostic</Link>
           </CardContent>
@@ -244,7 +244,7 @@ function AdaptiveConceptsView() {
       {servable.length === 0 ? (
         <EmptyState
           icon={<Brain aria-hidden className="h-8 w-8" />}
-          title="No practice questions for this chapter yet"
+          title="No concept diagnostic questions for this chapter yet"
           description="None of this chapter's concepts have multiple-choice questions available."
           action={<Link href="/pal" className={buttonVariants()}>Back to subjects</Link>}
         />
@@ -264,7 +264,7 @@ function AdaptiveConceptsView() {
       {unavailable.length > 0 && (
         <Card className="mt-5">
           <CardHeader>
-            <CardTitle className="text-base">Not ready for practice yet</CardTitle>
+            <CardTitle className="text-base">Not ready for a concept diagnostic yet</CardTitle>
             <CardDescription>
               {unavailable.length} concept{unavailable.length === 1 ? '' : 's'} in this chapter have
               no multiple-choice questions written. Your teacher sees these as content gaps.
@@ -317,7 +317,7 @@ function ConceptCard({
             card says what it has become instead. */}
         {completed ? (
           <p className="text-xs text-emerald-800">
-            You have shown this at every level available. Nothing left to practise.
+            You have shown this at every level available.
           </p>
         ) : (
           concept.rationale && <p className="text-xs text-slate-600">{concept.rationale}</p>
@@ -334,7 +334,7 @@ function ConceptCard({
           )}
           {attempted && (
             <div className="flex gap-1">
-              <dt>Practice</dt>
+              <dt>Concept diagnostic</dt>
               <dd className="font-semibold tabular-nums text-slate-700">
                 {Math.round(concept.practicePercentage)}% of {concept.practiceAttempts}
               </dd>
@@ -362,7 +362,7 @@ function ConceptCard({
           ) : (
             <>
               <Button className="w-full" size="sm" onClick={onStart}>
-                {attempted ? 'Continue practice' : 'Start practice'}
+                {attempted ? 'Take diagnostic again' : 'Start diagnostic'}
                 <ArrowRight aria-hidden className="ml-1.5 h-3.5 w-3.5" />
               </Button>
               <p className="mt-1.5 text-center text-[11px] text-slate-400">

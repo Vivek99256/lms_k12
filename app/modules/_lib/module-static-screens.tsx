@@ -1,6 +1,7 @@
 'use client';
 
 import { ModuleCategoryPage, type ModuleStaticScreen } from '@/app/_components/module-category-page';
+import { ATTENDANCE_AI_STACK_SCREENS } from '@/app/attendance/ai-stack/_screens/ai-stack-screens';
 import { COMPLAINT_AI_STACK_SCREENS } from '@/app/admin-services/complaint-ai-stack/_screens/ai-stack-screens';
 import { PARENT_COMMUNICATION_AI_STACK_SCREENS } from '@/app/front_desk/parent_communication/ai-stack/_screens/ai-stack-screens';
 import { SQAA_AI_STACK_SCREENS } from '@/app/sqaa/ai-stack/_screens/ai-stack-screens';
@@ -11,6 +12,7 @@ import { INSTITUTE_AI_STACK_SCREENS } from '@/app/organization-management/ai-sta
 import { CONSENT_AI_STACK_SCREENS } from '@/app/admin-services/consent-ai-stack/_screens/ai-stack-screens';
 import { CURRICULUM_PLANNING_AI_STACK_SCREENS } from '@/app/lms/curriculum-planning/ai-stack/_screens/ai-stack-screens';
 import { ENGAGEMENT_AI_STACK_SCREENS } from '@/app/engagement/ai-stack/_screens/ai-stack-screens';
+import { EXAM_ASSESSMENT_AI_STACK_SCREENS } from '@/app/exam-assessment/ai-stack/_screens/ai-stack-screens';
 import { INTERACTIONS_AI_STACK_SCREENS } from '@/app/interactions/ai-stack/_screens/ai-stack-screens';
 import { NEW_PAL_AI_STACK_SCREENS } from '@/app/pal/new/ai-stack/_screens/ai-stack-screens';
 import { PETTY_CASH_AI_STACK_SCREENS } from '@/app/admin-services/petty-cash-ai-stack/_screens/ai-stack-screens';
@@ -74,10 +76,14 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   // `admissions` module, `student:` renders `students`, and `student-request:` renders
   // `student_request`, which is a different module from both.
   'admission:ai-stack': ADMISSIONS_AI_STACK_SCREENS,
-  // `attendance:` is deliberately absent. Its hand-written screens were removed pending
-  // migration to the shared descriptor pattern (see lib/exam/exam-ai-stack.ts) — until
-  // that lands, the category falls back to its database-driven menus, same as any
-  // module with no static screens.
+  // Restored 2026-09-29. A prior revert/reapply in this file's history deleted then
+  // restored the hand-written screens under app/attendance/ai-stack/_screens/ without
+  // ever re-adding this row, so the generic /modules/attendance/ai-stack route fell back
+  // to Attendance's (empty) database-driven menus — "No screens available yet" — even
+  // though the direct /attendance/ai-stack route and its nine tabs were fully live the
+  // whole time. This is the same nine-tab hand-written screen list Fees's own pattern
+  // uses, not a migration to the shared AiStackModule descriptor.
+  'attendance:ai-stack': ATTENDANCE_AI_STACK_SCREENS,
   'certificate:ai-stack': CERTIFICATE_AI_STACK_SCREENS,
   'circular:ai-stack': CIRCULAR_AI_STACK_SCREENS,
   // `communication:` renders the `easy_com` module — the key this estate has always used
@@ -91,6 +97,12 @@ const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   'document-templates:ai-stack': DOCUMENT_TEMPLATES_AI_STACK_SCREENS,
   'engagement:ai-stack': ENGAGEMENT_AI_STACK_SCREENS,
   'exam:ai-stack': EXAM_AI_STACK_SCREENS,
+  // `exam-assessment:` is the LMS's online-delivery domain (online exams, homework,
+  // assignments, worksheets, projects) — the "Exam & Assesment" sidebar entry, tblmenumaster
+  // id 276. Distinct from `exam:` above (Mark Entry / Results, id 67); see
+  // lib/exam-assessment/exam-assessment-ai-stack.ts for the full account of why the two
+  // names collide in prose but never in data.
+  'exam-assessment:ai-stack': EXAM_ASSESSMENT_AI_STACK_SCREENS,
   'front-desk:ai-stack': FRONT_DESK_AI_STACK_SCREENS,
   'hostel:ai-stack': HOSTEL_AI_STACK_SCREENS,
   'institute:ai-stack': INSTITUTE_AI_STACK_SCREENS,
