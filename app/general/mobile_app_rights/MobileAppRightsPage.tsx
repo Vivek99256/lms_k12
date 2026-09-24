@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ImageIcon, LoaderCircle, Pencil, Save, Smartphone } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ExternalLink, ImageIcon, LoaderCircle, Pencil, Plus, Save, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +30,7 @@ import {
   type MobileConfigUpdateInput,
   type MobileRightsRow,
 } from "./api";
+import { loadPages, type MobilePageSummary } from "../mobile_page_builder/api";
 
 const sortOptions = Array.from({ length: 12 }, (_, index) => index + 1);
 
@@ -49,6 +51,11 @@ function emptyConfigInput(profileName: MobileConfigProfile): MobileConfigUpdateI
     subTitleIcon: "",
     subTitleSortOrder: 1,
     status: "Yes",
+    renderType: "native",
+    webUrl: "",
+    openMode: "in_app",
+    pageSource: "external",
+    customPageId: null,
   };
 }
 
@@ -81,6 +88,8 @@ export function MobileAppRightsPage() {
   const [editInput, setEditInput] = useState<MobileConfigUpdateInput>(emptyConfigInput("Student"));
   const [editSaving, setEditSaving] = useState(false);
 
+  const [mobilePages, setMobilePages] = useState<MobilePageSummary[]>([]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -105,6 +114,14 @@ export function MobileAppRightsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  useEffect(() => {
+    // Failing to load the picker list should not block the rest of this
+    // screen -- Custom Mobile Page just falls back to "no pages available".
+    loadPages()
+      .then(setMobilePages)
+      .catch(() => setMobilePages([]));
+  }, []);
 
   const loadRights = useCallback(async (profileId: number) => {
     if (!profileId) {
@@ -188,6 +205,11 @@ export function MobileAppRightsPage() {
       subTitleIcon: record.subTitleIcon,
       subTitleSortOrder: record.subTitleSortOrder || 1,
       status: record.status === "No" ? "No" : "Yes",
+      renderType: record.renderType,
+      webUrl: record.webUrl,
+      openMode: record.openMode,
+      pageSource: record.pageSource,
+      customPageId: record.customPageId,
     });
   }
 
@@ -593,6 +615,134 @@ export function MobileAppRightsPage() {
               <option value="No">No</option>
             </select>
           </div>
+        </div>
+
+        <div className="mt-4 space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="space-y-2">
+            <Label htmlFor="render_type">Render Type</Label>
+            <select
+              id="render_type"
+              className={erpSelectClass}
+              value={editInput.renderType}
+              onChange={(event) =>
+                setEditInput((current) => ({ ...current, renderType: event.target.value as MobileConfigUpdateInput["renderType"] }))
+              }
+            >
+              <option value="native">Native</option>
+              <option value="webview">WebView</option>
+              <option value="native_dynamic">Native Dynamic</option>
+            </select>
+          </div>
+
+          {editInput.renderType === "webview" ? (
+            <>
+              <div className="space-y-2">
+                <Label>Page Source</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="page_source"
+                      checked={editInput.pageSource === "external"}
+                      onChange={() => setEditInput((current) => ({ ...current, pageSource: "external" }))}
+                    />
+                    Existing Web Page
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="radio"
+                      name="page_source"
+                      checked={editInput.pageSource === "custom"}
+                      onChange={() => setEditInput((current) => ({ ...current, pageSource: "custom" }))}
+                    />
+                    Custom Mobile Page
+                  </label>
+                </div>
+              </div>
+
+              {editInput.pageSource === "custom" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="custom_page_id">Custom Page</Label>
+                  <div className="flex gap-2">
+                    <select
+                      id="custom_page_id"
+                      className={erpSelectClass}
+                      value={editInput.customPageId ?? ""}
+                      onChange={(event) =>
+                        setEditInput((current) => ({ ...current, customPageId: event.target.value ? Number(event.target.value) : null }))
+                      }
+                    >
+                      <option value="">Select a page…</option>
+                      {mobilePages.map((page) => (
+                        <option key={page.id} value={page.id}>
+                          {page.name} ({page.status})
+                        </option>
+                      ))}
+                    </select>
+                    <Link href="/general/mobile_page_builder" target="_blank">
+                      <Button type="button" variant="outline" size="sm">
+                        <Plus className="size-3.5" />
+                        New
+                      </Button>
+                    </Link>
+                  </div>
+                  {editInput.customPageId ? (
+                    <Link
+                      href={`/general/mobile_page_builder/${editInput.customPageId}/editor`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+                    >
+                      Edit Design <ExternalLink className="size-3" />
+                    </Link>
+                  ) : null}
+                  {editInput.customPageId && mobilePages.find((p) => p.id === editInput.customPageId)?.status !== "published" ? (
+                    <p className="text-xs text-amber-700">
+                      This page has not been published yet -- mobile users will see native fallback until it is.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="web_url">Web URL</Label>
+                  <Input
+                    id="web_url"
+                    value={editInput.webUrl}
+                    onChange={(event) => setEditInput((current) => ({ ...current, webUrl: event.target.value }))}
+                    placeholder="/fees/fees_collection"
+                  />
+                </div>
+              )}
+
+              {editInput.pageSource === "external" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="open_mode">Open Mode</Label>
+                  <select
+                    id="open_mode"
+                    className={erpSelectClass}
+                    value={editInput.openMode}
+                    onChange={(event) =>
+                      setEditInput((current) => ({ ...current, openMode: event.target.value as MobileConfigUpdateInput["openMode"] }))
+                    }
+                  >
+                    <option value="in_app">In App</option>
+                    <option value="external">External</option>
+                  </select>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {editInput.renderType === "native_dynamic" ? (
+            <div className="space-y-2">
+              <Label htmlFor="web_url_page_key">Page Key</Label>
+              <Input
+                id="web_url_page_key"
+                value={editInput.webUrl}
+                onChange={(event) => setEditInput((current) => ({ ...current, webUrl: event.target.value }))}
+                placeholder="fees_collect_summary"
+              />
+            </div>
+          ) : null}
         </div>
       </Modal>
     </main>
