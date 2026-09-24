@@ -6,6 +6,21 @@ import { mapQuestionToPlayerPayload, type RuntimeActivity } from '@/lib/h5p/ques
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import type { Question, QuestionScope } from './types';
 
+// Every player under `components/h5p/players/` renders through the
+// `h5p-*` classes defined here, but the stylesheet is only ever imported by
+// `app/h5p/layout.tsx` -- a boundary that exists for the standalone
+// `/h5p/...` routes and does not extend to a caller outside that segment.
+// PAL, homework, and the question bank quiz embed these same players
+// directly (that is the whole point of `QuestionPlayer`), so without this
+// import they render with none of the option/stage styling: buttons fall
+// back to their native inline layout and a set of answer options collapses
+// into one run-on paragraph instead of a stacked list. Every player file
+// imports this module, so importing the stylesheet once here -- rather than
+// per player, which is one forgotten line away from the same bug -- covers
+// every embedding surface as well as the standalone routes (Next.js dedupes
+// the already-loaded stylesheet there).
+import '@/app/h5p/h5p.css';
+
 /**
  * What every shared player does before it renders: turn the question into an
  * activity, or say why it cannot.
