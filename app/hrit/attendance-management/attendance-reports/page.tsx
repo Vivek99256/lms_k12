@@ -43,10 +43,12 @@ import {
   AttendanceGroupedTable,
   type GroupedRecord,
 } from '@/app/hrit/attendance-management/_shared/attendance-grouped-table'
+import { ModuleIntelligence } from '@/components/intelligence/module/ModuleIntelligence'
+import { staffAttendanceIntelligenceContract } from '@/components/intelligence/module/contracts/staff-attendance'
 
 
 type ViewTab = { id: ViewTabId; label: string }
-type ViewTabId = 'table-focus' | 'trend-focus' | 'daily-details'
+type ViewTabId = 'table-focus' | 'trend-focus' | 'daily-details' | 'intelligence'
 
 /**
  * The filter set the report data is currently loaded for. Dropdown selections
@@ -331,6 +333,7 @@ const viewTabs: ViewTab[] = [
   { id: 'table-focus', label: 'Table Focus' },
   { id: 'trend-focus', label: 'Trend Focus' },
   { id: 'daily-details', label: 'Daily Details' },
+  { id: 'intelligence', label: 'Intelligence' },
 ]
 
 function getEarlyGoingColumns(onView: (record: EarlyGoingRecord) => void): Column<EarlyGoingRecord>[] {
@@ -1082,6 +1085,11 @@ function AttendanceReportsPage() {
     </div>
   )
 
+  // Its own dedicated Intelligence workspace via the shared ModuleIntelligence
+  // renderer, kept as a tab on this reports page rather than replacing
+  // attendance-tracking (the personal punch dashboard, which stays untouched).
+  const renderIntelligence = () => <ModuleIntelligence contract={staffAttendanceIntelligenceContract} />
+
   const renderContent = () => {
     switch (viewMode) {
       case 'table-focus':
@@ -1090,6 +1098,8 @@ function AttendanceReportsPage() {
         return renderTrendFocus()
       case 'daily-details':
         return renderDailyDetails()
+      case 'intelligence':
+        return renderIntelligence()
       default:
         return renderTableFocus()
     }
@@ -1108,25 +1118,27 @@ function AttendanceReportsPage() {
         </div>
       </div>
 
-      <EnhancedAttendanceFilters
-        dateRange={dateRange}
-        groupBy={groupBy}
-        department={department}
-        employee={employee}
-        quickFilter={quickFilter}
-        departments={departmentOptions}
-        employees={employeeOptions}
-        employeesLoading={employeesLoading}
-        savedReports={savedReports}
-        onDateRangeChange={handleDateRangeChange}
-        onGroupByChange={setGroupBy}
-        onDepartmentChange={handleDepartmentChange}
-        onEmployeeChange={setEmployee}
-        onQuickFilterChange={setQuickFilter}
-        onSavedReportChange={handleSavedReportChange}
-        onReset={handleReset}
-        onSearch={handleSearchClick}
-      />
+      {viewMode !== 'intelligence' && (
+        <EnhancedAttendanceFilters
+          dateRange={dateRange}
+          groupBy={groupBy}
+          department={department}
+          employee={employee}
+          quickFilter={quickFilter}
+          departments={departmentOptions}
+          employees={employeeOptions}
+          employeesLoading={employeesLoading}
+          savedReports={savedReports}
+          onDateRangeChange={handleDateRangeChange}
+          onGroupByChange={setGroupBy}
+          onDepartmentChange={handleDepartmentChange}
+          onEmployeeChange={setEmployee}
+          onQuickFilterChange={setQuickFilter}
+          onSavedReportChange={handleSavedReportChange}
+          onReset={handleReset}
+          onSearch={handleSearchClick}
+        />
+      )}
 
       <AttendanceTabs
         tabs={viewTabs}
@@ -1134,19 +1146,22 @@ function AttendanceReportsPage() {
         onChange={(id: string) => setViewMode(id as ViewTabId)}
       />
 
-      {latestActivityNote && (
+      {/* The Intelligence workspace manages its own loading/empty/error state
+          internally — the report banners below belong to the other three
+          tabs' own data-fetching, not to it. */}
+      {viewMode !== 'intelligence' && latestActivityNote && (
         <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
           {latestActivityNote}
         </div>
       )}
 
-      {apiError && (
+      {viewMode !== 'intelligence' && apiError && (
         <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive">
           {apiError}
         </div>
       )}
 
-      {apiLoading && (
+      {viewMode !== 'intelligence' && apiLoading && (
         <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium text-muted-foreground">
           Loading attendance data...
         </div>

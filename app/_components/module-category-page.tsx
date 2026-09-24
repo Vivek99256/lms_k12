@@ -9,6 +9,10 @@ import Link from 'next/link';
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { ModuleAuditTrail } from '@/app/_components/module-audit-trail';
 import { ModuleIntelligence } from '@/app/_components/module-intelligence';
+import {
+  intelligenceEntryFor,
+  ModuleIntelligenceContractScreen,
+} from '@/app/_components/module-intelligence-contract';
 import { AddProcessPage } from '@/app/general/add_process/AddProcessPage';
 import { ModuleJourney } from '@/app/general/onboarding/_components/ModuleJourney';
 import { SchedulerConsole } from '@/app/platform-services/scheduler/_components/SchedulerConsole';
@@ -494,13 +498,38 @@ export function ModuleCategoryPage({
     const pinned = category?.platformModuleKey || platformModuleKey;
     const label = moduleLabel(moduleName);
 
+    /*
+     * THE MODULE'S OWN CONTRACT WINS OVER THE GENERIC LOOP VIEW.
+     *
+     * `ModuleIntelligence` below shows the Brain's signals filtered to this
+     * module — the same shape every module gets. A module that has a registered
+     * contract has something strictly richer: its own coverage, position,
+     * breakdowns, findings, Module Integration and Cross-Module Workflow, read
+     * from its own tables. Preferring the contract is what makes those twenty-one
+     * screens reachable from the bar at all; without it they exist and nothing
+     * opens them.
+     *
+     * The level-3 routes are passed so the matcher can recognise a module by its
+     * route family when the label alone is ambiguous.
+     */
+    const level3Hrefs = (category?.items ?? []).map((item: ModuleCategoryItem) =>
+      mapApiLinkToRoute(item.link),
+    );
+    const contractEntry = intelligenceEntryFor(moduleName, label, level3Hrefs);
+
     return [
       {
         id: 'module-intelligence',
         label: 'Intelligence',
         icon: Brain,
         render: () =>
-          pinned ? (
+          contractEntry?.loadContract ? (
+            <ModuleIntelligenceContractScreen
+              moduleSlug={moduleName}
+              label={label}
+              hrefs={level3Hrefs}
+            />
+          ) : pinned ? (
             <ModuleIntelligence moduleKey={pinned} fallbackLabel={label} />
           ) : (
             <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
@@ -685,9 +714,23 @@ export function ModuleCategoryPage({
     );
   }
 
+  /*
+   * The Intelligence workspace brings its own header — a context chip, the
+   * MODULE name, then the organisation and year — so the category's generic
+   * "Intelligence / Predictive and analytical views over <module> data" above it
+   * was a second <h1> saying the product name a second time, directly above the
+   * module name it duplicates. Suppressed for this category only, exactly as
+   * Onboarding already does a few lines above for the same reason.
+   */
+  const intelligenceWorkspace =
+    (categoryKey === INTELLIGENCE_CATEGORY_KEY || category?.key === INTELLIGENCE_CATEGORY_KEY) &&
+    activeTab?.kind === 'static';
+
   return (
     <PageFrame>
-      <PageHeader title={category?.label ?? ''} description={category?.description || undefined} />
+      {intelligenceWorkspace ? null : (
+        <PageHeader title={category?.label ?? ''} description={category?.description || undefined} />
+      )}
 
       {state === 'loading' && tabs.length === 0 ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
@@ -722,7 +765,18 @@ export function ModuleCategoryPage({
 
       {tabs.length > 0 ? (
         <>
-          <div className="flex flex-wrap items-center gap-5 overflow-x-auto border-b border-[#D9E3F1]">
+          {/*
+            * A ONE-TAB STRIP IS NOT NAVIGATION. Fees' Intelligence category has a
+            * single static screen, so the bar rendered one lone tab reading
+            * "Fees Intelligence" directly above a heading that already says Fees
+            * — pure chrome with nothing to switch to. It reappears the moment a
+            * second screen exists.
+            */}
+          <div
+            className={`flex flex-wrap items-center gap-5 overflow-x-auto border-b border-[#D9E3F1] ${
+              tabs.length < 2 ? 'hidden' : ''
+            }`}
+          >
             {tabs.map((tab) => {
               // A menu tab is clickable only if it leads somewhere: an inline
               // screen, or a route this app actually serves.

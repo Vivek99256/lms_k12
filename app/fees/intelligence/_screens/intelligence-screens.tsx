@@ -3,7 +3,8 @@
 import { Brain } from 'lucide-react';
 
 import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
-import { FeesIntelligenceScreen } from '@/app/fees/intelligence/_components/fees-intelligence-screen';
+import { ModuleIntelligence } from '@/components/intelligence/module/ModuleIntelligence';
+import { feesIntelligenceContract } from '@/components/intelligence/module/contracts/fees';
 
 /**
  * The Fees → Intelligence workspace.
@@ -33,6 +34,25 @@ export const FEES_INTELLIGENCE_SCREENS: ModuleStaticScreen[] = [
     id: 'fees-intelligence',
     label: 'Fees Intelligence',
     icon: Brain,
-    render: () => <FeesIntelligenceScreen />,
+    /*
+     * FEES NOW RENDERS THROUGH THE SHARED RENDERER, like every other module.
+     *
+     * It was the last screen on the old native renderer: one long vertical page
+     * of nine stacked sections, with no section nav, no Module Integration and
+     * no Cross-Module Workflow. That made the product's reference implementation
+     * the one screen that did not follow the product's own Intelligence UX.
+     *
+     * NOTHING ABOUT THE NUMBERS MOVES. `feesIntelligenceContract` loads the same
+     * `/fees/intelligence` endpoint through the same client and adapts the same
+     * payload — every figure is still computed by BrainFeesIntelligenceController
+     * over the same fee records. Cancellations and refunds, the one block the
+     * contract did not previously carry, are mapped into the position metrics so
+     * no figure is lost in the move.
+     *
+     * `fees-intelligence-screen.tsx` is deliberately left on disk rather than
+     * deleted: it is the reference for what this screen used to show, and
+     * removing 1,690 lines is a separate decision from changing which one runs.
+     */
+    render: () => <ModuleIntelligence contract={feesIntelligenceContract} />,
   },
 ];
