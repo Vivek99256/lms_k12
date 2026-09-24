@@ -282,3 +282,32 @@ export async function updateMobileConfig(id: number, input: MobileConfigUpdateIn
   });
   return message(payload, "Mobile App Menu Rights Updated Successfully");
 }
+
+// Unlike updateMobileConfig, which only ever edits a screen_name row that
+// already exists, this creates a brand-new home screen icon -- needed
+// because the ~46 rows this module manages were seeded once, in 2020, and
+// a menu like "Admission Enquiry" that was never among them otherwise has
+// no row to attach a Custom Mobile Page to.
+export async function createMobileConfig(input: MobileConfigUpdateInput): Promise<{ message: string; id: number }> {
+  const payload = await request("mobile-app-rights/config", {
+    method: "POST",
+    body: body({
+      profile_name: input.profileName,
+      main_title: input.mainTitle,
+      main_title_color_code: input.mainTitleColorCode,
+      main_title_background_image: input.mainTitleBackgroundImage,
+      main_sort_order: input.mainSortOrder,
+      sub_title_of_main: input.subTitleOfMain,
+      sub_title_icon: input.subTitleIcon,
+      sub_title_sort_order: input.subTitleSortOrder,
+      status: input.status,
+      render_type: input.renderType,
+      web_url: input.webUrl,
+      open_mode: input.openMode,
+      page_source: input.pageSource,
+      custom_page_id: input.customPageId,
+    }),
+  });
+  const data = isRecord(payload.data) ? payload.data : {};
+  return { message: message(payload, "Mobile app menu item created successfully."), id: readNumber(data.id) };
+}
