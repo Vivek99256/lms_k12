@@ -788,10 +788,16 @@ export default function CourseMasterPage() {
    * a list of subjects they cannot open. So it renders in the teacher/admin
    * view and not in the student view of this same screen.
    */
+  // "Future Capabilities" stays in CATALOG_CATEGORY_PLAN — the build-plan spec
+  // names it explicitly and lib/roadmap/catalog.test.ts pins its presence there
+  // — but is filtered out of this strip, at the product team's request, until
+  // the tier is ready to show customers.
+  const visibleCatalogRollup = categoryRollup.filter((entry) => entry.key !== 'Future Capabilities');
+
   const catalogRollupSection = (
     <div>
       <p className="mb-2 text-[13px] font-medium text-[#52637A]">Catalog</p>
-      <RoadmapRollupStrip entries={categoryRollup} />
+      <RoadmapRollupStrip entries={visibleCatalogRollup} />
     </div>
   );
 
