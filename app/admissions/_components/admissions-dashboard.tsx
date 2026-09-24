@@ -7,11 +7,16 @@ import type {
   StatusCountRow,
 } from '@/app/admissions/_lib/admissions-dashboard-api';
 
+/** These cards' ids in the page's Customize registry — stored per user, don't rename them. */
+type AdmissionsKpiId = 'kpi.enquiries' | 'kpi.applications' | 'kpi.registrations' | 'kpi.conversion_rate';
+
 export interface AdmissionsDashboardProps {
   totalEnquiries: number;
   totalApplications: number;
   totalRegistrations: number;
   conversionRate: number;
+  /** The signed-in user's show/hide choice per card (useDashboardPreferences). Every card shows when omitted. */
+  isVisible?: (id: AdmissionsKpiId) => boolean;
 }
 
 export function AdmissionsDashboard({
@@ -19,13 +24,16 @@ export function AdmissionsDashboard({
   totalApplications,
   totalRegistrations,
   conversionRate,
+  isVisible = () => true,
 }: AdmissionsDashboardProps) {
   return (
     <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Enquiries" value={totalEnquiries} />
-      <StatCard label="Applications" value={totalApplications} />
-      <StatCard label="Registrations" value={totalRegistrations} />
-      <StatCard label="Conversion rate" value={`${conversionRate}%`} hint="Enquiry to registration" />
+      {isVisible('kpi.enquiries') && <StatCard label="Enquiries" value={totalEnquiries} />}
+      {isVisible('kpi.applications') && <StatCard label="Applications" value={totalApplications} />}
+      {isVisible('kpi.registrations') && <StatCard label="Registrations" value={totalRegistrations} />}
+      {isVisible('kpi.conversion_rate') && (
+        <StatCard label="Conversion rate" value={`${conversionRate}%`} hint="Enquiry to registration" />
+      )}
     </div>
   );
 }

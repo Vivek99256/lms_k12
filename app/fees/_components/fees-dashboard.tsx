@@ -6,7 +6,6 @@
 // components/ui/stat-card.tsx. Swapping back is this one line:
 //   import { StatCard } from "@platform/components-core";
 import { StatCard } from '@/components/ui/stat-card';
-import { ComingSoonTile } from '@/components/ui/coming-soon';
 
 /**
  * Real Fees dashboard — built from confirmed real fields, not invented.
@@ -32,6 +31,9 @@ import { ComingSoonTile } from '@/components/ui/coming-soon';
  * Caller: app/fees/dashboard/page.tsx
  */
 
+/** These cards' ids in the page's Customize registry — stored per user, don't rename them. */
+type FeesKpiId = 'kpi.collected_this_term' | 'kpi.outstanding' | 'kpi.collection_rate' | 'kpi.defaulters';
+
 export interface FeesDashboardProps {
   collectedThisTerm: string;   // e.g. "₹0.0L" — real field, confirmed
   outstanding: string;          // e.g. "₹0.1L"
@@ -44,6 +46,9 @@ export interface FeesDashboardProps {
    * month_id, not the academic term — so "this term" means "this fee month".
    */
   termLabel?: string;
+
+  /** The signed-in user's show/hide choice per card (useDashboardPreferences). Every card shows when omitted. */
+  isVisible?: (id: FeesKpiId) => boolean;
 }
 
 export function FeesDashboard({
@@ -52,21 +57,16 @@ export function FeesDashboard({
   collectionRate,
   defaulters,
   termLabel,
+  isVisible = () => true,
 }: FeesDashboardProps) {
   return (
     <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Collected this term" value={collectedThisTerm} hint={termLabel} />
-      <StatCard label="Outstanding" value={outstanding} />
-      <StatCard label="Collection rate" value={collectionRate} />
-      <StatCard label="Defaulters" value={defaulters} />
-
-      {/* Spans the full row rather than sitting as a fifth stat: it is not a
-          measurement, and an orphan tile in a four-column grid reads as a
-          layout mistake instead of a deliberate roadmap note. */}
-      <ComingSoonTile
-        roadmapId="dashboard.personalization"
-        className="sm:col-span-2 xl:col-span-4"
-      />
+      {isVisible('kpi.collected_this_term') && (
+        <StatCard label="Collected this term" value={collectedThisTerm} hint={termLabel} />
+      )}
+      {isVisible('kpi.outstanding') && <StatCard label="Outstanding" value={outstanding} />}
+      {isVisible('kpi.collection_rate') && <StatCard label="Collection rate" value={collectionRate} />}
+      {isVisible('kpi.defaulters') && <StatCard label="Defaulters" value={defaulters} />}
 
       {/* Real charts (Collection vs target, Head-wise collected vs pending,
           Payment mode mix) confirmed in the live screenshot. The API now

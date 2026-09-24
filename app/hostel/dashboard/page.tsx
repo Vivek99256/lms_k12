@@ -15,6 +15,19 @@ import {
   type HostelDashboardPayload,
 } from '@/app/hostel/_lib/hostel-dashboard-api';
 import { Button } from '@/components/ui/button';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const HOSTEL_WIDGETS = [
+  { id: 'kpi.hostels', label: 'Hostels', group: 'kpi' },
+  { id: 'kpi.rooms', label: 'Rooms', group: 'kpi' },
+  { id: 'kpi.allocations', label: 'Allocations', group: 'kpi' },
+  { id: 'kpi.occupancy_rate', label: 'Occupancy rate', group: 'kpi' },
+  { id: 'chart.allocations_by_hostel', label: 'Allocations by hostel', group: 'chart' },
+  { id: 'chart.allocations_by_category', label: 'Allocations by admission category', group: 'chart' },
+] as const satisfies readonly DashboardWidget[];
 
 /**
  * Hostel dashboard — the module landing page, wired to the real Laravel
@@ -28,8 +41,12 @@ export default function HostelDashboardPage() {
   const [payload, setPayload] = useState<HostelDashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const prefs = useDashboardPreferences('module.hostel', HOSTEL_WIDGETS);
+  const show = prefs.isVisible;
+  const bothCharts = show('chart.allocations_by_hostel') && show('chart.allocations_by_category');
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession(getFeesSession());
   }, []);
 
@@ -71,6 +88,7 @@ export default function HostelDashboardPage() {
     if (!session) return;
 
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(session, controller.signal);
 
     return () => controller.abort();
@@ -84,44 +102,56 @@ export default function HostelDashboardPage() {
         title="Hostel dashboard"
         description="Rooms, occupancy and allocations for the current academic year."
         action={
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading || !session}
-            onClick={() => session && void load(session)}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {prefs.ready ? <CustomizeDashboard widgets={HOSTEL_WIDGETS} {...prefs.customizeProps} /> : null}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading || !session}
+              onClick={() => session && void load(session)}
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Refresh
+            </Button>
+          </div>
         }
       />
 
       {error ? <InlineMessage type="error" text={error} /> : null}
 
-      {loading && !summary ? (
+      {/* Wait for the user's layout too, so hidden widgets never flash in. */}
+      {(loading && !summary) || (!prefs.ready && !error) ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading hostel summary…
         </div>
       ) : null}
 
-      {summary ? (
+      {payload && prefs.ready && !prefs.hasVisible() ? <AllWidgetsHiddenNotice /> : null}
+
+      {summary && prefs.ready && prefs.hasVisible('kpi') ? (
         <HostelDashboard
           totalHostels={summary.total_hostels}
           totalRooms={summary.total_rooms}
           totalAllocations={summary.total_allocations}
           occupancyRate={summary.occupancy_rate}
+          isVisible={show}
         />
       ) : null}
 
-      {payload ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <AllocationsByHostelPanel rows={payload.allocations_by_hostel ?? []} />
-          <AllocationsByCategoryPanel rows={payload.allocations_by_category ?? []} />
+      {payload && prefs.ready && prefs.hasVisible('chart') ? (
+        // A lone remaining chart takes the full row instead of leaving a gap.
+        <div className={`grid grid-cols-1 gap-4 ${bothCharts ? 'xl:grid-cols-2' : ''}`}>
+          {show('chart.allocations_by_hostel') ? (
+            <AllocationsByHostelPanel rows={payload.allocations_by_hostel ?? []} />
+          ) : null}
+          {show('chart.allocations_by_category') ? (
+            <AllocationsByCategoryPanel rows={payload.allocations_by_category ?? []} />
+          ) : null}
         </div>
       ) : null}
     </PageFrame>

@@ -3,10 +3,33 @@
 import React, { useCallback, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { fetchStudentProfile, fetchStudents, type BrainStudentProfile } from '@/lib/brain/api';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 import { useBrainResource } from '../../_components/useBrainResource';
 import { Card, DataTable, ErrorState, LoadingState, MetricTiles, HeroHeader } from '../../_components/primitives';
 import { BarSeries, ChartCard, CompletenessSeries } from '../../_components/charts';
 import { Delta, EvidenceStrip, IntelligenceCard, SeverityChip } from '../../_components/IntelligenceCard';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const STUDENTS_WIDGETS = [
+  { id: 'kpi.total', label: 'Students', group: 'kpi' },
+  { id: 'kpi.shown', label: 'Shown', group: 'kpi' },
+  { id: 'kpi.incomplete', label: 'Incomplete on this page', group: 'kpi' },
+  { id: 'kpi.signals', label: 'Student signals', group: 'kpi' },
+  { id: 'chart.record_completeness', label: 'Record completeness', group: 'chart' },
+  { id: 'chart.by_admission_year', label: 'By admission year', group: 'chart' },
+  { id: 'chart.by_gender', label: 'By gender', group: 'chart' },
+  { id: 'panel.signals', label: 'What the Brain has found about these students', group: 'panel' },
+  { id: 'panel.student_roll', label: 'Student roll', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
+
+/** Chart-row columns by how many charts are still shown, so they fill the row. Literal classes for Tailwind. */
+const CHART_ROW_COLS: Record<number, string> = {
+  1: 'md:grid-cols-1',
+  2: 'md:grid-cols-2',
+  3: 'md:grid-cols-3',
+};
 
 /**
  * The student roll, and the intelligence the Brain has derived from it.
@@ -24,6 +47,9 @@ export default function StudentsPage() {
   const [term, setTerm] = useState('');
   const [applied, setApplied] = useState('');
   const { data, error, loading, refreshing, refresh } = useBrainResource(() => fetchStudents(applied), [applied]);
+  const prefs = useDashboardPreferences('brain.foundation-students', STUDENTS_WIDGETS);
+  const show = prefs.isVisible;
+  const visibleCharts = STUDENTS_WIDGETS.filter((w) => w.group === 'chart' && show(w.id)).length;
 
   // One student's intelligence, loaded on demand. The roll is the index; the
   // profile is the thing worth reading, and loading 300 of them up front to
@@ -43,7 +69,8 @@ export default function StudentsPage() {
     }
   }, []);
 
-  if (loading && !data) return <LoadingState label="Reading the student roll" />;
+  // Wait for the user's layout too, so hidden widgets never flash in.
+  if ((loading && !data) || !prefs.ready) return <LoadingState label="Reading the student roll" />;
   if (error && !data) return <ErrorState message={error} onRetry={refresh} />;
   if (!data) return null;
 
@@ -94,20 +121,27 @@ export default function StudentsPage() {
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               Refresh
             </button>
+            <CustomizeDashboard
+              widgets={STUDENTS_WIDGETS}
+              {...prefs.customizeProps}
+              className="h-auto rounded-xl border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 hover:border-slate-500 hover:bg-slate-800 hover:text-white"
+            />
           </div>
         }
       />
 
+      {!prefs.hasVisible() && <AllWidgetsHiddenNotice />}
+
       <MetricTiles
-        metrics={[
+        metrics={([
           { key: 'total', label: 'Students', value: data.total },
           { key: 'shown', label: 'Shown', value: data.data.length },
           { key: 'incomplete', label: 'Incomplete on this page', value: incomplete },
           { key: 'signals', label: 'Student signals', value: data.signals.length },
-        ]}
+        ] as const).filter((metric) => show(`kpi.${metric.key}`))}
       />
 
-      {data.signals.length > 0 && (
+      {show('panel.signals') && data.signals.length > 0 && (
         <section className="mb-6">
           <h2 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">
             What the Brain has found about these students
@@ -120,58 +154,69 @@ export default function StudentsPage() {
         </section>
       )}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <ChartCard title="Record completeness">
-          <CompletenessSeries data={data.analytics?.recordCompleteness ?? []} />
-        </ChartCard>
-        <ChartCard title="By admission year">
-          <BarSeries data={data.analytics?.byAdmissionYear ?? []} max={20} />
-        </ChartCard>
-        <ChartCard title="By gender">
-          <BarSeries data={data.analytics?.byGender ?? []} />
-        </ChartCard>
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-        <Card className="overflow-hidden">
-          <div className="border-b border-gray-100 px-5 py-3">
-            <p className="text-sm font-semibold text-slate-900">
-              Student roll <span className="font-normal text-slate-400">({data.total.toLocaleString()} total, {data.data.length} shown)</span>
-            </p>
-            <p className="text-[11px] text-slate-400">Select a student to see their individual intelligence.</p>
-          </div>
-          <DataTable
-            columns={[
-              { key: 'enrollment_no', label: 'Enrollment' },
-              { key: 'first_name', label: 'First name' },
-              { key: 'last_name', label: 'Last name' },
-              { key: 'gender', label: 'Gender' },
-              { key: 'dob', label: 'Date of birth' },
-              { key: 'mobile', label: 'Mobile' },
-              { key: 'admission_year', label: 'Admitted' },
-              { key: 'absences', label: 'Absences' },
-            ]}
-            rows={data.data}
-            onRowClick={(row) => openStudent(String(row.id))}
-            emptyMessage={applied ? `No students matching “${applied}”.` : 'No students on the roll for this organization.'}
-            maxHeight="34rem"
-          />
-        </Card>
-
-        <div>
-          {profileLoading && <LoadingState label="Reading this student" />}
-          {!profileLoading && !profile && (
-            <Card className="flex h-full min-h-[16rem] flex-col items-center justify-center p-8 text-center">
-              <p className="text-sm font-medium text-slate-500">Select a student</p>
-              <p className="mt-1 max-w-xs text-xs text-slate-400">
-                Their attendance against their class, subject strengths and weaknesses, risks and recommended actions appear
-                here &mdash; each traced to the school&apos;s own records.
-              </p>
-            </Card>
+      {visibleCharts > 0 && (
+        // The charts still shown fill the row instead of leaving gaps.
+        <div className={`mb-6 grid grid-cols-1 gap-4 ${CHART_ROW_COLS[visibleCharts]}`}>
+          {show('chart.record_completeness') && (
+            <ChartCard title="Record completeness">
+              <CompletenessSeries data={data.analytics?.recordCompleteness ?? []} />
+            </ChartCard>
           )}
-          {!profileLoading && profile && <StudentProfile profile={profile} />}
+          {show('chart.by_admission_year') && (
+            <ChartCard title="By admission year">
+              <BarSeries data={data.analytics?.byAdmissionYear ?? []} max={20} />
+            </ChartCard>
+          )}
+          {show('chart.by_gender') && (
+            <ChartCard title="By gender">
+              <BarSeries data={data.analytics?.byGender ?? []} />
+            </ChartCard>
+          )}
         </div>
-      </div>
+      )}
+
+      {show('panel.student_roll') && (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+          <Card className="overflow-hidden">
+            <div className="border-b border-gray-100 px-5 py-3">
+              <p className="text-sm font-semibold text-slate-900">
+                Student roll <span className="font-normal text-slate-400">({data.total.toLocaleString()} total, {data.data.length} shown)</span>
+              </p>
+              <p className="text-[11px] text-slate-400">Select a student to see their individual intelligence.</p>
+            </div>
+            <DataTable
+              columns={[
+                { key: 'enrollment_no', label: 'Enrollment' },
+                { key: 'first_name', label: 'First name' },
+                { key: 'last_name', label: 'Last name' },
+                { key: 'gender', label: 'Gender' },
+                { key: 'dob', label: 'Date of birth' },
+                { key: 'mobile', label: 'Mobile' },
+                { key: 'admission_year', label: 'Admitted' },
+                { key: 'absences', label: 'Absences' },
+              ]}
+              rows={data.data}
+              onRowClick={(row) => openStudent(String(row.id))}
+              emptyMessage={applied ? `No students matching “${applied}”.` : 'No students on the roll for this organization.'}
+              maxHeight="34rem"
+            />
+          </Card>
+
+          <div>
+            {profileLoading && <LoadingState label="Reading this student" />}
+            {!profileLoading && !profile && (
+              <Card className="flex h-full min-h-[16rem] flex-col items-center justify-center p-8 text-center">
+                <p className="text-sm font-medium text-slate-500">Select a student</p>
+                <p className="mt-1 max-w-xs text-xs text-slate-400">
+                  Their attendance against their class, subject strengths and weaknesses, risks and recommended actions appear
+                  here &mdash; each traced to the school&apos;s own records.
+                </p>
+              </Card>
+            )}
+            {!profileLoading && profile && <StudentProfile profile={profile} />}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

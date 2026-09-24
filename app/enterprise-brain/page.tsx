@@ -22,10 +22,37 @@ import {
   Settings2,
 } from 'lucide-react';
 import { fetchClassIntelligence, fetchExecutive } from '@/lib/brain/api';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 import { useBrainResource } from './_components/useBrainResource';
 import { Card, ErrorState, LoadingState } from './_components/primitives';
 import { Delta, EvidenceStrip, HealthDial, IntelligenceCard } from './_components/IntelligenceCard';
 import type { BrainClassIntelligence, BrainExecutivePayload } from '@/lib/brain/api';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const HOME_WIDGETS = [
+  { id: 'kpi.departments', label: 'Departments', group: 'kpi' },
+  { id: 'kpi.people', label: 'People', group: 'kpi' },
+  { id: 'kpi.students', label: 'Students', group: 'kpi' },
+  { id: 'kpi.capabilities', label: 'Capabilities', group: 'kpi' },
+  { id: 'kpi.signals', label: 'Signals', group: 'kpi' },
+  { id: 'kpi.evidence', label: 'Evidence', group: 'kpi' },
+  { id: 'kpi.recommendations', label: 'Recommendations', group: 'kpi' },
+  { id: 'kpi.decisions', label: 'Decisions', group: 'kpi' },
+  { id: 'kpi.executions', label: 'Executions', group: 'kpi' },
+  { id: 'kpi.outcomes', label: 'Outcomes', group: 'kpi' },
+  { id: 'panel.organization_intelligence', label: "What's happening in your organization", group: 'panel' },
+  { id: 'panel.organization_health', label: 'Organization health', group: 'panel' },
+  { id: 'panel.what_changed', label: 'What changed', group: 'panel' },
+  { id: 'panel.at_risk', label: 'What is at risk', group: 'panel' },
+  { id: 'panel.class_attendance', label: 'Class attendance intelligence', group: 'panel' },
+  { id: 'panel.top_findings', label: 'Most important findings', group: 'panel' },
+  { id: 'panel.priority_actions', label: 'Priority actions', group: 'panel' },
+  { id: 'panel.intelligence_tools', label: 'Intelligence tools', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
+
+type HomeWidgetId = (typeof HOME_WIDGETS)[number]['id'];
 
 /* ------------------------------------------------------------------ header context */
 
@@ -77,6 +104,7 @@ function OrganizationHero({
   counts,
   generatedAt,
   findingsRefreshedAt,
+  actions,
 }: {
   organization: string;
   academicYear: NonNullable<BrainExecutivePayload['academicYear']>;
@@ -84,6 +112,7 @@ function OrganizationHero({
   counts: NonNullable<BrainExecutivePayload['counts']>;
   generatedAt: string;
   findingsRefreshedAt?: string | null;
+  actions?: React.ReactNode;
 }) {
   const overall = health.overall;
   const scoreColor =
@@ -139,6 +168,8 @@ function OrganizationHero({
                   {counts.high} high · {counts.awaitingDecision} awaiting decision
                 </p>
               </div>
+
+              {actions}
             </div>
           </div>
         </div>
@@ -149,33 +180,45 @@ function OrganizationHero({
 
 /* ------------------------------------------------------------------ foundation cards */
 
-function FoundationCards({ summary }: { summary: NonNullable<BrainExecutivePayload['summary']> }) {
+function FoundationCards({
+  summary,
+  show,
+}: {
+  summary: NonNullable<BrainExecutivePayload['summary']>;
+  show: (id: HomeWidgetId) => boolean;
+}) {
   const cards = [
     {
+      id: 'kpi.departments' as const,
       label: 'Departments',
       value: summary.foundation.departments,
       href: '/enterprise-brain/foundation/departments',
       icon: FolderTree,
     },
     {
+      id: 'kpi.people' as const,
       label: 'People',
       value: summary.foundation.people,
       href: '/enterprise-brain/foundation/people',
       icon: Users,
     },
     {
+      id: 'kpi.students' as const,
       label: 'Students',
       value: summary.foundation.students,
       href: '/enterprise-brain/foundation/students',
       icon: GraduationCap,
     },
     {
+      id: 'kpi.capabilities' as const,
       label: 'Capabilities',
       value: summary.foundation.capabilities,
       href: '/enterprise-brain/capabilities',
       icon: Target,
     },
-  ];
+  ].filter((card) => show(card.id));
+
+  if (!cards.length) return null;
 
   return (
     <section className="mb-8">
@@ -199,15 +242,23 @@ function FoundationCards({ summary }: { summary: NonNullable<BrainExecutivePaylo
 
 /* ------------------------------------------------------------------ intelligence state */
 
-function IntelligenceState({ summary }: { summary: NonNullable<BrainExecutivePayload['summary']> }) {
+function IntelligenceState({
+  summary,
+  show,
+}: {
+  summary: NonNullable<BrainExecutivePayload['summary']>;
+  show: (id: HomeWidgetId) => boolean;
+}) {
   const items = [
-    { label: 'Signals', value: summary.brain.signals, icon: Radio, href: '/enterprise-brain/intelligence-loop', tone: 'text-rose-600' },
-    { label: 'Evidence', value: summary.brain.evidence, icon: FileSearch, href: '/enterprise-brain/intelligence-loop/evidence', tone: 'text-amber-600' },
-    { label: 'Recommendations', value: summary.brain.recommendations, icon: Workflow, href: '/enterprise-brain/automation', tone: 'text-indigo-600' },
-    { label: 'Decisions', value: summary.brain.decisions, icon: Settings2, href: '/enterprise-brain/automation', tone: 'text-emerald-600' },
-    { label: 'Executions', value: summary.brain.executions, icon: FlaskConical, href: '/enterprise-brain/automation', tone: 'text-sky-600' },
-    { label: 'Outcomes', value: summary.brain.outcomes, icon: Gauge, href: '/enterprise-brain/automation', tone: 'text-violet-600' },
-  ];
+    { id: 'kpi.signals' as const, label: 'Signals', value: summary.brain.signals, icon: Radio, href: '/enterprise-brain/intelligence-loop', tone: 'text-rose-600' },
+    { id: 'kpi.evidence' as const, label: 'Evidence', value: summary.brain.evidence, icon: FileSearch, href: '/enterprise-brain/intelligence-loop/evidence', tone: 'text-amber-600' },
+    { id: 'kpi.recommendations' as const, label: 'Recommendations', value: summary.brain.recommendations, icon: Workflow, href: '/enterprise-brain/automation', tone: 'text-indigo-600' },
+    { id: 'kpi.decisions' as const, label: 'Decisions', value: summary.brain.decisions, icon: Settings2, href: '/enterprise-brain/automation', tone: 'text-emerald-600' },
+    { id: 'kpi.executions' as const, label: 'Executions', value: summary.brain.executions, icon: FlaskConical, href: '/enterprise-brain/automation', tone: 'text-sky-600' },
+    { id: 'kpi.outcomes' as const, label: 'Outcomes', value: summary.brain.outcomes, icon: Gauge, href: '/enterprise-brain/automation', tone: 'text-violet-600' },
+  ].filter((item) => show(item.id));
+
+  if (!items.length) return null;
 
   return (
     <section className="mb-8">
@@ -544,8 +595,11 @@ function IntelligenceTools({
 export default function BrainOverviewPage() {
   const { data, error, loading, refresh } = useBrainResource(fetchExecutive, []);
   const classIntelligence = useBrainResource(fetchClassIntelligence, []);
+  const prefs = useDashboardPreferences('brain.home', HOME_WIDGETS);
+  const show = prefs.isVisible;
 
-  if (loading && !data) return <LoadingState label="Reading the school" />;
+  // Wait for the user's layout too, so hidden widgets never flash in.
+  if ((loading && !data) || !prefs.ready) return <LoadingState label="Reading the school" />;
   if (error && !data) return <ErrorState message={error} onRetry={refresh} />;
   if (!data) return null;
 
@@ -578,157 +632,174 @@ export default function BrainOverviewPage() {
         counts={counts}
         generatedAt={generatedAt}
         findingsRefreshedAt={findingsRefreshedAt}
+        actions={
+          <CustomizeDashboard
+            widgets={HOME_WIDGETS}
+            {...prefs.customizeProps}
+            className="h-auto rounded-xl border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 hover:border-slate-500 hover:bg-slate-800 hover:text-white"
+          />
+        }
       />
 
+      {!prefs.hasVisible() && <AllWidgetsHiddenNotice />}
+
       {/* ---------------------------------------------------- Foundation Cards */}
-      <FoundationCards summary={summary} />
+      <FoundationCards summary={summary} show={show} />
 
       {/* ---------------------------------------------------- Intelligence State */}
-      <IntelligenceState summary={summary} />
+      <IntelligenceState summary={summary} show={show} />
 
       {/* ---------------------------------------------------- Organization Intelligence */}
-      <OrganizationIntelligence intelligence={intelligence} />
+      {show('panel.organization_intelligence') && <OrganizationIntelligence intelligence={intelligence} />}
 
       {/* ---------------------------------------------------- Dimension Health */}
-      <section className="mb-8">
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-sm font-semibold tracking-tight text-slate-800">Organization health</h2>
-          {health.overall.score !== null && (
-            <p className="text-xs text-slate-500">
-              Overall{' '}
-              <span className="text-base font-semibold tabular-nums text-slate-900">{health.overall.score}</span>
-              <span className="text-slate-400">/100</span>{' '}
-              <span className="font-semibold text-slate-600">{health.overall.band}</span>
-            </p>
-          )}
-        </div>
-        <p className="mb-4 max-w-3xl text-xs leading-relaxed text-slate-500">{health.overall.why}</p>
+      {show('panel.organization_health') && (
+        <section className="mb-8">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold tracking-tight text-slate-800">Organization health</h2>
+            {health.overall.score !== null && (
+              <p className="text-xs text-slate-500">
+                Overall{' '}
+                <span className="text-base font-semibold tabular-nums text-slate-900">{health.overall.score}</span>
+                <span className="text-slate-400">/100</span>{' '}
+                <span className="font-semibold text-slate-600">{health.overall.band}</span>
+              </p>
+            )}
+          </div>
+          <p className="mb-4 max-w-3xl text-xs leading-relaxed text-slate-500">{health.overall.why}</p>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {health.dimensions.filter((d) => d.available).map((dimension) => (
-            <HealthDial key={dimension.key} dimension={dimension} />
-          ))}
-        </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {health.dimensions.filter((d) => d.available).map((dimension) => (
+              <HealthDial key={dimension.key} dimension={dimension} />
+            ))}
+          </div>
 
-        {unscored.length > 0 && (
-          <Card className="mt-4 border-amber-200/70 bg-amber-50/40 p-5">
-            <div className="flex items-start gap-3">
-              <AlertTriangle size={17} className="mt-0.5 shrink-0 text-amber-600" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900">
-                  {unscored.length} {unscored.length === 1 ? 'area cannot' : 'areas cannot'} be scored yet
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  These are not failures — there is too little recorded data to judge them, and saying so is more useful than
-                  showing a zero.
-                </p>
-                <ul className="mt-3 space-y-2">
-                  {unscored.map((dimension) => (
-                    <li key={dimension.key}>
-                      <p className="text-xs font-semibold text-slate-700">{dimension.label}</p>
-                      <p className="text-xs leading-relaxed text-slate-500">{dimension.why}</p>
-                      {dimension.drivers?.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                          {dimension.drivers.map((driver) => (
-                            <span key={driver.label} className="text-[11px] text-slate-400">
-                              {driver.label}: <span className="font-semibold text-slate-600">{driver.value}</span>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+          {unscored.length > 0 && (
+            <Card className="mt-4 border-amber-200/70 bg-amber-50/40 p-5">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={17} className="mt-0.5 shrink-0 text-amber-600" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {unscored.length} {unscored.length === 1 ? 'area cannot' : 'areas cannot'} be scored yet
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    These are not failures — there is too little recorded data to judge them, and saying so is more useful than
+                    showing a zero.
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {unscored.map((dimension) => (
+                      <li key={dimension.key}>
+                        <p className="text-xs font-semibold text-slate-700">{dimension.label}</p>
+                        <p className="text-xs leading-relaxed text-slate-500">{dimension.why}</p>
+                        {dimension.drivers?.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                            {dimension.drivers.map((driver) => (
+                              <span key={driver.label} className="text-[11px] text-slate-400">
+                                {driver.label}: <span className="font-semibold text-slate-600">{driver.value}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </div>
-          </Card>
-        )}
-      </section>
+            </Card>
+          )}
+        </section>
+      )}
 
       {/* ---------------------------------------------------- What changed */}
-      <section className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">What changed</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {whatChanged.map((item) => (
-            <Card key={item.key} className="p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">{item.label}</p>
-              {item.available ? (
-                <>
-                  <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{item.value}</p>
-                  <div className="mt-1">
-                    <Delta change={item.change} unit={item.unit === '%' ? '%' : 'pts'} />
-                  </div>
-                  <p className="mt-2 text-[11px] text-slate-400">{item.note}</p>
-                </>
-              ) : (
-                <>
-                  <p className="mt-1 text-sm font-semibold text-slate-400">Cannot compare yet</p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-500">{item.note}</p>
-                </>
-              )}
-            </Card>
-          ))}
-        </div>
-      </section>
+      {show('panel.what_changed') && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">What changed</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {whatChanged.map((item) => (
+              <Card key={item.key} className="p-5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">{item.label}</p>
+                {item.available ? (
+                  <>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{item.value}</p>
+                    <div className="mt-1">
+                      <Delta change={item.change} unit={item.unit === '%' ? '%' : 'pts'} />
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">{item.note}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">Cannot compare yet</p>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-500">{item.note}</p>
+                  </>
+                )}
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ---------------------------------------------------- What is at risk */}
-      <section className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">What is at risk</h2>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <RiskList
-            title="Classes below the attendance baseline"
-            empty="No class is materially below the school baseline."
-            items={atRisk.classes}
-            href={(item) => `/enterprise-brain#class-${item.id}`}
-          />
-          <RiskList
-            title="Students most often absent"
-            empty="No student meets the persistent-absence threshold."
-            items={atRisk.students}
-            href={(item) => `/enterprise-brain/foundation/students?student=${item.id}`}
-          />
-          <RiskList
-            title="Departments needing attention"
-            empty="Every department that holds staff looks healthy."
-            items={atRisk.departments}
-            href={(item) => `/enterprise-brain/foundation/departments#${item.id}`}
-          />
-        </div>
-      </section>
+      {show('panel.at_risk') && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">What is at risk</h2>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <RiskList
+              title="Classes below the attendance baseline"
+              empty="No class is materially below the school baseline."
+              items={atRisk.classes}
+              href={(item) => `/enterprise-brain#class-${item.id}`}
+            />
+            <RiskList
+              title="Students most often absent"
+              empty="No student meets the persistent-absence threshold."
+              items={atRisk.students}
+              href={(item) => `/enterprise-brain/foundation/students?student=${item.id}`}
+            />
+            <RiskList
+              title="Departments needing attention"
+              empty="Every department that holds staff looks healthy."
+              items={atRisk.departments}
+              href={(item) => `/enterprise-brain/foundation/departments#${item.id}`}
+            />
+          </div>
+        </section>
+      )}
 
       {/* ---------------------------------------------------- Class Intelligence */}
-      <ClassIntelligenceSection resource={classIntelligence} />
+      {show('panel.class_attendance') && <ClassIntelligenceSection resource={classIntelligence} />}
 
       {/* ---------------------------------------------------- Most important findings */}
-      <section className="mb-8">
-        <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-semibold tracking-tight text-slate-800">Most important findings</h2>
-          <Link href="/enterprise-brain/intelligence-loop" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
-            See all {counts.openFindings}
-          </Link>
-        </div>
-        <div className="space-y-3">
-          {topFindings.map((finding) => (
-            <IntelligenceCard key={finding.id} model={finding} />
-          ))}
-          {!topFindings.length && (
-            <Card className="p-8">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 size={18} className="text-emerald-500" />
-                <p className="text-sm text-slate-500">
-                  No open findings. Every check the Brain runs currently passes for this school.
-                </p>
-              </div>
-            </Card>
-          )}
-        </div>
-      </section>
+      {show('panel.top_findings') && (
+        <section className="mb-8">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold tracking-tight text-slate-800">Most important findings</h2>
+            <Link href="/enterprise-brain/intelligence-loop" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+              See all {counts.openFindings}
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {topFindings.map((finding) => (
+              <IntelligenceCard key={finding.id} model={finding} />
+            ))}
+            {!topFindings.length && (
+              <Card className="p-8">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 size={18} className="text-emerald-500" />
+                  <p className="text-sm text-slate-500">
+                    No open findings. Every check the Brain runs currently passes for this school.
+                  </p>
+                </div>
+              </Card>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ---------------------------------------------------- Priority Actions */}
-      <PriorityActions actions={actions} recommendedFocus={intelligence.recommendedFocus} />
+      {show('panel.priority_actions') && <PriorityActions actions={actions} recommendedFocus={intelligence.recommendedFocus} />}
 
       {/* ---------------------------------------------------- Intelligence Tools */}
-      <IntelligenceTools ingestion={ingestion} graph={graph} evidence={evidence} />
+      {show('panel.intelligence_tools') && <IntelligenceTools ingestion={ingestion} graph={graph} evidence={evidence} />}
     </div>
   );
 }

@@ -39,6 +39,9 @@ import {
   type AttendanceTrend,
   type ClassSection,
 } from "../_lib/attendance-api";
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from "@/app/dashboard/_components/CustomizeDashboard";
+import { useDashboardPreferences } from "@/app/dashboard/_lib/useDashboardPreferences";
+import type { DashboardWidget } from "@/app/dashboard/_lib/dashboard-preferences";
 
 ChartJS.register(
   CategoryScale,
@@ -65,6 +68,15 @@ export interface AttendanceStudent {
 
 const emptyTrend: AttendanceTrend = { labels: [], present: [], absent: [] };
 
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const ATTENDANCE_WIDGETS = [
+  { id: "kpi.present", label: "Present", group: "kpi" },
+  { id: "kpi.absent", label: "Absent", group: "kpi" },
+  { id: "kpi.class_attendance", label: "Class attendance", group: "kpi" },
+  { id: "chart.todays_marking", label: "Today’s marking", group: "chart" },
+  { id: "chart.attendance_trend", label: "Attendance trend", group: "chart" },
+] as const satisfies readonly DashboardWidget[];
+
 function sectionLabel(section: ClassSection): string {
   return `${section.standardName} - ${section.divisionName}`;
 }
@@ -81,6 +93,9 @@ export default function AttendancePage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const prefs = useDashboardPreferences("attendance.dashboard", ATTENDANCE_WIDGETS);
+  const show = prefs.isVisible;
+  const bothCharts = show("chart.todays_marking") && show("chart.attendance_trend");
 
   const selectedClass = selectedSection ? sectionLabel(selectedSection) : "";
 
@@ -331,10 +346,15 @@ export default function AttendancePage() {
             Track and manage student attendance
           </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-[#3f5bf6] text-white rounded-lg font-medium hover:bg-[#3552e0] transition-colors shadow-sm">
-          <Download className="w-4 h-4" />
-          Export
-        </button>
+        <div className="flex items-center gap-2">
+          {prefs.ready && (
+            <CustomizeDashboard widgets={ATTENDANCE_WIDGETS} {...prefs.customizeProps} size="lg" />
+          )}
+          <button className="flex items-center gap-2 px-4 py-2.5 bg-[#3f5bf6] text-white rounded-lg font-medium hover:bg-[#3552e0] transition-colors shadow-sm">
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -343,67 +363,85 @@ export default function AttendancePage() {
         </div>
       )}
 
-      {loading && students.length === 0 ? (
+      {/* Wait for the user's layout too, so hidden widgets never flash in. */}
+      {(loading && students.length === 0) || !prefs.ready ? (
         <div className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white py-12 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading attendance...
         </div>
       ) : (
         <>
+      {/* The register below is where attendance is marked, so it always stays. */}
+      {!prefs.hasVisible() && <AllWidgetsHiddenNotice />}
+
       {/* Attendance Stats Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <MetricCard
-          title="Present"
-          value={String(presentCount)}
-          icon={<UserCheck className="h-4 w-4" />}
-          variant="success"
-        />
-        <MetricCard
-          title="Absent"
-          value={String(absentCount)}
-          icon={<UserX className="h-4 w-4" />}
-          variant="danger"
-        />
-        <MetricCard
-          title="Class attendance"
-          value={`${attendancePercentage}%`}
-          icon={<Users className="h-4 w-4" />}
-          variant="default"
-        />
-      </div>
+      {prefs.hasVisible("kpi") && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {show("kpi.present") && (
+            <MetricCard
+              title="Present"
+              value={String(presentCount)}
+              icon={<UserCheck className="h-4 w-4" />}
+              variant="success"
+            />
+          )}
+          {show("kpi.absent") && (
+            <MetricCard
+              title="Absent"
+              value={String(absentCount)}
+              icon={<UserX className="h-4 w-4" />}
+              variant="danger"
+            />
+          )}
+          {show("kpi.class_attendance") && (
+            <MetricCard
+              title="Class attendance"
+              value={`${attendancePercentage}%`}
+              icon={<Users className="h-4 w-4" />}
+              variant="default"
+            />
+          )}
+        </div>
+      )}
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Doughnut Chart - Today's Marking */}
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-slate-950">
-              Today&rsquo;s marking
-            </h3>
-            <p className="text-xs text-slate-500">
-              Live split for Grade {selectedClass} — updates as you mark
-            </p>
-          </div>
-          <div className="h-64">
-            <Doughnut data={doughnutData} options={doughnutOptions} />
-          </div>
-        </section>
+      {/* Charts Section — a lone remaining chart takes the full row instead of leaving a gap. */}
+      {prefs.hasVisible("chart") && (
+        <div className={`grid grid-cols-1 gap-4 ${bothCharts ? "lg:grid-cols-2" : ""}`}>
+          {/* Doughnut Chart - Today's Marking */}
+          {show("chart.todays_marking") && (
+            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-slate-950">
+                  Today&rsquo;s marking
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Live split for Grade {selectedClass} — updates as you mark
+                </p>
+              </div>
+              <div className="h-64">
+                <Doughnut data={doughnutData} options={doughnutOptions} />
+              </div>
+            </section>
+          )}
 
-        {/* Line Chart - Attendance Trend */}
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-slate-950">
-              Attendance trend
-            </h3>
-            <p className="text-xs text-slate-500">
-              Class attendance % over the last eight school days
-            </p>
-          </div>
-          <div className="h-64">
-            <Line data={trendChartData} options={trendOptions} />
-          </div>
-        </section>
-      </div>
+          {/* Line Chart - Attendance Trend */}
+          {show("chart.attendance_trend") && (
+            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-slate-950">
+                  Attendance trend
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Class attendance % over the last eight school days
+                </p>
+              </div>
+              <div className="h-64">
+                <Line data={trendChartData} options={trendOptions} />
+              </div>
+            </section>
+          )}
+        </div>
+      )}
 
       {/* Tabbed Register */}
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">

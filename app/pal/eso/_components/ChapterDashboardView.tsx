@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Award, BookOpen, CheckCircle2, Circle, Flame, ListChecks, Lock, MessageSquareText, RefreshCw, Target } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { EmptyState, SectionPanel, StatCard } from '@/app/dashboard/_components/DashboardPrimitives';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 import { type ChapterDashboard, type ChapterSection, type ChapterSectionStatus, type MasterySignal } from '@/app/pal/data/pal-eso';
 import {
   chapterCompletionFromSections,
@@ -13,6 +16,19 @@ import {
   signalsFromChapterSection,
 } from '@/app/pal/data/pal-completion';
 import { CompletedBadge, ReadOnlyBadge } from '@/app/pal/_components/CompletionState';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const CHAPTER_DASHBOARD_WIDGETS = [
+  { id: 'kpi.mastered_concepts', label: 'Mastered concepts', group: 'kpi' },
+  { id: 'kpi.current_concept', label: 'Current concept', group: 'kpi' },
+  { id: 'kpi.learning_streak', label: 'Learning streak', group: 'kpi' },
+  { id: 'kpi.badges_earned', label: 'Badges earned', group: 'kpi' },
+  { id: 'kpi.responses_on_concept', label: 'Responses on this concept', group: 'kpi' },
+  { id: 'kpi.all_responses', label: 'All responses', group: 'kpi' },
+  { id: 'panel.next_step', label: 'Next step', group: 'panel' },
+  { id: 'panel.chapter_sections', label: 'Sections in this chapter', group: 'panel' },
+  { id: 'panel.mastery_signals', label: 'What PAL has seen so far', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
 
 /**
  * The "Hello, {name}" chapter-level PAL dashboard content — everything
@@ -47,41 +63,84 @@ export default function ChapterDashboardView({
   // learner back into teach or practice on work they have finished.
   const completion = chapterCompletionFromSections(data.chapterSections);
 
+  // One key for both routes that render this view, so a student's layout
+  // follows them between /dashboard and the chapter page.
+  const prefs = useDashboardPreferences('student.chapter-dashboard', CHAPTER_DASHBOARD_WIDGETS);
+  const show = prefs.isVisible;
+  const bothPanels = show('panel.chapter_sections') && show('panel.mastery_signals');
+
+  const header = (
+    <DashboardHeader
+      studentName={studentName}
+      data={data}
+      onGoToSubject={onGoToSubject}
+      onSeeMasteryDetails={() =>
+        initialMasteryConceptId &&
+        router.push(`/pal/eso/mastery/${initialMasteryConceptId}?learnerId=${learnerId}&chapterId=${data.chapterId}`)
+      }
+      customize={prefs.ready && <CustomizeDashboard widgets={CHAPTER_DASHBOARD_WIDGETS} {...prefs.customizeProps} />}
+    />
+  );
+
+  // Wait for the student's layout too, so hidden widgets never flash in.
+  if (!prefs.ready) {
+    return (
+      <>
+        {header}
+        <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-lg border border-slate-200 bg-slate-50" />
+          ))}
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      <DashboardHeader
-        studentName={studentName}
-        data={data}
-        onGoToSubject={onGoToSubject}
-        onSeeMasteryDetails={() =>
-          initialMasteryConceptId &&
-          router.push(`/pal/eso/mastery/${initialMasteryConceptId}?learnerId=${learnerId}&chapterId=${data.chapterId}`)
-        }
-      />
+      {header}
 
-      <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Mastered concepts"
-          value={`${data.masteredConcepts} of ${data.totalConceptsInCurriculum}`}
-          icon={ListChecks}
-          tone={data.masteredConcepts > 0 ? 'positive' : 'default'}
-        />
-        <StatCard label="Current concept" value={data.currentConceptName ?? 'Chapter complete'} icon={Target} />
-        {/* Both from the existing PAL gamification tables — previously only
-            reachable by navigating to /pal/new/gamification/* directly. */}
-        <StatCard
-          label="Learning streak"
-          value={data.gamification.streakCurrent > 0 ? `${data.gamification.streakCurrent} day${data.gamification.streakCurrent === 1 ? '' : 's'}` : 'Not started'}
-          icon={Flame}
-          tone={data.gamification.streakCurrent > 0 ? 'positive' : 'default'}
-        />
-        <StatCard
-          label="Badges earned"
-          value={data.gamification.badgesEarned}
-          icon={Award}
-          tone={data.gamification.badgesEarned > 0 ? 'positive' : 'default'}
-        />
-      </div>
+      {/* The review, recognition and completion banners below are not
+          widgets, so they still show. */}
+      {!prefs.hasVisible() && (
+        <div className="mb-6">
+          <AllWidgetsHiddenNotice />
+        </div>
+      )}
+
+      {(show('kpi.mastered_concepts') || show('kpi.current_concept') || show('kpi.learning_streak') || show('kpi.badges_earned')) && (
+        <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {show('kpi.mastered_concepts') && (
+            <StatCard
+              label="Mastered concepts"
+              value={`${data.masteredConcepts} of ${data.totalConceptsInCurriculum}`}
+              icon={ListChecks}
+              tone={data.masteredConcepts > 0 ? 'positive' : 'default'}
+            />
+          )}
+          {show('kpi.current_concept') && (
+            <StatCard label="Current concept" value={data.currentConceptName ?? 'Chapter complete'} icon={Target} />
+          )}
+          {/* Both from the existing PAL gamification tables — previously only
+              reachable by navigating to /pal/new/gamification/* directly. */}
+          {show('kpi.learning_streak') && (
+            <StatCard
+              label="Learning streak"
+              value={data.gamification.streakCurrent > 0 ? `${data.gamification.streakCurrent} day${data.gamification.streakCurrent === 1 ? '' : 's'}` : 'Not started'}
+              icon={Flame}
+              tone={data.gamification.streakCurrent > 0 ? 'positive' : 'default'}
+            />
+          )}
+          {show('kpi.badges_earned') && (
+            <StatCard
+              label="Badges earned"
+              value={data.gamification.badgesEarned}
+              icon={Award}
+              tone={data.gamification.badgesEarned > 0 ? 'positive' : 'default'}
+            />
+          )}
+        </div>
+      )}
 
       {/* A spaced review that is due right now. Pull-based by design (nothing
           notifies the student out of app), so this is the only place they
@@ -143,10 +202,14 @@ export default function ChapterDashboardView({
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <StatCard label="Responses on this concept" value={data.responsesOnCurrentConcept} icon={MessageSquareText} />
-        <StatCard label="All responses" value={data.allResponses} icon={BookOpen} />
-      </div>
+      {(show('kpi.responses_on_concept') || show('kpi.all_responses')) && (
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {show('kpi.responses_on_concept') && (
+            <StatCard label="Responses on this concept" value={data.responsesOnCurrentConcept} icon={MessageSquareText} />
+          )}
+          {show('kpi.all_responses') && <StatCard label="All responses" value={data.allResponses} icon={BookOpen} />}
+        </div>
+      )}
 
       {completion.isComplete && (
         <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -162,7 +225,7 @@ export default function ChapterDashboardView({
         </div>
       )}
 
-      {data.nextStep && !completion.isComplete && (
+      {data.nextStep && !completion.isComplete && show('panel.next_step') && (
         <NextStepPanel
           nextStep={data.nextStep}
           conceptId={data.currentConceptId}
@@ -172,22 +235,29 @@ export default function ChapterDashboardView({
         />
       )}
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <SectionPanel
-          title={`Sections in this chapter (${data.chapterSections.length})`}
-          description={`This shows every section in ${data.chapterName}.`}
-        >
-          <ChapterSectionsList
-            sections={data.chapterSections}
-            chapterId={data.chapterId}
-            onOpen={onOpenConcept}
-          />
-        </SectionPanel>
+      {(show('panel.chapter_sections') || show('panel.mastery_signals')) && (
+        // A lone remaining panel takes the full row instead of leaving a gap.
+        <div className={`mt-6 grid grid-cols-1 gap-6 ${bothPanels ? 'lg:grid-cols-2' : ''}`}>
+          {show('panel.chapter_sections') && (
+            <SectionPanel
+              title={`Sections in this chapter (${data.chapterSections.length})`}
+              description={`This shows every section in ${data.chapterName}.`}
+            >
+              <ChapterSectionsList
+                sections={data.chapterSections}
+                chapterId={data.chapterId}
+                onOpen={onOpenConcept}
+              />
+            </SectionPanel>
+          )}
 
-        <SectionPanel title="What PAL has seen so far" description="Evidence gathered on your current concept.">
-          <MasterySignalsList signals={data.masterySignals} />
-        </SectionPanel>
-      </div>
+          {show('panel.mastery_signals') && (
+            <SectionPanel title="What PAL has seen so far" description="Evidence gathered on your current concept.">
+              <MasterySignalsList signals={data.masterySignals} />
+            </SectionPanel>
+          )}
+        </div>
+      )}
     </>
   );
 }
@@ -197,14 +267,18 @@ function DashboardHeader({
   data,
   onGoToSubject,
   onSeeMasteryDetails,
+  customize,
 }: {
   studentName?: string;
   data: ChapterDashboard;
   onGoToSubject: (subjectId: number) => void;
   onSeeMasteryDetails: () => void;
+  /** The Customize (show/hide widgets) button, placed with the header's own buttons. */
+  customize?: ReactNode;
 }) {
   return (
-    <div>
+    // mb-6 keeps the gap below the header when the KPI row under it is hidden.
+    <div className="mb-6">
       <h1 className="text-2xl font-bold text-slate-900">Hello, {studentName || 'Student'}</h1>
       <p className="mt-1 text-sm text-slate-500">This page shows where you are, and all students start from the same concept.</p>
 
@@ -225,6 +299,7 @@ function DashboardHeader({
         <Button variant="outline" onClick={onSeeMasteryDetails} className="border-indigo-200 text-indigo-700 hover:bg-indigo-50">
           See mastery details
         </Button>
+        {customize}
       </div>
     </div>
   );

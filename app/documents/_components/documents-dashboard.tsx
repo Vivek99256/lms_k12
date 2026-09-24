@@ -27,6 +27,9 @@ import {
   type DocumentRow,
   type DocumentsOverview,
 } from '@/app/documents/_lib/documents-api';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import { toWidgetId, type DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 
 /**
  * The Document module's landing page — a card grid over the document sources the
@@ -58,6 +61,11 @@ function domainIcon(name: string): LucideIcon {
   return DOMAIN_ICONS[name] ?? FileText;
 }
 
+/** A domain card's Customize id, from the backend's stable domain key. Stored per user — don't change it. */
+function domainWidgetId(domain: DocumentDomain): string {
+  return toWidgetId('panel', 'domain', domain.key);
+}
+
 function formatCount(value: number): string {
   return new Intl.NumberFormat('en-IN').format(value);
 }
@@ -77,6 +85,7 @@ function DomainCard({ domain, onOpen }: { domain: DocumentDomain; onOpen: (sourc
     <section className="flex flex-col rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="flex items-start gap-3 border-b border-slate-200 px-4 py-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-indigo-50 text-indigo-600">
+          {/* eslint-disable-next-line react-hooks/static-components -- a lookup into the module-level DOMAIN_ICONS map */}
           <Icon className="size-4.5" strokeWidth={1.75} />
         </span>
         <div className="min-w-0 flex-1">
@@ -210,6 +219,7 @@ export function DocumentsDashboard() {
   }, [syear]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
@@ -227,49 +237,74 @@ export function DocumentsDashboard() {
     [overview],
   );
 
+  /** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+  const widgets = useMemo<DashboardWidget[]>(
+    () => [
+      { id: 'panel.total_documents', label: 'Total documents', group: 'panel' },
+      ...(overview?.domains ?? []).map((domain): DashboardWidget => ({
+        id: domainWidgetId(domain),
+        label: domain.label,
+        group: 'panel',
+      })),
+      { id: 'panel.recently_added', label: 'Recently added', group: 'panel' },
+    ],
+    [overview],
+  );
+  const prefs = useDashboardPreferences('module.documents', widgets);
+  const show = prefs.isVisible;
+  const visibleDomains = (overview?.domains ?? []).filter((domain) => show(domainWidgetId(domain)));
+
   return (
     <PageFrame>
       <PageHeader
         title="Documents"
         description="Every document the ERP already holds, in one place. Records stay with the module that owns them — this view reads, it does not change anything."
         action={
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-            {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {prefs.ready && <CustomizeDashboard widgets={widgets} {...prefs.customizeProps} size="sm" />}
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+              {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+              Refresh
+            </Button>
+          </div>
         }
       />
 
       {error && <InlineMessage type="error" text={error} />}
 
-      {loading && !overview ? (
+      {/* Wait for the user's layout too, so hidden widgets never flash in. */}
+      {(loading && !overview) || (!prefs.ready && !error) ? (
         <div className="flex h-48 items-center justify-center rounded-lg border border-slate-200 bg-white">
           <Loader2 className="size-5 animate-spin text-slate-400" />
         </div>
       ) : overview ? (
         <>
-          <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-            <p className="text-sm text-slate-600">
-              <span className="text-base font-bold tabular-nums text-slate-950">
-                {formatCount(overview.total)}
-              </span>{' '}
-              documents across {overview.domains.filter((d) => d.sources.length > 0).length} areas
-              {overview.syear ? ` · academic year ${overview.syear}` : ''}
-            </p>
+          {!prefs.hasVisible() && <AllWidgetsHiddenNotice />}
 
-            {/*
-              Without this line the screen looks broken. Changing the year moves
-              only the cards whose tables carry a syear; the rest hold the same
-              number, and an unexplained unchanged count reads as a filter that
-              did not work rather than as data that has no year to filter on.
-            */}
-            {overview.syear && unscopedDomains.length > 0 && (
-              <p className="mt-1.5 text-xs text-slate-500">
-                Not dated by academic year: {unscopedDomains.join(', ')}. These records carry no
-                year, so their counts are the same whichever year is selected.
+          {show('panel.total_documents') && (
+            <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <p className="text-sm text-slate-600">
+                <span className="text-base font-bold tabular-nums text-slate-950">
+                  {formatCount(overview.total)}
+                </span>{' '}
+                documents across {overview.domains.filter((d) => d.sources.length > 0).length} areas
+                {overview.syear ? ` · academic year ${overview.syear}` : ''}
               </p>
-            )}
-          </section>
+
+              {/*
+                Without this line the screen looks broken. Changing the year moves
+                only the cards whose tables carry a syear; the rest hold the same
+                number, and an unexplained unchanged count reads as a filter that
+                did not work rather than as data that has no year to filter on.
+              */}
+              {overview.syear && unscopedDomains.length > 0 && (
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Not dated by academic year: {unscopedDomains.join(', ')}. These records carry no
+                  year, so their counts are the same whichever year is selected.
+                </p>
+              )}
+            </section>
+          )}
 
           {/*
             A source whose table is not in this database is named rather than
@@ -287,21 +322,25 @@ export function DocumentsDashboard() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {overview.domains.map((domain) => (
-              <DomainCard key={domain.key} domain={domain} onOpen={openSource} />
-            ))}
-          </div>
-
-          <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <h2 className="text-sm font-bold text-slate-950">Recently added</h2>
-              <p className="mt-1 text-xs text-slate-600">
-                The newest documents across every source.
-              </p>
+          {visibleDomains.length > 0 && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {visibleDomains.map((domain) => (
+                <DomainCard key={domain.key} domain={domain} onOpen={openSource} />
+              ))}
             </div>
-            <RecentList rows={recent} />
-          </section>
+          )}
+
+          {show('panel.recently_added') && (
+            <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-4 py-3">
+                <h2 className="text-sm font-bold text-slate-950">Recently added</h2>
+                <p className="mt-1 text-xs text-slate-600">
+                  The newest documents across every source.
+                </p>
+              </div>
+              <RecentList rows={recent} />
+            </section>
+          )}
         </>
       ) : null}
     </PageFrame>
