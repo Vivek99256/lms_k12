@@ -3,11 +3,11 @@
 import { BookMarked, Cpu, FileText, Gauge, History, ShieldAlert, SlidersHorizontal, Terminal, Workflow } from 'lucide-react';
 
 import type { ModuleStaticScreen } from '@/app/_components/module-category-page';
+import { AiStackModelsScreen } from '@/app/_components/ai-stack/models-screen';
 import { AttendanceActivityScreen } from '@/app/attendance/ai-stack/_screens/attendance-activity-screen';
 import { AttendanceAutomationsScreen } from '@/app/attendance/ai-stack/_screens/attendance-automations-screen';
 import { AttendanceGuardrailsScreen } from '@/app/attendance/ai-stack/_screens/attendance-guardrails-screen';
 import { AttendanceKnowledgeBaseScreen } from '@/app/attendance/ai-stack/_screens/attendance-knowledge-base-screen';
-import { AttendanceModelsScreen } from '@/app/attendance/ai-stack/_screens/attendance-models-screen';
 import { AttendancePoliciesScreen } from '@/app/attendance/ai-stack/_screens/attendance-policies-screen';
 import { AttendancePromptsScreen } from '@/app/attendance/ai-stack/_screens/attendance-prompts-screen';
 import { AttendanceTemplatesScreen } from '@/app/attendance/ai-stack/_screens/attendance-templates-screen';
@@ -74,11 +74,23 @@ export const ATTENDANCE_AI_STACK_SCREENS: ModuleStaticScreen[] = [
     render: () => <AttendancePoliciesScreen />,
   },
   {
-    // Live, and read-only. See the note above.
+    // Live. Uses the shared `AiStackModelsScreen` — the same component Exam, New PAL and
+    // every other module's AI Stack use — rather than Attendance's own former hand-rolled
+    // screen. That old screen (`attendance-models-screen.tsx`, kept in this folder but no
+    // longer wired in) read `fetchAiConfigurations().resolved` and searched it for
+    // `row.module === 'attendance'`. That search could never succeed: `resolved` is built
+    // by `AiConfigurationResolver::overview()`, which enumerates `AiModuleRegistry` — AI
+    // CAPABILITY keys ('conversational_ai', 'generative_ai', 'agent_reasoning', …), never
+    // a product module like 'attendance'. So the tab reported "no row for attendance" on
+    // every estate, unconditionally — nothing to do with `ai_modules` being unregistered,
+    // and no amount of re-running migrations could have fixed it. The shared screen reads
+    // `ai_module_model_bindings` through `fetchModuleModels('attendance')` instead, which
+    // is keyed by the real product module and is exactly how Fees' own Models tab (the
+    // origin of this shared component) already works.
     id: 'models',
     label: 'Models',
     icon: Cpu,
-    render: () => <AttendanceModelsScreen />,
+    render: () => <AiStackModelsScreen module={{ key: 'attendance', label: 'Attendance' }} />,
   },
   {
     // Live. `ai_templates` rows for Attendance with `kind = 'prompt'` — the other half of
