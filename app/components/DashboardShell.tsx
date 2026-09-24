@@ -163,6 +163,11 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
     label: 'Gamification',
     href: '/pal/new/gamification',
   },
+  {
+    id: 'pal-ai-stack',
+    label: 'AI Stack',
+    href: '/pal/new/ai-stack',
+  },
 ];
 
 /** `href` itself, or a page nested under it — never a sibling that merely shares a prefix. */

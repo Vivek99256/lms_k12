@@ -57,9 +57,9 @@ export const EXAM_AI_STACK: AiStackModule = {
       'the marks come from the result records themselves rather than from a model.',
     groundedOn: 'the recorded marks above, which is the stronger ground of the two.',
     capabilityAgent:
-      'No agent manifest is bound to Exam, so nothing here opens a case or drafts a recommendation. The tool agents on the Automations tab still read the marks.',
+      'The Exam Agent may open a case for a student scoring below the passing mark, cite the recorded subject percentages as evidence, and draft a review. It may not contact a family or change a mark itself.',
     capabilityWorkflow:
-      'No workflow is bound to Exam, so nothing in this module pauses for an approval.',
+      'A drafted review must be approved by a person through the exam_result_followup workflow before anything is considered decided.',
   },
 
   report: {
@@ -112,13 +112,21 @@ export const EXAM_AI_STACK: AiStackModule = {
     },
   ],
 
-  // Assessment data feeds the academic-risk agent through its detectors, but that agent
-  // belongs to the Student module and sweeps children, not exams. Binding it here would
-  // put one agent under two modules with two run logs, which is the duplication the whole
-  // AI Stack design refuses.
-  boundAgent: null,
-  noAgentReason:
-    'Assessment data feeds the academic-risk agent through its detectors, but the Exam module itself has no agent of its own. Nothing here opens a case against an exam or a result.',
+  // Registered by 2026_09_29_100000_register_exam_agent_signal_and_workflow.php. This is
+  // distinct from the academic-risk agent (which belongs to the Student module and sweeps
+  // children across all its own detectors): the Exam Agent reads only exam results, through
+  // ResultReportService, and binds only to the exam_result_followup workflow.
+  boundAgent: {
+    agentKey: 'k12_exam',
+    workflowKey: 'exam_result_followup',
+    fallbackName: 'Exam Agent',
+    filters: [
+      { key: 'subject_id', label: 'Student id', placeholder: 'all' },
+      { key: 'limit', label: 'Result rows', placeholder: '100' },
+    ],
+    sweepDescription:
+      'Reads recorded exam results and opens a case for each student scoring below the passing mark, citing the subjects behind it.',
+  },
 
   operations: {
     exam_results_report: {

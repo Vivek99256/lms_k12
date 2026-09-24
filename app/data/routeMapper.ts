@@ -288,6 +288,10 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   // `new_pal.<sub_module>` convention as its two siblings above.
   'new_pal.gamification': '/pal/new/gamification',
   'lms/new-pal/gamification': '/pal/new/gamification',
+  // AI Stack — the fourth New PAL level-3 sub-module, registered by
+  // 2026_09_29_100500_add_new_pal_ai_stack_submodule_menu. Same `new_pal.<sub_module>`
+  // convention as its siblings above.
+  'new_pal.ai_stack': '/pal/new/ai-stack',
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',
