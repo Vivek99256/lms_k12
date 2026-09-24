@@ -207,6 +207,10 @@ function ConfigFields({ idPrefix, input, onChange, mobilePages, mainTitleOptions
             <option value="webview">WebView</option>
             <option value="native_dynamic">Native Dynamic</option>
           </select>
+          <p className="text-xs text-slate-500">
+            To show a page built in the Mobile Page Builder, choose <strong>WebView</strong>, then Page Source ={" "}
+            <strong>Custom Mobile Page</strong> below. Native Dynamic is a separate, unrelated system.
+          </p>
         </div>
 
         {input.renderType === "webview" ? (
@@ -316,6 +320,11 @@ function ConfigFields({ idPrefix, input, onChange, mobilePages, mainTitleOptions
               onChange={(event) => onChange((current) => ({ ...current, webUrl: event.target.value }))}
               placeholder="fees_collect_summary"
             />
+            <p className="text-xs text-amber-700">
+              This must match an existing Native Dynamic Pages entry (a native-rendered schema, not a WebView). It is
+              unrelated to the Mobile Page Builder / Custom Mobile Page -- a page&apos;s slug will not work here and
+              will show &quot;This page is not configured&quot; on the phone.
+            </p>
           </div>
         ) : null}
       </div>
