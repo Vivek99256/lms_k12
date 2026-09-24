@@ -1,6 +1,6 @@
 'use client';
 
-import { ModuleCategoryPage, type ModuleStaticScreen } from '@/app/modules/_components/module-category-page';
+import { ModuleCategoryPage, type ModuleStaticScreen } from '@/app/_components/module-category-page';
 import { COMPLAINT_AI_STACK_SCREENS } from '@/app/admin-services/complaint-ai-stack/_screens/ai-stack-screens';
 import { PARENT_COMMUNICATION_AI_STACK_SCREENS } from '@/app/front_desk/parent_communication/ai-stack/_screens/ai-stack-screens';
 import { SQAA_AI_STACK_SCREENS } from '@/app/sqaa/ai-stack/_screens/ai-stack-screens';
@@ -56,6 +56,15 @@ import { DOCUMENT_TEMPLATES_AI_STACK_SCREENS } from '@/app/document-templates/ai
  *
  * A MODULE ABSENT FROM THIS TABLE BEHAVES EXACTLY AS IT DID BEFORE: no static tabs, and
  * the category's database menus alone. Adding a module here is additive by construction.
+ *
+ * RENDERED THROUGH THE SHARED `ModuleCategoryPage` (app/_components/module-category-page),
+ * not the pared-down one under app/modules/_components. That distinction matters here
+ * specifically: this route is also what serves onboarding, workflow, schedular, audit-trail,
+ * process-builder and intelligence for every one of the 62 seeded modules — the shared
+ * component is what turns each of those into the real screen (the onboarding journey, the
+ * workflow console, …) instead of an empty tab strip. Pointing this at the other
+ * ModuleCategoryPage silently drops all six for every module but Fees and Teach/Learn,
+ * which reach it by their own dedicated routes instead of this one.
  */
 const STATIC_SCREENS: Record<string, ModuleStaticScreen[]> = {
   // The keys are MENU slugs, not `ai_modules` keys: this table is looked up by what the
@@ -146,7 +155,7 @@ export function ModuleCategoryRoute({
 
   return (
     <ModuleCategoryPage
-      moduleSlug={moduleKey}
+      moduleName={moduleKey}
       categoryKey={categoryKey}
       staticScreens={screens}
       // 'before' is the default and is right here: the AI Stack category has no database
