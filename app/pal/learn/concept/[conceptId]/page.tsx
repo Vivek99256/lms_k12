@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
+  AlertTriangle,
   ArrowRight,
   BookOpen,
   ExternalLink,
@@ -129,8 +130,8 @@ function ConceptLearnView() {
    * jump would have silently overridden both.
    *
    * A concept with no guided-learning node has nothing for the engine to move,
-   * so that one goes to the question set instead of an engine that has no
-   * opinion about it.
+   * and so no practice, check or mastery to go on to - that one returns to the
+   * plan rather than re-opening the concept diagnostic as if it were practice.
    */
   const continueToNextStep = useCallback(async () => {
     setContinuing(true);
@@ -139,9 +140,12 @@ function ConceptLearnView() {
     try {
       const outcome = await acknowledgeConceptLearn(conceptId);
 
+      const planChapterId = data?.chapterId || chapterHint;
       router.push(
         outcome.reason === 'no_eso_nodes'
-          ? `/pal/adaptive/concept/${conceptId}`
+          ? planChapterId
+            ? `/pal/plan/chapter/${planChapterId}`
+            : '/pal'
           : `/pal/eso?conceptId=${conceptId}`,
       );
     } catch (reason: unknown) {
@@ -152,7 +156,7 @@ function ConceptLearnView() {
       );
       setContinuing(false);
     }
-  }, [conceptId, router]);
+  }, [conceptId, router, data, chapterHint]);
 
   if (checkingCompletion) return <Centered>Loading this concept…</Centered>;
 
@@ -245,18 +249,9 @@ function ConceptLearnView() {
         </PalRailSection>
       )}
 
-      <PalRailSection title="Go to">
-        <div className="space-y-2">
-          <Link
-            href={`/pal/adaptive/concept/${conceptId}`}
-            className={cn(
-              buttonVariants({ variant: 'outline', size: 'sm' }),
-              'w-full justify-start',
-            )}
-          >
-            Extra practice questions
-          </Link>
-          {chapterId > 0 && (
+      {chapterId > 0 && (
+        <PalRailSection title="Go to">
+          <div className="space-y-2">
             <Link
               href={`/pal/mastery/chapter/${chapterId}`}
               className={cn(
@@ -266,9 +261,9 @@ function ConceptLearnView() {
             >
               My mastery
             </Link>
-          )}
-        </div>
-      </PalRailSection>
+          </div>
+        </PalRailSection>
+      )}
     </>
   );
 
@@ -285,6 +280,32 @@ function ConceptLearnView() {
       backLabel={chapterId ? 'Back to my plan' : 'Back to subjects'}
       rail={rail}
     >
+      {/* What tripped this learner up here specifically — routed by
+          MisconceptionLibraryService off a wrong diagnostic or practice
+          answer (see palController::learnContent()'s own note). Leads the
+          page: this is the most targeted material there is, ahead of the
+          chapter-wide resources below. */}
+      {data.misconceptions.length > 0 && (
+        <div className="mb-5 space-y-3">
+          {data.misconceptions.map((item) => (
+            <Card key={item.misconceptionTag} className="border-amber-200 bg-amber-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base text-amber-900">
+                  <AlertTriangle aria-hidden className="h-4 w-4 shrink-0" />
+                  {item.title}
+                </CardTitle>
+                <CardDescription className="text-amber-800">
+                  What tripped you up on this concept
+                </CardDescription>
+              </CardHeader>
+              {item.body && (
+                <CardContent className="text-sm text-amber-900">{item.body}</CardContent>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
       {!hasResources && (
         // Only when there is nothing at all. Ordinary on this estate - most
         // concepts have no material authored - so it is said plainly rather
@@ -296,16 +317,10 @@ function ConceptLearnView() {
               Nothing prepared for this one yet
             </CardTitle>
             <CardDescription>
-              No material has been written for this concept. Practising the questions is the best
-              way in — each answer tells you where you stand.
+              No material has been written for this concept. Continue below to go straight to
+              practice — each answer tells you where you stand.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link href={`/pal/adaptive/concept/${conceptId}`} className={buttonVariants()}>
-              Practise this concept
-              <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
-            </Link>
-          </CardContent>
         </Card>
       )}
 
@@ -338,14 +353,7 @@ function ConceptLearnView() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            href={`/pal/adaptive/concept/${conceptId}`}
-            className={buttonVariants({ variant: 'outline' })}
-          >
-            Extra practice questions
-          </Link>
-
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {/* Records that the lesson was read, THEN hands over to the engine.
                 Without the first step taught_at stays null, the engine serves
                 `teach` again, and the learner gets a second lesson screen

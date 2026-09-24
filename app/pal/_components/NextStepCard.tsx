@@ -56,10 +56,21 @@ export function nextStepPlan(
     reteach: { title: 'Worth going over this again', cta: 'Learn it again', href: learnHref, tone: 'warn' },
     review_content: { title: 'Worth going over this again', cta: 'See the material', href: learnHref, tone: 'warn' },
     practice: { title: 'Ready to start', cta: 'Start practice', tone: 'go' },
-    continue_practice: { title: 'Keep going', cta: 'Next 5 questions', tone: 'go' },
+    continue_practice: { title: 'Keep going', cta: 'Keep practising', tone: 'go' },
     advance_band: { title: 'Level cleared', cta: 'Move up a level', tone: 'go' },
     mastery_check: { title: 'Ready for the mastery check', cta: 'Check my mastery', href: esoHref, tone: 'done' },
     mastered: { title: 'Concept mastered', cta: 'Back to the plan', href: `/pal/plan/chapter/${ids.chapterId}`, tone: 'done' },
+    // Reteach/remediate would otherwise repeat forever once the learner is
+    // genuinely stuck (see PracticeOutcomeService::decide()'s bounded-retry
+    // comments) - this is the terminal step instead of another lap. It still
+    // does not block: the learner can carry on with the rest of the chapter
+    // from the plan while their teacher is flagged.
+    escalate: {
+      title: 'Time to bring in your teacher',
+      cta: 'See what happens next',
+      href: `/pal/intervention/concept/${ids.conceptId}`,
+      tone: 'warn',
+    },
   };
 
   return plan[action] ?? { title: 'What is next', cta: 'Continue', tone: 'go' };

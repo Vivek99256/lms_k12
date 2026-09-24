@@ -67,12 +67,42 @@ export type CurriculumAssessment = {
   competency_total_percent: number | null;
 };
 
+/**
+ * One learning outcome mapped to a concept under a competency, from
+ * lms_concept_outcome (outcome_type = 'learning_outcome') joined to its
+ * lms_learning_outcomes row.
+ */
+export type ConceptLearningOutcome = {
+  code: string | null;
+  label: string;
+};
+
+/**
+ * One competency mapped to a concept, from lms_concept_outcome
+ * (concept_id -> outcome_id, an real FK pair - never inferred by name) joined
+ * to its lms_learning_outcomes row. `label` is null when this concept's own
+ * learning outcomes carry a competency_code whose competency row itself
+ * wasn't mapped to this concept - the code and its outcomes still show.
+ */
+export type ConceptCompetency = {
+  code: string | null;
+  goal_code: string | null;
+  label: string | null;
+  learning_outcomes: ConceptLearningOutcome[];
+};
+
+/** A concept, and the competencies (with their learning outcomes) it develops. */
+export type CurriculumConcept = {
+  name: string;
+  competencies: ConceptCompetency[];
+};
+
 /** A topic_master row and the concepts mapped to it for one chapter. */
 export type CurriculumTopic = {
   topic_id: number;
   name: string;
   description: string | null;
-  concepts: string[];
+  concepts: CurriculumConcept[];
 };
 
 /** A chapter of a unit, with topic_master topics and concepts beneath them. */
@@ -90,13 +120,17 @@ export type UnitChapter = {
    * of Life" for "Cell" - where the two lists could be lined up.
    */
   extracted_name: string | null;
-  /** Topic -> concept hierarchy, sourced from topic_master and lms_concept.topic_id. */
+  /**
+   * Topic -> concept -> competency -> learning-outcome hierarchy, sourced
+   * from topic_master, lms_concept.topic_id and lms_concept_outcome (the real
+   * concept_id -> outcome_id mapping).
+   */
   topics: CurriculumTopic[];
   topic_count: number;
   /** Only the C-* / C=* codes found in this chapter's extracted markdown. */
   competency_codes: string[];
-  /** Concept names from lms_concept; retained as a safe fallback for old API payloads. */
-  concepts: string[];
+  /** Concepts from lms_concept with their own competencies/outcomes; a flat fallback for chapters whose topics carry none. */
+  concepts: CurriculumConcept[];
   concept_count: number;
   /** Periods the syllabus plans for this chapter. */
   periods: number | null;

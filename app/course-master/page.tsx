@@ -16,7 +16,6 @@ import {
   Globe,
   Library,
   ListTree,
-  Network,
   Music,
   Network,
   Palette,
@@ -102,7 +101,6 @@ function getCourseRoutes(courseId: number | string, standardId?: number | string
     coherenceMap: `/course-master/${id}/chapters?view=coherence-map`,
     // A view of the chapters screen rather than its own route, matching the other
     // sub-views there (question-bank, concept-intelligence, content).
-    coherenceMap: `/course-master/${id}/chapters?view=coherence-map`,
   };
 }
 

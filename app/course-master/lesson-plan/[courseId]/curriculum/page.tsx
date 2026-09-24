@@ -21,6 +21,7 @@ import {
   getCurriculumSession,
   type CurriculumApiResult,
   type CurriculumAssessment,
+  type CurriculumConcept,
   type OutcomeNode,
   type UnitChapter,
 } from '../../../data/curriculum';
@@ -274,7 +275,54 @@ function TheoryTooltip({
 }
 
 /**
- * One chapter, and the concepts beneath it — the third level of the tree.
+ * A concept, its competencies, and the learning outcomes mapped under each one
+ * — the flow's last two levels, both read from the real concept_id ->
+ * outcome_id mapping (lms_concept_outcome), never inferred by name.
+ */
+function ConceptRow({ concept }: { concept: CurriculumConcept }) {
+  const competencies = concept.competencies ?? [];
+
+  return (
+    <li>
+      <div className="flex items-start gap-2">
+        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#4F46E5]" />
+        <span className="text-[13px] leading-6 text-[#334155]">{concept.name}</span>
+      </div>
+      {competencies.length > 0 ? (
+        <ul className="ml-3.5 mt-1 space-y-2 border-l-2 border-[#EEF2FF] pl-3">
+          {competencies.map((competency, index) => (
+            <li key={`${competency.code ?? index}-${index}`}>
+              <div className="flex flex-wrap items-baseline gap-1.5">
+                {competency.code ? (
+                  <span className="rounded bg-[#EEF2FF] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#4338CA]">
+                    {competency.code}
+                  </span>
+                ) : null}
+                <span className="text-[12px] font-semibold leading-5 text-[#4338CA]">
+                  {competency.label ?? <span className="italic font-normal text-[#94A3B8]">Competency not mapped to this concept</span>}
+                </span>
+              </div>
+              {competency.learning_outcomes.length > 0 ? (
+                <ul className="ml-2 mt-1 space-y-1 border-l border-[#E2E8F0] pl-3">
+                  {competency.learning_outcomes.map((outcome, outcomeIndex) => (
+                    <li key={`${outcome.code ?? outcomeIndex}-${outcomeIndex}`} className="text-[12px] leading-5 text-[#475569]">
+                      {outcome.code ? <span className="mr-1.5 font-mono text-[10px] font-semibold text-[#64748B]">{outcome.code}</span> : null}
+                      {outcome.label}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
+
+/**
+ * One chapter, and the topics -> concepts -> competencies beneath it — the
+ * rest of the tree.
  *
  * Collapsed by default, and it has to be: these chapters carry forty to sixty
  * concepts eacch, so a single expanded unit would run to two hundred rows and
@@ -282,12 +330,14 @@ function TheoryTooltip({
  */
 function ChapterRow({ chapter }: { chapter: UnitChapter }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'topic' | 'competency'>('topic');
   const [openTopicId, setOpenTopicId] = useState<number | null>(null);
   const topics = chapter.topics ?? [];
-  const competencyCodes = chapter.competency_codes ?? [];
   const ToggleIcon = isOpen ? ChevronDown : ChevronRight;
-  const hasChapterDetail = chapter.concept_count > 0 || topics.length > 0 || competencyCodes.length > 0;
+  const hasChapterDetail = chapter.concept_count > 0 || topics.length > 0;
+  // Some chapters carry topic_master rows whose lms_concept.topic_id link was
+  // never set, so every topic opens empty even though the chapter has
+  // concepts. The flat concepts list is the only place they still show up.
+  const topicsCoverConcepts = topics.some((topic) => topic.concepts.length > 0);
 
   return (
     <div className="rounded-[12px] border border-[#E2E8F0]">
@@ -335,74 +385,56 @@ function ChapterRow({ chapter }: { chapter: UnitChapter }) {
 
       {isOpen && hasChapterDetail ? (
         <div className="border-t border-[#E2E8F0] px-3 py-3">
-          <div className="flex gap-1 border-b border-[#D8E1F0]" role="tablist" aria-label={`${chapter.chapter_name} details`}>
-            {(['topic', 'competency'] as const).map((tab) => {
-              const selected = activeTab === tab;
+          {/* Topic -> concept -> competency, in that order: the tree this
+              screen now follows end to end. */}
+          <div className="space-y-2">
+            {topics.map((topic, index) => {
+              const isTopicOpen = openTopicId === topic.topic_id;
               return (
-                <button
-                  key={tab}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  onClick={() => setActiveTab(tab)}
-                  className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-semibold capitalize ${selected ? 'border-[#4F46E5] text-[#4F46E5]' : 'border-transparent text-[#64748B] hover:text-[#334155]'}`}
-                >
-                  {tab}
-                </button>
+                <div key={topic.topic_id} className="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white">
+                  <button
+                    type="button"
+                    aria-expanded={isTopicOpen}
+                    onClick={() => setOpenTopicId(isTopicOpen ? null : topic.topic_id)}
+                    className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-[#F8FAFC]"
+                  >
+                    {isTopicOpen ? <ChevronDown size={15} className="mt-0.5 shrink-0 text-[#64748B]" /> : <ChevronRight size={15} className="mt-0.5 shrink-0 text-[#64748B]" />}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-semibold leading-5 text-[#0F172A]">{topicLabel(topic.name, index)}</span>
+                      {topic.description ? <span className="mt-0.5 block text-[12px] leading-5 text-[#64748B]">{topic.description}</span> : null}
+                    </span>
+                    <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] font-semibold text-[#475569]">{topic.concepts.length} {topic.concepts.length === 1 ? 'concept' : 'concepts'}</span>
+                  </button>
+                  {isTopicOpen ? (
+                    topic.concepts.length === 0 ? (
+                      <p className="border-t border-[#E2E8F0] px-3 py-3 text-[12px] italic text-[#94A3B8]">No concepts are mapped to this topic.</p>
+                    ) : (
+                      <ul className="space-y-2 border-t border-[#E2E8F0] px-3 py-3">
+                        {topic.concepts.map((concept, conceptIndex) => (
+                          <ConceptRow key={`${concept.name}-${conceptIndex}`} concept={concept} />
+                        ))}
+                      </ul>
+                    )
+                  ) : null}
+                </div>
               );
             })}
+            {/* Some chapters carry topics with no concept linked to any of
+                them (lms_concept.topic_id never set for that chapter) - the
+                flat list is the only place those concepts, and the
+                competencies on them, still surface. */}
+            {!topicsCoverConcepts && chapter.concepts.length > 0 ? (
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">Unassigned concepts</p>
+                <ul className="mt-2 space-y-2 border-l-2 border-[#E2E8F0] pl-3">
+                  {chapter.concepts.map((concept, index) => (
+                    <ConceptRow key={`${concept.name}-${index}`} concept={concept} />
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {topics.length === 0 && chapter.concepts.length === 0 ? <p className="text-[13px] text-[#64748B]">No topics are available for this chapter.</p> : null}
           </div>
-
-          {activeTab === 'topic' ? (
-            <div className="mt-3 space-y-2" role="tabpanel">
-              {topics.map((topic, index) => {
-                const isTopicOpen = openTopicId === topic.topic_id;
-                return (
-                  <div key={topic.topic_id} className="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white">
-                    <button
-                      type="button"
-                      aria-expanded={isTopicOpen}
-                      onClick={() => setOpenTopicId(isTopicOpen ? null : topic.topic_id)}
-                      className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-[#F8FAFC]"
-                    >
-                      {isTopicOpen ? <ChevronDown size={15} className="mt-0.5 shrink-0 text-[#64748B]" /> : <ChevronRight size={15} className="mt-0.5 shrink-0 text-[#64748B]" />}
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] font-semibold leading-5 text-[#0F172A]">{topicLabel(topic.name, index)}</span>
-                        {topic.description ? <span className="mt-0.5 block text-[12px] leading-5 text-[#64748B]">{topic.description}</span> : null}
-                      </span>
-                      <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[11px] font-semibold text-[#475569]">{topic.concepts.length} {topic.concepts.length === 1 ? 'concept' : 'concepts'}</span>
-                    </button>
-                    {isTopicOpen ? (
-                      topic.concepts.length === 0 ? (
-                        <p className="border-t border-[#E2E8F0] px-3 py-3 text-[12px] italic text-[#94A3B8]">No concepts are mapped to this topic.</p>
-                      ) : (
-                        <ul className="space-y-1.5 border-t border-[#E2E8F0] px-3 py-3">
-                          {topic.concepts.map((name, conceptIndex) => (
-                            <li key={`${name}-${conceptIndex}`} className="flex items-start gap-2"><span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#4F46E5]" /><span className="text-[13px] leading-6 text-[#334155]">{name}</span></li>
-                          ))}
-                        </ul>
-                      )
-                    ) : null}
-                  </div>
-                );
-              })}
-              {topics.length === 0 && chapter.concepts.length > 0 ? (
-                <div>
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">Unassigned concepts</p>
-                  <ul className="mt-2 space-y-1.5 border-l-2 border-[#E2E8F0] pl-3">
-                    {chapter.concepts.map((name, index) => <li key={`${name}-${index}`} className="flex items-start gap-2"><span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#4F46E5]" /><span className="text-[13px] leading-6 text-[#334155]">{name}</span></li>)}
-                  </ul>
-                </div>
-              ) : null}
-              {topics.length === 0 && chapter.concepts.length === 0 ? <p className="text-[13px] text-[#64748B]">No topics are available for this chapter.</p> : null}
-            </div>
-          ) : (
-            <div className="mt-3" role="tabpanel">
-              {competencyCodes.length === 0 ? <p className="text-[13px] text-[#64748B]">No competency codes are present in this chapter&apos;s extraction.</p> : (
-                <ul className="flex flex-wrap gap-2">{competencyCodes.map((code) => <li key={code} className="rounded-md bg-[#EEF2FF] px-2.5 py-1 font-mono text-[12px] font-semibold text-[#4338CA]">{code}</li>)}</ul>
-              )}
-            </div>
-          )}
         </div>
       ) : null}
     </div>
