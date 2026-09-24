@@ -430,9 +430,12 @@ function StepRow({
             </span>
           )}
 
-          {!completed && (
+          {/* Practice is reached through Learn, which hands over to the engine.
+              Only a concept the engine cannot run keeps a direct route, and that
+              route is the concept diagnostic - the one question set it has. */}
+          {!completed && !step.esoReady && (
             <Link href={`/pal/adaptive/concept/${step.conceptId}`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              Practise{step.nextDifficulty ? ` at ${bandLabel(step.nextDifficulty).toLowerCase()}` : ''}
+              Concept diagnostic
             </Link>
           )}
 

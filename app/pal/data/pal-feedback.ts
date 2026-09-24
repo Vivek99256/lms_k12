@@ -390,7 +390,7 @@ export function whatToFix(result: ConceptDiagnosticResult): FeedbackPoint[] {
 
   bands(result.ladder?.bandsThin).forEach((band) => {
     points.push({
-      claim: `There are not enough answers at ${band} yet to call it either way.`,
+      claim: `There are not enough answers at ${bandLabel(band)} yet to call it either way.`,
       evidence: [{ label: `${bandLabel(band)} is still thin`, field: 'ladder' }],
     });
   });
