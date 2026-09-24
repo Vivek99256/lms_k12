@@ -72,9 +72,25 @@ function routeFor(module: H5pHubModule): string | null {
   return module.route ? (H5P_ROUTE_MAP[module.route] ?? null) : null;
 }
 
-function ModuleCard({ module, contextQuery }: { module: H5pHubModule; contextQuery: string }) {
+function ModuleCard({
+  module,
+  contextQuery,
+  goToCreate,
+}: {
+  module: H5pHubModule;
+  contextQuery: string;
+  /** Skip straight to authoring instead of this type's list. Only when the
+   *  hub itself was opened with a return_to -- i.e. from a flow (Question
+   *  Bank's "Create H5P content") that already means "I want to make one",
+   *  not from browsing the H5P section on its own. */
+  goToCreate: boolean;
+}) {
   const Icon = TYPE_ICONS[module.h5pType] ?? Layers3;
-  const href = routeFor(module);
+  const baseHref = routeFor(module);
+  // h5p_mcq has no authoring page of its own at all -- it is served live
+  // from the Question Bank already -- so it keeps going to its list/quiz
+  // screen even when every other card jumps straight to /create.
+  const href = baseHref && goToCreate && module.route !== 'h5p_mcq.index' ? `${baseHref}/create` : baseHref;
   const pedagogies = [...module.pedagogies.primary, ...module.pedagogies.secondary];
 
   // Authored in the registry, not measured, so it is always present and is a
@@ -172,6 +188,7 @@ function ModuleCard({ module, contextQuery }: { module: H5pHubModule; contextQue
 function H5pHubContent() {
   const searchParams = useSearchParams();
   const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
+  const returnTo = searchParams?.get('return_to') || null;
 
   const [hub, setHub] = useState<H5pHub | null>(null);
   const [loading, setLoading] = useState(true);
@@ -204,7 +221,7 @@ function H5pHubContent() {
     return () => controller.abort();
   }, [ctx]);
 
-  const contextQuery = h5pContextQuery(ctx);
+  const contextQuery = h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined);
   const modules = hub?.modules ?? [];
   const totalNodes = modules.reduce((sum, module) => sum + module.nodeCount, 0);
 
@@ -246,7 +263,12 @@ function H5pHubContent() {
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {modules.map((module) => (
-                <ModuleCard key={module.h5pType} module={module} contextQuery={contextQuery} />
+                <ModuleCard
+                  key={module.h5pType}
+                  module={module}
+                  contextQuery={contextQuery}
+                  goToCreate={returnTo !== null}
+                />
               ))}
             </div>
 
