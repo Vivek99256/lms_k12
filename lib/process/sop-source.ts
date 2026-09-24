@@ -39,12 +39,51 @@ Output
 `
 
 /**
+ * Fees SOP v1.0, procedure 6.4.2, reproduced the same way.
+ *
+ * Counter collection is to the Fees SOP what 6.9.4 is to LMS + PAL: the one
+ * procedure written out in full, with every other procedure authored against
+ * it. It is also the useful test of a second module, because it exercises what
+ * the first one does not - a staff actor running most of the steps, a module
+ * that names its people differently ("Fees officer", "Parent"), and unattended
+ * steps that move money rather than marks.
+ */
+export const FEES_6_4_2_SOURCE = `Procedure: 6.4.2 Collect a regular fee payment and issue the receipt
+Primary actor: Fees officer
+
+Objective: Collect a fee payment at the counter against the student's outstanding instalments and issue a numbered receipt, so the ledger and the parent's record agree.
+Trigger: A parent presents a fee payment at the fees counter.
+Preconditions: The fee break-off is assigned to the student; the receipt book series is configured for the counter; any concession or waiver is approved and within the configured limit; the active academic year is correct.
+Inputs: Student identity; the assigned break-off and its outstanding instalments; the payment amount, mode and instrument details; the active receipt book series.
+Completion criteria: The receipt is issued from the configured series, the ledger is posted, and the payment is either credited or recorded as uncleared pending bank confirmation.
+
+Steps
+Step | Actor | User / operational action | System action / response | Decision / validation | Result
+1 | Fees officer | Searches the student and opens the fee ledger | Loads the assigned break-off, the outstanding instalments and any approved concession | BR-10: is the student in a standard allocated to this officer? | Ledger opens, or access is refused and audited
+2 | Fees officer | Selects the fee heads and instalments being paid | Computes the payable amount, including any late fee due | BR-01: are the selected heads mapped to the active year and standard? | Payable amount shown, or the unmapped head is named
+3 | Fees officer | Enters the amount, the payment mode and the instrument details | Validates the amount against the outstanding balance | BR-03: is the amount within the outstanding balance? | Amount accepted, or refused with the outstanding restated
+4 | AI | - | Allocates the amount across the outstanding instalments, oldest first | BR-04: does the allocation clear the oldest instalment first? | Allocation proposed against the ledger
+5 | Fees officer | Confirms the collection | Issues the receipt from the configured series and posts the ledger entry | BR-02: is a number available in the counter's series? | Receipt issued and the ledger posted, or issue blocked with the receipt book named
+6 | AI | - | Holds a cheque, NACH or gateway payment as uncleared until the bank confirms | BR-11: has the bank or gateway confirmed clearance? | Payment credited, or held as uncleared against the receipt
+7 | Fees officer + AI | Reviews the drafted confirmation and sends it | Drafts the payment confirmation to the parent and records the send | BR-07: has the officer applied the draft? | Confirmation sent to the parent and logged
+
+Output
+- A numbered fee receipt carrying the payment mode and instrument details.
+- A posted ledger entry against the student's outstanding instalments.
+- An uncleared-payment record for any cheque, NACH or gateway payment awaiting confirmation.
+- The day's collection line, carried into reconciliation (6.8).
+- A payment confirmation recorded in the parent communication log (6.3).
+`
+
+/**
  * Procedures whose full SOP text ships with the app, keyed by
- * `<module key>/<procedure ref>`. The SOP authors 6.9.4 in full and writes
- * every other procedure "per 6.9.4", so it is the one with tables to transcribe.
+ * `<module key>/<procedure ref>`. Each SOP authors one procedure in full and
+ * writes every other one against it - 6.9.4 for LMS + PAL, 6.4.2 for Fees - so
+ * those are the ones with tables to transcribe.
  */
 const SHIPPED_SOURCES: Record<string, string> = {
   'lms-pal/6.9.4': LMS_PAL_6_9_4_SOURCE,
+  'fees/6.4.2': FEES_6_4_2_SOURCE,
 }
 
 export function shippedSourceFor(moduleKey: string, procedureRef: string): string | null {

@@ -25,6 +25,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import { TemplateHtmlEditor } from '@/app/general/_components/TemplateHtmlEditor';
 import { useAuth } from '@/contexts/AuthContext';
+import { readAiSession } from '@/lib/ai/session';
 import {
   getAiReport,
   getReportRecipients,
@@ -100,11 +101,20 @@ export default function AiReportPage() {
   const reportId = Number(params?.id);
 
   const context = useMemo<IntelligenceContext>(() => {
-    const token = typeof window === 'undefined' ? null : localStorage.getItem('token');
+    // `readAiSession()` rather than `localStorage.getItem('token')`.
+    //
+    // There is no bare `token` key. The session is a JSON blob under `userData`, and the
+    // bearer lives at `user_token` inside it — which is why this page answered
+    // "MCP authentication token is required" on every load while the assistant that
+    // linked here worked fine. One helper reads it, so a page cannot pick the wrong
+    // field again, and it carries `host_name` too, which this page was not sending at
+    // all on a split deployment.
+    const session = readAiSession();
 
     return {
-      token,
-      instituteId: auth?.menuContext?.sub_institute_id ?? null,
+      token: session?.token ?? null,
+      baseUrl: session?.baseUrl ?? null,
+      instituteId: session?.instituteId || auth?.menuContext?.sub_institute_id || null,
       academicYear:
         (auth?.academicYears?.[0] as { syear?: string | number } | undefined)?.syear ?? null,
     };

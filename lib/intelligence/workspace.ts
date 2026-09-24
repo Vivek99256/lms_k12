@@ -79,7 +79,15 @@ export interface WorkspaceSuggestion {
   label: string;
   description: string | null;
   icon: string | null;
-  action_type: "prompt" | "generate" | "analyse" | "run_agent" | "start_workflow" | "ontology_view";
+  action_type:
+    | "prompt"
+    | "generate"
+    | "analyse"
+    | "run_agent"
+    | "start_workflow"
+    | "ontology_view"
+    // Writes a saved report rather than prose — see `generateReportForContext`.
+    | "report";
   action_ref: string | null;
   prompt?: string | null;
   payload?: Record<string, unknown>;
@@ -216,6 +224,28 @@ export interface AgentRunOutcome {
   error: string | null;
 }
 
+/**
+ * A report built from the module's own data, grounded on a live read rather than a
+ * model's memory. Returned by `POST /api/ai/workspace/report`, which resolves the
+ * module from the given route and renders its published report layout (or a generic
+ * one, when no layout is published yet) against the school's own records.
+ */
+export interface WorkspaceReport {
+  module: string;
+  /** The `ai_generated_reports` row id this was saved as. */
+  template_id: number | null;
+  title: string;
+  row_count: number;
+  columns: string[];
+  /** The MCP tool the underlying data came from, e.g. `students.directory`. */
+  source_tool: string | null;
+  /** Which centrally configured layout produced this, or null for the generic layout. */
+  layout_template_id: number | null;
+  layout_name: string | null;
+  /** The saved report's own page — `/ai-reports/<id>` — not this page. */
+  template_link: string | null;
+}
+
 function normalizeBaseUrl(baseUrl?: string | null) {
   return resolveAiBaseUrl(baseUrl);
 }
@@ -313,6 +343,22 @@ export function generateForContext(
   }
 ) {
   return post<GenerationOutcome>(session, "/generate", input);
+}
+
+/**
+ * Build a report from this module's own live data for the page at `route`, using the
+ * module's published report layout when one exists. `arguments` are the layout's own
+ * filters (e.g. `standard_id`, `active_only`) — omitted ones fall back to the layout's
+ * default view rather than an empty one.
+ *
+ * `row_count: 0` with no `template_link` is a real, empty answer — a filter combination
+ * this institute has no matching records for — and is not an error.
+ */
+export function generateReportForContext(
+  session: WorkspaceSession,
+  input: { route: string; arguments?: Record<string, unknown> }
+) {
+  return post<WorkspaceReport>(session, "/report", input);
 }
 
 export function fetchOntologyView(

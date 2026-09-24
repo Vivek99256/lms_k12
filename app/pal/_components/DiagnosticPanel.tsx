@@ -22,7 +22,7 @@ import {
 } from '@/app/pal/data/pal';
 
 /**
- * "Take diagnostic" — the onboarding assessment step of the learning journey
+ * "Take chapter diagnostic" — the onboarding assessment step of the learning journey
  * (Learn -> Diagnose -> Determine mastery -> Adapt -> Progress). Distinct from
  * the "Adaptive practice" panel: it doesn't narrow toward a known mastery
  * level, it samples the chapter's concepts plus their prerequisites across
@@ -47,7 +47,7 @@ export function DiagnosticButton({
         className="border-violet-200 text-violet-700 hover:bg-violet-50"
       >
         <ClipboardCheck className="h-3.5 w-3.5" />
-        Take diagnostic
+        Take chapter diagnostic
       </Button>
       {open && (
         <DiagnosticModal studentId={studentId} context={context} onClose={() => setOpen(false)} />
@@ -117,7 +117,7 @@ function DiagnosticModal({
         if (!controller.signal.aborted) setData(response);
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load the diagnostic assessment.');
+        setError(reason instanceof Error ? reason.message : 'Unable to load the chapter diagnostic assessment.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -153,7 +153,7 @@ function DiagnosticModal({
     try {
       setResult(await submitDiagnosticAssessment({ studentId, answers }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit the diagnostic assessment.');
+      setError(reason instanceof Error ? reason.message : 'Unable to submit the chapter diagnostic assessment.');
     } finally {
       setSubmitting(false);
     }
@@ -174,7 +174,7 @@ function DiagnosticModal({
               <ClipboardCheck className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-slate-900">Diagnostic assessment</h2>
+              <h2 className="text-base font-semibold text-slate-900">Chapter diagnostic assessment</h2>
               <p className="text-xs text-slate-500">
                 {context.chapterId
                   ? 'Establishes what you already know before you start this chapter.'
@@ -196,7 +196,7 @@ function DiagnosticModal({
           {loading && (
             <div className="flex items-center justify-center py-12 text-sm text-slate-500">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Building your diagnostic...
+              Building your chapter diagnostic...
             </div>
           )}
           {!loading && error && (
@@ -215,7 +215,7 @@ function DiagnosticModal({
 
           {!loading && !error && !result && questions.length === 0 && (
             <div className="py-12 text-center text-sm text-slate-500">
-              No diagnostic questions are available for this chapter yet.
+              No chapter diagnostic questions are available for this chapter yet.
             </div>
           )}
 
@@ -288,7 +288,7 @@ function DiagnosticModal({
                 </span>
                 <Button onClick={handleSubmit} disabled={submitting || answeredCount === 0}>
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Target className="h-4 w-4" />}
-                  Submit diagnostic
+                  Submit chapter diagnostic
                 </Button>
               </div>
             </div>
@@ -328,10 +328,10 @@ function DiagnosticResult({
     <div className="space-y-4">
       <div className="flex flex-col items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 py-6">
         <Sparkles className="h-8 w-8 text-violet-600" />
-        <div className="text-sm font-semibold text-violet-800">Diagnostic complete</div>
+        <div className="text-sm font-semibold text-violet-800">Chapter diagnostic complete</div>
         <p className="max-w-sm text-center text-xs text-violet-700">
           Here&apos;s where you stand on each concept probed &mdash; this seeds your mastery
-          record for adaptive practice going forward.
+          record for the concept diagnostic going forward.
         </p>
       </div>
 
@@ -381,7 +381,7 @@ function DiagnosticResult({
       <div className="flex justify-end">
         <Button variant="outline" onClick={onRetake}>
           <RotateCcw className="h-4 w-4" />
-          Retake diagnostic
+          Retake chapter diagnostic
         </Button>
       </div>
     </div>

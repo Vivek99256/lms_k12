@@ -16,6 +16,7 @@ import {
   Globe,
   Library,
   ListTree,
+  Network,
   Music,
   Palette,
   PenTool,
@@ -95,6 +96,9 @@ function getCourseRoutes(courseId: number | string, standardId?: number | string
     chapters: `/course-master/${id}/chapters`,
     lessonPlan: `/course-master/lesson-plan/${id}`,
     curriculum: `/course-master/lesson-plan/${id}/curriculum`,
+    // A view of the chapters screen rather than its own route, matching the other
+    // sub-views there (question-bank, concept-intelligence, content).
+    coherenceMap: `/course-master/${id}/chapters?view=coherence-map`,
   };
 }
 
@@ -630,27 +634,26 @@ export default function CourseMasterPage() {
         }}
         className="relative cursor-pointer rounded-[22px] border border-[#DCE3ED] bg-white p-5 shadow-[0_2px_5px_rgba(15,23,42,0.12)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5648E8] focus-visible:ring-offset-2"
       >
-        <div className="flex items-start justify-between">
-          <div className="flex min-w-0 flex-1 flex-col items-start gap-3">
-            {/* <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-[0_3px_8px_rgba(15,23,42,0.08)]"
-              style={{ backgroundColor: soft, color: accent }}
-            >
-              <SubjectIcon className="h-6 w-6" strokeWidth={1.8} />
-            </div> */}
-            <div className="min-w-0 ">
-              <h3 className="min-h-10 text-center line-clamp-2 mt-10 text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[#1E293B]">
-                {subject.subject_name}
-              </h3>
-              <p className="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-[#94A3B8]"><BookOpen className="h-3.5 w-3.5" strokeWidth={1.8} />{chapterCount} chapters</p>
-            </div>
-          </div>
+        {/* Action row.
+            Previously `absolute right-5 top-5`, which took it out of flow: the
+            card could not size around it and it could not wrap, so at
+            2xl:grid-cols-8 - where a card is ~170px wide and ~130px inside its
+            padding - the four 32px buttons plus their gaps needed ~146px and
+            spilled out of the card. In flow with flex-wrap it reflows to two
+            rows on a narrow card instead of overflowing, and the title below no
+            longer needs the `mt-10` that existed only to dodge it. */}
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          <button type="button" title="Lesson plans" aria-label={`Open ${subject.subject_name} lesson plans`} onClick={(event) => { event.stopPropagation(); router.push(routes.lessonPlan); }} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#DDD6FE] bg-[#F3F0FF] text-[#6D4AFF] transition hover:bg-[#E8E1FF]"><CalendarDays className="h-4 w-4" strokeWidth={1.9} /></button>
+          <button type="button" title="Curriculum" aria-label={`Open ${subject.subject_name} curriculum`} onClick={(event) => { event.stopPropagation(); router.push(routes.curriculum); }} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#BAE6FD] bg-[#ECF9FF] text-[#0284C7] transition hover:bg-[#DDF4FF]"><ListTree className="h-4 w-4" strokeWidth={1.9} /></button>
+          <button type="button" title="Chapters" aria-label={`Open ${subject.subject_name} chapters`} onClick={(event) => { event.stopPropagation(); router.push(routes.chapters); }} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#BBF7D0] bg-[#ECFDF3] text-[#16A34A] transition hover:bg-[#DCFBE8]"><BookOpen className="h-4 w-4" strokeWidth={1.9} /></button>
+          <button type="button" title="Coherence map" aria-label={`Open ${subject.subject_name} coherence map`} onClick={(event) => { event.stopPropagation(); router.push(routes.coherenceMap); }} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#FDE68A] bg-[#FFFBEB] text-[#D97706] transition hover:bg-[#FEF3C7]"><Network className="h-4 w-4" strokeWidth={1.9} /></button>
+        </div>
 
-          <div className="absolute right-5 top-5 flex items-center gap-1.5">
-            <button type="button" title="Lesson plans" aria-label={`Open ${subject.subject_name} lesson plans`} onClick={(event) => { event.stopPropagation(); router.push(routes.lessonPlan); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DDD6FE] bg-[#F3F0FF] text-[#6D4AFF] transition hover:bg-[#E8E1FF]"><CalendarDays className="h-4 w-4" strokeWidth={1.9} /></button>
-            <button type="button" title="Curriculum" aria-label={`Open ${subject.subject_name} curriculum`} onClick={(event) => { event.stopPropagation(); router.push(routes.curriculum); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BAE6FD] bg-[#ECF9FF] text-[#0284C7] transition hover:bg-[#DDF4FF]"><ListTree className="h-4 w-4" strokeWidth={1.9} /></button>
-            <button type="button" title="Chapters" aria-label={`Open ${subject.subject_name} chapters`} onClick={(event) => { event.stopPropagation(); router.push(routes.chapters); }} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#BBF7D0] bg-[#ECFDF3] text-[#16A34A] transition hover:bg-[#DCFBE8]"><BookOpen className="h-4 w-4" strokeWidth={1.9} /></button>
-          </div>
+        <div className="mt-4 min-w-0">
+          <h3 className="min-h-10 line-clamp-2 text-center text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[#1E293B]">
+            {subject.subject_name}
+          </h3>
+          <p className="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-[#94A3B8]"><BookOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />{chapterCount} chapters</p>
         </div>
 
         <p className="hidden">
@@ -785,10 +788,16 @@ export default function CourseMasterPage() {
    * a list of subjects they cannot open. So it renders in the teacher/admin
    * view and not in the student view of this same screen.
    */
+  // "Future Capabilities" stays in CATALOG_CATEGORY_PLAN — the build-plan spec
+  // names it explicitly and lib/roadmap/catalog.test.ts pins its presence there
+  // — but is filtered out of this strip, at the product team's request, until
+  // the tier is ready to show customers.
+  const visibleCatalogRollup = categoryRollup.filter((entry) => entry.key !== 'Future Capabilities');
+
   const catalogRollupSection = (
     <div>
       <p className="mb-2 text-[13px] font-medium text-[#52637A]">Catalog</p>
-      <RoadmapRollupStrip entries={categoryRollup} />
+      <RoadmapRollupStrip entries={visibleCatalogRollup} />
     </div>
   );
 
