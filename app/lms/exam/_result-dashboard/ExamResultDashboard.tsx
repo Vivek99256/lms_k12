@@ -22,6 +22,12 @@ import {
   StatCard,
 } from '@/app/dashboard/_components/DashboardPrimitives';
 import {
+  AllWidgetsHiddenNotice,
+  CustomizeDashboard,
+} from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
+import {
   SearchDropdown,
   type DropdownField,
   type SearchDropdownValues,
@@ -34,6 +40,20 @@ import {
 
 /** Marks under this share of the paper are the ones a teacher chases up. */
 const AT_RISK_PERCENT = 40;
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const RESULT_WIDGETS = [
+  { id: 'kpi.exams_published', label: 'Exams published / sat', group: 'kpi' },
+  { id: 'kpi.attempts_recorded', label: 'Attempts recorded', group: 'kpi' },
+  { id: 'kpi.students_assessed', label: 'Students assessed', group: 'kpi' },
+  { id: 'kpi.average_score', label: 'Average score', group: 'kpi' },
+  { id: 'kpi.below_at_risk', label: `Below ${AT_RISK_PERCENT}%`, group: 'kpi' },
+  { id: 'chart.score_distribution', label: 'Score distribution', group: 'chart' },
+  { id: 'panel.quick_actions', label: 'Result quick actions', group: 'panel' },
+  { id: 'panel.recent_exams', label: 'Recent exams / exam-by-exam results', group: 'panel' },
+  { id: 'panel.subject_performance', label: 'Subject performance', group: 'panel' },
+  { id: 'panel.students_to_watch', label: 'Students to watch', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
 
 /** "Section" in these dropdowns is the grade; Subject is not a result filter. */
 const academicFields: DropdownField[] = ['section', 'standard', 'division'];
@@ -69,6 +89,11 @@ export default function ExamResultDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const prefs = useDashboardPreferences('lms.exam-results', RESULT_WIDGETS);
+  const show = prefs.isVisible;
+  // Subject performance and Students to watch share a row; a lone one takes the full width.
+  const bothHalfPanels = show('panel.subject_performance') && show('panel.students_to_watch');
 
   /** Aborts the in-flight request so a fast series of filter changes cannot land out of order. */
   const requestRef = useRef<AbortController | null>(null);
@@ -209,7 +234,8 @@ export default function ExamResultDashboard() {
     </SectionPanel>
   );
 
-  if (loading) {
+  // Wait for the user's layout too, so hidden widgets never flash in.
+  if (loading || !prefs.ready) {
     return (
       <div className="space-y-5">
         {filterPanel}
@@ -248,185 +274,218 @@ export default function ExamResultDashboard() {
                 : 'How your published exams are performing this academic year.'}
           </p>
         </div>
+        {/* prefs.ready is guaranteed here: the loading branch above waits for it. */}
+        <CustomizeDashboard widgets={RESULT_WIDGETS} {...prefs.customizeProps} className="ml-auto shrink-0" />
       </header>
 
       {filterPanel}
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard
-          label={selectedStudent ? 'Exams sat' : 'Exams published'}
-          value={summary.examsPublished}
-          icon={FileText}
-        />
-        <StatCard label="Attempts recorded" value={summary.attemptsRecorded} icon={ClipboardList} />
-        <StatCard label="Students assessed" value={summary.studentsAssessed} icon={Users} />
-        <StatCard
-          label="Average score"
-          value={percentLabel(summary.averageScore)}
-          icon={TrendingUp}
-          tone={summary.averageScore !== null && summary.averageScore >= 60 ? 'positive' : 'default'}
-        />
-        <StatCard
-          label={`Below ${AT_RISK_PERCENT}%`}
-          value={summary.needsAttention}
-          icon={AlertTriangle}
-          tone={summary.needsAttention > 0 ? 'warning' : 'default'}
-        />
-      </section>
+      {!prefs.hasVisible() ? <AllWidgetsHiddenNotice /> : null}
 
-      <SectionPanel
-        title="Score distribution"
-        description="How every attempt in the current selection is spread across score bands"
-      >
-        {hasAttempts ? (
-          <DashboardBarChart
-            labels={data.scoreDistribution.map((band) => band.label)}
-            values={data.scoreDistribution.map((band) => band.attempts)}
-          />
-        ) : (
-          <EmptyState
-            message={
-              hasFilters
-                ? 'No exam attempts match the current filters.'
-                : 'No exam attempts have been recorded yet this year.'
-            }
-          />
-        )}
-      </SectionPanel>
+      {prefs.hasVisible('kpi') ? (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {show('kpi.exams_published') ? (
+            <StatCard
+              label={selectedStudent ? 'Exams sat' : 'Exams published'}
+              value={summary.examsPublished}
+              icon={FileText}
+            />
+          ) : null}
+          {show('kpi.attempts_recorded') ? (
+            <StatCard label="Attempts recorded" value={summary.attemptsRecorded} icon={ClipboardList} />
+          ) : null}
+          {show('kpi.students_assessed') ? (
+            <StatCard label="Students assessed" value={summary.studentsAssessed} icon={Users} />
+          ) : null}
+          {show('kpi.average_score') ? (
+            <StatCard
+              label="Average score"
+              value={percentLabel(summary.averageScore)}
+              icon={TrendingUp}
+              tone={summary.averageScore !== null && summary.averageScore >= 60 ? 'positive' : 'default'}
+            />
+          ) : null}
+          {show('kpi.below_at_risk') ? (
+            <StatCard
+              label={`Below ${AT_RISK_PERCENT}%`}
+              value={summary.needsAttention}
+              icon={AlertTriangle}
+              tone={summary.needsAttention > 0 ? 'warning' : 'default'}
+            />
+          ) : null}
+        </section>
+      ) : null}
 
-      <SectionPanel title="Result quick actions">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <QuickActionLink href="/exam/progress-report" label="Exam-wise progress report" icon={TrendingUp} />
-          <QuickActionLink href="/lms/question-wise-report" label="Question-wise report" icon={ListChecks} />
-          <QuickActionLink href="/lms/student-analysis" label="Student analysis" icon={Users} />
-        </div>
-      </SectionPanel>
-
-      <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      {show('chart.score_distribution') ? (
         <SectionPanel
-          title={selectedStudent ? 'Exam-by-exam results' : 'Recent exams'}
-          description={
-            selectedStudent
-              ? `Every exam ${selectedStudent.studentName || 'this student'} has attempted`
-              : 'Latest papers and how the class scored'
-          }
-          className="lg:col-span-2"
+          title="Score distribution"
+          description="How every attempt in the current selection is spread across score bands"
         >
-          {data.recentExams.length === 0 ? (
+          {hasAttempts ? (
+            <DashboardBarChart
+              labels={data.scoreDistribution.map((band) => band.label)}
+              values={data.scoreDistribution.map((band) => band.attempts)}
+            />
+          ) : (
             <EmptyState
               message={
                 hasFilters
-                  ? 'No exams match the current filters.'
-                  : 'No exams have been published for this academic year.'
+                  ? 'No exam attempts match the current filters.'
+                  : 'No exam attempts have been recorded yet this year.'
               }
             />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <th className="pb-2 pr-3">Exam</th>
-                    <th className="pb-2 pr-3">Class</th>
-                    <th className="pb-2 pr-3">Subject</th>
-                    <th className="pb-2 pr-3 text-right">Attempts</th>
-                    <th className="pb-2 pr-3 text-right">{selectedStudent ? 'Score' : 'Average'}</th>
-                    <th className="pb-2 pr-3 text-right">Lowest</th>
-                    <th className="pb-2 text-right">Highest</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {data.recentExams.map((exam) => (
-                    <tr key={exam.id}>
-                      <td className="max-w-[280px] py-3 pr-3">
-                        <span className="block truncate font-medium text-slate-900" title={exam.paperName}>
-                          {exam.paperName || '-'}
+          )}
+        </SectionPanel>
+      ) : null}
+
+      {show('panel.quick_actions') ? (
+        <SectionPanel title="Result quick actions">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <QuickActionLink href="/exam/progress-report" label="Exam-wise progress report" icon={TrendingUp} />
+            <QuickActionLink href="/lms/question-wise-report" label="Question-wise report" icon={ListChecks} />
+            <QuickActionLink href="/lms/student-analysis" label="Student analysis" icon={Users} />
+          </div>
+        </SectionPanel>
+      ) : null}
+
+      {show('panel.recent_exams') || show('panel.subject_performance') || show('panel.students_to_watch') ? (
+        <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {show('panel.recent_exams') ? (
+            <SectionPanel
+              title={selectedStudent ? 'Exam-by-exam results' : 'Recent exams'}
+              description={
+                selectedStudent
+                  ? `Every exam ${selectedStudent.studentName || 'this student'} has attempted`
+                  : 'Latest papers and how the class scored'
+              }
+              className="lg:col-span-2"
+            >
+              {data.recentExams.length === 0 ? (
+                <EmptyState
+                  message={
+                    hasFilters
+                      ? 'No exams match the current filters.'
+                      : 'No exams have been published for this academic year.'
+                  }
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <th className="pb-2 pr-3">Exam</th>
+                        <th className="pb-2 pr-3">Class</th>
+                        <th className="pb-2 pr-3">Subject</th>
+                        <th className="pb-2 pr-3 text-right">Attempts</th>
+                        <th className="pb-2 pr-3 text-right">{selectedStudent ? 'Score' : 'Average'}</th>
+                        <th className="pb-2 pr-3 text-right">Lowest</th>
+                        <th className="pb-2 text-right">Highest</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {data.recentExams.map((exam) => (
+                        <tr key={exam.id}>
+                          <td className="max-w-[280px] py-3 pr-3">
+                            <span className="block truncate font-medium text-slate-900" title={exam.paperName}>
+                              {exam.paperName || '-'}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {exam.totalQuestions} questions · {exam.totalMarks} marks
+                              {exam.closeDate ? ` · closes ${exam.closeDate}` : ''}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-3 text-slate-600">{exam.standardName || '-'}</td>
+                          <td className="py-3 pr-3 text-slate-600">{exam.subjectName || '-'}</td>
+                          <td className="py-3 pr-3 text-right tabular-nums text-slate-700">{exam.attempts}</td>
+                          <td className={`py-3 pr-3 text-right font-semibold tabular-nums ${percentToneClass(exam.averagePercent)}`}>
+                            {percentLabel(exam.averagePercent)}
+                          </td>
+                          <td className="py-3 pr-3 text-right tabular-nums text-slate-500">
+                            {percentLabel(exam.lowestPercent)}
+                          </td>
+                          <td className="py-3 text-right tabular-nums text-slate-500">
+                            {percentLabel(exam.highestPercent)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionPanel>
+          ) : null}
+
+          {show('panel.subject_performance') ? (
+            <SectionPanel
+              title="Subject performance"
+              description="Weakest subjects first"
+              className={bothHalfPanels ? '' : 'lg:col-span-2'}
+            >
+              {data.subjectPerformance.length === 0 ? (
+                <EmptyState message="No subject has any recorded attempts in this selection." />
+              ) : (
+                <div className="space-y-3">
+                  {data.subjectPerformance.map((subject) => (
+                    <div key={subject.subjectId}>
+                      <div className="flex items-baseline justify-between gap-3 text-sm">
+                        <span className="truncate font-medium text-slate-900" title={subject.subjectName}>
+                          {subject.subjectName || '-'}
                         </span>
-                        <span className="text-xs text-slate-500">
-                          {exam.totalQuestions} questions · {exam.totalMarks} marks
-                          {exam.closeDate ? ` · closes ${exam.closeDate}` : ''}
+                        <span className={`shrink-0 font-semibold tabular-nums ${percentToneClass(subject.averagePercent)}`}>
+                          {percentLabel(subject.averagePercent)}
                         </span>
-                      </td>
-                      <td className="py-3 pr-3 text-slate-600">{exam.standardName || '-'}</td>
-                      <td className="py-3 pr-3 text-slate-600">{exam.subjectName || '-'}</td>
-                      <td className="py-3 pr-3 text-right tabular-nums text-slate-700">{exam.attempts}</td>
-                      <td className={`py-3 pr-3 text-right font-semibold tabular-nums ${percentToneClass(exam.averagePercent)}`}>
-                        {percentLabel(exam.averagePercent)}
-                      </td>
-                      <td className="py-3 pr-3 text-right tabular-nums text-slate-500">
-                        {percentLabel(exam.lowestPercent)}
-                      </td>
-                      <td className="py-3 text-right tabular-nums text-slate-500">
-                        {percentLabel(exam.highestPercent)}
-                      </td>
-                    </tr>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-[#4F46E5]"
+                          style={{ width: `${Math.min(subject.averagePercent ?? 0, 100)}%` }}
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">{subject.attempts} attempts</p>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionPanel>
-
-        <SectionPanel title="Subject performance" description="Weakest subjects first">
-          {data.subjectPerformance.length === 0 ? (
-            <EmptyState message="No subject has any recorded attempts in this selection." />
-          ) : (
-            <div className="space-y-3">
-              {data.subjectPerformance.map((subject) => (
-                <div key={subject.subjectId}>
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="truncate font-medium text-slate-900" title={subject.subjectName}>
-                      {subject.subjectName || '-'}
-                    </span>
-                    <span className={`shrink-0 font-semibold tabular-nums ${percentToneClass(subject.averagePercent)}`}>
-                      {percentLabel(subject.averagePercent)}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-[#4F46E5]"
-                      style={{ width: `${Math.min(subject.averagePercent ?? 0, 100)}%` }}
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">{subject.attempts} attempts</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </SectionPanel>
+              )}
+            </SectionPanel>
+          ) : null}
 
-        <SectionPanel
-          title="Students to watch"
-          description={`Most recent attempts under ${AT_RISK_PERCENT}%`}
-        >
-          {data.studentsToWatch.length === 0 ? (
-            <EmptyState message={`No attempt in this selection scored below ${AT_RISK_PERCENT}%.`} />
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {data.studentsToWatch.map((row) => (
-                <div key={row.id} className="flex items-center justify-between gap-3 py-3 text-sm">
-                  <div className="min-w-0">
-                    <span className="block truncate font-medium text-slate-900">
-                      {row.studentName || `Student #${row.studentId}`}
-                    </span>
-                    <span className="block truncate text-xs text-slate-500" title={row.paperName}>
-                      {row.paperName || '-'}
-                      {row.attemptedOn ? ` · ${row.attemptedOn}` : ''}
-                    </span>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <span className={`block font-semibold tabular-nums ${percentToneClass(row.percent)}`}>
-                      {percentLabel(row.percent)}
-                    </span>
-                    <span className="block text-xs text-slate-500 tabular-nums">
-                      {row.obtainMarks}/{row.totalMarks}
-                    </span>
-                  </div>
+          {show('panel.students_to_watch') ? (
+            <SectionPanel
+              title="Students to watch"
+              description={`Most recent attempts under ${AT_RISK_PERCENT}%`}
+              className={bothHalfPanels ? '' : 'lg:col-span-2'}
+            >
+              {data.studentsToWatch.length === 0 ? (
+                <EmptyState message={`No attempt in this selection scored below ${AT_RISK_PERCENT}%.`} />
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {data.studentsToWatch.map((row) => (
+                    <div key={row.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                      <div className="min-w-0">
+                        <span className="block truncate font-medium text-slate-900">
+                          {row.studentName || `Student #${row.studentId}`}
+                        </span>
+                        <span className="block truncate text-xs text-slate-500" title={row.paperName}>
+                          {row.paperName || '-'}
+                          {row.attemptedOn ? ` · ${row.attemptedOn}` : ''}
+                        </span>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className={`block font-semibold tabular-nums ${percentToneClass(row.percent)}`}>
+                          {percentLabel(row.percent)}
+                        </span>
+                        <span className="block text-xs text-slate-500 tabular-nums">
+                          {row.obtainMarks}/{row.totalMarks}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </SectionPanel>
-      </section>
+              )}
+            </SectionPanel>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -40,6 +40,7 @@ function DragDropCreateContent() {
     [searchParams]
   );
   const contextQuery = h5pContextQuery(ctx);
+  const returnTo = searchParams?.get('return_to') || null;
 
   const [state, setState] = useState<DragDropEditorState>(emptyEditorState);
   const [saving, setSaving] = useState(false);
@@ -86,7 +87,7 @@ function DragDropCreateContent() {
           title="New drag and drop activity"
           description="Learners drag text or images into the correct drop zones"
           ctx={ctx}
-          backHref={`/h5p/h5p_drag_drop?${contextQuery}`}
+          backHref={returnTo ?? `/h5p/h5p_drag_drop?${contextQuery}`}
         />
 
         {!hasH5pContext(ctx) ? (

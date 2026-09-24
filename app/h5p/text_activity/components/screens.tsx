@@ -506,8 +506,11 @@ export function TextActivityListPage({ type }: { type: TextActivityType }) {
 
 function CreateContent({ type }: { type: TextActivityType }) {
   const router = useRouter();
-  const { ctx, contextQuery } = useH5pRouteContext();
+  const { ctx, contextQuery, searchParams } = useH5pRouteContext();
   const base = textActivityRoute(type);
+  // Set when opened from somewhere other than this type's own list -- the
+  // Question Bank's "Create H5P content" menu, for one.
+  const returnTo = searchParams?.get('return_to') || null;
 
   const [state, setState] = useState<TextActivityEditorState>(emptyEditorState);
   const [saving, setSaving] = useState(false);
@@ -557,7 +560,7 @@ function CreateContent({ type }: { type: TextActivityType }) {
           title={`New ${TEXT_ACTIVITY_LABELS[type].toLowerCase()} activity`}
           description={TEXT_ACTIVITY_DESCRIPTIONS[type]}
           ctx={ctx}
-          backHref={`${base}?${contextQuery}`}
+          backHref={returnTo ?? `${base}?${contextQuery}`}
         />
 
         {!hasH5pContext(ctx) ? (

@@ -47,7 +47,54 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
+import { fetchHub, type H5pHubModule } from '@/app/h5p/data/h5p-model';
+import {
+  H5P_ROUTE_MAP,
+  h5pContextQuery,
+  createTextActivity,
+  type H5pContext,
+  type TextActivityType,
+} from '@/app/h5p/data/h5p';
+import { trueFalseApi, singleChoiceSetApi, memoryGameApi, arithmeticQuizApi } from '@/app/h5p/data/h5p-content-types';
+import {
+  TrueFalseEditor,
+  emptyTrueFalseState,
+  trueFalseToPayload,
+  validateTrueFalseState,
+  type TrueFalseEditorState,
+} from '@/app/h5p/h5p_true_false/components/editor';
+import {
+  SingleChoiceSetEditor,
+  emptySingleChoiceState,
+  singleChoiceToPayload,
+  validateSingleChoiceState,
+  type SingleChoiceSetEditorState,
+} from '@/app/h5p/h5p_single_choice_set/components/editor';
+import {
+  MemoryGameEditor,
+  emptyMemoryState,
+  memoryToPayload,
+  validateMemoryState,
+  type MemoryGameEditorState,
+} from '@/app/h5p/h5p_memory_game/components/editor';
+import {
+  TextActivityEditor,
+  emptyEditorState as emptyTextActivityState,
+  toSavePayload as textActivityToPayload,
+  validateEditorState as validateTextActivityState,
+  type TextActivityEditorState,
+} from '@/app/h5p/text_activity/components/editor';
+import {
+  ArithmeticQuizEditor,
+  emptyArithmeticState,
+  arithmeticToPayload,
+  validateArithmeticState,
+  type ArithmeticQuizEditorState,
+} from '@/app/h5p/h5p_arithmetic_quiz/components/editor';
 import { ContentCard } from './ContentCard';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
@@ -75,6 +122,7 @@ import {
   getSubjectAndChapters,
   resolveSubjectDisplayName,
   deleteQuestionBankQuestion,
+  createQuestionBankQuestion,
   updateQuestionBankQuestion,
   reviewQuestionBankQuestion,
   fetchQuestionTypeCatalog,
@@ -245,6 +293,73 @@ const QUESTION_TYPE_API_CONFIG: Record<
 > = {
   MCQ: { question_type: 'mcq', question_type_id: 1 },
   Narrative: { question_type: 'narrative', question_type_id: 2 },
+};
+
+type ManualH5pTypeKey =
+  | 'h5p_true_false'
+  | 'h5p_single_choice_set'
+  | 'h5p_blanks'
+  | 'h5p_drag_text'
+  | 'h5p_mark_the_words'
+  | 'h5p_memory_game'
+  | 'h5p_arithmetic_quiz'
+  | 'h5p_drag_drop'
+  | 'h5p_course_presentation';
+
+/** The TextActivityEditor-backed keys, and which TextActivityType each is. */
+const H5P_TEXT_ACTIVITY_TYPE: Partial<Record<ManualH5pTypeKey, TextActivityType>> = {
+  h5p_blanks: 'fill_in_the_blanks',
+  h5p_drag_text: 'drag_text',
+  h5p_mark_the_words: 'mark_the_words',
+};
+
+interface ManualH5pOption {
+  key: ManualH5pTypeKey;
+  label: string;
+  /** 'inline' authors right in this modal. 'redirect' has no modal-sized
+   *  editor (a canvas or multi-slide deck) -- picking it shows a link out to
+   *  its real full-page /create instead of an embedded form. */
+  mode: 'inline' | 'redirect';
+}
+
+/**
+ * Which H5P content types a question_type_catalog.code can be authored as,
+ * mirrored from the backend's own App\Services\lms\H5P\QuestionBankSource::
+ * TYPE_CODES (next_lms_erp) -- the real, already-vetted mapping the H5P
+ * player screens use to pull bank questions, reversed here for authoring.
+ * Every type the backend maps appears somewhere below: 'inline' where a
+ * modal-ready editor exists, 'redirect' where it doesn't (h5p_drag_drop's
+ * canvas, h5p_course_presentation's slide deck). h5p_mcq is the one
+ * exception -- it has no authoring UI of its own at all, served live from
+ * the bank already -- so it never appears here.
+ */
+const FORMAT_TO_H5P_TYPES: Record<string, ManualH5pOption[]> = {
+  true_false: [{ key: 'h5p_true_false', label: 'True / False', mode: 'inline' }],
+  mcq: [{ key: 'h5p_single_choice_set', label: 'Single Choice Set', mode: 'inline' }],
+  assertion_reason: [{ key: 'h5p_single_choice_set', label: 'Single Choice Set', mode: 'inline' }],
+  fill_blank: [
+    { key: 'h5p_blanks', label: 'Fill in the Blanks', mode: 'inline' },
+    { key: 'h5p_drag_text', label: 'Drag Text', mode: 'inline' },
+    { key: 'h5p_mark_the_words', label: 'Mark the Words', mode: 'inline' },
+  ],
+  drag_text: [{ key: 'h5p_drag_text', label: 'Drag Text', mode: 'inline' }],
+  mark_the_words: [{ key: 'h5p_mark_the_words', label: 'Mark the Words', mode: 'inline' }],
+  numerical: [
+    { key: 'h5p_blanks', label: 'Fill in the Blanks', mode: 'inline' },
+    { key: 'h5p_arithmetic_quiz', label: 'Arithmetic Quiz', mode: 'inline' },
+  ],
+  match_following: [
+    { key: 'h5p_memory_game', label: 'Memory Game', mode: 'inline' },
+    { key: 'h5p_drag_drop', label: 'Drag & Drop', mode: 'redirect' },
+  ],
+  drag_drop: [{ key: 'h5p_drag_drop', label: 'Drag & Drop', mode: 'redirect' }],
+  case_study: [{ key: 'h5p_course_presentation', label: 'Course Presentation', mode: 'redirect' }],
+  case_study_parent: [{ key: 'h5p_course_presentation', label: 'Course Presentation', mode: 'redirect' }],
+  case_study_child: [{ key: 'h5p_course_presentation', label: 'Course Presentation', mode: 'redirect' }],
+  source_based_integrated: [{ key: 'h5p_course_presentation', label: 'Course Presentation', mode: 'redirect' }],
+  competency_focused: [{ key: 'h5p_course_presentation', label: 'Course Presentation', mode: 'redirect' }],
+  proof: [{ key: 'h5p_course_presentation', label: 'Course Presentation', mode: 'redirect' }],
+  construction: [{ key: 'h5p_course_presentation', label: 'Course Presentation', mode: 'redirect' }],
 };
 const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
 const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
@@ -1105,6 +1220,10 @@ export default function ChapterListPage() {
   // publisher's own invented form appears -- so the dropdown reads from it
   // rather than from whatever happens to be on the current page.
   const [questionTypeCatalog, setQuestionTypeCatalog] = useState<QuestionTypeCatalogEntry[]>([]);
+  // H5P content types for the "Create H5P content" submenu, loaded the first
+  // time that menu opens rather than on every page load.
+  const [h5pHubModules, setH5pHubModules] = useState<H5pHubModule[]>([]);
+  const [h5pHubLoaded, setH5pHubLoaded] = useState(false);
   const [questionBankBloomFilter, setQuestionBankBloomFilter] = useState('all');
   const [questionBankDifficultyFilter, setQuestionBankDifficultyFilter] = useState('all');
   const [questionBankCategoryFilter, setQuestionBankCategoryFilter] = useState('all');
@@ -1129,6 +1248,19 @@ export default function ChapterListPage() {
   const [manualQuestionChapterId, setManualQuestionChapterId] = useState('');
   const [manualQuestionConcept, setManualQuestionConcept] = useState('');
   const [manualQuestionType, setManualQuestionType] = useState<QuestionBankQuestionType>('MCQ');
+  // question_type_catalog.code for the chosen Question Type -- e.g. 'mcq' or
+  // 'assertion_reason' under MCQ, 'long' or 'fill_blank' under Narrative.
+  const [manualQuestionFormat, setManualQuestionFormat] = useState('');
+  // '' means "type the question manually" -- the default, unchanged behaviour.
+  const [manualH5pType, setManualH5pType] = useState<ManualH5pTypeKey | ''>('');
+  const [trueFalseState, setTrueFalseState] = useState<TrueFalseEditorState>(emptyTrueFalseState);
+  const [singleChoiceState, setSingleChoiceState] = useState<SingleChoiceSetEditorState>(emptySingleChoiceState);
+  // Shared by h5p_blanks / h5p_drag_text / h5p_mark_the_words -- one passage
+  // editor, same as the standalone text-activity screens share it, so
+  // switching between the three under one Format keeps the passage.
+  const [textActivityState, setTextActivityState] = useState<TextActivityEditorState>(emptyTextActivityState);
+  const [memoryGameState, setMemoryGameState] = useState<MemoryGameEditorState>(emptyMemoryState);
+  const [arithmeticState, setArithmeticState] = useState<ArithmeticQuizEditorState>(emptyArithmeticState);
   const [manualQuestionMarks, setManualQuestionMarks] = useState('1');
   const [manualQuestionText, setManualQuestionText] = useState('');
   const [manualQuestionOptions, setManualQuestionOptions] = useState<Record<QuestionOptionLabel, string>>({
@@ -1336,6 +1468,30 @@ export default function ChapterListPage() {
   const manualQuestionConceptOptions = useMemo(
     () => (manualQuestionChapter ? getQuestionBankConceptTitles(manualQuestionChapter) : []),
     [manualQuestionChapter]
+  );
+  // Only the catalog forms that belong to the chosen Question Type, keyed by
+  // question_type_catalog.lms_question_type_id -- the real FK, not a name match.
+  const manualQuestionFormatOptions = useMemo(() => {
+    const matches = questionTypeCatalog.filter(
+      (entry) => entry.lms_question_type_id === QUESTION_TYPE_API_CONFIG[manualQuestionType].question_type_id
+    );
+
+    // The catalog carries one row per (code, publisher) -- 'case_study' from
+    // KVS RO Agra and from NODIA Press are two distinct rows with the same
+    // code. This dropdown only ever selects a code (publisher plays no part
+    // in Format or the H5P mapping downstream), so two entries sharing a code
+    // would be two SelectItems with the same value -- indistinguishable to
+    // pick between, not just a duplicate React key. Keep the first.
+    const seen = new Set<string>();
+    return matches.filter((entry) => {
+      if (seen.has(entry.code)) return false;
+      seen.add(entry.code);
+      return true;
+    });
+  }, [questionTypeCatalog, manualQuestionType]);
+  const manualH5pTypeOptions = useMemo(
+    () => FORMAT_TO_H5P_TYPES[manualQuestionFormat] ?? [],
+    [manualQuestionFormat]
   );
   useEffect(() => {
     let cancelled = false;
@@ -2620,6 +2776,8 @@ export default function ChapterListPage() {
     setManualQuestionChapterId(targetChapter.id);
     setManualQuestionConcept(targetConcept);
     setManualQuestionType(targetType);
+    setManualQuestionFormat('');
+    resetManualH5pState();
     setManualQuestionMarks(targetType === 'Narrative' ? '3' : '1');
     setManualQuestionText('');
     setManualQuestionOptions({
@@ -2634,20 +2792,93 @@ export default function ChapterListPage() {
     setIsAddQuestionBankModalOpen(true);
   };
 
-  const openQuestionBankAddH5p = () => {
-    const targetChapter = resolveQuestionBankTargetChapter();
-    if (!targetChapter || !course) return;
+  /** Clears the H5P authoring choice and every type's draft state. Called
+   *  whenever something the H5P Content Type list depends on changes. */
+  const resetManualH5pState = () => {
+    setManualH5pType('');
+    setTrueFalseState(emptyTrueFalseState());
+    setSingleChoiceState(emptySingleChoiceState());
+    setTextActivityState(emptyTextActivityState());
+    setMemoryGameState(emptyMemoryState());
+    setArithmeticState(emptyArithmeticState());
+  };
 
+  const updateManualQuestionFormat = (value: string | null) => {
+    setManualQuestionFormat(value ?? '');
+    resetManualH5pState();
+    setManualQuestionError('');
+  };
+
+  const buildH5pContext = (): H5pContext | null => {
+    const targetChapter = resolveQuestionBankTargetChapter();
+    if (!targetChapter || !course) return null;
+
+    return {
+      chapter_id: String(targetChapter.id),
+      subject_id: String(subjectData?.subject?.subject_id ?? subjectId),
+      standard_id: String(subjectData?.subject?.standard_id ?? standardId ?? ''),
+      chapter_name: targetChapter.title,
+      subject_name: subjectData?.subject?.subject_name ?? course.subject,
+      standard_name: subjectData?.subject?.standard_name ?? getCourseGradeLabel(course.classGrade),
+    };
+  };
+
+  // Loaded the first time "Create H5P content" opens, not on every page load
+  // -- the list rarely changes and most visits never touch this menu.
+  const loadH5pHubModules = async () => {
+    if (h5pHubLoaded) return;
+    const ctx = buildH5pContext();
+    if (!ctx) return;
+
+    setH5pHubLoaded(true);
+    try {
+      const hub = await fetchHub(ctx);
+      setH5pHubModules(hub.modules);
+    } catch (error) {
+      console.error('Failed to load H5P content types', error);
+      setH5pHubLoaded(false);
+    }
+  };
+
+  /** Wherever the teacher is right now (this chapter's Question bank view),
+   *  so an H5P create page's Back link can return here instead of to that
+   *  type's own list. Read live rather than reconstructed, so it always
+   *  matches the address bar exactly -- filters, expanded chapter and all. */
+  const currentQuestionBankUrl = () =>
+    typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : null;
+
+  const openH5pContentType = (module: H5pHubModule) => {
+    const ctx = buildH5pContext();
+    const route = module.route ? H5P_ROUTE_MAP[module.route] : null;
+    if (!ctx || !route) return;
+
+    const returnTo = currentQuestionBankUrl();
     router.push(
-      `/h5p/html_contents?${new URLSearchParams({
-        chapter_id: String(targetChapter.id),
-        subject_id: String(subjectData?.subject?.subject_id ?? subjectId),
-        standard_id: String(subjectData?.subject?.standard_id ?? standardId ?? ''),
-        chapter_name: targetChapter.title,
-        subject_name: subjectData?.subject?.subject_name ?? course.subject,
-        standard_name: subjectData?.subject?.standard_name ?? getCourseGradeLabel(course.classGrade),
-      }).toString()}`
+      `${route}/create?${h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined)}`
     );
+  };
+
+  /** The "Create H5P content" menu item itself, not one of its submenu
+   *  entries -- takes the teacher to the full catalog of content types. */
+  const openH5pCatalog = () => {
+    const ctx = buildH5pContext();
+    if (!ctx) return;
+
+    const returnTo = currentQuestionBankUrl();
+    router.push(
+      `/h5p/html_contents?${h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined)}`
+    );
+  };
+
+  /** For an H5P Content Type whose editor doesn't fit this modal -- closes
+   *  the modal and hands off to that type's own full-page /create. */
+  const openManualH5pFullEditor = (key: ManualH5pTypeKey) => {
+    const ctx = buildH5pContext();
+    const route = H5P_ROUTE_MAP[`${key}.index`];
+    if (!ctx || !route) return;
+
+    closeAddQuestionBankModal();
+    router.push(`${route}/create?${h5pContextQuery(ctx)}`);
   };
 
   const openQuestionBankEditQuestion = (question: QuestionBankItem) => {
@@ -2659,6 +2890,11 @@ export default function ChapterListPage() {
     setManualQuestionChapterId(chapter?.id ?? question.chapterId);
     setManualQuestionConcept(question.conceptTitle);
     setManualQuestionType(question.type);
+    setManualQuestionFormat(question.typeCode ?? '');
+    // Editing an H5P-linked question through this modal isn't supported yet --
+    // it always reopens in the plain manual editor, matching what the modal
+    // already showed for these rows before this feature existed.
+    resetManualH5pState();
     setManualQuestionMarks(String(question.marks));
     setManualQuestionText(question.question);
     setManualQuestionOptions({
@@ -2679,6 +2915,9 @@ export default function ChapterListPage() {
 
     setManualQuestionChapterId(chapterId);
     setManualQuestionConcept(nextConcepts[0] ?? '');
+    // The H5P context (chapter/subject/standard) is stale for whatever draft
+    // was in progress -- clear it rather than let a save target the old chapter.
+    resetManualH5pState();
     setManualQuestionError('');
   };
 
@@ -2686,8 +2925,131 @@ export default function ChapterListPage() {
     const nextType: QuestionBankQuestionType = value === 'Narrative' ? 'Narrative' : 'MCQ';
 
     setManualQuestionType(nextType);
+    // The old Format no longer belongs to this Type -- clear it rather than
+    // leaving a stale selection the dropdown can no longer show.
+    setManualQuestionFormat('');
+    resetManualH5pState();
     setManualQuestionMarks(nextType === 'Narrative' ? '3' : '1');
     setManualQuestionError('');
+  };
+
+  /**
+   * The H5P branch of submitManualQuestion: create the H5P content itself,
+   * then link it into a new Question Bank row. Two separate systems, two
+   * separate calls -- if the second one fails, the first is NOT rolled back
+   * (there is no transaction spanning them), so the error names what was
+   * created rather than pretending nothing happened.
+   */
+  const submitH5pQuestion = async (chapter: Chapter, marks: number) => {
+    const ctx = buildH5pContext();
+    if (!ctx) {
+      setManualQuestionError('Missing chapter, subject or standard context for H5P content.');
+      return;
+    }
+
+    const requestContext = getRequestContext();
+    if (!requestContext) {
+      setManualQuestionError('Course master session data is missing.');
+      return;
+    }
+
+    const typeLabel =
+      manualH5pTypeOptions.find((option) => option.key === manualH5pType)?.label ?? 'H5P content';
+
+    let problems: string[];
+    let title: string;
+    let createH5pContent: () => Promise<{ id: number }>;
+
+    switch (manualH5pType) {
+      case 'h5p_true_false':
+        problems = validateTrueFalseState(trueFalseState);
+        title = trueFalseState.title.trim() || trueFalseState.questions[0]?.question_text.trim() || typeLabel;
+        createH5pContent = () => trueFalseApi.create(ctx, { ...trueFalseToPayload(trueFalseState) });
+        break;
+      case 'h5p_single_choice_set':
+        problems = validateSingleChoiceState(singleChoiceState);
+        title =
+          singleChoiceState.title.trim() || singleChoiceState.questions[0]?.question_text.trim() || typeLabel;
+        createH5pContent = () => singleChoiceSetApi.create(ctx, { ...singleChoiceToPayload(singleChoiceState) });
+        break;
+      case 'h5p_blanks':
+      case 'h5p_drag_text':
+      case 'h5p_mark_the_words': {
+        const textActivityType = H5P_TEXT_ACTIVITY_TYPE[manualH5pType]!;
+        problems = validateTextActivityState(textActivityType, textActivityState);
+        title = textActivityState.title.trim() || typeLabel;
+        createH5pContent = () =>
+          createTextActivity(textActivityType, ctx, textActivityToPayload(textActivityType, textActivityState));
+        break;
+      }
+      case 'h5p_memory_game':
+        problems = validateMemoryState(memoryGameState);
+        title = memoryGameState.title.trim() || typeLabel;
+        createH5pContent = () => memoryGameApi.create(ctx, { ...memoryToPayload(memoryGameState) });
+        break;
+      case 'h5p_arithmetic_quiz':
+        problems = validateArithmeticState(arithmeticState);
+        title = arithmeticState.title.trim() || typeLabel;
+        createH5pContent = () => arithmeticQuizApi.create(ctx, { ...arithmeticToPayload(arithmeticState) });
+        break;
+      // h5p_drag_drop / h5p_course_presentation are 'redirect' options -- the
+      // footer button is disabled whenever one is selected, so this should be
+      // unreachable. Surfaced rather than silently no-op'd in case that ever drifts.
+      default:
+        setManualQuestionError(`${typeLabel} needs its own full-page editor -- use "Open in full editor" above.`);
+        return;
+    }
+
+    if (problems.length > 0) {
+      setManualQuestionError(problems[0]);
+      return;
+    }
+
+    const matchedConcept = chapter.concepts?.find((item) => item.title === manualQuestionConcept);
+    const conceptId = matchedConcept && /^\d+$/.test(matchedConcept.id) ? Number(matchedConcept.id) : null;
+
+    setIsSavingQuestionBankItem(true);
+    setManualQuestionError('');
+
+    let h5pResult: { id: number };
+    try {
+      h5pResult = await createH5pContent();
+    } catch (error) {
+      setManualQuestionError(
+        error instanceof Error ? error.message : `Failed to create the ${typeLabel} content.`
+      );
+      setIsSavingQuestionBankItem(false);
+      return;
+    }
+
+    try {
+      await createQuestionBankQuestion({
+        chapter_id: Number(chapter.id),
+        subject_id: Number(subjectData?.subject?.subject_id ?? subjectId),
+        standard_id: Number(subjectData?.subject?.standard_id ?? standardId),
+        sub_institute_id: requestContext.sub_institute_id,
+        question: title,
+        question_type: manualQuestionType,
+        marks,
+        concept_id: conceptId,
+        concept: manualQuestionConcept,
+        question_type_code: manualQuestionFormat || null,
+        h5p_content_type: manualH5pType,
+        h5p_content_id: h5pResult.id,
+      });
+    } catch (error) {
+      setManualQuestionError(
+        `The ${typeLabel} content was created and saved, but adding it to the Question Bank failed: ` +
+          (error instanceof Error ? error.message : 'unknown error') +
+          `. Open "Create H5P content" → ${typeLabel} to find it and try again.`
+      );
+      setIsSavingQuestionBankItem(false);
+      return;
+    }
+
+    setIsSavingQuestionBankItem(false);
+    closeAddQuestionBankModal();
+    loadQuestionBankItems(questionBankChapterFilter);
   };
 
   const submitManualQuestion = async () => {
@@ -2704,13 +3066,18 @@ export default function ChapterListPage() {
       return;
     }
 
-    if (!manualQuestionText.trim()) {
-      setManualQuestionError('Please enter the question text.');
+    if (!Number.isFinite(marks) || marks <= 0) {
+      setManualQuestionError('Please enter valid marks.');
       return;
     }
 
-    if (!Number.isFinite(marks) || marks <= 0) {
-      setManualQuestionError('Please enter valid marks.');
+    if (manualH5pType !== '') {
+      await submitH5pQuestion(chapter, marks);
+      return;
+    }
+
+    if (!manualQuestionText.trim()) {
+      setManualQuestionError('Please enter the question text.');
       return;
     }
 
@@ -2733,6 +3100,10 @@ export default function ChapterListPage() {
       // by question generation. Preserve it on edit rather than dropping it.
       palCategory: editingQuestionBankItem?.palCategory ?? null,
       type: manualQuestionType,
+      // Local-state-only questions (the editedApiQuestionId === null branch
+      // below) never reach the database today -- this just keeps the in-memory
+      // item consistent with what was picked.
+      typeCode: manualQuestionFormat || null,
       marks,
       question: manualQuestionText.trim(),
       options:
@@ -2784,6 +3155,7 @@ export default function ChapterListPage() {
             matchedConcept && /^\d+$/.test(matchedConcept.id) ? Number(matchedConcept.id) : null,
           concept: nextQuestion.conceptTitle,
           model_answer: nextQuestion.type === 'Narrative' ? manualModelAnswer.trim() : null,
+          question_type_code: nextQuestion.typeCode,
           options: nextQuestion.options?.map((option) => ({
             label: option.label,
             text: option.text,
@@ -2815,15 +3187,56 @@ export default function ChapterListPage() {
     }
 
     if (editingQuestionBankItem) {
+      // Editing an item that was never saved server-side in the first place
+      // (a leftover from before questions were persisted on create) -- nothing
+      // to update in the database, so this stays a local-state edit.
       setQuestionBankItemEdits((current) => ({
         ...current,
         [editingQuestionBankItem.id]: nextQuestion,
       }));
-    } else {
-      setManualQuestionBankItems((current) => [...current, nextQuestion]);
+      closeAddQuestionBankModal();
+      return;
     }
 
+    const requestContext = getRequestContext();
+    if (!requestContext) {
+      setManualQuestionError('Course master session data is missing.');
+      return;
+    }
+
+    const matchedConcept = chapter.concepts?.find((item) => item.title === manualQuestionConcept);
+
+    setIsSavingQuestionBankItem(true);
+    setManualQuestionError('');
+
+    try {
+      await createQuestionBankQuestion({
+        chapter_id: Number(chapter.id),
+        subject_id: Number(subjectData?.subject?.subject_id ?? subjectId),
+        standard_id: Number(subjectData?.subject?.standard_id ?? standardId),
+        sub_institute_id: requestContext.sub_institute_id,
+        question: nextQuestion.question,
+        question_type: nextQuestion.type,
+        marks: nextQuestion.marks,
+        concept_id: matchedConcept && /^\d+$/.test(matchedConcept.id) ? Number(matchedConcept.id) : null,
+        concept: nextQuestion.conceptTitle,
+        model_answer: nextQuestion.type === 'Narrative' ? manualModelAnswer.trim() : null,
+        question_type_code: nextQuestion.typeCode,
+        options: nextQuestion.options?.map((option) => ({
+          label: option.label,
+          text: option.text,
+          is_correct: Boolean(option.isCorrect),
+        })),
+      });
+    } catch (error) {
+      setManualQuestionError(error instanceof Error ? error.message : 'Failed to add the question.');
+      setIsSavingQuestionBankItem(false);
+      return;
+    }
+
+    setIsSavingQuestionBankItem(false);
     closeAddQuestionBankModal();
+    loadQuestionBankItems(questionBankChapterFilter);
   };
 
   const submitGenerateQuestions = async () => {
@@ -3535,7 +3948,7 @@ export default function ChapterListPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(180px,1fr)]">
+          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1.3fr)_minmax(140px,1fr)]">
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
                 Question Type <span className="text-rose-500">*</span>
@@ -3554,6 +3967,32 @@ export default function ChapterListPage() {
               </Select>
             </div>
 
+            {manualQuestionFormatOptions.length > 0 ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                  Question Format
+                </Label>
+                <Select
+                  value={manualQuestionFormat}
+                  onValueChange={updateManualQuestionFormat}
+                >
+                  <SelectTrigger className="h-[50px] rounded-[7px] border-slate-300 bg-white px-4 text-[17px] text-slate-900 shadow-none">
+                    <SelectValue>
+                      {manualQuestionFormatOptions.find((entry) => entry.code === manualQuestionFormat)
+                        ?.label ?? 'Standard'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {manualQuestionFormatOptions.map((entry) => (
+                      <SelectItem key={entry.code} value={entry.code}>
+                        {entry.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
             <div className="space-y-1.5">
               <Label htmlFor="manual-question-marks" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
                 Marks
@@ -3571,6 +4010,100 @@ export default function ChapterListPage() {
             </div>
           </div>
 
+          {manualH5pTypeOptions.length > 0 ? (
+            <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1.3fr)_minmax(140px,1fr)]">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
+                  H5P Content Type
+                </Label>
+                <Select
+                  value={manualH5pType || 'none'}
+                  onValueChange={(value) => {
+                    setManualH5pType(value === 'none' ? '' : (value as ManualH5pTypeKey));
+                    setManualQuestionError('');
+                  }}
+                >
+                  <SelectTrigger className="h-[50px] rounded-[7px] border-slate-300 bg-white px-4 text-[17px] text-slate-900 shadow-none">
+                    <SelectValue>
+                      {manualH5pTypeOptions.find((option) => option.key === manualH5pType)?.label ??
+                        'Select H5P Content Type'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None — type the question manually</SelectItem>
+                    {manualH5pTypeOptions.map((option) => (
+                      <SelectItem key={option.key} value={option.key}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : null}
+
+          {manualH5pType !== '' &&
+          manualH5pTypeOptions.find((option) => option.key === manualH5pType)?.mode === 'redirect' ? (
+            <div className="mt-5 flex items-center justify-between gap-4 rounded-[8px] border border-indigo-200 bg-indigo-50 px-4 py-3">
+              <p className="text-sm text-indigo-900">
+                {manualH5pTypeOptions.find((option) => option.key === manualH5pType)?.label} needs its own
+                full-page editor — it doesn&apos;t fit here.
+              </p>
+              <button
+                type="button"
+                onClick={() => openManualH5pFullEditor(manualH5pType)}
+                className="shrink-0 rounded-[7px] bg-[#4f46e5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4338ca]"
+              >
+                Open in full editor
+              </button>
+            </div>
+          ) : manualH5pType !== '' ? (
+            <div className="mt-5">
+              {manualH5pType === 'h5p_true_false' ? (
+                <TrueFalseEditor
+                  state={trueFalseState}
+                  onChange={setTrueFalseState}
+                  disabled={isSavingQuestionBankItem}
+                />
+              ) : manualH5pType === 'h5p_single_choice_set' ? (
+                <SingleChoiceSetEditor
+                  state={singleChoiceState}
+                  onChange={setSingleChoiceState}
+                  disabled={isSavingQuestionBankItem}
+                />
+              ) : manualH5pType === 'h5p_memory_game' ? (
+                <MemoryGameEditor
+                  state={memoryGameState}
+                  onChange={setMemoryGameState}
+                  disabled={isSavingQuestionBankItem}
+                />
+              ) : manualH5pType === 'h5p_arithmetic_quiz' ? (
+                <ArithmeticQuizEditor
+                  state={arithmeticState}
+                  onChange={setArithmeticState}
+                  disabled={isSavingQuestionBankItem}
+                />
+              ) : (
+                // The remaining keys are h5p_blanks / h5p_drag_text /
+                // h5p_mark_the_words -- one shared editor, parametrised by
+                // type. It carries its own Save button (its API predates
+                // ContentTypeFormSpec's external-footer pattern the others
+                // follow) -- wiring it to the same submit as the modal's own
+                // footer button means the two happen to agree rather than fight.
+                <TextActivityEditor
+                  type={H5P_TEXT_ACTIVITY_TYPE[manualH5pType]!}
+                  state={textActivityState}
+                  onChange={setTextActivityState}
+                  onSave={() => {
+                    void submitManualQuestion();
+                  }}
+                  saving={isSavingQuestionBankItem}
+                  saveLabel="Add to bank"
+                />
+              )}
+            </div>
+          ) : (
+          <>
           <div className="mt-5 space-y-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="manual-question-text" className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">
@@ -3681,6 +4214,8 @@ export default function ChapterListPage() {
               />
             </div>
           )}
+          </>
+          )}
 
           {manualQuestionError ? (
             <p className="mt-5 rounded-[8px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
@@ -3700,7 +4235,10 @@ export default function ChapterListPage() {
           </button>
           <button
             type="button"
-            disabled={isSavingQuestionBankItem}
+            disabled={
+              isSavingQuestionBankItem ||
+              manualH5pTypeOptions.find((option) => option.key === manualH5pType)?.mode === 'redirect'
+            }
             className="ds-btn ds-btn--primary ds-btn--md inline-flex h-11 items-center gap-2 rounded-xl bg-[#4f46e5] px-6 text-[16px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.32)] transition-colors hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:bg-[#c6c3f8]"
             onClick={() => {
               void submitManualQuestion();
@@ -4724,7 +5262,7 @@ export default function ChapterListPage() {
             onSearchChange={setQuestionBankSearchInput}
             onClearAll={clearQuestionBankFilters}
             action={
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={(open) => { if (open) loadH5pHubModules(); }}>
                 <DropdownMenuTrigger
                   disabled={allChapters.length === 0 || questionBankLoading}
                   className="inline-flex h-10 items-center rounded-[8px] bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
@@ -4738,10 +5276,33 @@ export default function ChapterListPage() {
                     <Pencil size={16} className="mr-2" />
                     Add manually
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={openQuestionBankAddH5p}>
-                    <Layers3 size={16} className="mr-2" />
-                    Create H5P content
-                  </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    {/* Hovering opens the submenu (Base UI's own behaviour);
+                        clicking the label itself takes you to the full H5P
+                        catalog instead of just sitting there with a click
+                        that does nothing. */}
+                    <DropdownMenuSubTrigger onClick={openH5pCatalog}>
+                      <Layers3 size={16} className="mr-2" />
+                      Create H5P content
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      {h5pHubModules.length === 0 ? (
+                        <DropdownMenuItem disabled>
+                          {h5pHubLoaded ? 'No H5P content types available' : 'Loading…'}
+                        </DropdownMenuItem>
+                      ) : (
+                        h5pHubModules.map((module) => (
+                          <DropdownMenuItem
+                            key={module.h5pType}
+                            disabled={!module.available || !module.route || !H5P_ROUTE_MAP[module.route]}
+                            onClick={() => openH5pContentType(module)}
+                          >
+                            {module.title}
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
                 </DropdownMenuContent>
               </DropdownMenu>
             }
@@ -4820,28 +5381,28 @@ export default function ChapterListPage() {
 
   if (view === 'coherence-map') {
     return (
-      <div className="min-h-screen rounded-t-3xl">
-        <div className="mx-auto w-full max-w-[1460px] px-4 py-7 sm:px-6 lg:px-8">
-          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <button
-              type="button"
-              onClick={() => router.push('/course-master')}
-              className="font-medium transition-colors hover:text-slate-900"
-            >
-              Teach / learn
-            </button>
-            <ChevronRight size={14} className="text-slate-400" />
-            <button
-              type="button"
-              onClick={() => router.push(`/course-master/${courseId}/chapters`)}
-              className="font-medium transition-colors hover:text-slate-900"
-            >
-              {course.subject} - {getCourseGradeLabel(course.classGrade)}
-            </button>
-            <ChevronRight size={14} className="text-slate-400" />
-            <span className="font-semibold text-slate-900">Coherence map</span>
-          </div>
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          <button
+            type="button"
+            onClick={() => router.push('/course-master')}
+            className="font-medium transition-colors hover:text-slate-900"
+          >
+            Teach / learn
+          </button>
+          <ChevronRight size={14} className="text-slate-400" />
+          <button
+            type="button"
+            onClick={() => router.push(`/course-master/${courseId}/chapters`)}
+            className="font-medium transition-colors hover:text-slate-900"
+          >
+            {course.subject} - {getCourseGradeLabel(course.classGrade)}
+          </button>
+          <ChevronRight size={14} className="text-slate-400" />
+          <span className="font-semibold text-slate-900">Coherence map</span>
+        </div>
 
+        <div className="min-h-0 flex-1">
           <CoherenceMapView
             subjectId={subjectId}
             standardId={standardId}
@@ -5641,15 +6202,6 @@ export default function ChapterListPage() {
               </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
-            className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-[#c7d2fe] bg-white px-3.5 py-2 text-[14px] font-medium text-[#4338ca] shadow-sm transition-colors hover:bg-[#eef2ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
-          >
-            <Network size={16} strokeWidth={1.9} />
-            Coherence map
-          </button>
         </div>
 
         <div className="mb-6 border-b border-slate-200/80">
@@ -5676,14 +6228,6 @@ export default function ChapterListPage() {
             >
               <BookOpen size={16} />
               Chapters
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
-              className="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 font-medium text-slate-600 transition-colors hover:text-slate-900"
-            >
-              <Network size={16} />
-              Coherence map
             </button>
           </div>
         </div>
@@ -5774,6 +6318,15 @@ export default function ChapterListPage() {
                     >
                       <Database size={16} className="mr-2" />
                       Question Bank
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+                      className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+                    >
+                      <Network size={16} className="mr-2" />
+                      Coherence map
                     </Button>
                   </div>
 
