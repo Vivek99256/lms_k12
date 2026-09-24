@@ -273,6 +273,19 @@ function PageSection({
     { key: "label", label: "Label", value: (row) => row.label },
     { key: "field_key", label: "Field", value: (row) => row.fieldKey },
     { key: "field_type", label: "Type", value: (row) => row.fieldType },
+    {
+      key: "drill_endpoint",
+      label: "Tappable",
+      value: (row) => (row.drillEndpoint ? row.drillEndpoint : ""),
+      render: (row) =>
+        row.drillEndpoint ? (
+          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+            opens {row.drillEndpoint}
+          </span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        ),
+    },
     { key: "sort_order", label: "Sort", value: (row) => String(row.sortOrder), align: "right" },
     { key: "status", label: "Status", value: (row) => row.status },
   ];
