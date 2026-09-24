@@ -48,6 +48,10 @@ import {
   toneFor,
   Unavailable,
 } from '@/app/fees/intelligence/_components/fees-intelligence-primitives';
+import {
+  CrossModuleWorkflowSection,
+  ModuleIntegrationSection,
+} from '@/components/intelligence/module/sections';
 
 /**
  * Fees Intelligence — the native LMS screen.

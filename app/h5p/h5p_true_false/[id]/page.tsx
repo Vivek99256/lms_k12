@@ -22,6 +22,7 @@ import {
   type TrueFalseAnswer,
   type TrueFalseAttemptResult,
 } from '@/lib/h5p/true-false';
+import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
 import { H5pPageHeader, InlineBanner, MissingContextNotice } from '../../components/shared';
 import {
   PlayerSkeleton,
@@ -103,21 +104,66 @@ function Html({ html, className }: { html: string; className?: string }) {
   return <span className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-function TrueFalsePlayerContent() {
+/**
+ * A row supplied by the caller instead of fetched by id.
+ *
+ * This is what makes the player embeddable. The route below still loads by id
+ * from the URL, but a caller that already HAS the row -- the question bank
+ * library, which builds one in memory from a bank question and never saves it
+ * -- hands it over directly and skips the fetch entirely. `embedded` drops the
+ * page header, because an embedding surface has its own.
+ *
+ * Nothing downstream of here knows the difference: the row shape is identical,
+ * so scoring, feedback, solutions and xAPI behave exactly as they do for a
+ * saved activity.
+ */
+export interface PreloadedTrueFalse {
+  item: H5pTrueFalse;
+  ctx: H5pContext;
+  embedded?: boolean;
+  /**
+   * Fired once, where this player already reports completion over xAPI.
+   *
+   * It is how a module other than the H5P library uses this player: PAL needs
+   * the score to advance its state machine and homework needs it to record an
+   * attempt. The player still persists nothing itself -- the caller decides.
+   */
+  onResult?: (result: PlayerQuestionResult) => void;
+}
+
+function TrueFalsePlayerContent({ preloaded }: { preloaded?: PreloadedTrueFalse }) {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
   const searchParams = useSearchParams();
-  const ctx: H5pContext = useMemo(
+  const routeCtx: H5pContext = useMemo(
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
+  const ctx = preloaded?.ctx ?? routeCtx;
   const contextQuery = h5pContextQuery(ctx);
 
-  const [item, setItem] = useState<H5pTrueFalse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [fetched, setFetched] = useState<H5pTrueFalse | null>(null);
+  const [loading, setLoading] = useState(!preloaded);
   const [error, setError] = useState('');
 
-  const [attempt, setAttempt] = useState<Attempt | null>(null);
+  // Derived rather than copied into state: a preloaded row can change between
+  // renders (the library previews a different question), and state seeded once
+  // would keep showing the first one.
+  const item = preloaded?.item ?? fetched;
+
+  // Seeded straight from `preloaded`, not the derived `item` above, and only
+  // in the lazy initializer -- never from an effect. A caller that embeds
+  // this player hands the row over synchronously (it is built in memory, not
+  // fetched), so there is no async gap where `attempt` would need to catch up
+  // after the first render. This is what skips this type's own intro card for
+  // an embedded caller that already drew its own "Question X of Y" chrome
+  // around it -- PAL, the question bank quiz, the library's live preview. The
+  // standalone `/h5p/h5p_true_false/[id]` route (no `preloaded`) still starts
+  // on the intro, which is the one place a library preview of "N statements,
+  // pass mark X%" is the point.
+  const [attempt, setAttempt] = useState<Attempt | null>(() =>
+    preloaded?.embedded && preloaded.item ? newAttempt(preloaded.item) : null
+  );
   /** What the learner has picked but not yet committed. Only used on-check. */
   const [selected, setSelected] = useState<boolean | null>(null);
   /** True once this statement is marked, whichever way it got there. */
@@ -141,6 +187,11 @@ function TrueFalsePlayerContent() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // The caller supplied the row; there is nothing to fetch and no id to
+    // fetch it by.
+    if (preloaded) return;
+
     if (!hasH5pContext(ctx) || !id) {
       queueMicrotask(() => {
         if (!cancelled) setLoading(false);
@@ -153,7 +204,7 @@ function TrueFalsePlayerContent() {
     trueFalseApi
       .get(id, ctx)
       .then((data) => {
-        if (!cancelled) setItem(data);
+        if (!cancelled) setFetched(data);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load this activity');
@@ -165,7 +216,7 @@ function TrueFalsePlayerContent() {
     return () => {
       cancelled = true;
     };
-  }, [ctx, id]);
+  }, [ctx, id, preloaded]);
 
   // --- scoring -------------------------------------------------------------
 
@@ -198,8 +249,17 @@ function TrueFalsePlayerContent() {
         response: `${scored.score}/${scored.maxScore}`,
         durationSeconds: (done.finishedAt - done.startedAt) / 1000,
       });
+
+      preloaded?.onResult?.({
+        questionId: Number(item.id),
+        score: scored.score,
+        maxScore: scored.maxScore,
+        correct: scored.passed,
+        durationSeconds: (done.finishedAt - done.startedAt) / 1000,
+        response: `${scored.score}/${scored.maxScore}`,
+      });
     },
-    [item, ctx]
+    [item, ctx, preloaded]
   );
 
   // --- actions -------------------------------------------------------------
@@ -361,8 +421,29 @@ function TrueFalsePlayerContent() {
       const feedback = checked && selected !== null ? statementFeedback(entry.question, selected) : null;
 
       return (
-        <div className="h5p-surface h5p-stage p-5 sm:p-8">
-          {item.show_progress ? (
+        // No `h5p-surface` (border, shadow, its own rounded card) when
+        // embedded -- PAL and the question bank quiz already draw ONE
+        // bordered container around the whole run; a bordered, shadowed box
+        // for every statement inside it would nest a card inside a card,
+        // exactly the "small widget" look a full assessment layout is not
+        // supposed to have. The standalone route keeps it, where this IS the
+        // only surface on the page.
+        <div
+          className={`h5p-stage ${
+            preloaded?.embedded ? 'p-4 sm:p-5' : 'h5p-surface p-5 sm:p-8'
+          }`}
+        >
+          {/*
+            An embedded caller (PAL, the question bank quiz) already draws its
+            own overall "Question X of N" counter and progress bar around
+            every question in its run. This activity's own counter is almost
+            always "Statement 1 of 1" in that context, because a bank
+            question is built as a one-item set -- a second, smaller,
+            contradicting progress readout right next to the caller's real
+            one. Shown only for a genuine standalone multi-statement set (not
+            embedded).
+          */}
+          {!preloaded?.embedded && item.show_progress ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-medium tabular-nums text-[color:var(--h5p-ink-muted)]">
@@ -379,18 +460,28 @@ function TrueFalsePlayerContent() {
             </>
           ) : null}
 
+          {/*
+            Both `mt-5` below clear whatever rendered directly above them --
+            the progress block, or nothing when embedded and it is hidden.
+            Margin against nothing is just dead space, which is exactly the
+            "too much gap above the question" this is fixing.
+          */}
           {entry.question.media_image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={entry.question.media_image}
               alt={entry.question.media_alt ?? ''}
-              className="mt-5 max-h-64 w-full rounded-xl object-contain ring-1 ring-slate-200"
+              className={`max-h-64 w-full rounded-xl object-contain ring-1 ring-slate-200 ${
+                !preloaded?.embedded && item.show_progress ? 'mt-5' : ''
+              }`}
             />
           ) : null}
 
           <Html
             html={entry.question.question_text}
-            className="mt-5 block text-lg font-semibold leading-snug text-slate-900"
+            className={`block text-lg font-semibold leading-snug text-slate-900 ${
+              entry.question.media_image || (!preloaded?.embedded && item.show_progress) ? 'mt-5' : ''
+            }`}
           />
 
           <div className="mt-5 grid grid-cols-2 gap-3" role="group" aria-label="True or false">
@@ -472,15 +563,22 @@ function TrueFalsePlayerContent() {
     );
   };
 
+  // The standalone content route reads best at a constrained, article-like
+  // width. An embedded caller (PAL, the question bank quiz) has already
+  // chosen its own width -- a full assessment layout, in PAL's case -- and
+  // capping this player to `max-w-2xl` inside it would put a small centred
+  // box back in the middle of a page that caller deliberately made wide.
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-2xl">
+    <div className={preloaded?.embedded ? '' : 'p-4 sm:p-6'}>
+      <div className={preloaded?.embedded ? '' : 'mx-auto max-w-2xl'}>
+        {preloaded?.embedded ? null : (
         <H5pPageHeader
           title={item?.title || 'True or false'}
           description={item?.description || undefined}
           ctx={ctx}
           backHref={`/h5p/h5p_true_false?${contextQuery}`}
         />
+        )}
 
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />
@@ -547,6 +645,30 @@ function Solution({ attempt }: { attempt: Attempt }) {
         })}
       </ol>
     </section>
+  );
+}
+
+/**
+ * The player as a component, for a caller that already holds the row.
+ *
+ * The Suspense boundary stays, because the body still calls `useSearchParams`
+ * even when it does not read it -- hooks cannot be conditional, and an
+ * unwrapped `useSearchParams` opts the whole embedding route into client-side
+ * rendering.
+ */
+export function TrueFalsePlayer({ item, ctx, embedded, onResult }: PreloadedTrueFalse) {
+  // Memoised, because this object is the load effect's dependency. Passing a
+  // fresh one each render re-ran that effect on every render, and its cleanup
+  // then cancelled the setup the previous run had just scheduled.
+  const preloaded = useMemo(
+    () => ({ item, ctx, embedded, onResult }),
+    [item, ctx, embedded, onResult]
+  );
+
+  return (
+    <Suspense fallback={<PlayerSkeleton lines={2} label="Loading activity" />}>
+      <TrueFalsePlayerContent preloaded={preloaded} />
+    </Suspense>
   );
 }
 

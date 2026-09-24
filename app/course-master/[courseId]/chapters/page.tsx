@@ -42,6 +42,12 @@ import {
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ContentCard } from './ContentCard';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
@@ -242,31 +248,6 @@ const QUESTION_TYPE_API_CONFIG: Record<
 };
 const PRESENTATION_SLIDE_OPTIONS = ['8 slides', '10 slides', '12 slides', '15 slides', '18 slides'] as const;
 const GAMMA_THEME_OPTIONS = ['EduERP default', 'Clean light', 'Bold classroom', 'Scholar blue'] as const;
-// 'H5P Interactive' sits on the FORMAT axis, alongside Presentations and Videos -
-// not on the audience axis that Classroom vs Teacher Workspace occupies. That is
-// the whole point of tracker row 2 / Decision #35: an interactive item can belong
-// to either audience, so it must not compete with them as a destination.
-/**
- * Tracker "Content & LMS Architecture" row 2 / Decision #35.
- *
- * H5P stops being a 4th top-level destination beside Classroom Resource / Teacher
- * Workspace / Question Bank and becomes a format filter inside the first two.
- *
- * Flip this to true to put the old button back. It exists because a demo cadence is
- * live and this is the one visible change in Phase A2 - reverting it is a one-line
- * edit rather than a rollback.
- *
- * Currently TRUE: the button was restored on request. Both surfaces are live at once -
- * the button routes to /h5p/html_contents, and the 'H5P Interactive' filter tab stays
- * in the content library. Neither disables the other.
- *
- * Note: the button's reach is limited server-side. Every H5P item in the estate is
- * attached to a chapter that does not exist in chapter_master, so /h5p/html_contents
- * lands on an empty list for all 120 chapters the catalogue can show until the backend
- * reconciles those chapter ids. See
- * next_lms_erp/docs/decisions/2026-09-07-h5p-format-tag.md.
- */
-const SHOW_LEGACY_H5P_BUTTON = true;
 
 /**
  * Shown on a control the user's role does not permit.
@@ -2604,18 +2585,24 @@ export default function ChapterListPage() {
     resetManualQuestionForm();
   };
 
-  const openQuestionBankAddQuestion = () => {
+  const resolveQuestionBankTargetChapter = () => {
     const targetQuestion = filteredQuestionBankItems[0] ?? questionBankItems[0];
     const filterChapter =
       questionBankChapterFilter === 'all'
         ? null
         : allChapters.find((chapter) => chapter.id === questionBankChapterFilter) ?? null;
-    const targetChapter =
+    return (
       filterChapter ??
       (targetQuestion ? allChapters.find((chapter) => chapter.id === targetQuestion.chapterId) : null) ??
       resourceChapter ??
       allChapters[0] ??
-      null;
+      null
+    );
+  };
+
+  const openQuestionBankAddQuestion = () => {
+    const targetQuestion = filteredQuestionBankItems[0] ?? questionBankItems[0];
+    const targetChapter = resolveQuestionBankTargetChapter();
 
     if (!targetChapter || !course) return;
 
@@ -2645,6 +2632,22 @@ export default function ChapterListPage() {
     setManualModelAnswer('');
     setManualQuestionError('');
     setIsAddQuestionBankModalOpen(true);
+  };
+
+  const openQuestionBankAddH5p = () => {
+    const targetChapter = resolveQuestionBankTargetChapter();
+    if (!targetChapter || !course) return;
+
+    router.push(
+      `/h5p/html_contents?${new URLSearchParams({
+        chapter_id: String(targetChapter.id),
+        subject_id: String(subjectData?.subject?.subject_id ?? subjectId),
+        standard_id: String(subjectData?.subject?.standard_id ?? standardId ?? ''),
+        chapter_name: targetChapter.title,
+        subject_name: subjectData?.subject?.subject_name ?? course.subject,
+        standard_name: subjectData?.subject?.standard_name ?? getCourseGradeLabel(course.classGrade),
+      }).toString()}`
+    );
   };
 
   const openQuestionBankEditQuestion = (question: QuestionBankItem) => {
@@ -4721,15 +4724,26 @@ export default function ChapterListPage() {
             onSearchChange={setQuestionBankSearchInput}
             onClearAll={clearQuestionBankFilters}
             action={
-              <Button
-                type="button"
-                onClick={openQuestionBankAddQuestion}
-                disabled={allChapters.length === 0 || questionBankLoading}
-                className="h-10 rounded-[8px] bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
-              >
-                <Plus size={18} className="mr-2" />
-                Add question
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  disabled={allChapters.length === 0 || questionBankLoading}
+                  className="inline-flex h-10 items-center rounded-[8px] bg-[#4f46e5] px-5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] hover:bg-[#4338ca] disabled:bg-[#c6c3f8] disabled:text-white"
+                >
+                  <Plus size={18} className="mr-2" />
+                  Add question
+                  <ChevronDown size={16} className="ml-2" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={openQuestionBankAddQuestion}>
+                    <Pencil size={16} className="mr-2" />
+                    Add manually
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={openQuestionBankAddH5p}>
+                    <Layers3 size={16} className="mr-2" />
+                    Create H5P content
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             }
           />
 
@@ -5761,28 +5775,6 @@ export default function ChapterListPage() {
                       <Database size={16} className="mr-2" />
                       Question Bank
                     </Button>
-                    {SHOW_LEGACY_H5P_BUTTON && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                          router.push(
-                            `/h5p/html_contents?${new URLSearchParams({
-                              chapter_id: String(chapter.id),
-                              subject_id: String(subjectData?.subject?.subject_id ?? subjectId),
-                              standard_id: String(subjectData?.subject?.standard_id ?? standardId ?? ''),
-                              chapter_name: chapter.title,
-                              subject_name: subjectData?.subject?.subject_name ?? course.subject,
-                              standard_name: subjectData?.subject?.standard_name ?? getCourseGradeLabel(course.classGrade),
-                            }).toString()}`
-                          )
-                        }
-                        className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
-                      >
-                        <Layers3 size={16} className="mr-2" />
-                        H5P Content
-                      </Button>
-                    )}
                   </div>
 
                   {isExpanded && chapterConceptRows.length > 0 && (

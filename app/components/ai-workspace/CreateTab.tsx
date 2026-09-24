@@ -188,7 +188,7 @@ export function CreateTab({
               parent their own figures from should not be two places.
             */}
             <a
-              href={report.report.template_link}
+              href={report.report.template_link ?? undefined}
               target="_blank"
               rel="noreferrer"
               className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#0D6EFD] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#0b5ed7]"

@@ -224,6 +224,28 @@ export interface AgentRunOutcome {
   error: string | null;
 }
 
+/**
+ * A report built from the module's own data, grounded on a live read rather than a
+ * model's memory. Returned by `POST /api/ai/workspace/report`, which resolves the
+ * module from the given route and renders its published report layout (or a generic
+ * one, when no layout is published yet) against the school's own records.
+ */
+export interface WorkspaceReport {
+  module: string;
+  /** The `ai_generated_reports` row id this was saved as. */
+  template_id: number | null;
+  title: string;
+  row_count: number;
+  columns: string[];
+  /** The MCP tool the underlying data came from, e.g. `students.directory`. */
+  source_tool: string | null;
+  /** Which centrally configured layout produced this, or null for the generic layout. */
+  layout_template_id: number | null;
+  layout_name: string | null;
+  /** The saved report's own page — `/ai-reports/<id>` — not this page. */
+  template_link: string | null;
+}
+
 function normalizeBaseUrl(baseUrl?: string | null) {
   return resolveAiBaseUrl(baseUrl);
 }
@@ -324,29 +346,19 @@ export function generateForContext(
 }
 
 /**
- * A saved report for the module on screen.
+ * Build a report from this module's own live data for the page at `route`, using the
+ * module's published report layout when one exists. `arguments` are the layout's own
+ * filters (e.g. `standard_id`, `active_only`) — omitted ones fall back to the layout's
+ * default view rather than an empty one.
  *
- * Distinct from `generateForContext`, which returns text to read and copy. This returns
- * a document with an id, which `/ai-reports/{id}` previews, edits, refreshes, prints and
- * sends — four actions that already existed and had no way of being reached from the
- * assistant, because nothing in the panel produced a report to open.
+ * `row_count: 0` with no `template_link` is a real, empty answer — a filter combination
+ * this institute has no matching records for — and is not an error.
  */
 export function generateReportForContext(
   session: WorkspaceSession,
   input: { route: string; arguments?: Record<string, unknown> }
 ) {
   return post<WorkspaceReport>(session, "/report", input);
-}
-
-export interface WorkspaceReport {
-  module: string;
-  template_id: number;
-  title: string;
-  row_count: number;
-  source_tool: string | null;
-  layout_name: string | null;
-  /** Where the report opens, e.g. `/ai-reports/11`. */
-  template_link: string;
 }
 
 export function fetchOntologyView(

@@ -947,7 +947,28 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
 }
 
 
-export default function StudentHomeworkIndexPage() {
+/**
+ * Worksheet and Project are the same question_paper rows this screen lists,
+ * restricted to one exam_type — see ExamOperationsScreen's `scopedExamType`.
+ */
+export type ExamOperationsScope = 'worksheet' | 'project';
+
+interface ExamOperationsScreenProps {
+  scopedExamType?: ExamOperationsScope;
+}
+
+/**
+ * The Exam Operations screen. `/lms/exam` mounts it unscoped, showing every
+ * exam_type; `/lms/worksheet` and `/lms/project` mount it pinned to their own
+ * exam_type via `scopedExamType`, which pins the create-exam form's Exam Type
+ * field, filters the grid, and hides the Results dashboard tab (which is not
+ * scoped by exam_type and would otherwise mix worksheet/project results in
+ * with everything else).
+ */
+export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenProps = {}) {
+  const isScopedToOneType = Boolean(scopedExamType);
+  const scopedNoun =
+    scopedExamType === 'worksheet' ? 'worksheets' : scopedExamType === 'project' ? 'projects' : 'exams';
   const { isChatbotOpen } = useContext(ChatbotLayoutContext);
   // Follows the signed-in profile and is not switchable. The Viewing-as toggle is
   // gone, so a stored 'Student' preference would otherwise have left a teacher in
@@ -1043,7 +1064,7 @@ export default function StudentHomeworkIndexPage() {
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [examName, setExamName] = useState('');
   const [examDescription, setExamDescription] = useState('');
-  const [examType, setExamType] = useState('');
+  const [examType, setExamType] = useState(scopedExamType ?? '');
   const [attemptsAllowed, setAttemptsAllowed] = useState('');
   const [openDate, setOpenDate] = useState('');
   const [closeDate, setCloseDate] = useState('');
@@ -1620,7 +1641,7 @@ export default function StudentHomeworkIndexPage() {
     setOpenLevelDropdown(null);
     setExamName('');
     setExamDescription('');
-    setExamType('');
+    setExamType(scopedExamType ?? '');
     setAttemptsAllowed('');
     setOpenDate('');
     setCloseDate('');
@@ -2387,28 +2408,30 @@ export default function StudentHomeworkIndexPage() {
 
             {audienceMode === 'Teacher' && !isStudentProfile ? (
               <div className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-center gap-5">
-                  {innerTabs.map((tab) => {
-                    const TabIcon = tab.icon;
-                    const isActive = examInnerTab === tab.label;
+                {!isScopedToOneType ? (
+                  <div className="flex flex-wrap items-center gap-5">
+                    {innerTabs.map((tab) => {
+                      const TabIcon = tab.icon;
+                      const isActive = examInnerTab === tab.label;
 
-                    return (
-                      <button
-                        key={tab.label}
-                        type="button"
-                        onClick={() => setExamInnerTab(tab.label)}
-                        className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
-                          isActive
-                            ? 'border-[#5846EA] text-[#5846EA]'
-                            : 'border-transparent text-[#5F7087] hover:text-[#334155]'
-                        }`}
-                      >
-                        <TabIcon size={16} />
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                      return (
+                        <button
+                          key={tab.label}
+                          type="button"
+                          onClick={() => setExamInnerTab(tab.label)}
+                          className={`inline-flex items-center gap-2 border-b-2 pb-2 text-[14px] font-semibold transition ${
+                            isActive
+                              ? 'border-[#5846EA] text-[#5846EA]'
+                              : 'border-transparent text-[#5F7087] hover:text-[#334155]'
+                          }`}
+                        >
+                          <TabIcon size={16} />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
 
                 {/* Same order as `innerTabs`; `Exams` is the fallback because it is
                     the tab the screen opens on. */}
@@ -3914,21 +3937,27 @@ export default function StudentHomeworkIndexPage() {
                           <span className="mb-2.5 block text-[12px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
                             Exam Type
                           </span>
-                          <div className="relative">
-                            <select
-                              value={examType}
-                              onChange={(event) => setExamType(event.target.value)}
-                              className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
-                            >
-                              <option value="">Select exam type</option>
-                              {examTypeOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                          </div>
+                          {scopedExamType ? (
+                            <div className="flex h-12 w-full items-center rounded-[12px] border border-[#C9D4E5] bg-[#F8FAFC] px-4 text-[15px] font-medium capitalize text-[#0F172A]">
+                              {scopedExamType}
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <select
+                                value={examType}
+                                onChange={(event) => setExamType(event.target.value)}
+                                className="h-12 w-full appearance-none rounded-[12px] border border-[#C9D4E5] bg-white px-4 pr-10 text-[15px] font-medium text-[#0F172A] outline-none focus:border-[#5B4FE9]"
+                              >
+                                <option value="">Select exam type</option>
+                                {examTypeOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                            </div>
+                          )}
                         </label>
 
                         <label className="block">
@@ -4195,4 +4224,8 @@ export default function StudentHomeworkIndexPage() {
       `}</style>
     </>
   );
+}
+
+export default function StudentHomeworkIndexPage() {
+  return <ExamOperationsScreen />;
 }

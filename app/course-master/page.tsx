@@ -664,7 +664,12 @@ export default function CourseMasterPage() {
 
         <div className="hidden" />
 
-        <div className="mt-1 h-[5px] overflow-hidden rounded-full bg-[#EEF1F5]">
+        {/* Progress rail. The track is a faded wash of the card's own accent
+            rather than neutral grey: at 0% the fill has no width, so a grey
+            track made those cards look like they were missing the colored line
+            the others had. Tinting the track keeps the line on every card while
+            the solid fill still reads as the real progress. */}
+        <div className="mt-1 h-[5px] overflow-hidden rounded-full" style={{ backgroundColor: `${accent}29` }}>
           <div
             className="h-full rounded-full"
             style={{ width: `${progress}%`, backgroundColor: accent }}
@@ -763,7 +768,8 @@ export default function CourseMasterPage() {
           </div>
         </div>
 
-        <div className="mt-1 h-[5px] overflow-hidden rounded-full bg-[#EEF1F5]">
+        {/* Same tinted track as the staff card, for the same reason. */}
+        <div className="mt-1 h-[5px] overflow-hidden rounded-full" style={{ backgroundColor: `${accent}29` }}>
           <div
             className="h-full rounded-full bg-[#5648E8]"
             style={{ width: `${subject.coverage}%`, backgroundColor: accent }}
@@ -782,10 +788,16 @@ export default function CourseMasterPage() {
    * a list of subjects they cannot open. So it renders in the teacher/admin
    * view and not in the student view of this same screen.
    */
+  // "Future Capabilities" stays in CATALOG_CATEGORY_PLAN — the build-plan spec
+  // names it explicitly and lib/roadmap/catalog.test.ts pins its presence there
+  // — but is filtered out of this strip, at the product team's request, until
+  // the tier is ready to show customers.
+  const visibleCatalogRollup = categoryRollup.filter((entry) => entry.key !== 'Future Capabilities');
+
   const catalogRollupSection = (
     <div>
       <p className="mb-2 text-[13px] font-medium text-[#52637A]">Catalog</p>
-      <RoadmapRollupStrip entries={categoryRollup} />
+      <RoadmapRollupStrip entries={visibleCatalogRollup} />
     </div>
   );
 

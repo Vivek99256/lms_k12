@@ -379,6 +379,12 @@
   -webkit-tap-highlight-color: transparent;
 }
 .h5p-flip__inner {
+  /* Block, because the only element that carries this class is a <span>, and
+     an inline box ignores width and height -- which collapsed it to 0x0 and
+     took the two absolutely-positioned faces with it, leaving a memory board
+     of 4px dots. The card above it sizes correctly; this is the box that has
+     to fill it. */
+  display: block;
   position: relative;
   height: 100%;
   width: 100%;

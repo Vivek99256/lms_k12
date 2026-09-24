@@ -72,12 +72,24 @@ export type CoherenceEdge = {
   /** Row id in its own table; null for hierarchy edges, which are derived not stored. */
   relation_id: number | null;
   /** Which table the row lives in. Needed to address it for review or delete. */
-  source_table: 'concept' | 'learning' | null;
+  source_table: 'concept' | 'learning' | 'expert' | null;
   relation_type: string | null;
   link_type: string | null;
   confidence: number | null;
   note: string | null;
 };
+
+/**
+ * Whether an edge can be reviewed or deleted through `reviewRelation` /
+ * `deleteRelation` — both take `sourceTable` and `relationId`, so an edge
+ * needs both to be addressable. Hierarchy edges are derived, not stored, and
+ * carry neither.
+ */
+export function isReviewableEdge(
+  edge: CoherenceEdge
+): edge is CoherenceEdge & { source_table: 'concept' | 'learning'; relation_id: number } {
+  return edge.relation_id !== null && (edge.source_table === 'concept' || edge.source_table === 'learning');
+}
 
 export type CoherenceMeta = {
   sub_institute_id: number;

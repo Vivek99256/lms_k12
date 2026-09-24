@@ -50,6 +50,7 @@ import {
 import {
   createRelation,
   deleteRelation,
+  isReviewableEdge,
   reviewRelation,
   useCoherenceMap,
   type CoherenceEdge,
@@ -245,7 +246,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
 
   const review = useCallback(
     async (edge: CoherenceEdge, status: 'approved' | 'rejected') => {
-      if (!session || !edge.source_table || edge.relation_id === null) return;
+      if (!session || !isReviewableEdge(edge)) return;
 
       setBusy(true);
 
@@ -267,7 +268,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
 
   const remove = useCallback(
     async (edge: CoherenceEdge) => {
-      if (!session || !edge.source_table || edge.relation_id === null) return;
+      if (!session || !isReviewableEdge(edge)) return;
 
       setBusy(true);
 

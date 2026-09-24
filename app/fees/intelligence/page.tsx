@@ -1,6 +1,7 @@
 'use client';
 
 import { ModuleCategoryPage } from '@/app/_components/module-category-page';
+import { FeesIntelligenceScreen } from '@/app/fees/intelligence/_components/fees-intelligence-screen';
 import { FEES_INTELLIGENCE_SCREENS } from '@/app/fees/intelligence/_screens/intelligence-screens';
 
 /**
@@ -26,3 +27,4 @@ import { FEES_INTELLIGENCE_SCREENS } from '@/app/fees/intelligence/_screens/inte
 export default function Page() {
   return <ModuleCategoryPage moduleName="fees" categoryKey="intelligence" staticScreens={FEES_INTELLIGENCE_SCREENS} />;
 }
+

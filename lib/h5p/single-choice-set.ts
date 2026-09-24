@@ -34,6 +34,17 @@ export interface SingleChoiceOption {
   option_text: string;
   is_correct: boolean;
   feedback?: string | null;
+  /**
+   * The row this option was derived from, for an activity built out of a
+   * question bank row rather than authored into `h5p_single_choice_set`.
+   *
+   * `id` above is the activity's own option id and is synthetic for a derived
+   * activity, so it cannot be recorded against an attempt. This is the id that
+   * can: a module that stores what the learner chose reads it off the chosen
+   * option. Absent (and irrelevant) for an authored set, where the option IS
+   * the stored row.
+   */
+  source_option_id?: number | null;
 }
 
 export interface SingleChoiceQuestion {

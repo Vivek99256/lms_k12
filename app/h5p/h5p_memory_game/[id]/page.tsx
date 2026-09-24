@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Clock } from 'lucide-react';
 import {
@@ -19,6 +19,7 @@ import {
   tilesMatch,
   type MemoryTile,
 } from '@/lib/h5p/memory-game';
+import type { QuestionResult as PlayerQuestionResult } from '@/components/h5p/players/types';
 import { H5pPageHeader, InlineBanner, MissingContextNotice } from '../../components/shared';
 import {
   PlayerSkeleton,
@@ -64,19 +65,54 @@ function TileFace({ tile }: { tile: MemoryTile }) {
   );
 }
 
-function MemoryGamePlayerContent() {
+/**
+ * A row supplied by the caller instead of fetched by id.
+ *
+ * This is what makes the player embeddable. The route below still loads by id
+ * from the URL, but a caller that already HAS the row -- the question bank
+ * library, which builds one in memory from a bank question and never saves it
+ * -- hands it over directly and skips the fetch entirely. `embedded` drops the
+ * page header, because an embedding surface has its own.
+ *
+ * Nothing downstream of here knows the difference: the row shape is identical,
+ * so scoring, feedback, solutions and xAPI behave exactly as they do for a
+ * saved activity.
+ */
+export interface PreloadedMemoryGame {
+  item: H5pMemoryGame;
+  ctx: H5pContext;
+  embedded?: boolean;
+  /**
+   * Fired once, where this player already reports completion over xAPI.
+   *
+   * It is how a module other than the H5P library uses this player: PAL needs
+   * the score to advance its state machine and homework needs it to record an
+   * attempt. The player still persists nothing itself -- the caller decides.
+   */
+  onResult?: (result: PlayerQuestionResult) => void;
+}
+
+function MemoryGamePlayerContent({ preloaded }: { preloaded?: PreloadedMemoryGame }) {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
   const searchParams = useSearchParams();
-  const ctx: H5pContext = useMemo(
+  const routeCtx: H5pContext = useMemo(
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
+  const ctx = preloaded?.ctx ?? routeCtx;
   const contextQuery = h5pContextQuery(ctx);
 
-  const [game, setGame] = useState<H5pMemoryGame | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [fetchedGame, setFetchedGame] = useState<H5pMemoryGame | null>(null);
+  const [loading, setLoading] = useState(!preloaded);
   const [error, setError] = useState('');
+  /** Which preloaded board has had its clock started. */
+  const initialisedFor = useRef<number | null>(null);
+
+  // Derived rather than copied into state: a preloaded row can change between
+  // renders (the library previews a different question), and state seeded once
+  // would keep showing the first one.
+  const game = preloaded?.item ?? fetchedGame;
 
   const [seed, setSeed] = useState(() => newMemorySeed());
   const [turned, setTurned] = useState<Turned>({ first: null, second: null });
@@ -92,6 +128,23 @@ function MemoryGamePlayerContent() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // The caller supplied the row, so there is nothing to fetch -- but the
+    // attempt clock is started BELOW, inside the fetch callback. Leaving it at
+    // zero would measure every preview as having begun in 1970.
+    if (preloaded) {
+      if (initialisedFor.current !== preloaded.item.id) {
+        initialisedFor.current = preloaded.item.id;
+        queueMicrotask(() => {
+          const at = Date.now();
+          setStartedAt(at);
+          setNow(at);
+        });
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
     if (!hasH5pContext(ctx) || !id) {
       queueMicrotask(() => {
         if (!cancelled) setLoading(false);
@@ -105,7 +158,7 @@ function MemoryGamePlayerContent() {
       .get(id, ctx)
       .then((data) => {
         if (cancelled) return;
-        setGame(data);
+        setFetchedGame(data);
         // The attempt starts when the board does, not when the route was
         // entered -- a slow load must not count against the learner.
         const at = Date.now();
@@ -122,7 +175,7 @@ function MemoryGamePlayerContent() {
     return () => {
       cancelled = true;
     };
-  }, [ctx, id]);
+  }, [ctx, id, preloaded]);
 
   const board = useMemo(
     () =>
@@ -173,8 +226,17 @@ function MemoryGamePlayerContent() {
         response: `${scored.matchedPairs}/${scored.totalPairs} pairs in ${moveCount} moves`,
         durationSeconds: (at - startedAt) / 1000,
       });
+
+      preloaded?.onResult?.({
+        questionId: Number(game.id),
+        score: scored.score,
+        maxScore: scored.maxScore,
+        correct: scored.passed,
+        durationSeconds: (at - startedAt) / 1000,
+        response: `${scored.matchedPairs}/${scored.totalPairs} pairs in ${moveCount} moves`,
+      });
     },
-    [game, totalPairs, startedAt, ctx]
+    [game, totalPairs, startedAt, ctx, preloaded]
   );
 
   // One interval drives both the displayed clock and the time limit, for
@@ -400,13 +462,15 @@ function MemoryGamePlayerContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto">
+        {preloaded?.embedded ? null : (
         <H5pPageHeader
           title={game?.title || 'Memory game'}
           description={game?.description || undefined}
           ctx={ctx}
           backHref={`/h5p/h5p_memory_game?${contextQuery}`}
         />
+        )}
 
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />
@@ -419,6 +483,30 @@ function MemoryGamePlayerContent() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The player as a component, for a caller that already holds the row.
+ *
+ * The Suspense boundary stays, because the body still calls `useSearchParams`
+ * even when it does not read it -- hooks cannot be conditional, and an
+ * unwrapped `useSearchParams` opts the whole embedding route into client-side
+ * rendering.
+ */
+export function MemoryGamePlayer({ item, ctx, embedded, onResult }: PreloadedMemoryGame) {
+  // Memoised, because this object is the load effect's dependency. Passing a
+  // fresh one each render re-ran that effect on every render, and its cleanup
+  // then cancelled the setup the previous run had just scheduled.
+  const preloaded = useMemo(
+    () => ({ item, ctx, embedded, onResult }),
+    [item, ctx, embedded, onResult]
+  );
+
+  return (
+    <Suspense fallback={<PlayerSkeleton lines={3} label="Loading activity" />}>
+      <MemoryGamePlayerContent preloaded={preloaded} />
+    </Suspense>
   );
 }
 

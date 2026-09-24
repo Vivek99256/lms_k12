@@ -10,6 +10,16 @@ interface AuthContextType {
   user: { name: string; email: string; avatar?: string } | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: (credential: string) => Promise<{ success: boolean; error?: string }>;
+  /**
+   * Trades a single-use mobile web-handoff ticket (from the K12 app's
+   * WebView bridge) for a session, by relaying it through the ERP's
+   * `/api/mobile/web-handoff/claims` and persisting the same payload shape
+   * `login()` does. See `app/mobile-bridge/page.tsx`, the page that calls
+   * this.
+   */
+  loginFromHandoffTicket: (
+    ticket: string
+  ) => Promise<{ success: boolean; error?: string; redirectPath?: string }>;
   logout: () => void;
   menuContext: {
     sub_institute_id: number;
@@ -257,6 +267,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [persistLoginPayload]);
 
   /**
+   * The WebView bridge's counterpart to login()/loginWithGoogle(): exchange
+   * something that isn't a password (here, a ticket the ERP already bound to
+   * one user, one tenant and one target page) for the same kind of session
+   * those two produce, via persistLoginPayload(). See the ERP's
+   * MobileWebHandoffApiController@claims for what the ticket is redeemed
+   * against and why it returns JSON shaped like /api/api-login rather than a
+   * cookie.
+   */
+  const loginFromHandoffTicket = useCallback(
+    async (ticket: string) => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/mobile/web-handoff/claims?ticket=${encodeURIComponent(ticket)}`
+        );
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data && Number(data.status) === 1) {
+          clearTeachAssistantStorage();
+          persistLoginPayload(data as Record<string, unknown>);
+          const redirectPath =
+            typeof data.redirect_path === 'string' && data.redirect_path
+              ? data.redirect_path
+              : undefined;
+          return { success: true, redirectPath };
+        }
+        return {
+          success: false,
+          error: data?.message || 'This link has expired. Please open it again from the app.',
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Network error. Please try again.';
+        return { success: false, error: message };
+      }
+    },
+    [persistLoginPayload]
+  );
+
+  /**
    * Signing out takes the browser back to a clean copy of the app, not just to a
    * logged-out React state.
    *
@@ -319,7 +366,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, user, login, loginWithGoogle, logout, menuContext, academicTerms, academicYears, refreshAcademicTerms }}
+      value={{
+        isAuthenticated,
+        user,
+        login,
+        loginWithGoogle,
+        loginFromHandoffTicket,
+        logout,
+        menuContext,
+        academicTerms,
+        academicYears,
+        refreshAcademicTerms,
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -334,6 +392,9 @@ export function useAuth() {
       user: null,
       login: async (): Promise<{ success: boolean; error?: string }> => ({ success: false }),
       loginWithGoogle: async (): Promise<{ success: boolean; error?: string }> => ({ success: false }),
+      loginFromHandoffTicket: async (): Promise<{ success: boolean; error?: string; redirectPath?: string }> => ({
+        success: false,
+      }),
       logout: () => {},
       menuContext: null,
       academicTerms: [],

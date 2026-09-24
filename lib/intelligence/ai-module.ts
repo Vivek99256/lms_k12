@@ -372,3 +372,228 @@ export async function recordModuleActivitySafely(
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Models — this module's own choice, managed inside this module
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY THESE LIVE HERE AND NOT IN `ai-configuration.ts`
+ *
+ * That client talks to the central console under AI & Intelligence, which configures AI
+ * CAPABILITIES for the whole estate and writes `ai_api_keys` and `ai_models`.
+ *
+ * These talk to `/api/ai/modules/{key}/models`, which configures ONE PRODUCT MODULE and
+ * writes `ai_module_model_bindings`. The two never touch the same row, and nothing here
+ * links to the other: the AI Stack inside a module is decentralised, so choosing a model
+ * in Fees is something you finish in Fees.
+ *
+ * A save is not a screen preference. `AiConfigurationResolver` consults these bindings
+ * ahead of the central configuration and the three places that build a model client pass
+ * the product module through, so it changes what this module's next call runs on.
+ */
+
+/** What this module's next call of one kind would actually use. */
+export interface AiModuleEffectiveModel {
+  provider: string;
+  provider_label: string;
+  model: string | null;
+  /**
+   * How it was decided, in the resolver's own vocabulary. `module_binding` and
+   * `module_binding_platform` mean this module's own choice won; anything else means it
+   * is inheriting what the rest of the estate uses.
+   */
+  source: string;
+  scope: string;
+  has_credential: boolean;
+  max_output_tokens: number | null;
+}
+
+/** This module's own saved choice, when it has made one. */
+export interface AiModuleBinding {
+  provider: string | null;
+  model: string | null;
+  api_key_id: number | null;
+  max_output_tokens: number | null;
+  scope: 'platform' | 'institute';
+  /**
+   * False for a platform row: it is the estate's default for this module, and a school
+   * overrides it rather than edits it.
+   */
+  editable: boolean;
+  updated_at: string | null;
+}
+
+export interface AiModuleModelRow {
+  /** The AI capability — `conversational_ai`, `generative_ai`, `agent_reasoning`. */
+  capability: string;
+  label: string;
+  description: string;
+  /**
+   * False means the platform still reaches its provider its own way for this capability,
+   * so a choice is stored but not yet read. Said plainly rather than implying a binding
+   * that does not exist.
+   */
+  wired: boolean;
+  binding: AiModuleBinding | null;
+  effective: AiModuleEffectiveModel;
+}
+
+export interface AiModuleModelOption {
+  key: string;
+  label: string;
+  max_output_tokens: number | null;
+  scope: string;
+}
+
+export interface AiModuleProviderOption {
+  key: string;
+  label: string;
+  default_model: string | null;
+  models: AiModuleModelOption[];
+}
+
+export interface AiModuleCredentialOption {
+  id: number;
+  provider: string;
+  label: string;
+  daily_limit: number | null;
+  scope: string;
+}
+
+export interface AiModuleModelIndex {
+  module: { key: string };
+  rows: AiModuleModelRow[];
+  providers: AiModuleProviderOption[];
+  credentials: AiModuleCredentialOption[];
+}
+
+export interface AiModuleModelSaveInput {
+  capability: string;
+  provider: string;
+  model?: string | null;
+  api_key_id?: number | null;
+  max_output_tokens?: number | null;
+}
+
+export interface AiModuleModelSaved {
+  capability: string;
+  binding: AiModuleBinding;
+  effective: AiModuleEffectiveModel;
+}
+
+export interface AiModuleModelCleared {
+  capability: string;
+  cleared: boolean;
+  effective: AiModuleEffectiveModel;
+}
+
+/** What this module runs on, and what it could run on. */
+export function fetchModuleModels(moduleKey: string): Promise<AiModuleModelIndex> {
+  return call<AiModuleModelIndex>(`/modules/${encodeURIComponent(moduleKey)}/models`);
+}
+
+/** Save this module's choice for one capability. Applies to this module only. */
+export function saveModuleModel(
+  moduleKey: string,
+  input: AiModuleModelSaveInput,
+): Promise<AiModuleModelSaved> {
+  return call<AiModuleModelSaved>(`/modules/${encodeURIComponent(moduleKey)}/models`, {
+    method: 'PUT',
+    body: input,
+  });
+}
+
+/** Return this module to whatever the rest of the estate is configured to use. */
+export function clearModuleModel(moduleKey: string, capability: string): Promise<AiModuleModelCleared> {
+  return call<AiModuleModelCleared>(
+    `/modules/${encodeURIComponent(moduleKey)}/models?capability=${encodeURIComponent(capability)}`,
+    { method: 'DELETE' },
+  );
+}
+
+/** Whether a resolution came from this module's own choice rather than the estate's. */
+export function isModuleOwnChoice(effective: AiModuleEffectiveModel): boolean {
+  return effective.source.startsWith('module_binding');
+}
+
+/**
+ * A credential this module added for itself — distinct from `AiModuleCredentialOption`,
+ * which is any credential the module may *pick*. This is the shape returned right after
+ * adding or editing one of its own.
+ */
+export interface AiModuleOwnCredential {
+  id: number;
+  provider: string;
+  label: string;
+  daily_limit: number | null;
+  status?: number;
+  scope: 'institute';
+}
+
+export interface AiModuleModelCreateInput {
+  capability: string;
+  provider: string;
+  /** A model id. Added to this school's own model catalogue if it is not in it yet. */
+  model: string;
+  model_label?: string | null;
+  api_key: string;
+  account_email?: string | null;
+  api_limit?: number | null;
+  max_output_tokens?: number | null;
+}
+
+export interface AiModuleModelCreated {
+  capability: string;
+  credential: AiModuleOwnCredential;
+  model_id: number | null;
+  binding: AiModuleBinding | null;
+  effective: AiModuleEffectiveModel;
+}
+
+export interface AiModuleModelUpdateInput {
+  model?: string | null;
+  model_label?: string | null;
+  api_key?: string | null;
+  account_email?: string | null;
+  api_limit?: number | null;
+  /** `false` disables the credential; `true` re-enables it. */
+  status?: boolean;
+}
+
+export interface AiModuleModelUpdated {
+  capability: string;
+  credential: AiModuleOwnCredential;
+  effective: AiModuleEffectiveModel;
+}
+
+/**
+ * Add a brand-new model + credential from inside this module, and use it here
+ * immediately. This is "Add New Model" — distinct from `saveModuleModel`, which only
+ * picks among credentials that already exist. Writes a school-owned row; never touches
+ * the platform/estate default. See `AiModuleModelController::storeCredential`.
+ */
+export function createModuleModelCredential(
+  moduleKey: string,
+  input: AiModuleModelCreateInput,
+): Promise<AiModuleModelCreated> {
+  return call<AiModuleModelCreated>(`/modules/${encodeURIComponent(moduleKey)}/models/credentials`, {
+    method: 'POST',
+    body: input,
+  });
+}
+
+/**
+ * Edit, or enable/disable, a credential this module added for itself. Refused for a
+ * platform-scoped credential — those remain the central console's to change.
+ */
+export function updateModuleModelCredential(
+  moduleKey: string,
+  credentialId: number,
+  input: AiModuleModelUpdateInput,
+): Promise<AiModuleModelUpdated> {
+  return call<AiModuleModelUpdated>(
+    `/modules/${encodeURIComponent(moduleKey)}/models/credentials/${credentialId}`,
+    { method: 'PUT', body: { ...input, status: input.status === undefined ? undefined : input.status ? 1 : 0 } },
+  );
+}

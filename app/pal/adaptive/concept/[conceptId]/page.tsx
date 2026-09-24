@@ -7,6 +7,7 @@ import { ArrowRight, CheckCircle2, Lightbulb, Loader2, XCircle } from 'lucide-re
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import {
   fetchAdaptiveQuestions,
   fetchConceptResult,
@@ -14,12 +15,17 @@ import {
   type AdaptiveAnswerOutcome,
   type AdaptiveQuestionSet,
   type ConceptDiagnosticResult,
-  type DetectedMisconception,
   type DiagnosticQuestionItem,
-  type PracticeNext,
 } from '@/app/pal/data/pal-diagnostic';
+import { isConceptCompleted, signalsFromConceptResult } from '@/app/pal/data/pal-completion';
 import { BandChip, BandRow, bandLabel } from '@/app/pal/_components/BandMeter';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import {
+  CompletedBadge,
+  CompletedConceptPanel,
+  ReadOnlyBadge,
+  useConceptCompletion,
+} from '@/app/pal/_components/CompletionState';
+import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -39,6 +45,15 @@ import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace
  * it, along with `answer_master.feedback`, which is the misconception text and
  * the whole point of practising rather than being tested. The client still
  * never asserts correctness; it only displays what came back.
+ *
+ * ---------------------------------------------------------------------------
+ * A COMPLETED CONCEPT NEVER LOADS A QUESTION SET
+ * ---------------------------------------------------------------------------
+ * Completion is resolved BEFORE the questions are asked for, not after. A
+ * concept that has been cleared to hard and signed off renders its mastery and
+ * stops there - no set is fetched, so there is no answer this screen could
+ * record even if a control were left behind by accident. See
+ * app/pal/data/pal-completion.ts for the rule itself.
  */
 
 export default function AdaptivePracticePage() {
@@ -77,6 +92,13 @@ function AdaptivePracticeView() {
   const [showingResult, setShowingResult] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Answered first, and the question set is never requested until it says no.
+  const {
+    result: completedResult,
+    completed,
+    loading: checkingCompletion,
+  } = useConceptCompletion(conceptId);
+
   const load = useCallback(() => {
     const controller = new AbortController();
     // Every setState is deferred, including the loading/error reset: calling
@@ -101,7 +123,12 @@ function AdaptivePracticeView() {
     return () => controller.abort();
   }, [conceptId]);
 
-  useEffect(() => load(), [load]);
+  // Gated rather than aborted: fetching a set for a completed concept and then
+  // throwing it away would still have consumed the learner's question stock.
+  useEffect(() => {
+    if (checkingCompletion || completed) return;
+    return load();
+  }, [load, checkingCompletion, completed]);
 
   const answer = useCallback(
     async (question: DiagnosticQuestionItem, optionId: string) => {
@@ -143,6 +170,13 @@ function AdaptivePracticeView() {
     }
   }, [conceptId]);
 
+  if (checkingCompletion) return <Centered>Loading this concept…</Centered>;
+
+  // Read-only from here down: mastery information and a way back, nothing else.
+  if (completed && completedResult) {
+    return <CompletedConceptView result={completedResult} chapterId={completedResult.chapterId} />;
+  }
+
   if (loading) return <Centered>Loading practice…</Centered>;
 
   if (error && !set) {
@@ -163,11 +197,17 @@ function AdaptivePracticeView() {
   const allAnswered = items.length > 0 && answeredCount >= items.length;
 
   if (showingResult && result) {
+    // The set that was just submitted may be the one that finished the
+    // concept. It closes straight into the completed view rather than offering
+    // a "practise again" the concept is no longer open to.
+    if (isConceptCompleted(signalsFromConceptResult(result))) {
+      return <CompletedConceptView result={result} chapterId={result.chapterId || set?.chapterId || ''} />;
+    }
+
     return (
       <ConceptResultView
         result={result}
         chapterId={set?.chapterId ?? ''}
-        onPractiseAgain={load}
         onBack={() => router.push(`/pal/adaptive/chapter/${set?.chapterId ?? ''}`)}
       />
     );
@@ -206,7 +246,7 @@ function AdaptivePracticeView() {
           </PalRailSection>
 
           <PalRailSection title="Your journey">
-            <JourneyRail current="adaptive" completed={['diagnostic']} orientation="vertical" />
+            <JourneyRail current="adaptive" completed={stagesBefore('adaptive')} orientation="vertical" />
           </PalRailSection>
         </>
       }
@@ -273,6 +313,96 @@ function AdaptivePracticeView() {
             Submit concept diagnostic
             <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
           </Button>
+        </div>
+      )}
+    </PalWorkspace>
+  );
+}
+
+/**
+ * A completed concept, in full.
+ *
+ * Mastery information and the two navigation routes out - no question set, no
+ * lesson link, no "practise again", no control that could write anything. The
+ * rail carries context only, and the journey shows the concept closed out.
+ */
+function CompletedConceptView({
+  result,
+  chapterId,
+}: {
+  result: ConceptDiagnosticResult;
+  chapterId: string;
+}) {
+  // The highest rung actually cleared, not the one the rule aims at - a
+  // concept with no hard questions written completes without it, and saying
+  // "Hard" there would claim evidence that does not exist.
+  const cleared = result.ladder.bandsCleared.map((band) => band.toLowerCase());
+  const topCleared = ['hard', 'medium', 'easy'].find((band) => cleared.includes(band));
+
+  return (
+    <PalWorkspace
+      eyebrow="Concept mastery"
+      title={result.conceptName || 'Concept'}
+      description="This concept is completed. Everything below is a record of how you got there."
+      backHref={chapterId ? `/pal/adaptive/chapter/${chapterId}` : '/pal'}
+      backLabel={chapterId ? 'All concepts' : 'Back to subjects'}
+      actions={
+        <>
+          <CompletedBadge />
+          <ReadOnlyBadge />
+        </>
+      }
+      rail={
+        <>
+          <PalRailSection title="Where you finished">
+            <div className="flex items-baseline justify-between gap-3 py-1">
+              <span className="text-sm text-slate-600">Accuracy</span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900">
+                {Math.round(result.accuracy)}%
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 py-1">
+              <span className="text-sm text-slate-600">Correct</span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900">
+                {result.correct} of {result.attempted}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 py-1">
+              <span className="text-sm text-slate-600">Top level cleared</span>
+              <span className="text-sm font-semibold text-slate-900">
+                {topCleared ? bandLabel(topCleared) : 'None recorded'}
+              </span>
+            </div>
+          </PalRailSection>
+
+          <PalRailSection title="Your journey">
+            <JourneyRail
+              current="mastery"
+              completed={COMPLETED_THROUGH_CHECK}
+              bypassed={['intervention']}
+              orientation="vertical"
+            />
+          </PalRailSection>
+        </>
+      }
+    >
+      <CompletedConceptPanel result={result} />
+
+      {chapterId && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5">
+          <Link
+            href={`/pal/adaptive/chapter/${chapterId}`}
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            All concepts
+          </Link>
+          <Link
+            href={`/pal/mastery/chapter/${chapterId}`}
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            Chapter mastery
+            <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
+          </Link>
         </div>
       )}
     </PalWorkspace>
@@ -387,12 +517,10 @@ function PracticeQuestion({
 function ConceptResultView({
   result,
   chapterId,
-  onPractiseAgain,
   onBack,
 }: {
   result: ConceptDiagnosticResult;
   chapterId: string;
-  onPractiseAgain: () => void;
   onBack: () => void;
 }) {
   const understandingCopy: Record<string, string> = {
@@ -435,7 +563,15 @@ function ConceptResultView({
           </PalRailSection>
 
           <PalRailSection title="Your journey">
-            <JourneyRail current="plan" completed={['diagnostic', 'adaptive']} orientation="vertical" />
+            {/* Practice, not plan. This screen is the record of a practice set
+                that has just been submitted; pinning it to Plan put the
+                learner two stages behind where they actually were, and hid
+                the Feedback stage they are about to be handed to. */}
+            <JourneyRail
+              current="practice"
+              completed={stagesBefore('practice')}
+              orientation="vertical"
+            />
           </PalRailSection>
         </>
       }
@@ -544,19 +680,39 @@ function ConceptResultView({
         </Card>
       </div>
 
-      {/* The engine decided what comes next; this renders that one step as the
-          primary action. The alternatives stay available but secondary - a
-          learner is never trapped, they are just no longer asked to diagnose
-          themselves from a row of equal-weight buttons. */}
-      {result.next && (
-        <NextStepCard
-          next={result.next}
-          misconception={result.misconception}
-          conceptId={result.conceptId}
-          chapterId={result.chapterId || chapterId}
-          onPractiseAgain={onPractiseAgain}
-        />
-      )}
+      {/* The engine's decision is no longer rendered here - it is rendered on
+          the Feedback page, which is where the learner is about to be. Showing
+          it on both would mean pressing the same engine-chosen button on two
+          consecutive screens.
+
+          What stays is the handoff, carrying the engine's own sentence, so the
+          primary action on this screen is still visibly the engine's. */}
+      <Card className="mt-4 border-indigo-200 bg-indigo-50" data-pal-next-action={result.next?.action ?? 'none'}>
+        <CardContent className="pt-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <ArrowRight aria-hidden className="h-4 w-4" />
+                Before you move on
+              </p>
+              <p className="mt-1 text-sm text-slate-700">
+                {result.next?.reason ??
+                  'Have a look at what this set showed before you carry on.'}
+              </p>
+            </div>
+
+            <Link
+              href={`/pal/feedback/concept/${result.conceptId}?chapterId=${
+                result.chapterId || chapterId
+              }&published=${result.evidencePublished}`}
+              className={cn(buttonVariants(), 'shrink-0')}
+            >
+              See what this means
+              <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5">
         <Button variant="outline" onClick={onBack}>All concepts</Button>
@@ -578,100 +734,5 @@ function ConceptResultView({
         </div>
       </div>
     </PalWorkspace>
-  );
-}
-
-/**
- * The one next step, as decided by PracticeOutcomeService.
- *
- * Each action maps to a title, a button and a destination. Nothing is computed
- * here - the reason string is the server's own words, so this screen and the
- * plan can never explain the same decision differently.
- */
-function NextStepCard({
-  next,
-  misconception,
-  conceptId,
-  chapterId,
-  onPractiseAgain,
-}: {
-  next: PracticeNext;
-  misconception: DetectedMisconception | null;
-  conceptId: string;
-  chapterId: string;
-  onPractiseAgain: () => void;
-}) {
-  const esoHref = `/pal/eso?conceptId=${conceptId}`;
-  // The lesson, served read-only, so a button labelled "Learn" always opens a
-  // lesson. Pointing it at the engine meant the engine chose the screen, and it
-  // legitimately chose practice - the button could not keep its promise.
-  const learnHref = `/pal/learn/concept/${conceptId}?chapterId=${chapterId}`;
-
-  const plan: Record<string, { title: string; cta: string; href?: string; tone: 'go' | 'warn' | 'done' }> = {
-    remediate: { title: 'Clear up a mix-up first', cta: 'Sort this out', href: esoHref, tone: 'warn' },
-    reteach: { title: 'Worth going over this again', cta: 'Learn it again', href: learnHref, tone: 'warn' },
-    review_content: { title: 'Worth going over this again', cta: 'See the material', href: learnHref, tone: 'warn' },
-    practice: { title: 'Ready to start', cta: 'Start practice', tone: 'go' },
-    continue_practice: { title: 'Keep going', cta: 'Next 5 questions', tone: 'go' },
-    advance_band: { title: 'Level cleared', cta: 'Move up a level', tone: 'go' },
-    mastery_check: { title: 'Ready for the mastery check', cta: 'Check my mastery', href: esoHref, tone: 'done' },
-    mastered: { title: 'Concept mastered', cta: 'Back to the plan', href: `/pal/plan/chapter/${chapterId}`, tone: 'done' },
-  };
-
-  const step = plan[next.action] ?? { title: 'What is next', cta: 'Continue', tone: 'go' as const };
-
-  const tone =
-    step.tone === 'warn'
-      ? 'border-amber-200 bg-amber-50'
-      : step.tone === 'done'
-        ? 'border-emerald-200 bg-emerald-50'
-        : 'border-indigo-200 bg-indigo-50';
-
-  const Icon = step.tone === 'warn' ? Lightbulb : step.tone === 'done' ? CheckCircle2 : ArrowRight;
-
-  return (
-    <Card className={`mt-4 ${tone}`} data-pal-next-action={next.action}>
-      <CardContent className="pt-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <Icon aria-hidden className="h-4 w-4" />
-              {step.title}
-              {next.band && <BandChip band={next.band} />}
-            </p>
-
-            {/* The server's own sentence. */}
-            <p className="mt-1 text-sm text-slate-700">{next.reason}</p>
-
-            {misconception && (
-              <p className="mt-2 rounded-lg border border-white/60 bg-white/70 px-3 py-2 text-xs text-slate-700">
-                <span className="font-medium">What tripped you up: </span>
-                {misconception.description || misconception.correctiveAction}
-              </p>
-            )}
-
-            {!next.eso && (next.action === 'review_content' || next.action === 'mastered') && (
-              <p className="mt-2 text-xs text-slate-500">
-                Guided learning is not set up for this concept yet, so this step is shown from your plan instead.
-              </p>
-            )}
-          </div>
-
-          <div className="shrink-0">
-            {step.href ? (
-              <Link href={step.href} className={buttonVariants()}>
-                {step.cta}
-                <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
-              </Link>
-            ) : (
-              <Button onClick={onPractiseAgain}>
-                {step.cta}
-                <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

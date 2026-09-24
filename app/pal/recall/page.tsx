@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { fetchRecallQueue, type RecallItem, type RecallQueue } from '@/app/pal/data/pal-diagnostic';
-import { JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { COMPLETED_THROUGH_MASTERY, JourneyRail } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 
 /**
@@ -120,7 +120,8 @@ function RecallView() {
           <PalRailSection title="Your journey">
             <JourneyRail
               current="recall"
-              completed={['diagnostic', 'adaptive', 'plan', 'learn', 'practice', 'check', 'mastery']}
+              completed={COMPLETED_THROUGH_MASTERY}
+              bypassed={['intervention']}
               orientation="vertical"
             />
           </PalRailSection>

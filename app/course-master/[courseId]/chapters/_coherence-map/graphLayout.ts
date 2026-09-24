@@ -86,7 +86,7 @@ export type LayoutResult = {
   height: number;
 };
 
-type TreeNode = {
+export type TreeNode = {
   node: CoherenceNode;
   children: TreeNode[];
   level: number;
@@ -104,10 +104,7 @@ export function layoutMap(
   collapsed: Set<string>,
   typeFilter: Set<CoherenceNodeType>
 ): LayoutResult {
-  const byId = new Map<string, CoherenceNode>();
-  for (const node of map.nodes) byId.set(node.id, node);
-
-  const roots = buildForest(map.nodes, byId, typeFilter);
+  const roots = buildForest(map.nodes, typeFilter);
 
   const positioned: PositionedNode[] = [];
   const visible = new Set<string>();
@@ -188,11 +185,10 @@ export function layoutMap(
  * exactly what happens on a course where topic_id is unpopulated, so this path is
  * the normal one rather than an edge case.
  */
-function buildForest(
-  nodes: CoherenceNode[],
-  byId: Map<string, CoherenceNode>,
-  typeFilter: Set<CoherenceNodeType>
-): TreeNode[] {
+export function buildForest(nodes: CoherenceNode[], typeFilter: Set<CoherenceNodeType>): TreeNode[] {
+  const byId = new Map<string, CoherenceNode>();
+  for (const node of nodes) byId.set(node.id, node);
+
   const visibleParent = (node: CoherenceNode): string | null => {
     let parentId = node.parent_id;
 
@@ -241,6 +237,20 @@ function buildForest(
   for (const root of roots) sortChildren(root, 0);
 
   return roots;
+}
+
+/** Every concept-level node in a subtree, for a unit/chapter card's count and drill-down list. */
+export function conceptsUnder(tree: TreeNode): CoherenceNode[] {
+  const concepts: CoherenceNode[] = [];
+
+  const walk = (node: TreeNode) => {
+    if (node.node.type === 'concept') concepts.push(node.node);
+    for (const child of node.children) walk(child);
+  };
+
+  walk(tree);
+
+  return concepts;
 }
 
 function countDescendants(tree: TreeNode): number {
