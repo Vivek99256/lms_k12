@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BriefcaseBusiness, Loader2, Pencil, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 
 import { CapabilityShell } from '../_components/CapabilityShell';
+import { ModulePicker } from '../_components/ModulePicker';
 import {
   createAiPolicy,
   fetchAiPolicyOptions,
@@ -64,6 +65,10 @@ function PolicyManager() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  // Empty means "every policy" — unchanged default behavior. Selecting a module here
+  // calls the exact same `fetchAiPolicies(moduleKey)` a module's own AI Stack → Policies
+  // tab calls, so the list shown is that module's real policy set, not a copy of it.
+  const [moduleFilter, setModuleFilter] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -74,7 +79,7 @@ function PolicyManager() {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([fetchAiPolicyOptions(), fetchAiPolicies()])
+    Promise.all([fetchAiPolicyOptions(), fetchAiPolicies(moduleFilter || undefined)])
       .then(([nextOptions, nextIndex]) => {
         if (cancelled) return;
         setOptions(nextOptions);
@@ -90,7 +95,7 @@ function PolicyManager() {
     return () => {
       cancelled = true;
     };
-  }, [reloadToken]);
+  }, [reloadToken, moduleFilter]);
 
   const openAdd = () => {
     setForm({
@@ -273,6 +278,12 @@ function PolicyManager() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <ModulePicker
+            modules={options?.modules ?? []}
+            value={moduleFilter}
+            onChange={setModuleFilter}
+            loading={loading}
+          />
           <button
             type="button"
             onClick={load}
@@ -519,12 +530,29 @@ function PolicyManager() {
                       ))}
                     </select>
 
-                    <input
-                      value={assignment.scope_id}
-                      onChange={(event) => updateAssignment(index, 'scope_id', event.target.value)}
-                      placeholder="Scope id"
-                      className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring"
-                    />
+                    {assignment.scope_type === 'module' ? (
+                      // A module scope's id is an `ai_modules` row — picked by name, not typed
+                      // by number. Selecting "Fees" here writes the same id
+                      // `policies-screen.tsx` (the decentralized side) already writes when a
+                      // module saves its own policy, so the two can never name different rows
+                      // for the same module.
+                      <ModulePicker
+                        modules={options?.modules ?? []}
+                        value={(options?.modules ?? []).find((candidate) => String(candidate.id) === assignment.scope_id)?.key ?? ''}
+                        onChange={(moduleKey) => {
+                          const module = (options?.modules ?? []).find((candidate) => candidate.key === moduleKey);
+                          updateAssignment(index, 'scope_id', module ? String(module.id) : '');
+                        }}
+                        allowAll={false}
+                      />
+                    ) : (
+                      <input
+                        value={assignment.scope_id}
+                        onChange={(event) => updateAssignment(index, 'scope_id', event.target.value)}
+                        placeholder="Scope id"
+                        className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring"
+                      />
+                    )}
 
                     <select
                       value={assignment.status}
