@@ -1,4 +1,9 @@
 import {
+  intelligenceHrefFor,
+  moduleIntelligenceRoute,
+  resolveIntelligenceModuleForMenu,
+} from '@/components/intelligence/module/registry';
+import {
   LayoutDashboard, User, Banknote, Calendar, FileText,
   BarChart3, MessageSquare, Settings, BookOpen, ClipboardList,
   UserPlus, FileCheck, Menu, Brain
@@ -194,10 +199,37 @@ function overrideMenuLabel(link: string | null | undefined, fallback: string): s
   return EXAM_MENU_LINKS.has(normalizeMenuLink(link)) ? 'Exam' : fallback;
 }
 
+/**
+ * Where this module's Intelligence item should point.
+ *
+ * The tenant's own slug wins over anything the registry declares: the registry
+ * says WHICH intelligence a module gets, the database says what the module is
+ * called, and a school that renames a module must not need a code change.
+ */
+function intelligenceRouteFor(
+  module: Parameters<typeof intelligenceHrefFor>[0],
+  slug: string | undefined,
+): string {
+  const trimmed = (slug || '').trim();
+
+  return trimmed ? moduleIntelligenceRoute(trimmed) : intelligenceHrefFor(module);
+}
+
 export function buildMenuTree(
   level1: ApiMenuItem[],
   level2: ApiMenuGroups | undefined,
   level3: ApiMenuGroups | undefined,
+  /**
+   * level-2 `tblmenumaster.id` -> that module's `fees_menu_categories.module_name`.
+   *
+   * OPTIONAL, AND ITS ABSENCE COSTS THE CANONICAL URL, NEVER THE MENU ITEM.
+   * With a slug the item points at `/modules/<slug>/intelligence`, the route
+   * the database already spells for that module; without one it points at the
+   * module's legacy route, which renders the identical screen. A directory feed
+   * that is slow, rights-filtered or unavailable therefore degrades the link and
+   * never removes Intelligence from the menu.
+   */
+  moduleSlugs?: Map<number, string>,
 ): MenuItem[] {
   return level1
     .filter(item => item.status === 1)
@@ -237,6 +269,59 @@ export function buildMenuTree(
           // module navigates to /user_log and nothing else.
           const isAuditModule =
             (sub.name || sub.menu_title || sub.site_map_name || '').trim().replace(/\s+/g, ' ').toLowerCase() === 'audit';
+
+          /*
+           * THE INTELLIGENCE ITEM, appended beneath the module it belongs to.
+           *
+           * Which Intelligence a module gets is not declared per module and is
+           * not a table kept here — it is `resolveIntelligenceModuleForMenu`
+           * run against this tenant's own label, legacy link and level-3
+           * routes. An earlier version of this file DID keep its own
+           * {key, route, match} table, and it had already drifted: Fees, the
+           * one module with the full ladder, was missing from it, so the most
+           * complete Intelligence screen in the product was the one you could
+           * only reach by typing its URL. Crossing the two is what
+           * lib/brain/intelligence-navigation.test.ts pins.
+           *
+           * A module the matcher does not recognise gets NO item, which is why
+           * this is a conditional append rather than a row added to every
+           * module. "Payroll Register" resolving to nothing is the correct
+           * answer, not a gap to fill.
+           */
+          const intelligenceModule = resolveIntelligenceModuleForMenu(
+            sub.name || sub.menu_title || sub.site_map_name || '',
+            sub.link || '',
+            level3Items.map((l3) => l3.href),
+          );
+
+          /*
+           * A module whose own menu ALREADY carries an Intelligence row keeps
+           * it and gets nothing added. Some tenants have seeded a real
+           * tblmenumaster row for it; appending a synthetic sibling there would
+           * show the reader the same screen twice and make the duplicate look
+           * like two different things.
+           */
+          const hasOwnIntelligenceRow = level3Items.some(
+            (l3) => (l3.href || '').toLowerCase().endsWith('/intelligence'),
+          );
+
+          const intelligenceItems: Level3Item[] = intelligenceModule && !hasOwnIntelligenceRow
+            ? [
+                {
+                  // Negative, so a synthetic row can never collide with a real
+                  // tblmenumaster id that something else keys off.
+                  id: -Math.abs(sub.id),
+                  parentId: sub.id,
+                  menuType: sub.menu_type,
+                  label: 'Intelligence',
+                  href: intelligenceRouteFor(intelligenceModule, moduleSlugs?.get(sub.id)),
+                  link: intelligenceRouteFor(intelligenceModule, moduleSlugs?.get(sub.id)),
+                },
+              ]
+            : [];
+
+          const childItems: Level3Item[] = [...level3Items, ...intelligenceItems];
+
           return {
             id: sub.id,
             parentId: sub.parent_menu_id,
@@ -244,7 +329,7 @@ export function buildMenuTree(
             label: overrideMenuLabel(sub.link, sub.name || sub.menu_title || sub.site_map_name),
             href: resolveRoute(sub.link),
             icon: resolveIcon(sub.icon, 2),
-            submenus: isAuditModule ? undefined : (level3Items.length > 0 ? level3Items : undefined),
+            submenus: isAuditModule ? undefined : (childItems.length > 0 ? childItems : undefined),
           };
         });
       return {
