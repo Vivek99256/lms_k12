@@ -10,11 +10,13 @@
 
 import { CapabilityShell } from '../_components/CapabilityShell';
 import { ModelManager } from '../_components/ModelManager';
+import { ModuleModelOverrides } from '../_components/ModuleModelOverrides';
 
 export default function AiModelsPage() {
   return (
     <CapabilityShell slug="models">
       <ModelManager />
+      <ModuleModelOverrides />
     </CapabilityShell>
   );
 }
