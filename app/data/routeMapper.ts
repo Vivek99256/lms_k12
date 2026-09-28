@@ -586,6 +586,51 @@ const ENTERPRISE_BRAIN_ROUTE_NAME_MAP: Record<string, string> = {
   'brain': '/enterprise-brain',
 };
 
+/**
+ * Library module (see app/library) — App\Http\Controllers\library\* in
+ * next_lms_erp. The generic fallback at the end of this function (prepend a
+ * leading slash to whatever tblmenumaster's `link` holds) only produces the
+ * right route for entries whose link already happens to equal the Next.js
+ * path exactly (e.g. "library/scan_book"). Most of this module's Laravel
+ * route names/paths don't match this module's Next.js slugs 1:1 (e.g.
+ * "scan_books_remarks.index" vs. /library/add_book_remark), so those links
+ * fall through to a route that doesn't exist and render as disabled tabs.
+ * Both the dotted route name and the raw path are listed for each screen,
+ * matching this file's established convention for every other module.
+ */
+const LIBRARY_ROUTE_NAME_MAP: Record<string, string> = {
+  'books.index': '/library/book_resources',
+  'books': '/library/book_resources',
+  'library/books': '/library/book_resources',
+  'quick_return.index': '/library/quick_return',
+  'quick_return': '/library/quick_return',
+  'library/quick_return': '/library/quick_return',
+  'scan_books.index': '/library/scan_book',
+  'scan_books': '/library/scan_book',
+  'library/scan_books': '/library/scan_book',
+  'scan_books_remarks.index': '/library/add_book_remark',
+  'scan_books_remarks': '/library/add_book_remark',
+  'library/scan_books_remarks': '/library/add_book_remark',
+  'library_report.index': '/library/report',
+  'library_report': '/library/report',
+  'library/library_report': '/library/report',
+  'book_issue_report.index': '/library/issue_overdue_report',
+  'book_issue_report': '/library/issue_overdue_report',
+  'library/book_issue_report': '/library/issue_overdue_report',
+  'print_barcode.index': '/library/print_barcode',
+  'print_barcode': '/library/print_barcode',
+  'library/print_barcode': '/library/print_barcode',
+  'verified_report.index': '/library/scanned_book_report',
+  'verified_book_report': '/library/scanned_book_report',
+  'library/verified_book_report': '/library/scanned_book_report',
+  'verifiypending_report.index': '/library/pending_scan_report',
+  'verified_book_report_pending': '/library/pending_scan_report',
+  'library/verified_book_report_pending': '/library/pending_scan_report',
+  'lost_and_damage.index': '/library/lost_damage_report',
+  'lost_and_damage': '/library/lost_damage_report',
+  'library/lost_and_damage': '/library/lost_damage_report',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -753,6 +798,11 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
   const resultRoute = RESULT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (resultRoute) {
     return resultRoute;
+  }
+
+  const libraryRoute = LIBRARY_ROUTE_NAME_MAP[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (libraryRoute) {
+    return libraryRoute;
   }
 
   // LMS → H5P content: legacy Laravel route-name / path links → Next routes.

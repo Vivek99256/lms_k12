@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Download, FileText, Loader2, Printer, Search } from 'lucide-react';
+import { Download, FileDown, FileText, Loader2, Printer, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,10 +17,26 @@ import {
   SectionPanel,
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
-import { downloadFile, escapeCsv, getStoredAcademicYears, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
+import { downloadFile, escapeCsv, exportRowsToPdf, getStoredAcademicYears, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
 
 type StatusOption = { id: string; label: string };
 type Row = { itemCode: string; title: string; collectionType: string; remarks: string; itemStatus: string };
+
+function printRows(rows: Row[]) {
+  const html = `<html><head><title>Lost & Damage Report</title><style>
+  body { font-family: Arial, sans-serif; padding: 24px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
+  th { background: #f1f5f9; }
+  </style></head><body><h2>Lost & Damage Report</h2><table><thead><tr><th>Sr No</th><th>Item Code</th><th>Title</th><th>Collection Type</th><th>Remarks</th><th>Item Status</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td><td>${row.remarks || '-'}</td><td>${row.itemStatus || '-'}</td></tr>`).join('')}</tbody></table></body></html>`;
+  const printWindow = window.open('', '_blank', 'width=1200,height=900');
+  if (!printWindow) return;
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
 
 function parseRows(payload: Record<string, unknown>): Row[] {
   return toArray(payload.bookdata).map((item) => {
@@ -126,7 +142,8 @@ export default function LostDamageReportPage() {
             const lines = [headers.join('\t'), ...exportRows.map((row) => headers.map((header) => row[header] ?? '').join('\t'))];
             downloadFile('lost-damage-report.xls', lines.join('\n'), 'application/vnd.ms-excel');
           }}><FileText className="h-4 w-4" />Excel</Button>
-          <Button type="button" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</Button>
+          <Button type="button" variant="outline" onClick={() => void exportRowsToPdf('lost-damage-report', 'Lost & Damage Report', exportRows)}><FileDown className="h-4 w-4" />PDF</Button>
+          <Button type="button" variant="outline" onClick={() => printRows(filteredRows)}><Printer className="h-4 w-4" />Print</Button>
         </div>}
       />
       {message ? <InlineMessage type={message.type} text={message.text} /> : null}
