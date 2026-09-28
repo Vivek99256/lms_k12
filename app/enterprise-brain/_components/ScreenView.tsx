@@ -1,12 +1,27 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { fetchScreen } from '@/lib/brain/api';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import { toWidgetId, type DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 import { useBrainResource } from './useBrainResource';
 import {
   BreakdownBars, Card, DataTable, ErrorState, LoadingState, MetricTiles, Panel, HeroHeader,
 } from './primitives';
+
+/**
+ * Widget ids for the parts of a registry screen a user can hide for themselves,
+ * built from the server's own keys. Ids are stored per user — don't change how
+ * they are derived.
+ */
+const widgetId = {
+  metric: (key: string) => toWidgetId('kpi', key),
+  breakdown: (key: string) => toWidgetId('chart', `breakdown-${key}`),
+  series: (key: string) => toWidgetId('chart', key),
+  panel: (key: string) => toWidgetId('panel', key),
+};
 
 /**
  * The registry-driven Brain screen.
@@ -38,7 +53,28 @@ export default function ScreenView({
   const [applied, setApplied] = useState('');
   const resource = useBrainResource(() => fetchScreen(screen, applied), [screen, applied]);
 
-  if (resource.loading && !resource.data) {
+  // Everything on this screen a user can hide: one entry per metric, breakdown,
+  // series and panel the registry sent. Each screen keeps its own choices.
+  const widgets = useMemo(
+    (): DashboardWidget[] =>
+      resource.data
+        ? [
+            ...resource.data.metrics.map((metric) => ({ id: widgetId.metric(metric.key), label: metric.label, group: 'kpi' as const })),
+            ...resource.data.breakdowns.map((breakdown) => ({
+              id: widgetId.breakdown(breakdown.key),
+              label: breakdown.title,
+              group: 'chart' as const,
+            })),
+            ...resource.data.series.map((series) => ({ id: widgetId.series(series.key), label: series.title, group: 'chart' as const })),
+            ...resource.data.panels.map((panel) => ({ id: widgetId.panel(panel.key), label: panel.title, group: 'panel' as const })),
+          ]
+        : [],
+    [resource.data],
+  );
+  const prefs = useDashboardPreferences(toWidgetId('brain', screen), widgets);
+
+  // Wait for the user's layout too, so hidden widgets never flash in.
+  if ((resource.loading && !resource.data) || !prefs.ready) {
     return (
       <div className="p-1">
         <LoadingState label="Loading Enterprise Brain screen" />
@@ -56,6 +92,14 @@ export default function ScreenView({
 
   const data = resource.data;
   if (!data) return null;
+
+  const show = prefs.isVisible;
+  const metrics = data.metrics.filter((metric) => show(widgetId.metric(metric.key)));
+  const breakdowns = data.breakdowns.filter((breakdown) => show(widgetId.breakdown(breakdown.key)));
+  const seriesList = data.series.filter((series) => show(widgetId.series(series.key)));
+  const panels = data.panels.filter((panel) => show(widgetId.panel(panel.key)));
+  // A lone breakdown left after hiding the others takes the full row instead of leaving a gap.
+  const breakdownCols = breakdowns.length === 1 && data.breakdowns.length > 1 ? '' : 'lg:grid-cols-2';
 
   return (
     <div className="pb-8">
@@ -91,6 +135,11 @@ export default function ScreenView({
               <RefreshCw size={14} className={resource.refreshing ? 'animate-spin' : ''} />
               Refresh
             </button>
+            <CustomizeDashboard
+              widgets={widgets}
+              {...prefs.customizeProps}
+              className="h-auto rounded-xl border-slate-600 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 hover:border-slate-500 hover:bg-slate-800 hover:text-white"
+            />
           </div>
         }
       />
@@ -103,11 +152,13 @@ export default function ScreenView({
         </div>
       )}
 
-      <MetricTiles metrics={data.metrics} />
+      {widgets.length > 0 && !prefs.hasVisible() && <AllWidgetsHiddenNotice />}
 
-      {data.breakdowns.length > 0 && (
-        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {data.breakdowns.map((breakdown) => (
+      <MetricTiles metrics={metrics} />
+
+      {breakdowns.length > 0 && (
+        <div className={`mb-6 grid grid-cols-1 gap-4 ${breakdownCols}`}>
+          {breakdowns.map((breakdown) => (
             <Panel key={breakdown.key} title={breakdown.title} available={breakdown.available}>
               <BreakdownBars data={breakdown.data} />
             </Panel>
@@ -115,9 +166,9 @@ export default function ScreenView({
         </div>
       )}
 
-      {data.series.length > 0 && (
+      {seriesList.length > 0 && (
         <div className="mb-6 grid grid-cols-1 gap-4">
-          {data.series.map((series) => (
+          {seriesList.map((series) => (
             <Panel key={series.key} title={series.title} available={series.available} count={series.points.length}>
               {series.points.length ? (
                 <div className="flex items-end gap-1 px-4 py-4" style={{ height: '9rem' }}>
@@ -141,13 +192,15 @@ export default function ScreenView({
         </div>
       )}
 
-      <div className="space-y-4">
-        {data.panels.map((panel) => (
-          <Panel key={panel.key} title={panel.title} table={panel.table} count={panel.count} available={panel.available}>
-            <DataTable columns={panel.columns} rows={panel.rows} />
-          </Panel>
-        ))}
-      </div>
+      {panels.length > 0 && (
+        <div className="space-y-4">
+          {panels.map((panel) => (
+            <Panel key={panel.key} title={panel.title} table={panel.table} count={panel.count} available={panel.available}>
+              <DataTable columns={panel.columns} rows={panel.rows} />
+            </Panel>
+          ))}
+        </div>
+      )}
 
       {data.panels.length === 0 && data.metrics.length === 0 && (
         <Card className="p-6 text-sm text-slate-500">This screen has no data sources configured.</Card>

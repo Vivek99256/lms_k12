@@ -155,6 +155,26 @@ export interface DiagnosticConceptBreakdown {
   conceptExact: boolean;
 }
 
+/**
+ * One question's verdict in the post-submission review — title and
+ * correct/incorrect only, never the correct option or which option was
+ * chosen. Distinct from DiagnosticQuestionItem (the served paper): that one
+ * carries options with no verdict, this one carries a verdict with no
+ * options. The answer key still never crosses to the client, only the
+ * outcome does.
+ */
+export interface DiagnosticQuestionResult {
+  sequence: number;
+  questionId: string;
+  title: string;
+  difficulty: string;
+  conceptId: string | null;
+  conceptName: string | null;
+  answered: boolean;
+  /** null when unanswered — neither right nor wrong. */
+  isCorrect: boolean | null;
+}
+
 export interface ChapterDiagnosticResult {
   attemptId: string;
   chapterId: string;
@@ -170,6 +190,7 @@ export interface ChapterDiagnosticResult {
   conceptBreakdown: DiagnosticConceptBreakdown[];
   strengths: DiagnosticConceptBreakdown[];
   weaknesses: DiagnosticConceptBreakdown[];
+  questionResults: DiagnosticQuestionResult[];
   recommendedDifficulty: string;
   recommendedReason: string;
   submittedAt: string;
@@ -188,6 +209,22 @@ function readConcepts(value: unknown): DiagnosticConceptBreakdown[] {
       percentage: readNumber(row.percentage),
       band: readString(row.band),
       conceptExact: row.concept_exact === true || readString(row.concept_exact) === '1',
+    };
+  });
+}
+
+function readQuestionResults(value: unknown): DiagnosticQuestionResult[] {
+  return toArray(value).map((entry) => {
+    const row = toRecord(entry);
+    return {
+      sequence: readNumber(row.sequence),
+      questionId: readString(row.question_id),
+      title: readString(row.title),
+      difficulty: readString(row.difficulty),
+      conceptId: row.concept_id == null ? null : readString(row.concept_id),
+      conceptName: row.concept_name == null ? null : readString(row.concept_name),
+      answered: row.answered === true,
+      isCorrect: row.is_correct == null ? null : row.is_correct === true,
     };
   });
 }
@@ -228,6 +265,7 @@ function readResult(data: Record<string, unknown>): ChapterDiagnosticResult {
     conceptBreakdown: readConcepts(data.concept_breakdown),
     strengths: readConcepts(data.strengths),
     weaknesses: readConcepts(data.weaknesses),
+    questionResults: readQuestionResults(data.question_results),
     recommendedDifficulty: readString(data.recommended_difficulty),
     recommendedReason: readString(data.recommended_reason),
     submittedAt: readString(data.submitted_at),
@@ -576,7 +614,8 @@ export type PracticeNextAction =
   | 'continue_practice'
   | 'advance_band'
   | 'mastery_check'
-  | 'mastered';
+  | 'mastered'
+  | 'escalate';
 
 export interface PracticeNext {
   action: PracticeNextAction | string;
@@ -1143,6 +1182,21 @@ export interface LearnResources {
   notes: string[];
 }
 
+/**
+ * A corrective already routed to this learner for this concept by
+ * MisconceptionLibraryService — fired when a wrong answer (diagnostic or
+ * adaptive practice) matches a known misconception — and not yet marked
+ * resolved. See palController::learnContent()'s own note on this field.
+ */
+export interface ConceptLearnMisconception {
+  misconceptionTag: string;
+  title: string;
+  body: string | null;
+  mediaUrl: string | null;
+  format: string | null;
+  servedAt: string | null;
+}
+
 export interface ConceptLearn {
   status: number;
   conceptId: number;
@@ -1156,8 +1210,24 @@ export interface ConceptLearn {
   content: LearnContent | null;
   /** Every other resource for this concept, grouped by kind. */
   resources: LearnResources;
+  /** What tripped this learner up here, and the corrective for it. */
+  misconceptions: ConceptLearnMisconception[];
   reason: string | null;
   message: string;
+}
+
+function readMisconceptions(raw: unknown): ConceptLearnMisconception[] {
+  return toArray(raw).map((entry) => {
+    const row = toRecord(entry);
+    return {
+      misconceptionTag: readString(row.misconception_tag),
+      title: readString(row.title),
+      body: row.body == null ? null : readString(row.body),
+      mediaUrl: row.media_url == null ? null : readString(row.media_url),
+      format: row.format == null ? null : readString(row.format),
+      servedAt: row.served_at == null ? null : readString(row.served_at),
+    };
+  });
 }
 
 const EMPTY_RESOURCES: LearnResources = {
@@ -1304,6 +1374,7 @@ export async function fetchConceptLearn(
         }
       : null,
     resources: readResources(payload.resources),
+    misconceptions: readMisconceptions(payload.misconceptions),
     reason: payload.reason == null ? null : readString(payload.reason),
     message: readString(payload.message),
   };

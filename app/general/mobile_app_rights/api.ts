@@ -94,6 +94,10 @@ export type MobileRightsRow = {
   status: string;
 };
 
+export type MobileRenderType = "native" | "webview" | "native_dynamic";
+export type MobileOpenMode = "in_app" | "external";
+export type MobilePageSource = "external" | "custom";
+
 export type MobileConfigRecord = {
   id: number;
   userProfileName: string;
@@ -106,6 +110,11 @@ export type MobileConfigRecord = {
   subTitleSortOrder: number;
   status: string;
   screenName: string;
+  renderType: MobileRenderType;
+  webUrl: string;
+  openMode: MobileOpenMode;
+  pageSource: MobilePageSource;
+  customPageId: number | null;
 };
 
 export type MobileConfigUpdateInput = {
@@ -118,6 +127,11 @@ export type MobileConfigUpdateInput = {
   subTitleIcon: string;
   subTitleSortOrder: number;
   status: "Yes" | "No";
+  renderType: MobileRenderType;
+  webUrl: string;
+  openMode: MobileOpenMode;
+  pageSource: MobilePageSource;
+  customPageId: number | null;
 };
 
 function permissionSet(value: unknown): MobileAppRightsPermissionSet {
@@ -167,6 +181,15 @@ function rightsRow(row: RecordValue): MobileRightsRow {
   };
 }
 
+function renderType(value: unknown): MobileRenderType {
+  const normalized = readString(value).trim();
+  return normalized === "webview" || normalized === "native_dynamic" ? normalized : "native";
+}
+
+function pageSource(value: unknown): MobilePageSource {
+  return readString(value).trim() === "custom" ? "custom" : "external";
+}
+
 function configRecord(row: RecordValue): MobileConfigRecord {
   return {
     id: readNumber(row.id),
@@ -180,6 +203,11 @@ function configRecord(row: RecordValue): MobileConfigRecord {
     subTitleSortOrder: readNumber(row.sub_title_sort_order),
     status: readString(row.status).trim(),
     screenName: readString(row.screen_name).trim(),
+    renderType: renderType(row.render_type),
+    webUrl: readString(row.web_url).trim(),
+    openMode: readString(row.open_mode).trim() === "external" ? "external" : "in_app",
+    pageSource: pageSource(row.page_source),
+    customPageId: row.custom_page_id ? readNumber(row.custom_page_id) : null,
   };
 }
 
@@ -245,7 +273,41 @@ export async function updateMobileConfig(id: number, input: MobileConfigUpdateIn
       sub_title_icon: input.subTitleIcon,
       sub_title_sort_order: input.subTitleSortOrder,
       status: input.status,
+      render_type: input.renderType,
+      web_url: input.webUrl,
+      open_mode: input.openMode,
+      page_source: input.pageSource,
+      custom_page_id: input.customPageId,
     }),
   });
   return message(payload, "Mobile App Menu Rights Updated Successfully");
+}
+
+// Unlike updateMobileConfig, which only ever edits a screen_name row that
+// already exists, this creates a brand-new home screen icon -- needed
+// because the ~46 rows this module manages were seeded once, in 2020, and
+// a menu like "Admission Enquiry" that was never among them otherwise has
+// no row to attach a Custom Mobile Page to.
+export async function createMobileConfig(input: MobileConfigUpdateInput): Promise<{ message: string; id: number }> {
+  const payload = await request("mobile-app-rights/config", {
+    method: "POST",
+    body: body({
+      profile_name: input.profileName,
+      main_title: input.mainTitle,
+      main_title_color_code: input.mainTitleColorCode,
+      main_title_background_image: input.mainTitleBackgroundImage,
+      main_sort_order: input.mainSortOrder,
+      sub_title_of_main: input.subTitleOfMain,
+      sub_title_icon: input.subTitleIcon,
+      sub_title_sort_order: input.subTitleSortOrder,
+      status: input.status,
+      render_type: input.renderType,
+      web_url: input.webUrl,
+      open_mode: input.openMode,
+      page_source: input.pageSource,
+      custom_page_id: input.customPageId,
+    }),
+  });
+  const data = isRecord(payload.data) ? payload.data : {};
+  return { message: message(payload, "Mobile app menu item created successfully."), id: readNumber(data.id) };
 }

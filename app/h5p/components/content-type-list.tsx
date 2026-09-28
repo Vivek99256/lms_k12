@@ -213,7 +213,11 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
-  const contextQuery = h5pContextQuery(ctx);
+  // Carried through to the "Add" link below so Back on the create page can
+  // return past this list, straight to wherever this list itself was opened
+  // from (the Question Bank's "Create H5P content" menu, for one).
+  const returnTo = searchParams?.get('return_to') || null;
+  const contextQuery = h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const [rows, setRows] = useState<TRow[]>([]);

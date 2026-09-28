@@ -15,7 +15,12 @@ import './h5p.css';
  * WHY NOT IMPORT IT FROM EACH PLAYER. Fourteen imports of the same file is one
  * import in the output, so it would work -- but a new player is then one
  * forgotten line away from rendering unstyled, and the failure looks like a
- * broken activity rather than a missing import.
+ * broken activity rather than a missing import. (This import only reaches
+ * the standalone `/h5p/...` routes. A caller that embeds these players from
+ * outside this segment -- PAL, homework, the question bank quiz, all via
+ * `components/h5p/players/` -- gets the stylesheet from the single import in
+ * `components/h5p/players/shared.tsx` instead, which every player there
+ * imports.)
  *
  * This is a server component and holds no state, so it adds nothing to the
  * client bundle.

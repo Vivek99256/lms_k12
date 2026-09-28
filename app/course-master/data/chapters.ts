@@ -1067,6 +1067,9 @@ export interface QuestionTypeCatalogEntry {
   exam_section?: string | null;
   default_marks?: number | null;
   is_standard?: number;
+  /** The coarse type this form belongs to (1 = MCQ, 2 = Narrative), for
+   *  filtering the Format dropdown by the Question Type already chosen. */
+  lms_question_type_id?: number | null;
   /** Set when this form belongs to one publisher rather than the standard set. */
   publisher?: string | null;
   total?: number;
@@ -1198,6 +1201,49 @@ export async function fetchQuestionBank(chapterId: number): Promise<QuestionBank
   };
 }
 
+export interface CreateQuestionBankPayload {
+  chapter_id: number;
+  subject_id: number;
+  standard_id: number;
+  sub_institute_id: number;
+  question: string;
+  question_type: 'MCQ' | 'Narrative';
+  marks: number;
+  concept_id?: number | null;
+  concept?: string | null;
+  model_answer?: string | null;
+  question_type_code?: string | null;
+  /** Set together: the question's content lives in this h5p_<type> row
+   *  rather than in `options`/`model_answer`, which are omitted entirely. */
+  h5p_content_type?: string | null;
+  h5p_content_id?: number | null;
+  options?: Array<{ label: string; text: string; is_correct: boolean }>;
+}
+
+/**
+ * Insert a brand-new Question Bank question. Previously there was no such
+ * endpoint -- a newly "added" question only ever lived in local React state
+ * and vanished on refresh. Also what an H5P-authored question calls, once the
+ * H5P content itself has already been created and its id is known.
+ */
+export async function createQuestionBankQuestion(
+  payload: CreateQuestionBankPayload
+): Promise<{ id: number }> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-question-bank/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await readApiJson(res, 'Failed to add the question');
+  if (!res.ok || raw.status === false) {
+    throw new Error(getApiErrorMessage(raw, 'Failed to add the question'));
+  }
+
+  const data = raw.data as { id?: number } | undefined;
+  return { id: Number(data?.id ?? 0) };
+}
+
 export interface UpdateQuestionBankPayload {
   id: number;
   sub_institute_id: number;
@@ -1207,6 +1253,12 @@ export interface UpdateQuestionBankPayload {
   concept_id?: number | null;
   concept?: string | null;
   model_answer?: string | null;
+  /** question_type_catalog.code picked in the Question Format dropdown. Same
+   *  field an extracted question reports read-only as question_type_code
+   *  (QuestionBankApiQuestion above) -- a manual edit now writes it too, just
+   *  to lms_question_master.question_format_code rather than the extraction
+   *  sidecar. */
+  question_type_code?: string | null;
   options?: Array<{ label: string; text: string; is_correct: boolean }>;
 }
 

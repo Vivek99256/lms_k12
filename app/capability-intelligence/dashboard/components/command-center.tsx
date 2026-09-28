@@ -32,7 +32,6 @@ import { useRouter } from 'next/navigation'
 import {
   BookOpen, Layers, Briefcase, ClipboardCheck, Award, User, Target,
   Filter, Plus, Clock, Users, ArrowRight, CalendarDays, RotateCcw, Network, type LucideIcon } from 'lucide-react'
-import { ComingSoonTile } from '@/components/ui/coming-soon'
 import { Button } from '@/components/ui/g2g/button'
 import { Select } from '@/components/ui/g2g/select'
 import { Input } from '@/components/ui/g2g/input'
@@ -47,6 +46,30 @@ import { useCompetencyCommandCenter } from '../../_lib/use-command-center'
 import type {
   CompetencyFilters, CompetencyFilterOption, QuickCreateKind,
 } from '../../_lib/command-center-api'
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard'
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences'
+import { toWidgetId, type DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences'
+
+/* ---- per-user customisation ---- */
+
+/**
+ * The fixed sections of this dashboard a user can hide for themselves; the
+ * KPI tiles and progress rings are added from the API data in CommandCenter.
+ * Ids are stored per user — don't rename them.
+ */
+const COMMAND_CENTER_PANELS = [
+  { id: 'panel.work_queues', label: 'Work queues', group: 'panel' },
+  { id: 'panel.recent_activity', label: 'Recent activity', group: 'panel' },
+  { id: 'panel.quick_actions', label: 'Quick actions', group: 'panel' },
+  { id: 'panel.assessment_calendar', label: 'Assessment calendar (next 60 days)', group: 'panel' },
+] as const satisfies readonly DashboardWidget[]
+
+// Work queues, recent activity and quick actions share one row; however many are left fill it.
+const LOWER_GRID_COLUMNS: Record<number, string> = {
+  1: 'lg:grid-cols-1',
+  2: 'lg:grid-cols-2',
+  3: 'lg:grid-cols-3',
+}
 
 /* ---- static presentation maps (icons/colours keyed by backend keys) ---- */
 
@@ -371,6 +394,23 @@ export function CommandCenter() {
     loading, error, data, filterOptions, creating, actionMessage, actionError, retry, create, clearMessages,
   } = useCompetencyCommandCenter(filters)
 
+  // Everything on this dashboard a user can hide for themselves. KPI tiles and
+  // progress rings come from the API, so their ids are built from its stable keys.
+  const widgets = React.useMemo<DashboardWidget[]>(
+    () =>
+      data
+        ? [
+            ...data.summary.map((metric) => ({ id: toWidgetId('kpi', metric.key), label: metric.label, group: 'kpi' as const })),
+            ...data.progress.map((prog) => ({ id: toWidgetId('chart', prog.key), label: prog.title, group: 'chart' as const })),
+            ...COMMAND_CENTER_PANELS,
+          ]
+        : [],
+    [data],
+  )
+  const prefs = useDashboardPreferences('capability.command-center', widgets)
+  const show = prefs.isVisible
+  const lowerPanelCount = ['panel.work_queues', 'panel.recent_activity', 'panel.quick_actions'].filter((id) => show(id)).length
+
   const setFilter = (key: keyof CompetencyFilters) => (value: string) => {
     setFilters((prev) => {
       const next = { ...prev }
@@ -406,12 +446,17 @@ export function CommandCenter() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
-        <Button
-          onClick={() => openCreate('competency')}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-xl h-10 px-4 shadow-md shadow-primary/20 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" /> Create New
-        </Button>
+        <div className="flex items-center gap-2">
+          {prefs.ready && (
+            <CustomizeDashboard widgets={widgets} {...prefs.customizeProps} size="lg" className="h-10 rounded-xl" />
+          )}
+          <Button
+            onClick={() => openCreate('competency')}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-xl h-10 px-4 shadow-md shadow-primary/20 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" /> Create New
+          </Button>
+        </div>
       </div>
 
       {/* Action feedback */}
@@ -462,191 +507,199 @@ export function CommandCenter() {
           retry={retry}
           className="my-8"
         />
-      ) : loading && !data ? (
+      ) : (loading && !data) || !prefs.ready ? (
+        // Wait for the user's layout too, so hidden widgets never flash in.
         <DashboardSkeleton />
       ) : data ? (
         <>
+          {!prefs.hasVisible() && <AllWidgetsHiddenNotice />}
+
           {/* Summary Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {data.summary.map((metric) => {
-              const Icon = SUMMARY_ICONS[metric.key] ?? BookOpen
-              return (
-                <div key={metric.key} className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-2xl p-4 shadow-sm flex flex-col items-center justify-center text-center gap-2 group hover:shadow-md transition-all">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-1">
-                    <Icon className="w-5 h-5" />
+          {prefs.hasVisible('kpi') && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {data.summary.filter((metric) => show(toWidgetId('kpi', metric.key))).map((metric) => {
+                const Icon = SUMMARY_ICONS[metric.key] ?? BookOpen
+                return (
+                  <div key={metric.key} className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-2xl p-4 shadow-sm flex flex-col items-center justify-center text-center gap-2 group hover:shadow-md transition-all">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-1">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="text-2xl font-bold text-foreground leading-none">{nf(metric.value)}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{metric.label}</div>
+                    <div className="text-xs text-muted-foreground">{metric.desc}</div>
+                    <button
+                      onClick={() => go(SUMMARY_TARGET[metric.key] ?? 'cm-competency-library')}
+                      className="text-[10px] text-primary font-bold hover:underline mt-1 opacity-70 group-hover:opacity-100 transition-opacity"
+                    >
+                      View all
+                    </button>
                   </div>
-                  <div className="text-2xl font-bold text-foreground leading-none">{nf(metric.value)}</div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{metric.label}</div>
-                  <div className="text-xs text-muted-foreground">{metric.desc}</div>
-                  <button
-                    onClick={() => go(SUMMARY_TARGET[metric.key] ?? 'cm-competency-library')}
-                    className="text-[10px] text-primary font-bold hover:underline mt-1 opacity-70 group-hover:opacity-100 transition-opacity"
-                  >
-                    View all
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Personalisation is coming to every dashboard at once, via the shared
-              Dashboard Engine, rather than being rebuilt per screen. Stated here
-              because this is one of the three dashboards that engine replaces.
-
-              Note this is the one call site that is not a grid cell — the parent
-              is a flex column. The tile takes its height from its container, so
-              it needs nothing extra here. */}
-          <ComingSoonTile roadmapId="dashboard.personalization" />
+                )
+              })}
+            </div>
+          )}
 
           {/* Progress Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {data.progress.map((prog) => (
-              <div key={prog.key} className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-2xl p-5 shadow-sm flex items-center gap-5">
-                <div className="relative w-16 h-16 flex-shrink-0">
-                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                    <path className="text-muted/30" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path className={PROGRESS_COLORS[prog.key] ?? 'text-primary'} strokeWidth="3" strokeDasharray={`${prog.percent}, 100`} strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-foreground">
-                    {prog.percent}%
+          {prefs.hasVisible('chart') && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {data.progress.filter((prog) => show(toWidgetId('chart', prog.key))).map((prog) => (
+                <div key={prog.key} className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-2xl p-5 shadow-sm flex items-center gap-5">
+                  <div className="relative w-16 h-16 flex-shrink-0">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                      <path className="text-muted/30" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                      <path className={PROGRESS_COLORS[prog.key] ?? 'text-primary'} strokeWidth="3" strokeDasharray={`${prog.percent}, 100`} strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-foreground">
+                      {prog.percent}%
+                    </div>
+                  </div>
+                  <div className="flex flex-col flex-1">
+                    <div className="text-xs font-bold text-muted-foreground mb-1">{prog.title}</div>
+                    <div className="text-lg font-bold text-foreground leading-tight">{nf(prog.current)} / {nf(prog.total)}</div>
+                    <div className="text-xs text-muted-foreground">{prog.sub}</div>
+                    <button
+                      onClick={() => go(PROGRESS_TARGET[prog.key] ?? 'cm-assessments')}
+                      className="text-[10px] text-primary font-bold hover:underline mt-2 self-start"
+                    >
+                      View details
+                    </button>
                   </div>
                 </div>
-                <div className="flex flex-col flex-1">
-                  <div className="text-xs font-bold text-muted-foreground mb-1">{prog.title}</div>
-                  <div className="text-lg font-bold text-foreground leading-tight">{nf(prog.current)} / {nf(prog.total)}</div>
-                  <div className="text-xs text-muted-foreground">{prog.sub}</div>
-                  <button
-                    onClick={() => go(PROGRESS_TARGET[prog.key] ?? 'cm-assessments')}
-                    className="text-[10px] text-primary font-bold hover:underline mt-2 self-start"
-                  >
-                    View details
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* Lower Grids */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Work Queues */}
-            <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-[24px] shadow-sm flex flex-col overflow-hidden">
-              <div className="px-5 py-4 border-b border-primary/5 bg-primary/5">
-                <h3 className="font-bold text-sm text-foreground">Work Queues</h3>
-              </div>
-              <div className="flex flex-col p-2">
-                {data.work_queues.map((wq) => {
-                  const Icon = QUEUE_ICONS[wq.key] ?? ClipboardCheck
-                  return (
-                    <button
-                      key={wq.key}
-                      onClick={() => go(QUEUE_TARGET[wq.key] ?? 'cm-assessments')}
-                      className="flex items-center justify-between p-3 rounded-xl hover:bg-primary/5 transition-colors group text-left"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <span className="text-sm font-medium text-foreground">{wq.label}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className={cn('font-bold text-sm', wq.count > 0 ? 'text-foreground' : 'text-muted-foreground')}>{nf(wq.count)}</span>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="px-5 py-3 border-t border-primary/5 mt-auto">
-                <button onClick={() => go('cm-assessments')} className="text-xs text-primary font-bold hover:underline">View all work queues</button>
-              </div>
-            </div>
-
-            {/* Recent Activity */}
-            <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-[24px] shadow-sm flex flex-col overflow-hidden">
-              <div className="px-5 py-4 border-b border-primary/5 bg-primary/5">
-                <h3 className="font-bold text-sm text-foreground">Recent Activity</h3>
-              </div>
-              {data.recent_activity.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center p-8">
-                  <EmptyState icon={<Clock className="w-6 h-6" />} title="No recent activity" className="border-0 py-8" />
-                </div>
-              ) : (
-                <div className="flex flex-col p-5 gap-5">
-                  {data.recent_activity.map((activity) => (
-                    <div key={activity.id} className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0 mt-0.5">
-                        {(activity.user || '?').charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex flex-col flex-1 gap-0.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-foreground">{activity.user}</span>
-                          <span className="text-[10px] font-medium text-muted-foreground">{activity.time}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">{activity.action}</span>
-                      </div>
-                    </div>
-                  ))}
+          {lowerPanelCount > 0 && (
+            <div className={cn('grid grid-cols-1 gap-6', LOWER_GRID_COLUMNS[lowerPanelCount])}>
+              {/* Work Queues */}
+              {show('panel.work_queues') && (
+                <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-[24px] shadow-sm flex flex-col overflow-hidden">
+                  <div className="px-5 py-4 border-b border-primary/5 bg-primary/5">
+                    <h3 className="font-bold text-sm text-foreground">Work Queues</h3>
+                  </div>
+                  <div className="flex flex-col p-2">
+                    {data.work_queues.map((wq) => {
+                      const Icon = QUEUE_ICONS[wq.key] ?? ClipboardCheck
+                      return (
+                        <button
+                          key={wq.key}
+                          onClick={() => go(QUEUE_TARGET[wq.key] ?? 'cm-assessments')}
+                          className="flex items-center justify-between p-3 rounded-xl hover:bg-primary/5 transition-colors group text-left"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm font-medium text-foreground">{wq.label}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={cn('font-bold text-sm', wq.count > 0 ? 'text-foreground' : 'text-muted-foreground')}>{nf(wq.count)}</span>
+                            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="px-5 py-3 border-t border-primary/5 mt-auto">
+                    <button onClick={() => go('cm-assessments')} className="text-xs text-primary font-bold hover:underline">View all work queues</button>
+                  </div>
                 </div>
               )}
-              <div className="px-5 py-3 border-t border-primary/5 mt-auto">
-                <button onClick={() => go('cm-audit')} className="text-xs text-primary font-bold hover:underline">View all activity</button>
-              </div>
-            </div>
 
-            {/* Quick Actions */}
-            <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-[24px] shadow-sm flex flex-col overflow-hidden">
-              <div className="px-5 py-4 border-b border-primary/5 bg-primary/5">
-                <h3 className="font-bold text-sm text-foreground">Quick Actions</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-3 p-5">
-                {QUICK_ACTIONS.map((qa) => (
-                  <button
-                    key={qa.label}
-                    onClick={() => openCreate(qa.kind)}
-                    className="flex flex-col items-center justify-center gap-3 p-4 h-auto rounded-lg border border-primary/10 bg-background/50 hover:bg-primary/5 hover:border-primary/30 transition-all group text-center"
-                  >
-                    <qa.icon className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                    <span className="text-xs font-bold text-foreground">{qa.label}</span>
-                  </button>
-                ))}
-              </div>
+              {/* Recent Activity */}
+              {show('panel.recent_activity') && (
+                <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-[24px] shadow-sm flex flex-col overflow-hidden">
+                  <div className="px-5 py-4 border-b border-primary/5 bg-primary/5">
+                    <h3 className="font-bold text-sm text-foreground">Recent Activity</h3>
+                  </div>
+                  {data.recent_activity.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center p-8">
+                      <EmptyState icon={<Clock className="w-6 h-6" />} title="No recent activity" className="border-0 py-8" />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col p-5 gap-5">
+                      {data.recent_activity.map((activity) => (
+                        <div key={activity.id} className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0 mt-0.5">
+                            {(activity.user || '?').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex flex-col flex-1 gap-0.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-bold text-foreground">{activity.user}</span>
+                              <span className="text-[10px] font-medium text-muted-foreground">{activity.time}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{activity.action}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="px-5 py-3 border-t border-primary/5 mt-auto">
+                    <button onClick={() => go('cm-audit')} className="text-xs text-primary font-bold hover:underline">View all activity</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Actions */}
+              {show('panel.quick_actions') && (
+                <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-[24px] shadow-sm flex flex-col overflow-hidden">
+                  <div className="px-5 py-4 border-b border-primary/5 bg-primary/5">
+                    <h3 className="font-bold text-sm text-foreground">Quick Actions</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 p-5">
+                    {QUICK_ACTIONS.map((qa) => (
+                      <button
+                        key={qa.label}
+                        onClick={() => openCreate(qa.kind)}
+                        className="flex flex-col items-center justify-center gap-3 p-4 h-auto rounded-lg border border-primary/10 bg-background/50 hover:bg-primary/5 hover:border-primary/30 transition-all group text-center"
+                      >
+                        <qa.icon className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                        <span className="text-xs font-bold text-foreground">{qa.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Assessment Calendar Bottom Bar */}
-          <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-2xl shadow-sm p-4 flex items-center justify-between mt-2">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                <CalendarDays className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-foreground">
-                  Assessment Calendar (Next 60 Days)
-                  {data.assessment_calendar.upcoming_count > 0 && (
-                    <span className="ml-2 text-xs font-medium text-muted-foreground">· {nf(data.assessment_calendar.upcoming_count)} upcoming</span>
-                  )}
-                </span>
-                {data.assessment_calendar.cycle ? (
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <div className="w-2 h-2 rounded-full bg-primary" />
-                    <span className="text-xs font-medium text-muted-foreground">{data.assessment_calendar.cycle.name}</span>
-                    {data.assessment_calendar.cycle.range_label && (
-                      <span className="text-xs text-muted-foreground ml-2">{data.assessment_calendar.cycle.range_label}</span>
+          {show('panel.assessment_calendar') && (
+            <div className="bg-card/90 backdrop-blur-2xl border border-primary/10 rounded-2xl shadow-sm p-4 flex items-center justify-between mt-2">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                  <CalendarDays className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-foreground">
+                    Assessment Calendar (Next 60 Days)
+                    {data.assessment_calendar.upcoming_count > 0 && (
+                      <span className="ml-2 text-xs font-medium text-muted-foreground">· {nf(data.assessment_calendar.upcoming_count)} upcoming</span>
                     )}
-                  </div>
-                ) : (
-                  <span className="text-xs text-muted-foreground mt-0.5">No active assessment cycle</span>
-                )}
+                  </span>
+                  {data.assessment_calendar.cycle ? (
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                      <span className="text-xs font-medium text-muted-foreground">{data.assessment_calendar.cycle.name}</span>
+                      {data.assessment_calendar.cycle.range_label && (
+                        <span className="text-xs text-muted-foreground ml-2">{data.assessment_calendar.cycle.range_label}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground mt-0.5">No active assessment cycle</span>
+                  )}
+                </div>
               </div>
+              <Button
+                variant="outline"
+                onClick={() => go('cm-assessments')}
+                className="h-9 rounded-lg font-bold text-xs bg-background"
+              >
+                <CalendarDays className="w-3.5 h-3.5 mr-2" /> View Calendar
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => go('cm-assessments')}
-              className="h-9 rounded-lg font-bold text-xs bg-background"
-            >
-              <CalendarDays className="w-3.5 h-3.5 mr-2" /> View Calendar
-            </Button>
-          </div>
+          )}
         </>
       ) : null}
 

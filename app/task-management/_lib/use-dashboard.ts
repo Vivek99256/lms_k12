@@ -133,12 +133,13 @@ export function useDashboard() {
     [refresh],
   )
 
+  // `id` is stable - the dashboard stores per-user show/hide choices against it.
   const cards = useMemo(
     () => [
-      { title: 'Active Tasks', value: summary.active, subtitle: 'Open work across this scope' },
-      { title: 'Pending Review', value: summary.pending_review, subtitle: 'Awaiting owner approval' },
-      { title: 'Blocked / Overdue', value: summary.blocked_overdue, subtitle: 'Requires attention' },
-      { title: 'Completed', value: summary.completed_this_month, subtitle: 'Finished this month' },
+      { id: 'active_tasks', title: 'Active Tasks', value: summary.active, subtitle: 'Open work across this scope' },
+      { id: 'pending_review', title: 'Pending Review', value: summary.pending_review, subtitle: 'Awaiting owner approval' },
+      { id: 'blocked_overdue', title: 'Blocked / Overdue', value: summary.blocked_overdue, subtitle: 'Requires attention' },
+      { id: 'completed', title: 'Completed', value: summary.completed_this_month, subtitle: 'Finished this month' },
     ],
     [summary],
   )

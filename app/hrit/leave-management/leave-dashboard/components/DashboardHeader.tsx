@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { getGreeting } from '@/app/hrit/_lib/hrit-utils'
 
@@ -12,9 +12,11 @@ interface DashboardHeaderProps {
   userName: string
   currentDate: string
   upcomingLeaves: EmployeeLeave[]
+  /** Extra header buttons, shown beside the calendar button. */
+  actions?: ReactNode
 }
 
-export function DashboardHeader({ userName, currentDate, upcomingLeaves }: DashboardHeaderProps) {
+export function DashboardHeader({ userName, currentDate, upcomingLeaves, actions }: DashboardHeaderProps) {
   const [calendarOpen, setCalendarOpen] = useState(false)
 
   return (
@@ -29,18 +31,21 @@ export function DashboardHeader({ userName, currentDate, upcomingLeaves }: Dashb
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          className="h-14 justify-between gap-3 rounded-2xl border-border/80 bg-card px-4 text-base font-semibold shadow-sm sm:min-w-72"
-          onClick={() => setCalendarOpen(true)}
-          aria-label="Open monthly leave calendar"
-        >
-          <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
-            L
-          </span>
-          <span className="flex-1 text-left">{currentDate}</span>
-          <ChevronDown className="size-4 text-muted-foreground" />
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {actions}
+          <Button
+            variant="outline"
+            className="h-14 justify-between gap-3 rounded-2xl border-border/80 bg-card px-4 text-base font-semibold shadow-sm sm:min-w-72"
+            onClick={() => setCalendarOpen(true)}
+            aria-label="Open monthly leave calendar"
+          >
+            <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+              L
+            </span>
+            <span className="flex-1 text-left">{currentDate}</span>
+            <ChevronDown className="size-4 text-muted-foreground" />
+          </Button>
+        </div>
       </header>
 
       <LeaveCalendarDrawer

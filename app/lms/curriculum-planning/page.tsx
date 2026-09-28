@@ -18,7 +18,6 @@ import type {
   CurriculumPlanningApiData,
   CurriculumPlanningApiResponse,
   Lesson,
-  Stat,
   SubjectPlan,
   SubjectProgressDetail,
   UpcomingLessonRow,
@@ -33,8 +32,10 @@ import {
 import { AddTopicDialog, EditTopicDialog, FilterSyllabusDialog } from './dialogs';
 import { AllUpcomingLessonsView } from './UpcomingLessonsView';
 import { SubjectProgressDetailsView } from './SubjectProgressView';
-import { OverviewTab } from './OverviewTab';
+import { OVERVIEW_WIDGETS, OverviewTab, type OverviewStat } from './OverviewTab';
 import { CurriculumTab } from './CurriculumTab';
+import { CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
 
 type TabKey = 'overview' | 'curriculum';
 
@@ -50,6 +51,8 @@ export default function CurriculumPlanningPage() {
   const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = useState(false);
   const [isUpcomingLessonsViewOpen, setIsUpcomingLessonsViewOpen] = useState(false);
   const [isSubjectProgressViewOpen, setIsSubjectProgressViewOpen] = useState(false);
+  // Only the Overview tab is customisable; the Curriculum tab is a tree, not widgets.
+  const prefs = useDashboardPreferences('lms.curriculum-overview', OVERVIEW_WIDGETS);
 
   const session = useLmsSessionContext();
 
@@ -137,14 +140,14 @@ export default function CurriculumPlanningPage() {
     });
   }, [apiData, monthKeys]);
 
-  const stats: Stat[] = useMemo(() => {
+  const stats: OverviewStat[] = useMemo(() => {
     if (!apiData) return [];
     const s = apiData.stats;
     return [
-      { label: 'Total topics', value: String(s.total_topics), helper: `across ${apiData.subjects.length} subjects`, progress: 100, color: '#d8d4ce' },
-      { label: 'Completed', value: String(s.completed), helper: `${s.completion_percent}% of periods done`, progress: s.completion_percent, color: '#1aa179' },
-      { label: 'In progress', value: String(s.in_progress), helper: 'currently being taught', progress: Math.min(100, s.in_progress > 0 ? Math.round((s.in_progress / Math.max(1, s.completed + s.in_progress)) * 100) : 0), color: '#2f7dd9' },
-      { label: 'Weeks remaining', value: String(s.weeks_remaining), helper: 'in this term', progress: Math.max(0, 100 - s.completion_percent), color: '#b87916' },
+      { id: 'kpi.total_topics', label: 'Total topics', value: String(s.total_topics), helper: `across ${apiData.subjects.length} subjects`, progress: 100, color: '#d8d4ce' },
+      { id: 'kpi.completed', label: 'Completed', value: String(s.completed), helper: `${s.completion_percent}% of periods done`, progress: s.completion_percent, color: '#1aa179' },
+      { id: 'kpi.in_progress', label: 'In progress', value: String(s.in_progress), helper: 'currently being taught', progress: Math.min(100, s.in_progress > 0 ? Math.round((s.in_progress / Math.max(1, s.completed + s.in_progress)) * 100) : 0), color: '#2f7dd9' },
+      { id: 'kpi.weeks_remaining', label: 'Weeks remaining', value: String(s.weeks_remaining), helper: 'in this term', progress: Math.max(0, 100 - s.completion_percent), color: '#b87916' },
     ];
   }, [apiData]);
 
@@ -283,6 +286,9 @@ export default function CurriculumPlanningPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {activeTab === 'overview' && prefs.ready && (
+            <CustomizeDashboard widgets={OVERVIEW_WIDGETS} {...prefs.customizeProps} size="lg" className="h-10" />
+          )}
           <button
             type="button"
             onClick={() => setIsFilterDialogOpen(true)}
@@ -339,6 +345,9 @@ export default function CurriculumPlanningPage() {
           loadError={loadError}
           onOpenUpcomingLessons={() => setIsUpcomingLessonsViewOpen(true)}
           onOpenSubjectProgress={() => setIsSubjectProgressViewOpen(true)}
+          ready={prefs.ready}
+          show={prefs.isVisible}
+          hasVisible={prefs.hasVisible}
         />
       ) : (
         <CurriculumTab

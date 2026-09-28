@@ -7,7 +7,7 @@ import { useBrainResource } from '@/app/enterprise-brain/_components/useBrainRes
 
 import type { ModuleIntelligenceContract, SectionKey } from './contract';
 import { timestamp } from './format';
-import { AccentButton, Surface, Unavailable } from './primitives';
+import { AccentButton, NoDataReasonProvider, Surface } from './primitives';
 import { IntelligenceSectionNav, SECTION_NAV_LABELS } from './section-nav';
 import {
   BreakdownsSection,
@@ -42,9 +42,14 @@ import {
  * arithmetic in this whole directory is the width of a bar.
  *
  * IT NEVER SHOWS A SECTION AS EMPTY WHEN IT IS ACTUALLY UNCHECKED. Every
- * section falls back to the backend's own `reason`, and `coverage.available`
- * gates the entire screen — so a year with no records says why, rather than
- * rendering eight confident zeroes.
+ * section falls back to the backend's own `reason`, so a year with no records
+ * says why rather than rendering eight confident zeroes.
+ *
+ * DATA CAN BE EMPTY; THE INTELLIGENCE UI MUST NOT BE. `coverage.available` used
+ * to gate the whole screen down to one card, which also took away the section
+ * nav, Module Integration and Cross-Module Workflow. Now the nav and the
+ * selected section always render, and an empty block shows the shared No Data
+ * state carrying the coverage reason.
  *
  * THE ACADEMIC YEAR IS THE HEADER'S. `useBrainResource` puts the selected year
  * in its cache key and drops the previous payload when the key changes, so
@@ -115,6 +120,16 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
       ? openSection
       : contract.sections[0]?.key;
 
+  /**
+   * The module's own name, without the product word.
+   *
+   * Contracts label themselves "Fees Intelligence", "Result Intelligence" and
+   * so on, which is right for a tab but wrong for a heading that already sits
+   * under an Intelligence context chip. Stripping the suffix here means no
+   * contract has to change and none can forget.
+   */
+  const moduleName = contract.label.replace(/\s*intelligence\s*$/i, '').trim() || contract.label;
+
   const style = {
     '--intel-accent': contract.accent,
     '--intel-accent-glow': `${contract.accent}1A`,
@@ -177,19 +192,42 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
     <div style={style} className="space-y-6 px-1 pb-12">
       {/* ------------------------------------------------------------ header */}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--intel-accent)]">
+        {/*
+          * THE MODULE IS THE HEADING; "INTELLIGENCE" IS THE CONTEXT.
+          *
+          * This block used to read: a `Fees Intelligence` eyebrow, then an <h1>
+          * of the ORGANISATION name, then the year. Three problems came with it.
+          * The page already carries an <h1> of "Intelligence" from the category
+          * bar, so there were two <h1>s. The word "Intelligence" appeared four
+          * times on one screen. And the module's own name — the one thing a
+          * reader needs within a second — was the smallest text on the page,
+          * while the largest was the tenant's name, which never changes as you
+          * move between modules and so identifies nothing.
+          *
+          * Now: a quiet context chip, the MODULE as the heading, and the
+          * organisation demoted into the meta line beside the year it belongs
+          * with. It is the page's only `h1`: the category's duplicate heading is
+          * suppressed for this workspace (see module-category-page).
+          */}
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-[color:var(--intel-accent)]">
             <Brain className="h-3.5 w-3.5" />
-            {contract.label}
+            Intelligence
           </p>
-          <h1 className="mt-1 text-[22px] font-bold leading-tight tracking-tight text-slate-950">
-            {data.organization}
+          <h1 className="mt-1 truncate text-[24px] font-bold leading-tight tracking-tight text-slate-950">
+            {moduleName}
           </h1>
           <p className="mt-1 text-[12.5px] leading-5 text-slate-500">
-            Academic year {data.academicYear?.syear ?? 'not selected'} · {data.freshness?.positionLabel}
-            {data.freshness?.findingsRefreshedAt
-              ? ` · findings ${timestamp(data.freshness.findingsRefreshedAt)}`
-              : ' · findings not computed yet'}
+            {[
+              data.organization,
+              data.academicYear?.syear ? `Academic year ${data.academicYear.syear}` : null,
+              data.freshness?.positionLabel,
+              data.freshness?.findingsRefreshedAt
+                ? `findings ${timestamp(data.freshness.findingsRefreshedAt)}`
+                : 'findings not computed yet',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
         </div>
 
@@ -222,13 +260,24 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
         </Surface>
       ) : null}
 
-      {/* ---------------------------------------------- L0: the coverage gate */}
-      {!data.coverage?.available ? (
-        <Unavailable
-          title={contract.emptyState.title}
-          reason={data.coverage?.reason ?? contract.emptyState.fallbackReason}
-        />
-      ) : (
+      {/*
+        * ── L0 COVERAGE NO LONGER GATES THE SCREEN ──────────────────────────
+        *
+        * This used to short-circuit to a single "no data" card, which took the
+        * section nav and every section down with it. A tenant that has not
+        * entered marks yet would see a blank product rather than an Intelligence
+        * screen that happened to be empty — and could not open Module
+        * Integration or Cross-Module Workflow at all, even when those had
+        * something to show.
+        *
+        * DATA CAN BE EMPTY; THE INTELLIGENCE UI MUST NOT BE. The nav and the
+        * selected section always render. The coverage reason is handed to the
+        * sections through NoDataReasonProvider, so each empty block explains
+        * itself in the backend's own words instead of saying nothing.
+        */}
+      <NoDataReasonProvider
+        reason={data.coverage?.available ? null : (data.coverage?.reason ?? contract.emptyState.fallbackReason)}
+      >
         <>
           {/* --------------------------------------------- the section switcher */}
           <IntelligenceSectionNav
@@ -335,7 +384,7 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
           }
             })}
         </>
-      )}
+      </NoDataReasonProvider>
 
       {/* ------------------------------------------------------------ footer */}
       <footer className="border-t border-slate-100 pt-3 text-[11.5px] leading-5 text-slate-400">

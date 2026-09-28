@@ -1,17 +1,35 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, Sparkles, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { fetchChapterConcepts, type EsoChapterConcept } from '@/app/pal/data/pal-eso';
+import { fetchAdaptiveConcepts } from '@/app/pal/data/pal-diagnostic';
 
 /**
- * "Start Adaptive Learning" — the real student entry point into the
- * Adaptive Learning Engine (/pal/eso), replacing the manually-typed-URL-only
- * path that existed before. Mirrors DiagnosticButton's shape (a button that
- * opens a small modal) rather than introducing a new UI pattern.
+ * "Concept practice" — the student entry point into the node-level Adaptive
+ * Learning Engine (/pal/eso), replacing the manually-typed-URL-only path that
+ * existed before. Mirrors DiagnosticButton's shape (a button that opens a
+ * small modal) rather than introducing a new UI pattern.
+ *
+ * Deliberately NOT labelled "Adaptive Learning" even though that is this
+ * engine's own name internally (EsoPolicyService docblock: "Adaptive
+ * Learning Engine Developer Brief v1") — that label is reserved for the
+ * chapter-level, diagnostic-driven 5-question stage
+ * (/pal/adaptive/chapter/[chapterId]), which is a DIFFERENT system this
+ * button does not open. Two things sharing one internal name is exactly what
+ * caused both to render as "Concept diagnostic" on this row before; giving
+ * this one its own label is the fix, not a stylistic choice.
+ *
+ * Aware of the chapter diagnostic (fetchAdaptiveConcepts().hasDiagnostic),
+ * same as /pal/adaptive/chapter/[chapterId] (Stage 3): both surface a note
+ * rather than a hard lock when it hasn't been taken, because a chapter thin
+ * enough on MCQs to fail its 15-question 5/5/5 paper would otherwise strand a
+ * learner who CAN still practise concept-by-concept. This used to show no
+ * signal about the diagnostic at all, not even a note.
  *
  * Renders nothing when the chapter has no ESO-ready concepts yet (Phase 0
  * tagging scope) — no dead-end link is ever shown.
@@ -25,6 +43,11 @@ import { fetchChapterConcepts, type EsoChapterConcept } from '@/app/pal/data/pal
  */
 export function AdaptiveLearningButton({ chapterId }: { chapterId: string }) {
   const [concepts, setConcepts] = useState<EsoChapterConcept[] | null>(null);
+  // Whether the chapter diagnostic has been taken — this used to be
+  // unchecked entirely, letting a learner reach the engine straight from the
+  // subject list without ever sitting the 15-question baseline. null while
+  // loading, so the button stays hidden rather than flashing unlocked.
+  const [hasDiagnostic, setHasDiagnostic] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -32,13 +55,26 @@ export function AdaptiveLearningButton({ chapterId }: { chapterId: string }) {
     const controller = new AbortController();
     const numericChapterId = Number(chapterId);
     if (!Number.isFinite(numericChapterId)) return;
-    fetchChapterConcepts(numericChapterId, controller.signal)
-      .then((data) => {
-        if (!controller.signal.aborted) setConcepts(data);
+    Promise.all([
+      fetchChapterConcepts(numericChapterId, controller.signal),
+      // Same chapter-level flag the canonical /pal/adaptive/chapter and
+      // /pal/plan/chapter screens already gate on — reused here rather than
+      // adding a new endpoint.
+      fetchAdaptiveConcepts(numericChapterId, controller.signal)
+        .then((data) => data.hasDiagnostic)
+        .catch(() => false),
+    ])
+      .then(([conceptList, diagnosticTaken]) => {
+        if (controller.signal.aborted) return;
+        setConcepts(conceptList);
+        setHasDiagnostic(diagnosticTaken);
       })
       .catch(() => {
         // Chapter-readiness check failing shouldn't break the rest of the row — just hide the entry point.
-        if (!controller.signal.aborted) setConcepts([]);
+        if (!controller.signal.aborted) {
+          setConcepts([]);
+          setHasDiagnostic(false);
+        }
       });
     return () => controller.abort();
   }, [chapterId]);
@@ -53,13 +89,23 @@ export function AdaptiveLearningButton({ chapterId }: { chapterId: string }) {
         size="sm"
         variant="outline"
         onClick={() => setOpen(true)}
+        title={
+          hasDiagnostic === false
+            ? 'You have not taken the chapter diagnostic yet — practice will start at an easier level.'
+            : undefined
+        }
         className="border-violet-200 text-violet-700 hover:bg-violet-50"
       >
         <Sparkles className="h-3.5 w-3.5" />
-        Concept diagnostic
+        Concept practice
       </Button>
       {open && (
-        <ConceptPickerModal concepts={concepts} onClose={() => setOpen(false)} />
+        <ConceptPickerModal
+          concepts={concepts}
+          hasDiagnostic={hasDiagnostic}
+          chapterId={chapterId}
+          onClose={() => setOpen(false)}
+        />
       )}
     </>
   );
@@ -67,9 +113,13 @@ export function AdaptiveLearningButton({ chapterId }: { chapterId: string }) {
 
 function ConceptPickerModal({
   concepts,
+  hasDiagnostic,
+  chapterId,
   onClose,
 }: {
   concepts: EsoChapterConcept[];
+  hasDiagnostic: boolean | null;
+  chapterId: string;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -96,7 +146,7 @@ function ConceptPickerModal({
               <Sparkles className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Start concept diagnostic</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Start concept practice</h2>
               <p className="text-xs text-slate-500">Pick a concept to work on</p>
             </div>
           </div>
@@ -109,6 +159,17 @@ function ConceptPickerModal({
             <X className="h-4 w-4" />
           </button>
         </div>
+        {hasDiagnostic === false && (
+          <div className="mx-5 mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <span>You have not taken the chapter diagnostic yet, so practice will open at easy.</span>
+            <Link
+              href={`/pal/diagnostic/chapter/${chapterId}`}
+              className="font-medium underline underline-offset-2 hover:text-amber-950"
+            >
+              Take it first
+            </Link>
+          </div>
+        )}
         <div className="overflow-y-auto p-2">
           {concepts.map((concept) => (
             <button

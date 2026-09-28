@@ -74,6 +74,10 @@ function routeFor(module: H5pHubModule): string | null {
 
 function ModuleCard({ module, contextQuery }: { module: H5pHubModule; contextQuery: string }) {
   const Icon = TYPE_ICONS[module.h5pType] ?? Layers3;
+  // The listing page, not /create -- it's what shows existing items (manual
+  // vs. generated counts, View/Edit/Delete per row). contextQuery carries
+  // return_to when this hub was opened from the Question Bank, so that
+  // list's own "Add" button can hand it forward to the create page.
   const href = routeFor(module);
   const pedagogies = [...module.pedagogies.primary, ...module.pedagogies.secondary];
 
@@ -172,6 +176,7 @@ function ModuleCard({ module, contextQuery }: { module: H5pHubModule; contextQue
 function H5pHubContent() {
   const searchParams = useSearchParams();
   const ctx = useMemo(() => readH5pContext(new URLSearchParams(searchParams?.toString())), [searchParams]);
+  const returnTo = searchParams?.get('return_to') || null;
 
   const [hub, setHub] = useState<H5pHub | null>(null);
   const [loading, setLoading] = useState(true);
@@ -204,7 +209,7 @@ function H5pHubContent() {
     return () => controller.abort();
   }, [ctx]);
 
-  const contextQuery = h5pContextQuery(ctx);
+  const contextQuery = h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined);
   const modules = hub?.modules ?? [];
   const totalNodes = modules.reduce((sum, module) => sum + module.nodeCount, 0);
 

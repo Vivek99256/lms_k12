@@ -4,12 +4,14 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
+  AlertTriangle,
   ArrowRight,
   BookOpen,
   ExternalLink,
   FileText,
   Loader2,
   MonitorPlay,
+  Play,
   Presentation,
   Puzzle,
   School,
@@ -129,8 +131,8 @@ function ConceptLearnView() {
    * jump would have silently overridden both.
    *
    * A concept with no guided-learning node has nothing for the engine to move,
-   * so that one goes to the question set instead of an engine that has no
-   * opinion about it.
+   * and so no practice, check or mastery to go on to - that one returns to the
+   * plan rather than re-opening the concept diagnostic as if it were practice.
    */
   const continueToNextStep = useCallback(async () => {
     setContinuing(true);
@@ -139,9 +141,12 @@ function ConceptLearnView() {
     try {
       const outcome = await acknowledgeConceptLearn(conceptId);
 
+      const planChapterId = data?.chapterId || chapterHint;
       router.push(
         outcome.reason === 'no_eso_nodes'
-          ? `/pal/adaptive/concept/${conceptId}`
+          ? planChapterId
+            ? `/pal/plan/chapter/${planChapterId}`
+            : '/pal'
           : `/pal/eso?conceptId=${conceptId}`,
       );
     } catch (reason: unknown) {
@@ -152,7 +157,7 @@ function ConceptLearnView() {
       );
       setContinuing(false);
     }
-  }, [conceptId, router]);
+  }, [conceptId, router, data, chapterHint]);
 
   if (checkingCompletion) return <Centered>Loading this concept…</Centered>;
 
@@ -245,18 +250,9 @@ function ConceptLearnView() {
         </PalRailSection>
       )}
 
-      <PalRailSection title="Go to">
-        <div className="space-y-2">
-          <Link
-            href={`/pal/adaptive/concept/${conceptId}`}
-            className={cn(
-              buttonVariants({ variant: 'outline', size: 'sm' }),
-              'w-full justify-start',
-            )}
-          >
-            Extra practice questions
-          </Link>
-          {chapterId > 0 && (
+      {chapterId > 0 && (
+        <PalRailSection title="Go to">
+          <div className="space-y-2">
             <Link
               href={`/pal/mastery/chapter/${chapterId}`}
               className={cn(
@@ -266,9 +262,9 @@ function ConceptLearnView() {
             >
               My mastery
             </Link>
-          )}
-        </div>
-      </PalRailSection>
+          </div>
+        </PalRailSection>
+      )}
     </>
   );
 
@@ -285,6 +281,32 @@ function ConceptLearnView() {
       backLabel={chapterId ? 'Back to my plan' : 'Back to subjects'}
       rail={rail}
     >
+      {/* What tripped this learner up here specifically — routed by
+          MisconceptionLibraryService off a wrong diagnostic or practice
+          answer (see palController::learnContent()'s own note). Leads the
+          page: this is the most targeted material there is, ahead of the
+          chapter-wide resources below. */}
+      {data.misconceptions.length > 0 && (
+        <div className="mb-5 space-y-3">
+          {data.misconceptions.map((item) => (
+            <Card key={item.misconceptionTag} className="border-amber-200 bg-amber-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base text-amber-900">
+                  <AlertTriangle aria-hidden className="h-4 w-4 shrink-0" />
+                  {item.title}
+                </CardTitle>
+                <CardDescription className="text-amber-800">
+                  What tripped you up on this concept
+                </CardDescription>
+              </CardHeader>
+              {item.body && (
+                <CardContent className="text-sm text-amber-900">{item.body}</CardContent>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
       {!hasResources && (
         // Only when there is nothing at all. Ordinary on this estate - most
         // concepts have no material authored - so it is said plainly rather
@@ -296,16 +318,10 @@ function ConceptLearnView() {
               Nothing prepared for this one yet
             </CardTitle>
             <CardDescription>
-              No material has been written for this concept. Practising the questions is the best
-              way in — each answer tells you where you stand.
+              No material has been written for this concept. Continue below to go straight to
+              practice — each answer tells you where you stand.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link href={`/pal/adaptive/concept/${conceptId}`} className={buttonVariants()}>
-              Practise this concept
-              <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
-            </Link>
-          </CardContent>
         </Card>
       )}
 
@@ -338,14 +354,7 @@ function ConceptLearnView() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            href={`/pal/adaptive/concept/${conceptId}`}
-            className={buttonVariants({ variant: 'outline' })}
-          >
-            Extra practice questions
-          </Link>
-
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {/* Records that the lesson was read, THEN hands over to the engine.
                 Without the first step taught_at stays null, the engine serves
                 `teach` again, and the learner gets a second lesson screen
@@ -361,14 +370,67 @@ function ConceptLearnView() {
   );
 }
 
-const SECTION_ICON: Record<string, typeof FileText> = {
-  video: MonitorPlay,
-  presentation: Presentation,
-  notes: FileText,
-  classroom: School,
-  h5p: Puzzle,
-  other: BookOpen,
+/**
+ * How each kind of material reads: its icon, the colour that ties its cards
+ * together, and the wash a card falls back to when it has no thumbnail.
+ * Keyed by `LearnResourceItem['section']` / `LearnResourceSection['key']`.
+ */
+interface SectionStyle {
+  icon: typeof FileText;
+  gradient: string;
+  accent: string;
+  border: string;
+  chip: string;
+}
+
+const SECTION_STYLE: Record<string, SectionStyle> = {
+  video: {
+    icon: MonitorPlay,
+    gradient: 'from-indigo-500 to-indigo-700',
+    accent: 'text-indigo-600',
+    border: 'hover:border-indigo-300',
+    chip: 'bg-indigo-600',
+  },
+  presentation: {
+    icon: Presentation,
+    gradient: 'from-amber-500 to-amber-600',
+    accent: 'text-amber-600',
+    border: 'hover:border-amber-300',
+    chip: 'bg-amber-600',
+  },
+  notes: {
+    icon: FileText,
+    gradient: 'from-sky-500 to-sky-700',
+    accent: 'text-sky-600',
+    border: 'hover:border-sky-300',
+    chip: 'bg-sky-600',
+  },
+  classroom: {
+    icon: School,
+    gradient: 'from-violet-500 to-violet-700',
+    accent: 'text-violet-600',
+    border: 'hover:border-violet-300',
+    chip: 'bg-violet-600',
+  },
+  h5p: {
+    icon: Puzzle,
+    gradient: 'from-fuchsia-500 to-fuchsia-700',
+    accent: 'text-fuchsia-600',
+    border: 'hover:border-fuchsia-300',
+    chip: 'bg-fuchsia-600',
+  },
+  other: {
+    icon: BookOpen,
+    gradient: 'from-slate-400 to-slate-600',
+    accent: 'text-slate-600',
+    border: 'hover:border-slate-300',
+    chip: 'bg-slate-600',
+  },
 };
+
+function sectionStyle(key: string): SectionStyle {
+  return SECTION_STYLE[key] ?? SECTION_STYLE.other;
+}
 
 const FILE_TYPE_LABEL: Record<string, string> = {
   pdf: 'PDF',
@@ -399,12 +461,14 @@ function formatDuration(seconds: number): string {
  * between a useful list and a misleading one.
  */
 function ResourceSection({ section }: { section: LearnResourceSection }) {
-  const Icon = SECTION_ICON[section.key] ?? BookOpen;
+  const { icon: Icon, accent } = sectionStyle(section.key);
 
   return (
     <section>
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
-        <Icon aria-hidden className="h-4 w-4 text-slate-500" />
+        <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100', accent)}>
+          <Icon aria-hidden className="h-3.5 w-3.5" />
+        </span>
         <h3 className="text-sm font-semibold text-slate-900">{section.label}</h3>
         <span className="text-xs text-slate-500">{section.count}</span>
         {section.scope === 'chapter' && (
@@ -420,10 +484,10 @@ function ResourceSection({ section }: { section: LearnResourceSection }) {
       </div>
 
       {/* A grid rather than a list. The workspace gave the main column real
-          width, and a card carries what a row could not: the video still, the
+          width, and a card carries what a row could not: the still, the
           description, and the tagging - all of which were being fetched and
           then thrown away by a single truncated line. */}
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {section.items.map((item) => (
           <li key={item.id} className="flex">
             <ResourceCard item={item} sectionKey={section.key} />
@@ -435,71 +499,103 @@ function ResourceSection({ section }: { section: LearnResourceSection }) {
 }
 
 function ResourceCard({ item, sectionKey }: { item: LearnResourceItem; sectionKey: string }) {
-  const Icon = SECTION_ICON[sectionKey] ?? BookOpen;
+  const { icon: Icon, gradient, border, chip } = sectionStyle(sectionKey);
   const typeLabel = item.fileType
     ? (FILE_TYPE_LABEL[item.fileType] ?? item.fileType.toUpperCase())
     : null;
 
-  const meta = [
+  const difficulty =
     item.tags.difficulty === 'advance'
       ? 'Advanced'
       : item.tags.difficulty === 'basic'
         ? 'Foundational'
-        : null,
-    item.durationSeconds ? formatDuration(item.durationSeconds) : null,
+        : null;
+
+  // Duration rides on the thumbnail, the way a video site would show it, when
+  // there is a thumbnail to sit on; with no image to overlay it falls back
+  // into the meta line below instead of disappearing.
+  const durationOnThumbnail = Boolean(item.thumbnailUrl && item.durationSeconds);
+  const meta = [
+    !durationOnThumbnail && item.durationSeconds ? formatDuration(item.durationSeconds) : null,
     item.provider,
     item.h5pType ? item.h5pType.replace(/_/g, ' ') : null,
   ].filter(Boolean) as string[];
 
   const inner = (
     <>
-      {item.thumbnailUrl ? (
-        // 105 of 109 approved videos carry a still. Decorative alt: the title
-        // sits directly beneath, so announcing it twice helps nobody.
-        <div className="aspect-video w-full overflow-hidden rounded-t-lg border-b border-slate-200 bg-slate-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+      <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-slate-100">
+        {item.thumbnailUrl ? (
+          // 105 of 109 approved videos carry a still. Decorative alt: the
+          // title sits directly beneath, so announcing it twice helps nobody.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={item.thumbnailUrl}
             alt=""
             loading="lazy"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
           />
-        </div>
-      ) : (
-        // A flat band, not a placeholder image: inventing a picture for a PDF
-        // would be ornament, and the icon already says what kind of thing it is.
-        <div className="flex h-16 w-full items-center justify-center rounded-t-lg border-b border-slate-200 bg-slate-50">
-          <Icon aria-hidden className="h-5 w-5 text-slate-400" />
-        </div>
-      )}
+        ) : (
+          // A coloured wash, not a placeholder image: inventing a picture for
+          // a PDF would be ornament, and the icon already says what kind of
+          // thing this is.
+          <div className={cn('flex h-full w-full items-center justify-center bg-gradient-to-br', gradient)}>
+            <Icon aria-hidden className="h-9 w-9 text-white/85" />
+          </div>
+        )}
 
-      <div className="flex flex-1 flex-col p-3.5">
-        <div className="mb-1.5 flex items-center gap-1.5">
-          <span className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        {typeLabel && (
+          <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+            <Icon aria-hidden className="h-3 w-3" />
+            {typeLabel}
+          </span>
+        )}
+
+        {durationOnThumbnail && (
+          <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white">
+            {formatDuration(item.durationSeconds as number)}
+          </span>
+        )}
+
+        {item.url && sectionKey === 'video' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-300 group-hover:bg-black/25">
+            <span className="flex h-10 w-10 scale-90 items-center justify-center rounded-full bg-white/95 text-slate-900 opacity-0 shadow-md transition-all duration-300 group-hover:scale-100 group-hover:opacity-100">
+              <Play aria-hidden className="ml-0.5 h-4 w-4 fill-current" />
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col p-4">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             {item.category}
           </span>
-          {typeLabel && (
-            <span className="ml-auto shrink-0 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-              {typeLabel}
+          {difficulty && (
+            <span
+              className={cn(
+                'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                difficulty === 'Advanced' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
+              )}
+            >
+              {difficulty}
             </span>
           )}
         </div>
 
-        <p className="line-clamp-2 text-sm font-medium text-slate-900">{item.title}</p>
+        <p className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900">{item.title}</p>
 
-       
+        {item.description && (
+          <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.description}</p>
+        )}
 
         {meta.length > 0 && (
-          <p className="mt-1.5 text-[11px] text-slate-500">{meta.join(' \u00b7 ')}</p>
+          <p className="mt-1.5 text-[11px] text-slate-500">{meta.join(' · ')}</p>
         )}
 
         {item.tags.metaTags && item.tags.metaTags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {item.tags.metaTags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
-              >
+              <span key={tag} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
                 {tag}
               </span>
             ))}
@@ -512,31 +608,39 @@ function ResourceCard({ item, sectionKey }: { item: LearnResourceItem; sectionKe
 
         {/* mt-auto pins the footer to the bottom so cards in a row line up
             however much description each one happens to have. */}
-        <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-          <span
-            className={cn(
-              'text-[11px] font-medium',
-              item.scope === 'concept' ? 'text-indigo-700' : 'text-slate-500',
-            )}
-          >
+        <div className="mt-auto flex items-center justify-between gap-2 pt-3.5">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+            <span
+              aria-hidden
+              className={cn('h-1.5 w-1.5 rounded-full', item.scope === 'concept' ? 'bg-indigo-500' : 'bg-slate-300')}
+            />
             {item.scope === 'concept' ? 'This concept' : 'Whole chapter'}
           </span>
 
           {item.url ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700">
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white',
+                chip,
+              )}
+            >
               Open
               <ExternalLink aria-hidden className="h-3 w-3" />
             </span>
           ) : (
-            <span className="text-[11px] text-slate-400">Not openable yet</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-400">
+              Not available yet
+            </span>
           )}
         </div>
       </div>
     </>
   );
 
-  const shell =
-    'flex h-full w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-sm';
+  const shell = cn(
+    'group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition-all duration-300',
+    item.url && ['hover:-translate-y-0.5 hover:shadow-lg', border],
+  );
 
   // No url means H5P, which has nothing to open yet. Rendered as a plain card
   // rather than a dead link - a control that goes nowhere is worse than none.
@@ -551,7 +655,6 @@ function ResourceCard({ item, sectionKey }: { item: LearnResourceItem; sectionKe
       rel="noreferrer"
       className={cn(
         shell,
-        'transition-colors duration-200 hover:border-indigo-300 hover:bg-indigo-50/30',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
         'motion-reduce:transition-none',
       )}

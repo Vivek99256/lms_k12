@@ -71,8 +71,15 @@ function useH5pRouteContext() {
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
+  // Carried along in contextQuery so a list's "Add" link hands it to the
+  // create page, whose Back link then returns past this screen entirely.
+  const returnTo = searchParams?.get('return_to') || null;
 
-  return { ctx, contextQuery: h5pContextQuery(ctx), searchParams };
+  return {
+    ctx,
+    contextQuery: h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined),
+    searchParams,
+  };
 }
 
 function statusChip(activity: H5pTextActivity) {
@@ -506,8 +513,11 @@ export function TextActivityListPage({ type }: { type: TextActivityType }) {
 
 function CreateContent({ type }: { type: TextActivityType }) {
   const router = useRouter();
-  const { ctx, contextQuery } = useH5pRouteContext();
+  const { ctx, contextQuery, searchParams } = useH5pRouteContext();
   const base = textActivityRoute(type);
+  // Set when opened from somewhere other than this type's own list -- the
+  // Question Bank's "Create H5P content" menu, for one.
+  const returnTo = searchParams?.get('return_to') || null;
 
   const [state, setState] = useState<TextActivityEditorState>(emptyEditorState);
   const [saving, setSaving] = useState(false);
@@ -557,7 +567,7 @@ function CreateContent({ type }: { type: TextActivityType }) {
           title={`New ${TEXT_ACTIVITY_LABELS[type].toLowerCase()} activity`}
           description={TEXT_ACTIVITY_DESCRIPTIONS[type]}
           ctx={ctx}
-          backHref={`${base}?${contextQuery}`}
+          backHref={returnTo ?? `${base}?${contextQuery}`}
         />
 
         {!hasH5pContext(ctx) ? (

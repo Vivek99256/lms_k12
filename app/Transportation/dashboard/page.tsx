@@ -11,6 +11,18 @@ import {
   type TransportationDashboardPayload,
 } from '@/app/Transportation/_lib/transportation-dashboard-api';
 import { Button } from '@/components/ui/button';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const TRANSPORTATION_WIDGETS = [
+  { id: 'kpi.routes', label: 'Routes', group: 'kpi' },
+  { id: 'kpi.vehicles', label: 'Vehicles', group: 'kpi' },
+  { id: 'kpi.students_mapped', label: 'Students mapped', group: 'kpi' },
+  { id: 'kpi.capacity_utilization', label: 'Capacity utilization', group: 'kpi' },
+  { id: 'chart.vehicle_occupancy_by_shift', label: 'Vehicle occupancy by shift', group: 'chart' },
+] as const satisfies readonly DashboardWidget[];
 
 /**
  * Transportation dashboard — the module landing page, wired to the real
@@ -24,8 +36,10 @@ export default function TransportationDashboardPage() {
   const [payload, setPayload] = useState<TransportationDashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const prefs = useDashboardPreferences('module.transportation', TRANSPORTATION_WIDGETS);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession(getFeesSession());
   }, []);
 
@@ -67,6 +81,7 @@ export default function TransportationDashboardPage() {
     if (!session) return;
 
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(session, controller.signal);
 
     return () => controller.abort();
@@ -80,41 +95,50 @@ export default function TransportationDashboardPage() {
         title="Transportation dashboard"
         description="Routes, vehicles and student mappings for the current academic year."
         action={
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading || !session}
-            onClick={() => session && void load(session)}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {prefs.ready ? <CustomizeDashboard widgets={TRANSPORTATION_WIDGETS} {...prefs.customizeProps} /> : null}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading || !session}
+              onClick={() => session && void load(session)}
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Refresh
+            </Button>
+          </div>
         }
       />
 
       {error ? <InlineMessage type="error" text={error} /> : null}
 
-      {loading && !summary ? (
+      {/* Wait for the user's layout too, so hidden widgets never flash in. */}
+      {(loading && !summary) || (!prefs.ready && !error) ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading transportation summary…
         </div>
       ) : null}
 
-      {summary ? (
+      {payload && prefs.ready && !prefs.hasVisible() ? <AllWidgetsHiddenNotice /> : null}
+
+      {summary && prefs.ready && prefs.hasVisible('kpi') ? (
         <TransportationDashboard
           totalRoutes={summary.total_routes}
           totalVehicles={summary.total_vehicles}
           totalStudentsMapped={summary.total_students_mapped}
           capacityUtilization={summary.capacity_utilization}
+          isVisible={prefs.isVisible}
         />
       ) : null}
 
-      {payload ? <VanSummaryPanel rows={payload.van_summary ?? []} /> : null}
+      {payload && prefs.ready && prefs.isVisible('chart.vehicle_occupancy_by_shift') ? (
+        <VanSummaryPanel rows={payload.van_summary ?? []} />
+      ) : null}
     </PageFrame>
   );
 }

@@ -10,8 +10,14 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, FileDown, Loader2 } from 'lucide-react';
+import { ChevronDown, ExternalLink, FileDown, Loader2 } from 'lucide-react';
 import { splitSectionsByContent } from '@/lib/question-paper/sections';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { fetchPaperContext, fetchTemplateIndex, readSchoolBranding } from './api';
 import { generateQuestionPaperPdf } from './pdf';
 import { resolvePaper } from './resolve';
@@ -164,34 +170,71 @@ export function QuestionPaperTemplateSelect({
   );
 }
 
-/** The per-row action: this exam, the chosen template, as a PDF. */
+const pdfButtonClassName =
+  'inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-[#CFD9E6] bg-white px-3 text-[12px] font-semibold text-[#5846EA] transition hover:border-[#5846EA] hover:bg-[#F5F4FF] disabled:cursor-not-allowed disabled:opacity-50';
+
+/**
+ * The per-row action: this exam, the chosen template, as a PDF.
+ *
+ * `openHref` is opt-in (Worksheet and Project pass it; Exam/tab 242 does
+ * not), and turns the single "PDF" button into a two-option menu: "Open PDF"
+ * opens the stored file straight in a new tab via `openHref`, while "Download
+ * PDF" keeps the existing template-driven generate-and-save behaviour.
+ */
 export function ExamPdfButton({
   controller,
   paperId,
   examName,
+  openHref,
 }: {
   controller: ExamPaperPdfController;
   paperId: number;
   examName: string;
+  openHref?: string;
 }) {
   const busy = controller.busyPaperId === paperId;
   const disabled = busy || !controller.selectedTemplate || !paperId;
+  const downloadTitle = controller.selectedTemplate
+    ? `Question paper PDF using "${controller.selectedTemplate.name}"`
+    : 'Choose a question paper template first';
+
+  if (!openHref) {
+    return (
+      <button
+        type="button"
+        onClick={() => void controller.generate(paperId, examName)}
+        disabled={disabled}
+        title={downloadTitle}
+        className={pdfButtonClassName}
+      >
+        {busy ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+        PDF
+      </button>
+    );
+  }
 
   return (
-    <button
-      type="button"
-      onClick={() => void controller.generate(paperId, examName)}
-      disabled={disabled}
-      title={
-        controller.selectedTemplate
-          ? `Question paper PDF using "${controller.selectedTemplate.name}"`
-          : 'Choose a question paper template first'
-      }
-      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-[#CFD9E6] bg-white px-3 text-[12px] font-semibold text-[#5846EA] transition hover:border-[#5846EA] hover:bg-[#F5F4FF] disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {busy ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
-      PDF
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={busy}
+        title={`Question paper PDF for ${examName || 'this paper'}`}
+        className={pdfButtonClassName}
+      >
+        {busy ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+        PDF
+        <ChevronDown size={12} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => window.open(openHref, '_blank', 'noopener,noreferrer')}>
+          <ExternalLink size={14} />
+          Open PDF
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={disabled} onClick={() => void controller.generate(paperId, examName)}>
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+          Download PDF
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

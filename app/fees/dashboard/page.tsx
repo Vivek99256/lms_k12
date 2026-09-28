@@ -12,6 +12,20 @@ import {
   type FeesDashboardPayload,
 } from '@/app/fees/_lib/fees-dashboard-api';
 import { Button } from '@/components/ui/button';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const FEES_WIDGETS = [
+  { id: 'kpi.collected_this_term', label: 'Collected this term', group: 'kpi' },
+  { id: 'kpi.outstanding', label: 'Outstanding', group: 'kpi' },
+  { id: 'kpi.collection_rate', label: 'Collection rate', group: 'kpi' },
+  { id: 'kpi.defaulters', label: 'Defaulters', group: 'kpi' },
+  { id: 'chart.collection_vs_target', label: 'Collection vs target', group: 'chart' },
+  { id: 'chart.headwise', label: 'Head-wise collected vs pending', group: 'chart' },
+  { id: 'chart.payment_mode_mix', label: 'Payment mode mix', group: 'chart' },
+] as const satisfies readonly DashboardWidget[];
 
 /**
  * Fees dashboard — the four stat cards, wired to the real Laravel aggregate
@@ -26,9 +40,11 @@ export default function FeesDashboardPage() {
   const [payload, setPayload] = useState<FeesDashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const prefs = useDashboardPreferences('module.fees', FEES_WIDGETS);
 
   // Session lives in browser storage, so it can only be read after mount.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession(getFeesSession());
   }, []);
 
@@ -74,6 +90,7 @@ export default function FeesDashboardPage() {
     if (!session) return;
 
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(session, controller.signal);
 
     return () => controller.abort();
@@ -87,47 +104,55 @@ export default function FeesDashboardPage() {
         title="Fees dashboard"
         description="Collection, outstanding and defaulters for the current academic year."
         action={
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading || !session}
-            onClick={() => session && void load(session)}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {prefs.ready ? <CustomizeDashboard widgets={FEES_WIDGETS} {...prefs.customizeProps} /> : null}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading || !session}
+              onClick={() => session && void load(session)}
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Refresh
+            </Button>
+          </div>
         }
       />
 
       {error ? <InlineMessage type="error" text={error} /> : null}
 
-      {loading && !summary ? (
+      {/* Wait for the user's layout too, so hidden widgets never flash in. */}
+      {(loading && !summary) || (!prefs.ready && !error) ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading fees summary…
         </div>
       ) : null}
 
-      {summary ? (
+      {payload && prefs.ready && !prefs.hasVisible() ? <AllWidgetsHiddenNotice /> : null}
+
+      {summary && prefs.ready && prefs.hasVisible('kpi') ? (
         <FeesDashboard
           collectedThisTerm={summary.collected_display}
           outstanding={summary.outstanding_display}
           collectionRate={summary.collection_rate_display}
           defaulters={summary.defaulters_count}
           termLabel={payload?.context?.month_label ?? undefined}
+          isVisible={prefs.isVisible}
         />
       ) : null}
 
-      {payload ? (
+      {payload && prefs.ready && prefs.hasVisible('chart') ? (
         <FeesCharts
           collectionVsTarget={payload.collection_vs_target ?? []}
           headwise={payload.headwise ?? []}
           paymentModeMix={payload.payment_mode_mix ?? []}
           stale={loading}
+          isVisible={prefs.isVisible}
         />
       ) : null}
     </PageFrame>

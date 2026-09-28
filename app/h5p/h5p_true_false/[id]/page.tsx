@@ -570,7 +570,7 @@ function TrueFalsePlayerContent({ preloaded }: { preloaded?: PreloadedTrueFalse 
   // box back in the middle of a page that caller deliberately made wide.
   return (
     <div className={preloaded?.embedded ? '' : 'p-4 sm:p-6'}>
-      <div className={preloaded?.embedded ? '' : 'mx-auto max-w-2xl'}>
+      <div className={preloaded?.embedded ? '' : 'mx-auto'}>
         {preloaded?.embedded ? null : (
         <H5pPageHeader
           title={item?.title || 'True or false'}

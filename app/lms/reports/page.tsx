@@ -5,8 +5,25 @@ import { useEffect, useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import RequireStaff from '@/app/lms/_shared/RequireStaff';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const REPORTS_WIDGETS = [
+  { id: 'kpi.overall_completion', label: 'Overall completion', group: 'kpi' },
+  { id: 'kpi.lessons_delivered', label: 'Lessons delivered', group: 'kpi' },
+  { id: 'kpi.on_track_subjects', label: 'On-track subjects', group: 'kpi' },
+  { id: 'kpi.avg_lessons_per_week', label: 'Avg lessons/week', group: 'kpi' },
+  { id: 'chart.subject_completion', label: 'Subject completion', group: 'chart' },
+  { id: 'chart.lesson_status', label: 'Lesson status breakdown', group: 'chart' },
+  { id: 'chart.monthly_lessons', label: 'Monthly lessons delivered', group: 'chart' },
+  { id: 'panel.schedule_status', label: 'Schedule status by subject', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
 
 type StatCard = {
+  /** Widget id the user's show/hide choice for this card is stored under. */
+  id: (typeof REPORTS_WIDGETS)[number]['id'];
   label: string;
   value: string;
   helper: string;
@@ -228,6 +245,7 @@ function buildSummaryStats(rows: LessonPlanApiRow[], scheduleRows: SubjectSchedu
 
   return [
     {
+      id: 'kpi.overall_completion',
       label: 'Overall completion',
       value: `${overallPercent}%`,
       helper: `${totalDelivered} of ${totalPlanned} lessons`,
@@ -235,6 +253,7 @@ function buildSummaryStats(rows: LessonPlanApiRow[], scheduleRows: SubjectSchedu
       color: '#18a379',
     },
     {
+      id: 'kpi.lessons_delivered',
       label: 'Lessons delivered',
       value: String(totalDelivered),
       helper: `of ${totalPlanned} planned`,
@@ -242,6 +261,7 @@ function buildSummaryStats(rows: LessonPlanApiRow[], scheduleRows: SubjectSchedu
       color: '#2f7dd9',
     },
     {
+      id: 'kpi.on_track_subjects',
       label: 'On-track subjects',
       value: String(onTrackCount),
       helper: `${behindCount} behind schedule`,
@@ -249,6 +269,7 @@ function buildSummaryStats(rows: LessonPlanApiRow[], scheduleRows: SubjectSchedu
       color: '#b87916',
     },
     {
+      id: 'kpi.avg_lessons_per_week',
       label: 'Avg lessons/week',
       value: avgPerWeek.toFixed(1),
       helper: `over ${dates.length > 0 ? Math.max(1, Math.round((Math.max(...dates.map((d) => d.getTime())) - Math.min(...dates.map((d) => d.getTime()))) / (7 * 24 * 60 * 60 * 1000)) + 1) : 0} weeks`,
@@ -485,6 +506,11 @@ export default function ReportsPage() {
   const [rows, setRows] = useState<LessonPlanApiRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const prefs = useDashboardPreferences('lms.reports', REPORTS_WIDGETS);
+  const show = prefs.isVisible;
+  // The four panels sit in two rows of two; a lone panel left in a row takes its full width.
+  const bothTopPanels = show('chart.subject_completion') && show('chart.lesson_status');
+  const bothBottomPanels = show('chart.monthly_lessons') && show('panel.schedule_status');
 
   useEffect(() => {
     const session = getReportsSession();
@@ -554,10 +580,15 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <HeaderButton>
-          <Download size={15} />
-          Export PDF
-        </HeaderButton>
+        <div className="flex flex-wrap items-center gap-2">
+          {prefs.ready && (
+            <CustomizeDashboard widgets={REPORTS_WIDGETS} {...prefs.customizeProps} size="lg" />
+          )}
+          <HeaderButton>
+            <Download size={15} />
+            Export PDF
+          </HeaderButton>
+        </div>
       </div>
 
       {loadError ? (
@@ -567,24 +598,38 @@ export default function ReportsPage() {
         </div>
       ) : null}
 
-      {isLoading ? (
+      {/* Wait for the user's layout too, so hidden widgets never flash in. */}
+      {isLoading || !prefs.ready ? (
         <div className="rounded-lg border border-[#ddd9d2] bg-white px-5 py-10 text-center text-sm font-medium text-[#716b64]">
           Loading reports...
         </div>
+      ) : !prefs.hasVisible() ? (
+        <AllWidgetsHiddenNotice />
       ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {summaryStats.map((stat) => (
-              <SummaryCard key={stat.label} stat={stat} />
-            ))}
-          </div>
+          {prefs.hasVisible('kpi') && (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {summaryStats
+                .filter((stat) => show(stat.id))
+                .map((stat) => (
+                  <SummaryCard key={stat.label} stat={stat} />
+                ))}
+            </div>
+          )}
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <SubjectCompletionPanel subjectCompletion={subjectCompletion} />
-            <LessonStatusPanel lessonStatuses={lessonStatuses} />
-            <MonthlyLessonsPanel monthlyLessons={monthlyLessons} />
-            <ScheduleStatusPanel scheduleRows={scheduleRows} />
-          </div>
+          {(show('chart.subject_completion') || show('chart.lesson_status')) && (
+            <div className={`mt-4 grid gap-4 ${bothTopPanels ? 'xl:grid-cols-2' : ''}`}>
+              {show('chart.subject_completion') && <SubjectCompletionPanel subjectCompletion={subjectCompletion} />}
+              {show('chart.lesson_status') && <LessonStatusPanel lessonStatuses={lessonStatuses} />}
+            </div>
+          )}
+
+          {(show('chart.monthly_lessons') || show('panel.schedule_status')) && (
+            <div className={`mt-4 grid gap-4 ${bothBottomPanels ? 'xl:grid-cols-2' : ''}`}>
+              {show('chart.monthly_lessons') && <MonthlyLessonsPanel monthlyLessons={monthlyLessons} />}
+              {show('panel.schedule_status') && <ScheduleStatusPanel scheduleRows={scheduleRows} />}
+            </div>
+          )}
         </>
       )}
     </div>

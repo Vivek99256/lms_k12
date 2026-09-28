@@ -125,6 +125,7 @@ function InteractiveVideoCreateContent() {
   );
 
   const contextQuery = h5pContextQuery(ctx);
+  const returnTo = searchParams?.get('return_to') || null;
 
   const applyPreview = (nextFile: File | null) => {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
@@ -226,7 +227,7 @@ function InteractiveVideoCreateContent() {
           title="Add interactive video"
           description="Upload a video and add timed questions or info cards"
           ctx={ctx}
-          backHref={`/h5p/h5p_interactive_video?${contextQuery}`}
+          backHref={returnTo ?? `/h5p/h5p_interactive_video?${contextQuery}`}
         />
 
         {!hasH5pContext(ctx) ? (

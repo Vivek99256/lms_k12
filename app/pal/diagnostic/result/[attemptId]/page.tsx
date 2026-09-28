@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowRight, Loader2, Target, TrendingUp } from 'lucide-react';
+import { ArrowRight, CheckCircle2, CircleDashed, Loader2, Target, TrendingUp, XCircle } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import {
   fetchChapterDiagnosticResult,
   type ChapterDiagnosticResult,
   type DiagnosticConceptBreakdown,
+  type DiagnosticQuestionResult,
 } from '@/app/pal/data/pal-diagnostic';
 import { BandRow, LevelBadge, StrengthBadge, bandLabel } from '@/app/pal/_components/BandMeter';
 import { JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
@@ -206,14 +207,14 @@ function DiagnosticResultView() {
             </CardTitle>
             <CardDescription>
               {result.recommendedDifficulty
-                ? `Practice will start at ${bandLabel(result.recommendedDifficulty)}.`
-                : 'Practice will start at the level that fits this result.'}
+                ? `Your concept diagnostic will start at ${bandLabel(result.recommendedDifficulty)}.`
+                : 'Your concept diagnostic will start at the level that fits this result.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {result.weaknesses.length === 0 ? (
               <p className="text-sm text-slate-600">
-                Nothing stood out as weak in this chapter. Practice will confirm it.
+                Nothing stood out as weak in this chapter. The concept diagnostic will confirm it.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -261,6 +262,25 @@ function DiagnosticResultView() {
         </Card>
       )}
 
+      {result.questionResults.length > 0 && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="text-base">Question by question</CardTitle>
+            <CardDescription>
+              Every question on this paper, in the order you saw it — correct, incorrect or
+              unanswered.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-slate-100">
+              {result.questionResults.map((question) => (
+                <QuestionResultRow key={question.questionId} question={question} />
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5">
         <Link href={`/pal/diagnostic/chapter/${result.chapterId}/history`} className={buttonVariants({ variant: 'outline' })}>Previous attempts</Link>
 
@@ -276,6 +296,39 @@ function DiagnosticResultView() {
         </p>
       )}
     </PalWorkspace>
+  );
+}
+
+function QuestionResultRow({ question }: { question: DiagnosticQuestionResult }) {
+  const verdict =
+    question.isCorrect === true
+      ? { Icon: CheckCircle2, className: 'text-emerald-600', label: 'Correct' }
+      : question.isCorrect === false
+        ? { Icon: XCircle, className: 'text-rose-600', label: 'Incorrect' }
+        : { Icon: CircleDashed, className: 'text-slate-400', label: 'Unanswered' };
+
+  return (
+    <li className="flex items-start gap-3 py-2.5">
+      <verdict.Icon aria-hidden className={`mt-0.5 h-4 w-4 shrink-0 ${verdict.className}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold tabular-nums text-slate-500">
+            Q{question.sequence}
+          </span>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium capitalize text-slate-600">
+            {question.difficulty}
+          </span>
+          {question.conceptName && (
+            <span className="text-[11px] text-slate-400">{question.conceptName}</span>
+          )}
+        </div>
+        <p
+          className="mt-1 text-sm text-slate-800 [&_img]:max-w-full"
+          dangerouslySetInnerHTML={{ __html: question.title }}
+        />
+      </div>
+      <span className={`shrink-0 text-xs font-semibold ${verdict.className}`}>{verdict.label}</span>
+    </li>
   );
 }
 

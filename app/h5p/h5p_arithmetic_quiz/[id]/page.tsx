@@ -448,7 +448,7 @@ function ArithmeticQuizPlayerContent() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto">
         <H5pPageHeader
           title={quiz?.title || 'Arithmetic quiz'}
           description={quiz?.description || undefined}

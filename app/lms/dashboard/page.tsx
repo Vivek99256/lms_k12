@@ -33,8 +33,18 @@ import {
 } from '@/components/ui/table';
 import { fetchStudentList, type StudentListRow } from '@/app/lms/data/studentAnalysis';
 import { fetchLmsDashboard, type LmsDashboard } from '@/app/lms/data/lmsDashboard';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const LMS_PROGRESS_WIDGETS = [
+  { id: 'panel.timeline', label: 'Profile and standards timeline', group: 'panel' },
+  { id: 'chart.past_performance', label: 'Past performance', group: 'chart' },
+  { id: 'panel.current_subjects', label: 'Current standard — subjects', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
 
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
@@ -78,6 +88,9 @@ export default function LmsDashboardPage() {
   const [dashboard, setDashboard] = useState<LmsDashboard | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState('');
+
+  const prefs = useDashboardPreferences('lms.student-progress', LMS_PROGRESS_WIDGETS);
+  const show = prefs.isVisible;
 
   const loadDashboard = useCallback(
     (userId: string, userProfile: string, signal?: AbortSignal) => {
@@ -200,6 +213,9 @@ export default function LmsDashboardPage() {
                 : 'Pick a class and student to view their learning progress.'}
             </p>
           </div>
+          {prefs.ready ? (
+            <CustomizeDashboard widgets={LMS_PROGRESS_WIDGETS} {...prefs.customizeProps} className="ml-auto shrink-0" />
+          ) : null}
         </header>
 
         {errorText ? (
@@ -259,120 +275,129 @@ export default function LmsDashboardPage() {
           </section>
         ) : null}
 
-        {loading ? (
+        {/* Wait for the user's layout too, so hidden widgets never flash in. */}
+        {loading || (dashboard && !prefs.ready) ? (
           <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-20 text-sm text-slate-500">
             <Loader2 className="size-4 animate-spin" /> Loading dashboard…
           </div>
         ) : dashboard ? (
           <>
-            {/* Profile + timeline */}
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap items-center gap-4">
-                <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-500">
-                  <User className="size-7" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    {dashboard.profile.name || 'Student'}
-                  </h2>
-                  {dashboard.profile.enrollmentNo ? (
-                    <p className="text-sm text-slate-500">Enrollment: {dashboard.profile.enrollmentNo}</p>
-                  ) : null}
-                </div>
-                <div className="rounded-xl bg-slate-50 px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-slate-800">{dashboard.standardCount}</p>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Standards</p>
-                </div>
-              </div>
+            {!prefs.hasVisible() ? <AllWidgetsHiddenNotice /> : null}
 
-              {dashboard.timeline.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {dashboard.timeline.map((entry, index) => (
-                    <span
-                      key={`${entry.standardName}-${entry.syear}-${index}`}
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600"
-                    >
-                      <GraduationCap className="size-3.5 text-indigo-500" />
-                      {entry.standardName || '—'}
-                      {entry.syear ? <span className="text-slate-400">· {entry.syear}</span> : null}
-                    </span>
-                  ))}
+            {/* Profile + timeline */}
+            {show('panel.timeline') ? (
+              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center gap-4">
+                  <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-500">
+                    <User className="size-7" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      {dashboard.profile.name || 'Student'}
+                    </h2>
+                    {dashboard.profile.enrollmentNo ? (
+                      <p className="text-sm text-slate-500">Enrollment: {dashboard.profile.enrollmentNo}</p>
+                    ) : null}
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-4 py-3 text-center">
+                    <p className="text-2xl font-bold text-slate-800">{dashboard.standardCount}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Standards</p>
+                  </div>
                 </div>
-              ) : null}
-            </section>
+
+                {dashboard.timeline.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {dashboard.timeline.map((entry, index) => (
+                      <span
+                        key={`${entry.standardName}-${entry.syear}-${index}`}
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600"
+                      >
+                        <GraduationCap className="size-3.5 text-indigo-500" />
+                        {entry.standardName || '—'}
+                        {entry.syear ? <span className="text-slate-400">· {entry.syear}</span> : null}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
 
             {/* Past performance chart */}
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <BarChart3 className="size-4 text-indigo-500" />
-                <h2 className="text-base font-semibold text-slate-900">Past Performance</h2>
-              </div>
-              {pastChart.hasData ? (
-                <div className="h-72 w-full">
-                  <Bar data={pastChart.data} options={chartOptions} />
+            {show('chart.past_performance') ? (
+              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <BarChart3 className="size-4 text-indigo-500" />
+                  <h2 className="text-base font-semibold text-slate-900">Past Performance</h2>
                 </div>
-              ) : (
-                <p className="rounded-xl border border-dashed border-slate-300 px-3 py-10 text-center text-sm text-slate-500">
-                  No past-standard results available.
-                </p>
-              )}
-            </section>
+                {pastChart.hasData ? (
+                  <div className="h-72 w-full">
+                    <Bar data={pastChart.data} options={chartOptions} />
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-slate-300 px-3 py-10 text-center text-sm text-slate-500">
+                    No past-standard results available.
+                  </p>
+                )}
+              </section>
+            ) : null}
 
             {/* Current subjects + chapters */}
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <BookOpen className="size-4 text-indigo-500" />
-                <h2 className="text-base font-semibold text-slate-900">Current Standard — Subjects</h2>
-              </div>
-              {dashboard.currentSubjects.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-slate-300 px-3 py-10 text-center text-sm text-slate-500">
-                  No current-standard subject data available.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  {dashboard.currentSubjects.map((subject, index) => (
-                    <div key={`${subject.name}-${index}`} className="rounded-xl border border-slate-200 p-4">
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <h3 className="min-w-0 truncate text-sm font-semibold text-slate-900">{subject.name}</h3>
-                        <span className="shrink-0 text-sm font-semibold text-slate-700">{subject.percent}%</span>
-                      </div>
-                      <div className="mb-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className={cn('h-full rounded-full', tierColor(subject.percent))}
-                          style={{ width: `${subject.percent}%` }}
-                        />
-                      </div>
-                      {subject.chapters.length > 0 ? (
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="hover:bg-transparent">
-                                <TableHead className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Chapter</TableHead>
-                                <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Obtain</TableHead>
-                                <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Total</TableHead>
-                                <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">%</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {subject.chapters.map((chapter, ci) => (
-                                <TableRow key={`${chapter.title}-${ci}`}>
-                                  <TableCell className="text-slate-700">{chapter.title}</TableCell>
-                                  <TableCell className="text-right text-slate-600">{chapter.obtain}</TableCell>
-                                  <TableCell className="text-right text-slate-600">{chapter.total}</TableCell>
-                                  <TableCell className="text-right font-medium text-slate-700">{chapter.percent}%</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-400">No chapter breakdown.</p>
-                      )}
-                    </div>
-                  ))}
+            {show('panel.current_subjects') ? (
+              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <BookOpen className="size-4 text-indigo-500" />
+                  <h2 className="text-base font-semibold text-slate-900">Current Standard — Subjects</h2>
                 </div>
-              )}
-            </section>
+                {dashboard.currentSubjects.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-300 px-3 py-10 text-center text-sm text-slate-500">
+                    No current-standard subject data available.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {dashboard.currentSubjects.map((subject, index) => (
+                      <div key={`${subject.name}-${index}`} className="rounded-xl border border-slate-200 p-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <h3 className="min-w-0 truncate text-sm font-semibold text-slate-900">{subject.name}</h3>
+                          <span className="shrink-0 text-sm font-semibold text-slate-700">{subject.percent}%</span>
+                        </div>
+                        <div className="mb-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={cn('h-full rounded-full', tierColor(subject.percent))}
+                            style={{ width: `${subject.percent}%` }}
+                          />
+                        </div>
+                        {subject.chapters.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="hover:bg-transparent">
+                                  <TableHead className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Chapter</TableHead>
+                                  <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Obtain</TableHead>
+                                  <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Total</TableHead>
+                                  <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">%</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {subject.chapters.map((chapter, ci) => (
+                                  <TableRow key={`${chapter.title}-${ci}`}>
+                                    <TableCell className="text-slate-700">{chapter.title}</TableCell>
+                                    <TableCell className="text-right text-slate-600">{chapter.obtain}</TableCell>
+                                    <TableCell className="text-right text-slate-600">{chapter.total}</TableCell>
+                                    <TableCell className="text-right font-medium text-slate-700">{chapter.percent}%</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-400">No chapter breakdown.</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : null}
           </>
         ) : !isStudent && !selectedStudentId ? (
           <div className="rounded-xl border border-dashed border-slate-300 px-3 py-16 text-center text-sm text-slate-500">

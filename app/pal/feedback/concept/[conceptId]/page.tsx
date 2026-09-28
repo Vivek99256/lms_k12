@@ -269,6 +269,8 @@ function ConceptFeedbackView() {
   }
 
   const chapterId = feedback.chapterId || chapterHint;
+  // Practice is the engine's, not the concept diagnostic's question set.
+  const practiceHref = `/pal/eso?conceptId=${conceptId}`;
   const published = Math.max(feedback.evidencePublished, publishedHint);
   const openCase = support?.records[0] ?? null;
 
@@ -319,7 +321,7 @@ function ConceptFeedbackView() {
             </Link>
           )}
           <Link
-            href={`/pal/adaptive/concept/${conceptId}`}
+            href={practiceHref}
             className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full justify-start')}
           >
             Practise again
@@ -334,7 +336,7 @@ function ConceptFeedbackView() {
       eyebrow={feedback.conceptName || 'This concept'}
       title="How your practice went"
       description="Read this before the check. It takes a minute."
-      backHref={`/pal/adaptive/concept/${conceptId}`}
+      backHref={practiceHref}
       backLabel="Back to practice"
       rail={rail}
     >
@@ -348,7 +350,7 @@ function ConceptFeedbackView() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href={`/pal/adaptive/concept/${conceptId}`} className={buttonVariants()}>
+            <Link href={practiceHref} className={buttonVariants()}>
               Start practice
               <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
             </Link>
@@ -430,7 +432,7 @@ function ConceptFeedbackView() {
               misconception={result.misconception}
               conceptId={conceptId}
               chapterId={chapterId}
-              onPractiseAgain={() => router.push(`/pal/adaptive/concept/${conceptId}`)}
+              onPractiseAgain={() => router.push(practiceHref)}
             />
           ) : feedback.checkReadiness.ready ? (
             <Card className="mt-4 border-emerald-200 bg-emerald-50">

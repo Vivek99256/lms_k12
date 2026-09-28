@@ -43,7 +43,6 @@ import {
 } from '@/app/pal/data/pal';
 import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import { getViewAsStudent, setViewAsStudent } from '@/app/pal/data/pal-view-as';
-import { DiagnosticButton } from '@/app/pal/_components/DiagnosticPanel';
 import StudentPicker from '@/app/pal/_components/StudentPicker';
 import ViewAsBanner from '@/app/pal/_components/ViewAsBanner';
 import { AdaptiveLearningButton } from '@/app/pal/_components/AdaptiveLearningButton';
@@ -639,9 +638,26 @@ function ChapterRow({
 
               {/* Diagnostic is the onboarding step of the learning journey — it
                   establishes a baseline before instruction, so it's offered
-                  whether or not the student has quiz attempts yet. Opens in a
-                  modal, without leaving this page. */}
-              <DiagnosticButton studentId={studentId} context={context} />
+                  whether or not the student has quiz attempts yet.
+                  Routes to the canonical /pal/diagnostic/chapter page — the
+                  ONLY diagnostic that enforces exactly 15 questions (5 easy /
+                  5 medium / 5 hard, question_type=MCQ, scoped to this
+                  chapter). This used to open DiagnosticPanel's modal instead,
+                  a legacy DOK-sampled assessment with no fixed count and no
+                  MCQ-only filter — a student who used this button never took
+                  the paper the rest of the journey (Concept diagnostic, Plan,
+                  etc.) actually reads its result from. */}
+              {!isStaff && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => router.push(`/pal/diagnostic/chapter/${context.chapterId}`)}
+                  className="border-violet-200 text-violet-700 hover:bg-violet-50"
+                >
+                  <ClipboardCheck className="h-3.5 w-3.5" />
+                  Chapter diagnostic assessment
+                </Button>
+              )}
 
               {/* Adaptive Learning is a learner-facing feature: a student may only
                   ever start their own session, never a teacher/staff/admin acting

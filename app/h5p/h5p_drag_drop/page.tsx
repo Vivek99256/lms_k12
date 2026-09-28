@@ -72,7 +72,8 @@ function DragDropListContent() {
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
-  const contextQuery = h5pContextQuery(ctx);
+  const returnTo = searchParams?.get('return_to') || null;
+  const contextQuery = h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const [tasks, setTasks] = useState<H5pDragDrop[]>([]);

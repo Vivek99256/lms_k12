@@ -17,6 +17,21 @@ import {
   type StudentsDashboardPayload,
 } from '@/app/students/_lib/students-dashboard-api';
 import { Button } from '@/components/ui/button';
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard';
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences';
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences';
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const STUDENTS_WIDGETS = [
+  { id: 'kpi.active_students', label: 'Active students', group: 'kpi' },
+  { id: 'kpi.classes', label: 'Classes', group: 'kpi' },
+  { id: 'kpi.left_this_year', label: 'Left this year', group: 'kpi' },
+  { id: 'kpi.retention', label: 'Retention', group: 'kpi' },
+  { id: 'chart.students_by_class', label: 'Students by class', group: 'chart' },
+  { id: 'chart.gender_breakdown', label: 'Gender breakdown', group: 'chart' },
+  { id: 'chart.left_by_reason', label: 'Students who left, by reason', group: 'chart' },
+  { id: 'panel.recently_enrolled', label: 'Recently enrolled', group: 'panel' },
+] as const satisfies readonly DashboardWidget[];
 
 /**
  * Students dashboard — the module landing page (Main dashboard → Students →
@@ -31,8 +46,14 @@ export default function StudentsDashboardPage() {
   const [payload, setPayload] = useState<StudentsDashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const prefs = useDashboardPreferences('module.students', STUDENTS_WIDGETS);
+  const show = prefs.isVisible;
+  // Each row holds two panels; a lone one takes the full width.
+  const bothUpper = show('chart.students_by_class') && show('chart.gender_breakdown');
+  const bothLower = show('panel.recently_enrolled') && show('chart.left_by_reason');
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession(getFeesSession());
   }, []);
 
@@ -74,6 +95,7 @@ export default function StudentsDashboardPage() {
     if (!session) return;
 
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(session, controller.signal);
 
     return () => controller.abort();
@@ -87,50 +109,57 @@ export default function StudentsDashboardPage() {
         title="Students dashboard"
         description="Enrollment, class strength and movement for the current academic year."
         action={
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading || !session}
-            onClick={() => session && void load(session)}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {prefs.ready ? <CustomizeDashboard widgets={STUDENTS_WIDGETS} {...prefs.customizeProps} /> : null}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading || !session}
+              onClick={() => session && void load(session)}
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Refresh
+            </Button>
+          </div>
         }
       />
 
       {error ? <InlineMessage type="error" text={error} /> : null}
 
-      {loading && !summary ? (
+      {/* Wait for the user's layout too, so hidden widgets never flash in. */}
+      {(loading && !summary) || (!prefs.ready && !error) ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading students summary…
         </div>
       ) : null}
 
-      {summary ? (
+      {payload && prefs.ready && !prefs.hasVisible() ? <AllWidgetsHiddenNotice /> : null}
+
+      {summary && prefs.ready && prefs.hasVisible('kpi') ? (
         <StudentsDashboard
           totalStudents={summary.total_students}
           inactiveThisYear={summary.inactive_this_year}
           totalClasses={summary.total_classes}
+          isVisible={show}
         />
       ) : null}
 
-      {payload ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <StudentsByClassPanel rows={payload.students_by_class ?? []} />
-          <GenderBreakdownPanel rows={payload.gender_breakdown ?? []} />
+      {payload && prefs.ready && (show('chart.students_by_class') || show('chart.gender_breakdown')) ? (
+        <div className={`grid grid-cols-1 gap-4 ${bothUpper ? 'xl:grid-cols-2' : ''}`}>
+          {show('chart.students_by_class') ? <StudentsByClassPanel rows={payload.students_by_class ?? []} /> : null}
+          {show('chart.gender_breakdown') ? <GenderBreakdownPanel rows={payload.gender_breakdown ?? []} /> : null}
         </div>
       ) : null}
 
-      {payload ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <RecentEnrollmentsPanel rows={payload.recent_enrollments ?? []} />
-          <DropReasonsPanel rows={payload.drop_reasons ?? []} />
+      {payload && prefs.ready && (show('panel.recently_enrolled') || show('chart.left_by_reason')) ? (
+        <div className={`grid grid-cols-1 gap-4 ${bothLower ? 'xl:grid-cols-2' : ''}`}>
+          {show('panel.recently_enrolled') ? <RecentEnrollmentsPanel rows={payload.recent_enrollments ?? []} /> : null}
+          {show('chart.left_by_reason') ? <DropReasonsPanel rows={payload.drop_reasons ?? []} /> : null}
         </div>
       ) : null}
     </PageFrame>

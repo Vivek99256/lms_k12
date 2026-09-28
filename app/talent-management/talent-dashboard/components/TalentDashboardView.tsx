@@ -61,6 +61,35 @@ import type {
   TalentTone,
 } from '../../_lib/talent-types'
 import { cn } from '@/lib/utils'
+import { AllWidgetsHiddenNotice, CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard'
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences'
+import type { DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences'
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const TALENT_WIDGETS = [
+  { id: 'kpi.open_positions', label: 'Open positions', group: 'kpi' },
+  { id: 'kpi.candidate_pipeline', label: 'Candidate pipeline', group: 'kpi' },
+  { id: 'kpi.onboarding', label: 'Onboarding', group: 'kpi' },
+  { id: 'kpi.performance', label: 'Performance', group: 'kpi' },
+  { id: 'kpi.mobility', label: 'Mobility', group: 'kpi' },
+  { id: 'kpi.offboarding', label: 'Offboarding', group: 'kpi' },
+  { id: 'chart.hiring_pipeline', label: 'Hiring pipeline overview', group: 'chart' },
+  { id: 'chart.performance_cycle', label: 'Performance cycle progress', group: 'chart' },
+  { id: 'chart.onboarding_progress', label: 'Onboarding progress', group: 'chart' },
+  { id: 'panel.action_items', label: 'My action items', group: 'panel' },
+  { id: 'panel.recent_activities', label: 'Recent activities', group: 'panel' },
+  { id: 'panel.quick_links', label: 'Quick links', group: 'panel' },
+] as const satisfies readonly DashboardWidget[]
+
+const CHART_IDS = ['chart.hiring_pipeline', 'chart.performance_cycle', 'chart.onboarding_progress'] as const
+const PANEL_IDS = ['panel.action_items', 'panel.recent_activities', 'panel.quick_links'] as const
+
+/** The middle and bottom rows hold three cards each; however many are left fill the row. */
+const ROW_COLUMNS: Record<number, string> = {
+  1: 'lg:grid-cols-1',
+  2: 'lg:grid-cols-2',
+  3: 'lg:grid-cols-3',
+}
 
 /* ── formatting ───────────────────────────────────────────────────────────── */
 
@@ -257,6 +286,11 @@ export function TalentDashboard() {
     refresh,
   } = useTalentDashboard()
 
+  const prefs = useDashboardPreferences('talent.dashboard', TALENT_WIDGETS)
+  const show = prefs.isVisible
+  const chartCount = CHART_IDS.filter((id) => show(id)).length
+  const panelCount = PANEL_IDS.filter((id) => show(id)).length
+
   const go = React.useCallback(
     (menuId: string, query?: string) => router.push(moduleHref(menuId, query)),
     [router],
@@ -307,7 +341,8 @@ export function TalentDashboard() {
     )
   }
 
-  if (loading) {
+  // Wait for the user's layout too, so hidden widgets never flash in.
+  if (loading || !prefs.ready) {
     return <DashboardSkeleton />
   }
 
@@ -445,324 +480,357 @@ export function TalentDashboard() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <CustomizeDashboard widgets={TALENT_WIDGETS} {...prefs.customizeProps} size="lg" className="ml-2 shrink-0" />
             </div>
           </div>
         </div>
       </div>
 
+      {!prefs.hasVisible() && <AllWidgetsHiddenNotice />}
+
       {/* Top KPI Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
-        <KpiCard
-          icon={<Briefcase className="size-4" />}
-          title="Open Positions"
-          value={kpis.open_positions}
-          footer={`${formatCount(kpis.critical_positions)} Critical`}
-          footerTone="text-destructive"
-          onClick={() => go('recruitment', 'tab=job-openings')}
-        />
-        <KpiCard
-          icon={<Users className="size-4" />}
-          title="Candidate Pipeline"
-          value={kpis.candidates}
-          footer={trendLabel}
-          footerTone={trendTone}
-          onClick={() => go('recruitment', 'tab=candidates')}
-        />
-        <KpiCard
-          icon={<UserPlus className="size-4" />}
-          title="Onboarding"
-          value={kpis.onboarding}
-          footer={`${formatCount(kpis.preboarding)} Preboarding`}
-          footerTone="text-primary"
-          onClick={() => go('onboarding')}
-        />
-        <KpiCard
-          icon={<TrendingUp className="size-4" />}
-          title="Performance"
-          value={kpis.performance}
-          footer={`${formatCount(kpis.pending_reviews)} Pending Reviews`}
-          footerTone="text-warning"
-          onClick={() => go('performance')}
-        />
-        <KpiCard
-          icon={<ArrowRightLeft className="size-4" />}
-          title="Mobility"
-          value={kpis.mobility}
-          footer={`${formatCount(kpis.mobility_applications)} Applications`}
-          footerTone="text-primary"
-          onClick={() => go('mobility-succession')}
-        />
-        <KpiCard
-          icon={<LogOut className="size-4" />}
-          title="Offboarding"
-          value={kpis.offboarding}
-          footer={`${formatCount(kpis.clearances_pending)} Clearances Pending`}
-          footerTone="text-destructive"
-          onClick={() => go('offboarding')}
-        />
-      </div>
+      {prefs.hasVisible('kpi') && (
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          {show('kpi.open_positions') && (
+            <KpiCard
+              icon={<Briefcase className="size-4" />}
+              title="Open Positions"
+              value={kpis.open_positions}
+              footer={`${formatCount(kpis.critical_positions)} Critical`}
+              footerTone="text-destructive"
+              onClick={() => go('recruitment', 'tab=job-openings')}
+            />
+          )}
+          {show('kpi.candidate_pipeline') && (
+            <KpiCard
+              icon={<Users className="size-4" />}
+              title="Candidate Pipeline"
+              value={kpis.candidates}
+              footer={trendLabel}
+              footerTone={trendTone}
+              onClick={() => go('recruitment', 'tab=candidates')}
+            />
+          )}
+          {show('kpi.onboarding') && (
+            <KpiCard
+              icon={<UserPlus className="size-4" />}
+              title="Onboarding"
+              value={kpis.onboarding}
+              footer={`${formatCount(kpis.preboarding)} Preboarding`}
+              footerTone="text-primary"
+              onClick={() => go('onboarding')}
+            />
+          )}
+          {show('kpi.performance') && (
+            <KpiCard
+              icon={<TrendingUp className="size-4" />}
+              title="Performance"
+              value={kpis.performance}
+              footer={`${formatCount(kpis.pending_reviews)} Pending Reviews`}
+              footerTone="text-warning"
+              onClick={() => go('performance')}
+            />
+          )}
+          {show('kpi.mobility') && (
+            <KpiCard
+              icon={<ArrowRightLeft className="size-4" />}
+              title="Mobility"
+              value={kpis.mobility}
+              footer={`${formatCount(kpis.mobility_applications)} Applications`}
+              footerTone="text-primary"
+              onClick={() => go('mobility-succession')}
+            />
+          )}
+          {show('kpi.offboarding') && (
+            <KpiCard
+              icon={<LogOut className="size-4" />}
+              title="Offboarding"
+              value={kpis.offboarding}
+              footer={`${formatCount(kpis.clearances_pending)} Clearances Pending`}
+              footerTone="text-destructive"
+              onClick={() => go('offboarding')}
+            />
+          )}
+        </div>
+      )}
 
       {/* Middle Dashboard Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Hiring Pipeline */}
-        <Card className="shadow-sm col-span-1 flex flex-col">
-          <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Filter className="size-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-bold text-foreground">Hiring Pipeline Overview</CardTitle>
-            </div>
-            <button
-              type="button"
-              onClick={() => go('recruitment', 'tab=requisitions')}
-              className="text-xs font-bold text-primary cursor-pointer hover:underline"
-            >
-              View Details
-            </button>
-          </CardHeader>
-          <CardContent className="p-5 pt-4 flex-1 flex flex-col">
-            <div className="flex-1">
-              <div className="flex items-end justify-between px-2 mb-3">
-                {pipeline.stages.map((stage) => (
-                  <div key={stage.key} className="flex flex-col items-center gap-2">
-                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{stage.label}</span>
-                    <span className="text-xl font-bold text-foreground">{numberFormat.format(stage.value)}</span>
-                  </div>
-                ))}
-              </div>
-              {/* Funnel bar - widths are the real stage shares, not fixed. */}
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex mb-8 mt-4">
-                {pipeline.stages.map((stage, index) => (
-                  <div
-                    key={stage.key}
-                    className={cn('h-full', ['bg-primary/20', 'bg-primary/40', 'bg-primary/60', 'bg-primary/80', 'bg-primary'][index])}
-                    style={{ width: stageWidth(stage) }}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center justify-between border-t border-border/40 pt-4 mt-auto">
-              <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Average Time to Hire</span>
-                <span className="text-sm font-bold text-foreground mt-1">
-                  {pipeline.avg_time_to_hire_days === null ? 'No hires yet' : `${pipeline.avg_time_to_hire_days} Days`}
-                </span>
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Offer Acceptance Rate</span>
-                <span className={cn('text-sm font-bold mt-1', pipeline.offer_acceptance_rate === null ? 'text-muted-foreground' : 'text-success')}>
-                  {pipeline.offer_acceptance_rate === null ? 'No offers extended' : `${pipeline.offer_acceptance_rate}%`}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Performance Cycle Progress */}
-        <Card className="shadow-sm col-span-1 flex flex-col">
-          <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="size-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-bold text-foreground">Performance Cycle Progress</CardTitle>
-            </div>
-            <button
-              type="button"
-              onClick={() => go('performance')}
-              className="text-xs font-bold text-primary cursor-pointer hover:underline"
-            >
-              View Details
-            </button>
-          </CardHeader>
-          <CardContent className="p-5 pt-4 flex-1 flex flex-col justify-between">
-            {cycle.total === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
-                <Clock className="size-6 text-muted-foreground/60" />
-                <p className="text-sm font-medium text-foreground">No reviews in this cycle yet</p>
-                <p className="text-xs text-muted-foreground">
-                  {cycle.cycle_name ? `${cycle.cycle_name} has no employee reviews.` : 'No review cycle has been created.'}
-                </p>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-8 flex-1">
-                <DonutChart percentage={cycle.completed_pct} colorClass="text-slate-700" label="Completed" />
-                <div className="flex flex-col gap-3">
-                  <LegendRow swatch="bg-slate-700" label="Completed" value={cycle.completed} total={cycle.total} />
-                  <LegendRow swatch="bg-muted-foreground/40" label="In Progress" value={cycle.in_progress} total={cycle.total} />
-                  <LegendRow swatch="bg-muted/60" label="Not Started" value={cycle.not_started} total={cycle.total} />
+      {chartCount > 0 && (
+        <div className={cn('grid grid-cols-1 gap-6 mb-6', ROW_COLUMNS[chartCount])}>
+          {/* Hiring Pipeline */}
+          {show('chart.hiring_pipeline') && (
+            <Card className="shadow-sm col-span-1 flex flex-col">
+              <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Filter className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-bold text-foreground">Hiring Pipeline Overview</CardTitle>
                 </div>
-              </div>
-            )}
-            <div className="flex flex-col items-center justify-center border-t border-border/40 pt-4 mt-6">
-              <span className="text-xs font-bold text-foreground">
-                {cycle.cycle_name ? `Cycle: ${cycle.cycle_name}` : 'No active cycle'}
-              </span>
-              {cyclePeriod && <span className="text-xs text-muted-foreground mt-0.5">{cyclePeriod}</span>}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Onboarding Progress */}
-        <Card className="shadow-sm col-span-1 flex flex-col">
-          <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2">
-              <UserPlus className="size-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-bold text-foreground">Onboarding Progress</CardTitle>
-            </div>
-            <button
-              type="button"
-              onClick={() => go('onboarding')}
-              className="text-xs font-bold text-primary cursor-pointer hover:underline"
-            >
-              View Details
-            </button>
-          </CardHeader>
-          <CardContent className="p-5 pt-4 flex-1 flex flex-col justify-between">
-            {onboarding.total === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
-                <UserPlus className="size-6 text-muted-foreground/60" />
-                <p className="text-sm font-medium text-foreground">No onboarding journeys yet</p>
-                <p className="text-xs text-muted-foreground">New hires will appear here once a journey is created.</p>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-8 flex-1">
-                <DonutChart percentage={onboarding.completed_pct} colorClass="text-slate-600" label="Completed" />
-                <div className="flex flex-col gap-3">
-                  <LegendRow swatch="bg-slate-600" label="Completed" value={onboarding.completed} total={onboarding.total} />
-                  <LegendRow swatch="bg-muted-foreground/40" label="In Progress" value={onboarding.in_progress} total={onboarding.total} />
-                  <LegendRow swatch="bg-muted/60" label="Not Started" value={onboarding.not_started} total={onboarding.total} />
-                </div>
-              </div>
-            )}
-            <div className="flex items-center justify-between border-t border-border/40 pt-4 mt-6">
-              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                Average Onboarding Completion Time
-              </span>
-              <span className={cn('text-sm font-bold mt-1', onboarding.avg_completion_days === null ? 'text-muted-foreground' : 'text-success')}>
-                {onboarding.avg_completion_days === null ? 'No data' : `${onboarding.avg_completion_days} Days`}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Bottom Dashboard Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Action Items */}
-        <Card className="shadow-sm col-span-1 flex flex-col">
-          <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between border-b border-border/40">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="size-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-bold text-foreground">My Action Items</CardTitle>
-            </div>
-            <button
-              type="button"
-              onClick={() => go('recruitment')}
-              className="text-xs font-bold text-primary cursor-pointer hover:underline"
-            >
-              View All
-            </button>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 flex flex-col">
-            <div className="flex flex-col divide-y divide-border/40">
-              {actionItems.map((item: TalentActionItem) => (
                 <button
-                  key={item.key}
                   type="button"
-                  onClick={() => go(item.menu)}
-                  className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors cursor-pointer group text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                  onClick={() => go('recruitment', 'tab=requisitions')}
+                  className="text-xs font-bold text-primary cursor-pointer hover:underline"
                 >
-                  <div className="flex items-center gap-3">
-                    <ActionIcon actionKey={item.key} />
-                    <span className="text-sm font-medium text-foreground">{item.label}</span>
+                  View Details
+                </button>
+              </CardHeader>
+              <CardContent className="p-5 pt-4 flex-1 flex flex-col">
+                <div className="flex-1">
+                  <div className="flex items-end justify-between px-2 mb-3">
+                    {pipeline.stages.map((stage) => (
+                      <div key={stage.key} className="flex flex-col items-center gap-2">
+                        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{stage.label}</span>
+                        <span className="text-xl font-bold text-foreground">{numberFormat.format(stage.value)}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge className={cn('font-bold border-0', item.count === 0 ? TONE_BADGE.neutral : TONE_BADGE[item.tone])}>
-                      {numberFormat.format(item.count)}
-                    </Badge>
-                    <span className={cn('text-xs font-bold flex items-center gap-1 group-hover:underline', item.count === 0 ? 'text-muted-foreground' : TONE_TEXT[item.tone])}>
-                      {item.count === 0 ? 'All clear' : 'Open'} <ChevronRight className="size-3" />
+                  {/* Funnel bar - widths are the real stage shares, not fixed. */}
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex mb-8 mt-4">
+                    {pipeline.stages.map((stage, index) => (
+                      <div
+                        key={stage.key}
+                        className={cn('h-full', ['bg-primary/20', 'bg-primary/40', 'bg-primary/60', 'bg-primary/80', 'bg-primary'][index])}
+                        style={{ width: stageWidth(stage) }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-border/40 pt-4 mt-auto">
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Average Time to Hire</span>
+                    <span className="text-sm font-bold text-foreground mt-1">
+                      {pipeline.avg_time_to_hire_days === null ? 'No hires yet' : `${pipeline.avg_time_to_hire_days} Days`}
                     </span>
                   </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Offer Acceptance Rate</span>
+                    <span className={cn('text-sm font-bold mt-1', pipeline.offer_acceptance_rate === null ? 'text-muted-foreground' : 'text-success')}>
+                      {pipeline.offer_acceptance_rate === null ? 'No offers extended' : `${pipeline.offer_acceptance_rate}%`}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Recent Activities */}
-        <Card className="shadow-sm col-span-1 flex flex-col">
-          <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between border-b border-border/40">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="size-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-bold text-foreground">Recent Activities</CardTitle>
-            </div>
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="text-xs font-bold text-primary cursor-pointer hover:underline"
-            >
-              Refresh
-            </button>
-          </CardHeader>
-          <CardContent className="p-5 flex-1 flex flex-col gap-6">
-            {activity.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
-                <TrendingUp className="size-6 text-muted-foreground/60" />
-                <p className="text-sm font-medium text-foreground">No recent activity</p>
-                <p className="text-xs text-muted-foreground">Actions across the talent modules will appear here.</p>
-              </div>
-            ) : (
-              activity.map((entry: TalentActivityEntry) => (
-                <div key={entry.id} className="flex gap-4">
-                  <div
-                    className={cn(
-                      'size-8 rounded-full flex items-center justify-center shrink-0 border',
-                      entry.tone === 'success' && 'bg-success/10 border-success/20',
-                      entry.tone === 'danger' && 'bg-destructive/10 border-destructive/20',
-                      (entry.tone === 'neutral' || entry.tone === 'primary' || entry.tone === 'warning') && 'bg-muted border-border/60',
-                    )}
-                  >
-                    <ActivityIcon entry={entry} />
+          {/* Performance Cycle Progress */}
+          {show('chart.performance_cycle') && (
+            <Card className="shadow-sm col-span-1 flex flex-col">
+              <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-bold text-foreground">Performance Cycle Progress</CardTitle>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => go('performance')}
+                  className="text-xs font-bold text-primary cursor-pointer hover:underline"
+                >
+                  View Details
+                </button>
+              </CardHeader>
+              <CardContent className="p-5 pt-4 flex-1 flex flex-col justify-between">
+                {cycle.total === 0 ? (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
+                    <Clock className="size-6 text-muted-foreground/60" />
+                    <p className="text-sm font-medium text-foreground">No reviews in this cycle yet</p>
+                    <p className="text-xs text-muted-foreground">
+                      {cycle.cycle_name ? `${cycle.cycle_name} has no employee reviews.` : 'No review cycle has been created.'}
+                    </p>
                   </div>
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-sm font-medium text-foreground">{entry.text}</span>
-                    {entry.context && <span className="text-xs font-bold text-muted-foreground">{entry.context}</span>}
+                ) : (
+                  <div className="flex items-center justify-center gap-8 flex-1">
+                    <DonutChart percentage={cycle.completed_pct} colorClass="text-slate-700" label="Completed" />
+                    <div className="flex flex-col gap-3">
+                      <LegendRow swatch="bg-slate-700" label="Completed" value={cycle.completed} total={cycle.total} />
+                      <LegendRow swatch="bg-muted-foreground/40" label="In Progress" value={cycle.in_progress} total={cycle.total} />
+                      <LegendRow swatch="bg-muted/60" label="Not Started" value={cycle.not_started} total={cycle.total} />
+                    </div>
                   </div>
-                  <span className="text-[11px] font-bold text-muted-foreground ml-auto whitespace-nowrap">
-                    {relativeTime(entry.at)}
+                )}
+                <div className="flex flex-col items-center justify-center border-t border-border/40 pt-4 mt-6">
+                  <span className="text-xs font-bold text-foreground">
+                    {cycle.cycle_name ? `Cycle: ${cycle.cycle_name}` : 'No active cycle'}
+                  </span>
+                  {cyclePeriod && <span className="text-xs text-muted-foreground mt-0.5">{cyclePeriod}</span>}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Onboarding Progress */}
+          {show('chart.onboarding_progress') && (
+            <Card className="shadow-sm col-span-1 flex flex-col">
+              <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-bold text-foreground">Onboarding Progress</CardTitle>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => go('onboarding')}
+                  className="text-xs font-bold text-primary cursor-pointer hover:underline"
+                >
+                  View Details
+                </button>
+              </CardHeader>
+              <CardContent className="p-5 pt-4 flex-1 flex flex-col justify-between">
+                {onboarding.total === 0 ? (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
+                    <UserPlus className="size-6 text-muted-foreground/60" />
+                    <p className="text-sm font-medium text-foreground">No onboarding journeys yet</p>
+                    <p className="text-xs text-muted-foreground">New hires will appear here once a journey is created.</p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-8 flex-1">
+                    <DonutChart percentage={onboarding.completed_pct} colorClass="text-slate-600" label="Completed" />
+                    <div className="flex flex-col gap-3">
+                      <LegendRow swatch="bg-slate-600" label="Completed" value={onboarding.completed} total={onboarding.total} />
+                      <LegendRow swatch="bg-muted-foreground/40" label="In Progress" value={onboarding.in_progress} total={onboarding.total} />
+                      <LegendRow swatch="bg-muted/60" label="Not Started" value={onboarding.not_started} total={onboarding.total} />
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-border/40 pt-4 mt-6">
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Average Onboarding Completion Time
+                  </span>
+                  <span className={cn('text-sm font-bold mt-1', onboarding.avg_completion_days === null ? 'text-muted-foreground' : 'text-success')}>
+                    {onboarding.avg_completion_days === null ? 'No data' : `${onboarding.avg_completion_days} Days`}
                   </span>
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
-        {/* Quick Links */}
-        <Card className="shadow-sm col-span-1 flex flex-col">
-          <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between border-b border-border/40">
-            <div className="flex items-center gap-2">
-              <LinkIcon className="size-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-bold text-foreground">Quick Links</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="p-5 flex-1 flex flex-col justify-center">
-            <div className="grid grid-cols-2 gap-3">
-              {quickLinks.map((link) => (
-                <Button
-                  key={link.label}
-                  variant="outline"
-                  onClick={link.run}
-                  className="h-12 justify-start gap-3 shadow-sm hover:border-primary/40 font-medium"
+      {/* Bottom Dashboard Row */}
+      {panelCount > 0 && (
+        <div className={cn('grid grid-cols-1 gap-6', ROW_COLUMNS[panelCount])}>
+          {/* Action Items */}
+          {show('panel.action_items') && (
+            <Card className="shadow-sm col-span-1 flex flex-col">
+              <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between border-b border-border/40">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-bold text-foreground">My Action Items</CardTitle>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => go('recruitment')}
+                  className="text-xs font-bold text-primary cursor-pointer hover:underline"
                 >
-                  <div className="size-6 rounded-md bg-muted flex items-center justify-center border border-border/60">
-                    {link.icon}
+                  View All
+                </button>
+              </CardHeader>
+              <CardContent className="p-0 flex-1 flex flex-col">
+                <div className="flex flex-col divide-y divide-border/40">
+                  {actionItems.map((item: TalentActionItem) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => go(item.menu)}
+                      className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors cursor-pointer group text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    >
+                      <div className="flex items-center gap-3">
+                        <ActionIcon actionKey={item.key} />
+                        <span className="text-sm font-medium text-foreground">{item.label}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Badge className={cn('font-bold border-0', item.count === 0 ? TONE_BADGE.neutral : TONE_BADGE[item.tone])}>
+                          {numberFormat.format(item.count)}
+                        </Badge>
+                        <span className={cn('text-xs font-bold flex items-center gap-1 group-hover:underline', item.count === 0 ? 'text-muted-foreground' : TONE_TEXT[item.tone])}>
+                          {item.count === 0 ? 'All clear' : 'Open'} <ChevronRight className="size-3" />
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Activities */}
+          {show('panel.recent_activities') && (
+            <Card className="shadow-sm col-span-1 flex flex-col">
+              <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between border-b border-border/40">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-bold text-foreground">Recent Activities</CardTitle>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void refresh()}
+                  className="text-xs font-bold text-primary cursor-pointer hover:underline"
+                >
+                  Refresh
+                </button>
+              </CardHeader>
+              <CardContent className="p-5 flex-1 flex flex-col gap-6">
+                {activity.length === 0 ? (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
+                    <TrendingUp className="size-6 text-muted-foreground/60" />
+                    <p className="text-sm font-medium text-foreground">No recent activity</p>
+                    <p className="text-xs text-muted-foreground">Actions across the talent modules will appear here.</p>
                   </div>
-                  {link.label}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                ) : (
+                  activity.map((entry: TalentActivityEntry) => (
+                    <div key={entry.id} className="flex gap-4">
+                      <div
+                        className={cn(
+                          'size-8 rounded-full flex items-center justify-center shrink-0 border',
+                          entry.tone === 'success' && 'bg-success/10 border-success/20',
+                          entry.tone === 'danger' && 'bg-destructive/10 border-destructive/20',
+                          (entry.tone === 'neutral' || entry.tone === 'primary' || entry.tone === 'warning') && 'bg-muted border-border/60',
+                        )}
+                      >
+                        <ActivityIcon entry={entry} />
+                      </div>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-sm font-medium text-foreground">{entry.text}</span>
+                        {entry.context && <span className="text-xs font-bold text-muted-foreground">{entry.context}</span>}
+                      </div>
+                      <span className="text-[11px] font-bold text-muted-foreground ml-auto whitespace-nowrap">
+                        {relativeTime(entry.at)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Quick Links */}
+          {show('panel.quick_links') && (
+            <Card className="shadow-sm col-span-1 flex flex-col">
+              <CardHeader className="pb-2 pt-5 px-5 flex flex-row items-center justify-between border-b border-border/40">
+                <div className="flex items-center gap-2">
+                  <LinkIcon className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-bold text-foreground">Quick Links</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-5 flex-1 flex flex-col justify-center">
+                <div className="grid grid-cols-2 gap-3">
+                  {quickLinks.map((link) => (
+                    <Button
+                      key={link.label}
+                      variant="outline"
+                      onClick={link.run}
+                      className="h-12 justify-start gap-3 shadow-sm hover:border-primary/40 font-medium"
+                    >
+                      <div className="size-6 rounded-md bg-muted flex items-center justify-center border border-border/60">
+                        {link.icon}
+                      </div>
+                      {link.label}
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   )
 }

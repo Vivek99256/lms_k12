@@ -54,6 +54,19 @@ import { PriorityBadge } from '../../_components/priority-badge'
 import { useDashboard } from '../../_lib/use-dashboard'
 import type { TaskStatus, WorkspaceScope, WorkspaceTask } from '../../_lib/task-types'
 import { CreateTaskModal } from '../../my-tasks/components/create-task-modal'
+import { CustomizeDashboard } from '@/app/dashboard/_components/CustomizeDashboard'
+import { useDashboardPreferences } from '@/app/dashboard/_lib/useDashboardPreferences'
+import { toWidgetId, type DashboardWidget } from '@/app/dashboard/_lib/dashboard-preferences'
+
+/** Everything on this dashboard a user can hide for themselves. Ids are stored per user — don't rename them. */
+const TASK_WIDGETS = [
+  // Only the KPI cards: the filters, views and task list are this screen's working area.
+  // Ids are toWidgetId('kpi', card.id) over the card ids from useDashboard.
+  { id: 'kpi.active_tasks', label: 'Active tasks', group: 'kpi' },
+  { id: 'kpi.pending_review', label: 'Pending review', group: 'kpi' },
+  { id: 'kpi.blocked_overdue', label: 'Blocked / overdue', group: 'kpi' },
+  { id: 'kpi.completed', label: 'Completed', group: 'kpi' },
+] as const satisfies readonly DashboardWidget[]
 
 const statusLabels: Record<TaskStatus, string> = {
   PENDING: 'Pending',
@@ -97,6 +110,8 @@ export function TaskDashboardCenter() {
     setMessage,
   } = useDashboard()
 
+  const prefs = useDashboardPreferences('task.dashboard', TASK_WIDGETS)
+
   const [view, setView] = useState<WorkspaceView>('list')
   const [selected, setSelected] = useState<WorkspaceTask | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -121,30 +136,37 @@ export function TaskDashboardCenter() {
           <h1 className="text-3xl font-bold tracking-tight">Task Management Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">Track assignments, reviews, deadlines, and ownership.</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 size-4" />
-          Assign Task
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {prefs.ready && <CustomizeDashboard widgets={TASK_WIDGETS} {...prefs.customizeProps} />}
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 size-4" />
+            Assign Task
+          </Button>
+        </div>
       </div>
       {message && <div className="rounded-xl border border-success/30 bg-success/5 p-3 text-sm text-success">{message}</div>}
       {error && <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map(({ title, value, subtitle }, index) => {
-          const Icon = cardIcons[index]
-          return (
-            <Card key={title}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm">{title}</CardTitle>
-                <Icon className="size-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{value}</div>
-                <p className="text-xs text-muted-foreground">{subtitle}</p>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+      {/* Wait for the user's layout too, so hidden cards never flash in. */}
+      {prefs.ready && prefs.hasVisible('kpi') && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {cards.map(({ id, title, value, subtitle }, index) => {
+            if (prefs.hidden.has(toWidgetId('kpi', id))) return null
+            const Icon = cardIcons[index]
+            return (
+              <Card key={title}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm">{title}</CardTitle>
+                  <Icon className="size-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{value}</div>
+                  <p className="text-xs text-muted-foreground">{subtitle}</p>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       <div className="rounded-2xl border border-primary/10 bg-card p-3 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

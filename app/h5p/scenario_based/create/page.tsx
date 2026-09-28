@@ -75,6 +75,7 @@ function ScenarioCreateContent() {
     [searchParams]
   );
   const contextQuery = h5pContextQuery(ctx);
+  const returnTo = searchParams?.get('return_to') || null;
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -225,7 +226,7 @@ function ScenarioCreateContent() {
           title="Add scenario"
           description="Upload an image and click on it to place interactive points"
           ctx={ctx}
-          backHref={`/h5p/scenario_based?${contextQuery}`}
+          backHref={returnTo ?? `/h5p/scenario_based?${contextQuery}`}
         />
 
         {!hasH5pContext(ctx) ? (

@@ -37,8 +37,6 @@ import {
   type PracticeItem,
 } from '@/app/pal/data/pal-eso';
 import { useViewAsStudent } from '@/app/pal/data/pal-view-as';
-import { fetchConceptResult } from '@/app/pal/data/pal-diagnostic';
-import { buildConceptFeedback, type ConceptFeedback } from '@/app/pal/data/pal-feedback';
 import AiTutorPanel from '@/app/pal/eso/_components/AiTutorPanel';
 import { isDirectMediaFile, looksLikeFile, toEmbedUrl } from '@/lib/video-embed';
 
@@ -119,12 +117,6 @@ function EsoConceptFlow() {
   // so it can never be mistaken for learner evidence.
   const [planPending, setPlanPending] = useState(false);
 
-  // The Feedback step, on exactly the same terms as Plan: no engine action, no
-  // D1-D5 change, held in UI state so it can never be mistaken for evidence.
-  // It runs when the practice phase ends, so the learner reads what the set
-  // showed BEFORE the check rather than after it.
-  const [feedbackPending, setFeedbackPending] = useState(false);
-
   /**
    * Put a newly resolved action on screen.
    *
@@ -141,18 +133,11 @@ function EsoConceptFlow() {
       if (previous?.action === 'diagnostic' && next.action !== 'diagnostic') {
         setPlanPending(true);
       }
-      // The practice phase has just ended. Show the synthesis before the
-      // consequential check, never after it - after it, it would be a
-      // post-mortem of a decision already taken.
-      if (
-        previous &&
-        PRACTICE_ACTIONS.includes(previous.action) &&
-        !PRACTICE_ACTIONS.includes(next.action)
-      ) {
-        setFeedbackPending(true);
-      }
+      // No interstitial when practice ends: the learner goes straight into the
+      // check. Each practice answer already shows its own right/wrong feedback.
       return next;
     });
+    setStepSeq((n) => n + 1);
   }, []);
 
   /**
@@ -271,7 +256,7 @@ function EsoConceptFlow() {
 
   return (
     <PalWorkspace
-      eyebrow="Concept diagnostic"
+      eyebrow="Guided learning"
       title="Practice"
       description="The engine picks each step from what you have already shown it."
       rail={rail}
@@ -323,12 +308,6 @@ function EsoConceptFlow() {
 
           {planPending ? (
             <PlanStep action={action} onContinue={() => setPlanPending(false)} />
-          ) : feedbackPending ? (
-            <FeedbackStep
-              conceptId={action.conceptId ?? conceptId}
-              action={action}
-              onContinue={() => setFeedbackPending(false)}
-            />
           ) : (
             <FlowStep
               // stepSeq is what makes a REPEATED stage remount. practice ->
@@ -408,99 +387,6 @@ function ContentUnavailableStep({ action }: { action: EsoAction }) {
  * control back. Duplicating the plan here would put two copies of the same
  * numbers on one screen.
  */
-/**
- * The in-flow Feedback step.
- *
- * Compact on purpose, and it does not navigate. The engine flow is one screen
- * and has to stay one screen - sending a learner mid-flow to another route and
- * back would break the step sequence the whole page is built around. The
- * standalone page at /pal/feedback/concept/[conceptId] serves the ADAPTIVE
- * practice path, which is a different set of screens entirely.
- *
- * The reading itself comes from the same pure module both surfaces use, so the
- * two can never tell a learner different things about one practice set.
- */
-function FeedbackStep({
-  conceptId,
-  action,
-  onContinue,
-}: {
-  conceptId: number;
-  action: EsoAction;
-  onContinue: () => void;
-}) {
-  const [feedback, setFeedback] = useState<ConceptFeedback | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const nextLabel =
-    FLOW_STAGES.find((stage) => stage.actions.includes(action.action))?.label ?? 'the next step';
-
-  useEffect(() => {
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      setLoading(true);
-      fetchConceptResult(conceptId, controller.signal)
-        // Swallowed: this is an interstitial between two engine steps. A
-        // failed read must never strand a learner mid-flow, so the step still
-        // renders and still continues - just without the detail.
-        .then((result) => setFeedback(buildConceptFeedback(result)))
-        .catch(() => undefined)
-        .finally(() => {
-          if (!controller.signal.aborted) setLoading(false);
-        });
-    });
-    return () => controller.abort();
-  }, [conceptId]);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Target className="h-4 w-4 text-indigo-500" />
-          What that practice showed
-        </CardTitle>
-        <CardDescription>
-          A quick read of how that went, before the check.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {loading ? (
-          <p className="text-sm text-slate-500">Working that out…</p>
-        ) : feedback && !feedback.isEmpty ? (
-          <>
-            <p className="text-sm text-slate-700">{feedback.headline}</p>
-
-            {feedback.wentWell[0] && (
-              <p className="text-sm text-slate-700">
-                <span className="font-medium">Going well: </span>
-                {feedback.wentWell[0].claim}
-              </p>
-            )}
-
-            {feedback.toFix[0] && (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-slate-800">
-                <span className="font-medium">Worth fixing: </span>
-                {feedback.toFix[0].claim}
-              </p>
-            )}
-
-            <p className="text-sm text-slate-600">{feedback.checkReadiness.reason}</p>
-          </>
-        ) : (
-          <p className="text-sm text-slate-600">
-            Have a look at how that went, then carry on.
-          </p>
-        )}
-
-        <div className="flex justify-end">
-          <Button data-eso-feedback-continue onClick={onContinue}>
-            Continue to {nextLabel.toLowerCase()}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function PlanStep({ action, onContinue }: { action: EsoAction; onContinue: () => void }) {
   const nextLabel =
@@ -825,12 +711,9 @@ const FLOW_STAGES: Array<{ key: string; label: string; actions: string[] }> = [
   // practising - and since the rail is the only progress indicator on the
   // screen, it never moved across the three practice questions either.
   { key: 'practice', label: 'Practice', actions: ['practice', 'continue_practice'] },
-  // Feedback has no engine action, and follows Plan's precedent exactly. The
-  // engine's vocabulary goes straight from practice/continue_practice to
-  // check_understanding; there is no "synthesise the set" action, and adding
-  // one would be a D1-D5 policy change made to serve a screen. It is driven by
-  // `feedbackPending` on the practice -> not-practice edge, the same way
-  // `planPending` runs on the diagnostic -> not-diagnostic edge.
+  // Feedback has no engine action and no screen of its own here: each practice
+  // answer shows its right/wrong feedback in place, and the last one leads
+  // straight into the check. Listed to keep this rail in step with JourneyRail.
   { key: 'feedback', label: 'Feedback', actions: [] },
   { key: 'check', label: 'Check', actions: ['check_understanding'] },
   // Extra support has no engine action ON PURPOSE, and this is the
@@ -848,9 +731,6 @@ const FLOW_STAGES: Array<{ key: string; label: string; actions: string[] }> = [
   // lights only from an open intervention record. See
   // app/pal/data/pal-intervention.ts.
   { key: 'intervention', label: 'Extra support', actions: [] },
-  { key: 'check', label: 'Check', actions: ['check_understanding'] },
-  { key: 'practice', label: 'Practice', actions: ['practice', 'continue_practice'] },
-  { key: 'check', label: 'Check', actions: ['check_understanding'] },
   { key: 'mastery', label: 'Mastery', actions: ['mastered_stop_practice'] },
   // Recall is the whole D2 retention exchange, not a new retention mechanism:
   // `retrieval_due` is the check being served, and `retained` / `reloop_node`
@@ -861,14 +741,6 @@ const FLOW_STAGES: Array<{ key: string; label: string; actions: string[] }> = [
   { key: 'recall', label: 'Recall', actions: ['retrieval_due', 'retained', 'reloop_node'] },
 ];
 
-/**
- * The actions that mean "still practising".
- *
- * Read off FLOW_STAGES rather than written out again, so the edge that fires
- * the Feedback step can never disagree with the stage the rail is lighting.
- */
-const PRACTICE_ACTIONS: string[] =
-  FLOW_STAGES.find((stage) => stage.key === 'practice')?.actions ?? [];
 
 /**
  * Stages that only some learners walk. Kept in step with JourneyRail's

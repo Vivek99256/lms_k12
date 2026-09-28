@@ -11,11 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   startChapterDiagnostic,
   submitChapterDiagnostic,
-  BAND_ORDER,
   type ChapterDiagnosticPaper,
   type DiagnosticQuestionItem,
 } from '@/app/pal/data/pal-diagnostic';
-import { BandChip, bandLabel } from '@/app/pal/_components/BandMeter';
 import {
   CompletedBadge,
   CompletedChapterPanel,
@@ -187,41 +185,17 @@ function DiagnosticExam() {
   }, [timerRunning]);
 
   /**
-   * Questions grouped into their bands, in BAND_ORDER, each carrying the
-   * number the learner actually sees.
+   * Questions in the order the paper was served, each carrying the number the
+   * learner actually sees. Numbered 1..n straight down the page.
    *
-   * The number is assigned HERE, over the grouped order, rather than being the
-   * question's position in `paper.questions`. The paper is drawn interleaved,
-   * so the flat position gave Easy "1, 2, 4, 13, 18" and Medium "6, 9, 10, 15"
-   * - correct indices into a flat list nobody is ever shown, and nonsense
-   * beside the bands the questions are actually read in. Numbering the rendered
-   * order instead runs 1..n straight down the page and keeps every number
-   * unique across the three bands, so "question 7" means one question.
+   * Used to group by band under an "Easy"/"Medium"/"Hard" header per section.
+   * The selection itself is still exactly 5/5/5 and still scored by band
+   * server-side - only the label shown to the student is gone - so the
+   * paper is served flat, in whatever order the backend's own interleave()
+   * already produced, rather than re-sorted into band blocks here.
    */
-  const grouped = useMemo(() => {
-    const out = new Map<string, DiagnosticQuestionItem[]>();
-    (paper?.questions ?? []).forEach((question) => {
-      const band = (question.difficulty || 'untagged').toLowerCase();
-      out.set(band, [...(out.get(band) ?? []), question]);
-    });
-
-    const ordered: Array<[string, DiagnosticQuestionItem[]]> = [];
-    BAND_ORDER.forEach((band) => {
-      if (out.has(band)) ordered.push([band, out.get(band)!]);
-    });
-    out.forEach((items, band) => {
-      if (!BAND_ORDER.includes(band as never)) ordered.push([band, items]);
-    });
-
-    let number = 0;
-
-    return ordered.map(
-      ([band, items]) =>
-        [band, items.map((question) => ({ question, number: ++number }))] as [
-          string,
-          Array<{ question: DiagnosticQuestionItem; number: number }>,
-        ]
-    );
+  const numbered = useMemo(() => {
+    return (paper?.questions ?? []).map((question, index) => ({ question, number: index + 1 }));
   }, [paper]);
 
   const total = paper?.questions.length ?? 0;
@@ -332,22 +306,6 @@ function DiagnosticExam() {
         )}
       </PalRailSection>
 
-      {grouped.length > 0 && (
-        <PalRailSection title="By difficulty">
-          {grouped.map(([band, items]) => {
-            const done = items.filter(({ question }) => answers[question.questionId]).length;
-            return (
-              <PalRailStat
-                key={band}
-                label={bandLabel(band)}
-                value={`${done}/${items.length}`}
-                tone={done === items.length ? 'positive' : 'default'}
-              />
-            );
-          })}
-        </PalRailSection>
-      )}
-
       <PalRailSection title="Your journey">
         <JourneyRail current="diagnostic" orientation="vertical" />
       </PalRailSection>
@@ -427,31 +385,18 @@ function DiagnosticExam() {
 
       {error && <div className="mb-4"><ErrorCard message={error} onRetry={() => setError(null)} retryLabel="Dismiss" /></div>}
 
-      <div className="space-y-6">
-        {grouped.map(([band, items]) => (
-          <section key={band} aria-labelledby={`band-${band}`}>
-            <div className="mb-2 flex items-center gap-2">
-              <h2 id={`band-${band}`} className="text-sm font-semibold text-slate-900">
-                {bandLabel(band)}
-              </h2>
-              <span className="text-xs text-slate-500">{items.length} questions</span>
-            </div>
-
-            <div className="space-y-3">
-              {items.map(({ question, number }) => (
-                <QuestionCard
-                  key={question.questionId}
-                  question={question}
-                  index={number}
-                  selected={answers[question.questionId] ?? null}
-                  onSelect={(optionId) =>
-                    setAnswers((previous) => ({ ...previous, [question.questionId]: optionId }))
-                  }
-                  disabled={submitting}
-                />
-              ))}
-            </div>
-          </section>
+      <div className="space-y-3">
+        {numbered.map(({ question, number }) => (
+          <QuestionCard
+            key={question.questionId}
+            question={question}
+            index={number}
+            selected={answers[question.questionId] ?? null}
+            onSelect={(optionId) =>
+              setAnswers((previous) => ({ ...previous, [question.questionId]: optionId }))
+            }
+            disabled={submitting}
+          />
         ))}
       </div>
 
@@ -540,9 +485,7 @@ function QuestionCard({
     <Card data-pal-question-id={question.questionId}>
       <CardContent className="pt-5">
         <fieldset disabled={disabled}>
-          <legend className="sr-only">
-            Question {index}, {bandLabel(question.difficulty).toLowerCase()}
-          </legend>
+          <legend className="sr-only">Question {index}</legend>
 
           <div className="mb-3 flex items-start gap-3">
             <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold tabular-nums text-slate-600">

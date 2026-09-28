@@ -3,20 +3,31 @@
 import { StatCard } from '@/components/ui/stat-card';
 import type { MaterialTypeRow, RecentIssueRow } from '@/app/library/_lib/library-dashboard-api';
 
+/** These cards' ids in the page's Customize registry — stored per user, don't rename them. */
+type LibraryKpiId = 'kpi.titles' | 'kpi.copies_in_catalog' | 'kpi.currently_issued' | 'kpi.overdue';
+
 export interface LibraryDashboardProps {
   totalTitles: number;
   totalItems: number;
   currentlyIssued: number;
   overdue: number;
+  /** The signed-in user's show/hide choice per card (useDashboardPreferences). Every card shows when omitted. */
+  isVisible?: (id: LibraryKpiId) => boolean;
 }
 
-export function LibraryDashboard({ totalTitles, totalItems, currentlyIssued, overdue }: LibraryDashboardProps) {
+export function LibraryDashboard({
+  totalTitles,
+  totalItems,
+  currentlyIssued,
+  overdue,
+  isVisible = () => true,
+}: LibraryDashboardProps) {
   return (
     <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Titles" value={totalTitles} />
-      <StatCard label="Copies in catalog" value={totalItems} />
-      <StatCard label="Currently issued" value={currentlyIssued} />
-      <StatCard label="Overdue" value={overdue} />
+      {isVisible('kpi.titles') && <StatCard label="Titles" value={totalTitles} />}
+      {isVisible('kpi.copies_in_catalog') && <StatCard label="Copies in catalog" value={totalItems} />}
+      {isVisible('kpi.currently_issued') && <StatCard label="Currently issued" value={currentlyIssued} />}
+      {isVisible('kpi.overdue') && <StatCard label="Overdue" value={overdue} />}
     </div>
   );
 }

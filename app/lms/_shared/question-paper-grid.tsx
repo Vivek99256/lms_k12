@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { ChevronDown, Search } from 'lucide-react';
 
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { examPaperPdfUrl } from '@/app/lms/lmsAssignment/api';
 import {
   ExamPdfButton,
   ExamPdfNotice,
@@ -280,10 +281,12 @@ function Cell({
   column,
   row,
   pdf,
+  showOpenPdfOption,
 }: {
   column: QuestionPaperColumn;
   row: ExamRecord;
   pdf: ExamPaperPdfController;
+  showOpenPdfOption: boolean;
 }) {
   switch (column) {
     case 'exam':
@@ -321,7 +324,12 @@ function Cell({
     case 'paper':
       return (
         <td className="border-b border-[#E6EDF5] px-4 py-3">
-          <ExamPdfButton controller={pdf} paperId={row.paperId} examName={row.name} />
+          <ExamPdfButton
+            controller={pdf}
+            paperId={row.paperId}
+            examName={row.name}
+            openHref={showOpenPdfOption ? examPaperPdfUrl(row.paperId) : undefined}
+          />
         </td>
       );
   }
@@ -337,6 +345,7 @@ export function QuestionPaperGrid({
   searchPlaceholder = 'Search exams...',
   emptyMessage,
   showTypeFilter = true,
+  showOpenPdfOption = false,
   toolbarActions,
   children,
 }: {
@@ -354,6 +363,12 @@ export function QuestionPaperGrid({
   emptyMessage?: string;
   /** Hidden on a page pinned to one exam_type, where it can only ever filter to itself. */
   showTypeFilter?: boolean;
+  /**
+   * Adds an "Open PDF" menu item beside the Paper column's existing download
+   * action, pointed at the stored file (`GET /api/question-paper/{id}/pdf`).
+   * Off by default so `/lms/exam` (tab 242) keeps its single PDF button.
+   */
+  showOpenPdfOption?: boolean;
   toolbarActions?: ReactNode;
   /** Rendered between the toolbar and the table (publish notices and the like). */
   children?: ReactNode;
@@ -479,7 +494,13 @@ export function QuestionPaperGrid({
               {filteredRows.map((row) => (
                 <tr key={row.id} className="bg-white">
                   {columns.map((column) => (
-                    <Cell key={column} column={column} row={row} pdf={pdf} />
+                    <Cell
+                      key={column}
+                      column={column}
+                      row={row}
+                      pdf={pdf}
+                      showOpenPdfOption={showOpenPdfOption}
+                    />
                   ))}
                 </tr>
               ))}
