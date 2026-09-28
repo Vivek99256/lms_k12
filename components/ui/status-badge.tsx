@@ -145,6 +145,12 @@ const statusVariantMap: Record<string, VariantProps<typeof statusBadgeVariants>[
   'Training Assigned': 'processing',
   'Final Warning': 'error',
   'Escalated to HR': 'error',
+  // Compliance Management (org_compliance_library.status / derived_status).
+  Upcoming: 'processing',
+  'Due Soon': 'warning',
+  Overdue: 'error',
+  'Not Applicable': 'inactive',
+  'Pending Verification': 'pending',
 }
 
 const StatusBadge = React.forwardRef<HTMLDivElement, StatusBadgeProps>(
