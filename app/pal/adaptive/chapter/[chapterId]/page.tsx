@@ -254,6 +254,7 @@ function AdaptiveConceptsView() {
             <ConceptCard
               key={concept.conceptId}
               concept={concept}
+              chapterId={chapterId}
               completed={completedConceptIds.has(String(concept.conceptId))}
               onStart={() => router.push(`/pal/adaptive/concept/${concept.conceptId}`)}
             />
@@ -290,10 +291,12 @@ function AdaptiveConceptsView() {
 
 function ConceptCard({
   concept,
+  chapterId,
   completed,
   onStart,
 }: {
   concept: AdaptiveConcept;
+  chapterId: string;
   completed: boolean;
   onStart: () => void;
 }) {
@@ -346,10 +349,10 @@ function ConceptCard({
         <div className="mt-auto pt-4">
           {completed ? (
             // Read-only. The only route out of a completed concept is its own
-            // mastery record, which the practice page serves in place of a set.
+            // mastery page.
             <>
               <Link
-                href={`/pal/adaptive/concept/${concept.conceptId}`}
+                href={`/pal/mastery/concept/${concept.conceptId}?chapterId=${chapterId}`}
                 className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'w-full')}
               >
                 <CheckCircle2 aria-hidden className="mr-1.5 h-3.5 w-3.5" />

@@ -188,7 +188,6 @@ export function useChapterCompletion(chapterId: string, enabled = true): Chapter
  */
 export function CompletedConceptPanel({ result }: { result: ConceptDiagnosticResult }) {
   const cleared = result.ladder.bandsCleared.map((band) => band.toLowerCase());
-  const unavailable = result.ladder.bandsUnavailable.map((band) => band.toLowerCase());
   const pct = Math.round(result.accuracy);
 
   return (
@@ -223,81 +222,104 @@ export function CompletedConceptPanel({ result }: { result: ConceptDiagnosticRes
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Level by level</CardTitle>
-            <CardDescription>How you answered at each difficulty.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <ConceptEvidence result={result} completed />
+    </div>
+  );
+}
+
+/**
+ * How a concept was answered at each difficulty, and which rungs of the ladder
+ * are cleared. Shared by the completed panel and the concept mastery page,
+ * which also shows a concept that is not completed yet - there, a rung that is
+ * not cleared is still to come rather than "not required".
+ */
+export function ConceptEvidence({
+  result,
+  completed,
+}: {
+  result: ConceptDiagnosticResult;
+  completed: boolean;
+}) {
+  const cleared = result.ladder.bandsCleared.map((band) => band.toLowerCase());
+  const unavailable = result.ladder.bandsUnavailable.map((band) => band.toLowerCase());
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Level by level</CardTitle>
+          <CardDescription>How you answered at each difficulty.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {BAND_ORDER.map((band) => {
+            const stats = result.byDifficulty[band];
+            const stock = result.availability[band] ?? 0;
+
+            return (
+              <BandRow
+                key={band}
+                band={band}
+                correct={stats?.correct ?? 0}
+                served={stock === 0 ? 0 : (stats?.attempted ?? 0)}
+                percentage={stats?.accuracy ?? 0}
+              />
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Mastery</CardTitle>
+          {/* The ladder's own words, so this screen and the plan can never
+              explain the same verdict differently. */}
+          <CardDescription>{result.ladder.reason}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-1.5">
             {BAND_ORDER.map((band) => {
-              const stats = result.byDifficulty[band];
-              const stock = result.availability[band] ?? 0;
+              const done = cleared.includes(band);
 
               return (
-                <BandRow
-                  key={band}
-                  band={band}
-                  correct={stats?.correct ?? 0}
-                  served={stock === 0 ? 0 : (stats?.attempted ?? 0)}
-                  percentage={stats?.accuracy ?? 0}
-                />
+                <li key={band} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex items-center gap-2">
+                    {done ? (
+                      <CheckCircle2 aria-hidden className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <span aria-hidden className="h-4 w-4 rounded-full border border-slate-300" />
+                    )}
+                    <span className="text-slate-700">{bandLabel(band)}</span>
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {done
+                      ? 'Cleared'
+                      : unavailable.includes(band)
+                        ? 'No questions written'
+                        : completed
+                          ? 'Not required'
+                          : 'Not cleared yet'}
+                  </span>
+                </li>
               );
             })}
-          </CardContent>
-        </Card>
+          </ul>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Mastery</CardTitle>
-            {/* The ladder's own words, so this screen and the plan can never
-                explain the same verdict differently. */}
-            <CardDescription>{result.ladder.reason}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-1.5">
-              {BAND_ORDER.map((band) => {
-                const done = cleared.includes(band);
-
-                return (
-                  <li key={band} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="flex items-center gap-2">
-                      {done ? (
-                        <CheckCircle2 aria-hidden className="h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <span aria-hidden className="h-4 w-4 rounded-full border border-slate-300" />
-                      )}
-                      <span className="text-slate-700">{bandLabel(band)}</span>
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {done
-                        ? 'Cleared'
-                        : unavailable.includes(band)
-                          ? 'No questions written'
-                          : 'Not required'}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-
-            <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
-              <div>
-                <dd className="text-lg font-semibold tabular-nums text-slate-900">
-                  {result.attempted}
-                </dd>
-                <dt className="text-[11px] text-slate-500">Questions answered</dt>
-              </div>
-              <div>
-                <dd className="text-lg font-semibold tabular-nums text-emerald-700">
-                  {result.correct}
-                </dd>
-                <dt className="text-[11px] text-slate-500">Correct</dt>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
-      </div>
+          <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+            <div>
+              <dd className="text-lg font-semibold tabular-nums text-slate-900">
+                {result.attempted}
+              </dd>
+              <dt className="text-[11px] text-slate-500">Questions answered</dt>
+            </div>
+            <div>
+              <dd className="text-lg font-semibold tabular-nums text-emerald-700">
+                {result.correct}
+              </dd>
+              <dt className="text-[11px] text-slate-500">Correct</dt>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
     </div>
   );
 }
