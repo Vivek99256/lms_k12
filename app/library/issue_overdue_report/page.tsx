@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Download, FileText, Loader2, Printer, Search } from 'lucide-react';
+import { Download, FileDown, FileText, Loader2, Printer, Search } from 'lucide-react';
 
 import SearchDropdown from '@/components/search-dropdown/SearchDropdown';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import type { SearchDropdownValues } from '@/components/search-dropdown/types';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
-import { downloadFile, escapeCsv, formatDate, formatDateTime, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
+import { downloadFile, escapeCsv, exportRowsToPdf, formatDate, formatDateTime, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
 
 type Row = {
   studentName: string;
@@ -111,6 +111,10 @@ export default function IssueOverdueReportPage() {
       const params = new URLSearchParams({ path: 'book_issue_report' });
       const body = new URLSearchParams();
       appendSessionParams(body, session);
+      // See the identical comment in app/library/report/page.tsx — the
+      // legacy blade's hidden `submit=Search` field bypasses the
+      // checkPermission middleware's can_add requirement for report search.
+      body.set('submit', 'Search');
       body.set('report_type', reportType);
       body.set('grade', getSingleValue(academicFilters.section));
       body.set('standard', getSingleValue(academicFilters.standard));
@@ -156,6 +160,7 @@ export default function IssueOverdueReportPage() {
             const lines = [headers.join('\t'), ...exportRows.map((row) => headers.map((header) => row[header] ?? '').join('\t'))];
             downloadFile('issue-overdue-report.xls', lines.join('\n'), 'application/vnd.ms-excel');
           }}><FileText className="h-4 w-4" />Excel</Button>
+          <Button type="button" variant="outline" onClick={() => void exportRowsToPdf('issue-overdue-report', 'Issue / Overdue Report', exportRows)}><FileDown className="h-4 w-4" />PDF</Button>
           <Button type="button" variant="outline" onClick={() => printRows(filteredRows)}><Printer className="h-4 w-4" />Print</Button>
         </div>}
       />

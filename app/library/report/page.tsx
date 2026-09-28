@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Download, FileText, Loader2, Printer, Search } from 'lucide-react';
+import { Download, FileDown, FileText, Loader2, Printer, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,7 @@ import {
   SectionPanel,
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
-import { downloadFile, escapeCsv, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
+import { downloadFile, escapeCsv, exportRowsToPdf, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
 
 type ReportOption = { id: string; label: string };
 type ReportRow = Record<string, string>;
@@ -185,6 +185,12 @@ export default function LibraryReportPage() {
       const params = new URLSearchParams({ path: 'show_library_report' });
       const body = new URLSearchParams();
       appendSessionParams(body, session);
+      // The Laravel `checkPermission` middleware only enforces `can_add` on
+      // POSTs whose `submit` field does not contain "Search" — the legacy
+      // blade form sends this hidden field so a view-only role can still run
+      // a report search. Omitting it 403s any role with can_view but not
+      // can_add on this menu entry.
+      body.set('submit', 'Search');
       body.set('report_of', reportOf);
       if (fieldValue) body.set(reportOf, fieldValue);
       if (session.subInstituteId === '47' && reportOf === 'material_resource' && fieldValue === 'book') {
@@ -230,6 +236,7 @@ export default function LibraryReportPage() {
               const lines = [headers.join('\t'), ...exportRows.map((row) => headers.map((header) => row[header] ?? '').join('\t'))];
               downloadFile('library-report.xls', lines.join('\n'), 'application/vnd.ms-excel');
             }}><FileText className="h-4 w-4" />Excel</Button>
+            <Button type="button" variant="outline" onClick={() => void exportRowsToPdf('library-report', 'Library Report', exportRows)}><FileDown className="h-4 w-4" />PDF</Button>
             <Button type="button" variant="outline" onClick={() => printRows(filteredRows)}><Printer className="h-4 w-4" />Print</Button>
           </div>
         )}

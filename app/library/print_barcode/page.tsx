@@ -19,7 +19,7 @@ import {
   SectionPanel,
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionFormData, appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
-import { downloadFile, escapeCsv, MessageState, normalizePayload, submitBackendPost } from '@/app/library/_lib/library-module-utils';
+import { downloadFile, escapeCsv, MessageState, normalizePayload, sessionFormFields, submitBackendPost } from '@/app/library/_lib/library-module-utils';
 
 type PrintType = 'member' | 'item_code';
 type Row = {
@@ -159,13 +159,31 @@ export default function PrintBarcodePage() {
   };
 
   const handlePrintPdf = () => {
-    const selectedRows = rows.filter((row) => selectedIds.includes(row.id));
+    const checkedRows = rows.filter((row) => selectedIds.includes(row.id));
+    // A row with no member id / item code (Laravel's `code` field came back
+    // empty) still renders with a synthetic, index-based `id` so it stays
+    // selectable -- but there is nothing to encode as a barcode for it.
+    // Sending an empty string in check_id[] crashes
+    // LibraryReportController::generateBarcodePdf() ("You should provide a
+    // barcode string"), which only reproduces once "select all" happens to
+    // sweep one of these rows in alongside valid ones.
+    const selectedRows = checkedRows.filter((row) => row.code.trim() !== '');
+    const skippedCount = checkedRows.length - selectedRows.length;
+
     if (selectedRows.length === 0) {
       setMessage({ type: 'info', text: 'Select at least one row before printing.' });
       return;
     }
 
+    if (skippedCount > 0) {
+      setMessage({
+        type: 'info',
+        text: `Skipped ${skippedCount} selected row${skippedCount === 1 ? '' : 's'} with no ${printType === 'member' ? 'member id' : 'item code'} to print.`,
+      });
+    }
+
     const fields: Record<string, string | string[]> = {
+      ...sessionFormFields(session),
       print_type: printType,
       'check_id[]': selectedRows.map((row) => row.code),
     };

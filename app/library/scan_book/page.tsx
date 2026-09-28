@@ -134,8 +134,16 @@ export default function ScanBookPage() {
     [filteredRecords],
   );
 
-  const handleSubmit = async () => {
-    if (!itemCode.trim()) {
+  const handleSubmit = async (overrideItemCode?: string) => {
+    // A physical barcode scanner types the whole code and its trailing Enter
+    // in rapid succession -- fast enough that the keydown handler can fire
+    // before this component has re-rendered with the last character's
+    // onChange. Reading the DOM input's live value here (passed in from the
+    // keydown handler below) avoids submitting a stale, empty `itemCode`
+    // from React state.
+    const value = (overrideItemCode ?? itemCode).trim();
+
+    if (!value) {
       setMessage({ type: 'info', text: 'Item code is required.' });
       return;
     }
@@ -151,7 +159,7 @@ export default function ScanBookPage() {
     try {
       const params = new URLSearchParams({ path: 'scan_books' });
       const payload = new URLSearchParams();
-      payload.set('item_code', itemCode.trim());
+      payload.set('item_code', value);
       appendSessionParams(payload, session);
 
       const response = await fetch(`/api/proxy?${params.toString()}`, {
@@ -169,7 +177,7 @@ export default function ScanBookPage() {
 
       setMessage({ type: status === 1 ? 'success' : 'error', text: nextMessage });
       setRecords(parseRecords(normalized));
-      setLastScannedItem(readString(normalized.searchedItem) || itemCode.trim());
+      setLastScannedItem(readString(normalized.searchedItem) || value);
       setItemCode('');
     } catch (error) {
       setMessage({
@@ -226,7 +234,7 @@ export default function ScanBookPage() {
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
-                  void handleSubmit();
+                  void handleSubmit(event.currentTarget.value);
                 }
               }}
             />
