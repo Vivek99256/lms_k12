@@ -169,6 +169,25 @@ const EXECUTORS: Record<string, Executor> = {
   },
 
   /**
+   * Who owes anything, from the live fee records. Backed by `fees.arrears` — the
+   * registry's own `exampleInput` names `standard_id`/`section_id`/`min_amount`/
+   * `limit`, aliased here the same way every other class/division pair in this
+   * file is, so a run with no arguments sweeps the default cohort rather than
+   * failing for want of one.
+   */
+  'fees.list_defaulters': (args, context) =>
+    readViaMcp(
+      context,
+      'fees.arrears',
+      given({
+        standard_id: count(args.standard_id ?? args.class_id),
+        division_id: count(args.division_id ?? args.section_id),
+        min_amount: typeof args.min_amount === 'number' ? args.min_amount : undefined,
+        limit: count(args.limit),
+      }),
+    ).then((output) => ({ output })),
+
+  /**
    * What was collected, from the receipts. Backed by `fees.collection_report`.
    */
   'fees.collection_report': (args, context) =>

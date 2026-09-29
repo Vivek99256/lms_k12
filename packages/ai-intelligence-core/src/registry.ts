@@ -89,7 +89,8 @@ export interface AiCapability {
 }
 
 /**
- * The twelve capabilities, in the order the menu lists them.
+ * The capabilities, in the order the menu lists them. Thirteen as of `ai.guardrails` —
+ * update the count here if you're reading this while adding a fourteenth.
  *
  * Registry order is the running order — the menu, the console index and the
  * roadmap all read it, so re-ordering here re-orders every surface at once and
@@ -508,6 +509,41 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
       enterprise_brain: {
         today: 'no',
         use: 'Would meter agent runs, which are the least predictable spend of the three.',
+      },
+    },
+  },
+
+  {
+    id: 'ai.guardrails',
+    slug: 'guardrails',
+    name: 'Guardrails',
+    purpose:
+      'What is actually enforced for a module right now — capability flags, review requirements, policy, agent rights and tool risk — read live rather than declared once and trusted.',
+    whyCentral:
+      'Each module already computes this correctly for itself; a caller cannot yet ask the same question about a module without opening that module. A shared read means the answer is checked from one place, the same way it is enforced from several.',
+    todayInK12:
+      'Live at /ai/guardrails as a module-scoped read. Computed from the same five sources each module’s own AI Stack → Guardrails tab already reads — module capability flags, template requires_review, ai_policies, agents.<module> rights, and tool risk annotations — not a new engine or a new table.',
+    toCentralise: [
+      'A shared read across every module at once, rather than one module per screen load.',
+      'An alert when a module’s enforcement disagrees with its declared policy.',
+    ],
+    afterCentralisation: [
+      'An administrator can see what is actually enforced without opening each module in turn.',
+      'A misconfigured module (capability on, no policy behind it) is visible centrally, not only from inside it.',
+    ],
+    status: 'coming-soon',
+    solutions: {
+      lms_k12: {
+        today: 'partial',
+        use: 'Every module’s own AI Stack → Guardrails tab already computes this; the central module-scoped read is new.',
+      },
+      g2g: {
+        today: 'no',
+        use: 'Would read the same five-source computation once it shares the policy and agent-rights tables.',
+      },
+      enterprise_brain: {
+        today: 'no',
+        use: 'Would use it to check an agent’s permitted tools before a run rather than after one fails.',
       },
     },
   },

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Download, FileText, Loader2, Printer, Search } from 'lucide-react';
+import { Download, FileDown, FileText, Loader2, Printer, Search } from 'lucide-react';
 
 import SearchDropdown from '@/components/search-dropdown/SearchDropdown';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import type { SearchDropdownValues } from '@/components/search-dropdown/types';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
-import { downloadFile, escapeCsv, formatDate, formatDateTime, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
-import { escapeHtml } from '@/lib/security/sanitize-html';
+import { downloadFile, escapeCsv, exportRowsToPdf, formatDate, formatDateTime, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
 
 type Row = {
   studentName: string;
@@ -63,7 +62,7 @@ function printRows(rows: Row[]) {
     th { background: #f1f5f9; }
   </style></head><body><h2>Issue / Overdue Report</h2><table><thead><tr>
   <th>Sr No</th><th>Student Name</th><th>GR No</th><th>Mobile</th><th>Std / Div</th><th>Book Name</th><th>Item Code</th><th>Issued Date</th><th>Due Date</th><th>Return Date</th>
-  </tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.studentName || '-')}</td><td>${escapeHtml(row.enrollmentNo || '-')}</td><td>${escapeHtml(row.mobile || '-')}</td><td>${escapeHtml(row.standardDivision || '-')}</td><td>${escapeHtml(row.bookTitle || '-')}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(formatDate(row.issuedDate))}</td><td>${escapeHtml(formatDate(row.dueDate))}</td><td>${escapeHtml(formatDateTime(row.returnDate))}</td></tr>`).join('')}</tbody></table></body></html>`;
+  </tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.studentName || '-'}</td><td>${row.enrollmentNo || '-'}</td><td>${row.mobile || '-'}</td><td>${row.standardDivision || '-'}</td><td>${row.bookTitle || '-'}</td><td>${row.itemCode || '-'}</td><td>${formatDate(row.issuedDate)}</td><td>${formatDate(row.dueDate)}</td><td>${formatDateTime(row.returnDate)}</td></tr>`).join('')}</tbody></table></body></html>`;
   const printWindow = window.open('', '_blank', 'width=1400,height=900');
   if (!printWindow) return;
   printWindow.document.open();
@@ -112,6 +111,10 @@ export default function IssueOverdueReportPage() {
       const params = new URLSearchParams({ path: 'book_issue_report' });
       const body = new URLSearchParams();
       appendSessionParams(body, session);
+      // See the identical comment in app/library/report/page.tsx — the
+      // legacy blade's hidden `submit=Search` field bypasses the
+      // checkPermission middleware's can_add requirement for report search.
+      body.set('submit', 'Search');
       body.set('report_type', reportType);
       body.set('grade', getSingleValue(academicFilters.section));
       body.set('standard', getSingleValue(academicFilters.standard));
@@ -157,6 +160,7 @@ export default function IssueOverdueReportPage() {
             const lines = [headers.join('\t'), ...exportRows.map((row) => headers.map((header) => row[header] ?? '').join('\t'))];
             downloadFile('issue-overdue-report.xls', lines.join('\n'), 'application/vnd.ms-excel');
           }}><FileText className="h-4 w-4" />Excel</Button>
+          <Button type="button" variant="outline" onClick={() => void exportRowsToPdf('issue-overdue-report', 'Issue / Overdue Report', exportRows)}><FileDown className="h-4 w-4" />PDF</Button>
           <Button type="button" variant="outline" onClick={() => printRows(filteredRows)}><Printer className="h-4 w-4" />Print</Button>
         </div>}
       />

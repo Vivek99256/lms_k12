@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Download, FileText, Loader2, Printer, Search } from 'lucide-react';
+import { Download, FileDown, FileText, Loader2, Printer, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,8 +17,7 @@ import {
   SectionPanel,
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
-import { downloadFile, escapeCsv, getStoredAcademicYears, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
-import { escapeHtml } from '@/lib/security/sanitize-html';
+import { downloadFile, escapeCsv, exportRowsToPdf, getStoredAcademicYears, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
 
 type Row = {
   syear: string;
@@ -45,7 +44,7 @@ function printRows(rows: Row[]) {
   table { border-collapse: collapse; width: 100%; }
   th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
   th { background: #f1f5f9; }
-  </style></head><body><h2>Pending Scan Report</h2><table><thead><tr><th>Sr No</th><th>SYear</th><th>Item Code</th><th>Title</th><th>Collection Type</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.syear || '-')}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(row.title || '-')}</td><td>${escapeHtml(row.collectionType || '-')}</td></tr>`).join('')}</tbody></table></body></html>`;
+  </style></head><body><h2>Pending Scan Report</h2><table><thead><tr><th>Sr No</th><th>SYear</th><th>Item Code</th><th>Title</th><th>Collection Type</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.syear || '-'}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td></tr>`).join('')}</tbody></table></body></html>`;
   const printWindow = window.open('', '_blank', 'width=1200,height=900');
   if (!printWindow) return;
   printWindow.document.open();
@@ -57,13 +56,14 @@ function printRows(rows: Row[]) {
 
 export default function PendingScanReportPage() {
   const session = useMemo(() => getFeesSession(), []);
-  const academicYears = useMemo(() => getStoredAcademicYears(), []);
+  const fallbackAcademicYears = useMemo(() => getStoredAcademicYears(), []);
   const [itemCode, setItemCode] = useState('');
   const [year, setYear] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<MessageState | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [academicYears, setAcademicYears] = useState<string[]>(fallbackAcademicYears);
 
   const filteredRows = useMemo(() => {
     if (!globalSearch) return rows;
@@ -91,6 +91,10 @@ export default function PendingScanReportPage() {
       const payload = normalizePayload(await response.json());
       const nextRows = parseRows(payload);
       setRows(nextRows);
+      // Same source-of-truth fix as scanned_book_report — prefer the live
+      // `all_year` list Laravel returns over the browser-storage fallback.
+      const yearsFromPayload = toArray(payload.all_year).map((item) => readString(asRecord(item).syear)).filter(Boolean);
+      if (yearsFromPayload.length > 0) setAcademicYears(yearsFromPayload);
       setMessage({ type: nextRows.length > 0 ? 'success' : 'info', text: nextRows.length > 0 ? `Loaded ${nextRows.length} row${nextRows.length === 1 ? '' : 's'}.` : 'No pending scan rows found.' });
     } catch (error) {
       setRows([]);
@@ -118,6 +122,7 @@ export default function PendingScanReportPage() {
             const lines = [headers.join('\t'), ...exportRows.map((row) => headers.map((header) => row[header] ?? '').join('\t'))];
             downloadFile('pending-scan-report.xls', lines.join('\n'), 'application/vnd.ms-excel');
           }}><FileText className="h-4 w-4" />Excel</Button>
+          <Button type="button" variant="outline" onClick={() => void exportRowsToPdf('pending-scan-report', 'Pending Scan Report', exportRows)}><FileDown className="h-4 w-4" />PDF</Button>
           <Button type="button" variant="outline" onClick={() => printRows(filteredRows)}><Printer className="h-4 w-4" />Print</Button>
         </div>}
       />

@@ -126,7 +126,8 @@ function FlashcardListContent() {
   /** Cards authored here, or questions read straight from the bank. */
   const [source, setSource] = useState<'authored' | 'bank'>('authored');
 
-  const contextQuery = h5pContextQuery(ctx);
+  const returnTo = searchParams?.get('return_to') || null;
+  const contextQuery = h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return cards;

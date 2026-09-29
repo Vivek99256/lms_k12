@@ -211,7 +211,7 @@ export function defaultSections(): SectionConfig[] {
     {
       key: 'findings',
       copy: {
-        eyebrow: 'Intelligence',
+        eyebrow: 'Signals',
         title: 'What the Brain sees',
         description:
           'What the figures mean. Each finding states what happened, why it matters, and the evidence it rests on — nothing appears here without figures behind it.',
@@ -220,7 +220,7 @@ export function defaultSections(): SectionConfig[] {
     {
       key: 'priorities',
       copy: {
-        eyebrow: 'Intelligence',
+        eyebrow: 'Risk',
         title: 'Priority attention',
         description: 'The findings worth acting on first, with the next step each one implies.',
       },

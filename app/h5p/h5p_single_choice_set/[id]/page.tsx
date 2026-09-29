@@ -93,6 +93,12 @@ function newAttempt(set: H5pSingleChoiceSet): Attempt {
           option_text: option.option_text,
           is_correct: Boolean(option.is_correct),
           feedback: option.feedback,
+          // Dropped here, this attempt's paper never carries the bank row an
+          // option came from -- chosenSourceOptionIds() would always read
+          // `undefined` off it, and every embedder relying on `choiceIds`
+          // (PAL, the question bank quiz) would silently record no answer at
+          // all, regardless of what the learner picked.
+          source_option_id: option.source_option_id,
         })),
       })),
       { randomize_questions: set.randomize_questions, randomize_answers: set.randomize_answers },
@@ -128,6 +134,13 @@ export interface PreloadedSingleChoiceSet {
   ctx: H5pContext;
   embedded?: boolean;
   /**
+   * False for an unbiased assessment (PAL's Chapter/Concept Diagnostic):
+   * picking an option is recorded but never colored correct/wrong, never
+   * explained, never locked. Defaults to true -- every other embedder wants
+   * the immediate right/wrong signal this type is built to give.
+   */
+  instantFeedback?: boolean;
+  /**
    * Fired once, where this player already reports completion over xAPI.
    *
    * It is how a module other than the H5P library uses this player: PAL needs
@@ -147,6 +160,7 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
   );
   const ctx = preloaded?.ctx ?? routeCtx;
   const contextQuery = h5pContextQuery(ctx);
+  const instantFeedback = preloaded?.instantFeedback ?? true;
 
   const [fetchedSet, setFetchedSet] = useState<H5pSingleChoiceSet | null>(null);
   const [loading, setLoading] = useState(!preloaded);
@@ -301,6 +315,10 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
    * moved past.
    */
   useEffect(() => {
+    // An unbiased assessment never auto-continues: there is no reveal to
+    // pause on, and the pick stays open to being changed until the learner
+    // moves on by themselves.
+    if (!instantFeedback) return;
     if (!set || !set.auto_continue) return;
     if (!attempt || attempt.finishedAt !== null || chosen === null) return;
 
@@ -311,10 +329,14 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
     const timer = window.setTimeout(() => advance(attempt), pause);
 
     return () => window.clearTimeout(timer);
-  }, [set, attempt, chosen, advance]);
+  }, [instantFeedback, set, attempt, chosen, advance]);
 
-  const choose = (optionId: number) => {
-    if (!set || !attempt || attempt.finishedAt !== null || chosen !== null) return;
+  const choose = useCallback((optionId: number) => {
+    if (!set || !attempt || attempt.finishedAt !== null) return;
+    // Instant feedback locks the pick once revealed. An assessment never
+    // reveals, so it never locks -- the learner can change their answer
+    // freely, same as the plain radio list this replaced.
+    if (instantFeedback && chosen !== null) return;
 
     const entry = attempt.paper[attempt.index];
     const correct = isCorrectChoice(entry.question, optionId);
@@ -323,7 +345,6 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
     answers[entry.index] = optionId;
 
     const answered = { ...attempt, answers };
-    setAttempt(answered);
     setChosen(optionId);
 
     const run = correct ? streak + 1 : 0;
@@ -339,9 +360,47 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
       response: plainText(option?.option_text ?? ''),
     });
 
-    // The auto-advance, if there is one, is set up by the effect above once
-    // `chosen` lands — not from here, so the timeout always has a cleanup.
-  };
+    if (!instantFeedback) {
+      // Recorded and reported (onResult still fires, so the caller's
+      // progress tracking sees it), but never "finished": finishing is what
+      // marks this question as revealed/scored, and an assessment question
+      // is neither until the whole paper is submitted, which happens outside
+      // this component entirely. Re-picking calls this again and simply
+      // reports the new pick over the old one.
+      setAttempt(answered);
+      preloaded?.onResult?.({
+        questionId: Number(set.id),
+        score: null,
+        maxScore: null,
+        correct: null,
+        durationSeconds: (Date.now() - attempt.startedAt) / 1000,
+        response: plainText(option?.option_text ?? ''),
+        choiceIds: chosenSourceOptionIds(answered),
+      });
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // EMBEDDED CALLERS BUILD A ONE-QUESTION SET PER QUESTION
+    // ─────────────────────────────────────────────────────────────────────
+    // PAL, the question bank quiz and every other embedder pass one bank
+    // question in and get one-item paper out — for them, THIS pick is the
+    // whole set, with nothing left to advance to. Finishing here, in place,
+    // is what keeps `entry`/`attempt.index` valid for the render below: the
+    // normal route (advance() -> finish()) moves `index` past the end of the
+    // paper first, which is exactly right for a standalone multi-question set
+    // (there is nowhere left to render, so the result screen is what is left
+    // to show) but wrong here, where the caller still wants to see this exact
+    // question in its answered state, not a screen replacing it. A genuine
+    // multi-question embedded set (none exist today, but nothing stops one)
+    // still advances normally between its own items and only finishes in
+    // place on the last one.
+    if (preloaded?.embedded && entry.index >= attempt.paper.length - 1) {
+      finish(answered);
+    } else {
+      setAttempt(answered);
+    }
+  }, [set, attempt, chosen, instantFeedback, streak, bestStreak, ctx, preloaded, finish]);
 
   // --- render --------------------------------------------------------------
 
@@ -358,8 +417,13 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
       );
     }
 
-    // Finished.
-    if (attempt && attempt.finishedAt !== null && result) {
+    // Finished — but not for an embedded caller, which never asked for a
+    // "you finished the set" screen in the first place. It already drew its
+    // own overall container around this single question (PAL's card, the
+    // question bank quiz's run), so finishing here falls through to the "in
+    // progress" render below instead, which is where the answered state
+    // (revealed options, the Verdict message) already lives.
+    if (attempt && attempt.finishedAt !== null && result && !preloaded?.embedded) {
       const message = singleChoiceFeedback(result.percentage, set.feedback_bands);
 
       return (
@@ -410,7 +474,7 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
     // In progress.
     if (attempt) {
       const entry = attempt.paper[attempt.index];
-      const feedback = chosen !== null ? answerFeedback(entry.question, chosen) : null;
+      const feedback = instantFeedback && chosen !== null ? answerFeedback(entry.question, chosen) : null;
 
       return (
         // No `h5p-surface` (border, shadow, its own rounded card) when
@@ -467,12 +531,25 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
           <div className="mt-5 space-y-2.5" role="group" aria-label="Answers">
             {entry.options.map((option, optionIndex) => {
               const picked = chosen === option.id;
-              const reveal = chosen !== null;
+              // Never true for an assessment (instantFeedback === false):
+              // the pick is shown, never the answer key, and the button
+              // below stays enabled so the learner can change their mind.
+              const reveal = instantFeedback && chosen !== null;
               const isRight = option.is_correct;
 
               // Which state this option is in. The colours for each live in
-              // h5p.css; nothing here names one.
-              const state = reveal ? (isRight ? 'is-correct' : picked ? 'is-wrong' : 'is-dimmed') : '';
+              // h5p.css; nothing here names one. `is-picked` is the neutral
+              // "this is your current answer" state a revealed pick never
+              // uses -- it carries no correct/wrong signal at all.
+              const state = reveal
+                ? isRight
+                  ? 'is-correct'
+                  : picked
+                    ? 'is-wrong'
+                    : 'is-dimmed'
+                : picked
+                  ? 'is-picked'
+                  : '';
 
               return (
                 <button
@@ -508,7 +585,10 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
                 message={feedback.message || encouragement(feedback.correct, attempt.index)}
               />
 
-              {!set.auto_continue ? (
+              {/* Never shown once this attempt is already finished (the
+                  embedded last-question case above) -- advance() would push
+                  `index` past the paper and finish() a second time. */}
+              {!set.auto_continue && attempt.finishedAt === null ? (
                 <PrimaryAction onClick={() => advance(attempt)} className="mt-4" autoFocus>
                   {attempt.index + 1 >= attempt.paper.length ? 'See your result' : 'Next question'}
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -658,13 +738,13 @@ function chosenSourceOptionIds(attempt: Attempt): number[] {
   return ids;
 }
 
-export function SingleChoiceSetPlayer({ item, ctx, embedded, onResult }: PreloadedSingleChoiceSet) {
+export function SingleChoiceSetPlayer({ item, ctx, embedded, instantFeedback, onResult }: PreloadedSingleChoiceSet) {
   // Memoised, because this object is the load effect's dependency. Passing a
   // fresh one each render re-ran that effect on every render, and its cleanup
   // then cancelled the setup the previous run had just scheduled.
   const preloaded = useMemo(
-    () => ({ item, ctx, embedded, onResult }),
-    [item, ctx, embedded, onResult]
+    () => ({ item, ctx, embedded, instantFeedback, onResult }),
+    [item, ctx, embedded, instantFeedback, onResult]
   );
 
   return (

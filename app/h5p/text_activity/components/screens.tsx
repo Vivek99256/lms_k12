@@ -71,8 +71,15 @@ function useH5pRouteContext() {
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
+  // Carried along in contextQuery so a list's "Add" link hands it to the
+  // create page, whose Back link then returns past this screen entirely.
+  const returnTo = searchParams?.get('return_to') || null;
 
-  return { ctx, contextQuery: h5pContextQuery(ctx), searchParams };
+  return {
+    ctx,
+    contextQuery: h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined),
+    searchParams,
+  };
 }
 
 function statusChip(activity: H5pTextActivity) {

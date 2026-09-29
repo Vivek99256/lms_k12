@@ -401,12 +401,13 @@ function StepRow({
             path was the one that skipped to practice.
 
             A completed concept keeps neither: it is read-only, and the only
-            route left is its own mastery record. */}
+            route left is its own mastery page - never the concept diagnostic,
+            which decides completion from a narrower payload than this one. */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {completed ? (
             <>
               <Link
-                href={`/pal/adaptive/concept/${step.conceptId}`}
+                href={`/pal/mastery/concept/${step.conceptId}?chapterId=${chapterId}`}
                 className={buttonVariants({ variant: 'outline', size: 'sm' })}
               >
                 View mastery

@@ -443,6 +443,42 @@ export const completeExecution = (id: string, result: string, feedback: string) 
     { method: 'POST', body: JSON.stringify({ result, feedback }) },
   );
 
+/**
+ * Same endpoint as `completeExecution`, plus the optional measured before/after
+ * that closes the learning loop — `BrainIntelligenceController::executionComplete`
+ * accepts `measured_before`/`measured_after`/`accounts_affected` but only this
+ * caller has a reason to send them.
+ */
+export const recordExecutionOutcome = (
+  id: string,
+  result: 'success' | 'partial' | 'failed',
+  feedback: string,
+  measured?: { before?: number; after?: number; unitsAffected?: number },
+) =>
+  brainFetch<{ executionId: string; outcomeId: string | null; result: string }>(
+    tenantPath(`/executions/${id}/complete`),
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        result,
+        feedback,
+        measured_before: measured?.before,
+        measured_after: measured?.after,
+        accounts_affected: measured?.unitsAffected,
+      }),
+    },
+  );
+
+/**
+ * Recompute one module's signals — `POST /api/brain/{tenant}/{module}/intelligence/run`,
+ * the per-module twin of the routes `routes/brain.php` registers for every
+ * module (staff-attendance, organization, talent, capability, lms-activity,
+ * task-management, …). Distinct from `runIntelligence`, which reruns the whole
+ * pipeline unscoped.
+ */
+export const runModuleIntelligence = (moduleKey: string) =>
+  brainFetch<Record<string, unknown>>(tenantPath(`/${moduleKey}/intelligence/run`), { method: 'POST' });
+
 /* -------------------------------------------- readable intelligence shapes */
 
 /** A signal as a person reads it. `technical` holds the engine's own vocabulary. */

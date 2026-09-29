@@ -46,6 +46,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
+    "framer-motion": "^13.4.4",
     "geist": "^1.7.2",
     "html2canvas-pro": "^2.3.2",
     "isomorphic-dompurify": "^4.1.0",

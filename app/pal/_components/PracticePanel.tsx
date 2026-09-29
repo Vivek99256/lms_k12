@@ -1,6 +1,5 @@
 'use client';
 
-import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ArrowRight,
@@ -18,6 +17,9 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { QuestionPlayer } from '@/components/h5p/players';
+import type { QuestionResult } from '@/components/h5p/players/types';
+import { canPlay, selectedOptionId, toPlayerQuestion } from '@/lib/pal/practice-answers';
 import {
   fetchAdaptivePractice,
   fetchPracticeHistory,
@@ -279,73 +281,17 @@ function AdaptivePracticeModal({
       {!loading && !error && !result && questions.length > 0 && (
         <div className="space-y-4">
           {questions.map((question, index) => (
-            <div key={question.id} className="rounded-lg border border-slate-200 p-4">
-              <div className="flex items-start gap-2">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-600">
-                  {index + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {question.conceptName && (
-                      <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                        {question.conceptName}
-                      </span>
-                    )}
-                    {question.difficulty && (
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                        {question.difficulty}
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    className="mt-1.5 text-sm font-medium text-slate-900 [&_img]:max-w-full"
-                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
-                  />
-                  {question.options.length > 0 ? (
-                    <div className="mt-2 space-y-1.5">
-                      {question.options.map((option) => {
-                        const selected = question.multipleAnswer
-                          ? Array.isArray(answers[question.id]) &&
-                            (answers[question.id] as string[]).includes(option.id)
-                          : answers[question.id] === option.id;
-                        return (
-                          <label
-                            key={option.id}
-                            className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                              selected
-                                ? 'border-indigo-400 bg-indigo-50 text-indigo-900'
-                                : 'border-slate-200 hover:bg-slate-50'
-                            }`}
-                          >
-                            <input
-                              type={question.multipleAnswer ? 'checkbox' : 'radio'}
-                              name={`practice-${question.id}`}
-                              checked={selected}
-                              onChange={() => toggleAnswer(question, option.id)}
-                              className="h-4 w-4 accent-indigo-600"
-                            />
-                            <span
-                              className="[&_img]:max-w-full"
-                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }}
-                            />
-                          </label>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs italic text-slate-400">
-                      This question type is not answerable here.
-                    </p>
-                  )}
-                  {question.hintText && (
-                    <p className="mt-2 flex items-start gap-1 text-xs text-indigo-700">
-                      <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      {question.hintText}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+            <PracticeQuestionRow
+              key={question.id}
+              question={question}
+              index={index}
+              scope={context}
+              answer={answers[question.id]}
+              onToggle={(optionId) => toggleAnswer(question, optionId)}
+              onPlayerAnswer={(optionId) =>
+                setAnswers((prev) => ({ ...prev, [question.id]: optionId }))
+              }
+            />
           ))}
 
           <div className="flex items-center justify-between">
@@ -360,6 +306,120 @@ function AdaptivePracticeModal({
         </div>
       )}
     </ModalShell>
+  );
+}
+
+/**
+ * One practice question, played through `QuestionPlayer` when `canPlay`
+ * allows it -- a single-answer MCQ row with a correct flag already on the
+ * option (`PracticeQuestionOption.correct`, sent to the browser today
+ * regardless). A multi-answer question, or one missing a correct flag, keeps
+ * the checkbox/radio list below unchanged; see `lib/pal/practice-answers.ts`.
+ */
+function PracticeQuestionRow({
+  question,
+  index,
+  scope,
+  answer,
+  onToggle,
+  onPlayerAnswer,
+}: {
+  question: PracticeQuestion;
+  index: number;
+  scope: PalChapterContext;
+  answer: string | string[] | undefined;
+  onToggle: (optionId: string) => void;
+  onPlayerAnswer: (optionId: string) => void;
+}) {
+  const playable = useMemo(() => canPlay(question), [question]);
+
+  const handleResult = useCallback(
+    (result: QuestionResult) => {
+      const optionId = selectedOptionId(question, result);
+      if (optionId) onPlayerAnswer(optionId);
+    },
+    [question, onPlayerAnswer]
+  );
+
+  return (
+    <div className="rounded-lg border border-slate-200 p-4">
+      <div className="flex items-start gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-600">
+          {index + 1}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {question.conceptName && (
+              <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                {question.conceptName}
+              </span>
+            )}
+            {question.difficulty && (
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                {question.difficulty}
+              </span>
+            )}
+          </div>
+          <div
+            className="mt-1.5 text-sm font-medium text-slate-900 [&_img]:max-w-full"
+            dangerouslySetInnerHTML={{ __html: question.title }}
+          />
+          {playable ? (
+            <div className="mt-2">
+              <QuestionPlayer
+                question={toPlayerQuestion(question, {
+                  standardId: scope.standardId,
+                  subjectId: scope.subjectId,
+                  chapterId: scope.chapterId,
+                })}
+                onResult={handleResult}
+                embedded
+              />
+            </div>
+          ) : question.options.length > 0 ? (
+            <div className="mt-2 space-y-1.5">
+              {question.options.map((option) => {
+                const selected = question.multipleAnswer
+                  ? Array.isArray(answer) && answer.includes(option.id)
+                  : answer === option.id;
+                return (
+                  <label
+                    key={option.id}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      selected
+                        ? 'border-indigo-400 bg-indigo-50 text-indigo-900'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type={question.multipleAnswer ? 'checkbox' : 'radio'}
+                      name={`practice-${question.id}`}
+                      checked={selected}
+                      onChange={() => onToggle(option.id)}
+                      className="h-4 w-4 accent-indigo-600"
+                    />
+                    <span
+                      className="[&_img]:max-w-full"
+                      dangerouslySetInnerHTML={{ __html: option.answer }}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs italic text-slate-400">
+              This question type is not answerable here.
+            </p>
+          )}
+          {question.hintText && (
+            <p className="mt-2 flex items-start gap-1 text-xs text-indigo-700">
+              <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {question.hintText}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -618,7 +678,7 @@ function PracticeHistoryModal({
                       <div className="min-w-0">
                         <div
                           className="truncate text-sm text-slate-800 [&_img]:hidden"
-                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.questionTitle) }}
+                          dangerouslySetInnerHTML={{ __html: item.questionTitle }}
                         />
                         <div className="text-[11px] text-slate-400">
                           {item.conceptName} · {item.createdAt}

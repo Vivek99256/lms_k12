@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Clock, GraduationCap, Loader2, Send } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { QuestionPlayer, libraryForQuestion } from '@/components/h5p/players';
+import { QuestionPlayer, libraryForQuestion, scopeOfQuestion } from '@/components/h5p/players';
 import type { QuestionResult } from '@/components/h5p/players/types';
+import { mappingForQuestion } from '@/lib/h5p/question-bank-h5p-map';
+import { mapQuestionToPlayerPayload } from '@/lib/h5p/question-bank-runtime';
 import {
   splitSubmissions,
   submissionFor,
@@ -417,6 +419,30 @@ function QuestionCard({
 }) {
   const playable = useMemo(() => toPlayerQuestion(question), [question]);
   const library = libraryForQuestion(playable);
+
+  // TEMP DIAGNOSTIC -- pinpointing why some questions still resolve to "no
+  // form is recorded" after question_type_raw was wired through. Logs every
+  // stage requested: the fetchPalQuiz() output, toBankQuestion()'s result
+  // (toPlayerQuestion is that plus scope, so `playable` covers both),
+  // mappingForQuestion()'s verdict, and mapQuestionToPlayerPayload()'s
+  // verdict -- paired with the raw-row log in fetchPalQuiz (app/pal/data/pal.ts)
+  // by on-screen question number. Remove once resolved.
+  useEffect(() => {
+    const mapping = mappingForQuestion(playable);
+    const built = mapQuestionToPlayerPayload(playable, scopeOfQuestion(playable));
+    // eslint-disable-next-line no-console
+    console.debug(`[PAL DEBUG] pipeline for on-screen #${index + 1} (questionId ${question.questionId})`, {
+      fetchPalQuiz_question: question,
+      toBankQuestion_output: playable,
+      mappingForQuestion_result: mapping,
+      mapQuestionToPlayerPayload_result: built,
+      why_null: mapping
+        ? null
+        : `question_type_code=${JSON.stringify(playable.question_type_code)}, ` +
+          `question_type_raw=${JSON.stringify(playable.question_type_raw)}, ` +
+          `question_type=${JSON.stringify(playable.question_type)} -- none of the three resolved to a known form or to 'mcq'.`,
+    });
+  }, [playable, question, index]);
 
   const handleResult = useCallback(
     (result: QuestionResult) => onResult(question.questionId, result),

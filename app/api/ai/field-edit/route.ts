@@ -46,7 +46,11 @@ import type { AiFieldContext } from "@/lib/ai/field-edit/types";
  */
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+// This proxies to the same /api/ai/generate route stuck-assist does, which now
+// allows up to 180s for a provider's own retry-with-backoff to finish rather than
+// being cut off mid-retry (see GenerationController::allowTimeForProviderRetries).
+// 30s predates that fix and would still truncate the same way.
+export const maxDuration = 180;
 
 const fieldContextSchema = z.object({
   fieldType: z

@@ -135,6 +135,27 @@
   100% { opacity: 0; transform: translate3d(var(--h5p-confetti-x), var(--h5p-confetti-y), 0) rotate(var(--h5p-confetti-r)); }
 }
 
+@keyframes h5p-confetti-fall {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  10%  { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--h5p-fall-drift, 0px), 115vh, 0) rotate(420deg); }
+}
+
+/* A single glow pulse, coloured per call site via `--h5p-glow-color` /
+   `--h5p-pulse-color` rather than a fixed token -- this is the one place in
+   the module a caller supplies a colour instead of a state name, because the
+   colour here already came from a state (the score tone, a metric's own
+   success/danger token) resolved one level up. */
+@keyframes h5p-ring-glow {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--h5p-glow-color, var(--h5p-accent)) 45%, transparent); }
+  100% { box-shadow: 0 0 0 18px color-mix(in srgb, var(--h5p-glow-color, var(--h5p-accent)) 0%, transparent); }
+}
+
+@keyframes h5p-metric-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--h5p-pulse-color, var(--h5p-accent)) var(--h5p-pulse-opacity, 35%), transparent); }
+  100% { box-shadow: 0 0 0 var(--h5p-pulse-spread, 10px) color-mix(in srgb, var(--h5p-pulse-color, var(--h5p-accent)) 0%, transparent); }
+}
+
 /* A slow outward ring. The one looping animation that is not decoration: on a
    detailed diagram an unopened hotspot is genuinely easy to miss, and the ring
    is how a learner is told there is something there without a caption saying
@@ -351,6 +372,49 @@
 
 .h5p-halo { animation: h5p-halo var(--h5p-dur-slow) var(--h5p-ease-out); }
 
+/* The ring's own settle pulse -- fires once, after the sweep animation that
+   draws it has finished, so it reads as the ring "landing" rather than as
+   part of the sweep itself. */
+.h5p-ring-glow { animation: h5p-ring-glow var(--h5p-dur-slow) var(--h5p-ease-out) both; }
+
+/* A metric card's one-shot outcome pulse -- success (correct) or danger
+   (incorrect), never both, and never on a card whose count is zero (nothing
+   to celebrate or soften). Fires after the card's own entrance so the two
+   never fight for attention. */
+.h5p-metric-pulse {
+  animation: h5p-metric-pulse var(--h5p-dur-celebrate) var(--h5p-ease-out) both;
+  animation-delay: var(--h5p-metric-pulse-delay, 550ms);
+}
+
+/* =====================================================================
+   Confetti rain -- decorative weather over a standout result's own reveal
+   dialog, portalled to <body>. The dialog itself (Radix `Dialog`, not this
+   file) owns the card, the headline and the dismissal; this is only ever the
+   rain in front of it.
+   ===================================================================== */
+
+.h5p-celebrate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  /* Decorative: never intercepts a tap (the dialog underneath stays fully
+     clickable through it), never enters the tab order, never competes with
+     the live region that already announced the result in words. */
+  pointer-events: none;
+  animation: h5p-rise var(--h5p-dur-base) var(--h5p-ease-out) both;
+}
+.h5p-celebrate-overlay__piece {
+  position: absolute;
+  top: -6%;
+  height: 0.625rem;
+  width: 0.375rem;
+  border-radius: 1px;
+  background: var(--h5p-confetti-color, var(--h5p-accent));
+  animation: h5p-confetti-fall var(--h5p-fall-duration, 2.6s) linear both;
+  animation-delay: var(--h5p-fall-delay, 0ms);
+}
+
 /* The ring is drawn by a pseudo-element under the marker, so it never affects
    the marker's own size or its hit area. `currentColor` inherits the marker's
    colour, which the author chose. */
@@ -468,7 +532,8 @@
      at zero length. */
   .h5p-skeleton,
   .h5p-streak__flame,
-  .h5p-burst__piece {
+  .h5p-burst__piece,
+  .h5p-celebrate-overlay__piece {
     animation: none;
   }
   /* The ring is removed rather than stopped: frozen mid-pulse it is a grey
@@ -476,6 +541,12 @@
   .h5p-ping::after { display: none; }
   .h5p-skeleton { background: var(--h5p-surface-sunken); }
   .h5p-burst { display: none; }
+  /* Belt and suspenders: `FullScreenCelebration` already skips rendering
+     under reduced motion, this covers the same case for anything reusing
+     the class directly. */
+  .h5p-celebrate-overlay { display: none; }
+  .h5p-ring-glow,
+  .h5p-metric-pulse { animation: none; box-shadow: none; }
 
   .h5p-tappable:hover { transform: none; }
 }
@@ -489,4 +560,5 @@
   .h5p-option.is-picked { outline: 2px solid Highlight; }
   .h5p-rail__fill { background: Highlight; }
   .h5p-burst { display: none; }
+  .h5p-celebrate-overlay__piece { display: none; }
 }

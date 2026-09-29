@@ -1,7 +1,6 @@
 'use client';
 
-import { sanitizeHtml } from '@/lib/security/sanitize-html';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertOctagon,
   ClipboardCheck,
@@ -13,11 +12,15 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { QuestionPlayer } from '@/components/h5p/players';
+import type { QuestionResult } from '@/components/h5p/players/types';
+import { canPlay, selectedOptionId, toPlayerQuestion } from '@/lib/pal/practice-answers';
 import {
   fetchDiagnosticAssessment,
   submitDiagnosticAssessment,
   type DiagnosticConceptResult,
   type DiagnosticData,
+  type DiagnosticQuestion as DiagnosticAssessmentQuestion,
   type DiagnosticSubmitResult,
   type PalChapterContext,
 } from '@/app/pal/data/pal';
@@ -223,64 +226,17 @@ function DiagnosticModal({
           {!loading && !error && !result && questions.length > 0 && (
             <div className="space-y-4">
               {questions.map((question, index) => (
-                <div key={question.id} className="rounded-lg border border-slate-200 p-4">
-                  <div className="flex items-start gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
-                      {index + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {question.conceptName && (
-                          <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                            {question.conceptName}
-                          </span>
-                        )}
-                        <QuestionMetaBadges
-                          bloomLevel={question.bloomLevel}
-                          dokLevel={question.dokLevel}
-                          difficulty={question.difficulty}
-                        />
-                      </div>
-                      <div
-                        className="mt-1.5 text-sm font-medium text-slate-900 [&_img]:max-w-full"
-                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
-                      />
-                      {question.options.length > 0 ? (
-                        <div className="mt-2 space-y-1.5">
-                          {question.options.map((option) => {
-                            const selected = question.multipleAnswer
-                              ? Array.isArray(answers[question.id]) &&
-                                (answers[question.id] as string[]).includes(option.id)
-                              : answers[question.id] === option.id;
-                            return (
-                              <label
-                                key={option.id}
-                                className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                                  selected
-                                    ? 'border-violet-400 bg-violet-50 text-violet-900'
-                                    : 'border-slate-200 hover:bg-slate-50'
-                                }`}
-                              >
-                                <input
-                                  type={question.multipleAnswer ? 'checkbox' : 'radio'}
-                                  name={`diagnostic-${question.id}`}
-                                  checked={selected}
-                                  onChange={() => toggleAnswer(question.id, question.multipleAnswer, option.id)}
-                                  className="h-4 w-4 accent-violet-600"
-                                />
-                                <span className="[&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
-                              </label>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-xs italic text-slate-400">
-                          This question type is not answerable here.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <DiagnosticQuestionRow
+                  key={question.id}
+                  question={question}
+                  index={index}
+                  scope={context}
+                  answer={answers[question.id]}
+                  onToggle={(optionId) => toggleAnswer(question.id, question.multipleAnswer, optionId)}
+                  onPlayerAnswer={(optionId) =>
+                    setAnswers((prev) => ({ ...prev, [question.id]: optionId }))
+                  }
+                />
               ))}
 
               <div className="flex items-center justify-between">
@@ -293,6 +249,110 @@ function DiagnosticModal({
                 </Button>
               </div>
             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One diagnostic-assessment question, played through `QuestionPlayer` when
+ * `canPlay` allows it -- same rule as `PracticeQuestionRow` in
+ * `PracticePanel.tsx`, over the same option shape
+ * (`PracticeQuestionOption.correct`, already sent to the browser today).
+ */
+function DiagnosticQuestionRow({
+  question,
+  index,
+  scope,
+  answer,
+  onToggle,
+  onPlayerAnswer,
+}: {
+  question: DiagnosticAssessmentQuestion;
+  index: number;
+  scope: PalChapterContext;
+  answer: string | string[] | undefined;
+  onToggle: (optionId: string) => void;
+  onPlayerAnswer: (optionId: string) => void;
+}) {
+  const playable = useMemo(() => canPlay(question), [question]);
+
+  const handleResult = useCallback(
+    (result: QuestionResult) => {
+      const optionId = selectedOptionId(question, result);
+      if (optionId) onPlayerAnswer(optionId);
+    },
+    [question, onPlayerAnswer]
+  );
+
+  return (
+    <div className="rounded-lg border border-slate-200 p-4">
+      <div className="flex items-start gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-50 text-xs font-semibold text-violet-600">
+          {index + 1}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {question.conceptName && (
+              <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                {question.conceptName}
+              </span>
+            )}
+            <QuestionMetaBadges
+              bloomLevel={question.bloomLevel}
+              dokLevel={question.dokLevel}
+              difficulty={question.difficulty}
+            />
+          </div>
+          <div
+            className="mt-1.5 text-sm font-medium text-slate-900 [&_img]:max-w-full"
+            dangerouslySetInnerHTML={{ __html: question.title }}
+          />
+          {playable ? (
+            <div className="mt-2">
+              <QuestionPlayer
+                question={toPlayerQuestion(question, {
+                  standardId: scope.standardId,
+                  subjectId: scope.subjectId,
+                  chapterId: scope.chapterId,
+                })}
+                onResult={handleResult}
+                embedded
+              />
+            </div>
+          ) : question.options.length > 0 ? (
+            <div className="mt-2 space-y-1.5">
+              {question.options.map((option) => {
+                const selected = question.multipleAnswer
+                  ? Array.isArray(answer) && answer.includes(option.id)
+                  : answer === option.id;
+                return (
+                  <label
+                    key={option.id}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      selected
+                        ? 'border-violet-400 bg-violet-50 text-violet-900'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type={question.multipleAnswer ? 'checkbox' : 'radio'}
+                      name={`diagnostic-${question.id}`}
+                      checked={selected}
+                      onChange={() => onToggle(option.id)}
+                      className="h-4 w-4 accent-violet-600"
+                    />
+                    <span className="[&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  </label>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs italic text-slate-400">
+              This question type is not answerable here.
+            </p>
           )}
         </div>
       </div>

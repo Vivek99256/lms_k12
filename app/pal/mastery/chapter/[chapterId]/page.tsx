@@ -315,7 +315,7 @@ function ChapterMasteryView() {
           <CardContent>
             <ul className="divide-y divide-slate-100">
               {concepts.map((concept) => (
-                <ConceptRow key={concept.conceptId} concept={concept} />
+                <ConceptRow key={concept.conceptId} concept={concept} chapterId={chapterId} />
               ))}
             </ul>
           </CardContent>
@@ -336,7 +336,7 @@ function ChapterMasteryView() {
   );
 }
 
-function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
+function ConceptRow({ concept, chapterId }: { concept: ConceptMasteryRow; chapterId: string }) {
   const stage = stageOf(concept.stage);
   const done = concept.stage === 'mastered' || concept.stage === 'retained';
   const completed = isConceptCompleted(signalsFromMasteryRow(concept));
@@ -409,11 +409,10 @@ function ConceptRow({ concept }: { concept: ConceptMasteryRow }) {
           )}
 
           {/* Completed is read-only: no review, no revisit, no practice. The
-              only route left is the concept's own mastery record, which the
-              practice page serves in place of a question set. */}
+              only route left is the concept's own mastery page. */}
           {completed ? (
             <Link
-              href={`/pal/adaptive/concept/${concept.conceptId}`}
+              href={`/pal/mastery/concept/${concept.conceptId}?chapterId=${chapterId}`}
               className={buttonVariants({ variant: 'outline', size: 'sm' })}
             >
               View mastery
