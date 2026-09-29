@@ -4,6 +4,8 @@ import React, { createContext, useMemo, useState, useEffect, useRef, useCallback
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
+import { StuckUserAssistant } from '@/components/ai/StuckUserAssistant';
+import type { StuckPromptContext } from '@/lib/ai/stuck-assist-types';
 import { PageAiContextProvider } from '@/contexts/PageAiContext';
 import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
@@ -565,6 +567,18 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     });
   };
 
+  // Set by the idle watcher the moment it fires, and consumed exactly once by
+  // ChatbotPanel, which renders the "need a hand?" prompt as its own first bubble.
+  // Opening the panel here rather than inside the watcher keeps "who owns
+  // isChatbotOpen" in one place.
+  const [pendingStuckPrompt, setPendingStuckPrompt] = useState<StuckPromptContext | null>(null);
+
+  const handleStuck = (context: StuckPromptContext) => {
+    setPendingStuckPrompt(context);
+    setIsChatbotOpen(true);
+    setIsRightToolbarOpen(false);
+  };
+
   const handleLevel1Select = (item: MenuItem) => {
     setSelectedBranch((current) => {
       const key = getMenuKey(item);
@@ -828,10 +842,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 className="min-h-0 flex-none overflow-hidden"
                 style={{ width: assistantPanel.width }}
               >
-                <ChatbotPanel onToggleChatbot={toggleChatbot} />
+                <ChatbotPanel
+                  onToggleChatbot={toggleChatbot}
+                  stuckPrompt={pendingStuckPrompt}
+                  onStuckPromptHandled={() => setPendingStuckPrompt(null)}
+                />
               </div>
             </>
           )}
+          <StuckUserAssistant chatbotOpen={isChatbotOpen} onStuck={handleStuck} />
         </div>
         <RightFloatingToolbar
           isChatbotOpen={isChatbotOpen}

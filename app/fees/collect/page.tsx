@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { fetchFeesDashboardSummary } from '@/app/fees/_lib/fees-dashboard-api';
 import { getFeesSession } from '@/app/fees/_lib/fees-api';
+import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 import {
   SearchDropdown,
   type DropdownValue,
@@ -534,6 +535,50 @@ export default function FeesCollectPage() {
       icon: <Target className="h-4 w-4" />,
     },
   ];
+
+  /**
+   * What the assistant can see about this screen: the dashboard figures already on
+   * it, which filters are actually applied, and how many rows they leave. Only
+   * settled numbers from `dashboardData` and the visible row count are registered —
+   * never the unsaved form state a clerk is midway through on the collect-fee dialog,
+   * which lives on the student's own page, not here.
+   */
+  useRegisterPageAiContext(
+    useMemo(
+      () => ({
+        pageTitle: 'Fee collection',
+        pageType: 'list' as const,
+        metrics: [
+          { key: 'total_payable', label: 'Total payable fees', value: totalPayableFees, unit: 'INR' },
+          { key: 'total_collected', label: 'Total collected fees', value: dashboardData.totalPaidFees, unit: 'INR' },
+          { key: 'total_pending', label: 'Total pending fees', value: dashboardData.totalPendingFees, unit: 'INR' },
+          { key: 'pending_students', label: 'Students with dues', value: dashboardData.pendingStudents },
+          { key: 'collection_rate', label: 'Collection rate', value: dashboardData.collectionRate, unit: '%' },
+        ],
+        filters: [
+          ...(statusFilter !== ALL_FILTER_VALUE ? [{ key: 'status', label: 'Status', value: statusFilter }] : []),
+          ...(feeHeadFilter !== ALL_FILTER_VALUE ? [{ key: 'fee_head', label: 'Fee head', value: feeHeadFilter }] : []),
+        ],
+        searchQuery: searchTerm.trim() || null,
+        recordCount: knownDuesCount,
+        availableActions: [
+          { key: 'collect_fee', label: 'Collect a fee payment for a student' },
+          { key: 'view_student', label: "View a student's fee details" },
+        ],
+      }),
+      [
+        totalPayableFees,
+        dashboardData.totalPaidFees,
+        dashboardData.totalPendingFees,
+        dashboardData.pendingStudents,
+        dashboardData.collectionRate,
+        statusFilter,
+        feeHeadFilter,
+        searchTerm,
+        knownDuesCount,
+      ]
+    )
+  );
 
   const handleAcademicDropdownChange = (values: SearchDropdownValues) => {
     setAcademicFilters({

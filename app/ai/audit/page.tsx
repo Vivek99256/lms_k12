@@ -15,6 +15,7 @@ import { CapabilityShell } from '../_components/CapabilityShell';
 import { ModulePicker } from '../_components/ModulePicker';
 import { fetchTemplateOptions, type TemplateModule } from '@/lib/intelligence/ai-templates';
 import { fetchModuleActivity, type AiModuleActivity } from '@/lib/intelligence/ai-module';
+import { formatDuration } from '@/app/fees/ai-stack/_screens/fees-ai-chrome';
 
 const STATUS_STYLES: Record<string, string> = {
   completed: 'bg-emerald-100 text-emerald-800',
@@ -148,13 +149,15 @@ function ModuleActivity() {
                   <th className="border-b border-border px-3 py-2 text-[11px] uppercase tracking-widest text-muted-foreground">Status</th>
                   <th className="border-b border-border px-3 py-2 text-[11px] uppercase tracking-widest text-muted-foreground">Used</th>
                   <th className="border-b border-border px-3 py-2 text-[11px] uppercase tracking-widest text-muted-foreground">Subject</th>
+                  <th className="border-b border-border px-3 py-2 text-[11px] uppercase tracking-widest text-muted-foreground">Duration</th>
+                  <th className="border-b border-border px-3 py-2 text-[11px] uppercase tracking-widest text-muted-foreground">Knowledge graph</th>
                   <th className="border-b border-border px-3 py-2 text-[11px] uppercase tracking-widest text-muted-foreground">When</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {data.entries.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-4 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">
                       No activity recorded for this module yet.
                     </td>
                   </tr>
@@ -171,6 +174,10 @@ function ModuleActivity() {
                       {entry.used.template?.name ?? entry.used.prompt?.name ?? entry.used.agent?.name ?? entry.used.workflow ?? entry.used.tool ?? '—'}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{entry.subject_label ?? '—'}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">{formatDuration(entry.duration_ms)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {entry.knowledge_graph_used === null ? '—' : entry.knowledge_graph_used ? 'Used' : 'Not used'}
+                    </td>
                     <td className="px-3 py-2 text-muted-foreground">{entry.created_at ?? '—'}</td>
                   </tr>
                 ))}
