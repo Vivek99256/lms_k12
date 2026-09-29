@@ -366,7 +366,6 @@ export default function YearlyStudentAttendancePage() {
       });
 
       const responseBody = (await response.json()) as unknown;
-      console.log('Yearly Attendance Report API response:', responseBody);
       const payload = normalizePayload(responseBody);
 
       if (!response.ok) {

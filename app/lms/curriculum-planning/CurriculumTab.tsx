@@ -8,6 +8,7 @@
 // point of the screen as much as the data is: a unit that declares fifteen
 // chapters and has none extracted should say so.
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight, CircleCheck } from 'lucide-react';
 import type { ApiCurriculum, ApiOutcomeGoal, ApiUnit, ApiUnmappedGroup } from './types';
@@ -185,7 +186,7 @@ function CurriculumDetails({ details }: { details: ApiCurriculum['details'] }) {
                 // Stored as authored HTML by the Blade editor these fields came from.
                 <div
                   className="prose-sm text-sm leading-relaxed text-[#3c3833]"
-                  dangerouslySetInnerHTML={{ __html: details[key] as string }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(details[key] as string) }}
                 />
               ) : (
                 <NotProvided />

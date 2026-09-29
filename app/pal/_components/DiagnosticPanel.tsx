@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertOctagon,
@@ -242,7 +243,7 @@ function DiagnosticModal({
                       </div>
                       <div
                         className="mt-1.5 text-sm font-medium text-slate-900 [&_img]:max-w-full"
-                        dangerouslySetInnerHTML={{ __html: question.title }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
                       />
                       {question.options.length > 0 ? (
                         <div className="mt-2 space-y-1.5">
@@ -267,7 +268,7 @@ function DiagnosticModal({
                                   onChange={() => toggleAnswer(question.id, question.multipleAnswer, option.id)}
                                   className="h-4 w-4 accent-violet-600"
                                 />
-                                <span className="[&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: option.answer }} />
+                                <span className="[&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                               </label>
                             );
                           })}

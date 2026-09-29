@@ -1,4 +1,5 @@
 import { resolveAiBaseUrl } from "@/app/components/utils/api_url";
+import { isTrustedBackendUrl } from "@/lib/security/trusted-backend";
 
 type McpMeta = {
   instituteId?: string | number | null;
@@ -13,7 +14,8 @@ type McpClientContext = {
 };
 
 function normalizeBaseUrl(baseUrl?: string | null) {
-  return resolveAiBaseUrl(baseUrl);
+  // A caller-supplied host is used only when it is a configured backend (SSRF guard).
+  return resolveAiBaseUrl(isTrustedBackendUrl(baseUrl) ? baseUrl : null);
 }
 
 function buildHeaders(token?: string | null, extra?: HeadersInit) {

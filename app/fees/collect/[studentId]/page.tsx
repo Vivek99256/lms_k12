@@ -19,6 +19,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { FeesAiAssist } from '@/app/fees/_components/fees-ai-assist';
 import { logFeesOperation } from '@/lib/fees/fees-ai-stack';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type SessionContext = {
   token: string;
@@ -338,7 +339,7 @@ export default function FeesCollectionStudentPage() {
     return selectedBank?.label ?? '';
   }, [banks, selectedBankId]);
   const printableReceiptHtml = useMemo(
-    () => normalizeReceiptHtml(receiptHtml, selectedBankId, selectedBankName),
+    () => sanitizeHtml(normalizeReceiptHtml(receiptHtml, selectedBankId, selectedBankName), { document: true }),
     [receiptHtml, selectedBankId, selectedBankName]
   );
   const collectionProgress = totalSummaryFees > 0

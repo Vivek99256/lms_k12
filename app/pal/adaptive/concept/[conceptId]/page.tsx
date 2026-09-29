@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -400,7 +401,7 @@ function DiagnosticQuestion({
           </span>
           <div
             className="min-w-0 flex-1 text-sm font-medium text-slate-900 [&_img]:max-w-full"
-            dangerouslySetInnerHTML={{ __html: question.title }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
           />
           <BandChip band={question.difficulty} className="shrink-0" />
         </div>
@@ -431,7 +432,7 @@ function DiagnosticQuestion({
                 </span>
                 <span
                   className="min-w-0 flex-1 [&_img]:max-w-full"
-                  dangerouslySetInnerHTML={{ __html: option.answer }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }}
                 />
               </label>
             );

@@ -15,6 +15,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/security/rate-limit';
+import { requireSession } from '@/lib/security/session-token';
+
+/** A resume is a few pages; anything far longer is not a resume. */
+const MAX_RESUME_CHARS = 60_000;
 
 const DEEPSEEK_ENDPOINT = 'https://api.deepseek.com/chat/completions';
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
@@ -111,11 +116,22 @@ async function requestGeminiScreening(apiKey: string, prompt: string) {
 }
 
 export async function POST(req: NextRequest) {
+  // Each call spends paid LLM credit: signed-in staff only, and not in bulk.
+  const session = requireSession(req);
+  if (!session) {
+    return NextResponse.json({ error: 'Sign in to screen candidates.' }, { status: 401 });
+  }
+  const limited = rateLimit(req, 'screen-candidate', { limit: 20, windowMs: 60_000, key: session.claims.id });
+  if (limited) return limited;
+
   try {
     const { resume, jdData } = await req.json();
 
     if (!resume || !jdData) {
       return NextResponse.json({ error: 'Missing resume or JD data' }, { status: 400 });
+    }
+    if (typeof resume !== 'string' || resume.length > MAX_RESUME_CHARS || typeof jdData !== 'object') {
+      return NextResponse.json({ error: 'The resume or JD data is not in the expected form.' }, { status: 400 });
     }
 
     const deepSeekApiKey = process.env.SCREENING_DEEPSEEK_API_KEY;
@@ -257,7 +273,8 @@ Provide analysis in valid JSON format:
   } catch (error) {
     console.error('Candidate screening error:', error);
     return NextResponse.json(
-      { error: 'Failed to screen candidate', details: error instanceof Error ? error.message : 'Unknown error' },
+      // Provider error text stays in the server log; it can carry request ids and key hints.
+      { error: 'Failed to screen candidate' },
       { status: 500 }
     );
   }

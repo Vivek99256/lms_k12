@@ -1,4 +1,5 @@
 import type { ActingUser } from './types';
+import { resolveBackendBaseUrl } from '@/lib/security/trusted-backend';
 
 /**
  * Who is calling, and what Laravel says they may do.
@@ -36,7 +37,8 @@ function defaultBaseUrl(): string {
 
 export function readRequestSession(request: Request): RequestSession {
   return {
-    baseUrl: (header(request, 'x-laravel-base-url') || defaultBaseUrl()).replace(/\/$/, ''),
+    // Only a configured backend may answer the permission check; see lib/security/trusted-backend.ts.
+    baseUrl: resolveBackendBaseUrl(header(request, 'x-laravel-base-url'), defaultBaseUrl()),
     token: header(request, 'x-laravel-token'),
     tenant_id: header(request, 'x-sub-institute-id'),
     user_id: header(request, 'x-user-id'),

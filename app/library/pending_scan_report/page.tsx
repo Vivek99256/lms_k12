@@ -18,6 +18,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
 import { downloadFile, escapeCsv, getStoredAcademicYears, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type Row = {
   syear: string;
@@ -44,7 +45,7 @@ function printRows(rows: Row[]) {
   table { border-collapse: collapse; width: 100%; }
   th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
   th { background: #f1f5f9; }
-  </style></head><body><h2>Pending Scan Report</h2><table><thead><tr><th>Sr No</th><th>SYear</th><th>Item Code</th><th>Title</th><th>Collection Type</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.syear || '-'}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td></tr>`).join('')}</tbody></table></body></html>`;
+  </style></head><body><h2>Pending Scan Report</h2><table><thead><tr><th>Sr No</th><th>SYear</th><th>Item Code</th><th>Title</th><th>Collection Type</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.syear || '-')}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(row.title || '-')}</td><td>${escapeHtml(row.collectionType || '-')}</td></tr>`).join('')}</tbody></table></body></html>`;
   const printWindow = window.open('', '_blank', 'width=1200,height=900');
   if (!printWindow) return;
   printWindow.document.open();

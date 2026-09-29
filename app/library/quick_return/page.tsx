@@ -26,6 +26,7 @@ import {
   readMessage,
   readStatus,
 } from '@/app/library/_lib/library-module-utils';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type ReturnRecord = {
   id: string;
@@ -94,7 +95,7 @@ function printRows(rows: ReturnRecord[]) {
             </tr>
           </thead>
           <tbody>
-            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.studentName || '-'}</td><td>${row.standardDivision || '-'}</td><td>${row.enrollmentNo || '-'}</td><td>${row.mobile || '-'}</td><td>${row.itemCode || '-'}</td><td>${row.bookName || '-'}</td><td>${formatDate(row.issuedDate)}</td><td>${formatDate(row.dueDate)}</td><td>${formatDateTime(row.returnDate)}</td><td>${row.publisherName || '-'}</td><td>${row.authorName || '-'}</td></tr>`).join('')}
+            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.studentName || '-')}</td><td>${escapeHtml(row.standardDivision || '-')}</td><td>${escapeHtml(row.enrollmentNo || '-')}</td><td>${escapeHtml(row.mobile || '-')}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(row.bookName || '-')}</td><td>${escapeHtml(formatDate(row.issuedDate))}</td><td>${escapeHtml(formatDate(row.dueDate))}</td><td>${escapeHtml(formatDateTime(row.returnDate))}</td><td>${escapeHtml(row.publisherName || '-')}</td><td>${escapeHtml(row.authorName || '-')}</td></tr>`).join('')}
           </tbody>
         </table>
       </body>

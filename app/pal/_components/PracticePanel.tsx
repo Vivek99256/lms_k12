@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ArrowRight,
@@ -298,7 +299,7 @@ function AdaptivePracticeModal({
                   </div>
                   <div
                     className="mt-1.5 text-sm font-medium text-slate-900 [&_img]:max-w-full"
-                    dangerouslySetInnerHTML={{ __html: question.title }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
                   />
                   {question.options.length > 0 ? (
                     <div className="mt-2 space-y-1.5">
@@ -325,7 +326,7 @@ function AdaptivePracticeModal({
                             />
                             <span
                               className="[&_img]:max-w-full"
-                              dangerouslySetInnerHTML={{ __html: option.answer }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }}
                             />
                           </label>
                         );
@@ -617,7 +618,7 @@ function PracticeHistoryModal({
                       <div className="min-w-0">
                         <div
                           className="truncate text-sm text-slate-800 [&_img]:hidden"
-                          dangerouslySetInnerHTML={{ __html: item.questionTitle }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.questionTitle) }}
                         />
                         <div className="text-[11px] text-slate-400">
                           {item.conceptName} · {item.createdAt}

@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -324,7 +325,7 @@ function QuestionResultRow({ question }: { question: DiagnosticQuestionResult })
         </div>
         <p
           className="mt-1 text-sm text-slate-800 [&_img]:max-w-full"
-          dangerouslySetInnerHTML={{ __html: question.title }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
         />
       </div>
       <span className={`shrink-0 text-xs font-semibold ${verdict.className}`}>{verdict.label}</span>

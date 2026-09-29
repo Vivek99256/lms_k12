@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -501,7 +502,7 @@ function QuestionCard({
                 // Question bodies are authored HTML in lms_question_master and
                 // contain markup and figures; the rest of PAL renders them the
                 // same way.
-                dangerouslySetInnerHTML={{ __html: question.title }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
               />
             </div>
           </div>
@@ -531,7 +532,7 @@ function QuestionCard({
                  
                   <span
                     className="min-w-0 flex-1 [&_img]:max-w-full"
-                    dangerouslySetInnerHTML={{ __html: option.answer }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }}
                   />
                 </label>
               );

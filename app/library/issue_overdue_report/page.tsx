@@ -20,6 +20,7 @@ import {
 import type { SearchDropdownValues } from '@/components/search-dropdown/types';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
 import { downloadFile, escapeCsv, formatDate, formatDateTime, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type Row = {
   studentName: string;
@@ -62,7 +63,7 @@ function printRows(rows: Row[]) {
     th { background: #f1f5f9; }
   </style></head><body><h2>Issue / Overdue Report</h2><table><thead><tr>
   <th>Sr No</th><th>Student Name</th><th>GR No</th><th>Mobile</th><th>Std / Div</th><th>Book Name</th><th>Item Code</th><th>Issued Date</th><th>Due Date</th><th>Return Date</th>
-  </tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.studentName || '-'}</td><td>${row.enrollmentNo || '-'}</td><td>${row.mobile || '-'}</td><td>${row.standardDivision || '-'}</td><td>${row.bookTitle || '-'}</td><td>${row.itemCode || '-'}</td><td>${formatDate(row.issuedDate)}</td><td>${formatDate(row.dueDate)}</td><td>${formatDateTime(row.returnDate)}</td></tr>`).join('')}</tbody></table></body></html>`;
+  </tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.studentName || '-')}</td><td>${escapeHtml(row.enrollmentNo || '-')}</td><td>${escapeHtml(row.mobile || '-')}</td><td>${escapeHtml(row.standardDivision || '-')}</td><td>${escapeHtml(row.bookTitle || '-')}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(formatDate(row.issuedDate))}</td><td>${escapeHtml(formatDate(row.dueDate))}</td><td>${escapeHtml(formatDateTime(row.returnDate))}</td></tr>`).join('')}</tbody></table></body></html>`;
   const printWindow = window.open('', '_blank', 'width=1400,height=900');
   if (!printWindow) return;
   printWindow.document.open();

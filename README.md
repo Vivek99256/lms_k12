@@ -75,6 +75,14 @@ npm run dev
 
 Open **http://localhost:3000** in your browser.
 
+### 4. Configure and deploy
+
+- Copy `.env.example` to `.env.local` and fill it in. Every variable is documented there.
+- Before deploying, read [`docs/security-hardening.md`](docs/security-hardening.md): the settings each environment must set (`NEXT_PUBLIC_APP_ENV`, `LARAVEL_JWT_SECRET`, `TRUSTED_BACKEND_ORIGINS`), and the server-side actions that are not in code.
+- `npm run typecheck`, `npm test` and `npm run build` must pass; CI (`.github/workflows/ci.yml`) runs them on every pull request.
+- Health check for uptime monitors: `GET /api/health`.
+- Report a security issue privately to the maintainers, not in a public issue.
+
 ---
 
 ## 🗂️ Project Direction

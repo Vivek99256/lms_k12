@@ -46,7 +46,10 @@ function MobileBridge() {
 
     void loginFromHandoffTicket(ticket).then((result) => {
       if (result.success) {
-        router.replace(result.redirectPath || '/');
+        // Only an in-app path: a backend-supplied absolute or protocol-relative URL
+        // would turn this handoff into an open redirect.
+        const path = result.redirectPath || '/';
+        router.replace(path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\') ? path : '/');
         return;
       }
       setError(result.error || 'This link has expired. Please open it again from the app.');

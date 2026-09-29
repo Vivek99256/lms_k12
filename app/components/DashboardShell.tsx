@@ -307,7 +307,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         });
         const data = await res.json().catch(() => ({}));
         if (!cancelled) {
-          setHasBrainAccess(Boolean(res.ok && data?.allowed) || isBrainVisibleByLmsSession());
+          // A definite server answer wins, including "no". The local session check
+          // (editable in localStorage) is only a fallback for a host without the endpoint.
+          setHasBrainAccess(
+            res.ok && typeof data?.allowed === 'boolean' ? data.allowed : isBrainVisibleByLmsSession(),
+          );
         }
       } catch {
         if (!cancelled) setHasBrainAccess(isBrainVisibleByLmsSession());

@@ -26,6 +26,7 @@ import {
   readString,
   toArray,
 } from '@/app/fees/_lib/fees-api';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type MessageState = {
   type: 'success' | 'error' | 'info';
@@ -301,10 +302,10 @@ function printResourceTable(records: ResourceRecord[], customFields: CustomField
         <h2>Book Resources</h2>
         <table>
           <thead>
-            <tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr>
+            <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
           </thead>
           <tbody>
-            ${rows.map((row) => `<tr>${headers.map((header) => `<td>${row[header as keyof typeof row] ?? '-'}</td>`).join('')}</tr>`).join('')}
+            ${rows.map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(row[header as keyof typeof row] ?? '-')}</td>`).join('')}</tr>`).join('')}
           </tbody>
         </table>
       </body>

@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import {
   Suspense,
   useCallback,
@@ -428,7 +429,7 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
                       {card.content && card.content.trim() !== '' ? (
                         <div
                           className="text-sm leading-relaxed text-slate-700 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded-lg"
-                          dangerouslySetInnerHTML={{ __html: card.content }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(card.content) }}
                         />
                       ) : (
                         <p className="text-sm text-slate-400">No content available</p>

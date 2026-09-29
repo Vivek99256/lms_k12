@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -1152,7 +1153,7 @@ function MisconceptionModal({ modal, onClose }: { modal: ActiveModal; onClose: (
               <div className="flex items-start justify-between gap-3">
                 <div
                   className="min-w-0 text-sm text-slate-800 [&_img]:max-w-full"
-                  dangerouslySetInnerHTML={{ __html: question.question }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.question) }}
                 />
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">

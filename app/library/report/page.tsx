@@ -18,6 +18,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
 import { downloadFile, escapeCsv, MessageState, normalizePayload } from '@/app/library/_lib/library-module-utils';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type ReportOption = { id: string; label: string };
 type ReportRow = Record<string, string>;
@@ -102,8 +103,8 @@ function printRows(rows: ReportRow[]) {
       th { background: #f1f5f9; }
     </style></head><body>
       <h2>Library Report</h2>
-      <table><thead><tr><th>Sr No</th>${headers.map((header) => `<th>${header}</th>`).join('')}</tr></thead><tbody>
-      ${rows.map((row, index) => `<tr><td>${index + 1}</td>${columnOrder.map((key) => `<td>${row[key] || '-'}</td>`).join('')}</tr>`).join('')}
+      <table><thead><tr><th>Sr No</th>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>
+      ${rows.map((row, index) => `<tr><td>${index + 1}</td>${columnOrder.map((key) => `<td>${escapeHtml(row[key] || '-')}</td>`).join('')}</tr>`).join('')}
       </tbody></table>
     </body></html>
   `;

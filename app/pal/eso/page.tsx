@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Lock, Sparkles, Target } from 'lucide-react';
@@ -1129,7 +1130,7 @@ function DiagnosticQuestion({
         </span>
         <Badge variant="secondary">{item.nodeType}</Badge>
       </div>
-      <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+      <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
       <div className="mt-2 space-y-1.5">
         {item.options.map((option) => (
           <label
@@ -1146,7 +1147,7 @@ function DiagnosticQuestion({
               onChange={() => onSelect(option.id)}
               className="h-4 w-4 accent-indigo-600"
             />
-            <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+            <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
           </label>
         ))}
       </div>
@@ -1303,7 +1304,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
               </span>
               {/* <Badge variant="secondary">{item.nodeType}</Badge> */}
             </div>
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -1320,7 +1321,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
                     onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
                     className="h-4 w-4 accent-indigo-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>
@@ -1431,7 +1432,7 @@ function PrerequisiteProbeStep({
 
         {item && (
           <div data-eso-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -1448,7 +1449,7 @@ function PrerequisiteProbeStep({
                     onChange={() => setSelected(option.id)}
                     className="h-4 w-4 accent-sky-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>
@@ -1803,7 +1804,7 @@ function CheckUnderstandingStep({
 
         {loaded.map((item) => (
           <div key={item.questionId} data-eso-cfu-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -1820,7 +1821,7 @@ function CheckUnderstandingStep({
                     onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
                     className="h-4 w-4 accent-indigo-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>
@@ -2013,7 +2014,7 @@ function TeachOrPracticeStep({
         )}
         {item && item !== 'loading' && (
           <div data-eso-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -2030,7 +2031,7 @@ function TeachOrPracticeStep({
                     onChange={() => setSelected(option.id)}
                     className="h-4 w-4 accent-indigo-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>
@@ -2151,7 +2152,7 @@ function ContrastPairStep({
         {action.contrastPair?.body && (
           <div
             className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
-            dangerouslySetInnerHTML={{ __html: action.contrastPair.body }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.contrastPair.body) }}
           />
         )}
 
@@ -2185,7 +2186,7 @@ function ContrastPairStep({
         )}
         {readyToRetest && item && item !== 'loading' && (
           <div data-eso-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -2202,7 +2203,7 @@ function ContrastPairStep({
                     onChange={() => setSelected(option.id)}
                     className="h-4 w-4 accent-indigo-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>
@@ -2516,7 +2517,7 @@ function RetrievalDueStep({
         {items?.map((item, index) => (
           <div key={item.questionId} data-eso-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
             <div className="mb-1 text-xs text-slate-400">Item {index + 1}</div>
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.title) }} />
             <div className="mt-2 space-y-1.5">
               {item.options.map((option) => (
                 <label
@@ -2533,7 +2534,7 @@ function RetrievalDueStep({
                     onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
                     className="h-4 w-4 accent-indigo-600"
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                 </label>
               ))}
             </div>

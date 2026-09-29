@@ -688,16 +688,6 @@ export default function MonthwiseStudentAttendancePage() {
         params.set(key, value);
       }
 
-      console.log('Monthwise Attendance Report resolved session:', {
-        subInstituteId: session.subInstituteId,
-        academicYearId: session.academicYearId,
-        userId: session.userId,
-        userProfileId: session.userProfileId,
-        userProfileName: session.userProfileName,
-        clientId: session.clientId,
-        hasToken: Boolean(session.token),
-      });
-      console.log('Monthwise Attendance Report request payload:', Object.fromEntries(body.entries()));
 
       if (!session.subInstituteId || !session.academicYearId) {
         throw new Error('Monthwise report session context is missing sub_institute_id or syear in browser storage.');
@@ -714,7 +704,6 @@ export default function MonthwiseStudentAttendancePage() {
       });
 
       const responseBody = (await response.json()) as unknown;
-      console.log('Monthwise Attendance Report API response:', responseBody);
       const payload = normalizePayload(responseBody);
 
       if (!response.ok) {

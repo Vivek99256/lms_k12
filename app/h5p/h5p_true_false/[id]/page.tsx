@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowRight, Check, X } from 'lucide-react';
@@ -101,7 +102,7 @@ function newAttempt(item: H5pTrueFalse): Attempt {
 
 /** Statements are stored as HTML, because H5P stores them so. */
 function Html({ html, className }: { html: string; className?: string }) {
-  return <span className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <span className={className} dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />;
 }
 
 /**

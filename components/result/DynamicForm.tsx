@@ -31,6 +31,7 @@ import type { FieldDef } from '@/lib/result/types';
 import { Checkbox, Switch } from './primitives';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { cn } from '@/lib/utils';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 export type FormValues = Record<string, unknown>;
 
@@ -242,7 +243,7 @@ function HtmlEditor({ value, onChange }: { value: string; onChange: (next: strin
           className="w-full resize-y bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100 focus:outline-none"
         />
       ) : (
-        <div className="max-h-96 overflow-auto bg-white p-4" dangerouslySetInnerHTML={{ __html: value || '<p class="text-slate-400">Nothing to preview yet.</p>' }} />
+        <div className="max-h-96 overflow-auto bg-white p-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(value, { document: true }) || '<p class="text-slate-400">Nothing to preview yet.</p>' }} />
       )}
     </div>
   );

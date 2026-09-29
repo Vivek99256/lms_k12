@@ -17,6 +17,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
 import { downloadFile, escapeCsv, MessageState, normalizePayload, readMessage, readStatus } from '@/app/library/_lib/library-module-utils';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type ScanRecord = {
   id: string;
@@ -91,7 +92,7 @@ function printRows(rows: ScanRecord[]) {
             </tr>
           </thead>
           <tbody>
-            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td><td>${row.scanStatus || '-'}</td><td>${row.syear || '-'}</td></tr>`).join('')}
+            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(row.title || '-')}</td><td>${escapeHtml(row.collectionType || '-')}</td><td>${escapeHtml(row.scanStatus || '-')}</td><td>${escapeHtml(row.syear || '-')}</td></tr>`).join('')}
           </tbody>
         </table>
       </body>
