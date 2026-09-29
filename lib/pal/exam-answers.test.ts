@@ -8,6 +8,7 @@ import {
   toPlayerQuestion,
   type PalExamQuestion,
 } from './exam-answers';
+import { mappingForQuestion } from '@/lib/h5p/question-bank-h5p-map';
 import type { QuestionResult } from '@/components/h5p/players/types';
 
 /**
@@ -30,6 +31,7 @@ function mcq(overrides: Partial<PalExamQuestion> = {}): PalExamQuestion {
       { id: '9003', answer: 'Nitrogen', correctFlag: '0' },
     ],
     questionTypeCode: 'mcq',
+    questionTypeRaw: 'Multiple choice',
     questionType: 'MCQ',
     modelAnswer: null,
     marks: 1,
@@ -101,6 +103,75 @@ test('an option the question does not carry is not submitted as one of its own',
   const submission = submissionFor(mcq(), result({ choiceIds: [4242] }));
 
   assert.equal(submission?.kind, 'interactive');
+});
+
+test('a row with no code still resolves from its catalogue label', () => {
+  // The bug this guards: `fetchPalQuiz` carried `question_type_code` and
+  // `question_type` but dropped `question_type_raw`, so a row awaiting a
+  // stable code -- ordinary for assertion & reason, match the following,
+  // case studies and every narrative form -- fell to "no form is recorded on
+  // this row" in PAL even though the identical row resolves fine on the
+  // question bank screens, which read this field. See `fetchPalQuiz` in
+  // `app/pal/data/pal.ts`.
+  const question = mcq({
+    questionTypeCode: null,
+    questionTypeRaw: 'Assertion & Reason',
+    questionType: 'MCQ',
+  });
+
+  assert.equal(mappingForQuestion(toBankQuestion(question))?.code, 'assertion_reason');
+});
+
+test('a narrative row with no code still resolves from its catalogue label', () => {
+  // The `question_type` fallback only ever reconstructs 'mcq' -- a narrative
+  // row (fill-in-the-blank, match the following, an essay form) has no rescue
+  // there at all, which is exactly why the middle rung matters most here.
+  const question = mcq({
+    questionTypeCode: null,
+    questionTypeRaw: 'Fill in the blank',
+    questionType: 'Narrative',
+    options: [],
+    modelAnswer: 'Paris',
+  });
+
+  assert.equal(mappingForQuestion(toBankQuestion(question))?.code, 'fill_blank');
+});
+
+test('match the following resolves from its catalogue label with no code', () => {
+  const question = mcq({
+    questionTypeCode: null,
+    questionTypeRaw: 'Match the Following',
+    questionType: 'Narrative',
+    options: [],
+    modelAnswer: 'Delhi - India; Paris - France',
+  });
+
+  assert.equal(mappingForQuestion(toBankQuestion(question))?.code, 'match_following');
+});
+
+test('a case study resolves from its catalogue label with no code', () => {
+  const question = mcq({
+    questionTypeCode: null,
+    questionTypeRaw: 'Case study',
+    questionType: 'Narrative',
+    options: [],
+  });
+
+  assert.equal(mappingForQuestion(toBankQuestion(question))?.code, 'case_study');
+});
+
+test('a row with neither a code nor a catalogue label genuinely has nothing to play', () => {
+  // Distinct from the two cases above: this row carries no form at all, on
+  // any of the three rungs, so refusing it is correct -- not the bug.
+  const question = mcq({
+    questionTypeCode: null,
+    questionTypeRaw: null,
+    questionType: 'Narrative',
+    options: [],
+    modelAnswer: 'Paris',
+  });
+
+  assert.equal(mappingForQuestion(toBankQuestion(question)), null);
 });
 
 test('true/false recovers the option from the verdict alone', () => {

@@ -114,13 +114,31 @@ function readLearningSource(value: unknown): EsoLearningSource {
 export interface QuestionOption {
   id: number;
   answer: string;
+  /** `answer_master.correct_answer === 1`. Drives QuestionPlayer, not shown to the student while the question is live. */
+  isCorrect: boolean;
 }
 
-/** A question the student can answer — never carries the answer key or any misconception mapping. */
+/**
+ * A question the student can answer — never carries any misconception
+ * mapping. `ServableQuestions::hydrate()` now includes each option's
+ * `isCorrect`, which is what lets `lib/pal/eso-answers.ts` build a real
+ * `QuestionPlayer` activity; scoring is still resolved server-side from the
+ * submitted answer_master id (`isAnswerCorrect()`), never from this flag.
+ */
 export interface EsoQuestion {
   questionId: number;
   title: string;
   options: QuestionOption[];
+  /** `"MCQ"` for a type-1 row, else the coarse label. See `questionTypeCode` on `PracticeItem` for the finer signal. */
+  questionType: string | null;
+  /**
+   * The question's own curriculum keys, off `ServableQuestions::hydrate()`.
+   * Required, not cosmetic: the shared H5P players refuse to render without a
+   * non-empty `chapter_id`/`standard_id`/`subject_id` (`hasH5pContext()`).
+   */
+  standardId: number | null;
+  subjectId: number | null;
+  chapterId: number | null;
 }
 
 export interface DiagnosticItem extends EsoQuestion {
@@ -133,6 +151,14 @@ export interface DiagnosticItem extends EsoQuestion {
 
 export interface PracticeItem extends EsoQuestion {
   nodeId: number;
+  /**
+   * Only Practice resolves this (`PalQuestionForms::describe()`, reusing PAL
+   * Test's own classification ladder) -- Practice is the one ESO surface not
+   * narrowed to MCQ, so it is the one that needs a finer type signal than
+   * `questionType` alone. Null when the ladder can't resolve one (most rows
+   * today), in which case `mappingForQuestion()` falls back to `questionType`.
+   */
+  questionTypeCode: string | null;
 }
 
 export interface DiagnosticNodeResult {
@@ -429,8 +455,12 @@ function mapQuestion(raw: unknown): EsoQuestion {
     title: readString(r.title),
     options: options.map((o) => {
       const opt = toRecord(o);
-      return { id: num(opt.id), answer: readString(opt.answer) };
+      return { id: num(opt.id), answer: readString(opt.answer), isCorrect: opt.is_correct === true };
     }),
+    questionType: r.question_type == null ? null : readString(r.question_type),
+    standardId: numOrNull(r.standard_id),
+    subjectId: numOrNull(r.subject_id),
+    chapterId: numOrNull(r.chapter_id),
   };
 }
 
@@ -557,7 +587,11 @@ export async function fetchNextAction(learnerId: string, conceptId: number, sign
 export async function fetchPracticeItem(learnerId: string, nodeId: number, signal?: AbortSignal): Promise<PracticeItem | null> {
   try {
     const data = toRecord(await esoGet(`api/pal/eso/practice-item/${learnerId}/${nodeId}`, signal));
-    return { ...mapQuestion(data), nodeId };
+    return {
+      ...mapQuestion(data),
+      nodeId,
+      questionTypeCode: data.question_type_code == null ? null : readString(data.question_type_code),
+    };
   } catch (reason) {
     // A 404 is a genuine content gap and an expected state. Anything else is a
     // fault, and swallowing it here reported 500s and expired sessions to the

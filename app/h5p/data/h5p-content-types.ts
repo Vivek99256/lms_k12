@@ -418,6 +418,16 @@ export interface H5pSingleChoiceOption {
   /** What to say to a learner who chose THIS option. */
   feedback: string | null;
   sort_order: number;
+  /**
+   * The `answer_master` row this option was derived from, for a set built at
+   * render time from a question bank row rather than saved to this table
+   * (`question-bank-runtime.ts`'s synthetic rows). `id` above is this
+   * activity's own (synthetic, negative) option id; this is the id a module
+   * that records an attempt -- PAL, homework -- actually needs. Absent for a
+   * genuinely saved `h5p_single_choice_set` row, where the option IS the
+   * stored data and there is nothing else to point back to.
+   */
+  source_option_id?: number | null;
 }
 
 export interface H5pSingleChoiceQuestion {

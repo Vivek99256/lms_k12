@@ -720,9 +720,27 @@ export async function fetchPalQuiz(
   const answerArr = toRecord(payload.answer_arr);
   const qp = toRecord(payload.questionpaper_data);
 
-  const questions: PalQuestion[] = toArray(payload.question_arr).map((entry) => {
+  const questions: PalQuestion[] = toArray(payload.question_arr).map((entry, entryIndex) => {
     const record = toRecord(entry);
     const questionId = readString(record.question_id);
+    // TEMP DIAGNOSTIC -- pinpointing why some /lms/pal/create rows still
+    // resolve to "no form is recorded" after question_type_raw was wired
+    // through. Logs the RAW row exactly as the API sent it, before this
+    // function reshapes anything. Remove once resolved.
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.debug(`[PAL DEBUG] raw question_arr[${entryIndex}] (on-screen #${entryIndex + 1})`, {
+        question_id: record.question_id,
+        question_type_code: record.question_type_code,
+        question_type_raw: record.question_type_raw,
+        question_type: record.question_type,
+        question_type_id: record.question_type_id,
+        question_type_catalog_id: record.question_type_catalog_id,
+        h5p_type: record.h5p_type,
+        all_keys: Object.keys(record),
+        full_record: record,
+      });
+    }
     const options = toArray(answerArr[questionId]).map((opt) => {
       const option = toRecord(opt);
       return {
@@ -738,8 +756,12 @@ export async function fetchPalQuiz(
       // The form, resolved server-side on the same three-tier ladder the
       // question bank endpoint uses (extraction sidecar -> generated column ->
       // grading type), so PAL and the bank never disagree about what a
-      // question is.
+      // question is. All three rungs are carried through -- dropping
+      // `question_type_raw` here is what previously left every question with
+      // no code and a non-MCQ grading type ("Narrative") unplayable, even
+      // though the question bank screens resolve the identical row fine.
       questionTypeCode: readString(record.question_type_code) || null,
+      questionTypeRaw: readString(record.question_type_raw) || null,
       questionType: readString(record.question_type) || null,
       modelAnswer: readString(record.model_answer) || null,
       marks: readNumber(record.marks) || null,
