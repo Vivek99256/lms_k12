@@ -53,6 +53,7 @@ import {
   FeesAiPill,
   FeesAiTableHead,
   formatWhen,
+  formatDuration,
 } from './fees-ai-chrome';
 
 const MODULE_KEY = 'fees';
@@ -175,7 +176,7 @@ export function FeesActivityScreen() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[68rem] border-collapse text-left text-sm">
               <FeesAiTableHead
-                columns={['When', 'Operation', 'Capability', 'AI Stack record used', 'By', 'About', 'Reference', 'Status']}
+                columns={['When', 'Operation', 'Capability', 'AI Stack record used', 'By', 'About', 'Reference', 'Duration', 'Status']}
               />
               <tbody className="divide-y divide-slate-200">
                 {entries.map((entry) => (
@@ -208,6 +209,9 @@ export function FeesActivityScreen() {
                       {entry.subject_label ?? (entry.subject_id ? `${entry.subject_entity_key ?? 'record'} ${entry.subject_id}` : '—')}
                     </td>
                     <td className="px-4 py-2.5 font-mono text-[11px] text-slate-600">{entry.reference ?? '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-slate-500">
+                      {formatDuration(entry.duration_ms)}
+                    </td>
                     <td className="px-4 py-2.5">
                       <FeesAiPill
                         tone={
@@ -325,6 +329,11 @@ function EntryDetail({ entry, onClose }: { entry: AiModuleActivityEntry; onClose
               }
             />
             <Detail label="Reference" value={entry.reference ?? '—'} />
+            <Detail label="Duration" value={formatDuration(entry.duration_ms)} />
+            <Detail
+              label="Knowledge graph"
+              value={entry.knowledge_graph_used === null ? 'Not measured' : entry.knowledge_graph_used ? 'Used' : 'Not used'}
+            />
           </dl>
 
           <div>

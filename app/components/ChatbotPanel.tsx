@@ -38,6 +38,8 @@ import {
   writeLifecycleThreadId,
   writeStoredMessages,
 } from '@/lib/chatbot-storage';
+import { canSeeInternalView } from '@/lib/session/internal-access';
+import type { StuckPromptContext } from '@/lib/ai/stuck-assist-types';
 // AI Workspace: the same panel, with four more things it can do. The conversational
 // path below is untouched — these are additional tabs beside it, not a replacement.
 // Deep import, not the package root: this module has no dependencies of its own, so a
@@ -154,7 +156,17 @@ const FALLBACK_PROMPTS = [
   'Which students have unpaid fees?',
 ];
 
-export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () => void }) {
+export default function ChatbotPanel({
+  onToggleChatbot,
+  stuckPrompt,
+  onStuckPromptHandled,
+}: {
+  onToggleChatbot: () => void;
+  /** Set when the idle watcher opened this panel — renders the "need a hand?" prompt
+   *  as the panel's own first bubble, not a separate popup. Consumed once. */
+  stuckPrompt?: StuckPromptContext | null;
+  onStuckPromptHandled?: () => void;
+}) {
   const pathname = usePathname() || '/dashboard';
   const { executeNavigation } = useAgentActionHandler();
   const [input, setInput] = useState('');
@@ -204,6 +216,14 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
   // Which answer is currently showing its stages. One at a time: the ladder is twelve
   // rows tall, and several expanded at once turns the thread into a wall of diagnostics.
   const [openTraceId, setOpenTraceId] = useState<string | null>(null);
+
+  // The stage ladder names the agent, model and tool behind an answer — read by staff
+  // as a trust check, read by an end user (a parent, a student) as unexplained jargon
+  // they did not ask for. The panel only ever mounts client-side after the person opens
+  // it, so this never runs during a server render and there is no hydration mismatch to
+  // guard against. `canSeeInternalView()` is the same rule the shell already uses to
+  // decide Enterprise Brain access — one rule, not a second opinion about who is staff.
+  const canSeeTrace = useMemo(() => canSeeInternalView(), []);
 
   // What the page says it is showing — filters, search, KPI tiles, visible rows, the
   // record it is about. Empty for a page that registers nothing, which is every page
@@ -464,6 +484,86 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
     sendMessage(transcript || input);
   };
 
+  /*
+   * The "are you stuck?" prompt, as the panel's own first bubble — never a separate
+   * popup. Captured once at mount (the panel remounts fresh every time it opens, so
+   * there is nothing to guard against re-triggering); `onStuckPromptHandled` is
+   * called once so DashboardShell clears its own copy and a later, unrelated open of
+   * this same panel does not show it again.
+   */
+  const [stuckContext] = useState<StuckPromptContext | null>(stuckPrompt ?? null);
+  const [stuckStage, setStuckStage] = useState<'asking' | 'submitting-ticket' | 'ticket-done' | null>(
+    stuckPrompt ? 'asking' : null
+  );
+
+  useEffect(() => {
+    if (stuckPrompt) onStuckPromptHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * "Yes, help me" dismisses this bubble rather than calling out for AI-generated
+   * suggestions — that path was removed. What's underneath is the ordinary empty-chat
+   * state, which already shows the existing, page-context-aware "Suggested prompts"
+   * — the one working, pre-existing mechanism for exactly this moment. The user can
+   * pick one of those or type their own question either way.
+   */
+  const dismissStuckPrompt = () => setStuckStage(null);
+
+  /** Lazy-loaded: this popup fires rarely and should not add to every page's bundle. */
+  const captureScreenshot = async (): Promise<string | null> => {
+    try {
+      const { default: html2canvas } = await import('html2canvas-pro');
+      const canvas = await html2canvas(document.body, {
+        scale: 1,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+      return canvas.toDataURL('image/png');
+    } catch {
+      // html2canvas can fail on some page content. The ticket is still worth
+      // raising without a screenshot.
+      return null;
+    }
+  };
+
+  const handleStuckNo = async () => {
+    if (!stuckContext) return;
+    setStuckStage('submitting-ticket');
+
+    const screenshot = await captureScreenshot();
+
+    try {
+      await fetch('/api/ai/assistance-tickets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
+        },
+        body: JSON.stringify({
+          module: stuckContext.module,
+          pageTitle: stuckContext.pageTitle,
+          pagePath: pathname,
+          idleSeconds: stuckContext.idleSeconds,
+          context: {
+            page_type: stuckContext.pageType,
+            filters: stuckContext.filtersSummary,
+            metrics: stuckContext.metricsSummary,
+            available_actions: stuckContext.availableActionsSummary,
+          },
+          screenshot,
+        }),
+      });
+    } catch {
+      // The ticket attempt failing must not trap the user here — they already
+      // said they're fine, so showing the same "thanks" either way is correct.
+    }
+
+    setStuckStage('ticket-done');
+  };
+
   return (
     <aside className="h-full w-full overflow-hidden rounded-[28px] border border-gray-200/60 bg-white/92 shadow-[0_18px_55px_rgba(15,23,42,0.1)] backdrop-blur-xl">
       <div className="flex h-full min-h-0 flex-col">
@@ -587,10 +687,17 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
             </div>
           ) : null}
 
-          {messages.length === 0 && workspace.loading && !workspace.payload ? (
+          {messages.length === 0 && !stuckStage && workspace.loading && !workspace.payload ? (
             /*
               Resolving. Showing the static fallback here and swapping it a moment
               later reads as the panel changing its mind, so it waits instead.
+
+              Skipped entirely while a stuck-prompt bubble is waiting to show: an idle
+              trigger opens this panel with zero real messages, which is exactly the
+              shape this branch and the one below it treat as "nothing to show yet" —
+              without this guard, the panel would render the suggested-prompts
+              skeleton or list instead of the prompt that opened it in the first
+              place.
             */
             <div className="py-5" aria-busy="true">
               <p className="mb-2 text-xs font-medium text-gray-900">Suggested prompts</p>
@@ -603,7 +710,7 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                 ))}
               </div>
             </div>
-          ) : messages.length === 0 ? (
+          ) : messages.length === 0 && !stuckStage ? (
             <div className="py-5">
               <p className="mb-2 text-xs font-medium text-gray-900">
                 {workspace.context?.entity_label
@@ -820,7 +927,7 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                       the one moment the stages are worth more than the answer, and it
                       is the whole reason the backend streams them.
                     */}
-                    {message.role === 'assistant' && message.lifecycleTrace?.length
+                    {canSeeTrace && message.role === 'assistant' && message.lifecycleTrace?.length
                       ? (() => {
                           const live = !message.isComplete && isLoading;
                           const traceOpen =
@@ -917,6 +1024,55 @@ export default function ChatbotPanel({ onToggleChatbot }: { onToggleChatbot: () 
                     >
                       Stop
                     </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/*
+                The "are you stuck?" prompt, as an ordinary assistant bubble — not a
+                centred popup. Reuses the exact avatar-and-bubble shape every other
+                assistant message uses below, so it reads as the same speaker rather
+                than a different system talking over the app.
+              */}
+              {stuckStage ? (
+                <div className="flex gap-3">
+                  <div
+                    className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full text-white shadow-[0_8px_18px_rgba(13,110,253,0.16)]"
+                    style={{ background: 'var(--accent-gradient)' }}
+                  >
+                    <BotIcon className="size-4" aria-hidden="true" />
+                  </div>
+                  <div className="max-w-[88%] rounded-3xl border border-gray-200/80 bg-white px-4 py-3 text-sm leading-7 text-gray-800 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+                    {stuckStage === 'asking' && (
+                      <>
+                        <p className="mb-3">
+                          It looks like you may need some help here. Are you stuck on this step, or would you
+                          like me to assist you?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleStuckNo}
+                            className="rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100"
+                          >
+                            No, I&apos;m fine
+                          </button>
+                          <button
+                            type="button"
+                            onClick={dismissStuckPrompt}
+                            className="rounded-full border border-transparent bg-[#0D6EFD] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#0b5ed7]"
+                          >
+                            Yes, help me
+                          </button>
+                        </div>
+                      </>
+                    )}
+
+                    {stuckStage === 'submitting-ticket' && <p>Noting this down for the support team&hellip;</p>}
+
+                    {stuckStage === 'ticket-done' && (
+                      <p>We&apos;ve noted this for the support team, in case this screen needs improving.</p>
+                    )}
                   </div>
                 </div>
               ) : null}
