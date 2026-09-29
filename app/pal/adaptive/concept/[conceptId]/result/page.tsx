@@ -11,6 +11,8 @@ import { fetchConceptResult, type ConceptDiagnosticResult } from '@/app/pal/data
 import { BAND_ORDER, BandChip, BandRow } from '@/app/pal/_components/BandMeter';
 import { JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
+import { ScoreRing } from '@/app/pal/_components/DiagnosticNavigator';
+import { AnswerReviewButton } from '@/app/pal/_components/AnswerReview';
 
 /**
  * Stage 2b - the concept diagnostic result.
@@ -136,27 +138,38 @@ function ConceptDiagnosticResultView() {
       backLabel="All concepts"
       rail={rail}
     >
-      <Card>
+      <Card className="overflow-hidden">
         <CardContent className="pt-6">
-          <p className="text-xl font-semibold text-slate-900">{headline}</p>
-          <p className="mt-1 text-sm text-slate-600">
-            You got <span className="font-semibold text-slate-900">{result.correct}</span> of{' '}
-            <span className="font-semibold text-slate-900">{result.attempted}</span> right on this
-            concept.
-          </p>
+          <div className="flex flex-wrap items-center gap-5">
+            <ScoreRing percentage={result.accuracy} />
+            <div className="flex-1">
+              <p className="text-xl font-semibold text-slate-900">{headline}</p>
+              <p className="mt-1 text-sm text-slate-600">
+                You got <span className="font-semibold text-slate-900">{result.correct}</span> of{' '}
+                <span className="font-semibold text-slate-900">{result.attempted}</span> right on this
+                concept.
+              </p>
+            </div>
+            <AnswerReviewButton results={result.questionResults} />
+          </div>
 
           {bands.length > 0 && (
             <div className="mt-4 space-y-4">
-              {bands.map((band) => {
+              {bands.map((band, index) => {
                 const stats = result.byDifficulty[band];
                 return (
-                  <BandRow
+                  <div
                     key={band}
-                    band={band}
-                    correct={stats.correct}
-                    served={stats.attempted}
-                    percentage={stats.accuracy}
-                  />
+                    className="h5p-enter h5p-stagger"
+                    style={{ '--h5p-stagger': `${index * 60}ms` } as React.CSSProperties}
+                  >
+                    <BandRow
+                      band={band}
+                      correct={stats.correct}
+                      served={stats.attempted}
+                      percentage={stats.accuracy}
+                    />
+                  </div>
                 );
               })}
             </div>

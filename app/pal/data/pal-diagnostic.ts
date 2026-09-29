@@ -36,12 +36,34 @@ import {
  * being bent into the shape of the other.
  *
  * ---------------------------------------------------------------------------
- * THE ANSWER KEY NEVER CROSSES THIS BOUNDARY
+ * OPTIONS NOW CARRY isCorrect
  * ---------------------------------------------------------------------------
- * Served questions carry options only. Correctness is resolved server-side from
- * the submitted answer_master id, and an option is honoured only when it really
- * belongs to the question it was submitted against. Nothing in this file sends
- * a "correct" flag, and the types below deliberately have nowhere to put one.
+ * `ServableQuestions::hydrate()` used to strip `correct_answer` before it
+ * reached the client, so these two endpoints could only ever render as plain
+ * radio buttons. It now includes it (matching what `/lms/pal/create` and
+ * `/lms/adaptive-practice` already send), which is what lets
+ * `lib/pal/diagnostic-answers.ts` build a real `QuestionPlayer` activity
+ * instead of refusing every question. Scoring is UNCHANGED -- submit still
+ * posts only an answer_master id, and the server still re-derives correctness
+ * from it rather than trusting anything the client reports back.
+ *
+ * ---------------------------------------------------------------------------
+ * THE FULL TYPE LADDER, NOT JUST THE COARSE LABEL
+ * ---------------------------------------------------------------------------
+ * `DiagnosticQuestionItem` used to carry only `questionType` (`"MCQ"` or a raw
+ * grading label), on the reasoning that `McqPool` only ever draws
+ * `question_type_id = 1` rows, so the coarse fallback was "enough". That
+ * reasoning tied the question paper to whatever one pool happens to draw
+ * today -- it did not mean the diagnostic engine could only ever RENDER MCQ.
+ * `questionTypeCode` / `questionTypeRaw` / `modelAnswer` / `assertion` /
+ * `reason` are now read the same way `/lms/pal/create` already sends them
+ * (`PalQuestion` in this file, `lib/pal/exam-answers.ts`), so the moment a
+ * diagnostic pool serves a true/false, fill-blank, match-the-following,
+ * assertion & reason, numerical or case-study row, `mappingForQuestion()`
+ * resolves it through the same three-tier ladder every other PAL surface
+ * uses, and `QuestionPlayer` renders the matching H5P form instead of the
+ * single generic radio layout. A pool that only ever draws MCQ still works
+ * unchanged -- these fields simply read null and the MCQ fallback fires.
  *
  * Session, tenant and year come from the signed-in session exactly as the rest
  * of the PAL data layer reads them (pal.ts, pal-eso.ts).
@@ -97,6 +119,8 @@ export const BAND_ORDER: DifficultyBand[] = ['easy', 'medium', 'hard'];
 export interface DiagnosticOption {
   id: string;
   answer: string;
+  /** `answer_master.correct_answer === 1`. Drives QuestionPlayer, never shown while the paper is being sat. */
+  isCorrect: boolean;
 }
 
 export interface DiagnosticQuestionItem {
@@ -109,6 +133,55 @@ export interface DiagnosticQuestionItem {
    * Null on a fresh paper and on any question they had not reached.
    */
   selectedOptionId: string | null;
+  /**
+   * `question_type_catalog.code`, e.g. `fill_blank`. Null when unresolved.
+   * The same field `PalExamQuestion.questionTypeCode` carries for `/lms/pal/create`
+   * (`lib/pal/exam-answers.ts`) -- carried here too so a chapter/concept
+   * diagnostic question resolves through `mappingForQuestion()`'s full
+   * three-tier ladder instead of only ever matching the MCQ fallback.
+   */
+  questionTypeCode: string | null;
+  /**
+   * `question_type_catalog`'s display label -- the middle rung of the ladder,
+   * read when `questionTypeCode` is null but the row still names its form.
+   */
+  questionTypeRaw: string | null;
+  /**
+   * `"MCQ"` for `question_type_id === 1`, else the coarse `question_type_master`
+   * label. The last-resort rung: `mappingForQuestion()` only falls back to this
+   * when neither `questionTypeCode` nor `questionTypeRaw` resolves.
+   */
+  questionType: string | null;
+  /** The stored written answer -- the answer key for the typed forms (fill-blank, numerical, essay). */
+  modelAnswer: string | null;
+  /** The assertion stem, for an Assertion & Reason question. Null otherwise. */
+  assertion: string | null;
+  /** The reason stem, for an Assertion & Reason question. Null otherwise. */
+  reason: string | null;
+  /**
+   * The question's own curriculum keys (`lms_question_master.standard_id`
+   * etc.), off `ServableQuestions::hydrate()`. Required, not cosmetic: the
+   * shared H5P players refuse to render at all without a non-empty
+   * `chapter_id`/`standard_id`/`subject_id` (`hasH5pContext()`).
+   */
+  standardId: number | null;
+  subjectId: number | null;
+  chapterId: number | null;
+}
+
+function readNullableNumber(value: unknown): number | null {
+  return value == null ? null : readNumber(value);
+}
+
+function readDiagnosticOptions(value: unknown): DiagnosticOption[] {
+  return toArray(value).map((entry) => {
+    const option = toRecord(entry);
+    return {
+      id: readString(option.id),
+      answer: readString(option.answer),
+      isCorrect: option.is_correct === true,
+    };
+  });
 }
 
 export interface ChapterDiagnosticPaper {
@@ -163,6 +236,11 @@ export interface DiagnosticConceptBreakdown {
  * options. The answer key still never crosses to the client, only the
  * outcome does.
  */
+export interface DiagnosticReviewOption {
+  id: string;
+  answer: string;
+}
+
 export interface DiagnosticQuestionResult {
   sequence: number;
   questionId: string;
@@ -173,6 +251,12 @@ export interface DiagnosticQuestionResult {
   answered: boolean;
   /** null when unanswered — neither right nor wrong. */
   isCorrect: boolean | null;
+  /** The review screen's answer key -- populated only after submission. */
+  options: DiagnosticReviewOption[];
+  selectedOptionId: string | null;
+  correctOptionId: string | null;
+  /** Shown only when the server actually has one -- never an empty placeholder. */
+  explanation: string | null;
 }
 
 export interface ChapterDiagnosticResult {
@@ -213,6 +297,13 @@ function readConcepts(value: unknown): DiagnosticConceptBreakdown[] {
   });
 }
 
+function readReviewOptions(value: unknown): DiagnosticReviewOption[] {
+  return toArray(value).map((entry) => {
+    const option = toRecord(entry);
+    return { id: readString(option.id), answer: readString(option.answer) };
+  });
+}
+
 function readQuestionResults(value: unknown): DiagnosticQuestionResult[] {
   return toArray(value).map((entry) => {
     const row = toRecord(entry);
@@ -225,6 +316,10 @@ function readQuestionResults(value: unknown): DiagnosticQuestionResult[] {
       conceptName: row.concept_name == null ? null : readString(row.concept_name),
       answered: row.answered === true,
       isCorrect: row.is_correct == null ? null : row.is_correct === true,
+      options: readReviewOptions(row.options),
+      selectedOptionId: row.selected_option_id == null ? null : readString(row.selected_option_id),
+      correctOptionId: row.correct_option_id == null ? null : readString(row.correct_option_id),
+      explanation: row.explanation == null ? null : readString(row.explanation) || null,
     };
   });
 }
@@ -299,12 +394,18 @@ export async function startChapterDiagnostic(
         questionId: readString(row.question_id) || readString(row.id),
         title: readString(row.question_title) || readString(row.title),
         difficulty: readString(row.difficulty),
-        options: toArray(row.options).map((opt) => {
-          const option = toRecord(opt);
-          return { id: readString(option.id), answer: readString(option.answer) };
-        }),
+        options: readDiagnosticOptions(row.options),
         selectedOptionId:
           row.answer_master_id == null ? null : readString(row.answer_master_id),
+        questionTypeCode: readString(row.question_type_code) || null,
+        questionTypeRaw: readString(row.question_type_raw) || null,
+        questionType: row.question_type == null ? null : readString(row.question_type),
+        modelAnswer: readString(row.model_answer) || null,
+        assertion: readString(row.assertion) || null,
+        reason: readString(row.reason) || null,
+        standardId: readNullableNumber(row.standard_id),
+        subjectId: readNullableNumber(row.subject_id),
+        chapterId: readNullableNumber(row.chapter_id),
       };
     }),
     timeAllowedMinutes: readNumber(payload.time_allowed) || 30,
@@ -521,15 +622,21 @@ export async function fetchAdaptiveQuestions(
         questionId: readString(row.question_id) || readString(row.id),
         title: readString(row.question_title) || readString(row.title),
         difficulty: readString(row.difficulty),
-        options: toArray(row.options).map((opt) => {
-          const option = toRecord(opt);
-          return { id: readString(option.id), answer: readString(option.answer) };
-        }),
+        options: readDiagnosticOptions(row.options),
         // Adaptive practice is never resumed - each set is drawn fresh and
         // answered one question at a time - so there is no prior choice to
         // restore. Stated rather than left optional, so the shared item type
         // stays exhaustive and a real selection can never be forgotten.
         selectedOptionId: null,
+        questionTypeCode: readString(row.question_type_code) || null,
+        questionTypeRaw: readString(row.question_type_raw) || null,
+        questionType: row.question_type == null ? null : readString(row.question_type),
+        modelAnswer: readString(row.model_answer) || null,
+        assertion: readString(row.assertion) || null,
+        reason: readString(row.reason) || null,
+        standardId: readNullableNumber(row.standard_id),
+        subjectId: readNullableNumber(row.subject_id),
+        chapterId: readNullableNumber(row.chapter_id),
       };
     }),
   };
@@ -659,6 +766,8 @@ export interface ConceptDiagnosticResult {
   misconception: DetectedMisconception | null;
   /** How many answers were just published to the mastery ledger. */
   evidencePublished: number;
+  /** The review screen's question-by-question answer key. */
+  questionResults: DiagnosticQuestionResult[];
 }
 
 function readLadder(value: unknown): MasteryLadderState {
@@ -755,6 +864,7 @@ export async function fetchConceptResult(
           correctiveAction: readString(misRecord.corrective_action),
         },
     evidencePublished: readNumber(payload.evidence_published),
+    questionResults: readQuestionResults(row.question_results),
   };
 }
 

@@ -3,11 +3,14 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowRight, Lightbulb, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Lightbulb, Loader2 } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { QuestionPlayer } from '@/components/h5p/players';
+import type { QuestionResult } from '@/components/h5p/players/types';
+import { canPlay, selectedOptionId, toPlayerQuestion } from '@/lib/pal/diagnostic-answers';
 import {
   fetchAdaptiveQuestions,
   submitAdaptiveAnswer,
@@ -24,6 +27,7 @@ import {
 } from '@/app/pal/_components/CompletionState';
 import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
+import { FlagToggle, ProgressRing, QuestionNavigator } from '@/app/pal/_components/DiagnosticNavigator';
 
 /**
  * Stage 2 - the concept diagnostic.
@@ -36,6 +40,14 @@ import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace
  * then an explicit Submit that leads to the concept diagnostic result. It is a
  * diagnosis, not practice: Feedback and "more questions" belong after Practice,
  * which the engine serves once the learner has been through Plan and Learn.
+ *
+ * ---------------------------------------------------------------------------
+ * ONE QUESTION AT A TIME, BY DESIGN
+ * ---------------------------------------------------------------------------
+ * Same navigator/Previous/Next pattern as the chapter diagnostic
+ * (`app/pal/_components/DiagnosticNavigator.tsx`) - `selected` still covers
+ * every question in the set the moment it is answered, the navigator and
+ * Previous/Next only control which one is on screen.
  *
  * ---------------------------------------------------------------------------
  * WHY SUBMIT STILL POSTS ONE ANSWER AT A TIME
@@ -82,6 +94,8 @@ function AdaptivePracticeView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, string>>({});
+  const [flagged, setFlagged] = useState<Record<string, boolean>>({});
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   // Question ids the server has already recorded, so a retried Submit posts
@@ -105,6 +119,8 @@ function AdaptivePracticeView() {
       setError(null);
       setSubmitError(null);
       setSelected({});
+      setFlagged({});
+      setCurrentIndex(0);
       recorded.current = new Set();
       fetchAdaptiveQuestions(conceptId, undefined, controller.signal)
         .then(setSet)
@@ -133,6 +149,35 @@ function AdaptivePracticeView() {
   const resultHref = `/pal/adaptive/concept/${conceptId}/result${
     set?.chapterId ? `?chapterId=${set.chapterId}` : ''
   }`;
+
+  const total = items.length;
+  const current = items[currentIndex] ?? null;
+  const isFirst = currentIndex <= 0;
+  const isLast = currentIndex >= total - 1;
+
+  const goTo = useCallback(
+    (index: number) => {
+      setCurrentIndex(Math.max(0, Math.min(total - 1, index)));
+    },
+    [total]
+  );
+
+  // Same keyboard support as the chapter diagnostic - left/right steps
+  // through the set the same way Previous/Next do.
+  useEffect(() => {
+    if (total === 0) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && ['INPUT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)) return;
+
+      if (event.key === 'ArrowRight') goTo(currentIndex + 1);
+      else if (event.key === 'ArrowLeft') goTo(currentIndex - 1);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [total, currentIndex, goTo]);
 
   const choose = useCallback(
     (questionId: string, optionId: string) => {
@@ -188,6 +233,11 @@ function AdaptivePracticeView() {
     );
   }
 
+  const navigatorItems = items.map((question) => ({
+    id: question.questionId,
+    answered: selected[question.questionId] != null,
+  }));
+
   return (
     <PalWorkspace
       eyebrow="Concept diagnostic"
@@ -199,25 +249,15 @@ function AdaptivePracticeView() {
       rail={
         <>
           <PalRailSection title="This set">
-            <div className="flex items-baseline justify-between gap-3 py-1">
-              <span className="text-sm text-slate-600">Answered</span>
-              <span className="text-sm font-semibold tabular-nums text-slate-900">
-                {answeredCount} of {items.length}
-              </span>
-            </div>
-            {items.length > 0 && (
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-indigo-600 transition-all"
-                  style={{ width: `${(answeredCount / items.length) * 100}%` }}
-                  role="progressbar"
-                  aria-valuenow={answeredCount}
-                  aria-valuemin={0}
-                  aria-valuemax={items.length}
-                  aria-label="Questions answered"
-                />
+            <div className="flex items-center gap-3">
+              <ProgressRing value={answeredCount} max={total} />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{answeredCount} of {total} answered</p>
+                {!allAnswered && total > 0 && (
+                  <p className="text-xs text-slate-500">Every question is needed to submit.</p>
+                )}
               </div>
-            )}
+            </div>
           </PalRailSection>
 
           <PalRailSection title="Your journey">
@@ -248,18 +288,41 @@ function AdaptivePracticeView() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {items.map((question, index) => (
+        <>
+          <div className="mb-4">
+            <QuestionNavigator items={navigatorItems} currentIndex={currentIndex} onJump={goTo} disabled={submitting} />
+          </div>
+
+          {current && (
             <DiagnosticQuestion
-              key={question.questionId}
-              question={question}
-              index={index + 1}
-              selectedId={selected[question.questionId] ?? null}
+              key={current.questionId}
+              question={current}
+              index={currentIndex + 1}
+              total={total}
+              selectedId={selected[current.questionId] ?? null}
               disabled={submitting}
-              onSelect={(optionId) => choose(question.questionId, optionId)}
+              onSelect={(optionId) => choose(current.questionId, optionId)}
+              flagged={flagged[current.questionId] ?? false}
+              onToggleFlag={() =>
+                setFlagged((previous) => ({ ...previous, [current.questionId]: !previous[current.questionId] }))
+              }
             />
-          ))}
-        </div>
+          )}
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <Button variant="outline" onClick={() => goTo(currentIndex - 1)} disabled={isFirst || submitting}>
+              <ArrowLeft aria-hidden className="mr-1.5 h-4 w-4" />
+              Previous
+            </Button>
+            <span className="text-xs font-medium tabular-nums text-slate-400">
+              Question {currentIndex + 1} of {total}
+            </span>
+            <Button variant="outline" onClick={() => goTo(currentIndex + 1)} disabled={isLast || submitting}>
+              Next
+              <ArrowRight aria-hidden className="ml-1.5 h-4 w-4" />
+            </Button>
+          </div>
+        </>
       )}
 
       {items.length > 0 && (
@@ -381,62 +444,95 @@ function CompletedConceptView({
 function DiagnosticQuestion({
   question,
   index,
+  total,
   selectedId,
   disabled,
   onSelect,
+  flagged,
+  onToggleFlag,
 }: {
   question: DiagnosticQuestionItem;
   index: number;
+  total: number;
   selectedId: string | null;
   disabled: boolean;
   onSelect: (optionId: string) => void;
+  flagged: boolean;
+  onToggleFlag: () => void;
 }) {
+  // Same payload shape as the chapter diagnostic. See `lib/pal/diagnostic-answers.ts`.
+  const playable = useMemo(() => canPlay(question), [question]);
+
+  const handleResult = useCallback(
+    (result: QuestionResult) => {
+      const optionId = selectedOptionId(question, result);
+      if (optionId) onSelect(optionId);
+    },
+    [question, onSelect]
+  );
+
   return (
-    <Card data-pal-question-id={question.questionId}>
+    <Card data-pal-question-id={question.questionId} className="h5p-enter overflow-hidden">
       <CardContent className="pt-5">
-        <div className="mb-3 flex items-start gap-3">
-          <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold tabular-nums text-slate-600">
-            {index}
-          </span>
-          <div
-            className="min-w-0 flex-1 text-sm font-medium text-slate-900 [&_img]:max-w-full"
-            dangerouslySetInnerHTML={{ __html: question.title }}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold tabular-nums text-indigo-700">
+              {index}
+            </span>
+            <span className="text-xs font-medium tabular-nums text-slate-400">of {total}</span>
+            <BandChip band={question.difficulty} />
+          </div>
+          <FlagToggle flagged={flagged} onToggle={onToggleFlag} disabled={disabled} />
+        </div>
+
+        {playable ? (
+          <QuestionPlayer
+            question={toPlayerQuestion(question)}
+            onResult={handleResult}
+            embedded
+            // Same reasoning as the chapter diagnostic: a concept
+            // diagnostic measures, it does not teach mid-assessment.
+            instantFeedback={false}
           />
-          <BandChip band={question.difficulty} className="shrink-0" />
-        </div>
+        ) : (
+          <>
+            <div
+              className="mb-3 text-base font-medium text-slate-900 [&_img]:max-w-full"
+              dangerouslySetInnerHTML={{ __html: question.title }}
+            />
+            <div className="space-y-2">
+              {question.options.map((option) => {
+                const isSelected = selectedId === option.id;
 
-        <div className="space-y-1.5 pl-9">
-          {question.options.map((option, optionIndex) => {
-            const isSelected = selectedId === option.id;
-
-            return (
-              <label
-                key={option.id}
-                data-pal-option-id={option.id}
-                className={`flex items-start gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                  isSelected ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200'
-                } ${disabled ? 'cursor-default' : 'cursor-pointer hover:border-slate-300 hover:bg-slate-50'}`}
-              >
-                <input
-                  type="radio"
-                  name={`concept-diagnostic-${question.questionId}`}
-                  value={option.id}
-                  checked={isSelected}
-                  disabled={disabled}
-                  onChange={() => onSelect(option.id)}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
-                />
-                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-slate-300 bg-white text-[11px] font-semibold text-slate-600">
-                  {String.fromCharCode(65 + optionIndex)}
-                </span>
-                <span
-                  className="min-w-0 flex-1 [&_img]:max-w-full"
-                  dangerouslySetInnerHTML={{ __html: option.answer }}
-                />
-              </label>
-            );
-          })}
-        </div>
+                return (
+                  <label
+                    key={option.id}
+                    data-pal-option-id={option.id}
+                    className={cn(
+                      'h5p-tappable h5p-focusable flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm transition-colors',
+                      isSelected ? 'border-indigo-400 bg-indigo-50 font-semibold text-indigo-900' : 'border-slate-200',
+                      disabled ? 'cursor-default' : 'cursor-pointer hover:border-slate-300 hover:bg-slate-50'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name={`concept-diagnostic-${question.questionId}`}
+                      value={option.id}
+                      checked={isSelected}
+                      disabled={disabled}
+                      onChange={() => onSelect(option.id)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
+                    />
+                    <span
+                      className="min-w-0 flex-1 [&_img]:max-w-full"
+                      dangerouslySetInnerHTML={{ __html: option.answer }}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );
