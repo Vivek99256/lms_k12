@@ -10,19 +10,18 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
-  Eye,
-  Gauge,
   Loader2,
-  Target,
-  Timer,
-  XCircle,
-  Zap,
+  Sparkles,
+  ThumbsUp,
+  TrendingUp,
+  Trophy,
   type LucideIcon,
 } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { QuestionPlayer } from '@/components/h5p/players';
 import type { QuestionResult } from '@/components/h5p/players/types';
 import { canPlay, selectedOptionId, toPlayerQuestion } from '@/lib/pal/diagnostic-answers';
@@ -31,7 +30,6 @@ import {
   submitChapterDiagnostic,
   type ChapterDiagnosticPaper,
   type ChapterDiagnosticResult,
-  type DiagnosticConceptBreakdown,
   type DiagnosticQuestionItem,
 } from '@/app/pal/data/pal-diagnostic';
 import {
@@ -44,15 +42,7 @@ import { COMPLETED_THROUGH_CHECK, JourneyRail } from '@/app/pal/_components/Jour
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 import { BandChip } from '@/app/pal/_components/BandMeter';
 import { FlagToggle, ProgressRing, QuestionNavigator } from '@/app/pal/_components/DiagnosticNavigator';
-import {
-  AchievementList,
-  Celebration,
-  deriveAchievements,
-  PrimaryAction,
-  SecondaryAction,
-  useCountUp,
-  type Achievement,
-} from '@/app/h5p/components/game';
+import { Celebration, ConfettiRain, PrimaryAction, useCountUp } from '@/app/h5p/components/game';
 
 /**
  * Stage 1 - the chapter diagnostic.
@@ -98,15 +88,18 @@ import {
  * See app/pal/data/pal-completion.ts for the rule.
  *
  * ---------------------------------------------------------------------------
- * SUBMIT DOES NOT NAVIGATE STRAIGHT TO THE RESULT PAGE
+ * SUBMIT SHOWS A REVEAL DIALOG, THEN GOES STRAIGHT TO THE RESULT PAGE
  * ---------------------------------------------------------------------------
  * `submitChapterDiagnostic` already returns the scored `ChapterDiagnosticResult`
- * in the same round trip, so a completion moment (score, percentage, time
- * taken) shows immediately, on a dedicated score-summary screen, rather than
- * after a second fetch. `Continue` there is what navigates to
- * `/pal/diagnostic/result/[attemptId]` -- the existing result page, unchanged,
- * still owned entirely by readiness analysis (strengths, weaknesses,
- * recommended focus) rather than raw score reporting.
+ * in the same round trip, so a completion moment (score, percentage, tier)
+ * shows immediately -- but as a dialog (`DiagnosticScoreSummary`, below), not
+ * a screen of its own. There used to be an intermediate "Diagnostic
+ * submitted" dashboard here (metric cards, a concept-breakdown preview,
+ * achievement chips); it duplicated what `/pal/diagnostic/result/[attemptId]`
+ * already shows, so every way of dismissing the dialog -- its one CTA,
+ * Escape, an outside click -- now leads straight there instead. That page
+ * still owns readiness analysis (strengths, weaknesses, recommended focus,
+ * the full answer review) and is unchanged by any of this.
  */
 
 export default function DiagnosticExamPage() {
@@ -143,11 +136,6 @@ function DiagnosticExam() {
   // Set the moment submit() returns a score - this is what switches the page
   // from the paper to the score-summary screen. Null the rest of the time.
   const [summary, setSummary] = useState<ChapterDiagnosticResult | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
-  // "Review answers" from the summary screen drops back into the already-loaded
-  // paper, read-only - no re-fetch, since every question and choice is still
-  // in `questions`/`answers`. Only meaningful once `summary` is set.
-  const [reviewing, setReviewing] = useState(false);
 
   const {
     mastery,
@@ -212,11 +200,6 @@ function DiagnosticExam() {
     try {
       const outcome = await submitChapterDiagnostic({ attemptId: paper.attemptId, answers });
       if (outcome.result) {
-        // Elapsed, not remaining - the summary screen reports what the
-        // learner spent, and the clock on the paper only ever counted down.
-        setElapsedSeconds(
-          secondsLeft !== null ? Math.max(0, paper.timeAllowedMinutes * 60 - secondsLeft) : null
-        );
         setSummary(outcome.result);
         setSubmitting(false);
       } else {
@@ -228,7 +211,7 @@ function DiagnosticExam() {
       setError(reason instanceof Error ? reason.message : 'The chapter diagnostic could not be submitted.');
       setSubmitting(false);
     }
-  }, [paper, answers, submitting, router, secondsLeft]);
+  }, [paper, answers, submitting, router]);
 
   // The timer auto-submits rather than discarding the paper: every answer is
   // already persisted server-side, so losing them at zero would be a choice,
@@ -376,18 +359,15 @@ function DiagnosticExam() {
     );
   }
 
-  // Submitted. Show what happened before sending the learner into the
-  // readiness analysis on the result page - see the module doc comment.
-  // "Review answers" drops back into the paper below (in read-only mode)
-  // rather than replacing this screen outright.
-  if (summary && !reviewing) {
+  // Submitted. A reveal dialog shows the score/tier moment, then sends the
+  // learner straight into the readiness analysis on the result page - see
+  // the module doc comment.
+  if (summary) {
     return (
       <DiagnosticScoreSummary
         result={summary}
         totalQuestions={total}
-        elapsedSeconds={elapsedSeconds}
         onContinue={() => router.push(`/pal/diagnostic/result/${summary.attemptId}`)}
-        onReview={() => setReviewing(true)}
       />
     );
   }
@@ -515,7 +495,7 @@ function DiagnosticExam() {
           onToggleFlag={() =>
             setFlagged((previous) => ({ ...previous, [current.questionId]: !previous[current.questionId] }))
           }
-          disabled={submitting || reviewing}
+          disabled={submitting}
         />
       )}
 
@@ -533,239 +513,243 @@ function DiagnosticExam() {
         </Button>
       </div>
 
-      {reviewing ? (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5">
-          <p className="text-sm text-slate-600">
-            Reviewing what you submitted. Nothing here can be changed.
-          </p>
-          <Button onClick={() => setReviewing(false)}>
-            Back to summary
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5">
-          <p className="text-sm text-slate-600">
-            {answered === total
-              ? 'All questions answered.'
-              : `${total - answered} unanswered. Unanswered questions score zero.`}
-          </p>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5">
+        <p className="text-sm text-slate-600">
+          {answered === total
+            ? 'All questions answered.'
+            : `${total - answered} unanswered. Unanswered questions score zero.`}
+        </p>
 
-          {confirming ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-700">Submit now?</span>
-              <Button variant="outline" size="sm" onClick={() => setConfirming(false)} disabled={submitting}>
-                Keep working
-              </Button>
-              <Button size="sm" onClick={() => void submit()} disabled={submitting}>
-                {submitting && <Loader2 aria-hidden className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                Yes, submit
-              </Button>
-            </div>
-          ) : (
-            <Button onClick={() => setConfirming(true)} disabled={submitting || total === 0}>
-              <CheckCircle2 aria-hidden className="mr-1.5 h-4 w-4" />
-              Submit chapter diagnostic
+        {confirming ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-700">Submit now?</span>
+            <Button variant="outline" size="sm" onClick={() => setConfirming(false)} disabled={submitting}>
+              Keep working
             </Button>
-          )}
-        </div>
-      )}
+            <Button size="sm" onClick={() => void submit()} disabled={submitting}>
+              {submitting && <Loader2 aria-hidden className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Yes, submit
+            </Button>
+          </div>
+        ) : (
+          <Button onClick={() => setConfirming(true)} disabled={submitting || total === 0}>
+            <CheckCircle2 aria-hidden className="mr-1.5 h-4 w-4" />
+            Submit chapter diagnostic
+          </Button>
+        )}
+      </div>
     </Shell>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Motion
+// Score tiers
 // ---------------------------------------------------------------------------
-// Three variant sets, reused rather than inlined so every section moves in
-// step: a stagger container for anything with children that should cascade,
-// a rise-and-fade for a section as a whole, and a spring scale-in for the
-// one hero element (the ring). `useFramerReducedMotion` (below) gates all of
-// it the same way `app/h5p/components/game.tsx`'s own `useReducedMotion`
-// gates the H5P layer's animation - the summary screen sits right next to
-// that layer and should not disagree with it about that preference.
+// Four bands over the raw percentage -- deliberately a different axis from
+// `result.level` (the server's beginner/developing/proficient/advanced
+// mastery read, still shown as its own pill below). This one drives only the
+// headline, the tone of the ring, and which tiers get a confetti moment; it
+// never feeds back into scoring or the level badge.
 
-const MOTION_CONTAINER = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
-};
+interface ScoreTier {
+  key: 'excellent' | 'great' | 'good' | 'keep-going';
+  label: string;
+  subtitle: string;
+  icon: LucideIcon;
+  tone: { bg: string; icon: string; fg: string };
+  /** Only the top band gets the full-viewport moment -- reward tied to a genuinely strong result, not to finishing. */
+  fullScreenCelebration: boolean;
+}
 
-const MOTION_ITEM = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as const } },
-};
+const SCORE_TIERS: readonly ScoreTier[] = [
+  {
+    key: 'excellent',
+    label: 'Excellent!',
+    subtitle: 'Great understanding of this chapter.',
+    icon: Trophy,
+    tone: { bg: 'var(--h5p-success-soft)', icon: 'var(--h5p-success)', fg: 'color-mix(in srgb, var(--h5p-success) 80%, #000)' },
+    fullScreenCelebration: true,
+  },
+  {
+    key: 'great',
+    label: 'Great work!',
+    subtitle: 'A few gaps are worth a closer look before you move on.',
+    icon: Sparkles,
+    tone: { bg: 'var(--h5p-accent-soft)', icon: 'var(--h5p-accent)', fg: 'var(--h5p-accent-deep)' },
+    fullScreenCelebration: false,
+  },
+  {
+    key: 'good',
+    label: 'Good start!',
+    subtitle: 'The concept diagnostic will help close the gaps.',
+    icon: ThumbsUp,
+    tone: {
+      bg: 'var(--h5p-reward-soft)',
+      icon: 'var(--h5p-reward)',
+      fg: 'color-mix(in srgb, var(--h5p-warning) 84%, #000)',
+    },
+    fullScreenCelebration: false,
+  },
+  {
+    key: 'keep-going',
+    label: 'Keep going!',
+    subtitle: 'This is exactly what a diagnostic is for — now you know where to start.',
+    icon: TrendingUp,
+    tone: { bg: 'var(--h5p-surface-sunken)', icon: 'var(--h5p-ink-muted)', fg: 'var(--h5p-ink-muted)' },
+    fullScreenCelebration: false,
+  },
+] as const;
 
-const MOTION_SCALE = {
-  hidden: { opacity: 0, scale: 0.85 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] as const } },
+function scoreTierFor(percentage: number): ScoreTier {
+  if (percentage >= 80) return SCORE_TIERS[0];
+  if (percentage >= 60) return SCORE_TIERS[1];
+  if (percentage >= 40) return SCORE_TIERS[2];
+  return SCORE_TIERS[3];
+}
+
+/**
+ * One small, finite gesture per tier's icon, playing once after the headline
+ * has popped in -- this is what gives the lowest band (no confetti, no ring
+ * sweep to speak of at a low score) its own "light encouraging" /
+ * "supportive" motion rather than leaning on the generic entrance alone.
+ * Never `repeat: Infinity` -- a reward tied to a real result plays once, the
+ * same reasoning `h5p.css` gives for the one deliberate looping exception
+ * (`h5p-ping`) being an affordance, not decoration.
+ */
+const TIER_ICON_MOTION: Record<ScoreTier['key'], Record<string, number[]>> = {
+  excellent: { rotate: [0, -10, 10, -6, 0], scale: [1, 1.15, 1.05, 1.1, 1] },
+  great: { rotate: [0, -14, 12, -8, 0] },
+  good: { rotate: [0, -14, 4, 0] },
+  'keep-going': { y: [0, -4, 0, -4, 0] },
 };
 
 /**
- * The score summary shown immediately after submit, before the result page.
+ * The score reveal shown immediately after submit, before the result page.
  *
  * Everything here comes from the same `ChapterDiagnosticResult` the result
  * page reads - no second request - so this is a rendering choice, not a new
- * data path. It reports the raw outcome (score, correct/incorrect, time,
- * concept-wise breakdown); the result page it hands off to is where that
- * outcome turns into readiness analysis (strengths, weaknesses, what to
- * focus on next) - the concept bars here are a preview of that, not a
- * replacement for it, which is why they cap at five with a "+N more" note.
+ * data path. It reports only the raw outcome (score, tier, correct/incorrect/
+ * unanswered, mastery level) as a moment, not an analysis; the result page it
+ * hands off to is where that outcome turns into readiness analysis
+ * (strengths, weaknesses, what to focus on next, the full concept breakdown
+ * and answer review).
  *
  * Built on `app/h5p/components/game.tsx` -- the same "finished" primitives
  * every H5P activity in this product already ends on (trophy, count-up,
- * confetti, achievement chips) -- rather than a bespoke completion design,
- * with the ring, metric cards and concept bars layered on top of them. The
- * one deliberate departure from that module's own `ResultScreen` is the
- * pill: that component's is "Passed" / "Not passed yet", and a chapter
- * diagnostic has no pass mark (see the page description above: "not a test
- * you can fail"), so this renders the performance LEVEL instead, and only
- * lights the confetti for a strong result rather than a pass/fail it does
- * not have.
+ * confetti) -- rather than a bespoke completion design, with the ring
+ * layered on top of them.
+ *
+ * ---------------------------------------------------------------------------
+ * A DIALOG, NOT A PAGE
+ * ---------------------------------------------------------------------------
+ * This used to render a full "Diagnostic submitted" page: a title, a rail, an
+ * inline score card, metric cards, a concept-breakdown preview and an
+ * achievement row -- all of which duplicated `/pal/diagnostic/result/[id]`
+ * (score, correct/incorrect/unanswered, concept breakdown, mastery level,
+ * and a genuinely fuller "Review answers" via `AnswerReviewButton`). Now it
+ * renders nothing of its own but a real `Dialog` (`components/ui/dialog`,
+ * Radix underneath -- the same modal every other confirmation in this app
+ * already uses, per the design system's "reuse variants, never fork" rule)
+ * over a bare backdrop. It auto-opens on mount (no trigger), gets its own
+ * confetti rain for a strong result, and every way of leaving it -- the one
+ * CTA, Escape, an outside click -- calls `onContinue`, which the caller wires
+ * to `router.push('/pal/diagnostic/result/[attemptId]')`. There is nothing
+ * left behind the dialog to reveal, so there is nothing to flash.
  */
 export function DiagnosticScoreSummary({
   result,
   totalQuestions,
-  elapsedSeconds,
   onContinue,
-  onReview,
 }: {
   result: ChapterDiagnosticResult;
   totalQuestions: number;
-  elapsedSeconds: number | null;
   onContinue: () => void;
-  onReview: () => void;
 }) {
   const reduceMotion = !!useFramerReducedMotion();
   const questionCount = result.totalQuestions || totalQuestions;
   const percentage = Math.max(0, Math.min(100, Math.round(result.percentage)));
   const level = (result.level || '').toLowerCase();
   const tone = LEVEL_TONE[level] ?? LEVEL_TONE.beginner;
-  const attempted = result.correct + result.incorrect;
-  // A diagnostic has no pass mark, so the celebration is tied to a strong
-  // result instead - the same threshold `deriveAchievements` uses for "Sharp".
-  const celebrate = percentage >= 70;
-
-  // Two milestones every submitted attempt earns, ahead of whatever
-  // `deriveAchievements` works out from the score itself - a 0% attempt
-  // still finished the diagnostic and still unlocked the next stage, and
-  // both of those are true regardless of how the questions went.
-  const achievements: Achievement[] = [
-    { id: 'diagnostic-completed', label: 'Diagnostic completed', detail: `${questionCount} questions, done.` },
-    { id: 'path-unlocked', label: 'Learning path unlocked', detail: 'The concept diagnostic is ready.' },
-    ...deriveAchievements({ percentage, passed: celebrate, questionCount }),
-  ];
-
-  const metrics: MetricSpec[] = [
-    { id: 'score', icon: Gauge, label: 'Score', value: `${percentage}%` },
-    { id: 'correct', icon: Target, label: 'Correct', value: result.correct },
-    { id: 'incorrect', icon: XCircle, label: 'Incorrect', value: result.incorrect },
-    { id: 'attempted', icon: Zap, label: 'Attempted', value: `${attempted}/${questionCount}` },
-  ];
-  if (elapsedSeconds !== null) {
-    metrics.push({ id: 'time', icon: Timer, label: 'Time taken', value: formatClock(elapsedSeconds) });
-  }
-
-  // A preview, not the analysis - the result page owns the full breakdown.
-  const topConcepts = result.conceptBreakdown.slice(0, 5);
+  const tier = scoreTierFor(percentage);
+  // The contained burst (inside the dialog) covers "great" and "excellent" --
+  // the same threshold `deriveAchievements` uses for "Sharp". "Excellent"
+  // additionally gets the confetti rain, below.
+  const celebrate = tier.key === 'excellent' || tier.key === 'great';
+  const TierIcon = tier.icon;
 
   return (
-    <PalWorkspace
-      title="Diagnostic submitted"
-      description="Here's how it went. Continue when you're ready to see what it means for this chapter."
-      backHref="/pal"
-      backLabel="Back to subjects"
-      rail={
-        <PalRailSection title="Your journey">
-          <JourneyRail current="diagnostic" orientation="vertical" />
-        </PalRailSection>
-      }
-    >
-      <motion.div
-        initial={reduceMotion ? false : 'hidden'}
-        animate="visible"
-        variants={MOTION_CONTAINER}
-        className="space-y-5"
-      >
-        <motion.div
-          variants={MOTION_SCALE}
-          className="h5p-surface h5p-stage relative overflow-visible p-6 text-center sm:p-8"
-        >
-          <Celebration show={celebrate} />
+    <div className="flex min-h-[60vh] items-center justify-center p-4">
+      {/* The whole result in one announcement -- a screen reader user gets
+          this the moment the page updates, same as `ResultScreen`, whether
+          or not they ever interact with the dialog's own visual content. */}
+      <p className="sr-only" aria-live="polite">
+        {`${result.correct} out of ${questionCount}, ${percentage} percent. ${tier.label}${level ? ` ${level} level.` : ''}`}
+      </p>
 
-          <div className="relative flex flex-col items-center">
-            <ScoreRing percentage={percentage} color={tone.icon} reduceMotion={reduceMotion} />
+      <ConfettiRain show={tier.fullScreenCelebration} />
 
-            <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-[color:var(--h5p-ink-faint)]">
-              Finished
-            </p>
+      {/* Always open: nothing below it is ever revealed, so there is no
+          local "closed" state to hold -- every dismissal path (the CTA,
+          Escape, an outside click) calls `onContinue` directly, which
+          navigates away and unmounts this along with everything else on
+          the exam page. */}
+      <Dialog open onOpenChange={(open) => { if (!open) onContinue(); }}>
+        <DialogContent className="w-full max-w-sm overflow-visible border-0 bg-transparent p-0 shadow-none">
+          <div className="h5p-surface h5p-stage relative overflow-visible rounded-[var(--h5p-radius-lg)] p-6 text-center sm:p-7">
+            <Celebration show={celebrate} />
 
-            {/* The whole result in one announcement, same as `ResultScreen`. */}
-            <p className="sr-only" aria-live="polite">
-              {`${result.correct} out of ${questionCount}, ${percentage} percent.${level ? ` ${level} level.` : ''}`}
-            </p>
+            <div className="relative flex flex-col items-center">
+              {/* The ring takes its colour from the score tier (the headline
+                  right below it), not from `tone` -- that token is the
+                  mastery-level pill's own colour, a related but distinct read
+                  on the same attempt, and the two can disagree. */}
+              <ScoreRing percentage={percentage} color={tier.tone.icon} reduceMotion={reduceMotion} />
 
-            <p className="mt-1 text-sm text-[color:var(--h5p-ink-muted)]">
-              {result.correct} of {questionCount} correct
-              {result.unanswered > 0 && ` · ${result.unanswered} unanswered`}
-            </p>
-
-            {level && (
-              <span
-                className="mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold capitalize"
-                style={{ background: tone.bg, color: tone.fg }}
+              <DialogTitle
+                className="mt-3 flex items-center justify-center gap-2 text-2xl font-extrabold"
+                style={{ color: tier.tone.icon }}
               >
-                {level}
-              </span>
-            )}
-          </div>
-        </motion.div>
+                <motion.span
+                  className="inline-flex"
+                  animate={reduceMotion ? undefined : TIER_ICON_MOTION[tier.key]}
+                  transition={{ duration: 0.7, delay: 0.6, ease: 'easeInOut' }}
+                >
+                  <TierIcon className="h-6 w-6" aria-hidden="true" />
+                </motion.span>
+                {tier.label}
+              </DialogTitle>
 
-        <motion.div variants={MOTION_CONTAINER} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {metrics.map((metric) => (
-            <MetricCard key={metric.id} {...metric} />
-          ))}
-        </motion.div>
+              <DialogDescription className="mx-auto mt-1.5 max-w-xs text-sm text-[color:var(--h5p-ink-muted)]">
+                {tier.subtitle}
+              </DialogDescription>
 
-        {topConcepts.length > 0 && (
-          <motion.div variants={MOTION_ITEM} className="h5p-surface p-5 sm:p-6">
-            <h3 className="text-left text-sm font-semibold text-[color:var(--h5p-ink)]">
-              How you did by concept
-            </h3>
-            <div className="mt-4 space-y-3">
-              {topConcepts.map((concept, index) => (
-                <ConceptBar
-                  key={`${concept.conceptId}-${index}`}
-                  concept={concept}
-                  reduceMotion={reduceMotion}
-                  delay={index * 0.08}
-                />
-              ))}
-            </div>
-            {result.conceptBreakdown.length > topConcepts.length && (
-              <p className="mt-3 text-left text-xs text-[color:var(--h5p-ink-faint)]">
-                +{result.conceptBreakdown.length - topConcepts.length} more concepts on the result page.
+              <p className="mt-3 text-sm text-[color:var(--h5p-ink-muted)]">
+                {result.correct} of {questionCount} correct
+                {result.unanswered > 0 && ` · ${result.unanswered} unanswered`}
               </p>
-            )}
-          </motion.div>
-        )}
 
-        <motion.div variants={MOTION_ITEM} className="h5p-surface p-5 text-center sm:p-6">
-          <AchievementList achievements={achievements} />
+              {level && (
+                <span
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold capitalize"
+                  style={{ background: tone.bg, color: tone.fg }}
+                >
+                  {level}
+                </span>
+              )}
 
-          <p className="mx-auto mt-2 max-w-md text-sm text-[color:var(--h5p-ink-muted)]">
-            {diagnosticMessage(percentage)}
-          </p>
-
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-            <PrimaryAction onClick={onContinue} icon={<ArrowRight className="h-4 w-4" aria-hidden="true" />}>
-              Continue
-            </PrimaryAction>
-            <SecondaryAction onClick={onReview} icon={<Eye className="h-4 w-4" aria-hidden="true" />}>
-              Review answers
-            </SecondaryAction>
+              <PrimaryAction
+                onClick={onContinue}
+                icon={<ArrowRight className="h-4 w-4" aria-hidden="true" />}
+                className="mt-6 w-full justify-center"
+                autoFocus
+              >
+                See your results
+              </PrimaryAction>
+            </div>
           </div>
-        </motion.div>
-      </motion.div>
-    </PalWorkspace>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 
@@ -787,16 +771,45 @@ function ScoreRing({
   const circumference = 2 * Math.PI * radius;
   const shown = useCountUp(percentage);
 
+  // The arc sweep below draws nothing at 0% -- `strokeDashoffset` starts and
+  // ends at the same value, so a 0% result (exactly the case a diagnostic
+  // exists to surface gently, and not a rare one) would otherwise show no
+  // ring motion at all. Everything on this component from here down is
+  // therefore keyed to the ring's OWN entrance and settle, never to the
+  // score, so there is always something to see regardless of the number.
+  const [settled, setSettled] = useState(reduceMotion);
+  useEffect(() => {
+    if (reduceMotion) return;
+    const timer = window.setTimeout(() => setSettled(true), 1300);
+    return () => window.clearTimeout(timer);
+  }, [reduceMotion]);
+
   return (
-    <div
-      className="relative"
+    <motion.div
+      className="relative shrink-0"
       style={{ width: size, height: size }}
       role="progressbar"
       aria-valuenow={percentage}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label="Score"
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.55, rotate: -60 }}
+      animate={{ opacity: 1, scale: 1, rotate: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.55, ease: [0.34, 1.56, 0.64, 1] }}
     >
+      {/* A sonar-style ring once the sweep settles: opacity and scale only,
+          never colour, so this animates correctly on a framer-motion
+          MotionValue whether or not `color` is a resolvable CSS colour or a
+          `var(--h5p-*)` token the browser has to look up. */}
+      <motion.span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-full"
+        style={{ border: `3px solid ${color}` }}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={settled && !reduceMotion ? { opacity: [0.6, 0], scale: [0.8, 1.4] } : { opacity: 0 }}
+        transition={{ duration: 0.75, ease: 'easeOut' }}
+      />
+
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
         <circle
           cx={size / 2}
@@ -821,105 +834,15 @@ function ScoreRing({
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-3xl font-extrabold tabular-nums text-[color:var(--h5p-ink)]">{shown}%</span>
+        <motion.span
+          className="text-3xl font-extrabold tabular-nums text-[color:var(--h5p-ink)]"
+          animate={settled && !reduceMotion ? { scale: [1, 1.14, 1] } : {}}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+        >
+          {shown}%
+        </motion.span>
       </div>
-    </div>
-  );
-}
-
-interface MetricSpec {
-  /**
-   * Not `key` - a spread `{...metric}` prop named `key` is the one prop name
-   * React reserves and strips before a component ever sees its props, so
-   * this doubled as the list key AND the theme lookup would always read
-   * `undefined` inside `MetricCard`. `id` is the data field; the list `key`
-   * is set separately from it at the call site.
-   */
-  id: 'score' | 'correct' | 'incorrect' | 'attempted' | 'time';
-  icon: LucideIcon;
-  label: string;
-  value: string | number;
-}
-
-/**
- * Colour per metric, in `--h5p-*` tokens: score is accent, correct is
- * success, incorrect is danger, attempted is reward (amber - neither a pass
- * nor a fail signal), time is neutral. A count-up only for the numeric ones;
- * "67%" and "1:21" are already-formatted strings and stay static.
- */
-const METRIC_THEME: Record<MetricSpec['id'], { bg: string; fg: string; ring: string }> = {
-  score: { bg: 'var(--h5p-accent-soft)', fg: 'var(--h5p-accent)', ring: 'var(--h5p-accent-line)' },
-  correct: { bg: 'var(--h5p-success-soft)', fg: 'var(--h5p-success)', ring: 'var(--h5p-success-line)' },
-  incorrect: { bg: 'var(--h5p-danger-soft)', fg: 'var(--h5p-danger)', ring: 'var(--h5p-danger-line)' },
-  attempted: {
-    bg: 'var(--h5p-reward-soft)',
-    fg: 'var(--h5p-reward)',
-    ring: 'color-mix(in srgb, var(--h5p-reward) 32%, var(--h5p-surface))',
-  },
-  time: { bg: 'var(--h5p-surface-sunken)', fg: 'var(--h5p-ink-muted)', ring: 'var(--h5p-line)' },
-};
-
-function MetricCard({ icon: Icon, label, value, id }: MetricSpec) {
-  const theme = METRIC_THEME[id];
-  const numeric = typeof value === 'number';
-  const shown = useCountUp(numeric ? value : 0);
-
-  return (
-    <motion.div
-      variants={MOTION_ITEM}
-      className="rounded-2xl border p-4 text-center"
-      style={{ borderColor: theme.ring, background: 'var(--h5p-surface)' }}
-    >
-      <span
-        className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl"
-        style={{ background: theme.bg, color: theme.fg }}
-      >
-        <Icon className="h-4 w-4" aria-hidden="true" />
-      </span>
-      <p className="mt-2 text-lg font-bold tabular-nums text-[color:var(--h5p-ink)]">{numeric ? shown : value}</p>
-      <p className="text-[11px] font-medium text-[color:var(--h5p-ink-faint)]">{label}</p>
     </motion.div>
-  );
-}
-
-/** One concept's line in the preview breakdown - a smaller, undecorated cousin of the result page's own `ConceptRow`, since this is a teaser rather than the analysis. */
-function ConceptBar({
-  concept,
-  reduceMotion,
-  delay,
-}: {
-  concept: DiagnosticConceptBreakdown;
-  reduceMotion: boolean;
-  delay: number;
-}) {
-  const pct = Math.max(0, Math.min(100, Math.round(concept.percentage)));
-  const barColor = pct >= 70 ? 'var(--h5p-success)' : pct >= 40 ? 'var(--h5p-warning)' : 'var(--h5p-danger)';
-
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-3 text-xs">
-        <span className="truncate font-medium text-[color:var(--h5p-ink-muted)]">
-          {concept.name}
-          {!concept.conceptExact && <span className="ml-1 text-[color:var(--h5p-ink-faint)]">(via chapter)</span>}
-        </span>
-        <span className="shrink-0 tabular-nums text-[color:var(--h5p-ink-faint)]">
-          {concept.correct}/{concept.served}
-        </span>
-      </div>
-      <div className="mt-1 h-2 w-full overflow-hidden rounded-full" style={{ background: 'var(--h5p-surface-sunken)' }}>
-        <motion.div
-          className="h-full rounded-full"
-          style={{ background: barColor }}
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{
-            duration: reduceMotion ? 0 : 0.7,
-            ease: [0.16, 1, 0.3, 1],
-            delay: reduceMotion ? 0 : 0.25 + delay,
-          }}
-        />
-      </div>
-    </div>
   );
 }
 
@@ -956,14 +879,6 @@ const LEVEL_TONE: Record<string, { bg: string; icon: string; fg: string }> = {
     fg: 'color-mix(in srgb, var(--h5p-success) 80%, #000)',
   },
 };
-
-/** Tiered, blame-free - a low score is what a diagnostic is FOR, not a bad result. */
-function diagnosticMessage(percentage: number): string {
-  if (percentage >= 90) return 'Excellent — you already have a strong handle on this chapter.';
-  if (percentage >= 70) return 'Good work. A few gaps are worth a closer look before you move on.';
-  if (percentage >= 40) return 'A solid starting point. The concept diagnostic will help close the gaps.';
-  return 'This is exactly what a diagnostic is for — now you know where to start.';
-}
 
 function Shell({
   chapterId,

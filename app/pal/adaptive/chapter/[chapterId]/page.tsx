@@ -343,7 +343,6 @@ function ConceptCard({
               </dd>
             </div>
           )}
-          {!concept.conceptExact && <div className="text-slate-400">questions from the chapter</div>}
         </dl>
 
         <div className="mt-auto pt-4">
@@ -370,6 +369,16 @@ function ConceptCard({
               </Button>
               <p className="mt-1.5 text-center text-[11px] text-slate-400">
                 {concept.availability.total} question{concept.availability.total === 1 ? '' : 's'} available
+                {/* Most concepts have no questions tagged to them directly and
+                    inherit the chapter's shared pool instead (see
+                    `ConceptPerformanceAnalyzer::forChapter()` -- the comment
+                    there literally calls this "the normal case"). Several
+                    cards can legitimately show the same total and next
+                    difficulty because they ARE reading the same pool; this
+                    says so inline, right where the number is, rather than
+                    leaving identical numbers across cards looking like a
+                    bug. */}
+                {!concept.conceptExact && ' from the chapter pool'}
                 {concept.nextDifficulty && ` · opening at ${bandLabel(concept.nextDifficulty).toLowerCase()}`}
               </p>
             </>

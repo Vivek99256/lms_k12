@@ -588,6 +588,17 @@ export interface AdaptiveQuestionSet {
   ruleFired: string;
   rationale: string;
   items: DiagnosticQuestionItem[];
+  /**
+   * How many questions on this concept were already answered BEFORE this
+   * set was drawn -- from `progress.attempted` in the same response, read
+   * at fetch time so it reflects standing prior to any of `items` being
+   * answered. The concept result screen reports a lifetime total across
+   * every attempt, not just this set, so a set of 5 can legitimately close
+   * out at 6 answered overall; this is what lets the screen that hands out
+   * the 5 say so upfront instead of the total only ever surfacing after
+   * submit.
+   */
+  priorAttempted: number;
 }
 
 /** The next practice set for one concept. Five questions by default. */
@@ -616,6 +627,7 @@ export async function fetchAdaptiveQuestions(
     conceptExact: payload.concept_exact === true,
     ruleFired: readString(payload.rule_fired),
     rationale: readString(payload.rationale),
+    priorAttempted: readNumber(toRecord(payload.progress).attempted),
     items: toArray(payload.items).map((entry) => {
       const row = toRecord(entry);
       return {

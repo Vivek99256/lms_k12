@@ -17,6 +17,12 @@ import { JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 import { ScoreRing } from '@/app/pal/_components/DiagnosticNavigator';
 import { AnswerReviewButton } from '@/app/pal/_components/AnswerReview';
+import { AchievementList, deriveAchievements, type Achievement } from '@/app/h5p/components/game';
+// `AnswerReviewButton` already imports this as a side effect, but this page
+// renders `AchievementList` directly too now -- so it names its own
+// dependency rather than relying on a sibling import's ordering to supply
+// the `.h5p-*` classes both of them use.
+import '@/app/h5p/h5p.css';
 
 /**
  * Stage 2 - the diagnostic result.
@@ -99,6 +105,18 @@ function DiagnosticResultView() {
   }
 
   const answered = result.correct + result.incorrect;
+  const percentage = Math.round(result.percentage);
+  // The reveal dialog on the previous screen (`DiagnosticScoreSummary`)
+  // already showed the moment this earned; these are the same two
+  // guaranteed milestones plus whatever `deriveAchievements` works out from
+  // the score, computed the same way, so the badges here are consistent
+  // with what was just celebrated rather than a second, different read of
+  // the same attempt.
+  const achievements: Achievement[] = [
+    { id: 'diagnostic-completed', label: 'Diagnostic completed', detail: `${result.totalQuestions} questions, done.` },
+    { id: 'path-unlocked', label: 'Learning path unlocked', detail: 'The concept diagnostic is ready.' },
+    ...deriveAchievements({ percentage, passed: percentage >= 60, questionCount: result.totalQuestions }),
+  ];
 
   return (
     <PalWorkspace
@@ -160,6 +178,10 @@ function DiagnosticResultView() {
             </div>
 
             <AnswerReviewButton results={result.questionResults} />
+          </div>
+
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <AchievementList achievements={achievements} />
           </div>
         </CardContent>
       </Card>

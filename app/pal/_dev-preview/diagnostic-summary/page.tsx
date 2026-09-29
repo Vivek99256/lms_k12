@@ -64,9 +64,7 @@ export default function DiagnosticSummaryPreview() {
             conceptBreakdown: [concept('Chemical reactions', 5, 5), concept('Balancing equations', 5, 5)],
           })}
           totalQuestions={15}
-          elapsedSeconds={81}
           onContinue={() => {}}
-          onReview={() => {}}
         />
       </section>
 
@@ -75,9 +73,7 @@ export default function DiagnosticSummaryPreview() {
         <DiagnosticScoreSummary
           result={mockResult({})}
           totalQuestions={15}
-          elapsedSeconds={612}
           onContinue={() => {}}
-          onReview={() => {}}
         />
       </section>
 
@@ -93,9 +89,7 @@ export default function DiagnosticSummaryPreview() {
             conceptBreakdown: [concept('Chemical reactions', 0, 2)],
           })}
           totalQuestions={15}
-          elapsedSeconds={81}
           onContinue={() => {}}
-          onReview={() => {}}
         />
       </section>
 
@@ -104,9 +98,7 @@ export default function DiagnosticSummaryPreview() {
         <DiagnosticScoreSummary
           result={mockResult({ conceptBreakdown: [] })}
           totalQuestions={15}
-          elapsedSeconds={null}
           onContinue={() => {}}
-          onReview={() => {}}
         />
       </section>
     </div>

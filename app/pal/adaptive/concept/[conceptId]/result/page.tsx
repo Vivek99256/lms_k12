@@ -51,11 +51,88 @@ const HEADLINE: Record<string, string> = {
   untested: 'Not enough answers to judge yet',
 };
 
+interface AttemptScope {
+  attempted: number;
+  correct: number;
+  accuracy: number;
+  byDifficulty: ConceptDiagnosticResult['byDifficulty'];
+  questionResults: ConceptDiagnosticResult['questionResults'];
+  /** True once `setSize` actually narrowed the view to less than the full lifetime history. */
+  scoped: boolean;
+}
+
+/**
+ * Scopes a lifetime `ConceptDiagnosticResult` down to just this attempt.
+ *
+ * Adaptive practice has no discrete "attempt" record server-side --
+ * `pal_adaptive_response` is one open-ended, per-answer ledger, and
+ * `conceptResult()` (correctly, for mastery tracking) reports standing
+ * across every row ever written for this concept, not just the set the
+ * learner just finished. `setSize` -- the number of questions THIS set
+ * served, put on the URL by the taking screen right before it navigates
+ * here -- is what recovers "just this attempt" on the frontend without a
+ * backend change: `questionResults` is already chronological
+ * (`ORDER BY id` in `AdaptiveLearningService::questionResults()`), `submit()`
+ * posts this set's answers immediately before the navigation, so they land
+ * as the newest rows -- the last `setSize` of them.
+ *
+ * Sliced by POSITION, not by question id, on purpose: a "recycled" set can
+ * legitimately re-serve a question the learner already answered before (see
+ * `AdaptiveLearningService::questions()`'s own doc comment on that), and
+ * matching by id would then pull in that OLDER row too and double-count it.
+ */
+function scopeToAttempt(result: ConceptDiagnosticResult, setSize: number | null): AttemptScope {
+  const total = result.questionResults.length;
+  const size = setSize !== null && setSize > 0 && setSize <= total ? setSize : total;
+  const scoped = size < total;
+  const questionResults = scoped ? result.questionResults.slice(-size) : result.questionResults;
+
+  if (!scoped) {
+    return {
+      attempted: result.attempted,
+      correct: result.correct,
+      accuracy: result.accuracy,
+      byDifficulty: result.byDifficulty,
+      questionResults,
+      scoped: false,
+    };
+  }
+
+  const byDifficulty: ConceptDiagnosticResult['byDifficulty'] = {};
+  let correct = 0;
+
+  for (const question of questionResults) {
+    if (question.isCorrect === true) correct += 1;
+
+    const band = byDifficulty[question.difficulty] ?? { attempted: 0, correct: 0, accuracy: 0 };
+    band.attempted += 1;
+    if (question.isCorrect === true) band.correct += 1;
+    byDifficulty[question.difficulty] = band;
+  }
+
+  Object.values(byDifficulty).forEach((band) => {
+    band.accuracy = band.attempted > 0 ? Math.round((band.correct / band.attempted) * 10000) / 100 : 0;
+  });
+
+  return {
+    attempted: size,
+    correct,
+    accuracy: size > 0 ? Math.round((correct / size) * 10000) / 100 : 0,
+    byDifficulty,
+    questionResults,
+    scoped: true,
+  };
+}
+
 function ConceptDiagnosticResultView() {
   const params = useParams();
   const searchParams = useSearchParams();
   const conceptId = String(params?.conceptId ?? '');
   const chapterHint = searchParams.get('chapterId') ?? '';
+  // Set by the taking screen right before it navigates here -- see
+  // `scopeToAttempt`'s own doc comment for why this exists at all.
+  const setSizeParam = searchParams.get('setSize');
+  const setSize = setSizeParam !== null ? parseInt(setSizeParam, 10) : null;
 
   const [result, setResult] = useState<ConceptDiagnosticResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,17 +183,18 @@ function ConceptDiagnosticResultView() {
   const chapterId = result.chapterId || chapterHint;
   const planHref = chapterId ? `/pal/plan/chapter/${chapterId}` : '/pal';
   const conceptsHref = chapterId ? `/pal/adaptive/chapter/${chapterId}` : '/pal';
-  const bands = BAND_ORDER.filter((band) => (result.byDifficulty[band]?.attempted ?? 0) > 0);
+  const scope = scopeToAttempt(result, setSize);
+  const bands = BAND_ORDER.filter((band) => (scope.byDifficulty[band]?.attempted ?? 0) > 0);
   const headline = HEADLINE[result.understanding] ?? 'Here is where you stand';
 
   const rail = (
     <>
-      <PalRailSection title="Your result">
-        <PalRailStat label="Correct" value={`${result.correct} of ${result.attempted}`} />
+      <PalRailSection title={scope.scoped ? 'This attempt' : 'Your result so far'}>
+        <PalRailStat label="Correct" value={`${scope.correct} of ${scope.attempted}`} />
         <PalRailStat
           label="Accuracy"
-          value={`${Math.round(result.accuracy)}%`}
-          tone={result.needsRemediation ? 'warning' : result.accuracy >= 70 ? 'positive' : 'default'}
+          value={`${Math.round(scope.accuracy)}%`}
+          tone={result.needsRemediation ? 'warning' : scope.accuracy >= 70 ? 'positive' : 'default'}
         />
         {result.currentDifficulty && (
           <PalRailStat label="Level" value={<BandChip band={result.currentDifficulty} />} />
@@ -141,22 +219,22 @@ function ConceptDiagnosticResultView() {
       <Card className="overflow-hidden">
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-5">
-            <ScoreRing percentage={result.accuracy} />
+            <ScoreRing percentage={scope.accuracy} />
             <div className="flex-1">
               <p className="text-xl font-semibold text-slate-900">{headline}</p>
               <p className="mt-1 text-sm text-slate-600">
-                You got <span className="font-semibold text-slate-900">{result.correct}</span> of{' '}
-                <span className="font-semibold text-slate-900">{result.attempted}</span> right on this
-                concept.
+                You got <span className="font-semibold text-slate-900">{scope.correct}</span> of{' '}
+                <span className="font-semibold text-slate-900">{scope.attempted}</span> right on this
+                concept{scope.scoped ? '' : ', across every attempt so far'}.
               </p>
             </div>
-            <AnswerReviewButton results={result.questionResults} />
+            <AnswerReviewButton results={scope.questionResults} />
           </div>
 
           {bands.length > 0 && (
             <div className="mt-4 space-y-4">
               {bands.map((band, index) => {
-                const stats = result.byDifficulty[band];
+                const stats = scope.byDifficulty[band];
                 return (
                   <div
                     key={band}

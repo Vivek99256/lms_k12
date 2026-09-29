@@ -146,9 +146,22 @@ function AdaptivePracticeView() {
   const items = useMemo(() => set?.items ?? [], [set]);
   const answeredCount = items.filter((question) => selected[question.questionId]).length;
   const allAnswered = items.length > 0 && answeredCount >= items.length;
-  const resultHref = `/pal/adaptive/concept/${conceptId}/result${
-    set?.chapterId ? `?chapterId=${set.chapterId}` : ''
-  }`;
+  // `setSize` is how the result page tells THIS attempt's questions apart
+  // from the concept's lifetime history -- adaptive practice has no discrete
+  // "attempt" record the way the chapter diagnostic does (`pal_adaptive_response`
+  // is one open-ended, per-answer ledger), so there is nothing server-side to
+  // key a single attempt by. `submit()` posts every item in `items`, in
+  // order, immediately before navigating here, so they land as the newest
+  // rows in that ledger -- the result page reads the last `setSize` of them
+  // back off `questionResults` rather than the lifetime total. See
+  // `ConceptDiagnosticResultView`'s own doc comment on that page.
+  const resultHref = (() => {
+    const query = new URLSearchParams();
+    if (set?.chapterId) query.set('chapterId', set.chapterId);
+    if (items.length > 0) query.set('setSize', String(items.length));
+    const search = query.toString();
+    return `/pal/adaptive/concept/${conceptId}/result${search ? `?${search}` : ''}`;
+  })();
 
   const total = items.length;
   const current = items[currentIndex] ?? null;
@@ -258,6 +271,19 @@ function AdaptivePracticeView() {
                 )}
               </div>
             </div>
+            {/* This set is only ever the NEW questions being served -- the
+                concept result afterwards reports a lifetime total across
+                every attempt (see `AdaptiveQuestionSet.priorAttempted`'s own
+                doc comment), so a learner who has been here before would
+                otherwise see this set's count and the result's count
+                disagree with no explanation. Said here, before that happens,
+                rather than left for the result screen to account for alone. */}
+            {set && set.priorAttempted > 0 && (
+              <p className="mt-2 text-xs text-slate-500">
+                You have also answered {set.priorAttempted} question{set.priorAttempted === 1 ? '' : 's'} on
+                this concept before -- your result will cover those too.
+              </p>
+            )}
           </PalRailSection>
 
           <PalRailSection title="Your journey">

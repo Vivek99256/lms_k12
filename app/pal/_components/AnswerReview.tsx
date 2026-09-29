@@ -44,6 +44,30 @@ const FILTERS: { key: Filter; label: string; test: (q: DiagnosticQuestionResult)
   { key: 'unanswered', label: 'Unanswered', test: (q) => !q.answered },
 ];
 
+/** Each filter's own colour, selected and not -- "All" stays brand indigo
+ * (it has no status of its own); the other three match the same
+ * correct/incorrect/unanswered palette the question navigator below and the
+ * per-question verdict chip already use, so a learner never has to learn a
+ * second colour language for the same three states on one screen. */
+const FILTER_TONE: Record<Filter, { selected: string; unselected: string }> = {
+  all: {
+    selected: 'border-indigo-600 bg-indigo-600 text-white',
+    unselected: 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50',
+  },
+  correct: {
+    selected: 'border-emerald-600 bg-emerald-600 text-white',
+    unselected: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300',
+  },
+  incorrect: {
+    selected: 'border-rose-600 bg-rose-600 text-white',
+    unselected: 'border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300',
+  },
+  unanswered: {
+    selected: 'border-slate-600 bg-slate-600 text-white',
+    unselected: 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300',
+  },
+};
+
 function verdictOf(question: DiagnosticQuestionResult) {
   if (!question.answered) {
     return { label: 'Unanswered', Icon: CircleDashed, tone: 'text-slate-500', chip: 'border-slate-200 bg-slate-50 text-slate-600' };
@@ -122,11 +146,10 @@ function AnswerReviewBody({ results }: { results: DiagnosticQuestionResult[] }) 
             key={f.key}
             type="button"
             onClick={() => changeFilter(f.key)}
+            aria-pressed={filter === f.key}
             className={cn(
               'h5p-tappable h5p-focusable rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-              filter === f.key
-                ? 'border-indigo-600 bg-indigo-600 text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              filter === f.key ? FILTER_TONE[f.key].selected : FILTER_TONE[f.key].unselected
             )}
           >
             {f.label} <span className="tabular-nums opacity-80">({counts[f.key]})</span>
@@ -142,7 +165,7 @@ function AnswerReviewBody({ results }: { results: DiagnosticQuestionResult[] }) 
         <>
           <div className="px-5 pt-4">
             <QuestionNavigator
-              items={filtered.map((q) => ({ id: q.questionId, answered: q.answered }))}
+              items={filtered.map((q) => ({ id: q.questionId, answered: q.answered, isCorrect: q.isCorrect }))}
               currentIndex={clampedIndex}
               onJump={setIndex}
             />
