@@ -4,7 +4,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import Script from 'next/script';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowLeft, BookOpen, CheckCircle2, Eye, EyeOff, Loader2, Mail, X } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  BarChart3,
+  BookOpen,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  GraduationCap,
+  Loader2,
+  Lock,
+  Mail,
+  ShieldCheck,
+  Users,
+  X,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Client IDs are public, but Next only inlines `NEXT_PUBLIC_*` values into the browser
@@ -12,13 +27,20 @@ import { useAuth } from '@/contexts/AuthContext';
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || '';
 
 const FIELD_CLASS =
-  'w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 placeholder-gray-400 ' +
-  'transition-colors focus:border-[#4169E1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4169E1]/40';
+  'w-full rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-[15px] text-gray-900 placeholder-gray-400 ' +
+  'transition-colors hover:border-gray-400 focus:border-[#4169E1] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#4169E1]/15';
 
 const PRIMARY_BUTTON_CLASS =
-  'flex w-full items-center justify-center gap-2 rounded-lg bg-[#4169E1] px-4 py-3 text-sm font-semibold text-white ' +
-  'transition-colors hover:bg-[#3658c7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4169E1] ' +
-  'disabled:cursor-not-allowed disabled:opacity-60';
+  'flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#3658c7] to-[#4169E1] px-4 py-3.5 text-[15px] font-semibold text-white ' +
+  'shadow-lg shadow-[#4169E1]/25 transition-all hover:shadow-xl hover:shadow-[#4169E1]/30 hover:brightness-110 active:scale-[0.99] ' +
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4169E1] ' +
+  'disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none';
+
+const HIGHLIGHTS = [
+  { icon: GraduationCap, title: 'Courses and lessons', text: 'Pick up where you left off, on any device.' },
+  { icon: BarChart3, title: 'Progress at a glance', text: 'Grades, attendance and assessments in one place.' },
+  { icon: Users, title: 'Stay connected', text: 'Message teachers, students and parents securely.' },
+];
 
 type GoogleId = {
   initialize: (config: {
@@ -157,22 +179,48 @@ export default function LoginPage() {
         />
       )}
 
-      {/* Brand panel — static and flat; nothing here animates or blocks the form. */}
-      <aside className="hidden bg-[#1e3a8a] text-white lg:flex lg:w-1/2 lg:flex-col lg:items-center lg:justify-center lg:p-14">
-        <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-[#4169E1]">
-          <BookOpen size={24} strokeWidth={2.25} aria-hidden="true" />
+      {/* Brand panel — decorative rings are static; only the entrance uses motion. */}
+      <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#1e3a8a] via-[#3557d4] to-[#4169E1] text-white lg:flex lg:w-1/2 lg:flex-col lg:justify-between lg:p-14 xl:p-20">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-32 h-[420px] w-[420px] rounded-full border border-white/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-[260px] w-[260px] rounded-full border border-white/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -left-40 h-[520px] w-[520px] rounded-full bg-white/5" />
+
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#4169E1] shadow-lg shadow-black/10">
+            <BookOpen size={22} strokeWidth={2.25} aria-hidden="true" />
+          </div>
+          <span className="text-xl font-bold tracking-tight">Teach Connect</span>
         </div>
-        <div className="max-w-md text-center">
-          <p className="mb-5 text-4xl font-bold leading-[1.1] xl:text-5xl">Learn without boundaries.</p>
-          <p className="text-base leading-relaxed text-white/70">
+
+        <div className="relative max-w-lg">
+          <p className="mb-4 text-4xl font-bold leading-[1.1] tracking-tight xl:text-5xl">Learn without boundaries.</p>
+          <p className="mb-10 text-base leading-relaxed text-white/75">
             Access premium courses, track your progress, and connect with educators.
           </p>
+          <ul className="space-y-5">
+            {HIGHLIGHTS.map(({ icon: Icon, title, text }) => (
+              <li key={title} className="flex items-start gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
+                  <Icon size={20} aria-hidden="true" />
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold">{title}</span>
+                  <span className="block text-sm text-white/70">{text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
+
+        <p className="relative flex items-center gap-2 text-xs text-white/60">
+          <ShieldCheck size={14} aria-hidden="true" />
+          Your data is encrypted and only visible to your school.
+        </p>
       </aside>
 
-      <main className="flex flex-1 items-center justify-center bg-white px-6 py-12">
-        <div className="w-full max-w-[400px]">
-          <div className="mb-10 flex items-center justify-center gap-3 lg:hidden">
+      <main className="flex flex-1 items-center justify-center bg-slate-50 px-4 py-10 sm:px-6">
+        <div className="login-card w-full max-w-[460px] rounded-2xl border border-gray-200 bg-white p-7 shadow-xl shadow-slate-900/5 sm:p-10">
+          <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#4169E1] text-white">
               <BookOpen size={18} strokeWidth={2.25} aria-hidden="true" />
             </div>
@@ -180,8 +228,8 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-8">
-            <h1 className="mb-1.5 text-2xl font-bold text-gray-900">Welcome back</h1>
-            <p className="text-sm text-gray-600">Enter your credentials to access your account.</p>
+            <h1 className="mb-2 text-3xl font-bold tracking-tight text-gray-900">Welcome back</h1>
+            <p className="text-[15px] text-gray-600">Sign in to continue to your account.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -191,21 +239,24 @@ export default function LoginPage() {
               <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-gray-700">
                 Email address
               </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                inputMode="email"
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
-                autoFocus
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className={FIELD_CLASS}
-              />
+              <div className="relative">
+                <Mail size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  autoFocus
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className={`${FIELD_CLASS} pl-11`}
+                />
+              </div>
             </div>
 
             <div>
@@ -222,6 +273,7 @@ export default function LoginPage() {
                 </button>
               </div>
               <div className="relative">
+                <Lock size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
                 <input
                   id="password"
                   name="password"
@@ -230,7 +282,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`${FIELD_CLASS} pr-12`}
+                  className={`${FIELD_CLASS} pl-11 pr-12`}
                 />
                 <button
                   type="button"
@@ -258,7 +310,7 @@ export default function LoginPage() {
 
           {GOOGLE_CLIENT_ID && (
             <>
-              <div className="my-7 flex items-center gap-4" role="separator" aria-label="or">
+              <div className="my-6 flex items-center gap-4" role="separator" aria-label="or">
                 <div className="h-px flex-1 bg-gray-200" />
                 <span className="text-xs uppercase tracking-wider text-gray-500">or</span>
                 <div className="h-px flex-1 bg-gray-200" />
@@ -268,7 +320,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={busy || !googleReady}
-                className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4169E1] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-[15px] font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4169E1] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isGoogleLoading ? (
                   <Spinner />
@@ -290,6 +342,19 @@ export default function LoginPage() {
       {showForgotModal && (
         <ForgotPasswordModal defaultEmail={email} onClose={() => setShowForgotModal(false)} />
       )}
+
+      <style jsx>{`
+        @keyframes cardIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .login-card {
+          animation: cardIn 0.35s cubic-bezier(0.2, 0, 0, 1) both;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .login-card { animation: none; }
+        }
+      `}</style>
     </div>
   );
 }
