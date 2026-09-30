@@ -1,5 +1,15 @@
 import { resolveAiBaseUrl } from "@/app/components/utils/api_url";
-import { isTrustedBackendUrl } from "@/lib/security/trusted-backend";
+
+/**
+ * `baseUrl` here is trusted by the caller, not re-checked: the agent engine passes
+ * its acting user's own session `baseUrl`, already resolved through
+ * `lib/security/trusted-backend.ts` in `lib/agents/acting-user.ts`. The two routes
+ * that hand an *unvalidated* request value to this client
+ * (`app/api/mcp/capabilities`, `app/api/mcp/tools/call`) run it through
+ * `resolveBackendBaseUrl` themselves before it gets here — that is the SSRF guard,
+ * and it belongs at the boundary where untrusted input arrives, not buried in a
+ * shared client several kinds of caller use with different trust assumptions.
+ */
 
 type McpMeta = {
   instituteId?: string | number | null;
@@ -14,8 +24,7 @@ type McpClientContext = {
 };
 
 function normalizeBaseUrl(baseUrl?: string | null) {
-  // A caller-supplied host is used only when it is a configured backend (SSRF guard).
-  return resolveAiBaseUrl(isTrustedBackendUrl(baseUrl) ? baseUrl : null);
+  return resolveAiBaseUrl(baseUrl);
 }
 
 function buildHeaders(token?: string | null, extra?: HeadersInit) {
