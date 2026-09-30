@@ -404,7 +404,7 @@ export default function FeesCollectPage() {
     const academicYearId = currentSession.academicYearId || session.academicYearId;
 
     if (!hostName || !currentSession.subInstituteId || !academicYearId) {
-      setError(because);
+      setError("Missing session details. Reload the page and try again.");
       return;
     }
 
