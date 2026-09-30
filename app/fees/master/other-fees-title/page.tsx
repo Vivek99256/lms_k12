@@ -252,8 +252,6 @@ export default function OtherFeesTitlePage() {
 
       const payload = (await response.json()) as ApiEnvelope;
       const normalizedRecords = normalizeList(payload);
-      console.log('Other Fees Title API response:', payload);
-      console.log('Other Fees Title records:', normalizedRecords);
       setRecords(normalizedRecords.map(mapRecord));
     } catch (fetchError) {
       setError(

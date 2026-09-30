@@ -315,7 +315,6 @@ export default function DaywiseStudentAttendancePage() {
       });
 
       const responseBody = (await response.json()) as unknown;
-      console.log('Daywise Attendance Report API response:', responseBody);
       const payload = normalizePayload(responseBody);
 
       if (!response.ok) {

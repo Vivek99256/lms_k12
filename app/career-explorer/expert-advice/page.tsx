@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -207,7 +208,7 @@ export default function ExpertAdvicePage() {
           </DialogHeader>
           <div
             className="prose max-w-none text-sm leading-6 text-foreground"
-            dangerouslySetInnerHTML={{ __html: dialog?.content ?? '' }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(dialog?.content ?? '') }}
           />
         </DialogContent>
       </Dialog>

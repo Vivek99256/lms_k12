@@ -536,10 +536,8 @@ export default function OrganizationProfilePage() {
     try {
       const session = buildSessionContext()
       // eslint-disable-next-line no-console
-      console.log("[OrganizationProfile] session", session)
       const record = await getOrganizationProfile(session)
       // eslint-disable-next-line no-console
-      console.log("[OrganizationProfile] record", record)
       const nextProfile = mapOrgProfileRecord(record)
       setProfile(nextProfile)
       setDraft(nextProfile)

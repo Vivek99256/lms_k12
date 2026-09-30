@@ -46,3 +46,12 @@ next-env.d.ts
 
 # agent management v1 store (JSON file adapter)
 /.data/
+
+# runtime state written by packages/conversational-ai-core (file-store.ts) — holds
+# conversation and admission data (names, phone numbers); never commit it
+/.kilo/conversational-ai/
+
+# scratch output from local tooling
+/.codex/
+*.log
+/diff_frontend.txt

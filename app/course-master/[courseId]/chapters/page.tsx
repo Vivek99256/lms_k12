@@ -2613,6 +2613,15 @@ export default function ChapterListPage() {
     router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
   };
 
+  const openChapterCoherenceMapView = (chapter: Chapter) => {
+    const nextParams = new URLSearchParams(searchParams?.toString());
+    nextParams.set('view', 'coherence-map');
+    nextParams.set('chapterId', chapter.id);
+    nextParams.set('expandedChapterId', chapter.id);
+
+    router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
+  };
+
   const closeContentDrawer = () => {
     setSelectedContentItem(null);
   };
@@ -2852,10 +2861,12 @@ export default function ChapterListPage() {
     const route = module.route ? H5P_ROUTE_MAP[module.route] : null;
     if (!ctx || !route) return;
 
+    // The listing page, not /create directly -- it's what shows how many
+    // items already exist (manual vs. generated), and View/Edit/Delete on
+    // each. return_to still rides along so that list's own "Add" button can
+    // hand it to the create page, and Back from there still returns here.
     const returnTo = currentQuestionBankUrl();
-    router.push(
-      `${route}/create?${h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined)}`
-    );
+    router.push(`${route}?${h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined)}`);
   };
 
   /** The "Create H5P content" menu item itself, not one of its submenu
@@ -5408,6 +5419,7 @@ export default function ChapterListPage() {
             standardId={standardId}
             title={`${course.subject} - ${getCourseGradeLabel(course.classGrade)}`}
             onClose={() => router.push(`/course-master/${courseId}/chapters`)}
+            initialChapterId={activeChapterId ? `chapter:${activeChapterId}` : undefined}
           />
         </div>
       </div>
@@ -6322,7 +6334,7 @@ export default function ChapterListPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+                      onClick={() => openChapterCoherenceMapView(chapter)}
                       className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                     >
                       <Network size={16} className="mr-2" />

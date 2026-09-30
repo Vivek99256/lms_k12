@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { rejectOversizedBody } from '@/lib/security/request-guards';
 
 export const runtime = 'nodejs';
 
 async function forwardMultipart(path: string, request: NextRequest) {
+  const oversized = rejectOversizedBody(request);
+  if (oversized) return oversized;
   const base = API_BASE_URL.replace(/\/$/, '');
   const url = `${base}/api/${path}`;
   const formData = await request.formData();

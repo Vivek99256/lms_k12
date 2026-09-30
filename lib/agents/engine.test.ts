@@ -19,8 +19,13 @@ const otherSchool: ActingUser = { tenant_id: '202', user_id: '7', user_name: 'Pr
 const allow: Authorizer = async () => ({ allowed: true, reason: null });
 const deny: Authorizer = async (moduleKey, action) => ({ allowed: false, reason: `Your role does not have ${action} rights for ${moduleKey}.` });
 
-function context(actor: ActingUser, authorize: Authorizer, store = new MemoryAgentStore()): EngineContext {
-  return { store, actor, authorize };
+function context(
+  actor: ActingUser,
+  authorize: Authorizer,
+  store = new MemoryAgentStore(),
+  toolSession?: EngineContext['toolSession'],
+): EngineContext {
+  return { store, actor, authorize, toolSession };
 }
 
 const reminderAgent = {
@@ -28,6 +33,14 @@ const reminderAgent = {
   module: 'fees',
   tools_allowed: ['fees.draft_reminder'],
   instructions: 'Draft polite reminders.',
+  status: 'active' as const,
+};
+
+const collectionAgent = {
+  name: 'Fee collection reporter',
+  module: 'fees',
+  tools_allowed: ['fees.collection_report'],
+  instructions: 'Report collections exactly as the receipts show them.',
   status: 'active' as const,
 };
 
@@ -94,6 +107,48 @@ test('a successful run logs module, tenant, the real caller, input and output', 
   assert.equal(log[0].id, run.id);
 });
 
+test('a read tool with no tool session fails asking the caller to sign in again', async () => {
+  const store = new MemoryAgentStore();
+  const agent = await createAgent(context(feesAdmin, allow, store), collectionAgent);
+
+  const { run } = await runAgent(context(feesAdmin, allow, store), agent.id, {
+    arguments: { from_date: '2026-07-01', to_date: '2026-07-31' },
+  });
+
+  assert.equal(run.status, 'failure');
+  assert.match(run.error ?? '', /needs your signed-in session/);
+});
+
+test('a read tool with a tool session reaches the MCP call as that person (regression: engine.ts must forward context.toolSession into executeTool)', async () => {
+  const store = new MemoryAgentStore();
+  const agent = await createAgent(context(feesAdmin, allow, store), collectionAgent);
+
+  const calls: Array<{ authorization: string | null }> = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ authorization: new Headers(init?.headers).get('authorization') });
+    return new Response(JSON.stringify({ success: true, message: 'ok', data: { total_collected: 45000 } }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  try {
+    const { run } = await runAgent(
+      context(feesAdmin, allow, store, { baseUrl: 'https://example-erp.test', token: 'test-bearer-token', instituteId: '101' }),
+      agent.id,
+      { arguments: { from_date: '2026-07-01', to_date: '2026-07-31' } },
+    );
+
+    assert.equal(run.status, 'success');
+    assert.equal(run.error, null);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].authorization, 'Bearer test-bearer-token');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test('a refused run is written as denied under the caller and then rejected with 403', async () => {
   const store = new MemoryAgentStore();
   const agent = await createAgent(context(feesAdmin, allow, store), reminderAgent);
@@ -142,7 +197,7 @@ test('tenants are isolated: another institute cannot see or run the agent', asyn
   const store = new MemoryAgentStore();
   const agent = await createAgent(context(feesAdmin, allow, store), reminderAgent);
 
-  assert.deepEqual(await listAgents(context(otherSchool, allow, store)), []);
+  assert.deepEqual(await listAgents(context(otherSchool, allow, store), { module: reminderAgent.module }), []);
   await assert.rejects(runAgent(context(otherSchool, allow, store), agent.id), (error: unknown) =>
     error instanceof AgentEngineError && error.status === 404);
   assert.equal((await store.listRuns('202')).length, 0);
@@ -150,5 +205,16 @@ test('tenants are isolated: another institute cannot see or run the agent', asyn
 
 test('a session without an institute or user cannot do anything', async () => {
   const anonymous: ActingUser = { tenant_id: '', user_id: '', user_name: '', profile_id: '', profile_name: '' };
-  await assert.rejects(listAgents(context(anonymous, allow)), (error: unknown) => error instanceof AgentEngineError && error.status === 401);
+  await assert.rejects(listAgents(context(anonymous, allow), { module: reminderAgent.module }), (error: unknown) => error instanceof AgentEngineError && error.status === 401);
+});
+
+test('listing agents needs view rights on a named module', async () => {
+  const store = new MemoryAgentStore();
+  await createAgent(context(feesAdmin, allow, store), reminderAgent);
+
+  await assert.rejects(listAgents(context(feesAdmin, allow, store)), (error: unknown) =>
+    error instanceof AgentEngineError && error.status === 400);
+  await assert.rejects(listAgents(context(feesClerk, deny, store), { module: reminderAgent.module }), (error: unknown) =>
+    error instanceof AgentEngineError && error.status === 403);
+  assert.equal((await listAgents(context(feesAdmin, allow, store), { module: reminderAgent.module })).length, 1);
 });

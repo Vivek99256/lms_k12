@@ -39,12 +39,15 @@ function stackShadow(count: number): string {
 export function ConceptDeck({
   map,
   onPick,
+  initialChapterId = null,
 }: {
   map: CoherenceMap;
   onPick: (conceptId: string) => void;
+  /** Pre-selects a chapter, so the deck opens straight into its concept list. */
+  initialChapterId?: string | null;
 }) {
   const [openUnit, setOpenUnit] = useState<string | null>(null);
-  const [openChapter, setOpenChapter] = useState<string | null>(null);
+  const [openChapter, setOpenChapter] = useState<string | null>(initialChapterId);
   const [query, setQuery] = useState('');
 
   const forest = useMemo(() => buildForest(map.nodes, new Set(ALL_LEVELS)), [map.nodes]);

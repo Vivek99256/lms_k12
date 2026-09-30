@@ -91,4 +91,15 @@ export interface PlayerProps {
   onResult?: (result: QuestionResult) => void;
   /** False on a page that draws its own title. Defaults to true. */
   embedded?: boolean;
+  /**
+   * False for an unbiased assessment: picking an option is recorded (still
+   * calls `onResult`, still drives progress tracking) but is shown only as
+   * "this is your current pick" -- never colored correct/wrong, never
+   * explained, never locked against changing your mind. Defaults to true,
+   * which is every other embedding today (PAL Test, ESO Practice/Check, the
+   * question bank quiz): pick an option, see it marked right or wrong at
+   * once. PAL's Chapter and Concept Diagnostic are the one place that must
+   * measure rather than teach mid-assessment, so they pass `false`.
+   */
+  instantFeedback?: boolean;
 }

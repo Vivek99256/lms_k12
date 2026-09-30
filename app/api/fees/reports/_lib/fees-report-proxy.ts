@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { resolveBackendBaseUrl } from '@/lib/security/trusted-backend';
 
 type ProxySession = {
   baseUrl: string;
@@ -28,7 +29,7 @@ function readHeader(request: NextRequest, name: string) {
 }
 
 function readSession(request: NextRequest): ProxySession {
-  const baseUrl = readHeader(request, 'x-laravel-base-url') || getDefaultBaseUrl();
+  const baseUrl = resolveBackendBaseUrl(readHeader(request, 'x-laravel-base-url'), getDefaultBaseUrl());
 
   return {
     baseUrl,
@@ -87,6 +88,8 @@ function parseJsonPayload(text: string) {
 }
 
 function summarizeHtml(text: string) {
+  // Upstream HTML (for example a Laravel debug page) never reaches clients in production.
+  if (process.env.NODE_ENV === 'production') return '';
   return text.replace(/\s+/g, ' ').trim().slice(0, 500);
 }
 

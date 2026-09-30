@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { createLocalAiModel } from "@/lib/ai/local-model";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { requireSession } from "@/lib/security/session-token";
 import {
   convertSopProcedure,
   findModule,
@@ -127,6 +129,17 @@ interface ConvertResponse {
 }
 
 export async function POST(request: Request) {
+  // The AI fallback spends this server's model key: signed-in users only, and not in bulk.
+  const session = requireSession(request);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Sign in to convert a procedure.", code: "PROCESS_CONVERT_UNAUTHENTICATED" },
+      { status: 401 }
+    );
+  }
+  const limited = rateLimit(request, "process-convert", { limit: 30, windowMs: 60_000, key: session.claims.id });
+  if (limited) return limited;
+
   let body: z.infer<typeof requestSchema>;
 
   try {

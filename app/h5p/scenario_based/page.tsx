@@ -56,7 +56,8 @@ function ScenarioListContent() {
     () => readH5pContext(new URLSearchParams(searchParams?.toString())),
     [searchParams]
   );
-  const contextQuery = h5pContextQuery(ctx);
+  const returnTo = searchParams?.get('return_to') || null;
+  const contextQuery = h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined);
 
   const [scenarios, setScenarios] = useState<H5pScenario[]>([]);
   const [loading, setLoading] = useState(true);

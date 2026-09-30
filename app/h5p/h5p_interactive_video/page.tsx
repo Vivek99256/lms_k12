@@ -104,7 +104,8 @@ function InteractiveVideoListContent() {
     return videos.filter((video) => (video.title ?? '').toLowerCase().includes(term));
   }, [videos, search]);
 
-  const contextQuery = h5pContextQuery(ctx);
+  const returnTo = searchParams?.get('return_to') || null;
+  const contextQuery = h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined);
 
   const handleDelete = async (video: H5pInteractiveVideo) => {
     if (!window.confirm(`Delete "${video.title ?? 'this video'}"? This cannot be undone.`)) return;

@@ -39,6 +39,7 @@ import {
 } from 'chart.js';
 import { Bar, Doughnut, Radar } from 'react-chartjs-2';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
+import { useRegisterPageAiContext } from '@/contexts/PageAiContext';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -677,6 +678,36 @@ export default function AdmissionManagementContent() {
       followUpsDue,
     };
   }, [rosterData]);
+
+  /**
+   * What the assistant can see: the KPI tiles already on screen, the search actually
+   * applied, and the row count it leaves — not the roster rows themselves, which the
+   * assistant reads through its own governed tools rather than whatever happens to be
+   * paginated into view.
+   */
+  useRegisterPageAiContext(
+    useMemo(
+      () => ({
+        pageTitle: 'Admission enquiries',
+        pageType: 'list' as const,
+        metrics: [
+          { key: 'total_enquiries', label: 'Total enquiries', value: kpiStats.total },
+          { key: 'new_this_week', label: 'New this week', value: kpiStats.newThisWeek },
+          { key: 'converted', label: 'Converted', value: kpiStats.convertedCount },
+          { key: 'conversion_rate', label: 'Conversion rate', value: kpiStats.conversionRate, unit: '%' },
+          { key: 'follow_ups_due', label: 'Follow-ups due', value: kpiStats.followUpsDue },
+        ],
+        searchQuery: searchQuery.trim() || null,
+        recordCount: filteredRosterData.length,
+        availableActions: [
+          { key: 'add_enquiry', label: 'Add a new admission enquiry' },
+          { key: 'schedule_follow_up', label: 'Schedule a follow-up' },
+          { key: 'confirm_admission', label: 'Confirm an admission from an enquiry' },
+        ],
+      }),
+      [kpiStats, searchQuery, filteredRosterData.length]
+    )
+  );
 
   const sourceBreakdown = useMemo(() => {
     const counts = rosterData.reduce<Record<string, number>>((acc, row) => {
