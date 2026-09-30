@@ -57,6 +57,7 @@ import {
   type TableExportRow,
 } from '@/lib/table-export';
 import { useAuth } from '@/contexts/AuthContext';
+import { escapeHtml, sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type ViewMode = 'issue' | 'history';
 type MessageType = 'success' | 'error' | 'info';
@@ -242,13 +243,13 @@ function openCertificatePrintWindow(title: string, html: string) {
   printWindow.document.write(`
     <html>
       <head>
-        <title>${title}</title>
+        <title>${escapeHtml(title)}</title>
         <style>
           body { margin: 0; padding: 16px; background: #ffffff; }
           .pagebreak { page-break-after: always; }
         </style>
       </head>
-      <body onload="window.print()">${html}</body>
+      <body onload="window.print()">${sanitizeHtml(html, { document: true })}</body>
     </html>
   `);
   printWindow.document.close();
@@ -272,7 +273,7 @@ function HtmlMessageBanner({ message }: { message: HtmlMessage | null }) {
   return (
     <div
       className={`rounded-lg border px-3 py-2 text-sm font-medium ${classes}`}
-      dangerouslySetInnerHTML={{ __html: message.text }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.text) }}
     />
   );
 }
@@ -1129,7 +1130,7 @@ export default function StudentCertificateModule({
               <div className="overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <div
                   className="mx-auto min-w-[760px] max-w-[980px] bg-white p-4 shadow-sm"
-                  dangerouslySetInnerHTML={{ __html: previewPayload.html }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewPayload.html, { document: true }) }}
                 />
               </div>
             ) : (

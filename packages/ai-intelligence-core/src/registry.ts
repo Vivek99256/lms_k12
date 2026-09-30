@@ -119,6 +119,7 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
     ],
     status: 'live',
     roadmapId: 'ai.gateway',
+    href: '/ai/providers',
     solutions: {
       lms_k12: {
         today: 'yes',
@@ -157,6 +158,7 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
     ],
     status: 'live',
     roadmapId: 'ai.gateway',
+    href: '/ai/models',
     solutions: {
       lms_k12: {
         today: 'yes',
@@ -200,6 +202,7 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
     ],
     status: 'live',
     roadmapId: 'ai.gateway',
+    href: '/ai/prompts',
     solutions: {
       lms_k12: {
         today: 'yes',
@@ -484,7 +487,7 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
     whyCentral:
       'The bill arrives as one number from the provider. Attributing it is only possible where the calls are counted — the shared gateway — which is the same place the quota has to be enforced.',
     todayInK12:
-      'Not built. Fees carries a locked "usage and audit" switch scoped to its own module, which the architecture review treated as a module view over central data rather than a second meter.',
+      'Live at /ai/usage-cost as a module-scoped view over the same conversation, generation and key rows each module reads for its own AI Stack tab. There is no separate central meter yet.',
     toCentralise: [
       'Metering at the gateway: tokens, latency and cost tagged with solution, tenant, module and capability.',
       'Quotas and alerts per product and per tenant.',
@@ -495,8 +498,9 @@ export const AI_CAPABILITIES: readonly AiCapability[] = [
       'A runaway agent hits a quota instead of an invoice.',
       'Cost per capability informs which model each capability should get.',
     ],
-    status: 'coming-soon',
+    status: 'live',
     roadmapId: 'ai.gateway',
+    href: '/ai/usage-cost',
     solutions: {
       lms_k12: {
         today: 'no',

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { resolveBackendBaseUrl } from '@/lib/security/trusted-backend';
 
 export const runtime = 'nodejs';
 
@@ -19,7 +20,7 @@ export const runtime = 'nodejs';
  */
 export async function POST(request: NextRequest) {
   const baseFromHeader = request.headers.get('x-laravel-base-url');
-  const base = (baseFromHeader || API_BASE_URL).replace(/\/$/, '');
+  const base = resolveBackendBaseUrl(baseFromHeader, API_BASE_URL);
   if (!base) {
     return NextResponse.json(
       { status: '0', message: 'Missing Laravel base URL.' },

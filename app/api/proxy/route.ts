@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { isSafeRelayPath, rejectOversizedBody, upstreamFailure } from '@/lib/security/request-guards';
 
 export const runtime = 'nodejs';
 
@@ -21,6 +22,9 @@ export async function GET(request: NextRequest) {
   const targetPath = request.nextUrl.searchParams.get('path');
   if (!targetPath) {
     return NextResponse.json({ message: 'Missing path parameter' }, { status: 400 });
+  }
+  if (!isSafeRelayPath(targetPath)) {
+    return NextResponse.json({ message: 'Invalid path parameter' }, { status: 400 });
   }
 
   const base = API_BASE_URL.replace(/\/$/, '');
@@ -53,9 +57,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(payload, { status: upstream.status });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Proxy request failed';
-    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : undefined;
-    return NextResponse.json({ message, cause, target: url }, { status: 502 });
+    // The target URL and low-level cause name internal hosts: log them, don't return them.
+    return upstreamFailure('api/proxy', err);
   }
 }
 
@@ -80,12 +83,18 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
   if (!targetPath) {
     return NextResponse.json({ message: 'Missing path parameter' }, { status: 400 });
   }
+  if (!isSafeRelayPath(targetPath)) {
+    return NextResponse.json({ message: 'Invalid path parameter' }, { status: 400 });
+  }
 
   const base = API_BASE_URL.replace(/\/$/, '');
   const requestQuery = new URLSearchParams(request.nextUrl.searchParams);
   requestQuery.delete('path');
   const query = requestQuery.toString();
   const url = `${base}/${resolveTargetPath(targetPath)}${query ? `?${query}` : ''}`;
+
+  const oversized = rejectOversizedBody(request);
+  if (oversized) return oversized;
 
   const contentType = request.headers.get('content-type') || '';
   const bodyText = await request.text();
@@ -115,8 +124,7 @@ async function forwardWithBody(request: NextRequest, method: 'POST' | 'PUT' | 'P
 
     return NextResponse.json(payload, { status: upstream.status });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Proxy request failed';
-    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : undefined;
-    return NextResponse.json({ message, cause, target: url }, { status: 502 });
+    // The target URL and low-level cause name internal hosts: log them, don't return them.
+    return upstreamFailure('api/proxy', err);
   }
 }

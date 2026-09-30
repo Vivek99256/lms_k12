@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -289,7 +290,7 @@ function ReviewCard({ question, index }: { question: PalResultQuestion; index: n
           <div className="flex flex-wrap items-center gap-2">
             <div
               className="text-sm font-medium text-slate-900 [&_img]:max-w-full"
-              dangerouslySetInnerHTML={{ __html: question.title }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.title) }}
             />
           </div>
           <div className="mt-2">
@@ -343,7 +344,7 @@ function ReviewCard({ question, index }: { question: PalResultQuestion; index: n
                   ) : (
                     <span className="h-4 w-4 shrink-0" />
                   )}
-                  <span className="[&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  <span className="[&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
                   {given && (
                     <span className="ml-auto text-[11px] font-medium text-slate-500">Your answer</span>
                   )}

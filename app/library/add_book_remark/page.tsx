@@ -19,6 +19,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionFormData, appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
 import { downloadFile, escapeCsv, MessageState, normalizePayload, readMessage, readStatus } from '@/app/library/_lib/library-module-utils';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type StatusType = {
   id: string;
@@ -89,7 +90,7 @@ function printRows(rows: RemarkRecord[], statusTypes: StatusType[], remarksMap: 
             </tr>
           </thead>
           <tbody>
-            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td><td>${remarksMap[row.id] || row.remarks || '-'}</td><td>${statusLookup[statusMap[row.id] || row.itemStatusId] || '-'}</td></tr>`).join('')}
+            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(row.title || '-')}</td><td>${escapeHtml(row.collectionType || '-')}</td><td>${escapeHtml(remarksMap[row.id] || row.remarks || '-')}</td><td>${escapeHtml(statusLookup[statusMap[row.id] || row.itemStatusId] || '-')}</td></tr>`).join('')}
           </tbody>
         </table>
       </body>

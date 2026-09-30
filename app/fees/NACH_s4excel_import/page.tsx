@@ -28,6 +28,7 @@ import {
 } from '@/app/fees/_lib/fees-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type S4Response = ApiStatusPayload & {
   fee_month?: unknown;
@@ -164,7 +165,7 @@ export default function NachS4ExcelImportPage() {
         <SectionPanel title="Import summary">
           <div
             className="max-h-[420px] overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800"
-            dangerouslySetInnerHTML={{ __html: summaryHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(summaryHtml) }}
           />
         </SectionPanel>
       )}

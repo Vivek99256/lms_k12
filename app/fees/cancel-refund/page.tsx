@@ -34,6 +34,7 @@ import {
   type DropdownValue,
   type SearchDropdownValues,
 } from '@/components/search-dropdown';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type SessionContext = {
   token: string;
@@ -812,7 +813,7 @@ function ReceiptPreview({
           <Button type="button" variant="outline" onClick={onClose}>Close</Button>
         </div>
         <div className="overflow-auto p-4">
-          <div className="min-w-[720px]" dangerouslySetInnerHTML={{ __html: html }} />
+          <div className="min-w-[720px]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(html, { document: true }) }} />
         </div>
       </div>
     </div>

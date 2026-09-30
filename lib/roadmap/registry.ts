@@ -769,7 +769,7 @@ export const ROADMAP_ITEMS: RoadmapItem[] = [
     title: 'AI providers and models',
     blurb: 'Central model access, prompts and cost tracking, so no module holds its own keys.',
     phase: 'Phase 2',
-    status: 'coming-soon',
+    status: 'live',
     audience: 'customer',
   },
   {
