@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { logFeesOperation } from '@/lib/fees/fees-ai-stack';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import {
   Table,
   TableBody,
@@ -820,7 +821,7 @@ function GeneratedCircularModal({
   result: GeneratedCircularResult;
   onClose: () => void;
 }) {
-  const printableHtml = result.html || buildGeneratedSummaryHtml(result);
+  const printableHtml = result.html ? sanitizeHtml(result.html, { document: true }) : buildGeneratedSummaryHtml(result);
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=960,height=720');
@@ -854,7 +855,7 @@ function GeneratedCircularModal({
 
         <div className="min-h-0 flex-1 overflow-auto p-4">
           {result.html ? (
-            <div className="min-w-[760px]" dangerouslySetInnerHTML={{ __html: result.html }} />
+            <div className="min-w-[760px]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(result.html, { document: true }) }} />
           ) : (
             <div className="min-w-[1060px]" dangerouslySetInnerHTML={{ __html: buildGeneratedSummaryHtml(result) }} />
           )}

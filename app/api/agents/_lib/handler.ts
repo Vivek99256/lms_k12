@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { actingUserOf, laravelAuthorizer, readRequestSession } from '@/lib/agents/acting-user';
 import { AgentEngineDenied, AgentEngineError, type EngineContext } from '@/lib/agents/engine';
 import { getAgentStore } from '@/lib/agents/store';
+import { checkSessionToken } from '@/lib/security/session-token';
 
 /**
  * Shared plumbing for the /api/agents routes.
@@ -15,9 +16,23 @@ import { getAgentStore } from '@/lib/agents/store';
 
 export function engineContextFor(request: Request): EngineContext {
   const session = readRequestSession(request);
+  const actor = actingUserOf(session);
+
+  // When the token's signature can be verified (LARAVEL_JWT_SECRET is set), its
+  // claims decide who is calling: the institute header must match the token's own
+  // institute, and the run log records the token's user, not a header's.
+  const verified = checkSessionToken(session.token);
+  if (verified?.verified) {
+    const { sub_institute_id: tokenTenant, id: tokenUser } = verified.claims;
+    if (tokenTenant && actor.tenant_id && tokenTenant !== actor.tenant_id) {
+      throw new AgentEngineError('Your sign-in belongs to a different institute. Sign in again.', 403);
+    }
+    if (tokenUser) actor.user_id = tokenUser;
+  }
+
   return {
     store: getAgentStore(),
-    actor: actingUserOf(session),
+    actor,
     authorize: laravelAuthorizer(session),
     // The credential a `read` tool needs to fetch live records as this person. It
     // reaches one backend call and is never stored: `actingUserOf` above is what the
@@ -49,7 +64,8 @@ export function fail(error: unknown) {
   }
   console.error('[agents]', error);
   return NextResponse.json(
-    { status: 0, message: error instanceof Error ? error.message : 'The agent engine could not complete the request.' },
+    // Unexpected errors are logged above; their text can name files or hosts, so it stays server-side.
+    { status: 0, message: 'The agent engine could not complete the request.' },
     { status: 500 },
   );
 }

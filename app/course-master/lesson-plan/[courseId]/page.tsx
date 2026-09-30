@@ -1092,12 +1092,6 @@ export default function LessonPlanPage() {
         hostName: readString(userData.host_name ?? menuContext.host_name) || API_BASE_URL,
       };
 
-      console.log('Current Session:', {
-        ...userData,
-        token: userData.token ? 'present' : undefined,
-        user_token: userData.user_token ? 'present' : undefined,
-      });
-      console.log('Current Standard ID:', currentStandardId);
       setSessionContext(nextSessionContext);
     };
 
@@ -1129,12 +1123,6 @@ export default function LessonPlanPage() {
         return;
       }
 
-      console.log('Division request values:', {
-        hostName: sessionContext.hostName,
-        subInstituteId: sessionContext.subInstituteId,
-        standardId: currentStandardId,
-        hasToken: Boolean(sessionContext.token),
-      });
 
       if (!sessionContext.hostName || !sessionContext.token || !sessionContext.subInstituteId) {
         if (!cancelled) {
@@ -1172,7 +1160,6 @@ export default function LessonPlanPage() {
         }
 
         const payload = (await response.json()) as Record<string, unknown>;
-        console.log('Division API response:', payload);
         const divisionData =
           payload.data ??
           payload.divisions ??
@@ -1291,10 +1278,6 @@ export default function LessonPlanPage() {
       try {
         const resolvedToken = sessionContext.token;
 
-        console.log({
-          token: resolvedToken ? 'present' : 'missing',
-          lessonPlanApiUrl,
-        });
 
         const response = await fetch(lessonPlanApiUrl, {
           method: 'GET',
@@ -1338,7 +1321,6 @@ export default function LessonPlanPage() {
           throw new Error(apiMessage);
         }
 
-        console.log(payload);
         const typedPayload = payload as LessonPlanApiResponse;
         const firstItem = Array.isArray(typedPayload.data) ? typedPayload.data[0] : null;
         setApiPeriods(Array.isArray(firstItem?.periods) ? firstItem.periods : []);

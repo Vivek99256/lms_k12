@@ -18,5 +18,11 @@ export function resolveDashboardRole(userProfileName: string | null | undefined)
   if (STUDENT_PROFILES.has(normalized)) return 'student';
   if (ADMIN_PROFILES.has(normalized)) return 'admin';
 
+  // Profile names are free text per school ("Class Teacher", "Senior Teacher", "HOD").
+  // Falling through to the admin dashboard for these gave teachers a dashboard whose
+  // summary endpoint refuses them, so match on the role word before giving up.
+  if (/\b(teacher|hod|faculty)\b/.test(normalized)) return 'teacher';
+  if (/\bstudent\b/.test(normalized)) return 'student';
+
   return 'admin';
 }

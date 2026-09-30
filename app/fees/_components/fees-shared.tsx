@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, Loader2, Printer, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 /**
  * The page body, inside the shell's scroll region.
@@ -210,7 +211,7 @@ export function ReceiptPreviewModal({
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) return;
 
-    printWindow.document.write(`<html><body>${html}</body></html>`);
+    printWindow.document.write(`<html><body>${sanitizeHtml(html, { document: true })}</body></html>`);
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
@@ -232,7 +233,7 @@ export function ReceiptPreviewModal({
           </div>
         </div>
         <div className="overflow-auto bg-slate-50 p-4">
-          <div className="mx-auto min-w-[720px] max-w-[900px] bg-white p-4 shadow-sm" dangerouslySetInnerHTML={{ __html: html }} />
+          <div className="mx-auto min-w-[720px] max-w-[900px] bg-white p-4 shadow-sm" dangerouslySetInnerHTML={{ __html: sanitizeHtml(html, { document: true }) }} />
         </div>
       </div>
     </div>

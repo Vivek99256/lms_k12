@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { callMcpTool } from "@/lib/ai/mcp-client";
+import { isTrustedBackendUrl } from "@/lib/security/trusted-backend";
 
 export const runtime = "nodejs";
 
@@ -24,10 +25,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // SSRF guard: body.baseUrl is an unvalidated request value, so only a
+    // configured backend may be named; anything else falls back to the default.
+    const baseUrl = body.baseUrl && isTrustedBackendUrl(body.baseUrl) ? body.baseUrl : null;
+
     const payload = await callMcpTool(
       {
         token: request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim(),
-        baseUrl: body.baseUrl,
+        baseUrl,
         meta: body.meta,
       },
       {

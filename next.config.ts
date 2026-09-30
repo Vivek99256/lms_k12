@@ -32,7 +32,46 @@ function resolveBuildId(): string {
 
 const BUILD_ID = resolveBuildId();
 
+/**
+ * A `NEXT_PUBLIC_` variable is inlined into the browser bundle the moment any
+ * client code reads it. A secret with that prefix is one import away from being
+ * published, so say so at build time rather than finding out from a leak.
+ */
+const SECRET_NAME_RE = /SERVICE_ROLE|SECRET|PRIVATE|PASSWORD|API_KEY$/i;
+for (const name of Object.keys(process.env)) {
+  if (name.startsWith("NEXT_PUBLIC_") && SECRET_NAME_RE.test(name)) {
+    console.warn(
+      `[security] ${name} looks like a secret but has the NEXT_PUBLIC_ prefix, which ships it to every browser if referenced. Rename it without the prefix.`,
+    );
+  }
+}
+
+/**
+ * Who may frame the app. Same-origin by default; list extra origins (for example an
+ * ERP page that embeds a screen) in FRAME_ANCESTORS, space-separated.
+ */
+const FRAME_ANCESTORS = ["'self'", ...(process.env.FRAME_ANCESTORS || "").split(/\s+/).filter(Boolean)].join(" ");
+
+/**
+ * Baseline response headers. Deliberately conservative so nothing that loads today
+ * stops loading: the CSP only restricts framing, plugins and <base> — a script-src
+ * policy needs its own testing pass (see docs/security-hardening.md).
+ */
+const SECURITY_HEADERS = [
+  { key: "Content-Security-Policy", value: `frame-ancestors ${FRAME_ANCESTORS}; object-src 'none'; base-uri 'self'` },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(self), payment=(self), usb=()" },
+  // Browsers ignore HSTS over plain HTTP, so local development is unaffected. No
+  // includeSubDomains: sibling hosts on the same domain are not all on HTTPS yet.
+  { key: "Strict-Transport-Security", value: "max-age=31536000" },
+];
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
   // Pin the Turbopack workspace root to this project.
   //
   // Turbopack otherwise infers a root by walking up for a lockfile, so a stray

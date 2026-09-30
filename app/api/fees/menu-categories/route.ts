@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { resolveBackendBaseUrl } from '@/lib/security/trusted-backend';
 
 /**
  * Server-side proxy for the Fees category navigation feed.
@@ -37,11 +38,13 @@ function jsonError(message: string, status: number, details?: Record<string, unk
 }
 
 function summarizeHtml(text: string) {
+  // Upstream HTML (for example a Laravel debug page) never reaches clients in production.
+  if (process.env.NODE_ENV === 'production') return '';
   return text.replace(/\s+/g, ' ').trim().slice(0, 500);
 }
 
 export async function GET(request: NextRequest) {
-  const baseUrl = readHeader(request, 'x-laravel-base-url') || getDefaultBaseUrl();
+  const baseUrl = resolveBackendBaseUrl(readHeader(request, 'x-laravel-base-url'), getDefaultBaseUrl());
   const token = readHeader(request, 'x-laravel-token');
   const subInstituteId = readHeader(request, 'x-sub-institute-id');
   const userId = readHeader(request, 'x-user-id');

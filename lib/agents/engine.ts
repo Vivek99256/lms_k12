@@ -69,13 +69,26 @@ function requireActor(actor: ActingUser) {
   if (!actor.user_id) throw new AgentEngineError('Your session has no user id. Sign in again.', 401);
 }
 
-export async function listAgents(context: EngineContext, filter?: { module?: string; status?: AgentStatus }) {
+/**
+ * Reading agents and their run log needs `view` on the module, checked with Laravel
+ * like every write. The tenant header alone never unlocks a list: without this, any
+ * caller could name an institute and read its agents and run history.
+ */
+async function requireViewer(context: EngineContext, moduleKey: string | undefined) {
   requireActor(context.actor);
+  const key = (moduleKey ?? '').trim();
+  if (!isKnownModule(key)) throw new AgentEngineError('Choose a module to list its agents.', 400);
+  const decision = await context.authorize(rbacModuleKey(key), 'view');
+  if (!decision.allowed) throw new AgentEngineError(decision.reason ?? 'Not permitted.', 403);
+}
+
+export async function listAgents(context: EngineContext, filter?: { module?: string; status?: AgentStatus }) {
+  await requireViewer(context, filter?.module);
   return context.store.listAgents(context.actor.tenant_id, filter);
 }
 
 export async function listRuns(context: EngineContext, filter?: { module?: string; agentId?: string; limit?: number }) {
-  requireActor(context.actor);
+  await requireViewer(context, filter?.module);
   return context.store.listRuns(context.actor.tenant_id, filter);
 }
 

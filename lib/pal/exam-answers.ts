@@ -67,6 +67,20 @@ export interface PalExamQuestion {
   options: PalExamOption[];
   /** `question_type_catalog.code`, e.g. `fill_blank`. Null when unresolved. */
   questionTypeCode: string | null;
+  /**
+   * `question_type_catalog`'s display label, e.g. `Assertion & Reason`.
+   *
+   * THE MIDDLE RUNG OF THE LADDER. `mappingForQuestion` resolves a row's form
+   * from `question_type_code`, then this, then `questionType`'s collapsed
+   * spelling -- the same order the question bank screens already use, so PAL
+   * and the bank read the same row the same way. A row can carry this even
+   * when `questionTypeCode` is null (not yet backfilled with a stable code),
+   * which is exactly the row this field exists to catch: without it, every
+   * question that reaches this state falls straight to "no form is recorded"
+   * for every form except MCQ, which is the only one `questionType`'s
+   * fallback can reconstruct on its own.
+   */
+  questionTypeRaw: string | null;
   /** The grading engine's collapsed spelling: 'MCQ' | 'Narrative'. */
   questionType: string | null;
   /** The stored written answer, which is the answer key for the typed forms. */
@@ -93,6 +107,7 @@ export function toBankQuestion(question: PalExamQuestion): BankQuestion {
     id: Number(question.questionId),
     question: question.questionText,
     question_type_code: question.questionTypeCode,
+    question_type_raw: question.questionTypeRaw,
     question_type: question.questionType,
     model_answer: question.modelAnswer,
     marks: question.marks,

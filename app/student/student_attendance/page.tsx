@@ -468,7 +468,6 @@ export default function StudentAttendancePage() {
           cache: 'no-store',
         });
         const payload = normalizePayload(await response.json());
-        console.log('Student Attendance API response:', payload);
 
         if (!response.ok) {
           throw new Error(payload.message || `HTTP ${response.status}: Unable to load student attendance options.`);

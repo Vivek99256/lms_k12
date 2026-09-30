@@ -32,6 +32,7 @@ import {
 } from '@/app/fees/_lib/fees-api';
 import { getStoredMenuContext } from '@/app/hooks/useMenuRights';
 import { useAuth } from '@/contexts/AuthContext';
+import { escapeHtml, sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type MessageState = {
   type: 'success' | 'error' | 'info';
@@ -308,12 +309,12 @@ function openPrintWindow(title: string, html: string) {
   printWindow.document.write(`
     <html>
       <head>
-        <title>${title}</title>
+        <title>${escapeHtml(title)}</title>
         <style>
           body { margin: 0; padding: 16px; background: #ffffff; }
         </style>
       </head>
-      <body onload="window.print()">${html}</body>
+      <body onload="window.print()">${sanitizeHtml(html, { document: true })}</body>
     </html>
   `);
   printWindow.document.close();
@@ -768,7 +769,7 @@ export default function StudentIcardPage() {
             <div className="overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div
                 className="mx-auto min-w-[860px] bg-white p-4 shadow-sm"
-                dangerouslySetInnerHTML={{ __html: preview.html }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(preview.html, { document: true }) }}
               />
             </div>
           </div>

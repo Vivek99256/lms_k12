@@ -89,9 +89,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ id: payload?.data?.id ?? null });
   } catch (error) {
+    // The message can name internal hosts (a fetch failure); keep it in the server log.
     console.error("[ai/assistance-tickets] route failure", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not raise the assistance ticket.", code: "AI_ASSISTANCE_TICKET_FAILED" },
+      { error: "Could not raise the assistance ticket.", code: "AI_ASSISTANCE_TICKET_FAILED" },
       { status: 500 }
     );
   }

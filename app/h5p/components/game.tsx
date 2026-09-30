@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Award, Check, Flame, Gauge, RotateCcw, Sparkles, Target, Timer, Trophy, X, Zap } from 'lucide-react';
 
 /**
@@ -339,6 +340,77 @@ export function Celebration({ show, pieces = 18 }: { show: boolean; pieces?: num
         <span key={piece.key} className="h5p-burst__piece" style={piece.style} />
       ))}
     </div>
+  );
+}
+
+/**
+ * A viewport-covering confetti rain, portalled to `document.body` so it is
+ * never confined by an ancestor's stacking context, clipped by an
+ * `overflow-hidden` container, or -- the specific reason this is a portal and
+ * not just an absolutely-positioned layer -- boxed in by a `transform`
+ * ancestor. A centred dialog is usually translated to its centre with
+ * `transform: translate(-50%, -50%)`, which creates a new containing block
+ * for any `position: fixed` descendant; a confetti layer nested inside one
+ * would be fixed to the DIALOG's box, not the viewport. Portalling sidesteps
+ * that entirely.
+ *
+ * NO TIMER, NO CARD. Earlier this component also owned a centred message and
+ * dismissed itself on a clock; both were wrong once the result screen grew an
+ * actual dialog for the reveal moment (Radix `Dialog`, not this) that the
+ * learner dismisses themselves -- a screen the learner controls should not
+ * also be racing an independent timeout. This is now purely decorative
+ * weather: the caller's own `show` (typically "the reveal dialog is still
+ * open, and the result earned it") is the only clock it runs on. Each piece
+ * still only falls once and holds its end state, so a dialog left open for a
+ * while does not get rained on indefinitely.
+ */
+export function ConfettiRain({ show, pieces: pieceCount = 60 }: { show: boolean; pieces?: number }) {
+  const reduced = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
+
+  // Portals need `document`, which does not exist on the server -- this is
+  // what defers the actual `createPortal` call to after the client mounts.
+  // Deferred to a microtask so the setState is never synchronous inside the
+  // effect body, the same convention `DiagnosticExamPage`'s own `load`
+  // follows and what react-hooks/set-state-in-effect enforces.
+  useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+  }, []);
+
+  // Deterministic, not random -- same reasoning as `Celebration` above: no
+  // hydration mismatch, and a burst that looks designed rather than jittery.
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: pieceCount }, (_, index) => {
+        const left = (index * 53) % 100;
+        const fallDuration = 2.4 + ((index * 17) % 14) / 10;
+        const delay = (index % 14) * 90;
+        const drift = ((index * 29) % 140) - 70;
+        const colour = ['var(--h5p-reward)', 'var(--h5p-accent)', 'var(--h5p-success)'][index % 3];
+
+        return {
+          key: index,
+          style: {
+            left: `${left}%`,
+            '--h5p-fall-duration': `${fallDuration}s`,
+            '--h5p-fall-delay': `${delay}ms`,
+            '--h5p-fall-drift': `${drift}px`,
+            '--h5p-confetti-color': colour,
+          } as React.CSSProperties,
+        };
+      }),
+    [pieceCount]
+  );
+
+  if (!mounted || !show || reduced) return null;
+
+  return createPortal(
+    <div className="h5p-celebrate-overlay" role="presentation" aria-hidden="true">
+      {pieces.map((piece) => (
+        <span key={piece.key} className="h5p-celebrate-overlay__piece" style={piece.style} />
+      ))}
+    </div>,
+    document.body
   );
 }
 
