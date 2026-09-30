@@ -1,309 +1,305 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { FormEvent } from 'react';
+import Script from 'next/script';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { ArrowLeft, CheckCircle2, Mail, X } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  BarChart3,
+  BookOpen,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  GraduationCap,
+  Loader2,
+  Lock,
+  Mail,
+  ShieldCheck,
+  Users,
+  X,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Client IDs are public, but Next only inlines `NEXT_PUBLIC_*` values into the browser
+// bundle. Reading it at module level lets the build substitute the literal.
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || '';
+
+const FIELD_CLASS =
+  'w-full rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-[15px] text-gray-900 placeholder-gray-400 ' +
+  'transition-colors hover:border-gray-400 focus:border-[#4169E1] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#4169E1]/15';
+
+const PRIMARY_BUTTON_CLASS =
+  'flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#3658c7] to-[#4169E1] px-4 py-3.5 text-[15px] font-semibold text-white ' +
+  'shadow-lg shadow-[#4169E1]/25 transition-all hover:shadow-xl hover:shadow-[#4169E1]/30 hover:brightness-110 active:scale-[0.99] ' +
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4169E1] ' +
+  'disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none';
+
+const HIGHLIGHTS = [
+  { icon: GraduationCap, title: 'Courses and lessons', text: 'Pick up where you left off, on any device.' },
+  { icon: BarChart3, title: 'Progress at a glance', text: 'Grades, attendance and assessments in one place.' },
+  { icon: Users, title: 'Stay connected', text: 'Message teachers, students and parents securely.' },
+];
+
+type GoogleId = {
+  initialize: (config: {
+    client_id: string;
+    callback: (response: { credential?: string }) => void;
+    auto_select?: boolean;
+    cancel_on_tap_outside?: boolean;
+  }) => void;
+  prompt: (listener?: (notification: { isNotDisplayed(): boolean; isSkippedMoment(): boolean }) => void) => void;
+};
+
+function getGoogleId(): GoogleId | undefined {
+  return (window as unknown as { google?: { accounts?: { id?: GoogleId } } }).google?.accounts?.id;
+}
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+    >
+      <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+function Spinner() {
+  return <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />;
+}
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, login, loginWithGoogle } = useAuth();
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/dashboard');
-    }
-  }, [isAuthenticated, router]);
-
-  const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [googleClientId, setGoogleClientId] = useState('');
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const googleInitialised = useRef(false);
+
+  // One place decides where a signed-in user goes: a fresh login flips
+  // `isAuthenticated`, and so does landing here with a live session.
+  useEffect(() => {
+    if (isAuthenticated) router.replace('/dashboard');
+  }, [isAuthenticated, router]);
 
   useEffect(() => {
-    setGoogleClientId(
-      // Only NEXT_PUBLIC_ variables reach the browser; the old name was always empty here.
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || ''
-    );
+    router.prefetch('/dashboard');
+  }, [router]);
+
+  const finishSignIn = useCallback(() => {
+    localStorage.removeItem('selectedMenuBranch');
+    // Leave the button in its loading state; the effect above navigates away.
   }, []);
 
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const existing = document.querySelector('script[data-google-gsi="true"]');
-    if (existing) return;
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.setAttribute('data-google-gsi', 'true');
-    document.head.appendChild(script);
-  }, [googleClientId]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setError('');
     setIsLoading(true);
     try {
-      const result = await login(email, password);
+      const result = await login(email.trim(), password);
       if (!result.success) {
-        setError(result.error || 'Email or password is incorrect. Please try again.');
+        setError(result.error || 'Your email or password is incorrect. Check them and try again.');
         setIsLoading(false);
         return;
       }
-      localStorage.removeItem('selectedMenuBranch');
-      setIsLoading(false);
-      setShowSuccess(true);
-      window.setTimeout(() => {
-        router.replace('/dashboard');
-      }, 1100);
+      finishSignIn();
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError('We could not sign you in. Check your connection and try again.');
       setIsLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleCredential = useCallback(
+    async (response: { credential?: string }) => {
+      if (!response?.credential) {
+        setError('Google sign-in was cancelled.');
+        setIsGoogleLoading(false);
+        return;
+      }
+      const result = await loginWithGoogle(response.credential);
+      if (!result.success) {
+        setError(result.error || 'We could not sign you in with Google. Try again.');
+        setIsGoogleLoading(false);
+        return;
+      }
+      finishSignIn();
+    },
+    [finishSignIn, loginWithGoogle]
+  );
+
+  const handleGoogleSignIn = () => {
     setError('');
-    if (!googleClientId) {
-      setError("Google sign-in isn't available right now. Please use your email and password.");
+    const google = getGoogleId();
+    if (!google) {
+      setError('Google sign-in did not load. Refresh the page and try again.');
       return;
     }
-
-    if (typeof window === 'undefined') return;
-
-    const win = window as unknown as { google?: any };
-    if (!win.google?.accounts?.id) {
-      setError('Google sign-in failed to load. Please refresh the page.');
-      return;
-    }
-
     setIsGoogleLoading(true);
     try {
-      win.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: async (response: { credential?: string }) => {
-          const credential = response?.credential;
-          if (!credential) {
-            setError('Google sign-in was cancelled.');
-            setIsGoogleLoading(false);
-            return;
-          }
-          const result = await loginWithGoogle(credential);
-          if (!result.success) {
-            setError(result.error || "We couldn't sign you in with Google. Please try again.");
-            setIsGoogleLoading(false);
-            return;
-          }
-          localStorage.removeItem('selectedMenuBranch');
-          setShowSuccess(true);
-          window.setTimeout(() => {
-            router.replace('/dashboard');
-          }, 1100);
-        },
-        auto_select: false,
-        cancel_on_tap_outside: true,
+      if (!googleInitialised.current) {
+        google.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleCredential,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        googleInitialised.current = true;
+      }
+      // The prompt can be dismissed or suppressed without ever calling back, which
+      // would leave the button spinning forever.
+      google.prompt((n) => {
+        if (n.isNotDisplayed() || n.isSkippedMoment()) setIsGoogleLoading(false);
       });
-
-      win.google.accounts.id.prompt();
     } catch {
-      setError("We couldn't start Google sign-in. Please try again.");
+      setError('We could not start Google sign-in. Try again.');
       setIsGoogleLoading(false);
     }
   };
 
+  const busy = isLoading || isGoogleLoading;
+
   return (
-    <div className="h-screen flex overflow-hidden">
-      {/* Left Side - Animated Branding / Illustration */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-[#1e3a8a] via-[#4169E1] to-[#3b82f6]">
-        {/* Animated background orbs */}
-        <div className="absolute inset-0">
-          <div className="absolute top-[5%] left-[5%] w-[300px] h-[300px] bg-blue-400/40 rounded-full blur-[80px] animate-pulse" style={{ animationDuration: '4s' }} />
-          <div className="absolute bottom-[10%] right-[5%] w-[350px] h-[350px] bg-blue-600/40 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '5s' }} />
-          <div className="absolute top-[40%] left-[30%] w-[200px] h-[200px] bg-indigo-400/30 rounded-full blur-[60px] animate-pulse" style={{ animationDuration: '6s' }} />
+    <div className="flex min-h-dvh">
+      {GOOGLE_CLIENT_ID && (
+        <Script
+          src="https://accounts.google.com/gsi/client"
+          strategy="lazyOnload"
+          onReady={() => setGoogleReady(true)}
+        />
+      )}
+
+      {/* Brand panel — decorative rings are static; only the entrance uses motion. */}
+      <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#1e3a8a] via-[#3557d4] to-[#4169E1] text-white lg:flex lg:w-1/2 lg:flex-col lg:justify-between lg:p-14 xl:p-20">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-32 h-[420px] w-[420px] rounded-full border border-white/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-[260px] w-[260px] rounded-full border border-white/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-40 -left-40 h-[520px] w-[520px] rounded-full bg-white/5" />
+
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#4169E1] shadow-lg shadow-black/10">
+            <BookOpen size={22} strokeWidth={2.25} aria-hidden="true" />
+          </div>
+          <span className="text-xl font-bold tracking-tight">Teach Connect</span>
         </div>
 
-        {/* Animated floating shapes */}
-        <div className="absolute inset-0 overflow-hidden">
-          {/* Bouncing shapes */}
-          <div className="absolute top-[15%] left-[15%] w-16 h-16 border-2 border-white/20 rounded-3xl rotate-12 animate-bounce" style={{ animationDuration: '3s' }} />
-          <div className="absolute top-[55%] left-[55%] w-12 h-12 border-2 border-white/20 rounded-full animate-bounce" style={{ animationDuration: '4s' }} />
-          <div className="absolute top-[25%] right-[20%] w-20 h-20 border-2 border-white/10 rounded-[2rem] -rotate-12 animate-bounce" style={{ animationDuration: '5s' }} />
-          <div className="absolute bottom-[25%] left-[25%] w-14 h-14 border-2 border-white/20 rounded-2xl rotate-45 animate-bounce" style={{ animationDuration: '3.5s' }} />
-          <div className="absolute top-[70%] right-[25%] w-10 h-10 bg-white/10 rounded-lg rotate-12 animate-bounce" style={{ animationDuration: '2.5s' }} />
-          
-          {/* Spinning shapes */}
-          <div className="absolute top-[35%] left-[10%] w-8 h-8 border border-white/20 rounded-md animate-spin" style={{ animationDuration: '8s' }} />
-          <div className="absolute bottom-[35%] right-[15%] w-6 h-6 border border-white/15 rounded-full animate-spin" style={{ animationDuration: '6s' }} />
-          <div className="absolute top-[50%] right-[40%] w-10 h-10 border-2 border-white/10 rounded-xl animate-spin" style={{ animationDuration: '10s' }} />
-          
-          {/* Pulsing dots */}
-          <div className="absolute top-[20%] left-[45%] w-3 h-3 bg-white/40 rounded-full animate-pulse" style={{ animationDuration: '2s' }} />
-          <div className="absolute top-[65%] left-[20%] w-2 h-2 bg-blue-300/60 rounded-full animate-pulse" style={{ animationDuration: '1.5s' }} />
-          <div className="absolute top-[40%] right-[15%] w-3 h-3 bg-white/30 rounded-full animate-pulse" style={{ animationDuration: '2.5s' }} />
-          <div className="absolute bottom-[40%] left-[40%] w-2 h-2 bg-blue-200/50 rounded-full animate-pulse" style={{ animationDuration: '3s' }} />
-          <div className="absolute bottom-[15%] right-[35%] w-3 h-3 bg-white/25 rounded-full animate-pulse" style={{ animationDuration: '2s' }} />
-          
-          {/* Drifting small shapes */}
-          <div className="absolute top-[80%] left-[70%] w-4 h-4 bg-white/10 rounded animate-ping" style={{ animationDuration: '3s' }} />
-          <div className="absolute top-[10%] left-[75%] w-3 h-3 border border-white/20 rounded-full animate-ping" style={{ animationDuration: '4s' }} />
-          <div className="absolute bottom-[20%] left-[50%] w-5 h-5 bg-blue-400/20 rounded-lg animate-ping" style={{ animationDuration: '2.5s' }} />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-center items-center text-white h-full p-10 xl:p-14">
-          {/* Logo with rotating ring */}
-          <div className="relative mb-8">
-            <div className="absolute inset-0 bg-white/20 rounded-2xl animate-spin" style={{ animationDuration: '12s' }} />
-            <div className="absolute inset-1 bg-[#4169E1] rounded-xl" />
-            <div className="relative w-11 h-11 bg-white rounded-xl flex items-center justify-center shadow-lg z-10">
-              <svg className="w-5 h-5 text-[#4169E1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Headline */}
-          <div className="text-center max-w-md">
-            <h1 className="text-4xl xl:text-5xl font-bold leading-[1.1] mb-5">
-              Everything your school needs,
-              <br />
-              <span className="bg-gradient-to-r from-blue-200 via-white to-blue-100 bg-clip-text text-transparent">in one place.</span>
-            </h1>
-            <p className="text-base text-white/60 leading-relaxed">
-              Manage admissions, fees, attendance, learning and communication with your school.
-            </p>
-          </div>
-
-          {/* Animated chevrons */}
-          <div className="flex gap-1 mt-8">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="w-2 h-2 bg-white/40 rounded-full animate-bounce"
-                style={{ animationDuration: `${1.5 + i * 0.3}s`, animationDelay: `${i * 0.2}s` }}
-              />
+        <div className="relative max-w-lg">
+          <p className="mb-4 text-4xl font-bold leading-[1.1] tracking-tight xl:text-5xl">Learn without boundaries.</p>
+          <p className="mb-10 text-base leading-relaxed text-white/75">
+            Access premium courses, track your progress, and connect with educators.
+          </p>
+          <ul className="space-y-5">
+            {HIGHLIGHTS.map(({ icon: Icon, title, text }) => (
+              <li key={title} className="flex items-start gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
+                  <Icon size={20} aria-hidden="true" />
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold">{title}</span>
+                  <span className="block text-sm text-white/70">{text}</span>
+                </span>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
-      </div>
 
-      {/* Right Side - Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-white relative">
-        {/* Subtle pattern */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, #4169E1 1px, transparent 0)',
-          backgroundSize: '28px 28px',
-        }} />
+        <p className="relative flex items-center gap-2 text-xs text-white/60">
+          <ShieldCheck size={14} aria-hidden="true" />
+          Your data is encrypted and only visible to your school.
+        </p>
+      </aside>
 
-        <div className="w-full max-w-[400px] relative z-10">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
-            <div className="w-9 h-9 bg-gradient-to-br from-[#4169E1] to-blue-600 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
+      <main className="flex flex-1 items-center justify-center bg-slate-50 px-4 py-10 sm:px-6">
+        <div className="login-card w-full max-w-[460px] rounded-2xl border border-gray-200 bg-white p-7 shadow-xl shadow-slate-900/5 sm:p-10">
+          <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#4169E1] text-white">
+              <BookOpen size={18} strokeWidth={2.25} aria-hidden="true" />
             </div>
             <span className="text-lg font-bold text-gray-900">Teach Connect</span>
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-1.5">Welcome back</h2>
-            <p className="text-sm text-gray-500">Sign in with your email and password</p>
+            <h1 className="mb-2 text-3xl font-bold tracking-tight text-gray-900">Welcome back</h1>
+            <p className="text-[15px] text-gray-600">Sign in to continue to your account.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm flex items-center gap-2.5">
-                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {error}
-              </div>
-            )}
+            {error && <ErrorBanner message={error} />}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4169E1]/20 focus:border-[#4169E1] transition-all text-sm"
-              />
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-gray-700">
+                Email address
+              </label>
+              <div className="relative">
+                <Mail size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  autoFocus
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className={`${FIELD_CLASS} pl-11`}
+                />
+              </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(true)}
+                  className="rounded text-sm font-medium text-[#4169E1] transition-colors hover:text-[#3658c7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4169E1]"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="relative">
+                <Lock size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
                 <input
                   id="password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4169E1]/20 focus:border-[#4169E1] transition-all text-sm pr-12"
+                  className={`${FIELD_CLASS} pl-11 pr-12`}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-lg text-gray-500 transition-colors hover:text-gray-700 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#4169E1]"
                 >
-                  {showPassword ? (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  )}
+                  {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <div className="relative">
-                  <input type="checkbox" className="sr-only peer" />
-                  <div className="w-5 h-5 rounded-md border border-gray-300 bg-white peer-checked:bg-[#4169E1] peer-checked:border-[#4169E1] transition-all flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                </div>
-                <span className="text-sm text-gray-600">Remember me</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowForgotModal(true)}
-                className="text-sm font-medium text-[#4169E1] hover:text-[#3658c7] transition-colors"
-              >
-                Forgot password?
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-[#4169E1] to-blue-600 hover:from-[#3658c7] hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-[#4169E1]/25 hover:shadow-xl hover:shadow-[#4169E1]/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
+            <button type="submit" disabled={busy} className={PRIMARY_BUTTON_CLASS}>
               {isLoading ? (
                 <>
-                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
+                  <Spinner />
                   Signing in…
                 </>
               ) : (
@@ -312,135 +308,62 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-7">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="px-4 bg-white text-gray-400 text-xs uppercase tracking-wider">or</span>
-            </div>
-          </div>
+          {GOOGLE_CLIENT_ID && (
+            <>
+              <div className="my-6 flex items-center gap-4" role="separator" aria-label="or">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-xs uppercase tracking-wider text-gray-500">or</span>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
 
-          {/* Social Login */}
-          <div className="grid grid-cols-1 gap-3">
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={isGoogleLoading || !googleClientId}
-              title={!googleClientId ? 'Google sign-in not configured' : 'Continue with Google'}
-              className="flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-              </svg>
-              <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={busy || !googleReady}
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-[15px] font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4169E1] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isGoogleLoading ? (
+                  <Spinner />
+                ) : (
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                  </svg>
+                )}
                 {isGoogleLoading ? 'Connecting to Google…' : 'Continue with Google'}
-              </span>
-            </button>
-          </div>
-{/* 
-  Sign up link
-  <p className="text-center text-sm text-gray-500 mt-7">
-    Don&apos;t have an account?{' '}
-    <button className="font-semibold text-[#4169E1] hover:text-[#3658c7] transition-colors">
-      Sign up for free
-    </button>
-  </p>
-
-  Mock hint
-  <p className="text-center text-[11px] text-gray-400 mt-5">
-    Demo mode — use any email and password to sign in
-  </p>
-*/}
+              </button>
+            </>
+          )}
         </div>
-      </div>
+      </main>
 
-      {/* Forgot password modal — pops over the login screen without leaving it. */}
-      <ForgotPasswordModal
-        open={showForgotModal}
-        defaultEmail={email}
-        onClose={() => setShowForgotModal(false)}
-      />
-
-      {/* Post-submit success animation — checkmark draw-in, then redirect */}
-      {showSuccess && (
-        <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-[#1e3a8a] via-[#4169E1] to-[#3b82f6]">
-          <div className="flex flex-col items-center gap-5">
-            <div className="relative flex h-24 w-24 items-center justify-center">
-              <svg className="h-24 w-24 -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="44"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeDasharray="276.5"
-                  className="animate-successRing"
-                />
-              </svg>
-              <svg className="absolute h-10 w-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4 12l5 5L20 6"
-                  strokeDasharray="24"
-                  className="animate-successCheck"
-                />
-              </svg>
-            </div>
-            <p className="animate-successText text-lg font-semibold text-white opacity-0">Signed in. Taking you to your dashboard…</p>
-          </div>
-        </div>
+      {showForgotModal && (
+        <ForgotPasswordModal defaultEmail={email} onClose={() => setShowForgotModal(false)} />
       )}
 
       <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+        @keyframes cardIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        .success-overlay {
-          animation: fadeIn 0.25s ease-out;
+        .login-card {
+          animation: cardIn 0.35s cubic-bezier(0.2, 0, 0, 1) both;
         }
-        @keyframes successRing {
-          from { stroke-dashoffset: 276.5; }
-          to { stroke-dashoffset: 0; }
-        }
-        @keyframes successCheck {
-          0%, 40% { stroke-dashoffset: 24; opacity: 0; }
-          55% { opacity: 1; }
-          100% { stroke-dashoffset: 0; opacity: 1; }
-        }
-        @keyframes successText {
-          0%, 45% { opacity: 0; transform: translateY(4px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-successRing {
-          animation: successRing 0.6s ease-out forwards;
-        }
-        .animate-successCheck {
-          animation: successCheck 0.7s ease-out forwards;
-        }
-        .animate-successText {
-          animation: successText 0.6s ease-out forwards;
+        @media (prefers-reduced-motion: reduce) {
+          .login-card { animation: none; }
         }
       `}</style>
     </div>
   );
 }
 
+// Mounted only while open, so every opening starts from fresh state.
 function ForgotPasswordModal({
-  open,
   defaultEmail,
   onClose,
 }: {
-  open: boolean;
   defaultEmail: string;
   onClose: () => void;
 }) {
@@ -450,55 +373,35 @@ function ForgotPasswordModal({
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setEmail(defaultEmail);
-      setError('');
-      setSuccess(false);
-      setIsLoading(false);
-    }
-  }, [open, defaultEmail]);
-
-  useEffect(() => {
-    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [onClose]);
 
-  if (!open) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setError('');
     setIsLoading(true);
     try {
       const res = await fetch('/api/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email.trim() }),
       });
       const data = await res.json().catch(() => ({}));
-      // Laravel returns { success: true|false, message }. Treat either an
-      // explicit success:true OR any 2xx as a success — the endpoint used
-      // to send emails through a non-API controller, so the safest UX is
-      // 'show the success state' once we got an OK response.
-      if (res.ok && (data?.success === true || data?.success === undefined)) {
+      // Laravel returns { success: true|false, message }. Any 2xx without an explicit
+      // `success: false` counts as sent — the endpoint once mailed through a non-API
+      // controller, so an OK response is the reliable signal.
+      if (res.ok && data?.success !== false) {
         setSuccess(true);
         return;
       }
-      if (data?.success === false) {
-        setError("We couldn't send the reset link. Please try again.");
-        return;
-      }
-      if (!res.ok) {
-        setError("We couldn't send the reset link. Please try again.");
-        return;
-      }
-      setSuccess(true);
+      setError(data?.message || 'We could not send the reset link. Try again.');
     } catch {
-      setError('Check your internet connection and try again.');
+      setError('We could not reach the server. Check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -506,85 +409,82 @@ function ForgotPasswordModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="forgot-password-title"
     >
       <div
-        className="relative w-full max-w-[440px] rounded-2xl bg-white shadow-2xl border border-gray-200/50 overflow-hidden"
+        className="relative w-full max-w-[440px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          className="absolute right-3 top-3 rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-[#4169E1]"
         >
-          <X size={18} />
+          <X size={18} aria-hidden="true" />
         </button>
 
         {success ? (
           <div className="p-8 text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mb-5">
-              <CheckCircle2 size={32} className="text-green-600" />
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+              <CheckCircle2 size={32} className="text-green-600" aria-hidden="true" />
             </div>
-            <h2 id="forgot-password-title" className="text-xl font-bold text-gray-900 mb-2">Check your email</h2>
-            <p className="text-sm text-gray-500 mb-7">
-              If an account exists for <span className="font-semibold text-gray-700">{email}</span>, we've sent password reset instructions.
+            <h2 id="forgot-password-title" className="mb-2 text-xl font-bold text-gray-900">
+              Check your email
+            </h2>
+            <p className="mb-7 text-sm text-gray-600" role="status">
+              If an account exists for <span className="font-semibold text-gray-800">{email}</span>, we&apos;ve sent password reset instructions.
             </p>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full py-3 px-4 bg-gradient-to-r from-[#4169E1] to-blue-600 hover:from-[#3658c7] hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-[#4169E1]/25 transition-all duration-200"
-            >
+            <button type="button" onClick={onClose} autoFocus className={PRIMARY_BUTTON_CLASS}>
               Back to sign in
             </button>
           </div>
         ) : (
           <div className="p-8">
-            <h2 id="forgot-password-title" className="text-xl font-bold text-gray-900 mb-1.5">Forgot your password?</h2>
-            <p className="text-sm text-gray-500 mb-6">Enter the email linked to your account and we'll send you a reset link.</p>
+            <h2 id="forgot-password-title" className="mb-1.5 text-xl font-bold text-gray-900">
+              Forgot your password?
+            </h2>
+            <p className="mb-6 text-sm text-gray-600">
+              Enter the email tied to your account and we&apos;ll send you a reset link.
+            </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {error && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm flex items-center gap-2.5">
-                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {error}
-                </div>
-              )}
+              {error && <ErrorBanner message={error} />}
 
               <div>
-                <label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
+                <label htmlFor="forgot-email" className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Email address
+                </label>
                 <div className="relative">
-                  <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
                   <input
                     id="forgot-email"
                     type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     value={email}
-                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError('');
+                    }}
                     placeholder="you@example.com"
                     required
                     autoFocus
-                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4169E1]/20 focus:border-[#4169E1] transition-all text-sm"
+                    className={`${FIELD_CLASS} pl-11`}
                   />
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 px-4 bg-gradient-to-r from-[#4169E1] to-blue-600 hover:from-[#3658c7] hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-[#4169E1]/25 hover:shadow-xl hover:shadow-[#4169E1]/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
+              <button type="submit" disabled={isLoading} className={PRIMARY_BUTTON_CLASS}>
                 {isLoading ? (
                   <>
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
+                    <Spinner />
                     Sending reset link…
                   </>
                 ) : (
@@ -595,9 +495,9 @@ function ForgotPasswordModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full flex items-center justify-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                className="flex w-full items-center justify-center gap-2 rounded text-sm font-medium text-gray-600 transition-colors hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4169E1]"
               >
-                <ArrowLeft size={14} />
+                <ArrowLeft size={14} aria-hidden="true" />
                 Back to sign in
               </button>
             </form>
