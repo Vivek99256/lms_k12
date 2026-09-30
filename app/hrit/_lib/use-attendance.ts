@@ -123,7 +123,7 @@ export function useAttendance() {
       })
       setAttendanceHistory(records)
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to load attendance.')
+      setError(error instanceof Error ? error.message : "Couldn't load attendance. Try again.")
       setTodayRecord(null)
       setMonthlySummary(null)
       setAttendanceHistory([])
@@ -156,7 +156,7 @@ export function useAttendance() {
       }
       await loadAttendance()
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to record attendance. Please try again.')
+      setError(error instanceof Error ? error.message : "Couldn't record attendance. Try again.")
     } finally {
       setProcessing(false)
     }

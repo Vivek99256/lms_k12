@@ -29,7 +29,7 @@ export default function VisitorReportPage() {
     } catch (value: unknown) {
       setVisitors([]);
       setGenerated(true);
-      setError(errorMessage(value, "The visitor report could not be generated."));
+      setError(errorMessage(value, "Couldn't generate the visitor report. Try again."));
     } finally {
       setLoading(false);
     }

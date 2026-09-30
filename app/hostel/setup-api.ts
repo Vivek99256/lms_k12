@@ -159,7 +159,7 @@ export function getHostelSetupSession(): HostelSetupSession {
   };
 
   if (!result.token || !result.subInstituteId || !result.syear || !result.userId) {
-    throw new Error("Your login session is missing hostel API credentials. Please sign in again before opening this module.");
+    throw new Error("Your session has expired. Sign in again.");
   }
 
   return result;
@@ -198,10 +198,10 @@ async function request<T>(module: HostelModule, session: HostelSetupSession, met
 
   const payload = (await response.json().catch(() => ({}))) as ApiResult;
   if (!response.ok) {
-    throw new Error(messageFrom(payload, `Request failed (${response.status}).`));
+    throw new Error(messageFrom(payload, "Couldn't complete the request. Try again."));
   }
   if (statusFrom(payload) === "2") {
-    throw new Error(messageFrom(payload, "Authentication failed."));
+    throw new Error(messageFrom(payload, "Your session has expired. Sign in again."));
   }
   return payload as T;
 }

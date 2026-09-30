@@ -47,7 +47,7 @@ export function CrossModuleWorkflowSection({
       const payload = 'data' in response ? response.data : response;
       setData(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load module workflows.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load module workflows.');
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ export function CrossModuleWorkflowSection({
     } catch (err) {
       setTriggerMessage({
         type: 'error',
-        text: err instanceof Error ? err.message : 'Failed to initiate workflow.',
+        text: err instanceof Error ? err.message : 'Couldn’t initiate workflow.',
       });
     } finally {
       setTriggering(false);
@@ -108,7 +108,7 @@ export function CrossModuleWorkflowSection({
         <div className="flex items-start gap-2 text-red-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
           <div>
-            <p className="text-[13px] font-semibold">Failed to load cross-module workflows</p>
+            <p className="text-[13px] font-semibold">Couldn’t load cross-module workflows</p>
             <p className="mt-0.5 text-[12.5px] text-slate-600">{error}</p>
           </div>
         </div>

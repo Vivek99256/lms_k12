@@ -102,7 +102,7 @@ export default function HomeworkReviewQueuePage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "The review queue could not be loaded."
+          : "The review queue couldn’t be loaded."
       );
     } finally {
       setLoading(false);

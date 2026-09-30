@@ -45,7 +45,7 @@ export default function LmsTeacherDashboardPage() {
 
     fetchTeacherDashboard(getDashboardSession())
       .then(setData)
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Unable to load the LMS teacher dashboard.'))
+      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Couldn’t load the LMS teacher dashboard.'))
       .finally(() => setLoading(false));
   }, []);
 

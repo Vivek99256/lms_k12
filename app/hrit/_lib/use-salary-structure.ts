@@ -65,7 +65,7 @@ export function useSalaryStructure() {
 
       const session = buildSessionContext()
       if (!isPayrollSessionReady(session)) {
-        setError('Your session could not be resolved. Please sign in again.')
+        setError('Your session has expired. Please sign in again.')
         setLoading(false)
         setSearched(true)
         return
@@ -107,7 +107,7 @@ export function useSalaryStructure() {
         )
         setSearched(true)
       } catch (loadError) {
-        setError(toMessage(loadError, 'Failed to load salary structures.'))
+        setError(toMessage(loadError, "Couldn't load salary structures. Try again."))
         setRows([])
         setPayrollTypes([])
         setSearched(true)
@@ -197,7 +197,7 @@ export function useSalaryStructure() {
               values: row.values,
             })),
           }),
-        'Failed to save the salary structure.',
+        "Couldn't save the salary structure. Try again.",
       ),
     /** Copies the searched year's structures into year + 1. */
     rollover: () =>
@@ -208,7 +208,7 @@ export function useSalaryStructure() {
             employeeIds: lastQuery?.employeeIds,
             departmentIds: lastQuery?.departmentIds,
           }),
-        'Failed to roll over the salary structures.',
+        "Couldn't roll over the salary structures. Try again.",
       ),
   }
 }

@@ -1108,7 +1108,7 @@ export async function buildPalContentModelPayload(input: { chapterId?: string; c
       error:
         error instanceof Error
           ? error.message
-          : 'PAL could not load the semantic intelligence source.',
+          : 'PAL couldn’t load the semantic intelligence source.',
       isReady: false,
     };
   }
@@ -1145,7 +1145,7 @@ export async function getPalContentModel(input: { chapterId?: string; concept?: 
       context: null,
       frameworkModules: {} as Record<FrameworkSlug, PalModuleView>,
       uluModules: {} as Record<UluSlug, PalModuleView>,
-      error: `PAL backend content-model request failed with status ${res.status}.`,
+      error: 'We couldn’t load the content structure. Please try again.',
       isReady: false,
     };
   }

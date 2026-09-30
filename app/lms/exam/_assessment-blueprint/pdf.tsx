@@ -131,7 +131,7 @@ export async function generateBlueprintPdf({
     const sheet = host.querySelector<HTMLElement>('.blueprint-sheet');
 
     if (!sheet) {
-      throw new Error('The blueprint could not be laid out for export.');
+      throw new Error('The blueprint couldn’t be laid out for export.');
     }
 
     const pages = findPageCuts(sheet, pageHeightPx);

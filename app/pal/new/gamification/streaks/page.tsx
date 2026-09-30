@@ -55,7 +55,7 @@ export default function StreaksPage() {
         if (!cancelled) setHistory(rows);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setHistoryError(err instanceof Error ? err.message : 'Could not load the day ledger.');
+        if (!cancelled) setHistoryError(err instanceof Error ? err.message : 'Couldn’t load the day ledger.');
       });
     return () => {
       cancelled = true;
@@ -84,7 +84,7 @@ export default function StreaksPage() {
         <StatusPanel
           kind="error"
           title="Streak is not available"
-          message={error || 'The backend did not return a streak payload.'}
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={reload}
           retrying={refreshing}
         />
@@ -179,8 +179,7 @@ export default function StreaksPage() {
 
         <div className="space-y-5">
           <SectionCard
-            title="What counts as a streak day"
-            description="Served by the API from the specification, so the rule the learner is told is the rule the server applies."
+            title="What counts as a streak day"
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <StatTile

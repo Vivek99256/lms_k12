@@ -28,7 +28,7 @@ function printRows(rows: Row[]) {
   table { border-collapse: collapse; width: 100%; }
   th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
   th { background: #f1f5f9; }
-  </style></head><body><h2>Lost & Damage Report</h2><table><thead><tr><th>Sr No</th><th>Item Code</th><th>Title</th><th>Collection Type</th><th>Remarks</th><th>Item Status</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td><td>${row.remarks || '-'}</td><td>${row.itemStatus || '-'}</td></tr>`).join('')}</tbody></table></body></html>`;
+  </style></head><body><h2>Lost & Damage Report</h2><table><thead><tr><th>No.</th><th>Item code</th><th>Title</th><th>Collection type</th><th>Remarks</th><th>Item status</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td><td>${row.remarks || '-'}</td><td>${row.itemStatus || '-'}</td></tr>`).join('')}</tbody></table></body></html>`;
   const printWindow = window.open('', '_blank', 'width=1200,height=900');
   if (!printWindow) return;
   printWindow.document.open();
@@ -80,7 +80,7 @@ export default function LostDamageReportPage() {
           setAcademicYears(yearsFromPayload);
         }
       } catch (error) {
-        setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load lost and damage report.' });
+        setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load lost and damage report. Try again." });
       } finally {
         setLoading(false);
       }
@@ -94,7 +94,7 @@ export default function LostDamageReportPage() {
   }, [globalSearch, rows]);
 
   const exportRows = useMemo<Record<string, string>[]>(() => filteredRows.map((row, index) => ({
-    'Sr No': String(index + 1),
+    'No.': String(index + 1),
     'Item Code': row.itemCode || '-',
     Title: row.title || '-',
     'Collection Type': row.collectionType || '-',
@@ -118,7 +118,7 @@ export default function LostDamageReportPage() {
       setMessage({ type: nextRows.length > 0 ? 'success' : 'info', text: nextRows.length > 0 ? `Loaded ${nextRows.length} row${nextRows.length === 1 ? '' : 's'}.` : 'No lost/damage rows found.' });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load lost and damage report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load lost and damage report. Try again." });
     } finally {
       setSearching(false);
     }
@@ -150,14 +150,14 @@ export default function LostDamageReportPage() {
 
       <SectionPanel title="Filters">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem_16rem_auto]">
-          <Field label="Item Code"><Input value={itemCode} onChange={(event) => setItemCode(event.target.value)} placeholder="Enter item code" /></Field>
+          <Field label="Item code"><Input value={itemCode} onChange={(event) => setItemCode(event.target.value)} placeholder="Enter item code" /></Field>
           <Field label="Status">
             <NativeSelect value={status} onChange={setStatus}>
               <option value="all">All</option>
               {statusOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
             </NativeSelect>
           </Field>
-          <Field label="Academic Year">
+          <Field label="Academic year">
             <NativeSelect value={academicYear} onChange={setAcademicYear}>
               <option value="all">All</option>
               {academicYears.map((year) => <option key={year} value={year}>{year}</option>)}
@@ -174,7 +174,7 @@ export default function LostDamageReportPage() {
 
       <SectionPanel title="Results">
         <div className="space-y-4">
-          <Field label="Global Search">
+          <Field label="Global search">
             <div className="relative max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} className="pl-9" placeholder="Search all columns" />
@@ -182,7 +182,7 @@ export default function LostDamageReportPage() {
           </Field>
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <Table className="min-w-[900px]">
-              <TableHeader><TableRow className="bg-slate-100 hover:bg-slate-100"><TableHead>Sr No</TableHead><TableHead>Item Code</TableHead><TableHead>Title</TableHead><TableHead>Collection Type</TableHead><TableHead>Remarks</TableHead><TableHead>Item Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow className="bg-slate-100 hover:bg-slate-100"><TableHead>No.</TableHead><TableHead>Item code</TableHead><TableHead>Title</TableHead><TableHead>Collection type</TableHead><TableHead>Remarks</TableHead><TableHead>Item status</TableHead></TableRow></TableHeader>
               <TableBody>
                 {loading ? <LoadingRows colSpan={6} label="Loading lost and damage report" /> : filteredRows.length > 0 ? filteredRows.map((row, index) => (
                   <TableRow key={`${row.itemCode}-${index}`} className="odd:bg-white even:bg-slate-50/60">

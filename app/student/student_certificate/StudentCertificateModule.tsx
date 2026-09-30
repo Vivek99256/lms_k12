@@ -500,7 +500,7 @@ export default function StudentCertificateModule({
         const payload = normalizePayload(responseBody);
 
         if (!response.ok || readStatus(payload) !== 1) {
-          throw new Error(readMessage(payload, 'Unable to load certificate templates.'));
+          throw new Error(readMessage(payload, "Couldn't load certificate templates. Try again."));
         }
 
         if (!isMounted) {
@@ -519,7 +519,7 @@ export default function StudentCertificateModule({
 
         setTemplateError({
           type: 'error',
-          text: error instanceof Error ? error.message : 'Unable to load certificate templates.',
+          text: error instanceof Error ? error.message : "Couldn't load certificate templates. Try again.",
         });
       } finally {
         if (isMounted) {
@@ -536,9 +536,9 @@ export default function StudentCertificateModule({
   }, [academicYears, menuContext, selectedTemplate]);
 
   const historyExportColumns = useMemo<TableExportColumn[]>(() => [
-    { key: 'srNo', label: 'Sr No', align: 'center' },
-    { key: 'enrollmentNo', label: 'GR No' },
-    { key: 'studentName', label: 'Student Name', width: '220px' },
+    { key: 'srNo', label: 'No.', align: 'center' },
+    { key: 'enrollmentNo', label: 'GR no.' },
+    { key: 'studentName', label: 'Student name', width: '220px' },
     { key: 'standardName', label: 'Standard' },
     { key: 'divisionName', label: 'Division' },
     { key: 'certificateNumber', label: 'Certificate No.' },
@@ -685,7 +685,7 @@ export default function StudentCertificateModule({
       const payload = normalizePayload(responseBody);
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, 'Unable to fetch students.'));
+        throw new Error(readMessage(payload, "Couldn't load students. Try again."));
       }
 
       const rows = parseStudentRows(payload);
@@ -698,7 +698,7 @@ export default function StudentCertificateModule({
       setIssueRows([]);
       setIssueMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to fetch students.',
+        text: error instanceof Error ? error.message : "Couldn't load students. Try again.",
       });
     } finally {
       setIssueLoading(false);
@@ -774,12 +774,12 @@ export default function StudentCertificateModule({
       const payload = normalizePayload(responseBody);
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, 'Unable to generate certificate preview.'));
+        throw new Error(readMessage(payload, "Couldn't generate certificate preview. Try again."));
       }
 
       const preview = parsePreviewPayload(payload);
       if (!preview) {
-        throw new Error('Certificate preview HTML was not returned by Laravel.');
+        throw new Error("Couldn't generate the certificate preview. Try again.");
       }
 
       setPreviewPayload(preview);
@@ -788,7 +788,7 @@ export default function StudentCertificateModule({
         text: readMessage(payload, 'Certificate preview generated successfully.'),
       });
     } catch (error) {
-      const text = error instanceof Error ? error.message : 'Unable to generate certificate preview.';
+      const text = error instanceof Error ? error.message : "Couldn't generate certificate preview. Try again.";
       setPreviewMessage({
         type: 'error',
         text,
@@ -843,7 +843,7 @@ export default function StudentCertificateModule({
       const payload = normalizePayload(responseBody);
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, 'Unable to issue certificates.'));
+        throw new Error(readMessage(payload, "Couldn't issue certificates. Try again."));
       }
 
       setPreviewMessage({
@@ -854,7 +854,7 @@ export default function StudentCertificateModule({
       setViewMode('history');
       await handleHistorySearch(previewPayload.template);
     } catch (error) {
-      const text = error instanceof Error ? error.message : 'Unable to issue certificates.';
+      const text = error instanceof Error ? error.message : "Couldn't issue certificates. Try again.";
       setPreviewMessage({
         type: 'error',
         text,
@@ -905,7 +905,7 @@ export default function StudentCertificateModule({
       const payload = normalizePayload(responseBody);
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, 'Unable to fetch certificate history.'));
+        throw new Error(readMessage(payload, "Couldn't load certificate history. Try again."));
       }
 
       const rows = parseHistoryRows(payload);
@@ -918,7 +918,7 @@ export default function StudentCertificateModule({
       setHistoryRows([]);
       setHistoryMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to fetch certificate history.',
+        text: error instanceof Error ? error.message : "Couldn't load certificate history. Try again.",
       });
     } finally {
       setHistoryLoading(false);
@@ -943,8 +943,8 @@ export default function StudentCertificateModule({
       <PageHeader
         title={isReportOnly ? 'Student Certificate Report' : 'Student Certificate'}
         description={isReportOnly
-          ? 'Mirror the Laravel Student Certificate History report with the same filters, exports, quick search, and certificate reprint flow.'
-          : 'Port the Laravel student certificate issue and history workflows into the existing Next.js ERP architecture using the current proxy and shared UI patterns.'}
+          ? 'Review issued certificates, export the list and reprint a certificate.'
+          : 'Issue student certificates and review certificate history.'}
         action={(
           <div className="flex flex-wrap items-center gap-2">
             {!isReportOnly && (
@@ -975,7 +975,7 @@ export default function StudentCertificateModule({
         <>
           <SectionPanel
             title="Search Students"
-            description="Match the Laravel Student Certificate search panel by grade, standard, division, student name, unique ID, mobile, and GR number."
+            description="Search by grade, standard, division, student name, unique ID, mobile or GR no."
           >
             <div className="space-y-4">
               <SearchDropdown
@@ -998,7 +998,7 @@ export default function StudentCertificateModule({
                 <Field label="Mobile">
                   <Input value={issueMobile} onChange={(event) => setIssueMobile(event.target.value)} placeholder="Enter mobile number" />
                 </Field>
-                <Field label="GR No">
+                <Field label="GR no.">
                   <Input value={issueGrNo} onChange={(event) => setIssueGrNo(event.target.value)} placeholder="Enter GR number" />
                 </Field>
               </div>
@@ -1016,7 +1016,7 @@ export default function StudentCertificateModule({
 
           <SectionPanel
             title="Students"
-            description="Select one or more students, choose a template from Laravel, and generate the certificate preview before final issuance."
+            description="Select one or more students, choose a template and preview the certificate before issuing it."
           >
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1064,8 +1064,8 @@ export default function StudentCertificateModule({
                           onChange={(event) => handleSelectAllStudents(event.target.checked)}
                         />
                       </TableHead>
-                      <TableHead>GR No</TableHead>
-                      <TableHead>Student Name</TableHead>
+                      <TableHead>GR no.</TableHead>
+                      <TableHead>Student name</TableHead>
                       <TableHead>Standard</TableHead>
                       <TableHead>Division</TableHead>
                     </TableRow>
@@ -1103,7 +1103,7 @@ export default function StudentCertificateModule({
 
           <SectionPanel
             title="Preview"
-            description="Laravel returns generated certificate HTML, so the Next.js frontend preserves that preview and print flow without recreating certificate markup."
+            description="Preview the certificate here, then print it."
             footer={(
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
@@ -1135,7 +1135,7 @@ export default function StudentCertificateModule({
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-600">
-                Generate a preview to review the certificate HTML returned by Laravel.
+                Generate a preview to review the certificate.
               </div>
             )}
           </SectionPanel>
@@ -1144,7 +1144,7 @@ export default function StudentCertificateModule({
         <>
           <SectionPanel
             title="History Filters"
-            description="Match the Laravel Student Certificate History filters, including date range and certificate type, then export or re-open the saved certificate HTML."
+            description="Filter by date range and certificate type, then export or reopen a saved certificate."
           >
             <div className="space-y-4">
               <SearchDropdown
@@ -1167,7 +1167,7 @@ export default function StudentCertificateModule({
                 <Field label="Mobile">
                   <Input value={historyMobile} onChange={(event) => setHistoryMobile(event.target.value)} placeholder="Enter mobile number" />
                 </Field>
-                <Field label="GR No">
+                <Field label="GR no.">
                   <Input value={historyGrNo} onChange={(event) => setHistoryGrNo(event.target.value)} placeholder="Enter GR number" />
                 </Field>
                 <Field label="From date">
@@ -1206,7 +1206,7 @@ export default function StudentCertificateModule({
 
           <SectionPanel
             title="Certificate History"
-            description="Client-side quick search, sorting, pagination, export, and reprint sit on top of the Laravel-filtered certificate history response."
+            description="Search, sort, export and reprint from the filtered certificate history."
             footer={(
               filteredAndSortedHistoryRows.length > 0 ? (
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1286,7 +1286,7 @@ export default function StudentCertificateModule({
                     onClick={() => exportRowsAsPdf({
                       filename: 'student-certificate-history.pdf',
                       title: 'Student Certificate History',
-                      subtitle: 'Legacy parity certificate history export',
+                      subtitle: 'Report period and academic year',
                       columns: historyExportColumns,
                       rows: historyExportRows,
                     })}
@@ -1300,7 +1300,7 @@ export default function StudentCertificateModule({
                     variant="outline"
                     onClick={() => openPrintPreview({
                       title: 'Student Certificate History',
-                      subtitle: 'Legacy parity certificate history report',
+                      subtitle: 'Report period and academic year',
                       columns: historyExportColumns,
                       rows: historyExportRows,
                     })}
@@ -1316,9 +1316,9 @@ export default function StudentCertificateModule({
                 <Table className="min-w-[1180px]">
                   <TableHeader>
                     <TableRow className="bg-slate-100 hover:bg-slate-100">
-                      <TableHead className="text-center">Sr No</TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => toggleHistorySort('enrollmentNo')}>GR No</TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => toggleHistorySort('studentName')}>Student Name</TableHead>
+                      <TableHead className="text-center">No.</TableHead>
+                      <TableHead className="cursor-pointer" onClick={() => toggleHistorySort('enrollmentNo')}>GR no.</TableHead>
+                      <TableHead className="cursor-pointer" onClick={() => toggleHistorySort('studentName')}>Student name</TableHead>
                       <TableHead className="cursor-pointer" onClick={() => toggleHistorySort('standardName')}>Standard</TableHead>
                       <TableHead className="cursor-pointer" onClick={() => toggleHistorySort('divisionName')}>Division</TableHead>
                       <TableHead className="cursor-pointer" onClick={() => toggleHistorySort('certificateNumber')}>Certificate No.</TableHead>

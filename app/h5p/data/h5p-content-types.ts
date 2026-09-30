@@ -612,8 +612,8 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
         user_profile_name: session.user_profile_name,
       });
       const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-      const raw = await readApiJson(res, `Failed to load ${spec.noun}s`);
-      if (!res.ok) throw new Error(getApiErrorMessage(raw, `Failed to load ${spec.noun}s`));
+      const raw = await readApiJson(res, `Couldn’t load ${spec.noun}s`);
+      if (!res.ok) throw new Error(getApiErrorMessage(raw, `Couldn’t load ${spec.noun}s`));
       return ((raw[spec.listKey] as TRow[]) ?? []) as TRow[];
     },
 
@@ -625,7 +625,7 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
         user_profile_name: session.user_profile_name,
       });
       const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-      const raw = await readApiJson(res, `Failed to load ${spec.noun}`);
+      const raw = await readApiJson(res, `Couldn’t load ${spec.noun}`);
       if (!res.ok || !raw[spec.itemKey]) {
         throw new Error(getApiErrorMessage(raw, `${spec.noun} not found`));
       }
@@ -643,7 +643,7 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
           syear: session.syear,
           ...payload,
         },
-        `Failed to create ${spec.noun}`
+        `Couldn’t create ${spec.noun}`
       );
       return {
         status: true,
@@ -665,7 +665,7 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
           user_id: session.user_id,
           ...payload,
         },
-        `Failed to update ${spec.noun}`
+        `Couldn’t update ${spec.noun}`
       );
       return { status: true, message: (raw.message as string) || 'Saved.' };
     },
@@ -679,7 +679,7 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
           sub_institute_id: session.sub_institute_id,
           user_id: session.user_id,
         },
-        `Failed to delete ${spec.noun}`
+        `Couldn’t delete ${spec.noun}`
       );
       return { status: true, message: (raw.message as string) || 'Deleted.' };
     },
@@ -702,7 +702,7 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
           user_id: session.user_id,
           published,
         },
-        published ? `Failed to publish ${spec.noun}` : `Failed to unpublish ${spec.noun}`
+        published ? `Couldn’t publish ${spec.noun}` : `Couldn’t unpublish ${spec.noun}`
       );
       return { status: true, message: (raw.message as string) || 'Saved.' };
     },
@@ -716,7 +716,7 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
           sub_institute_id: session.sub_institute_id,
           user_id: session.user_id,
         },
-        `Failed to duplicate ${spec.noun}`
+        `Couldn’t duplicate ${spec.noun}`
       );
       return {
         status: true,
@@ -744,9 +744,9 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
         headers: authHeaders(),
         body: fd,
       });
-      const raw = await readApiJson(res, 'Failed to upload file');
+      const raw = await readApiJson(res, 'Couldn’t upload file');
       if (!res.ok || !isApiSuccess(raw) || !raw.url) {
-        throw new Error(getApiErrorMessage(raw, 'Failed to upload file'));
+        throw new Error(getApiErrorMessage(raw, 'Couldn’t upload file'));
       }
       return String(raw.url);
     },
@@ -771,8 +771,8 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
       });
       const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
       if (!res.ok) {
-        const raw = await readApiJson(res, 'Failed to export package');
-        throw new Error(getApiErrorMessage(raw, 'Failed to export package'));
+        const raw = await readApiJson(res, 'Couldn’t export package');
+        throw new Error(getApiErrorMessage(raw, 'Couldn’t export package'));
       }
 
       const blob = await res.blob();
@@ -808,9 +808,9 @@ function contentTypeApi<TRow, TPayload extends Record<string, unknown>>(
         headers: authHeaders(),
         body: fd,
       });
-      const raw = await readApiJson(res, 'Failed to import package');
+      const raw = await readApiJson(res, 'Couldn’t import package');
       if (!res.ok || !isApiSuccess(raw)) {
-        throw new Error(getApiErrorMessage(raw, 'Failed to import package'));
+        throw new Error(getApiErrorMessage(raw, 'Couldn’t import package'));
       }
       return {
         status: true,

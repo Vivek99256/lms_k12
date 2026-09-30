@@ -170,7 +170,7 @@ export function DepartmentCreateWizard({
         } catch (cause) {
           if (!cancelled) {
             setError(
-              cause instanceof Error ? cause.message : "Failed to load employees for head of department."
+              cause instanceof Error ? cause.message : "Couldn't load employees for head of department. Try again."
             );
           }
         } finally {
@@ -233,7 +233,7 @@ export function DepartmentCreateWizard({
       onCreated?.();
       setStep(1);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Failed to create department.");
+      setError(cause instanceof Error ? cause.message : "Couldn't create department. Try again.");
     } finally {
       setIsSaving(false);
     }
@@ -250,7 +250,7 @@ export function DepartmentCreateWizard({
       reset();
       onFinished();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Failed to activate department.");
+      setError(cause instanceof Error ? cause.message : "Couldn't activate department. Try again.");
     } finally {
       setIsSaving(false);
     }
@@ -266,7 +266,7 @@ export function DepartmentCreateWizard({
       const picked = headCandidates.find((employee) => employee.id === employeeId);
       setCreated((prev) => (prev ? { ...prev, head: picked?.name ?? prev.head } : prev));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Failed to assign head of department.");
+      setError(cause instanceof Error ? cause.message : "Couldn't assign head of department. Try again.");
     } finally {
       setIsSaving(false);
     }
@@ -281,7 +281,7 @@ export function DepartmentCreateWizard({
       await setDepartmentHead(session, created.id, null);
       setCreated((prev) => (prev ? { ...prev, head: "-" } : prev));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Failed to clear head of department.");
+      setError(cause instanceof Error ? cause.message : "Couldn't clear head of department. Try again.");
     } finally {
       setIsSaving(false);
     }

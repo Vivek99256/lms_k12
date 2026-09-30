@@ -165,7 +165,7 @@ function parseProxyJsonBody<T>(text: string, contentType: string): T {
     return JSON.parse(text) as T;
   } catch {
     throw new Error(
-      `Fees report proxy returned a non-JSON response (${contentType || 'unknown content type'}). ${summarizeResponseText(text) || 'Empty response body.'}`
+      "Couldn't load the report. Try again."
     );
   }
 }
@@ -189,7 +189,7 @@ async function fetchReportProxyJson<T extends ReportApiPayload>(
   const payload = parseProxyJsonBody<T>(text, contentType);
 
   if (!response.ok) {
-    const message = readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to complete request.`;
+    const message = readString(asRecord(payload).message) || "Couldn't complete request. Try again.";
     throw new Error(message);
   }
 
@@ -214,7 +214,7 @@ export async function fetchReportProxyText(
   const text = await response.text();
 
   if (!response.ok) {
-    throw new Error(summarizeResponseText(text) || `HTTP ${response.status}: Unable to complete request.`);
+    throw new Error(summarizeResponseText(text) || "Couldn't complete request. Try again.");
   }
 
   return text;

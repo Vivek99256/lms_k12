@@ -290,13 +290,10 @@ function NotConnectedBanner() {
     <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       <PlugZap size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
       <div>
-        <p className="font-medium">The Event Bus read API is not connected yet, so this screen is empty.</p>
+        <p className="font-medium">Event data is not available yet, so this page is empty.</p>
         <p className="mt-0.5 text-xs leading-5">
-          The tables these panels read — <code className="rounded bg-amber-100 px-1">sync_log</code>,{' '}
-          <code className="rounded bg-amber-100 px-1">ai_audit_logs</code>, <code className="rounded bg-amber-100 px-1">workflow_runs</code>,{' '}
-          <code className="rounded bg-amber-100 px-1">whatsapp_sent_messages</code> and the rest — exist and hold real rows, but no endpoint
-          serves them to the browser. Nothing is substituted in the meantime: there is no sample data, no placeholder count and no cached
-          figure anywhere on this page. The wiring checklist at the bottom of Overview lists what each panel needs.
+          Nothing is substituted in the meantime: there is no sample data, no placeholder count and no cached
+          figure anywhere on this page. The data sources listed at the bottom of Overview show what each panel needs.
         </p>
       </div>
     </div>
@@ -317,7 +314,7 @@ function DataSourcesPanel() {
 
   return (
     <SectionPanel
-      title="Backend wiring checklist"
+      title="Data sources"
       description="Which table each panel will read, and what has to exist before it can. No counts are shown here — this is the mapping, not the data."
     >
       <ul className="divide-y divide-slate-100">
@@ -388,7 +385,7 @@ export function EventBusConsole() {
       // is nothing to see when the truth is they may not see it.
       ?.catch((cause: unknown) => {
         if (cancelled) return;
-        setFailure(cause instanceof Error ? cause : new Error('This view could not be loaded.'));
+        setFailure(cause instanceof Error ? cause : new Error("Couldn't load this view. Try again."));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

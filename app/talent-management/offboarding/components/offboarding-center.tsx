@@ -234,7 +234,7 @@ export function OffboardingCenter() {
       })
       .catch(err => {
         console.error(err)
-        showBanner('error', 'Failed to load exit cases')
+        showBanner('error', "Couldn't load exit cases. Try again.")
       })
       .finally(() => setLoadingCases(false))
   }, [isContextReady, session, searchQuery, departmentFilter, reasonFilter, statusFilter, exitTypeFilter, page, perPage, sortBy, sortDir, refreshTrigger])
@@ -257,7 +257,7 @@ export function OffboardingCenter() {
       })
       .catch(err => {
         console.error(err)
-        showBanner('error', 'Failed to load case details')
+        showBanner('error', "Couldn't load case details. Try again.")
       })
       .finally(() => setLoadingDetails(false))
   }, [isContextReady, session, activeCaseId, refreshTrigger])
@@ -329,7 +329,7 @@ export function OffboardingCenter() {
       })
     } catch (err: any) {
       console.error(err)
-      showBanner('error', err.message || 'Failed to create exit case')
+      showBanner('error', err.message || "Couldn't create the exit case. Try again.")
     } finally {
       setSubmitting(false)
     }
@@ -348,7 +348,7 @@ export function OffboardingCenter() {
       bumpRefresh()
     } catch (err: any) {
       console.error(err)
-      showBanner('error', 'Failed to extend notice period')
+      showBanner('error', "Couldn't extend the notice period. Try again.")
     } finally {
       setSubmitting(false)
     }
@@ -367,7 +367,7 @@ export function OffboardingCenter() {
       bumpRefresh()
     } catch (err: any) {
       console.error(err)
-      showBanner('error', 'Failed to assign handover manager')
+      showBanner('error', "Couldn't assign handover manager. Try again.")
     } finally {
       setSubmitting(false)
     }
@@ -385,7 +385,7 @@ export function OffboardingCenter() {
       bumpRefresh()
     } catch (err: any) {
       console.error(err)
-      showBanner('error', 'Failed to withdraw case')
+      showBanner('error', "Couldn't withdraw case. Try again.")
     } finally {
       setSubmitting(false)
     }
@@ -399,7 +399,7 @@ export function OffboardingCenter() {
       bumpRefresh()
     } catch (err: any) {
       console.error(err)
-      showBanner('error', `Failed to transition status to ${newStatus}`)
+      showBanner('error', "Couldn't transition status to ${newStatus}. Try again.")
     }
   }
 
@@ -414,7 +414,7 @@ export function OffboardingCenter() {
       bumpRefresh()
     } catch (err: any) {
       console.error(err)
-      showBanner('error', 'Failed to update clearance checklist')
+      showBanner('error', "Couldn't update clearance checklist. Try again.")
     }
   }
 
@@ -438,7 +438,7 @@ export function OffboardingCenter() {
       bumpRefresh()
     } catch (err: any) {
       console.error(err)
-      showBanner('error', 'Failed to update documents')
+      showBanner('error', "Couldn't update documents. Try again.")
     }
   }
 
@@ -463,7 +463,7 @@ export function OffboardingCenter() {
       bumpRefresh()
     } catch (err: any) {
       console.error(err)
-      showBanner('error', 'Failed to save exit interview details')
+      showBanner('error', "Couldn't save the exit interview details. Try again.")
     }
   }
 
@@ -476,7 +476,7 @@ export function OffboardingCenter() {
       bumpRefresh()
     } catch (err: any) {
       console.error(err)
-      showBanner('error', 'Failed to add comment')
+      showBanner('error', "Couldn't add comment. Try again.")
     }
   }
 

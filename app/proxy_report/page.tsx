@@ -49,7 +49,7 @@ import {
 const PAGE_SIZE = 10;
 
 const exportColumns: TableExportColumn[] = [
-  { key: "serial", label: "Sr. No." },
+  { key: "serial", label: "No." },
   { key: "date", label: "Date" },
   { key: "standard", label: "Standard" },
   { key: "division", label: "Division" },
@@ -135,7 +135,7 @@ export default function ProxyReportPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Proxy report data could not be loaded."
+          : "Couldn't load proxy report data. Try again."
       );
     } finally {
       setLoading(false);
@@ -396,7 +396,7 @@ export default function ProxyReportPage() {
               <Table className="min-w-[1280px] table-fixed">
                 <TableHeader className="bg-slate-50">
                   <TableRow>
-                    <TableHead className="w-20">Sr. No.</TableHead>
+                    <TableHead className="w-20">No.</TableHead>
                     <TableHead className="w-32">Date</TableHead>
                     <TableHead className="w-36">Standard</TableHead>
                     <TableHead className="w-32">Division</TableHead>

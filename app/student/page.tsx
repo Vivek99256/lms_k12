@@ -842,7 +842,7 @@ export default function StudentPage() {
 
       if (!session) {
         if (!cancelled) {
-          setError('Unable to load curriculum data.');
+          setError("Couldn't load curriculum data. Try again.");
           setIsDetailLoading(false);
         }
         return;
@@ -864,7 +864,7 @@ export default function StudentPage() {
         setExpandedUnitId(curriculumResult.unit_data[0]?.unit_number ?? null);
       } catch {
         if (!cancelled) {
-          setError('Unable to load curriculum data.');
+          setError("Couldn't load curriculum data. Try again.");
         }
       } finally {
         if (!cancelled) {
@@ -906,7 +906,7 @@ export default function StudentPage() {
       );
 
       if (!resolvedSubInstituteId) {
-        if (!cancelled) setContentError('Unable to load content for this chapter.');
+        if (!cancelled) setContentError("Couldn't load content for this chapter. Try again.");
         return;
       }
 
@@ -925,7 +925,7 @@ export default function StudentPage() {
         }));
       } catch {
         if (!cancelled) {
-          setContentError('Unable to load content for this chapter.');
+          setContentError("Couldn't load content for this chapter. Try again.");
         }
       } finally {
         if (!cancelled) {
@@ -1042,7 +1042,7 @@ export default function StudentPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setQuestionBankError(err instanceof Error ? err.message : 'Failed to load questions.');
+        setQuestionBankError(err instanceof Error ? err.message : "Couldn't load questions. Try again.");
         setQuestionBankItems([]);
       })
       .finally(() => {

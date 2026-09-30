@@ -671,7 +671,7 @@ export function JourneyListSheet({
                   <TableMessageRow
                     colSpan={7}
                     tone="error"
-                    title="Could not load journeys"
+                    title="Couldn't load journeys. Try again."
                     description={error}
                     action={
                       <Button variant="outline" size="sm" onClick={onRetry}>

@@ -113,7 +113,7 @@ export default function PedagogyEngine() {
 
       if (!res.ok || payload.error) {
         setModule(null);
-        setError(payload.error || `The Pedagogy Engine request failed with status ${res.status}.`);
+        setError(payload.error || `Couldn’t load the teaching methods. Please try again.`);
         setState('error');
         return;
       }
@@ -131,7 +131,7 @@ export default function PedagogyEngine() {
       setState('ready');
     } catch (err) {
       setModule(null);
-      setError(err instanceof Error ? err.message : 'The Pedagogy Engine request failed.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load the teaching methods. Please try again.');
       setState('error');
     }
   }, [chapterId, concept]);
@@ -159,8 +159,8 @@ export default function PedagogyEngine() {
       <PageShell>
         <StatusPanel
           icon={<Loader2 className="h-8 w-8 animate-spin" />}
-          title="Loading the Pedagogy Engine"
-          message="Fetching the rule set from the PAL backend."
+          title="Loading the teaching methods"
+          message="Loading the teaching rules."
         />
       </PageShell>
     );
@@ -171,8 +171,8 @@ export default function PedagogyEngine() {
       <PageShell>
         <StatusPanel
           icon={<AlertTriangle className="h-8 w-8" />}
-          title="Pedagogy Engine is not available"
-          message={error || 'The backend did not return a Pedagogy Engine payload.'}
+          title="Teaching methods aren’t available"
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={retry}
         />
       </PageShell>
@@ -184,8 +184,8 @@ export default function PedagogyEngine() {
       <PageShell>
         <StatusPanel
           icon={<Inbox className="h-8 w-8" />}
-          title="No Pedagogy Engine rules yet"
-          message="The backend responded successfully but has no active rule sections. Run `php artisan pal:install-pedagogy-engine` on the API to install the PAL V4 rule set."
+          title="No teaching rules yet"
+          message="No teaching rules are set up yet. Ask your administrator to enable them."
           onRetry={retry}
         />
       </PageShell>
@@ -202,7 +202,7 @@ export default function PedagogyEngine() {
             <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-300">
               <span>New PAL</span>
               <span>/</span>
-              <span>Pedagogy Engine</span>
+              <span>Teaching methods</span>
             </div>
             <div className="mt-3 flex items-start gap-4">
               <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white ring-1 ring-white/20">
@@ -269,7 +269,7 @@ export default function PedagogyEngine() {
       ) : (
         <section className="rounded-[26px] border border-dashed border-amber-200 bg-amber-50/60 px-6 py-5">
           <p className="text-sm leading-6 text-amber-900">
-            No extracted chapter was found in <span className="font-mono">semantic_intelligence</span>, so the rules
+            No extracted chapter was found in the chapter concepts, so the rules
             below are shown unresolved — the engine has no concept to evaluate them against.
           </p>
         </section>

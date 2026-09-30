@@ -580,19 +580,19 @@ export default function AdmissionManagementContent() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load enquiries (${response.status})`);
+        throw new Error(`Couldn't load enquiries. Try again.`);
       }
 
       const payload = (await response.json()) as AdmissionEnquiryApiResponse;
       if (String(payload.status_code) !== '1') {
-        throw new Error(payload.message || 'Failed to load enquiries.');
+        throw new Error(payload.message || "Couldn't load enquiries. Try again.");
       }
 
       setRosterData(Array.isArray(payload.data) ? payload.data.map(mapAdmissionEnquiryToRosterRow) : []);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       setRosterData([]);
-      setRosterError(error instanceof Error ? error.message : 'Failed to load enquiries.');
+      setRosterError(error instanceof Error ? error.message : "Couldn't load enquiries. Try again.");
     } finally {
       if (!signal?.aborted) {
         setIsRosterLoading(false);
@@ -917,7 +917,7 @@ export default function AdmissionManagementContent() {
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       setFollowUpEntries([]);
-      setFollowUpListError(error instanceof Error ? error.message : 'Failed to load admission follow-ups.');
+      setFollowUpListError(error instanceof Error ? error.message : "Couldn't load admission follow-ups. Try again.");
     } finally {
       if (!signal?.aborted) {
         setIsFollowUpLoading(false);
@@ -971,7 +971,7 @@ export default function AdmissionManagementContent() {
       setNextFollowUpByEnquiry((prev) => ({ ...prev, [editingEnquiry.apiId]: followUpDate }));
       await loadFollowUps(editingEnquiry.apiId);
     } catch (error) {
-      setFollowUpFormError(error instanceof Error ? error.message : 'Failed to save the follow-up.');
+      setFollowUpFormError(error instanceof Error ? error.message : "Couldn't save the follow-up. Try again.");
     } finally {
       setIsSavingFollowUp(false);
     }
@@ -1052,12 +1052,12 @@ export default function AdmissionManagementContent() {
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to update enquiry (${response.status})`);
+          throw new Error(`Couldn't update enquiry. Try again.`);
         }
 
         const responsePayload = (await response.json().catch(() => null)) as AdmissionEnquiryApiResponse | null;
         if (responsePayload?.status_code != null && String(responsePayload.status_code) !== '1') {
-          throw new Error(responsePayload.message || 'Failed to update enquiry.');
+          throw new Error(responsePayload.message || "Couldn't update enquiry. Try again.");
         }
 
         form.reset();
@@ -1065,7 +1065,7 @@ export default function AdmissionManagementContent() {
         closeEnquiryModal();
         await loadAdmissionEnquiries();
       } catch (error) {
-        setEnquiryFormError(error instanceof Error ? error.message : 'Failed to update enquiry.');
+        setEnquiryFormError(error instanceof Error ? error.message : "Couldn't update enquiry. Try again.");
       } finally {
         setIsSavingEnquiry(false);
       }
@@ -1127,12 +1127,12 @@ export default function AdmissionManagementContent() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to save enquiry (${response.status})`);
+        throw new Error(`Couldn't save enquiry. Try again.`);
       }
 
       const responsePayload = (await response.json().catch(() => null)) as AdmissionEnquiryApiResponse | null;
       if (responsePayload?.status_code != null && String(responsePayload.status_code) !== '1') {
-        throw new Error(responsePayload.message || 'Failed to save enquiry.');
+        throw new Error(responsePayload.message || "Couldn't save enquiry. Try again.");
       }
 
       form.reset();
@@ -1140,7 +1140,7 @@ export default function AdmissionManagementContent() {
       setIsEnquiryModalOpen(false);
       await loadAdmissionEnquiries();
     } catch (error) {
-      setEnquiryFormError(error instanceof Error ? error.message : 'Failed to save enquiry.');
+      setEnquiryFormError(error instanceof Error ? error.message : "Couldn't save enquiry. Try again.");
     } finally {
       setIsSavingEnquiry(false);
     }
@@ -1341,7 +1341,7 @@ export default function AdmissionManagementContent() {
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 text-slate-400 font-medium border-b border-slate-100">
-                <th className="p-4 font-semibold text-xs tracking-wider uppercase">Enquiry No.</th>
+                <th className="p-4 font-semibold text-xs tracking-wider uppercase">Enquiry no.</th>
                 <th className="p-4 font-semibold text-xs tracking-wider uppercase">Student</th>
                 <th className="p-4 font-semibold text-xs tracking-wider uppercase">Grade</th>
                 <th className="p-4 font-semibold text-xs tracking-wider uppercase">Source</th>
@@ -1479,15 +1479,15 @@ export default function AdmissionManagementContent() {
                 </div>
               )}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <EnquiryModalField label="Enquiry Number" htmlFor="enquiryNumber">
+                <EnquiryModalField label="Enquiry no." htmlFor="enquiryNumber">
                   <input id="enquiryNumber" name="enquiry_no" value={editingEnquiry?.enquiryNo || nextEnquiryNumber} readOnly className={`${enquiryInputClassName} cursor-not-allowed text-slate-500`} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Student Name" htmlFor="studentName" required>
+                <EnquiryModalField label="Student name" htmlFor="studentName" required>
                   <input id="studentName" name="first_name" type="text" defaultValue={editingEnquiry?.firstName || ''} placeholder="Enter student name" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Middle Name (Father Name)" htmlFor="middleName" required>
+                <EnquiryModalField label="Middle name (Father's name)" htmlFor="middleName" required>
                   <input id="middleName" name="middle_name" type="text" defaultValue={editingEnquiry?.middleName || ''} placeholder="Enter father name" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
@@ -1557,7 +1557,7 @@ export default function AdmissionManagementContent() {
                   <textarea id="address" name="address" defaultValue={editingEnquiry?.address || ''} placeholder="Enter full address" className={enquiryTextareaClassName} />
                 </EnquiryModalField>
 
-                <EnquiryModalField label="Father Name" htmlFor="fatherName" required>
+                <EnquiryModalField label="Father's name" htmlFor="fatherName" required>
                   <input id="fatherName" name="father_name" type="text" defaultValue={editingEnquiry?.fatherName || ''} placeholder="Enter father name" className={enquiryInputClassName} />
                 </EnquiryModalField>
 
@@ -1849,7 +1849,7 @@ export default function AdmissionManagementContent() {
                     <table className="w-full text-left border-collapse text-sm">
                       <thead>
                         <tr className="bg-slate-50 text-slate-400 font-medium border-b border-slate-100">
-                          <th className="p-3 font-semibold text-xs tracking-wider uppercase">Sr. No</th>
+                          <th className="p-3 font-semibold text-xs tracking-wider uppercase">No.</th>
                           <th className="p-3 font-semibold text-xs tracking-wider uppercase">Next Followup Date</th>
                           <th className="p-3 font-semibold text-xs tracking-wider uppercase">Created On</th>
                           <th className="p-3 font-semibold text-xs tracking-wider uppercase">Remarks</th>

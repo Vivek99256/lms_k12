@@ -93,7 +93,7 @@ export default function CustomModulePage() {
     try {
       setModules(await loadCustomModules());
     } catch (value: unknown) {
-      setError(errorMessage(value, "Custom modules could not be loaded."));
+      setError(errorMessage(value, "Couldn't load custom modules. Try again."));
     } finally {
       setLoading(false);
     }
@@ -115,7 +115,7 @@ export default function CustomModulePage() {
       setLevel2Options(data.displayUnder ? await loadLevel2Menus(data.displayUnder) : []);
       setView("form");
     } catch (value: unknown) {
-      setError(errorMessage(value, "The module form could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the module form. Try again."));
     } finally {
       setBusy(false);
     }
@@ -130,7 +130,7 @@ export default function CustomModulePage() {
       setColumnDraft(emptyColumn);
       setView("columns");
     } catch (value: unknown) {
-      setError(errorMessage(value, "The column list could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the column list. Try again."));
     } finally {
       setBusy(false);
     }
@@ -144,7 +144,7 @@ export default function CustomModulePage() {
       setRecords(await loadCustomModuleRecords(id));
       setView("records");
     } catch (value: unknown) {
-      setError(errorMessage(value, "The records could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the records. Try again."));
     } finally {
       setBusy(false);
     }
@@ -171,7 +171,7 @@ export default function CustomModulePage() {
       await loadList();
       setView("list");
     } catch (value: unknown) {
-      setError(errorMessage(value, "The module could not be saved."));
+      setError(errorMessage(value, "Couldn't save the module. Try again."));
     } finally {
       setBusy(false);
     }
@@ -193,7 +193,7 @@ export default function CustomModulePage() {
       setNotice(await deleteCustomModule(module.id));
       await loadList();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The module could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the module. Try again."));
     } finally {
       setBusy(false);
     }
@@ -215,7 +215,7 @@ export default function CustomModulePage() {
       setColumnsView(await loadCustomModuleColumns(columnsView.tableId));
       setColumnDraft(emptyColumn);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The column could not be saved."));
+      setError(errorMessage(value, "Couldn't save the column. Try again."));
     } finally {
       setBusy(false);
     }
@@ -233,7 +233,7 @@ export default function CustomModulePage() {
       setColumnsView(await loadCustomModuleColumns(columnsView.tableId));
       if (columnDraft.id === column.id) setColumnDraft(emptyColumn);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The column could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the column. Try again."));
     } finally {
       setBusy(false);
     }
@@ -261,7 +261,7 @@ export default function CustomModulePage() {
       setColumnsView(await loadCustomModuleColumns(columnsView.tableId));
       await loadList();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The table schema could not be applied."));
+      setError(errorMessage(value, "Couldn't apply the table schema. Try again."));
     } finally {
       setBusy(false);
     }
@@ -278,7 +278,7 @@ export default function CustomModulePage() {
       setNotice(await deleteCustomModuleRecord(records.tableId, recordId, records.tableName));
       setRecords(await loadCustomModuleRecords(records.tableId));
     } catch (value: unknown) {
-      setError(errorMessage(value, "The record could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the record. Try again."));
     } finally {
       setBusy(false);
     }

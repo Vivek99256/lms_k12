@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -94,7 +96,7 @@ function ScenarioShowContent() {
         if (!cancelled) setScenario(data);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load scenario');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load scenario. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

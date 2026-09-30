@@ -98,7 +98,7 @@ export function CreateTab({
 
       setResult({ suggestion, outcome });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The content could not be generated.');
+      setError(caught instanceof Error ? caught.message : 'The content couldn’t be generated.');
     } finally {
       setBusyKey(null);
     }

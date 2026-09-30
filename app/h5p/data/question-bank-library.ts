@@ -120,9 +120,9 @@ async function postBank(body: Record<string, unknown>, signal?: AbortSignal): Pr
     body: JSON.stringify(instituteId ? { sub_institute_id: instituteId, ...body } : body),
   });
 
-  const raw = await readApiJson(res, 'Failed to load the question bank');
+  const raw = await readApiJson(res, 'Couldn’t load the question bank');
   if (!res.ok || raw.status === false) {
-    throw new Error((raw.message as string) || 'Failed to load the question bank');
+    throw new Error((raw.message as string) || 'Couldn’t load the question bank');
   }
 
   return raw;

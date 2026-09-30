@@ -208,7 +208,7 @@ export function DocumentsDashboard() {
       setOverview(overviewResult);
       setRecent(recentResult);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'The document sources could not be loaded.');
+      setError(reason instanceof Error ? reason.message : "Couldn't load the document sources. Try again.");
       setOverview(null);
     } finally {
       setLoading(false);

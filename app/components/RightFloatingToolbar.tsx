@@ -29,52 +29,52 @@ type ToolbarMenu = {
 const toolbarMenus: ToolbarMenu[] = [
   {
     id: 'conversational-ai',
-    label: 'AI STACK - Conversational AI',
+    label: 'AI assistant',
     icon: Bot,
     accentFrom: '#0D6EFD',
     accentTo: '#7ED957',
     options: [
       {
-        title: 'AI STACK - Conversational AI',
+        title: 'AI assistant',
         description: 'Launch chat-driven experiences for guided support, Q&A, and interactive workflows.',
       },
     ],
   },
   {
     id: 'generative-ai',
-    label: 'AI STACK - Generative AI',
+    label: 'AI content creator',
     icon: Sparkle,
     accentFrom: '#2563EB',
     accentTo: '#0D6EFD',
     options: [
       {
-        title: 'AI STACK - Generative AI',
+        title: 'AI content creator',
         description: 'Create content, drafts, visuals, and structured outputs from prompts and context.',
       },
     ],
   },
   {
     id: 'knowledge-graph',
-    label: 'AI STACK - Knowledge Graph',
+    label: 'Knowledge map',
     icon: Network,
     accentFrom: '#0D6EFD',
     accentTo: '#10B981',
     options: [
       {
-        title: 'AI STACK - Knowledge Graph',
+        title: 'Knowledge map',
         description: 'Connect entities, topics, and relationships for richer discovery and reasoning.',
       },
     ],
   },
   {
     id: 'recommendation-engine',
-    label: 'AI STACK - Recommendation Engine',
+    label: 'Recommendations',
     icon: Sparkles,
     accentFrom: '#16A34A',
     accentTo: '#84CC16',
     options: [
       {
-        title: 'AI STACK - Recommendation Engine',
+        title: 'Recommendations',
         description: 'Surface personalized suggestions, next-best actions, and relevant content paths.',
       },
     ],
@@ -171,7 +171,7 @@ export default function RightFloatingToolbar({
     <div
       ref={containerRef}
       className="fixed bottom-4 right-3 z-[70] flex items-end md:bottom-auto md:right-4 md:top-1/2 md:-translate-y-1/2 md:items-center"
-      aria-label="Floating AI Stack toolbar"
+      aria-label="Floating AI tools toolbar"
     >
       <div
         className="flex flex-col-reverse items-end gap-3 transition-all duration-300 ease-out md:flex-row md:items-center md:gap-3"
@@ -189,7 +189,7 @@ export default function RightFloatingToolbar({
               }}
             >
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">
-                AI Stack
+                AI tools
               </p>
               <h2 className="mt-1 text-lg font-semibold leading-tight">{activeMenu.label}</h2>
               <p className="mt-1 text-sm text-white/80">

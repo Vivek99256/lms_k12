@@ -57,7 +57,7 @@ export default function NativeDynamicPagesPage() {
       setFieldsByEndpoint(registry.fieldsByEndpoint);
       setPages(loadedPages);
     } catch (loadError: unknown) {
-      setError(errorMessage(loadError, "Native dynamic pages could not be loaded."));
+      setError(errorMessage(loadError, "Couldn't load native dynamic pages. Try again."));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -148,7 +148,7 @@ function AddPageSection({
       setDataEndpoint("");
       onCreated(msg);
     } catch (submitError: unknown) {
-      onError(errorMessage(submitError, "Could not create the page."));
+      onError(errorMessage(submitError, "Couldn't create the page. Try again."));
     } finally {
       setBusy(false);
     }
@@ -230,7 +230,7 @@ function PageSection({
       setEditingPage(false);
       onChanged(msg);
     } catch (saveError: unknown) {
-      onError(errorMessage(saveError, "Could not update the page."));
+      onError(errorMessage(saveError, "Couldn't update the page. Try again."));
     } finally {
       setPageBusy(false);
     }
@@ -250,7 +250,7 @@ function PageSection({
       setSelectedField("");
       onChanged(msg);
     } catch (addError: unknown) {
-      onError(errorMessage(addError, "Could not add the tile."));
+      onError(errorMessage(addError, "Couldn't add the tile. Try again."));
     } finally {
       setAddingBusy(false);
     }
@@ -263,7 +263,7 @@ function PageSection({
         const msg = await deleteField(field.id);
         onChanged(msg);
       } catch (deleteError: unknown) {
-        onError(errorMessage(deleteError, "Could not remove the tile."));
+        onError(errorMessage(deleteError, "Couldn't remove the tile. Try again."));
       }
     },
     [onChanged, onError]
@@ -420,7 +420,7 @@ function EditFieldModal({
       });
       onSaved(msg);
     } catch (saveError: unknown) {
-      onError(errorMessage(saveError, "Could not update the tile."));
+      onError(errorMessage(saveError, "Couldn't update the tile. Try again."));
     } finally {
       setBusy(false);
     }

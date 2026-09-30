@@ -58,7 +58,7 @@ export async function careerExplorerRequest<T = unknown>(
       },
     });
   } catch {
-    throw new Error('The career explorer service could not be reached. Check your connection and try again.');
+    throw new Error('The career explorer service couldn’t be reached. Check your connection and try again.');
   }
   const text = await response.text();
   let payload: unknown = {};
@@ -69,7 +69,7 @@ export async function careerExplorerRequest<T = unknown>(
   }
   const envelope = payload as ApiEnvelope;
   if (!response.ok || ['0', '2'].includes(String(envelope.status ?? envelope.status_code ?? ''))) {
-    throw new Error(messageFrom(payload, `Request failed (HTTP ${response.status}).`));
+    throw new Error(messageFrom(payload, `Request failed.`));
   }
   return payload as T;
 }

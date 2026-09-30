@@ -97,6 +97,24 @@ const aiIntelligenceIcons: Record<string, LucideIcon> = Object.fromEntries(
   }),
 );
 
+/** Display text for menu entries whose lookup key (route/icon maps) is a different string. */
+const menuDisplayLabels: Record<string, string> = {
+  'RBAC': 'Roles and permissions',
+  'Workflow': 'Workflows',
+  'Notification': 'Notifications',
+  'Template': 'Templates',
+  'Scheduler': 'Schedules',
+  'Document': 'Documents',
+  'Integration': 'Integrations',
+  'Audit': 'Audit log',
+  'Event Bus': 'Activity feed',
+  'Add Process': 'Add process',
+  'Fields Configuration': 'Field settings',
+  'Mobile App Rights': 'Mobile app rights',
+  'Platform Administration': 'Platform administration',
+  "What's Coming": "What's coming",
+};
+
 function LogoImage({ url, fallback }: { url: string; fallback: React.ReactNode }) {
   const [hasError, setHasError] = useState(false);
 
@@ -285,12 +303,12 @@ export default function Header({
     icons: Record<string, LucideIcon>;
   }[] = [
     {
-      label: 'Platform Services',
+      label: 'Platform services',
       href: '/platform-administration',
       span: 2,
       columns: [
         { items: platformServicesItems },
-        { label: 'Setup & configuration', items: platformSetupItems },
+        { label: 'Setup and configuration', items: platformSetupItems },
       ],
       // Merged so one lookup serves the whole section. The two maps have no keys in
       // common — they describe different screens — so neither can shadow the other.
@@ -298,7 +316,7 @@ export default function Header({
       icons: { ...platformServicesIcons, ...platformSetupIcons },
     },
     {
-      label: 'AI & Intelligence',
+      label: 'AI and insights',
       href: '/ai',
       span: 1,
       columns: [{ items: aiIntelligenceItems }],
@@ -549,7 +567,7 @@ const logoUrl = (() => {
           className={`relative p-2 rounded-full transition-colors ${
             isChatbotOpen ? 'text-gray-600 bg-gray-100' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-100'
           }`}
-          title="Toggle Chatbot"
+          title="Open AI assistant"
         >
           <div className="w-8 h-8 bg-gradient-to-br from-[#0D6EFD] to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
           <Bot size={16} />
@@ -569,17 +587,17 @@ const logoUrl = (() => {
                 url={logoUrl}
                 fallback={
                   <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
-                    {user?.name?.charAt(0).toUpperCase() || 'S'}
+                    {user?.name?.charAt(0).toUpperCase() || 'U'}
                   </div>
                 }
               />
             ) : (
               <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700">
-                {user?.name?.charAt(0).toUpperCase() || 'S'}
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
             )}
             <span className="font-medium text-sm flex items-center gap-1">
-              {user?.name || 'Sarah Patel'}
+              {user?.name || 'User'}
               <ChevronDown size={14} className={`transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
             </span>
           </div>
@@ -667,13 +685,13 @@ const logoUrl = (() => {
                                   key={subItem}
                                   type="button"
                                   onClick={() => { closeUserDropdown(); router.push(route); }}
-                                  title={subItem}
+                                  title={menuDisplayLabels[subItem] ?? subItem}
                                   className="h-10 w-full flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1.5 text-left text-sm font-semibold text-muted-foreground shadow-xs transition-all cursor-pointer hover:border-muted-foreground/30 hover:bg-muted/60 hover:text-foreground hover:shadow-sm"
                                 >
                                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                                     {ItemIcon ? <ItemIcon size={15} /> : subItem.charAt(0).toUpperCase()}
                                   </span>
-                                  <span className="min-w-0 flex-1 truncate">{subItem}</span>
+                                  <span className="min-w-0 flex-1 truncate">{menuDisplayLabels[subItem] ?? subItem}</span>
                                 </button>
                               );
                             })}
@@ -699,7 +717,7 @@ const logoUrl = (() => {
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                   <LogOut size={15} />
                 </span>
-                Sign Out
+                Sign out
               </button>
             </div>
           </div>,

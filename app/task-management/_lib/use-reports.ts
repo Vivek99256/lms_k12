@@ -52,7 +52,7 @@ export function useReports() {
         setLearningMessage('No rejected tasks — no learning recommendations right now.')
       }
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load reports.'))
+      setError(toMessage(reason, "Couldn't load reports. Try again."))
     } finally {
       setLoading(false)
     }

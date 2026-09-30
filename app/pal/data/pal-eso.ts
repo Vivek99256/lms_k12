@@ -74,7 +74,7 @@ async function esoFetch(path: string, init: RequestInit = {}): Promise<unknown> 
     if (response.status === 422) {
       throw new Error(serverMessage || 'That request was rejected — check the required fields.');
     }
-    throw new Error(serverMessage || `HTTP ${response.status}: the Adaptive Learning Engine API is unavailable.`);
+    throw new Error(serverMessage || `This feature is not available right now. Please try again later.`);
   }
 
   if (record.success === false) {

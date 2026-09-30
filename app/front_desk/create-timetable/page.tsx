@@ -107,7 +107,7 @@ export default function CreateTimetablePage() {
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Academic sections could not be loaded."
+            : "Couldn't load academic sections. Try again."
         );
       } finally {
         setLoadingClasses(false);
@@ -131,7 +131,7 @@ export default function CreateTimetablePage() {
       setStandards(await listStandards(session, Number(value)));
     } catch (loadError: unknown) {
       setError(
-        loadError instanceof Error ? loadError.message : "Standards could not be loaded."
+        loadError instanceof Error ? loadError.message : "Couldn't load standards. Try again."
       );
     } finally {
       setLoadingStandards(false);
@@ -152,7 +152,7 @@ export default function CreateTimetablePage() {
       setDivisions(await listDivisions(session, Number(value)));
     } catch (loadError: unknown) {
       setError(
-        loadError instanceof Error ? loadError.message : "Divisions could not be loaded."
+        loadError instanceof Error ? loadError.message : "Couldn't load divisions. Try again."
       );
     } finally {
       setLoadingDivisions(false);
@@ -183,7 +183,7 @@ export default function CreateTimetablePage() {
       setSearched(true);
     } catch (loadError: unknown) {
       setError(
-        loadError instanceof Error ? loadError.message : "Timetable could not be loaded."
+        loadError instanceof Error ? loadError.message : "Couldn't load timetable. Try again."
       );
     } finally {
       setLoadingGrid(false);
@@ -237,7 +237,7 @@ export default function CreateTimetablePage() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : "Timetable entry could not be deleted."
+          : "Couldn't delete timetable entry. Try again."
       );
     } finally {
       setBusy(false);
@@ -293,7 +293,7 @@ export default function CreateTimetablePage() {
       await loadGrid();
     } catch (submitError: unknown) {
       setError(
-        submitError instanceof Error ? submitError.message : "Timetable could not be saved."
+        submitError instanceof Error ? submitError.message : "Couldn't save timetable. Try again."
       );
     } finally {
       setBusy(false);

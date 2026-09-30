@@ -63,7 +63,7 @@ function PalChapterDashboard() {
         .then(setData)
         .catch((reason: unknown) => {
           if (signal?.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Unable to load your PAL dashboard.');
+          setError(reason instanceof Error ? reason.message : 'Couldn’t load your PAL dashboard.');
         })
         .finally(() => {
           if (!signal?.aborted) setLoading(false);

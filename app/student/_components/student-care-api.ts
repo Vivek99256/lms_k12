@@ -13,7 +13,7 @@ function context() {
   return { session, params };
 }
 function assertSuccess(payload: Envelope) {
-  if (Number(payload.status) !== 1) throw new Error(payload.message || 'Unable to complete request.');
+  if (Number(payload.status) !== 1) throw new Error(payload.message || "Couldn't complete request. Try again.");
 }
 
 export async function listCareRecords(module: CareModule, signal?: AbortSignal): Promise<CareRecord[]> {

@@ -584,7 +584,7 @@ export function CareerIntelligence({ studentId }: { studentId?: string }) {
       setAlignment(alignmentPayload);
     } catch (err) {
       setData(null);
-      setError(err instanceof Error ? err.message : 'Unable to load career evidence.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load career evidence.');
     } finally {
       setLoading(false);
     }
@@ -626,7 +626,7 @@ export function CareerIntelligence({ studentId }: { studentId?: string }) {
     return (
       <CenterMessage
         icon={CircleAlert}
-        title="Unable to load career evidence"
+        title="Couldn’t load career evidence"
         description={error || 'Something went wrong while loading this information.'}
         action={<Button variant="outline" className="mt-2" onClick={() => void refresh()}><RefreshCw />Try again</Button>}
       />

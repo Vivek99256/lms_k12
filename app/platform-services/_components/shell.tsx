@@ -236,7 +236,7 @@ export function usePlatformRegistry(): RegistryState {
       })
       .catch((cause: unknown) => {
         if (cancelled) return;
-        setError(cause instanceof PlatformApiError ? cause.message : 'The platform registry could not be loaded.');
+        setError(cause instanceof PlatformApiError ? cause.message : "Couldn't load the platform registry. Try again.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

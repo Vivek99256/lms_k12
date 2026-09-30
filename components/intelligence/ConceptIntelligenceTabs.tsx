@@ -300,7 +300,7 @@ export function ConceptIntelligenceTabs({
         setLabels(result.byKey);
       } catch (error: unknown) {
         setLabels((current) => ({ ...current, [tabId]: previous }));
-        setLabelError(error instanceof Error ? error.message : 'Could not save the tab name.');
+        setLabelError(error instanceof Error ? error.message : 'Couldn’t save the tab name.');
       } finally {
         setSavingKey(null);
       }

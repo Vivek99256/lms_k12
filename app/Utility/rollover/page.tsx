@@ -86,7 +86,7 @@ export default function RolloverPage() {
           .map((module) => module.key)
       );
     } catch (value: unknown) {
-      setError(errorMessage(value, "The rollover status could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the rollover status. Try again."));
     } finally {
       setLoading(false);
     }
@@ -149,7 +149,7 @@ export default function RolloverPage() {
       setNotice(message);
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The rollover could not be completed."));
+      setError(errorMessage(value, "Couldn't complete the rollover. Try again."));
     } finally {
       setRunning(false);
     }
@@ -165,7 +165,7 @@ export default function RolloverPage() {
       setNotice(await rolloverAllStudentsOnly());
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The student rollover could not be completed."));
+      setError(errorMessage(value, "Couldn't complete the student rollover. Try again."));
     } finally {
       setRunning(false);
     }
@@ -196,7 +196,7 @@ export default function RolloverPage() {
     } catch (value: unknown) {
       setStudents([]);
       setSearched(true);
-      setError(errorMessage(value, "Students could not be loaded."));
+      setError(errorMessage(value, "Couldn't load students. Try again."));
     } finally {
       setSearching(false);
     }
@@ -220,7 +220,7 @@ export default function RolloverPage() {
       setStudents(result.students);
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The selected students could not be rolled over."));
+      setError(errorMessage(value, "Couldn't roll over the selected students. Try again."));
     } finally {
       setRunning(false);
     }

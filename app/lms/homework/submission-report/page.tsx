@@ -153,7 +153,7 @@ export default function StudentHomeworkSubmissionReportPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Report could not be loaded."
+          : "Report couldn’t be loaded."
       );
     } finally {
       setLoading(false);
@@ -248,7 +248,7 @@ export default function StudentHomeworkSubmissionReportPage() {
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <header>
         <h1 className="text-2xl font-bold text-slate-900">
-          Student Homework Submission Report
+          Homework submission report
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           Track homework submissions, remarks and AI-checked work.
@@ -352,7 +352,7 @@ export default function StudentHomeworkSubmissionReportPage() {
                 onClick={() =>
                   exportRowsAsExcel({
                     filename: "homework-submission-report.xls",
-                    title: "Student Homework Submission Report",
+                    title: "Homework submission report",
                     columns: exportColumns,
                     rows: exportRows,
                   })
@@ -366,8 +366,8 @@ export default function StudentHomeworkSubmissionReportPage() {
                 disabled={!exportRows.length}
                 onClick={() =>
                   openPrintPreview({
-                    title: "Student Homework Submission Report",
-                    subtitle: "Assignment submissions",
+                    title: "Homework submission report",
+                    subtitle: "Homework submissions",
                     columns: exportColumns,
                     rows: exportRows,
                   })
@@ -382,21 +382,21 @@ export default function StudentHomeworkSubmissionReportPage() {
             <Table>
               <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead>Sr. No.</TableHead>
-                  <TableHead>GR No</TableHead>
-                  <TableHead>Student Name</TableHead>
+                  <TableHead>No.</TableHead>
+                  <TableHead>GR no.</TableHead>
+                  <TableHead>Student name</TableHead>
                   <TableHead>Std/Div</TableHead>
-                  <TableHead>SMS No.</TableHead>
-                  <TableHead>Sent Date</TableHead>
+                  <TableHead>SMS no.</TableHead>
+                  <TableHead>Sent date</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Assignment Paper</TableHead>
-                  <TableHead>Submission Date</TableHead>
-                  <TableHead>Teacher Remarks</TableHead>
+                  <TableHead>Homework paper</TableHead>
+                  <TableHead>Submission date</TableHead>
+                  <TableHead>Teacher remarks</TableHead>
                   <TableHead>AI Score</TableHead>
                   <TableHead>Reviewed PDF</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Student File</TableHead>
+                  <TableHead>Student file</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -573,7 +573,7 @@ export default function StudentHomeworkSubmissionReportPage() {
             <DialogTitle>AI evaluation summary</DialogTitle>
             <DialogDescription>
               {summaryRow
-                ? `${summaryRow.studentName || "Student"} — ${summaryRow.title || "Assignment"}`
+                ? `${summaryRow.studentName || "Student"} — ${summaryRow.title || "Homework"}`
                 : null}
             </DialogDescription>
           </DialogHeader>

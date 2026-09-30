@@ -107,7 +107,7 @@ export function MyTaskDetailsDrawer({ taskId, open, onClose, onUpdated }: Props)
           setEditPriority(response.data.priority ?? response.data.task_type ?? 'Medium')
           setEditDueDate(response.data.due_date ?? '')
         })
-        .catch((reason: unknown) => { if (active) setError(toMessage(reason, 'Unable to load this task.')) })
+        .catch((reason: unknown) => { if (active) setError(toMessage(reason, "Couldn't load this task. Try again.")) })
         .finally(() => { if (active) setLoading(false) })
     }
 
@@ -128,7 +128,7 @@ export function MyTaskDetailsDrawer({ taskId, open, onClose, onUpdated }: Props)
       setMessage(response.message)
       onUpdated()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to update the task.'))
+      setError(toMessage(reason, "Couldn't update the task. Try again."))
     } finally {
       setSaving(false)
     }
@@ -141,7 +141,7 @@ export function MyTaskDetailsDrawer({ taskId, open, onClose, onUpdated }: Props)
       setEmployees(users.map((user) => ({ id: String(user.id), name: [user.first_name, user.middle_name, user.last_name].filter(Boolean).join(' ') })))
       setEditing(true)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load employees.'))
+      setError(toMessage(reason, "Couldn't load employees. Try again."))
     }
   }
 
@@ -170,7 +170,7 @@ export function MyTaskDetailsDrawer({ taskId, open, onClose, onUpdated }: Props)
       const refreshed = await myTasksApi.getMyTask(session, task.id)
       setTask(refreshed.data)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to update the task.'))
+      setError(toMessage(reason, "Couldn't update the task. Try again."))
     } finally {
       setSaving(false)
     }
@@ -186,7 +186,7 @@ export function MyTaskDetailsDrawer({ taskId, open, onClose, onUpdated }: Props)
       onUpdated()
       onClose()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to delete the task.'))
+      setError(toMessage(reason, "Couldn't delete the task. Try again."))
     } finally {
       setSaving(false)
     }
@@ -215,7 +215,7 @@ export function MyTaskDetailsDrawer({ taskId, open, onClose, onUpdated }: Props)
       setExtReason('')
       await refreshExtensions()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to request the extension.'))
+      setError(toMessage(reason, "Couldn't request the extension. Try again."))
     } finally {
       setExtBusy(false)
     }
@@ -234,7 +234,7 @@ export function MyTaskDetailsDrawer({ taskId, open, onClose, onUpdated }: Props)
       setTask(refreshed.data)
       onUpdated()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to record the decision.'))
+      setError(toMessage(reason, "Couldn't record the decision. Try again."))
     } finally {
       setExtBusy(false)
     }
@@ -245,7 +245,7 @@ export function MyTaskDetailsDrawer({ taskId, open, onClose, onUpdated }: Props)
       <SheetContent side="right" className="w-full p-0 sm:max-w-[640px]">
         <SheetHeader className="border-b p-6">
           <SheetTitle>{task?.title ?? 'Task details'}</SheetTitle>
-          <SheetDescription>Verified task information from Laravel</SheetDescription>
+          <SheetDescription>Verified task information</SheetDescription>
         </SheetHeader>
 
         <div className="h-[calc(100vh-98px)] overflow-y-auto p-6">

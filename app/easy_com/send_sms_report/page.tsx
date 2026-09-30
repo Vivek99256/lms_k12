@@ -18,7 +18,7 @@ export default function Page() {
         academicYear: true,
         columns: [
           { key: 'name', label: 'Name' },
-          { key: 'enrollment_no', label: 'GR No.' },
+          { key: 'enrollment_no', label: 'GR no.' },
           { key: 'sms_no', label: 'Mobile' },
           { key: 'sms_text', label: 'SMS text', wide: true },
           { key: 'module_name', label: 'Source' },

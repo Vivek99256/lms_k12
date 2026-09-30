@@ -37,7 +37,7 @@ export default function BrainSettingsPage() {
       setValue('');
       resource.refresh();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not save the setting.');
+      setSaveError(err instanceof Error ? err.message : 'Couldn’t save the setting.');
     } finally {
       setSaving(false);
     }

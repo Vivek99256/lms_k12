@@ -57,7 +57,7 @@ export default function AssignmentSubmissionPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Your assignments could not be loaded."
+          : "Your assignments couldn’t be loaded."
       );
     } finally {
       setLoading(false);
@@ -148,7 +148,7 @@ export default function AssignmentSubmissionPage() {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "Your assignment could not be submitted."
+          : "Your assignment couldn’t be submitted."
       );
     } finally {
       setSaving(false);

@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -119,7 +121,7 @@ function DragDropListContent() {
     fetchDragDrops(ctx)
       .then(setTasks)
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Failed to load activities');
+        setError(friendlyError(err, 'We couldn’t load activities. Please try again.'));
       })
       .finally(() => setLoading(false));
   }, [ctx]);
@@ -154,7 +156,7 @@ function DragDropListContent() {
       setSuccess(result.message);
       load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete activity');
+      setError(friendlyError(err, 'We couldn’t delete activity. Please try again.'));
     } finally {
       setBusyId(null);
     }
@@ -169,7 +171,7 @@ function DragDropListContent() {
       setSuccess(result.message);
       load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to change publish state');
+      setError(friendlyError(err, 'We couldn’t publish or unpublish this activity. Please try again.'));
     } finally {
       setBusyId(null);
     }
@@ -181,7 +183,7 @@ function DragDropListContent() {
     try {
       await exportDragDropPackage(task.id, ctx);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to export package');
+      setError(friendlyError(err, 'We couldn’t export the file. Please try again.'));
     } finally {
       setBusyId(null);
     }
@@ -202,7 +204,7 @@ function DragDropListContent() {
       );
       load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to import package');
+      setError(friendlyError(err, 'We couldn’t import the file. Please try again.'));
     } finally {
       setImporting(false);
     }
@@ -223,7 +225,7 @@ function DragDropListContent() {
       <div className="mx-auto max-w-6xl">
         <H5pPageHeader
           title="Drag and drop"
-          description="Learners can drag text or images into correct drop zones"
+          description="Students can drag text or images into correct drop zones"
           ctx={ctx}
           backHref={`/h5p/html_contents?${contextQuery}`}
           actions={

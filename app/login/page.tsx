@@ -53,7 +53,7 @@ export default function LoginPage() {
     try {
       const result = await login(email, password);
       if (!result.success) {
-        setError(result.error || 'Invalid credentials. Please try again.');
+        setError(result.error || 'Email or password is incorrect. Please try again.');
         setIsLoading(false);
         return;
       }
@@ -72,7 +72,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setError('');
     if (!googleClientId) {
-      setError('Google sign-in is not configured. Set NEXT_GOOGLE_CLIENT_ID and try again.');
+      setError("Google sign-in isn't available right now. Please use your email and password.");
       return;
     }
 
@@ -97,7 +97,7 @@ export default function LoginPage() {
           }
           const result = await loginWithGoogle(credential);
           if (!result.success) {
-            setError(result.error || 'Unable to sign in with Google.');
+            setError(result.error || "We couldn't sign you in with Google. Please try again.");
             setIsGoogleLoading(false);
             return;
           }
@@ -113,7 +113,7 @@ export default function LoginPage() {
 
       win.google.accounts.id.prompt();
     } catch {
-      setError('Unable to start Google sign-in. Please try again.');
+      setError("We couldn't start Google sign-in. Please try again.");
       setIsGoogleLoading(false);
     }
   };
@@ -172,12 +172,12 @@ export default function LoginPage() {
           {/* Headline */}
           <div className="text-center max-w-md">
             <h1 className="text-4xl xl:text-5xl font-bold leading-[1.1] mb-5">
-              Learn without
+              Everything your school needs,
               <br />
-              <span className="bg-gradient-to-r from-blue-200 via-white to-blue-100 bg-clip-text text-transparent">boundaries.</span>
+              <span className="bg-gradient-to-r from-blue-200 via-white to-blue-100 bg-clip-text text-transparent">in one place.</span>
             </h1>
             <p className="text-base text-white/60 leading-relaxed">
-              Access premium courses, track your progress, and connect with educators.
+              Manage admissions, fees, attendance, learning and communication with your school.
             </p>
           </div>
 
@@ -215,7 +215,7 @@ export default function LoginPage() {
 
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-1.5">Welcome back</h2>
-            <p className="text-sm text-gray-500">Enter your credentials to access your account</p>
+            <p className="text-sm text-gray-500">Sign in with your email and password</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -304,7 +304,7 @@ export default function LoginPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Signing in...
+                  Signing in…
                 </>
               ) : (
                 'Sign in'
@@ -395,7 +395,7 @@ export default function LoginPage() {
                 />
               </svg>
             </div>
-            <p className="animate-successText text-lg font-semibold text-white opacity-0">Signed in — taking you in</p>
+            <p className="animate-successText text-lg font-semibold text-white opacity-0">Signed in. Taking you to your dashboard…</p>
           </div>
         </div>
       )}
@@ -489,16 +489,16 @@ function ForgotPasswordModal({
         return;
       }
       if (data?.success === false) {
-        setError(data?.message || 'Unable to send reset link. Please try again.');
+        setError("We couldn't send the reset link. Please try again.");
         return;
       }
       if (!res.ok) {
-        setError(data?.message || 'Unable to send reset link. Please try again.');
+        setError("We couldn't send the reset link. Please try again.");
         return;
       }
       setSuccess(true);
     } catch {
-      setError('Network error. Please try again.');
+      setError('Check your internet connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -545,7 +545,7 @@ function ForgotPasswordModal({
         ) : (
           <div className="p-8">
             <h2 id="forgot-password-title" className="text-xl font-bold text-gray-900 mb-1.5">Forgot your password?</h2>
-            <p className="text-sm text-gray-500 mb-6">No worries - enter the email tied to your account and we'll send you a reset link.</p>
+            <p className="text-sm text-gray-500 mb-6">Enter the email linked to your account and we'll send you a reset link.</p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
@@ -585,7 +585,7 @@ function ForgotPasswordModal({
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    Sending reset link...
+                    Sending reset link…
                   </>
                 ) : (
                   'Send reset link'

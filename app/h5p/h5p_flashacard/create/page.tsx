@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Plus, Save, Trash2 } from 'lucide-react';
@@ -91,7 +93,7 @@ function FlashcardCreateContent() {
       const result = await createFlashcards(ctx, cards);
       router.push('/h5p/h5p_flashacard?' + h5pContextQuery(ctx, { flash: result.message }));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create flashcards');
+      setError(friendlyError(err, 'We couldn’t create flashcards. Please try again.'));
       setSaving(false);
     }
   };

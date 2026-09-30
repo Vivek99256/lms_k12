@@ -112,7 +112,7 @@ export const formatDate = (dateString: string): string => {
   const parsed = parseDate(dateString)
   if (!parsed) return '—'
 
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('en-IN', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -123,7 +123,7 @@ export const formatDateShort = (dateString: string): string => {
   const parsed = parseDate(dateString)
   if (!parsed) return '—'
 
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('en-IN', {
     month: 'short',
     day: 'numeric',
   }).format(parsed)

@@ -76,7 +76,7 @@ export function useMyTasks() {
       if (response.data.filters.status_options?.length) setStatusOptions(response.data.filters.status_options)
     } catch (reason) {
       setTasks([])
-      setError(toMessage(reason, 'Unable to load tasks.'))
+      setError(toMessage(reason, "Couldn't load tasks. Try again."))
     } finally {
       setLoading(false)
     }

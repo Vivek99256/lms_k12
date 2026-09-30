@@ -42,7 +42,7 @@ export function useSalaryCertificate() {
     const load = async () => {
       const session = buildSessionContext()
       if (!isPayrollSessionReady(session)) {
-        setError('Your session could not be resolved. Please sign in again.')
+        setError('Your session has expired. Please sign in again.')
         setOptionsLoading(false)
         return
       }
@@ -51,7 +51,7 @@ export function useSalaryCertificate() {
         const response = await payrollService.getSalaryCertificateOptions(session)
         if (!cancelled) setOptions(response)
       } catch (loadError) {
-        if (!cancelled) setError(toMessage(loadError, 'Failed to load salary certificate options.'))
+        if (!cancelled) setError(toMessage(loadError, "Couldn't load salary certificate options. Try again."))
       } finally {
         if (!cancelled) setOptionsLoading(false)
       }
@@ -107,7 +107,7 @@ export function useSalaryCertificate() {
       } catch (generateError) {
         const message = toMessage(
           generateError,
-          'Failed to generate the certificate. Check that the employee has a salary structure for the selected year.',
+          "Couldn't generate the certificate. Check that the employee has a salary structure for the selected year.",
         )
         setError(message)
         return { ok: false as const, message }

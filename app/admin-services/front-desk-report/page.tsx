@@ -42,7 +42,7 @@ export default function FrontDeskReportPage() {
     } catch (value: unknown) {
       setEntries([]);
       setGenerated(true);
-      setError(errorMessage(value, "The front desk report could not be generated."));
+      setError(errorMessage(value, "Couldn't generate the front desk report. Try again."));
     } finally {
       setLoading(false);
     }

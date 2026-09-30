@@ -107,7 +107,7 @@ function MatchingOccupationsCard({ studentId }: { studentId?: string }) {
       setItems([]);
       setKnowledgeAreas([]);
       setKnowledgeIntro('');
-      setError(err instanceof Error ? err.message : 'Unable to load matching occupations.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load matching occupations.');
     } finally {
       setLoading(false);
     }
@@ -271,7 +271,7 @@ function CareerCertaintyCard({ open, onOpenChange }: {
   const refresh = useCallback(async () => {
     setLoading(true); setLoadError('');
     try { setCurrent(await loadCurrentAspiration()); }
-    catch (err) { setLoadError(err instanceof Error ? err.message : 'Unable to load your answer.'); }
+    catch (err) { setLoadError(err instanceof Error ? err.message : 'Couldn’t load your answer.'); }
     finally { setLoading(false); }
   }, []);
 
@@ -320,7 +320,7 @@ function CareerCertaintyCard({ open, onOpenChange }: {
       setCurrent(saved);
       onOpenChange(false);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Unable to save your answer.');
+      setSaveError(err instanceof Error ? err.message : 'Couldn’t save your answer.');
     } finally {
       setSaving(false);
     }

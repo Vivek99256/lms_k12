@@ -103,7 +103,7 @@ export function CapabilityLiveData({ slug, name }: { slug: string; name: string 
           <div className="flex items-start gap-3 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-5">
             <ServerCrash className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium text-card-foreground">Could not load this capability</p>
+              <p className="text-sm font-medium text-card-foreground">Couldn’t load this capability</p>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">{error}</p>
             </div>
           </div>
@@ -121,7 +121,7 @@ function Body({ detail, name }: { detail: CapabilityDetail; name: string }) {
       <div className="flex items-start gap-3 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-5">
         <Database className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-card-foreground">Not installed on this estate</p>
+          <p className="text-sm font-medium text-card-foreground">Not installed for your school</p>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {name} needs {detail.missing_tables?.length === 1 ? 'a table' : 'tables'} that this database does
             not have yet:{' '}

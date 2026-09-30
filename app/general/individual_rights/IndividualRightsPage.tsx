@@ -95,7 +95,7 @@ export function IndividualRightsPage() {
       setSummary(data.summary);
       setPermissions(data.permissions);
     } catch (value: unknown) {
-      setError(errorMessage(value, "Individual rights could not be loaded."));
+      setError(errorMessage(value, "Couldn't load individual rights. Try again."));
     } finally {
       setLoading(false);
     }
@@ -118,7 +118,7 @@ export function IndividualRightsPage() {
         selected: {},
       });
     } catch (value: unknown) {
-      setError(errorMessage(value, "The profile users and rights matrix could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the profile users and rights. Try again."));
       setUsers([]);
       setMatrix(noMatrix);
     } finally {
@@ -140,7 +140,7 @@ export function IndividualRightsPage() {
     try {
       setMatrix(await loadIndividualRightsMatrix(profileId, userId));
     } catch (value: unknown) {
-      setError(errorMessage(value, "The selected user's rights could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the selected user's rights. Try again."));
       setMatrix((current) => ({
         rows: current.rows,
         selected: {},
@@ -225,7 +225,7 @@ export function IndividualRightsPage() {
       await loadUsers(selectedProfileId);
       await loadMatrix(selectedProfileId, selectedUserId);
     } catch (value: unknown) {
-      setError(errorMessage(value, "Individual rights could not be saved."));
+      setError(errorMessage(value, "Couldn't save individual rights. Try again."));
     } finally {
       setSaving(false);
     }
@@ -248,7 +248,7 @@ export function IndividualRightsPage() {
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <ErpPageHeader
         title="Individual Rights"
-        description="Assign view, add, edit, and delete rights to individual users using the legacy ERP menu tree."
+        description="Assign view, add, edit, and delete rights to individual users using the menu tree."
         onRefresh={() => void load()}
         refreshing={loading || usersLoading || matrixLoading || saving}
       />
@@ -405,7 +405,7 @@ export function IndividualRightsPage() {
 
       <ErpSection
         title="Rights Summary"
-        description="Current individual rights already stored in Laravel."
+        description="Current individual rights already saved."
         icon={<KeyRound className="size-5" />}
       >
         {loading ? (

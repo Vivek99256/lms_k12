@@ -16,11 +16,11 @@ import { FeesPlaceholderScreen } from '@/app/fees/_components/fees-placeholder-s
 export const FEES_HELP_SUPPORT_SCREENS: ModuleStaticScreen[] = [
   {
     id: 'getting-started',
-    label: 'Getting Started',
+    label: 'Getting started',
     icon: Rocket,
     render: () => (
       <FeesPlaceholderScreen
-        title="Getting Started"
+        title="Getting started"
         summary="A short orientation to the Fees module for someone using it for the first time."
         points={[
           'What each Fees category is for, and when to use it.',
@@ -32,11 +32,11 @@ export const FEES_HELP_SUPPORT_SCREENS: ModuleStaticScreen[] = [
   },
   {
     id: 'user-guides',
-    label: 'User Guides',
+    label: 'User guides',
     icon: BookOpen,
     render: () => (
       <FeesPlaceholderScreen
-        title="User Guides"
+        title="User guides"
         summary="Step-by-step instructions for each Fees screen."
         points={[
           'Guides grouped by category, matching the tabs in the module.',
@@ -64,11 +64,11 @@ export const FEES_HELP_SUPPORT_SCREENS: ModuleStaticScreen[] = [
   },
   {
     id: 'video-tutorials',
-    label: 'Video Tutorials',
+    label: 'Video tutorials',
     icon: PlayCircle,
     render: () => (
       <FeesPlaceholderScreen
-        title="Video Tutorials"
+        title="Video tutorials"
         summary="Short recordings of the common Fees tasks."
         points={[
           'Walkthroughs of collection, cancellation and month-end.',
@@ -80,11 +80,11 @@ export const FEES_HELP_SUPPORT_SCREENS: ModuleStaticScreen[] = [
   },
   {
     id: 'release-notes',
-    label: 'Release Notes',
+    label: 'Release notes',
     icon: ScrollText,
     render: () => (
       <FeesPlaceholderScreen
-        title="Release Notes"
+        title="Release notes"
         summary="What has changed in the Fees module, newest first."
         points={[
           'New screens, changed behaviour and fixes per release.',
@@ -96,11 +96,11 @@ export const FEES_HELP_SUPPORT_SCREENS: ModuleStaticScreen[] = [
   },
   {
     id: 'raise-a-ticket',
-    label: 'Raise a Ticket',
+    label: 'Raise a ticket',
     icon: LifeBuoy,
     render: () => (
       <FeesPlaceholderScreen
-        title="Raise a Ticket"
+        title="Raise a ticket"
         summary="Report a Fees problem and follow it through to a fix."
         points={[
           'A form that captures the screen and context automatically.',

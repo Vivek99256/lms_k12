@@ -84,8 +84,8 @@ export default function AttendanceRegularizationPage() {
 
       <Alert>
         <AlertDescription>
-          Regularization requests are stored for this session only — the backend endpoint to submit and approve
-          them has not been built yet, so nothing here is saved once you leave or reload the page.
+          Regularization requests are stored for this session only — submitting and approving
+          them is not available yet, so nothing here is saved once you leave or reload the page.
         </AlertDescription>
       </Alert>
 

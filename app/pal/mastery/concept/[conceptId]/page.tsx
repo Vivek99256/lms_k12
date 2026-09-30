@@ -122,7 +122,7 @@ function ConceptMasteryView() {
         })
         .catch((reason: unknown) => {
           if (signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Mastery for this concept could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'Mastery for this concept couldn’t be loaded.');
         })
         .finally(() => {
           if (!signal.aborted) setLoading(false);

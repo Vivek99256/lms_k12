@@ -100,7 +100,7 @@ async function fetchJson<T>(url: string, session: SessionContext, init?: Request
   });
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
-    throw new Error(readString(payload.message) || `Request failed (${response.status})`);
+    throw new Error(readString(payload.message) || "Couldn't complete the request. Try again.");
   }
   return payload as T;
 }
@@ -275,7 +275,7 @@ export async function saveAttendance(
   );
 
   if (readString(payload.status_code) !== '1') {
-    throw new Error(readString(payload.message) || 'Failed to save attendance.');
+    throw new Error(readString(payload.message) || "Couldn't save attendance. Try again.");
   }
   return readString(payload.message) || 'Attendance saved.';
 }

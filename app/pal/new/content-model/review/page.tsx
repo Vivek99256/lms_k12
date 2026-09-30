@@ -48,7 +48,7 @@ export default function ContentModelReviewPage() {
         setSelected(new Set());
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        setError((err as Error).message || 'Could not load the review queue.');
+        setError((err as Error).message || 'Couldn’t load the review queue.');
       } finally {
         setLoading(false);
       }

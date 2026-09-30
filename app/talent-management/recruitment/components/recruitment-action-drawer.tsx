@@ -275,7 +275,7 @@ export function RecruitmentActionDrawer({ action, jobs, candidates, selectedJob,
       onClose()
       replaceValues({})
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The operation could not be completed.')
+      setError(cause instanceof Error ? cause.message : "Couldn't complete the operation. Try again.")
     } finally {
       setSaving(false)
     }
@@ -289,7 +289,7 @@ export function RecruitmentActionDrawer({ action, jobs, candidates, selectedJob,
       <SheetContent side="right" className="flex h-full w-full flex-col overflow-hidden p-0 sm:max-w-2xl">
         <SheetHeader className="border-b p-6 pr-12">
           <SheetTitle>{title}</SheetTitle>
-          <SheetDescription>Fields and status values follow the Laravel recruitment contract.</SheetDescription>
+          <SheetDescription>Fields and status values follow the recruitment process.</SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto p-6">
 

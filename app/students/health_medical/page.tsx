@@ -42,7 +42,7 @@ export default function HealthAndMedicalPage() {
       })
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load health and medical records.');
+        setError(reason instanceof Error ? reason.message : "Couldn't load health and medical records. Try again.");
       })
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false);

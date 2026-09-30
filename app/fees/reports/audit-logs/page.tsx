@@ -124,7 +124,7 @@ export default function FeesAuditLogsPage() {
       });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to fetch audit logs.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load audit logs. Try again." });
     } finally {
       setLoading(false);
     }
@@ -145,9 +145,9 @@ export default function FeesAuditLogsPage() {
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'fees-audit-log.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-audit-log.xls', title: 'Fees Audit Log', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-audit-log.pdf', title: 'Fees Audit Log', subtitle: 'Read-only audit trail', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Fees Audit Log', subtitle: 'Read-only audit trail', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-audit-log.xls', title: 'Fee audit log', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-audit-log.pdf', title: 'Fee audit log', subtitle: 'Read-only audit trail', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Fee audit log', subtitle: 'Read-only audit trail', columns: exportColumns, rows: exportRows })}
           />
         }
       />

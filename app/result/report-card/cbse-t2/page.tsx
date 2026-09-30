@@ -172,7 +172,7 @@ export default function CbseT2ReportCardPage() {
       setStudents(parseStudents(payload));
     } catch (err) {
       setStudents([]);
-      setError(err instanceof Error ? err.message : 'Failed to load report cards.');
+      setError(err instanceof Error ? err.message : "Couldn't load report cards. Try again.");
     } finally {
       setLoading(false);
       setSearched(true);
@@ -192,7 +192,7 @@ export default function CbseT2ReportCardPage() {
       });
       toast.success('Result HTML saved for mobile app');
     } catch (err) {
-      toast.error('Failed to save result HTML', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't save the result. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }

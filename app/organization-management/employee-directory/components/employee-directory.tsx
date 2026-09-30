@@ -142,7 +142,7 @@ export function EmployeeDirectory() {
       await reload()
       setNotice(response?.message || 'Status updated.')
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : 'Failed to update status.')
+      setNotice(cause instanceof Error ? cause.message : "Couldn't update status. Try again.")
     } finally {
       setStatusChangingId(null)
     }

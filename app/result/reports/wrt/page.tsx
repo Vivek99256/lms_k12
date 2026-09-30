@@ -90,7 +90,7 @@ export default function WrtReportPage() {
       setStudents(parseStudents(payload));
     } catch (err) {
       setStudents([]);
-      setError(err instanceof Error ? err.message : 'Failed to load the WRT report.');
+      setError(err instanceof Error ? err.message : "Couldn't load the WRT report. Try again.");
     } finally {
       setLoading(false);
       setSearched(true);
@@ -110,7 +110,7 @@ export default function WrtReportPage() {
       });
       toast.success('Result HTML saved for mobile app');
     } catch (err) {
-      toast.error('Failed to save result HTML', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't save the result. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }

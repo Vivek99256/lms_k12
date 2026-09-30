@@ -64,7 +64,7 @@ const MODULE_KEY = 'fees';
 const CAPABILITY_WORDING: Record<string, { label: string; allows: string }> = {
   conversational: { label: 'Conversational', allows: 'Somebody may ask the assistant a fee question from a Fees page.' },
   generative: { label: 'Generative', allows: 'A model may write text and fill Fees report templates.' },
-  agent: { label: 'Agents', allows: 'A backend domain agent may run for Fees.' },
+  agent: { label: 'Agents', allows: 'A Fees assistant may run.' },
   workflow: { label: 'Workflows', allows: 'A multi-step Fees workflow may be started and may pause for approval.' },
   ontology: { label: 'Knowledge graph', allows: 'Fees records may be traversed through the entity graph.' },
 };

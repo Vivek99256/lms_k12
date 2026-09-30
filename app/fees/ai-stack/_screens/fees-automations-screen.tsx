@@ -129,7 +129,7 @@ export function FeesAutomationsScreen() {
         setNote(`${agent.name} enabled as ${agent.id}. It runs only when someone presses Run, and only as that person.`);
         refreshAll();
       } catch (cause) {
-        setNote(cause instanceof Error ? cause.message : 'The agent could not be enabled.');
+        setNote(cause instanceof Error ? cause.message : "Couldn't turn on the assistant. Try again.");
       } finally {
         setBusy(null);
       }
@@ -147,7 +147,7 @@ export function FeesAutomationsScreen() {
         setNote(`${agent.name} is now ${next}.`);
         refreshAll();
       } catch (cause) {
-        setNote(cause instanceof Error ? cause.message : 'The status could not be changed.');
+        setNote(cause instanceof Error ? cause.message : "Couldn't change the status. Try again.");
       } finally {
         setBusy(null);
       }

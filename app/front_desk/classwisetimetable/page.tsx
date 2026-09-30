@@ -48,7 +48,7 @@ export default function ClasswiseTimetablePage() {
     } catch (loadError) {
       setTimetable(null);
       setSearched(true);
-      setError(loadError instanceof Error ? loadError.message : "Timetable could not be loaded.");
+      setError(loadError instanceof Error ? loadError.message : "Couldn't load timetable. Try again.");
     } finally {
       setLoading(false);
     }

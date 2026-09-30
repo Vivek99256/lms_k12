@@ -40,7 +40,7 @@ const ORIGIN_RATIONALE: Record<TaskDraft["origin"], string> = {
     "Master data and configuration the procedure depends on. Until these hold, the process cannot run at all.",
   gate:
     "The engine performs these steps unattended, and the SOP gives the AI ownership of no record - so a named person verifies the output and logs the acceptance (6.15.6, BR-07).",
-  step: "Steps whose actor is Teacher or Teacher + AI. Directly assignable work inside the procedure.",
+  step: "Steps done by a teacher, or a teacher with AI. Directly assignable work inside the procedure.",
   output: "Where this procedure hands over. Raised so nothing it produces is left unactioned.",
   learner_activity:
     "Steps the learner performs. Recorded for completeness and delivered by the PAL workspace itself - Task Management assigns to staff, so these are never published.",

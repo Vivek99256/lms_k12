@@ -83,11 +83,11 @@ export default function PrintBarcodePage() {
   }, [globalSearch, rows]);
 
   const exportRows = useMemo<Record<string, string>[]>(() => filteredRows.map((row, index) => {
-    const exportRow: Record<string, string> = { 'Sr No': String(index + 1) };
+    const exportRow: Record<string, string> = { 'No.': String(index + 1) };
     if (printType === 'member') {
       exportRow['Member Id'] = row.code || '-';
-      exportRow['Roll No'] = row.rollNo || '-';
-      exportRow['Student Name'] = row.studentName || '-';
+      exportRow['Roll no.'] = row.rollNo || '-';
+      exportRow['Student name'] = row.studentName || '-';
       exportRow['Std / Div'] = row.standardDivision || '-';
     } else {
       exportRow['Item Code'] = row.code || '-';
@@ -107,7 +107,7 @@ export default function PrintBarcodePage() {
       setRows(parseRows(payload, 'member'));
       setPrintType('member');
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load print barcode page.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load print barcode page. Try again." });
     } finally {
       setLoading(false);
     }
@@ -152,7 +152,7 @@ export default function PrintBarcodePage() {
     } catch (error) {
       setRows([]);
       setSelectedIds([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to search barcode rows.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't search barcode rows. Try again." });
     } finally {
       setSearching(false);
     }
@@ -203,8 +203,8 @@ export default function PrintBarcodePage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Print Barcode"
-        description="Search member IDs or item codes, select rows, and reuse the existing Laravel PDF barcode generation flow."
+        title="Print barcode"
+        description="Search member IDs or item codes, select rows and print barcodes."
         action={<div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => {
             if (exportRows.length === 0) return;
@@ -226,13 +226,13 @@ export default function PrintBarcodePage() {
 
       <SectionPanel title="Filters">
         <div className="grid gap-4 lg:grid-cols-4">
-          <Field label="Search Type">
+          <Field label="Search type">
             <NativeSelect value={printType} onChange={(value) => { setPrintType(value as PrintType); setSelectedIds([]); }}>
-              <option value="member">Member Id</option>
-              <option value="item_code">Item Code</option>
+              <option value="member">Member ID</option>
+              <option value="item_code">Item code</option>
             </NativeSelect>
           </Field>
-          <Field label="Search By">
+          <Field label="Search by">
             <Input value={searchBy} onChange={(event) => setSearchBy(event.target.value)} placeholder="Search..." />
           </Field>
           {printType === 'member' ? (
@@ -247,8 +247,8 @@ export default function PrintBarcodePage() {
             </div>
           ) : (
             <>
-              <Field label="From Item Code"><Input value={fromItemCode} onChange={(event) => setFromItemCode(event.target.value)} /></Field>
-              <Field label="To Item Code"><Input value={toItemCode} onChange={(event) => setToItemCode(event.target.value)} /></Field>
+              <Field label="From item code"><Input value={fromItemCode} onChange={(event) => setFromItemCode(event.target.value)} /></Field>
+              <Field label="To item code"><Input value={toItemCode} onChange={(event) => setToItemCode(event.target.value)} /></Field>
             </>
           )}
           <div className="flex items-end">
@@ -262,7 +262,7 @@ export default function PrintBarcodePage() {
 
       <SectionPanel title="Results">
         <div className="space-y-4">
-          <Field label="Global Search">
+          <Field label="Global search">
             <div className="relative max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} className="pl-9" placeholder="Search all columns" />
@@ -281,14 +281,14 @@ export default function PrintBarcodePage() {
                   </TableHead>
                   {printType === 'member' ? (
                     <>
-                      <TableHead>Member Id</TableHead>
-                      <TableHead>Roll No</TableHead>
-                      <TableHead>Student Name</TableHead>
+                      <TableHead>Member ID</TableHead>
+                      <TableHead>Roll no.</TableHead>
+                      <TableHead>Student name</TableHead>
                       <TableHead>Std / Div</TableHead>
                     </>
                   ) : (
                     <>
-                      <TableHead>Item Code</TableHead>
+                      <TableHead>Item code</TableHead>
                       <TableHead>Title</TableHead>
                       <TableHead>Classification</TableHead>
                     </>

@@ -104,7 +104,7 @@ function headers(ctx: ReturnType<typeof buildSessionContext>, contentType?: stri
 
 async function readJson(response: Response, what: string): Promise<Record<string, unknown>> {
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to ${what}.`);
+    throw new Error(`Couldn’t ${what}. Try again.`);
   }
   return toRecord(await response.json());
 }

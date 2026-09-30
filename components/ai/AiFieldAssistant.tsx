@@ -273,7 +273,7 @@ export function AiFieldAssistant({
       const body = await response.json();
 
       if (!response.ok) {
-        setError(body?.error ?? "The assistant could not complete that.");
+        setError(body?.error ?? "The assistant couldn’t complete that.");
         setPhase("error");
         return;
       }
@@ -283,7 +283,7 @@ export function AiFieldAssistant({
       setPhase("result");
     } catch (caught) {
       if ((caught as Error)?.name === "AbortError") return;
-      setError(caught instanceof Error ? caught.message : "The assistant could not be reached.");
+      setError(caught instanceof Error ? caught.message : "The assistant couldn’t be reached.");
       setPhase("error");
     }
   }

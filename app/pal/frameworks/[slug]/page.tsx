@@ -17,7 +17,7 @@ export default async function FrameworkDetailPage({
       meta={FRAMEWORK_META}
       emptyTitle="Framework intelligence is not available"
       eyebrow="Framework"
-      description="This Framework detail page is sourced from live semantic_intelligence data for the selected concept."
+      description="This view is built from the selected concept’s concepts and skills."
       basePath="/pal/frameworks"
       variant="framework"
       selectModules={(model) => model.frameworkModules}

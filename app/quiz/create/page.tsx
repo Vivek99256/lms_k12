@@ -28,7 +28,7 @@ export default function CreateQuizPage() {
         setSelectedSubject(subjects[0] ?? null);
         setSelectedChapter(subjects[0]?.chapters[0] ?? null);
       } catch (err) {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load subjects.');
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Couldn't load subjects. Try again.");
       } finally {
         if (!cancelled) setLoadingSubjects(false);
       }

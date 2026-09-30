@@ -39,10 +39,10 @@ async function postDashboardProxy<T extends ApiStatusPayload>(path: string, sess
   }
 
   if (!response.ok) {
-    throw new Error(readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to load the dashboard.`);
+    throw new Error(readString(asRecord(payload).message) || "We couldn't load the dashboard. Please try again.");
   }
 
-  assertApiSuccess(payload, 'Unable to load the dashboard.');
+  assertApiSuccess(payload, "We couldn't load the dashboard. Please try again.");
   return payload;
 }
 
@@ -82,10 +82,10 @@ async function postDashboardDirect<T extends ApiStatusPayload>(laravelPath: stri
   }
 
   if (!response.ok) {
-    throw new Error(readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to load the dashboard.`);
+    throw new Error(readString(asRecord(payload).message) || "We couldn't load the dashboard. Please try again.");
   }
 
-  assertApiSuccess(payload, 'Unable to load the dashboard.');
+  assertApiSuccess(payload, "We couldn't load the dashboard. Please try again.");
   return payload;
 }
 

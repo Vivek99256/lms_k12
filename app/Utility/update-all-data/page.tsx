@@ -77,7 +77,7 @@ export default function UpdateAllDataPage() {
       setClassOptions(classes);
       setSelectedMonths([]);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The bulk update screen could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the bulk update screen. Try again."));
     } finally {
       setLoading(false);
     }
@@ -104,7 +104,7 @@ export default function UpdateAllDataPage() {
       setNotice(await task());
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The update could not be completed."));
+      setError(errorMessage(value, "Couldn't complete the update. Try again."));
     } finally {
       setBusy(null);
     }

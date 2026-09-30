@@ -103,7 +103,7 @@ export default function OnlineFeesCollectPage() {
         text: nextStudents.length ? `Loaded ${nextStudents.length} student${nextStudents.length === 1 ? '' : 's'}.` : 'No students found for this mobile number.',
       });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load students for this mobile number.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load students for this mobile number. Try again." });
     } finally {
       setLoadingStudents(false);
     }
@@ -152,7 +152,7 @@ export default function OnlineFeesCollectPage() {
       const text = await response.text();
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Unable to validate fees breakoff.`);
+        throw new Error("Couldn't validate fee breakoff. Try again.");
       }
 
       const nextValidation = parseBreakoffResponse(text);
@@ -169,7 +169,7 @@ export default function OnlineFeesCollectPage() {
       return nextValidation;
     } catch (error) {
       setValidation(null);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to validate fees breakoff.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't validate fee breakoff. Try again." });
       return null;
     } finally {
       setValidating(false);
@@ -209,7 +209,7 @@ export default function OnlineFeesCollectPage() {
     <PageFrame>
       <PageHeader
         title="Online fees collect"
-        description="Search by registered mobile number, validate fee mapping, and continue into the configured Laravel payment gateway."
+        description="Search by registered mobile number, validate fee mapping, and continue into the configured payment gateway."
         action={validation ? (
           <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-right">
             <p className="text-xs font-medium text-emerald-700">Mapped amount</p>

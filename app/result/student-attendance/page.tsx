@@ -101,7 +101,7 @@ export default function StudentAttendancePage() {
       );
       setRemarkOptions(toOptions(source.remark_data));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't load students. Try again.");
       setStudents([]);
       setRemarkOptions([]);
     } finally {
@@ -137,10 +137,10 @@ export default function StudentAttendancePage() {
         data[`values[${student.id}][teacher_remark]`] = student.teacherRemark;
       }
       const payload = await resultPost('api/result/student-attendance-master', data);
-      const message = assertOk(payload, 'Laravel did not confirm that attendance was saved.');
+      const message = assertOk(payload, "Couldn't save attendance. Try again.");
       toast.success('Attendance saved', message || undefined);
     } catch (err) {
-      toast.error('Could not save attendance', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't save attendance. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }

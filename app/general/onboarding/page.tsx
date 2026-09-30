@@ -39,7 +39,7 @@ export default function OnboardingPage() {
     try {
       setOverview(await loadOnboardingOverview());
     } catch (caught) {
-      setError(errorMessage(caught, "Could not load the onboarding overview."));
+      setError(errorMessage(caught, "Couldn't load the onboarding overview. Try again."));
     } finally {
       isRefresh ? setRefreshing(false) : setLoading(false);
     }

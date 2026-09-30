@@ -43,7 +43,7 @@ export const HousesContent: React.FC<HousesContentProps> = ({
       .then(setHouses)
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load houses.');
+        setError(reason instanceof Error ? reason.message : "Couldn't load houses. Try again.");
       })
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false);

@@ -63,7 +63,7 @@ export function ModuleJourney({
           current && next.steps.some((step) => step.id === current) ? current : null
         );
       } catch (caught) {
-        setError(errorMessage(caught, "Could not load this module's onboarding journey."));
+        setError(errorMessage(caught, "Couldn't load the onboarding journey. Try again."));
       } finally {
         isRefresh ? setRefreshing(false) : setLoading(false);
       }
@@ -93,7 +93,7 @@ export function ModuleJourney({
       );
       setNotice("Step updated.");
     } catch (caught) {
-      setError(errorMessage(caught, "Could not update this step."));
+      setError(errorMessage(caught, "Couldn't update this step. Try again."));
     } finally {
       setSaving(false);
     }

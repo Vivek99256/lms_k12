@@ -8,8 +8,10 @@ import { RecordTable, type RecordColumn } from '@/components/erp/RecordTable';
 import { fetchTeacherDiary, type DiaryEntry } from '@/app/lms/data/teacherDiary';
 import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
+import { friendlyError } from "@/lib/user-messages";
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return friendlyError(error, "We couldn’t load the teacher diary. Please try again.");
 }
 
 export default function TeacherDiaryPage() {
@@ -46,7 +48,7 @@ export default function TeacherDiaryPage() {
       { key: 'standard', label: 'Standard', value: (r) => r.standard || '-', sortable: true },
       { key: 'division', label: 'Division', value: (r) => r.division || '-', sortable: true },
       { key: 'subject', label: 'Subject', value: (r) => r.subject || '-', sortable: true },
-      { key: 'schoolDate', label: 'Planned Date', value: (r) => r.schoolDate || '-', sortable: true },
+      { key: 'schoolDate', label: 'Planned date', value: (r) => r.schoolDate || '-', sortable: true },
       {
         key: 'status',
         label: 'Status',
@@ -62,7 +64,7 @@ export default function TeacherDiaryPage() {
           ),
       },
       { key: 'reason', label: 'Reason', value: (r) => r.reason || '-' },
-      { key: 'executionDate', label: 'Execution Date', value: (r) => r.executionDate || '-', sortable: true },
+      { key: 'executionDate', label: 'Date taught', value: (r) => r.executionDate || '-', sortable: true },
     ],
     []
   );

@@ -66,7 +66,7 @@ export function AgentManagement({
         setNote(`${agent.name} is now ${status}.`);
         agents.refresh();
       } catch (cause) {
-        setNote(cause instanceof Error ? cause.message : 'The status could not be changed.');
+        setNote(cause instanceof Error ? cause.message : 'The status couldn’t be changed.');
       }
     },
     [agents],

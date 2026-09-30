@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { CheckCircle2, Clock, Lightbulb, X } from 'lucide-react';
@@ -119,7 +121,7 @@ function InteractiveVideoPlayerContent() {
         if (!cancelled) setVideo(loaded);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load video');
+        if (!cancelled) setLoadError(friendlyError(err, 'We couldn’t load video. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

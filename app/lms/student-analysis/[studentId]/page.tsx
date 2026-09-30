@@ -32,8 +32,10 @@ import RequireStaff from '@/app/lms/_shared/RequireStaff';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ChartTitle, Tooltip, Legend);
 
+import { friendlyError } from "@/lib/user-messages";
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return friendlyError(error, "We couldn’t load the student analysis. Please try again.");
 }
 
 function tierColor(percent: number): string {

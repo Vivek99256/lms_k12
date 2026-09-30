@@ -203,14 +203,14 @@ export function useQuestionPaperRows(examType?: string, reloadToken?: number) {
       const payload = (await response.json()) as QuestionPaperApiResponse;
 
       if (!response.ok || payload.status_code !== 1) {
-        throw new Error(payload.message || 'Failed to load exams');
+        throw new Error(payload.message || 'Couldn’t load exams');
       }
 
       setRows(Array.isArray(payload.data) ? payload.data.map(mapQuestionPaperToExam) : []);
     } catch (error) {
       if (signal?.aborted) return;
       setRows([]);
-      setLoadError(error instanceof Error ? error.message : 'Failed to load exams');
+      setLoadError(error instanceof Error ? error.message : 'Couldn’t load exams');
     } finally {
       if (showLoading) setIsLoading(false);
     }

@@ -115,7 +115,7 @@ export default function QuestionPaperTemplates() {
         }
       }
     } catch (error) {
-      setIndexError(errorMessage(error, 'Unable to load question paper templates.'));
+      setIndexError(errorMessage(error, 'Couldn’t load question paper templates.'));
     } finally {
       setIndexLoading(false);
     }
@@ -140,7 +140,7 @@ export default function QuestionPaperTemplates() {
         setPapers(rows);
       } catch (error) {
         if (cancelled) return;
-        setPapersError(errorMessage(error, 'Unable to load exams.'));
+        setPapersError(errorMessage(error, 'Couldn’t load exams.'));
       } finally {
         if (!cancelled) setPapersLoading(false);
       }
@@ -175,7 +175,7 @@ export default function QuestionPaperTemplates() {
       } catch (error) {
         if (cancelled) return;
         setPaperContext(null);
-        setPaperError(errorMessage(error, 'Unable to load the question paper.'));
+        setPaperError(errorMessage(error, 'Couldn’t load the question paper.'));
       } finally {
         if (!cancelled) setPaperLoading(false);
       }
@@ -247,7 +247,7 @@ export default function QuestionPaperTemplates() {
       setEditing(false);
       setNotice(asCopy || !draft.id ? 'Template saved to your school.' : 'Template updated.');
     } catch (error) {
-      setSaveError(errorMessage(error, 'Unable to save the template.'));
+      setSaveError(errorMessage(error, 'Couldn’t save the template.'));
     } finally {
       setSaving(false);
     }
@@ -273,7 +273,7 @@ export default function QuestionPaperTemplates() {
 
       await loadIndex(true);
     } catch (error) {
-      setSaveError(errorMessage(error, 'Unable to remove the template.'));
+      setSaveError(errorMessage(error, 'Couldn’t remove the template.'));
     }
   };
 
@@ -297,7 +297,7 @@ export default function QuestionPaperTemplates() {
         fileName: paperContext.paper.paper_name || draft.name,
       });
     } catch (error) {
-      setSaveError(errorMessage(error, 'Unable to generate the PDF.'));
+      setSaveError(errorMessage(error, 'Couldn’t generate the PDF.'));
     } finally {
       setPdfBusy(false);
     }

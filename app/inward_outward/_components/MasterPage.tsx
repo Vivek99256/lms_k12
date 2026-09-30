@@ -32,7 +32,7 @@ export default function MasterPage({ kind }: { kind: MasterKind }) {
     try {
       setRows(physical ? await listPhysicalFiles() : await listPlaces());
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : `Unable to load ${label.toLowerCase()} records.` });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : `Couldn't load ${label.toLowerCase()} records. Try again.` });
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ export default function MasterPage({ kind }: { kind: MasterKind }) {
       reset();
       await load();
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : `Unable to save ${label.toLowerCase()}.` });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : `Couldn't save ${label.toLowerCase()}. Try again.` });
     } finally {
       setSaving(false);
     }
@@ -88,7 +88,7 @@ export default function MasterPage({ kind }: { kind: MasterKind }) {
       setMessage({ type: 'success', text: `${label} deleted successfully.` });
       await load();
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : `Unable to delete ${label.toLowerCase()}.` });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : `Couldn't delete ${label.toLowerCase()}. Try again.` });
     }
   };
 
@@ -117,7 +117,7 @@ export default function MasterPage({ kind }: { kind: MasterKind }) {
           <TableBody>{filtered.length ? filtered.map((row) => {
             const file = physical ? row as PhysicalFileLocation : null;
             return <TableRow key={row.id}><TableCell className="font-semibold">{row.title}</TableCell><TableCell className="whitespace-normal">{row.description}</TableCell>{physical && <><TableCell>{file?.fileCode}</TableCell><TableCell>{file?.fileLocation}</TableCell></>}<TableCell><div className="flex justify-end gap-1"><Button size="icon-sm" variant="outline" aria-label={`Edit ${row.title}`} onClick={() => startEdit(row)}><Pencil /></Button><Button size="icon-sm" variant="destructive" aria-label={`Delete ${row.title}`} onClick={() => void remove(row)}><Trash2 /></Button></div></TableCell></TableRow>;
-          }) : <TableRow><TableCell colSpan={physical ? 5 : 3} className="h-28 text-center text-slate-600">No records found.</TableCell></TableRow>}</TableBody>
+          }) : <TableRow><TableCell colSpan={physical ? 5 : 3} className="h-28 text-center text-slate-600">No records yet.</TableCell></TableRow>}</TableBody>
         </Table>}
       </Panel>
     </PageFrame>

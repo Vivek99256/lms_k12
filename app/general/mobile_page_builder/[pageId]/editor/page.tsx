@@ -57,7 +57,7 @@ export default function MobilePageEditorPage() {
         const loaded = await loadPage(pageId);
         if (!cancelled) setPage(loaded);
       } catch (loadErr: unknown) {
-        if (!cancelled) setLoadError(errorMessage(loadErr, 'Could not open this page.'));
+        if (!cancelled) setLoadError(errorMessage(loadErr, "Couldn't open this page. Try again."));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -79,7 +79,7 @@ export default function MobilePageEditorPage() {
   if (loadError || !page) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-slate-50 text-center">
-        <p className="text-sm text-red-600">{loadError || 'This page could not be opened.'}</p>
+        <p className="text-sm text-red-600">{loadError || "Couldn't open this page. Try again."}</p>
         <Button variant="outline" onClick={() => router.push('/general/mobile_page_builder')}>
           Back to Mobile Pages
         </Button>
@@ -133,7 +133,7 @@ function EditorShell({ pageId, initialPage }: { pageId: number; initialPage: Mob
     try {
       setNotice(await saveDraft(pageId, currentLayout()));
     } catch (saveError: unknown) {
-      setError(errorMessage(saveError, 'The draft could not be saved.'));
+      setError(errorMessage(saveError, "Couldn't save the draft. Try again."));
     } finally {
       setSaving(false);
     }
@@ -148,7 +148,7 @@ function EditorShell({ pageId, initialPage }: { pageId: number; initialPage: Mob
       setStatus(result.page.status);
       setNotice(result.message);
     } catch (publishError: unknown) {
-      setError(errorMessage(publishError, 'The page could not be published.'));
+      setError(errorMessage(publishError, "Couldn't publish the page. Try again."));
     } finally {
       setPublishing(false);
     }
@@ -159,7 +159,7 @@ function EditorShell({ pageId, initialPage }: { pageId: number; initialPage: Mob
       await updatePageMeta(pageId, { name, slug });
       setNotice('Page details saved.');
     } catch (renameError: unknown) {
-      setError(errorMessage(renameError, 'Could not save the page name/slug.'));
+      setError(errorMessage(renameError, "Couldn't save the page name/slug. Try again."));
     }
   }, [pageId, name, slug]);
 

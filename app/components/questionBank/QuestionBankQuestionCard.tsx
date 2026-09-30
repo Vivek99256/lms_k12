@@ -327,7 +327,7 @@ function QuestionFigure({
       ) : (
         <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-500">
           <ImageOff size={13} />
-          Figure could not be loaded
+          Figure couldn’t be loaded
         </div>
       )}
       {(figure.caption || figure.ocr_text) && (

@@ -369,7 +369,7 @@ export function AssignWorkPanel({ workType }: { workType: WorkType }) {
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Students could not be loaded."
+            : "Students couldn’t be loaded."
         );
       } finally {
         if (searchRequestRef.current === requestId) setLoading(false);
@@ -470,7 +470,7 @@ export function AssignWorkPanel({ workType }: { workType: WorkType }) {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : `${copy.Noun} could not be created.`
+          : `${copy.Noun} couldn’t be created.`
       );
     } finally {
       setSaving(false);

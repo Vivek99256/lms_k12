@@ -544,14 +544,14 @@ export default function ReportsPage() {
         const payload = (await response.json().catch(() => null)) as LessonPlanningReportResponse | null;
 
         if (!response.ok || !payload || String(payload.status_code ?? '1') === '0') {
-          throw new Error(payload?.message || 'Unable to load the lesson plan report.');
+          throw new Error(payload?.message || 'Couldn’t load the lesson plan report.');
         }
 
         setRows(Array.isArray(payload.data) ? payload.data : []);
       } catch (error) {
         if (controller.signal.aborted) return;
         setRows([]);
-        setLoadError(error instanceof Error ? error.message : 'Unable to load the lesson plan report.');
+        setLoadError(error instanceof Error ? error.message : 'Couldn’t load the lesson plan report.');
       } finally {
         if (!controller.signal.aborted) setIsLoading(false);
       }
@@ -593,7 +593,7 @@ export default function ReportsPage() {
 
       {loadError ? (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-          <p className="text-sm font-semibold text-red-700">Unable to load reports</p>
+          <p className="text-sm font-semibold text-red-700">Couldn’t load reports</p>
           <p className="mt-1 text-sm text-red-600">{loadError}</p>
         </div>
       ) : null}

@@ -3,7 +3,7 @@ import { AcademicSetupPage } from "../_components/AcademicSetupPage";
 export default function DivisionCapacityMappingPage() {
   return <AcademicSetupPage config={{
     module: "division-capacities",
-    title: "Division Capacity Mapping",
+    title: "Division capacity mapping",
     description: "Set the student capacity for each grade, standard, and division.",
     singular: "Division Capacity",
     fields: [

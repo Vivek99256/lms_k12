@@ -65,7 +65,7 @@ function PalResultContent() {
         setResult(await fetchPalResult(questionPaperId, onlineExamId, controller.signal));
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load the quiz result.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load the quiz result.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }

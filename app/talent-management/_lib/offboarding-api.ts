@@ -65,7 +65,7 @@ async function apiRequest<T>(
 
   const payload = (await response.json().catch(() => ({}))) as unknown;
   if (!response.ok) {
-    throw new Error(messageFrom(payload, `API Error: ${response.status} ${response.statusText}`));
+    throw new Error(messageFrom(payload, "Couldn't complete that request. Try again."));
   }
 
   return payload as T;

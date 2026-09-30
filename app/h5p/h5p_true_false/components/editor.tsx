@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Copy, ImagePlus, Loader2, Plus, Trash2 } from 'lucide-react';
 import {
@@ -207,7 +209,7 @@ export function TrueFalseEditor({
           value={state.description}
           onChange={(v) => set('description', v)}
           disabled={disabled}
-          hint="For teachers, in the content list. Learners do not see this."
+          hint="For teachers, in the content list. Students do not see this."
           rows={2}
         />
         <TextAreaField
@@ -448,7 +450,7 @@ function StatementRow({
       const url = await trueFalseApi.uploadMedia(file, 'image');
       onUpdate({ media_image: url });
     } catch (err: unknown) {
-      setUploadError(err instanceof Error ? err.message : 'Could not upload that picture');
+      setUploadError(friendlyError(err, 'We couldn’t upload that picture. Please try again.'));
     } finally {
       setUploading(false);
     }

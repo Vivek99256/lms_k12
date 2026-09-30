@@ -113,7 +113,7 @@ export async function fetchAuthoringVocabulary(): Promise<AuthoringTypeDescripto
   const body = await res.json().catch(() => null);
 
   if (!res.ok || body?.status_code !== 1) {
-    throw new Error(messageFrom(body, 'Could not load the authoring options.'));
+    throw new Error(messageFrom(body, 'Couldn’t load the authoring options.'));
   }
 
   return (body.data?.authoring_types ?? []) as AuthoringTypeDescriptor[];
@@ -172,7 +172,7 @@ export async function submitAuthoringJob(request: AuthoringRequest): Promise<Aut
   const body = await res.json().catch(() => null);
 
   if (!res.ok || body?.status_code !== 1) {
-    throw new Error(messageFrom(body, `Could not create the content (${res.status}).`));
+    throw new Error(messageFrom(body, `Couldn’t create the content (${res.status}).`));
   }
 
   const data = body.data ?? {};

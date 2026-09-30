@@ -552,7 +552,7 @@ export default function CurriculumPage() {
 
       if (!session || !courseId) {
         if (!cancelled) {
-          setError('Unable to load curriculum data.');
+          setError('Couldn’t load curriculum data.');
           setLoading(false);
         }
         return;
@@ -591,7 +591,7 @@ export default function CurriculumPage() {
         setOpenOutcomeId(curriculumResult.outcomes[0]?.id ?? null);
       } catch {
         if (!cancelled) {
-          setError('Unable to load curriculum data.');
+          setError('Couldn’t load curriculum data.');
         }
       } finally {
         if (!cancelled) {
@@ -647,7 +647,7 @@ export default function CurriculumPage() {
       <div className="flex min-h-screen items-center justify-center bg-slate-50/50">
         <div className="text-center">
           <h2 className="mb-2 text-xl font-semibold text-slate-900">Course not found</h2>
-          <p className="text-slate-500">The requested course could not be found.</p>
+          <p className="text-slate-500">The requested course couldn’t be found.</p>
         </div>
       </div>
     );

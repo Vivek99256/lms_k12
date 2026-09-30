@@ -6,6 +6,7 @@ import { AlertCircle, Loader2, type LucideIcon } from 'lucide-react';
 
 import { mapApiLinkToRoute } from '@/app/data/routeMapper';
 import { PageFrame, PageHeader } from '@/app/fees/_components/fees-shared';
+import { friendlyError } from '@/lib/user-messages';
 import { getFeesSession, type FeesSession } from '@/app/fees/_lib/fees-api';
 import { fetchModuleMenuCategories, type ModuleCategory } from '@/app/_lib/module-categories-api';
 
@@ -92,7 +93,7 @@ export function ModuleCategoryPage({
     if (!session.subInstituteId || !session.userId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setState('error');
-      setError('No active session found. Sign in again to load this module.');
+      setError('Your session has ended. Please sign in again.');
       return;
     }
 
@@ -108,7 +109,7 @@ export function ModuleCategoryPage({
         setState('ready');
       } catch (caught) {
         if (controller.signal.aborted) return;
-        setError(caught instanceof Error ? caught.message : 'Unable to load this module.');
+        setError(friendlyError(caught, "We couldn't load this section. Please try again."));
         setState('error');
       }
     })();
@@ -141,26 +142,26 @@ export function ModuleCategoryPage({
       {state === 'loading' ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading screens…
+          Loading pages…
         </div>
       ) : null}
 
       {state === 'error' ? (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error || 'Unable to load this module.'}</span>
+          <span>{error || "We couldn't load this section. Please try again."}</span>
         </div>
       ) : null}
 
       {state === 'ready' && categories.length === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
-          {`No module is configured under "${moduleSlug}".`}
+          This section isn't set up for your school.
         </div>
       ) : null}
 
       {state === 'ready' && categories.length > 0 && !category ? (
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
-          {`${moduleLabel} has no "${categoryKey}" category configured.`}
+          Nothing here yet.
         </div>
       ) : null}
 
@@ -175,7 +176,7 @@ export function ModuleCategoryPage({
       {screens.length > 0 ? (
         <section className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-            {category?.label ?? 'Screens'}
+            {category?.label ?? 'Pages'}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-5 border-b border-[#D9E3F1]">
             {screens.map((screen) => {
@@ -194,16 +195,16 @@ export function ModuleCategoryPage({
               );
             })}
           </div>
-          <p className="mt-3 text-sm text-slate-500">Choose a screen to open it.</p>
+          <p className="mt-3 text-sm text-slate-500">Choose a page to open it.</p>
         </section>
       ) : null}
 
       {state === 'ready' && category && screens.length === 0 && staticScreens.length === 0
         ? emptyFallback ?? (
             <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
-              <p className="text-sm font-medium text-slate-700">No screens available yet</p>
+              <p className="text-sm font-medium text-slate-700">Nothing here yet.</p>
               <p className="mt-1 text-sm text-slate-500">
-                {`There are no ${category.label} screens available for your account in ${moduleLabel}.`}
+                {`There are no ${category.label} pages available for your account in ${moduleLabel}.`}
               </p>
             </div>
           )

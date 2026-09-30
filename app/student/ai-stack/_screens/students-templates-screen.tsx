@@ -102,7 +102,7 @@ const STARTER_LAYOUT = [
   '<thead><tr>',
   '<th style="border:1px solid #cbd5e1;padding:6px;text-align:left">Roll</th>',
   '<th style="border:1px solid #cbd5e1;padding:6px;text-align:left">Student</th>',
-  '<th style="border:1px solid #cbd5e1;padding:6px;text-align:left">Enrolment no.</th>',
+  '<th style="border:1px solid #cbd5e1;padding:6px;text-align:left">GR no.</th>',
   '<th style="border:1px solid #cbd5e1;padding:6px;text-align:left">Std / Div</th>',
   '<th style="border:1px solid #cbd5e1;padding:6px;text-align:left">Mobile</th>',
   '</tr></thead><tbody>',
@@ -649,7 +649,7 @@ function BuildReportPanel({
         },
       });
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : 'The report could not be built.');
+      onError(cause instanceof Error ? cause.message : "Couldn't build the report. Try again.");
     } finally {
       setBuilding(false);
     }

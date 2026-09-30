@@ -69,7 +69,7 @@ export function useCompetencyCommandCenter(filters: CompetencyFilters): Competen
       );
       setData(response.data);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the competency command center.'));
+      setError(toMessage(loadError, 'Couldn’t load the competency command center.'));
       setData(null);
     } finally {
       setLoading(false);
@@ -115,7 +115,7 @@ export function useCompetencyCommandCenter(filters: CompetencyFilters): Competen
         await load();
         return { ok: true, message: response.message };
       } catch (createError) {
-        const message = toMessage(createError, 'Failed to create the record.');
+        const message = toMessage(createError, 'Couldn’t create the record.');
         setActionError(message);
         return { ok: false, message };
       } finally {

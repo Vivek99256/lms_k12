@@ -39,7 +39,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(`${fallback}.`);
   }
 }
 
@@ -76,8 +76,8 @@ export async function fetchTeacherDiary(signal?: AbortSignal): Promise<DiaryEntr
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the teacher diary.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the teacher diary'));
+  if (!res.ok) throw new Error(`Couldn’t load the teacher diary. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load the teacher diary'));
 
   return toArray(raw.data).map((entry) => {
     const r = toRecord(entry);

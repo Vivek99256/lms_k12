@@ -93,7 +93,7 @@ export function WorkflowConsole({ module: pinnedModule, breadcrumb, title, descr
   const mayDelete = permissions?.delete ?? false;
   const rightsReason = rights.authenticated
     ? 'Your role cannot change approval workflows for this institute.'
-    : 'Sign in again — your permissions could not be checked.';
+    : "Sign in again. We couldn't check your permissions.";
 
   const load = useCallback(
     (isRefresh = false) => {
@@ -103,7 +103,7 @@ export function WorkflowConsole({ module: pinnedModule, breadcrumb, title, descr
       fetchWorkflows({ module: moduleKey ?? undefined, component: componentKey ?? undefined })
         .then(setPayload)
         .catch((cause: unknown) => {
-          setError(cause instanceof PlatformApiError ? cause.message : 'The workflows could not be loaded.');
+          setError(cause instanceof PlatformApiError ? cause.message : "Couldn't load the workflows. Try again.");
         })
         .finally(() => setLoading(false));
     },
@@ -146,7 +146,7 @@ export function WorkflowConsole({ module: pinnedModule, breadcrumb, title, descr
         await updateWorkflow(chain.id, { status });
         saved(`"${chain.name}" is now ${status}.`);
       } catch (cause) {
-        failed(cause, 'The status could not be changed.');
+        failed(cause, "Couldn't change the status. Try again.");
       }
     },
     [saved, failed],
@@ -165,7 +165,7 @@ export function WorkflowConsole({ module: pinnedModule, breadcrumb, title, descr
         await deleteWorkflow(chain.id);
         saved(`"${chain.name}" deleted.`);
       } catch (cause) {
-        failed(cause, 'The workflow could not be deleted.');
+        failed(cause, "Couldn't delete the workflow. Try again.");
       }
     },
     [saved, failed],
@@ -582,7 +582,7 @@ function ChainEditor({
         onSaved(`"${name}" created as a ${status}.`);
       }
     } catch (cause) {
-      onFailed(cause, 'The workflow could not be saved.');
+      onFailed(cause, "Couldn't save the workflow. Try again.");
     } finally {
       setBusy(false);
     }

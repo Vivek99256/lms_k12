@@ -58,7 +58,7 @@ export default function BreakoffRolloverPage() {
       setMonths(monthOptions);
       setSelectedMonths([]);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The breakoff rollover status could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the breakoff rollover status. Try again."));
     } finally {
       setLoading(false);
     }
@@ -90,7 +90,7 @@ export default function BreakoffRolloverPage() {
       setNotice(await rolloverFeeBreakoff(includeAdvanceFees));
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The fee breakoff rollover could not be completed."));
+      setError(errorMessage(value, "Couldn't complete the fee breakoff rollover. Try again."));
     } finally {
       setRunning(false);
     }
@@ -117,7 +117,7 @@ export default function BreakoffRolloverPage() {
       setSelectedMonths([]);
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The breakoff months could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the breakoff months. Try again."));
     } finally {
       setDeleting(false);
     }

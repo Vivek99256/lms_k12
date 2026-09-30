@@ -55,8 +55,8 @@ type MatchResult = {
 
 const STEP_TABS: StepTab[] = [
   { label: 'Select module & upload', description: 'Pick the module and choose the file to import.', icon: Upload },
-  { label: 'Match fields', description: 'Confirm which columns map to ERP fields.', icon: Search },
-  { label: 'Map fields', description: 'Assign remaining columns and set defaults.', icon: Wand2 },
+  { label: 'Match columns', description: 'Confirm which columns map to ERP fields.', icon: Search },
+  { label: 'Set defaults', description: 'Assign remaining columns and set defaults.', icon: Wand2 },
   { label: 'Import results', description: 'See how many records were imported, skipped, or failed.', icon: ListChecks },
 ];
 
@@ -100,11 +100,11 @@ export default function ImportDataPage() {
         headers: createAuthHeaders(session),
       });
       const payload = await res.json();
-      if (!res.ok || payload.status !== '1') throw new Error(payload.message || 'Failed to load import tables.');
+      if (!res.ok || payload.status !== '1') throw new Error(payload.message || "Couldn't load import tables. Try again.");
       const raw = (payload.data ?? []) as ImportTable[];
       setTables(raw.filter((t) => t.is_customized_table === 1));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load import tables.');
+      setError(err instanceof Error ? err.message : "Couldn't load import tables. Try again.");
     } finally {
       setLoadingTables(false);
     }
@@ -154,7 +154,7 @@ export default function ImportDataPage() {
         body: formData,
       });
       const payload = await res.json();
-      if (!res.ok || payload.status !== '1') throw new Error(payload.message || 'Failed to parse file.');
+      if (!res.ok || payload.status !== '1') throw new Error(payload.message || "Couldn't parse file. Try again.");
 
       const data = payload.data;
       const tableFields = data.table_fields as TableField[];
@@ -212,7 +212,7 @@ export default function ImportDataPage() {
       setFieldsUnmatched(tableFields.filter((f) => !matchedFieldNames.has(f.field)));
       setStep(2);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to parse file.');
+      setError(err instanceof Error ? err.message : "Couldn't parse file. Try again.");
     } finally {
       setUploading(false);
     }
@@ -304,7 +304,7 @@ export default function ImportDataPage() {
         </div>
 
         {error && (
-          <AlertBanner variant="error" title="Something went wrong" onDismiss={() => setError('')}>
+          <AlertBanner variant="error" title="Couldn't complete that action" onDismiss={() => setError('')}>
             {error}
           </AlertBanner>
         )}
@@ -417,7 +417,7 @@ export default function ImportDataPage() {
           <div className="grid gap-6 lg:grid-cols-5">
             <div className="lg:col-span-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Step 2</p>
-              <h2 className="mt-1 text-xl font-bold text-slate-900">Match fields</h2>
+              <h2 className="mt-1 text-xl font-bold text-slate-900">Match columns</h2>
               <p className="mt-2 text-sm text-slate-500">
                 Drag fields into <span className="font-semibold text-slate-700">Matched fields</span> to include them in this import.
               </p>
@@ -494,7 +494,8 @@ export default function ImportDataPage() {
               <CardHeader className="border-b">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Step 3</p>
                 <CardTitle className="mt-1 flex items-center gap-2 text-xl">
-                  Map fields
+                  Set defaults
+
                   <Badge variant="secondary" className="ml-2">{parseResult.totalRows} rows detected</Badge>
                   <Badge variant="outline" className="ml-1">{totalMapped}/{parseResult.csvHeaderFields.length} mapped</Badge>
                 </CardTitle>

@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Eye, Loader2 } from 'lucide-react';
@@ -79,7 +81,7 @@ function DragDropEditContent() {
         setState(editorStateFromTask(data));
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load activity');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load activity. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -99,7 +101,7 @@ function DragDropEditContent() {
       const result = await updateDragDrop(id, ctx, toSavePayload(state));
       router.push(`/h5p/h5p_drag_drop?${h5pContextQuery(ctx, { flash: result.message })}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update activity');
+      setError(friendlyError(err, 'We couldn’t update activity. Please try again.'));
       setSaving(false);
     }
   };
@@ -124,7 +126,7 @@ function DragDropEditContent() {
       setTask({ ...task, status: next ? 'published' : 'draft' });
       setSuccess(result.message);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to change publish state');
+      setError(friendlyError(err, 'We couldn’t publish or unpublish this activity. Please try again.'));
     } finally {
       setPublishing(false);
     }

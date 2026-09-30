@@ -208,7 +208,7 @@ export default function FeesCancelRefundPage() {
 
       const payload = await parseJsonResponse<CancelSearchResponse>(response);
       if (!response.ok) {
-        throw new Error(payload.message || `HTTP ${response.status}: Unable to search fee receipts.`);
+        throw new Error(payload.message || "Couldn't search fee receipts. Try again.");
       }
 
       const status = readStatus(payload);
@@ -225,7 +225,7 @@ export default function FeesCancelRefundPage() {
     } catch (error) {
       setRows([]);
       setCancelTypes([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to search fee receipts.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't search fee receipts. Try again." });
     } finally {
       setLoading(false);
     }
@@ -295,12 +295,12 @@ export default function FeesCancelRefundPage() {
 
       const payload = await parseJsonResponse<{ status?: string | number; status_code?: string | number; message?: string }>(response);
       if (!response.ok) {
-        throw new Error(payload.message || `HTTP ${response.status}: Unable to cancel selected fees.`);
+        throw new Error(payload.message || "Couldn't cancel selected fees. Try again.");
       }
 
       const status = readStatus(payload);
       if (status !== 1) {
-        throw new Error(payload.message || 'Unable to cancel selected fees.');
+        throw new Error(payload.message || "Couldn't cancel selected fees. Try again.");
       }
 
       const selectedRowKeys = new Set(selectedRows.map(getRowKey));
@@ -309,7 +309,7 @@ export default function FeesCancelRefundPage() {
       setFormState({});
       setMessage({ type: 'success', text: payload.message || 'Fees deleted successfully.' });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to cancel selected fees.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't cancel selected fees. Try again." });
     } finally {
       setSubmitting(false);
     }
@@ -358,20 +358,20 @@ export default function FeesCancelRefundPage() {
       <div className="mx-auto  space-y-4 ">
         <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <MetricCard title="Receipts found" value={String(metrics.receiptCount)} icon={<ReceiptText className="h-4 w-4" />} />
-          <MetricCard title="Eligible to cancel" value={String(metrics.eligibleCount)} icon={<CheckCircle2 className="h-4 w-4" />} />
-          <MetricCard title="Blocked online" value={String(metrics.blockedCount)} icon={<Ban className="h-4 w-4" />} />
-          <MetricCard title="Selected value" value={currencyFormatter.format(metrics.selectedAmount)} icon={<WalletCards className="h-4 w-4" />} />
+          <MetricCard title="Can be cancelled" value={String(metrics.eligibleCount)} icon={<CheckCircle2 className="h-4 w-4" />} />
+          <MetricCard title="Paid online (can't cancel here)" value={String(metrics.blockedCount)} icon={<Ban className="h-4 w-4" />} />
+          <MetricCard title="Selected amount" value={currencyFormatter.format(metrics.selectedAmount)} icon={<WalletCards className="h-4 w-4" />} />
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-base font-bold leading-none text-slate-950">Fees Cancel / Refund</h1>
-              <p className="mt-2 text-xs text-slate-700">Search paid receipts, select eligible rows, and submit fee cancellations to Laravel.</p>
+              <h1 className="text-base font-bold leading-none text-slate-950">Cancel or refund fees</h1>
+              <p className="mt-2 text-xs text-slate-700">Search paid receipts, select eligible rows, and submit fee cancellations.</p>
             </div>
             <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-              <TabButton active={activeTab === 'cancel'} onClick={() => setActiveTab('cancel')}>Fees Cancel</TabButton>
-              <TabButton active={activeTab === 'refund'} onClick={() => setActiveTab('refund')}>Fees Refund</TabButton>
+              <TabButton active={activeTab === 'cancel'} onClick={() => setActiveTab('cancel')}>Cancel fees</TabButton>
+              <TabButton active={activeTab === 'refund'} onClick={() => setActiveTab('refund')}>Refund fees</TabButton>
             </div>
           </div>
 
@@ -392,16 +392,16 @@ export default function FeesCancelRefundPage() {
                   />
                 </div>
 
-                <Field label="Enrollment No">
+                <Field label="GR no.">
                   <Input value={enrollmentNo} onChange={(event) => setEnrollmentNo(event.target.value)} placeholder="Enter GR no" />
                 </Field>
-                <Field label="Receipt No">
+                <Field label="Receipt no.">
                   <Input value={receiptNo} onChange={(event) => setReceiptNo(event.target.value)} placeholder="Receipt number" />
                 </Field>
-                <Field label="From Date">
+                <Field label="From date">
                   <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
                 </Field>
-                <Field label="To Date">
+                <Field label="To date">
                   <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
                 </Field>
               </div>
@@ -441,17 +441,17 @@ export default function FeesCancelRefundPage() {
                           aria-label="Select visible cancellable receipts"
                         />
                       </TableHead>
-                      <SortableHead label="GR No" sortKey="enrollmentNo" state={sortState} onSort={updateSort} />
+                      <SortableHead label="GR no." sortKey="enrollmentNo" state={sortState} onSort={updateSort} />
                       <SortableHead label="Student" sortKey="studentName" state={sortState} onSort={updateSort} />
                       <TableHead>Standard</TableHead>
                       <TableHead>Division</TableHead>
-                      <SortableHead label="Receipt No" sortKey="receiptNo" state={sortState} onSort={updateSort} />
+                      <SortableHead label="Receipt no." sortKey="receiptNo" state={sortState} onSort={updateSort} />
                       <SortableHead label="Amount" sortKey="totalAmount" state={sortState} onSort={updateSort} align="right" />
-                      <SortableHead label="Receipt Date" sortKey="receiptDate" state={sortState} onSort={updateSort} />
-                      <SortableHead label="Created Date" sortKey="createdOn" state={sortState} onSort={updateSort} />
-                      <SortableHead label="Payment Mode" sortKey="paymentMode" state={sortState} onSort={updateSort} />
-                      <TableHead>Cancel Type</TableHead>
-                      <TableHead>Cancel Remarks</TableHead>
+                      <SortableHead label="Receipt date" sortKey="receiptDate" state={sortState} onSort={updateSort} />
+                      <SortableHead label="Created date" sortKey="createdOn" state={sortState} onSort={updateSort} />
+                      <SortableHead label="Payment mode" sortKey="paymentMode" state={sortState} onSort={updateSort} />
+                      <TableHead>Cancel type</TableHead>
+                      <TableHead>Cancel remarks</TableHead>
                       <TableHead>Receipt</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -584,7 +584,7 @@ export default function FeesCancelRefundPage() {
                   </Button>
                   <Button type="button" onClick={handleSubmitCancel} disabled={submitting || selectedKeys.length === 0}>
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                    Cancel Selected
+                    Cancel selected
                   </Button>
                 </div>
               </div>
@@ -758,11 +758,11 @@ function RefundWorkflow({ session }: { session: SessionContext }) {
     try {
       const response = await fetch(`${baseUrl}/api/fees-refund/detail/${encodeURIComponent(id)}`, { method: 'POST', headers: headers(), body: new URLSearchParams(context()) });
       const payload = await parseJsonResponse<{ status_code?: string | number; message?: string; student?: unknown; fee_heads?: unknown }>(response);
-      if (!response.ok || readStatus(payload) !== 1) throw new Error(payload.message || 'Unable to load refundable fee heads.');
+      if (!response.ok || readStatus(payload) !== 1) throw new Error(payload.message || "Couldn't load refundable fee heads. Try again.");
       const nextHeads = Object.fromEntries(Object.entries(asRecord(payload.fee_heads)).map(([key, value]) => [key, { label: readString(asRecord(value).label) || key, amount: readNumber(asRecord(value).amount) }]));
       const nextStudent = asRecord(payload.student);
       setHeads(nextHeads); setAmounts(Object.fromEntries(Object.entries(nextHeads).map(([key, value]) => [key, String(value.amount)]))); setStudent({ student_id: readString(nextStudent.student_id) || id, enrollment: readString(nextStudent.enrollment), name: readString(nextStudent.name) });
-    } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load refund detail.' }); } finally { setBusy(false); }
+    } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load refund detail. Try again." }); } finally { setBusy(false); }
   };
 
   const save = async () => {
@@ -774,9 +774,9 @@ function RefundWorkflow({ session }: { session: SessionContext }) {
     try {
       const response = await fetch(`${baseUrl}/api/fees-refund/save`, { method: 'POST', headers: headers(), body: form });
       const payload = await parseJsonResponse<{ status_code?: string | number; message?: string }>(response);
-      if (!response.ok || readStatus(payload) !== 1) throw new Error(payload.message || 'Refund could not be saved.');
+      if (!response.ok || readStatus(payload) !== 1) throw new Error(payload.message || "Couldn't save refund. Try again.");
       setNotice({ type: 'success', text: payload.message || 'Fees refund saved successfully.' });
-    } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : 'Refund could not be saved.' }); } finally { setBusy(false); }
+    } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : "Couldn't save refund. Try again." }); } finally { setBusy(false); }
   };
 
   return (

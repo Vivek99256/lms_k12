@@ -368,7 +368,7 @@ async function loadFallbackOnboarding(): Promise<OnboardingData> {
   });
   const payload = (await response.json()) as MenuRightsResponse;
   if (!response.ok) {
-    throw new Error(payload.message || "Menu rights could not be loaded.");
+    throw new Error(payload.message || "Couldn't load menu rights. Try again.");
   }
 
   const rawLevel1 = payload.data?.["level 1"] ?? payload["level 1"];

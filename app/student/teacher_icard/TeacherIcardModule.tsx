@@ -312,7 +312,7 @@ export default function TeacherIcardModule() {
         const payload = normalizePayload(responseBody);
 
         if (!response.ok || readStatus(payload) !== 1) {
-          throw new Error(readMessage(payload, 'Unable to load User I-card metadata.'));
+          throw new Error(readMessage(payload, "Couldn't load user I-card metadata. Try again."));
         }
 
         if (!active) {
@@ -333,7 +333,7 @@ export default function TeacherIcardModule() {
 
         setMessage({
           type: 'error',
-          text: error instanceof Error ? error.message : 'Unable to load User I-card metadata.',
+          text: error instanceof Error ? error.message : "Couldn't load user I-card metadata. Try again.",
         });
       } finally {
         if (active) {
@@ -394,7 +394,7 @@ export default function TeacherIcardModule() {
       const payload = normalizePayload(responseBody);
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, 'Unable to fetch users for I-card generation.'));
+        throw new Error(readMessage(payload, "Couldn't load users for I-card generation. Try again."));
       }
 
       const nextUsers = parseUserRows(payload);
@@ -408,7 +408,7 @@ export default function TeacherIcardModule() {
       setUsers([]);
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to fetch users for I-card generation.',
+        text: error instanceof Error ? error.message : "Couldn't load users for I-card generation. Try again.",
       });
     } finally {
       setSearchLoading(false);
@@ -484,12 +484,12 @@ export default function TeacherIcardModule() {
       const payload = normalizePayload(responseBody);
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, 'Unable to generate User I-cards.'));
+        throw new Error(readMessage(payload, "Couldn't generate user I-cards. Try again."));
       }
 
       const html = readString(payload.html);
       if (!html) {
-        throw new Error('User I-card preview HTML was not returned by Laravel.');
+        throw new Error("Couldn't generate the I-card preview. Try again.");
       }
 
       setPreview({
@@ -507,7 +507,7 @@ export default function TeacherIcardModule() {
       setPreview(null);
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to generate User I-cards.',
+        text: error instanceof Error ? error.message : "Couldn't generate user I-cards. Try again.",
       });
     } finally {
       setPreviewLoading(false);
@@ -524,14 +524,14 @@ export default function TeacherIcardModule() {
     <PageFrame>
       <PageHeader
         title="User I-card"
-        description="Mirror the legacy teacher or staff I-card workflow through the existing Next.js module patterns, without changing the old Laravel teacher I-card behavior."
+        description="Generate and print I-cards for teachers and other employees."
       />
 
       {message && <InlineMessage type={message.type} text={message.text} />}
 
       <SectionPanel
         title="Search Filters"
-        description="Laravel only requires the user type for this module, then returns active users for that selected profile."
+        description="Choose a user type to list active users."
       >
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Type">
@@ -648,7 +648,7 @@ export default function TeacherIcardModule() {
 
       <SectionPanel
         title="Preview"
-        description="Laravel still owns the legacy User I-card HTML template rendering, and the Next.js frontend reuses that rendered output for preview and print."
+        description="Preview the I-cards here, then print them."
         footer={(
           <div className="flex justify-end">
             <Button
@@ -681,7 +681,7 @@ export default function TeacherIcardModule() {
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-600">
-            Generate User I-cards to preview the rendered Laravel template output here.
+            Generate User I-cards to preview them here.
           </div>
         )}
       </SectionPanel>

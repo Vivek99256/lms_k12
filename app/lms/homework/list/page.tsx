@@ -45,7 +45,7 @@ export default function StudentHomeworkListPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Your homework could not be loaded."
+          : "Your homework couldn’t be loaded."
       );
     } finally {
       setLoading(false);

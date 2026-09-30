@@ -107,7 +107,7 @@ function ConceptLearnView() {
         .then(setData)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'The lesson could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'The lesson couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -153,7 +153,7 @@ function ConceptLearnView() {
       // Left on the page with the reason, rather than pushed into a screen that
       // would show the lesson again because the acknowledgement never landed.
       setContinueError(
-        reason instanceof Error ? reason.message : 'That could not be recorded. Try again.',
+        reason instanceof Error ? reason.message : 'That couldn’t be recorded. Try again.',
       );
       setContinuing(false);
     }
@@ -202,7 +202,7 @@ function ConceptLearnView() {
       <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
-            <p className="text-sm text-rose-800">{error ?? 'The lesson could not be loaded.'}</p>
+            <p className="text-sm text-rose-800">{error ?? 'The lesson couldn’t be loaded.'}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={load}>
                 Try again

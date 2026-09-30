@@ -648,13 +648,13 @@ function AddLessonDialog({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload?.status === false) {
-        throw new Error(payload?.message || `Failed to schedule the lesson (${response.status}).`);
+        throw new Error(payload?.message || `Couldn’t schedule the lesson (${response.status}).`);
       }
 
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to schedule the lesson.');
+      setError(err instanceof Error ? err.message : 'Couldn’t schedule the lesson.');
     } finally {
       setIsSaving(false);
     }
@@ -809,13 +809,13 @@ function EditLessonDialog({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload?.status === false) {
-        throw new Error(payload?.message || `Failed to update the lesson (${response.status}).`);
+        throw new Error(payload?.message || `Couldn’t update the lesson (${response.status}).`);
       }
 
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to update the lesson.');
+      setError(err instanceof Error ? err.message : 'Couldn’t update the lesson.');
     } finally {
       setIsSaving(false);
     }
@@ -834,13 +834,13 @@ function EditLessonDialog({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload?.status === false) {
-        throw new Error(payload?.message || `Failed to delete the lesson (${response.status}).`);
+        throw new Error(payload?.message || `Couldn’t delete the lesson (${response.status}).`);
       }
 
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to delete the lesson.');
+      setError(err instanceof Error ? err.message : 'Couldn’t delete the lesson.');
       setIsDeleting(false);
     }
   };
@@ -1090,7 +1090,7 @@ export default function LessonPlanPage() {
         setApiPeriods(Array.isArray(payload.data) ? payload.data : []);
       } catch (error) {
         if ((error as Error)?.name === 'AbortError') return;
-        setLoadError(error instanceof Error ? error.message : 'Unable to load the lesson plan.');
+        setLoadError(error instanceof Error ? error.message : 'Couldn’t load the lesson plan.');
         setApiPeriods([]);
       } finally {
         if (!controller.signal.aborted) setIsLoading(false);

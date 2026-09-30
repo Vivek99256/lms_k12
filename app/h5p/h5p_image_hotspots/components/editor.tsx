@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { useRef, useState } from 'react';
 import { ImagePlus, Loader2, Plus, Trash2 } from 'lucide-react';
 import {
@@ -170,7 +172,7 @@ export function ImageHotspotsEditor({
     try {
       apply(await imageHotspotsApi.uploadMedia(file, role));
     } catch (err: unknown) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to upload image');
+      setUploadError(friendlyError(err, 'We couldn’t upload the image. Please try again.'));
     } finally {
       setUploading(null);
     }
@@ -228,7 +230,7 @@ export function ImageHotspotsEditor({
           value={state.description}
           onChange={(v) => set('description', v)}
           disabled={disabled}
-          hint="For teachers, in the content list. Learners do not see this."
+          hint="For teachers, in the content list. Students do not see this."
           rows={2}
         />
         <TextField

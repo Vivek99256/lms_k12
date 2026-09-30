@@ -432,12 +432,12 @@ async function interventionFetch(path: string, init?: RequestInit): Promise<Fetc
     if (response.status === 403) {
       throw new Error(message || 'You are not allowed to view this support case.');
     }
-    throw new Error(message || `HTTP ${response.status}: support cases are unavailable.`);
+    throw new Error(message || `This feature is not available right now. Please try again later.`);
   }
 
   const record = toRecord(payload);
   if (record.success === false) {
-    throw new Error(readString(record.message) || 'The request could not be completed.');
+    throw new Error(readString(record.message) || 'The request couldn’t be completed.');
   }
   return { missing: false, data: 'data' in record ? record.data : payload };
 }

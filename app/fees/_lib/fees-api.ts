@@ -216,7 +216,7 @@ function parseJsonResponseBody<T>(text: string, contentType: string): T {
     return JSON.parse(text) as T;
   } catch {
     throw new Error(
-      `Laravel returned a non-JSON response (${contentType || 'unknown content type'}). ${summarizeResponseText(text) || 'Empty response body.'}`
+      "Couldn't read the response. Try again."
     );
   }
 }
@@ -237,7 +237,7 @@ export async function fetchLaravelJson<T>(session: FeesSession, url: string, ini
   const payload = parseJsonResponseBody<T>(text, contentType);
 
   if (!response.ok) {
-    const message = readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to complete request.`;
+    const message = readString(asRecord(payload).message) || "Couldn't complete request. Try again.";
     throw new Error(message);
   }
 
@@ -248,7 +248,7 @@ export function parseJsonText<T>(text: string): T {
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error('Laravel returned an HTML page instead of JSON. This route needs type=API support or an active Laravel session.');
+    throw new Error("Couldn't read the response. Sign in again and try again.");
   }
 }
 

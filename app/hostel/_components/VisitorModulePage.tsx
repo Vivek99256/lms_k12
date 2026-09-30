@@ -60,7 +60,7 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
         setOptions(loadedOptions);
       }
     } catch (loadError: unknown) {
-      setError(loadError instanceof Error ? loadError.message : "Visitor data could not be loaded.");
+      setError(loadError instanceof Error ? loadError.message : "Couldn't load visitor data. Try again.");
     } finally {
       setLoading(false);
     }
@@ -114,7 +114,7 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
       setForm(defaultVisitorForm());
       await load(filters);
     } catch (saveError: unknown) {
-      setError(saveError instanceof Error ? saveError.message : "Visitor could not be saved.");
+      setError(saveError instanceof Error ? saveError.message : "Couldn't save visitor. Try again.");
     } finally {
       setBusy(false);
     }
@@ -132,8 +132,8 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
             <h1 className="text-2xl font-bold text-slate-950">{mode === "details" ? "Visitor Details" : "Visitor Report"}</h1>
             <p className="mt-1 text-sm text-slate-500">
               {mode === "details"
-                ? "Laravel visitor fields, validations, and list/report behavior were mapped into the existing Next.js design system."
-                : "Search visitors by date range using the existing token-capable Laravel admin API."}
+                ? "Record and review visitors."
+                : "Search visitors by date range."}
             </p>
           </div>
           {mode === "details" && (
@@ -161,7 +161,7 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div>
-                  <Label htmlFor="appointment_type">Appointment Type</Label>
+                  <Label htmlFor="appointment_type">Appointment type</Label>
                   <select
                     id="appointment_type"
                     value={form.appointment_type}
@@ -180,7 +180,7 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
                     onChange={(event) => updateForm("visitor_type", event.target.value)}
                     className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   >
-                    <option value="">Select Visitor Type</option>
+                    <option value="">Select visitor type</option>
                     {options.visitorTypes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                   </select>
                 </div>
@@ -204,12 +204,12 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
                     onChange={(event) => updateForm("to_meet", event.target.value)}
                     className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   >
-                    <option value="">Select Staff Member</option>
+                    <option value="">Select staff member</option>
                     {options.toMeet.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="coming_from">Coming From</Label>
+                  <Label htmlFor="coming_from">Coming from</Label>
                   <Input id="coming_from" value={form.coming_from} onChange={(event) => updateForm("coming_from", event.target.value)} className="mt-1" />
                 </div>
                 <div>
@@ -225,15 +225,15 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
                   <Input id="purpose" value={form.purpose} onChange={(event) => updateForm("purpose", event.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label htmlFor="meet_date">Meet Date</Label>
+                  <Label htmlFor="meet_date">Meet date</Label>
                   <Input id="meet_date" type="date" value={form.meet_date} onChange={(event) => updateForm("meet_date", event.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label htmlFor="in_time">Checkin Time</Label>
+                  <Label htmlFor="in_time">Checkin time</Label>
                   <Input id="in_time" type="time" value={form.in_time} onChange={(event) => updateForm("in_time", event.target.value)} className="mt-1" />
                 </div>
                 <div className="md:col-span-2">
-                  <Label htmlFor="visitor_photo">Visitor Photo</Label>
+                  <Label htmlFor="visitor_photo">Visitor photo</Label>
                   <Input id="visitor_photo" type="file" accept="image/*" onChange={onFileChange} className="mt-1" />
                 </div>
               </div>
@@ -256,11 +256,11 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
                 </div>
               </div>
               <div>
-                <Label htmlFor="from-date">From Date</Label>
+                <Label htmlFor="from-date">From date</Label>
                 <Input id="from-date" type="date" value={filters.fromDate} onChange={(event) => setFilters((current) => ({ ...current, fromDate: event.target.value }))} className="mt-1" />
               </div>
               <div>
-                <Label htmlFor="to-date">To Date</Label>
+                <Label htmlFor="to-date">To date</Label>
                 <Input id="to-date" type="date" value={filters.toDate} onChange={(event) => setFilters((current) => ({ ...current, toDate: event.target.value }))} className="mt-1" />
               </div>
               <Button variant="outline" onClick={() => void load(filters)} disabled={loading}>
@@ -276,7 +276,7 @@ export function VisitorModulePage({ mode }: { mode: Mode }) {
                     <TableHead>Visitor</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Contact</TableHead>
-                    <TableHead>To Meet</TableHead>
+                    <TableHead>To meet</TableHead>
                     <TableHead>Purpose</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Checkin</TableHead>

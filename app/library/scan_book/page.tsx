@@ -79,15 +79,15 @@ function printRows(rows: ScanRecord[]) {
         </style>
       </head>
       <body>
-        <h2>Scan Book</h2>
+        <h2>Scan book</h2>
         <table>
           <thead>
             <tr>
-              <th>Sr No</th>
-              <th>Item Code</th>
+              <th>No.</th>
+              <th>Item code</th>
               <th>Title</th>
-              <th>Collection Type</th>
-              <th>Scan Status</th>
+              <th>Collection type</th>
+              <th>Scan status</th>
               <th>SYear</th>
             </tr>
           </thead>
@@ -125,7 +125,7 @@ export default function ScanBookPage() {
 
   const exportRows = useMemo(
     () => filteredRecords.map((record, index) => ({
-      'Sr No': String(index + 1),
+      'No.': String(index + 1),
       'Item Code': record.itemCode || '-',
       Title: record.title || '-',
       'Collection Type': record.collectionType || '-',
@@ -174,7 +174,7 @@ export default function ScanBookPage() {
 
       const normalized = normalizePayload(await response.json());
       const status = readStatus(normalized);
-      const nextMessage = readMessage(normalized, 'Unable to scan book.');
+      const nextMessage = readMessage(normalized, "Couldn't scan book. Try again.");
 
       setMessage({ type: status === 1 ? 'success' : 'error', text: nextMessage });
       setRecords(parseRecords(normalized));
@@ -183,7 +183,7 @@ export default function ScanBookPage() {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to scan book.',
+        text: error instanceof Error ? error.message : "Couldn't scan book. Try again.",
       });
     } finally {
       setLoading(false);
@@ -193,7 +193,7 @@ export default function ScanBookPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Scan Book"
+        title="Scan book"
         description="Scan item codes and review the matching verification rows using the existing library verification flow."
         action={(
           <div className="flex flex-wrap gap-2">
@@ -225,13 +225,13 @@ export default function ScanBookPage() {
 
       {message ? <InlineMessage type={message.type} text={message.text} /> : null}
 
-      <SectionPanel title="Scanner" description="Laravel scans a single item code at a time and records the verification scan for the current academic year.">
+      <SectionPanel title="Scanner" description="Scan one item code at a time. Each scan is recorded for the current academic year.">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-          <Field label="Item Code">
+          <Field label="Item code">
             <Input
               value={itemCode}
               onChange={(event) => setItemCode(event.target.value)}
-              placeholder="Scan Item Code"
+              placeholder="Scan item code"
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
@@ -250,12 +250,12 @@ export default function ScanBookPage() {
       </SectionPanel>
 
       <SectionPanel
-        title="Scanned Books"
-        description={lastScannedItem ? `Showing the backend response for item code ${lastScannedItem}.` : 'The Laravel screen only shows scan results after a scan attempt.'}
+        title="Scanned books"
+        description={lastScannedItem ? `Showing the result for item code ${lastScannedItem}.` : 'Scan results appear after you scan an item.'}
       >
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="Global Search">
+            <Field label="Global search">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -272,11 +272,11 @@ export default function ScanBookPage() {
             <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100">
-                  <TableHead>Sr No</TableHead>
-                  <TableHead>Item Code</TableHead>
+                  <TableHead>No.</TableHead>
+                  <TableHead>Item code</TableHead>
                   <TableHead>Title</TableHead>
-                  <TableHead>Collection Type</TableHead>
-                  <TableHead>Scan Status</TableHead>
+                  <TableHead>Collection type</TableHead>
+                  <TableHead>Scan status</TableHead>
                   <TableHead>SYear</TableHead>
                 </TableRow>
                 <TableRow className="bg-white hover:bg-white">

@@ -115,7 +115,7 @@ export default function ReportPage({ config }: { config: ReportConfig }) {
       setSearched(true);
     } catch (cause) {
       setRows([]);
-      setError(cause instanceof Error ? cause.message : 'Unable to load the report.');
+      setError(cause instanceof Error ? cause.message : "Couldn't load the report. Try again.");
       setSearched(true);
     } finally {
       setBusy(false);

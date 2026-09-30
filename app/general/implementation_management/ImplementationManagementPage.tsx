@@ -86,8 +86,8 @@ const PROGRESS_STAGES: ProgressStage[] = [
     summaryPercent: 100,
     items: [
       {
-        title: "Staff Data",
-        helper: "Download the legacy Excel template for staff import.",
+        title: "Employee data",
+        helper: "Download the Excel template for staff import.",
         status: "complete",
         action: {
           kind: "external",
@@ -96,7 +96,7 @@ const PROGRESS_STAGES: ProgressStage[] = [
       },
       {
         title: "Student Data",
-        helper: "Download the legacy Excel template for student import.",
+        helper: "Download the Excel template for student import.",
         status: "complete",
         action: {
           kind: "external",
@@ -139,8 +139,8 @@ const PROGRESS_STAGES: ProgressStage[] = [
         },
       },
       {
-        title: "Fees Collect",
-        helper: "Continue into the legacy fee collection flow.",
+        title: "Fee collection",
+        helper: "Continue to fee collection.",
         status: "complete",
         action: { kind: "legacy", path: "fees_collect?implementation=1" },
       },
@@ -268,7 +268,7 @@ export function ImplementationManagementPage() {
       setWelcome(welcomeData);
       setData(implementationData);
     } catch (value: unknown) {
-      setError(errorMessage(value, "Implementation Management could not be loaded."));
+      setError(errorMessage(value, "Couldn't load implementation management. Try again."));
       setWelcome(null);
       setData(emptyState());
     } finally {
@@ -359,8 +359,8 @@ export function ImplementationManagementPage() {
   function validate(): string {
     if (!data.totalBoys.trim()) return "Total Boys is required.";
     if (!data.totalGirls.trim()) return "Total Girls is required.";
-    if (!data.totalMale.trim()) return "Total Male Staff is required.";
-    if (!data.totalFemale.trim()) return "Total Female Staff is required.";
+    if (!data.totalMale.trim()) return "Total male employees is required.";
+    if (!data.totalFemale.trim()) return "Total female employees is required.";
     if (count(data.totalStrength) !== count(data.totalBoys) + count(data.totalGirls)) {
       return "Total Strength must equal Total Boys plus Total Girls.";
     }
@@ -389,7 +389,7 @@ export function ImplementationManagementPage() {
       );
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "Implementation Management could not be saved."));
+      setError(errorMessage(value, "Couldn't save implementation management. Try again."));
     } finally {
       setSaving(false);
     }

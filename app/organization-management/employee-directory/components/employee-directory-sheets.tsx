@@ -287,7 +287,7 @@ function AddEmployeeSheet({ open, onOpenChange }: { open: boolean; onOpenChange:
                 <Select placeholder="Select Department" options={[{ label: 'Engineering', value: 'eng' }, { label: 'Product', value: 'prod' }]} />
               </div>
               <div className="space-y-2">
-                <Label>Job Role / Designation</Label>
+                <Label>Designation</Label>
                 <Select placeholder="Select Job Role" options={[{ label: 'Senior Full Stack Engineer', value: 'se' }, { label: 'Product Designer', value: 'pd' }]} />
               </div>
               <div className="space-y-2">

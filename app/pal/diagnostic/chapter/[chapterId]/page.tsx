@@ -174,7 +174,7 @@ function DiagnosticExam() {
         })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'The chapter diagnostic could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'The chapter diagnostic couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -208,7 +208,7 @@ function DiagnosticExam() {
         router.push(`/pal/diagnostic/result/${paper.attemptId}`);
       }
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : 'The chapter diagnostic could not be submitted.');
+      setError(reason instanceof Error ? reason.message : 'The chapter diagnostic couldn’t be submitted.');
       setSubmitting(false);
     }
   }, [paper, answers, submitting, router]);

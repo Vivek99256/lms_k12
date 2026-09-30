@@ -50,7 +50,7 @@ async function request(init?: RequestInit): Promise<UnknownRecord> {
     !response.ok ||
     (isRecord(payload) && ["0", "2"].includes(normalizeApiStatus(payload as ApiEnvelope)))
   ) {
-    throw new Error(messageFrom(payload, `Request failed (${response.status}).`));
+    throw new Error(messageFrom(payload, "Couldn't complete the request. Try again."));
   }
   return isRecord(payload) ? payload : {};
 }

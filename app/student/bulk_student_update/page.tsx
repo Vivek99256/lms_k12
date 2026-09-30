@@ -49,7 +49,7 @@ export default function BulkStudentUpdatePage() {
       setSections(sectionOptions);
     }).catch((reason: unknown) => {
       if (reason instanceof DOMException && reason.name === 'AbortError') return;
-      setError(reason instanceof Error ? reason.message : 'Unable to load bulk update.');
+      setError(reason instanceof Error ? reason.message : "Couldn't load bulk update. Try again.");
     }).finally(() => {
       if (!controller.signal.aborted) setIsLoading(false);
     });
@@ -87,7 +87,7 @@ export default function BulkStudentUpdatePage() {
     try {
       setRows(await searchBulkStudents({ grade, standard, division, orderBy, fields: selectedFields }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to search students.');
+      setError(reason instanceof Error ? reason.message : "Couldn't search students. Try again.");
     } finally {
       setIsSearching(false);
     }
@@ -101,7 +101,7 @@ export default function BulkStudentUpdatePage() {
     try {
       setMessage(await saveBulkStudents(rows, selectedFields));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to update students.');
+      setError(reason instanceof Error ? reason.message : "Couldn't update students. Try again.");
     } finally {
       setIsSaving(false);
     }
@@ -140,10 +140,10 @@ export default function BulkStudentUpdatePage() {
           <label className="space-y-1">
             <span className="text-xs font-medium text-slate-600">Order By</span>
             <select value={orderBy} onChange={(event) => setOrderBy(event.target.value)} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-500">
-              <option value="student_name">Student Name</option>
+              <option value="student_name">Student name</option>
               <option value="standard_id">Standard</option>
-              <option value="enrollment_no">GR No.</option>
-              <option value="roll_no">Roll No.</option>
+              <option value="enrollment_no">GR no.</option>
+              <option value="roll_no">Roll no.</option>
               <option value="last_name">Last Name</option>
             </select>
           </label>

@@ -79,7 +79,7 @@ export default function StudentTransferPage() {
       setFromSyear((current) => current || session.syear || years[0] || "");
       setToSyear((current) => current || session.syear || years[0] || "");
     } catch (value: unknown) {
-      setError(errorMessage(value, "The student transfer screen could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the student transfer screen. Try again."));
     } finally {
       setLoading(false);
     }
@@ -160,7 +160,7 @@ export default function StudentTransferPage() {
       setStudents([]);
       setModules([]);
       setSearched(true);
-      setError(errorMessage(value, "Students could not be loaded."));
+      setError(errorMessage(value, "Couldn't load students. Try again."));
     } finally {
       setSearching(false);
     }
@@ -191,7 +191,7 @@ export default function StudentTransferPage() {
       const result = await searchTransferableStudents(search);
       setStudents(result.students);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The student transfer could not be completed."));
+      setError(errorMessage(value, "Couldn't complete the student transfer. Try again."));
     } finally {
       setSaving(false);
     }

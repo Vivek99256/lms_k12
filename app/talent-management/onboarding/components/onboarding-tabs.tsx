@@ -129,7 +129,7 @@ export function JourneyTab({
                 <TableMessageRow
                   colSpan={6}
                   tone="error"
-                  title="Could not load journey stages"
+                  title="Couldn't load journey stages. Try again."
                   description={error}
                   action={
                     <Button variant="outline" size="sm" onClick={onRetry}>
@@ -317,7 +317,7 @@ export function ProbationTab({
                 <TableMessageRow
                   colSpan={7}
                   tone="error"
-                  title="Could not load probation records"
+                  title="Couldn't load probation records. Try again."
                   description={error}
                   action={
                     <Button variant="outline" size="sm" onClick={onRetry}>
@@ -490,7 +490,7 @@ export function TimelineTab({
 
           {!loading && error && (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
-              <p className="text-sm font-semibold text-destructive">Could not load the timeline</p>
+              <p className="text-sm font-semibold text-destructive">Couldn't load the timeline</p>
               <p className="text-xs text-muted-foreground">{error}</p>
               <Button variant="outline" size="sm" onClick={onRetry}>
                 Retry
