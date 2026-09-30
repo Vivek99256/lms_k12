@@ -10,13 +10,27 @@
  * LMS-K12's pre-existing, unrelated `master_compliance` table).
  *
  * Per explicit product decision, this port does NOT point at either of those.
- * It targets NEW LMS-K12 endpoints a sibling backend agent is building against
- * NEW tables (e.g. `org_compliance_library`):
+ * It targets the LMS-K12 Compliance Management System backend
+ * (`App\Http\Controllers\api\OrganizationManagement\Compliance\*`):
  *
- *   GET    /organization-management/compliance-library        - list + employee options for the "Assigned Employee" dropdown
- *   POST   /organization-management/compliance-library         - create (multipart - optional attachment file)
- *   PUT    /organization-management/compliance-library/{id}    - update (multipart, spoofed PUT via `_method`)
- *   DELETE /organization-management/compliance-library/{id}    - delete
+ *   GET    /organization-management/compliance-library              - list + department/employee/category/template options
+ *   POST   /organization-management/compliance-library               - create (multipart - optional attachment file)
+ *   GET    /organization-management/compliance-library/dashboard     - KPIs + status/department/category distribution
+ *   GET    /organization-management/compliance-library/calendar      - due dates for a given month
+ *   GET    /organization-management/compliance-library/my            - records assigned to the logged-in user
+ *   GET    /organization-management/compliance-library/overdue       - overdue records with days_overdue
+ *   GET    /organization-management/compliance-library/{id}          - detail: record + evidence + activity + cycle history
+ *   PUT    /organization-management/compliance-library/{id}          - update (multipart, spoofed PUT via `_method`)
+ *   DELETE /organization-management/compliance-library/{id}          - delete
+ *   POST   /organization-management/compliance-library/{id}/complete - mark completed, generates next recurring cycle
+ *   GET    /organization-management/compliance-library/{id}/evidence - list evidence documents
+ *   POST   /organization-management/compliance-library/{id}/evidence - upload an evidence document (multipart)
+ *   POST   /organization-management/compliance-library/evidence/{evidenceId}/verify
+ *   POST   /organization-management/compliance-library/evidence/{evidenceId}/reject
+ *   DELETE /organization-management/compliance-library/evidence/{evidenceId}
+ *   GET/POST/PUT/DELETE /organization-management/compliance-library/categories[/{id}]
+ *   GET/POST/PUT/DELETE /organization-management/compliance-library/templates[/{id}]
+ *   POST   /organization-management/compliance-library/templates/{id}/duplicate
  *
  * Transport follows this project's own pattern: native `fetch` +
  * `buildSessionContext()` / `createAuthHeaders()` (see `lib/erp-client.ts`),
@@ -78,6 +92,10 @@ async function request<T>(
 
 const apiGet = <T,>(session: SessionContext, path: string, params?: Record<string, string | undefined>) =>
   request<T>(session, 'GET', path, { params });
+const apiPost = <T,>(session: SessionContext, path: string, body?: unknown) =>
+  request<T>(session, 'POST', path, { body });
+const apiPut = <T,>(session: SessionContext, path: string, body?: unknown) =>
+  request<T>(session, 'PUT', path, { body });
 const apiPostForm = <T,>(session: SessionContext, path: string, form: FormData) =>
   request<T>(session, 'POST', path, { form });
 /** Multipart update - spoofed PUT via `_method`, same pattern as onboarding-api.ts. */
@@ -100,7 +118,7 @@ function withContextParams(session: SessionContext, extra?: Record<string, strin
 }
 
 // ---------------------------------------------------------------------------
-// Envelopes
+// Envelopes / types
 // ---------------------------------------------------------------------------
 
 export interface ComplianceApiResponse<T> {
@@ -109,47 +127,117 @@ export interface ComplianceApiResponse<T> {
   data: T;
 }
 
+export type ComplianceStatus =
+  | 'Upcoming'
+  | 'Due Soon'
+  | 'In Progress'
+  | 'Pending Verification'
+  | 'Completed'
+  | 'Overdue'
+  | 'Expired'
+  | 'Not Applicable';
+
+export type CompliancePriority = 'Low' | 'Medium' | 'High' | 'Critical';
+
+export type ComplianceFrequency =
+  | 'One-Time'
+  | 'Daily'
+  | 'Weekly'
+  | 'Monthly'
+  | 'Quarterly'
+  | 'Half-Yearly'
+  | 'Yearly'
+  | 'Custom';
+
 /** One compliance library row, as returned by the API. */
 export interface ComplianceApiRecord {
   id: number | string;
   name: string;
   description: string | null;
+  category_id: number | null;
+  category_name: string | null;
   department: string | null;
+  department_id: number | null;
   assigned_to: string | null;
+  assigned_user?: string | null;
   due_date: string | null;
-  frequency: string | null;
+  next_due_date: string | null;
+  frequency: ComplianceFrequency | string | null;
   custom_date: string | null;
+  priority: CompliancePriority | string | null;
+  status: ComplianceStatus | string | null;
+  derived_status: ComplianceStatus | string | null;
+  completed_at: string | null;
+  parent_compliance_id: number | null;
+  evidence_count: number | null;
   attachment_name: string | null;
   attachment_url: string | null;
+  days_overdue?: number | null;
 }
 
 export interface ComplianceEmployeeOption {
   value: string;
   label: string;
+  department_id?: number | null;
 }
 
 export interface ComplianceDepartmentOption {
   value: string;
   label: string;
+  name?: string;
 }
 
-/** GET list response - records plus the department/employee options for the create/update form. */
+export interface ComplianceCategoryOption {
+  value: string;
+  label: string;
+}
+
+export interface ComplianceTemplateOption {
+  id: number;
+  name: string;
+  description: string | null;
+  category_id: number | null;
+  default_frequency: ComplianceFrequency | string | null;
+  default_custom_frequency_details: string | null;
+  default_priority: CompliancePriority | string | null;
+}
+
+/** GET list response - records plus the department/employee/category/template options for the create/update form. */
 export interface ComplianceListResponse extends ComplianceApiResponse<ComplianceApiRecord[]> {
   departments?: ComplianceDepartmentOption[];
   employees?: ComplianceEmployeeOption[];
+  categories?: ComplianceCategoryOption[];
+  templates?: ComplianceTemplateOption[];
+  pagination?: { current_page: number; per_page: number; total: number; last_page: number };
 }
 
 /** Fields the create/update form sends (mirrors ComplianceFormState, minus the file itself). */
 export interface CompliancePayload {
   name: string;
   description: string;
+  category_id?: string;
   department: string;
+  department_id?: string;
   assigned_to: string;
   due_date: string;
   frequency: string;
   custom_date: string;
-  /** Set only when replacing/clearing the attachment on an update. */
-  remove_attachment?: boolean;
+  priority?: string;
+  status?: string;
+}
+
+export interface ComplianceFilters {
+  search?: string;
+  category_id?: string;
+  department_id?: string;
+  status?: string;
+  priority?: string;
+  frequency?: string;
+  assigned_to?: string;
+  due_date_from?: string;
+  due_date_to?: string;
+  page?: string;
+  per_page?: string;
 }
 
 /**
@@ -168,17 +256,159 @@ function toBackendPayload(payload: CompliancePayload): Record<string, unknown> {
   };
 }
 
+export interface ComplianceEvidenceRecord {
+  id: number;
+  compliance_id: number;
+  file_name: string | null;
+  file_url: string | null;
+  document_type: string | null;
+  description: string | null;
+  expiry_date: string | null;
+  verification_status: 'Pending Verification' | 'Verified' | 'Rejected';
+  rejection_reason: string | null;
+  uploaded_by_name?: string | null;
+  verified_by_name?: string | null;
+  verified_at: string | null;
+  created_at: string | null;
+}
+
+export interface ComplianceActivityEntry {
+  action: string;
+  actor_name: string | null;
+  created_at: string;
+  details: string | null;
+}
+
+export interface ComplianceCycleEntry {
+  id: number;
+  due_date: string | null;
+  status: string;
+  is_current: boolean;
+}
+
+export interface ComplianceDetailResponse {
+  record: ComplianceApiRecord;
+  evidence: ComplianceEvidenceRecord[];
+  activity: ComplianceActivityEntry[];
+  cycles: ComplianceCycleEntry[];
+}
+
+export interface ComplianceDashboardResponse {
+  kpis: {
+    total: number;
+    upcoming: number;
+    due_this_month: number;
+    due_soon: number;
+    overdue: number;
+    completed: number;
+    critical: number;
+    pending_verification: number;
+    pending_evidence_verification: number;
+  };
+  status_distribution: Record<string, number>;
+  department_distribution: { label: string; value: number }[];
+  category_distribution: { label: string; value: number }[];
+}
+
+export interface ComplianceCalendarEvent {
+  id: number;
+  name: string;
+  due_date: string | null;
+  status: string;
+  priority: string | null;
+  category_name: string | null;
+  assigned_user: string | null;
+}
+
+export interface ComplianceMyResponse {
+  records: ComplianceApiRecord[];
+  summary: { total: number; upcoming: number; due_soon: number; overdue: number; completed: number };
+}
+
+export interface ComplianceCategoryRecord {
+  id: number;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  status: boolean;
+  is_global: boolean;
+}
+
+export interface ComplianceTemplateRecord extends ComplianceTemplateOption {
+  category_name: string | null;
+  sort_order: number;
+  status: boolean;
+  is_global: boolean;
+}
+
+function filterParams(filters?: ComplianceFilters): Record<string, string | undefined> {
+  if (!filters) return {};
+  return {
+    search: filters.search,
+    category_id: filters.category_id,
+    department_id: filters.department_id,
+    status: filters.status,
+    priority: filters.priority,
+    frequency: filters.frequency,
+    assigned_to: filters.assigned_to,
+    due_date_from: filters.due_date_from,
+    due_date_to: filters.due_date_to,
+    page: filters.page,
+    per_page: filters.per_page,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
 
 export const complianceLibraryService = {
   /** GET /organization-management/compliance-library */
-  getRecords: (session: SessionContext) =>
+  getRecords: (session: SessionContext, filters?: ComplianceFilters) =>
     apiGet<ComplianceListResponse>(
       session,
       '/organization-management/compliance-library',
+      withContextParams(session, filterParams(filters)),
+    ),
+
+  /** GET /organization-management/compliance-library/{id} */
+  getDetail: (session: SessionContext, id: string | number) =>
+    apiGet<ComplianceApiResponse<ComplianceDetailResponse>>(
+      session,
+      `/organization-management/compliance-library/${id}`,
       withContextParams(session),
+    ),
+
+  /** GET /organization-management/compliance-library/dashboard */
+  getDashboard: (session: SessionContext) =>
+    apiGet<ComplianceApiResponse<ComplianceDashboardResponse>>(
+      session,
+      '/organization-management/compliance-library/dashboard',
+      withContextParams(session),
+    ),
+
+  /** GET /organization-management/compliance-library/calendar */
+  getCalendar: (session: SessionContext, year: number, month: number) =>
+    apiGet<ComplianceApiResponse<ComplianceCalendarEvent[]>>(
+      session,
+      '/organization-management/compliance-library/calendar',
+      withContextParams(session, { year: String(year), month: String(month) }),
+    ),
+
+  /** GET /organization-management/compliance-library/my */
+  getMy: (session: SessionContext, filters?: ComplianceFilters) =>
+    apiGet<ComplianceApiResponse<ComplianceMyResponse>>(
+      session,
+      '/organization-management/compliance-library/my',
+      withContextParams(session, filterParams(filters)),
+    ),
+
+  /** GET /organization-management/compliance-library/overdue */
+  getOverdue: (session: SessionContext, filters?: ComplianceFilters) =>
+    apiGet<ComplianceApiResponse<ComplianceApiRecord[]>>(
+      session,
+      '/organization-management/compliance-library/overdue',
+      withContextParams(session, filterParams(filters)),
     ),
 
   /** POST /organization-management/compliance-library (multipart - optional attachment) */
@@ -219,6 +449,135 @@ export const complianceLibraryService = {
     apiDelete<ComplianceApiResponse<{ id: string | number }>>(
       session,
       `/organization-management/compliance-library/${id}`,
+      withContextParams(session),
+    ),
+
+  /** POST /organization-management/compliance-library/{id}/complete */
+  completeRecord: (session: SessionContext, id: string | number, note?: string, completionDate?: string) =>
+    apiPost<ComplianceApiResponse<{ record: ComplianceApiRecord; next_cycle: ComplianceApiRecord | null }>>(
+      session,
+      `/organization-management/compliance-library/${id}/complete`,
+      { completion_note: note || undefined, completion_date: completionDate || undefined },
+    ),
+
+  /** GET .../{id}/evidence */
+  getEvidence: (session: SessionContext, id: string | number) =>
+    apiGet<ComplianceApiResponse<ComplianceEvidenceRecord[]>>(
+      session,
+      `/organization-management/compliance-library/${id}/evidence`,
+      withContextParams(session),
+    ),
+
+  /** POST .../{id}/evidence (multipart) */
+  uploadEvidence: (
+    session: SessionContext,
+    id: string | number,
+    file: File,
+    meta?: { document_type?: string; description?: string; expiry_date?: string },
+  ) => {
+    const form = new FormData();
+    form.set('file', file);
+    if (meta?.document_type) form.set('document_type', meta.document_type);
+    if (meta?.description) form.set('description', meta.description);
+    if (meta?.expiry_date) form.set('expiry_date', meta.expiry_date);
+    Object.entries(withContextParams(session)).forEach(([key, value]) => {
+      if (value !== undefined) form.set(key, String(value));
+    });
+    return apiPostForm<ComplianceApiResponse<ComplianceEvidenceRecord>>(
+      session,
+      `/organization-management/compliance-library/${id}/evidence`,
+      form,
+    );
+  },
+
+  /** POST .../evidence/{evidenceId}/verify */
+  verifyEvidence: (session: SessionContext, evidenceId: string | number) =>
+    apiPost<ComplianceApiResponse<ComplianceEvidenceRecord>>(
+      session,
+      `/organization-management/compliance-library/evidence/${evidenceId}/verify`,
+      withContextParams(session),
+    ),
+
+  /** POST .../evidence/{evidenceId}/reject */
+  rejectEvidence: (session: SessionContext, evidenceId: string | number, reason: string) =>
+    apiPost<ComplianceApiResponse<ComplianceEvidenceRecord>>(
+      session,
+      `/organization-management/compliance-library/evidence/${evidenceId}/reject`,
+      { ...withContextParams(session), rejection_reason: reason },
+    ),
+
+  /** DELETE .../evidence/{evidenceId} */
+  deleteEvidence: (session: SessionContext, evidenceId: string | number) =>
+    apiDelete<ComplianceApiResponse<{ id: number }>>(
+      session,
+      `/organization-management/compliance-library/evidence/${evidenceId}`,
+      withContextParams(session),
+    ),
+
+  // -- Categories -----------------------------------------------------------
+
+  getCategories: (session: SessionContext) =>
+    apiGet<ComplianceApiResponse<ComplianceCategoryRecord[]>>(
+      session,
+      '/organization-management/compliance-library/categories',
+      withContextParams(session, { include_inactive: 'true' }),
+    ),
+
+  createCategory: (session: SessionContext, data: { name: string; description?: string; sort_order?: number }) =>
+    apiPost<ComplianceApiResponse<ComplianceCategoryRecord>>(
+      session,
+      '/organization-management/compliance-library/categories',
+      { ...withContextParams(session), ...data },
+    ),
+
+  updateCategory: (session: SessionContext, id: number, data: Partial<{ name: string; description: string; sort_order: number; status: boolean }>) =>
+    apiPut<ComplianceApiResponse<ComplianceCategoryRecord>>(
+      session,
+      `/organization-management/compliance-library/categories/${id}`,
+      { ...withContextParams(session), ...data },
+    ),
+
+  deleteCategory: (session: SessionContext, id: number) =>
+    apiDelete<ComplianceApiResponse<{ id: number }>>(
+      session,
+      `/organization-management/compliance-library/categories/${id}`,
+      withContextParams(session),
+    ),
+
+  // -- Templates --------------------------------------------------------------
+
+  getTemplates: (session: SessionContext) =>
+    apiGet<ComplianceApiResponse<ComplianceTemplateRecord[]>>(
+      session,
+      '/organization-management/compliance-library/templates',
+      withContextParams(session, { include_inactive: 'true' }),
+    ),
+
+  createTemplate: (session: SessionContext, data: Record<string, unknown>) =>
+    apiPost<ComplianceApiResponse<ComplianceTemplateRecord>>(
+      session,
+      '/organization-management/compliance-library/templates',
+      { ...withContextParams(session), ...data },
+    ),
+
+  updateTemplate: (session: SessionContext, id: number, data: Record<string, unknown>) =>
+    apiPut<ComplianceApiResponse<ComplianceTemplateRecord>>(
+      session,
+      `/organization-management/compliance-library/templates/${id}`,
+      { ...withContextParams(session), ...data },
+    ),
+
+  duplicateTemplate: (session: SessionContext, id: number) =>
+    apiPost<ComplianceApiResponse<ComplianceTemplateRecord>>(
+      session,
+      `/organization-management/compliance-library/templates/${id}/duplicate`,
+      withContextParams(session),
+    ),
+
+  deleteTemplate: (session: SessionContext, id: number) =>
+    apiDelete<ComplianceApiResponse<{ id: number }>>(
+      session,
+      `/organization-management/compliance-library/templates/${id}`,
       withContextParams(session),
     ),
 };

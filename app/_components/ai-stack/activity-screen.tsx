@@ -55,6 +55,7 @@ import {
   AiStackPill,
   AiStackTableHead,
   formatWhen,
+  formatDuration,
 } from './ai-stack-chrome';
 import type { AiStackModule } from './ai-stack-module';
 
@@ -190,6 +191,7 @@ export function AiStackActivityScreen({ module }: { module: AiStackModule }) {
                   'By',
                   'About',
                   'Reference',
+                  'Duration',
                   'Status',
                 ]}
               />
@@ -227,6 +229,9 @@ export function AiStackActivityScreen({ module }: { module: AiStackModule }) {
                         (entry.subject_id ? `${entry.subject_entity_key ?? 'record'} ${entry.subject_id}` : '—')}
                     </td>
                     <td className="px-4 py-2.5 font-mono text-[11px] text-slate-600">{entry.reference ?? '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11px] text-slate-500">
+                      {formatDuration(entry.duration_ms)}
+                    </td>
                     <td className="px-4 py-2.5">
                       <AiStackPill
                         tone={
@@ -346,6 +351,11 @@ function EntryDetail({ entry, onClose }: { entry: AiModuleActivityEntry; onClose
               }
             />
             <Detail label="Reference" value={entry.reference ?? '—'} />
+            <Detail label="Duration" value={formatDuration(entry.duration_ms)} />
+            <Detail
+              label="Knowledge graph"
+              value={entry.knowledge_graph_used === null ? 'Not measured' : entry.knowledge_graph_used ? 'Used' : 'Not used'}
+            />
           </dl>
 
           <div>

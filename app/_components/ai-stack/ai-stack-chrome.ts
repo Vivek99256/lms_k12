@@ -35,4 +35,5 @@ export {
   FeesAiPill as AiStackPill,
   FeesAiTableHead as AiStackTableHead,
   formatWhen,
+  formatDuration,
 } from '@/app/fees/ai-stack/_screens/fees-ai-chrome';

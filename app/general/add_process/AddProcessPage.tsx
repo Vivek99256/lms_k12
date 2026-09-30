@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ErpAlert, ErpLoading, ErpPageHeader, ErpSection } from "@/components/erp/erp-ui";
 import { RecordTable, type RecordColumn } from "@/components/erp/RecordTable";
 import { errorMessage } from "@/lib/erp-legacy";
+import { buildSessionContext } from "@/lib/erp-client";
 import {
   convertSopProcedure,
   deriveTasks,
@@ -349,7 +350,8 @@ export function AddProcessPage({
 
       const response = await fetch("/api/process/convert", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // The route spends a model key, so it only answers signed-in users.
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${buildSessionContext().token}` },
         body: JSON.stringify({
           text: from.text,
           moduleKey: from.moduleKey,

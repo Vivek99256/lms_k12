@@ -19,7 +19,7 @@ import type { PlayerProps } from './types';
  * any others; what makes it different is the stem, which the transform
  * composes from the assertion and reason columns before this renders.
  */
-export function MultipleChoicePlayer({ question, onResult, embedded = true }: PlayerProps) {
+export function MultipleChoicePlayer({ question, onResult, embedded = true, instantFeedback }: PlayerProps) {
   const { activity, reason } = buildFor(question, 'single_choice_set');
 
   if (!activity || activity.kind !== 'single_choice_set') {
@@ -37,6 +37,7 @@ export function MultipleChoicePlayer({ question, onResult, embedded = true }: Pl
         subject_id: String(scope.subject_id ?? ''),
       }}
       embedded={embedded}
+      instantFeedback={instantFeedback}
       onResult={onResult}
     />
   );

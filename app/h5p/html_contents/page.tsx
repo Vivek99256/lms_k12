@@ -72,25 +72,13 @@ function routeFor(module: H5pHubModule): string | null {
   return module.route ? (H5P_ROUTE_MAP[module.route] ?? null) : null;
 }
 
-function ModuleCard({
-  module,
-  contextQuery,
-  goToCreate,
-}: {
-  module: H5pHubModule;
-  contextQuery: string;
-  /** Skip straight to authoring instead of this type's list. Only when the
-   *  hub itself was opened with a return_to -- i.e. from a flow (Question
-   *  Bank's "Create H5P content") that already means "I want to make one",
-   *  not from browsing the H5P section on its own. */
-  goToCreate: boolean;
-}) {
+function ModuleCard({ module, contextQuery }: { module: H5pHubModule; contextQuery: string }) {
   const Icon = TYPE_ICONS[module.h5pType] ?? Layers3;
-  const baseHref = routeFor(module);
-  // h5p_mcq has no authoring page of its own at all -- it is served live
-  // from the Question Bank already -- so it keeps going to its list/quiz
-  // screen even when every other card jumps straight to /create.
-  const href = baseHref && goToCreate && module.route !== 'h5p_mcq.index' ? `${baseHref}/create` : baseHref;
+  // The listing page, not /create -- it's what shows existing items (manual
+  // vs. generated counts, View/Edit/Delete per row). contextQuery carries
+  // return_to when this hub was opened from the Question Bank, so that
+  // list's own "Add" button can hand it forward to the create page.
+  const href = routeFor(module);
   const pedagogies = [...module.pedagogies.primary, ...module.pedagogies.secondary];
 
   // Authored in the registry, not measured, so it is always present and is a
@@ -263,12 +251,7 @@ function H5pHubContent() {
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {modules.map((module) => (
-                <ModuleCard
-                  key={module.h5pType}
-                  module={module}
-                  contextQuery={contextQuery}
-                  goToCreate={returnTo !== null}
-                />
+                <ModuleCard key={module.h5pType} module={module} contextQuery={contextQuery} />
               ))}
             </div>
 

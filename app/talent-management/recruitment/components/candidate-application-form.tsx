@@ -171,7 +171,8 @@ export function CandidateApplicationForm({
     const skills = (job.skills ?? '').split(',').map((skill) => skill.trim()).filter(Boolean)
     const response = await fetch('/api/screenCandidate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // The route spends paid LLM credit, so it only answers signed-in staff.
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${buildSessionContext().token}` },
       body: JSON.stringify({
         resume: resumeText,
         jdData: {

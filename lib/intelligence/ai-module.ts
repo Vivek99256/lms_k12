@@ -282,6 +282,10 @@ export interface AiModuleActivityEntry {
   reference: string | null;
   used: AiModuleActivityUsed;
   result: Record<string, unknown> | null;
+  /** Milliseconds, when the operation that wrote this row measured its own duration. Null means not measured — never zero. */
+  duration_ms: number | null;
+  /** Whether this operation drew on the knowledge graph. Null means the writer had no opinion, not "no". */
+  knowledge_graph_used: boolean | null;
   created_at: string | null;
 }
 
@@ -315,6 +319,9 @@ export interface RecordModuleActivityInput {
   workflow?: string | null;
   tool?: string | null;
   result?: Record<string, unknown> | null;
+  /** Only send this if the screen actually measured it — omit rather than guess. */
+  duration_ms?: number | null;
+  knowledge_graph_used?: boolean | null;
 }
 
 export function fetchModuleActivity(

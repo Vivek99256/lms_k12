@@ -4,6 +4,8 @@ import React, { createContext, useMemo, useState, useEffect, useRef, useCallback
 import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
+import { StuckUserAssistant } from '@/components/ai/StuckUserAssistant';
+import type { StuckPromptContext } from '@/lib/ai/stuck-assist-types';
 import { PageAiContextProvider } from '@/contexts/PageAiContext';
 import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
 import Level3Subheader from '@/app/components/Level3Subheader';
@@ -17,7 +19,7 @@ import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
 import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
-import { canSeeInternalItems } from '@/lib/roadmap';
+import { canSeeInternalItems, showDeferredModules } from '@/lib/roadmap';
 import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useModuleLevel3Nav } from '@/app/_lib/use-module-level3-nav';
@@ -307,7 +309,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         });
         const data = await res.json().catch(() => ({}));
         if (!cancelled) {
-          setHasBrainAccess(Boolean(res.ok && data?.allowed) || isBrainVisibleByLmsSession());
+          // A definite server answer wins, including "no". The local session check
+          // (editable in localStorage) is only a fallback for a host without the endpoint.
+          setHasBrainAccess(
+            res.ok && typeof data?.allowed === 'boolean' ? data.allowed : isBrainVisibleByLmsSession(),
+          );
         }
       } catch {
         if (!cancelled) setHasBrainAccess(isBrainVisibleByLmsSession());
@@ -321,7 +327,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, []);
 
   const displayedMenuItems = useMemo<MenuItem[]>(() => {
-    if (!hasBrainAccess) return menuItems;
+    if (!hasBrainAccess || !showDeferredModules()) return menuItems; // Enterprise Brain is not part of V1
     const alreadyPresent = menuItems.some((item) => normalizeMenuLabel(item.label) === 'enterprise brain');
     if (alreadyPresent) return menuItems;
 
@@ -563,6 +569,18 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       setIsRightToolbarOpen(!next);
       return next;
     });
+  };
+
+  // Set by the idle watcher the moment it fires, and consumed exactly once by
+  // ChatbotPanel, which renders the "need a hand?" prompt as its own first bubble.
+  // Opening the panel here rather than inside the watcher keeps "who owns
+  // isChatbotOpen" in one place.
+  const [pendingStuckPrompt, setPendingStuckPrompt] = useState<StuckPromptContext | null>(null);
+
+  const handleStuck = (context: StuckPromptContext) => {
+    setPendingStuckPrompt(context);
+    setIsChatbotOpen(true);
+    setIsRightToolbarOpen(false);
   };
 
   const handleLevel1Select = (item: MenuItem) => {
@@ -828,10 +846,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 className="min-h-0 flex-none overflow-hidden"
                 style={{ width: assistantPanel.width }}
               >
-                <ChatbotPanel onToggleChatbot={toggleChatbot} />
+                <ChatbotPanel
+                  onToggleChatbot={toggleChatbot}
+                  stuckPrompt={pendingStuckPrompt}
+                  onStuckPromptHandled={() => setPendingStuckPrompt(null)}
+                />
               </div>
             </>
           )}
+          <StuckUserAssistant chatbotOpen={isChatbotOpen} onStuck={handleStuck} />
         </div>
         <RightFloatingToolbar
           isChatbotOpen={isChatbotOpen}

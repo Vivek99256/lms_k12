@@ -12,6 +12,8 @@ import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { QuestionPlayer } from '@/components/h5p/players';
+import { canPlay, selectedOptionId, toPlayerQuestion } from '@/lib/pal/eso-answers';
 import {
   defaultLearnerId,
   fetchDiagnostic,
@@ -1801,31 +1803,58 @@ function CheckUnderstandingStep({
           </div>
         )}
 
-        {loaded.map((item) => (
-          <div key={item.questionId} data-eso-cfu-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
-            <div className="mt-2 space-y-1.5">
-              {item.options.map((option) => (
-                <label
-                  key={option.id}
-                  data-eso-option-id={option.id}
-                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                    answers[item.questionId] === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`cfu-${item.questionId}`}
-                    checked={answers[item.questionId] === option.id}
-                    onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
-                    className="h-4 w-4 accent-indigo-600"
+        {loaded.map((item) => {
+          // canPlay refuses any form CFU's submit endpoint (answer_master_id
+          // only) could not record -- see lib/pal/eso-answers.ts. CFU is
+          // narrowed to MCQ server-side already, so this resolves for
+          // essentially every item; the radio list stays as the fallback.
+          const playable = canPlay(item);
+
+          return (
+            <div key={item.questionId} data-eso-cfu-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
+              {/* The interactive player draws its own stem -- a plain-HTML
+                  copy of the same title above it would read as a duplicated
+                  question. Only the radio fallback needs one of its own. */}
+              {!playable && (
+                <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+              )}
+
+              {playable ? (
+                <div className="mt-2">
+                  <QuestionPlayer
+                    question={toPlayerQuestion(item)}
+                    onResult={(result) => {
+                      const optionId = selectedOptionId(item, result);
+                      if (optionId != null) setAnswers((prev) => ({ ...prev, [item.questionId]: optionId }));
+                    }}
+                    embedded
                   />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
-                </label>
-              ))}
+                </div>
+              ) : (
+                <div className="mt-2 space-y-1.5">
+                  {item.options.map((option) => (
+                    <label
+                      key={option.id}
+                      data-eso-option-id={option.id}
+                      className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                        answers[item.questionId] === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`cfu-${item.questionId}`}
+                        checked={answers[item.questionId] === option.id}
+                        onChange={() => setAnswers((prev) => ({ ...prev, [item.questionId]: option.id }))}
+                        className="h-4 w-4 accent-indigo-600"
+                      />
+                      <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {error && <Alert tone="error">{error}</Alert>}
 
@@ -2011,29 +2040,50 @@ function TeachOrPracticeStep({
             </div>
           </div>
         )}
-        {item && item !== 'loading' && (
+        {item && item !== 'loading' && (() => {
+          const playable = canPlay(item);
+          return (
           <div data-eso-question-id={item.questionId} className="rounded-lg border border-slate-200 p-4">
-            <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
-            <div className="mt-2 space-y-1.5">
-              {item.options.map((option) => (
-                <label
-                  key={option.id}
-                  data-eso-option-id={option.id}
-                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                    selected === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="practice-option"
-                    checked={selected === option.id}
-                    onChange={() => setSelected(option.id)}
-                    className="h-4 w-4 accent-indigo-600"
-                  />
-                  <span dangerouslySetInnerHTML={{ __html: option.answer }} />
-                </label>
-              ))}
-            </div>
+            {/* The interactive player draws its own stem -- a plain-HTML
+                copy of the same title above it would read as a duplicated
+                question. Only the radio fallback needs one of its own. */}
+            {!playable && (
+              <div className="text-sm font-medium text-slate-900" dangerouslySetInnerHTML={{ __html: item.title }} />
+            )}
+
+            {playable ? (
+              <div className="mt-2">
+                <QuestionPlayer
+                  question={toPlayerQuestion(item)}
+                  onResult={(result) => {
+                    const optionId = selectedOptionId(item, result);
+                    if (optionId != null) setSelected(optionId);
+                  }}
+                  embedded
+                />
+              </div>
+            ) : (
+              <div className="mt-2 space-y-1.5">
+                {item.options.map((option) => (
+                  <label
+                    key={option.id}
+                    data-eso-option-id={option.id}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      selected === option.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="practice-option"
+                      checked={selected === option.id}
+                      onChange={() => setSelected(option.id)}
+                      className="h-4 w-4 accent-indigo-600"
+                    />
+                    <span dangerouslySetInnerHTML={{ __html: option.answer }} />
+                  </label>
+                ))}
+              </div>
+            )}
             {error && <div className="mt-2"><Alert tone="error">{error}</Alert></div>}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               {/* Says what submitting will do, so it is obvious that it moved.
@@ -2057,7 +2107,8 @@ function TeachOrPracticeStep({
               </Button>
             </div>
           </div>
-        )}
+          );
+        })()}
       </CardContent>
     </Card>
   );

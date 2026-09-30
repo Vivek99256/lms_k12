@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Layers } from 'lucide-react';
@@ -83,7 +84,7 @@ export default function ExploreSectorsPage() {
           {!loading && !error && (
             <div
               className="prose max-w-none text-sm leading-6 text-foreground"
-              dangerouslySetInnerHTML={{ __html: current?.html ?? '<p>No content available for this sector.</p>' }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(current?.html ?? '<p>No content available for this sector.</p>') }}
             />
           )}
         </CardContent>

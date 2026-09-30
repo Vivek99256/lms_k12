@@ -17,6 +17,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
 import { downloadFile, escapeCsv, MessageState, normalizePayload, readMessage, readStatus } from '@/app/library/_lib/library-module-utils';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type ScanRecord = {
   id: string;
@@ -91,7 +92,7 @@ function printRows(rows: ScanRecord[]) {
             </tr>
           </thead>
           <tbody>
-            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td><td>${row.scanStatus || '-'}</td><td>${row.syear || '-'}</td></tr>`).join('')}
+            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(row.title || '-')}</td><td>${escapeHtml(row.collectionType || '-')}</td><td>${escapeHtml(row.scanStatus || '-')}</td><td>${escapeHtml(row.syear || '-')}</td></tr>`).join('')}
           </tbody>
         </table>
       </body>
@@ -134,8 +135,16 @@ export default function ScanBookPage() {
     [filteredRecords],
   );
 
-  const handleSubmit = async () => {
-    if (!itemCode.trim()) {
+  const handleSubmit = async (overrideItemCode?: string) => {
+    // A physical barcode scanner types the whole code and its trailing Enter
+    // in rapid succession -- fast enough that the keydown handler can fire
+    // before this component has re-rendered with the last character's
+    // onChange. Reading the DOM input's live value here (passed in from the
+    // keydown handler below) avoids submitting a stale, empty `itemCode`
+    // from React state.
+    const value = (overrideItemCode ?? itemCode).trim();
+
+    if (!value) {
       setMessage({ type: 'info', text: 'Item code is required.' });
       return;
     }
@@ -151,7 +160,7 @@ export default function ScanBookPage() {
     try {
       const params = new URLSearchParams({ path: 'scan_books' });
       const payload = new URLSearchParams();
-      payload.set('item_code', itemCode.trim());
+      payload.set('item_code', value);
       appendSessionParams(payload, session);
 
       const response = await fetch(`/api/proxy?${params.toString()}`, {
@@ -169,7 +178,7 @@ export default function ScanBookPage() {
 
       setMessage({ type: status === 1 ? 'success' : 'error', text: nextMessage });
       setRecords(parseRecords(normalized));
-      setLastScannedItem(readString(normalized.searchedItem) || itemCode.trim());
+      setLastScannedItem(readString(normalized.searchedItem) || value);
       setItemCode('');
     } catch (error) {
       setMessage({
@@ -226,7 +235,7 @@ export default function ScanBookPage() {
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
-                  void handleSubmit();
+                  void handleSubmit(event.currentTarget.value);
                 }
               }}
             />

@@ -17,6 +17,7 @@ import FilterBar, { type FilterFieldDef, type FilterValues } from '@/components/
 import { Banner, Checkbox, EmptyState, Skeleton, TableSkeleton } from '@/components/result/primitives';
 import { toast } from '@/components/result/toast';
 import { printElement } from '@/components/result/print';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { asRecord, extractRows, readString, resultGet, resultPost, toCollection, toOptions } from '@/lib/result/api';
 
 type StudentRow = {
@@ -336,7 +337,7 @@ export default function NewReportCardPage() {
               <div
                 ref={printRef}
                 className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white p-4"
-                dangerouslySetInnerHTML={{ __html: reportHtml }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportHtml, { document: true }) }}
               />
             </CardContent>
           </Card>

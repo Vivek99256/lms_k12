@@ -2861,10 +2861,12 @@ export default function ChapterListPage() {
     const route = module.route ? H5P_ROUTE_MAP[module.route] : null;
     if (!ctx || !route) return;
 
+    // The listing page, not /create directly -- it's what shows how many
+    // items already exist (manual vs. generated), and View/Edit/Delete on
+    // each. return_to still rides along so that list's own "Add" button can
+    // hand it to the create page, and Back from there still returns here.
     const returnTo = currentQuestionBankUrl();
-    router.push(
-      `${route}/create?${h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined)}`
-    );
+    router.push(`${route}?${h5pContextQuery(ctx, returnTo ? { return_to: returnTo } : undefined)}`);
   };
 
   /** The "Create H5P content" menu item itself, not one of its submenu

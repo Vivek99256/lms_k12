@@ -1,7 +1,7 @@
 // app/students/attendance/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -42,6 +42,7 @@ import {
 import { AllWidgetsHiddenNotice, CustomizeDashboard } from "@/app/dashboard/_components/CustomizeDashboard";
 import { useDashboardPreferences } from "@/app/dashboard/_lib/useDashboardPreferences";
 import type { DashboardWidget } from "@/app/dashboard/_lib/dashboard-preferences";
+import { useRegisterPageAiContext } from "@/contexts/PageAiContext";
 
 ChartJS.register(
   CategoryScale,
@@ -164,6 +165,40 @@ export default function AttendancePage() {
   const presentCount = students.filter((s) => s.status === "present").length;
   const absentCount = students.filter((s) => s.status === "absent").length;
   const attendancePercentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+
+  /**
+   * What the assistant can see: the class and date actually on screen, and the
+   * register's own settled counts. Registered even while `loading` is true — a
+   * student asking "what am I looking at?" mid-load still gets the class and date,
+   * just with the counts at their last-known values until the fetch resolves.
+   */
+  useRegisterPageAiContext(
+    useMemo(
+      () =>
+        selectedSection
+          ? {
+              pageTitle: "Attendance",
+              pageType: "detail" as const,
+              entityType: "class_section",
+              metrics: [
+                { key: "total_students", label: "Students in register", value: totalStudents },
+                { key: "present", label: "Present", value: presentCount },
+                { key: "absent", label: "Absent", value: absentCount },
+                { key: "attendance_rate", label: "Attendance rate", value: attendancePercentage, unit: "%" },
+              ],
+              filters: [
+                { key: "class", label: "Class", value: selectedClass },
+                { key: "date", label: "Date", value: selectedDate.toISOString().slice(0, 10) },
+              ],
+              availableActions: [
+                { key: "mark_attendance", label: "Mark attendance for a student" },
+                { key: "view_trend", label: "View the attendance trend for this class" },
+              ],
+            }
+          : null,
+      [selectedSection, selectedClass, selectedDate, totalStudents, presentCount, absentCount, attendancePercentage]
+    )
+  );
 
   const handleStatusChange = (
     studentId: string,

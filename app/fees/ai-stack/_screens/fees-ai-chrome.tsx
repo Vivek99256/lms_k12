@@ -213,3 +213,16 @@ export function formatWhen(value: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+/**
+ * Milliseconds into something readable, or an honest "—".
+ *
+ * Never shows 0 or "0ms" for a value nobody measured — `null`/`undefined` is "not
+ * measured", which is a different fact from "instant", and the two must not read
+ * the same to whoever is reading the ledger.
+ */
+export function formatDuration(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value) || value < 0) return '—';
+  if (value < 1000) return `${Math.round(value)}ms`;
+  return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0)}s`;
+}

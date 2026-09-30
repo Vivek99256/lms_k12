@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowRight, CheckCircle2, CircleDashed, Loader2, Target, TrendingUp, XCircle } from 'lucide-react';
+import { ArrowRight, Loader2, Target, TrendingUp } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,11 +11,18 @@ import {
   fetchChapterDiagnosticResult,
   type ChapterDiagnosticResult,
   type DiagnosticConceptBreakdown,
-  type DiagnosticQuestionResult,
 } from '@/app/pal/data/pal-diagnostic';
 import { BandRow, LevelBadge, StrengthBadge, bandLabel } from '@/app/pal/_components/BandMeter';
 import { JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
+import { ScoreRing } from '@/app/pal/_components/DiagnosticNavigator';
+import { AnswerReviewButton } from '@/app/pal/_components/AnswerReview';
+import { AchievementList, deriveAchievements, type Achievement } from '@/app/h5p/components/game';
+// `AnswerReviewButton` already imports this as a side effect, but this page
+// renders `AchievementList` directly too now -- so it names its own
+// dependency rather than relying on a sibling import's ordering to supply
+// the `.h5p-*` classes both of them use.
+import '@/app/h5p/h5p.css';
 
 /**
  * Stage 2 - the diagnostic result.
@@ -98,6 +105,18 @@ function DiagnosticResultView() {
   }
 
   const answered = result.correct + result.incorrect;
+  const percentage = Math.round(result.percentage);
+  // The reveal dialog on the previous screen (`DiagnosticScoreSummary`)
+  // already showed the moment this earned; these are the same two
+  // guaranteed milestones plus whatever `deriveAchievements` works out from
+  // the score, computed the same way, so the badges here are consistent
+  // with what was just celebrated rather than a second, different read of
+  // the same attempt.
+  const achievements: Achievement[] = [
+    { id: 'diagnostic-completed', label: 'Diagnostic completed', detail: `${result.totalQuestions} questions, done.` },
+    { id: 'path-unlocked', label: 'Learning path unlocked', detail: 'The concept diagnostic is ready.' },
+    ...deriveAchievements({ percentage, passed: percentage >= 60, questionCount: result.totalQuestions }),
+  ];
 
   return (
     <PalWorkspace
@@ -134,18 +153,17 @@ function DiagnosticResultView() {
       }
     >
 
-      {/* Headline. The percentage and the level say the same thing two ways,
-          because a level alone is vague and a percentage alone invites it to be
-          read as a mark out of a hundred. */}
-      <Card className="mb-4">
+      {/* Headline. The ring and the level say the same thing two ways, because
+          a level alone is vague and a percentage alone invites it to be read
+          as a mark out of a hundred. */}
+      <Card className="mb-4 overflow-hidden">
         <CardContent className="pt-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-semibold tabular-nums text-slate-900">
-                  {Math.round(result.percentage)}%
-                </span>
-                <LevelBadge level={result.level} />
+          <div className="flex flex-wrap items-center gap-5">
+            <ScoreRing percentage={result.percentage} />
+
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <LevelBadge level={result.level} className="h5p-enter" />
               </div>
               <p className="mt-1 text-sm text-slate-600">
                 {result.correct} correct of {result.totalQuestions}
@@ -158,18 +176,12 @@ function DiagnosticResultView() {
               <Stat label="Incorrect" value={result.incorrect} />
               {result.unanswered > 0 && <Stat label="Skipped" value={result.unanswered} />}
             </div>
+
+            <AnswerReviewButton results={result.questionResults} />
           </div>
 
-          <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-indigo-600 transition-all"
-              style={{ width: `${Math.max(0, Math.min(100, result.percentage))}%` }}
-              role="progressbar"
-              aria-valuenow={Math.round(result.percentage)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Overall chapter diagnostic score"
-            />
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <AchievementList achievements={achievements} />
           </div>
         </CardContent>
       </Card>
@@ -186,15 +198,20 @@ function DiagnosticResultView() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {result.difficultyBreakdown.map((band) => (
-              <BandRow
+            {result.difficultyBreakdown.map((band, index) => (
+              <div
                 key={band.band}
-                band={band.band}
-                correct={band.correct}
-                served={band.served}
-                percentage={band.percentage}
-                unanswered={band.unanswered}
-              />
+                className="h5p-enter h5p-stagger"
+                style={{ '--h5p-stagger': `${index * 60}ms` } as React.CSSProperties}
+              >
+                <BandRow
+                  band={band.band}
+                  correct={band.correct}
+                  served={band.served}
+                  percentage={band.percentage}
+                  unanswered={band.unanswered}
+                />
+              </div>
             ))}
           </CardContent>
         </Card>
@@ -262,25 +279,6 @@ function DiagnosticResultView() {
         </Card>
       )}
 
-      {result.questionResults.length > 0 && (
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="text-base">Question by question</CardTitle>
-            <CardDescription>
-              Every question on this paper, in the order you saw it — correct, incorrect or
-              unanswered.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="divide-y divide-slate-100">
-              {result.questionResults.map((question) => (
-                <QuestionResultRow key={question.questionId} question={question} />
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5">
         <Link href={`/pal/diagnostic/chapter/${result.chapterId}/history`} className={buttonVariants({ variant: 'outline' })}>Previous attempts</Link>
 
@@ -296,39 +294,6 @@ function DiagnosticResultView() {
         </p>
       )}
     </PalWorkspace>
-  );
-}
-
-function QuestionResultRow({ question }: { question: DiagnosticQuestionResult }) {
-  const verdict =
-    question.isCorrect === true
-      ? { Icon: CheckCircle2, className: 'text-emerald-600', label: 'Correct' }
-      : question.isCorrect === false
-        ? { Icon: XCircle, className: 'text-rose-600', label: 'Incorrect' }
-        : { Icon: CircleDashed, className: 'text-slate-400', label: 'Unanswered' };
-
-  return (
-    <li className="flex items-start gap-3 py-2.5">
-      <verdict.Icon aria-hidden className={`mt-0.5 h-4 w-4 shrink-0 ${verdict.className}`} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold tabular-nums text-slate-500">
-            Q{question.sequence}
-          </span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium capitalize text-slate-600">
-            {question.difficulty}
-          </span>
-          {question.conceptName && (
-            <span className="text-[11px] text-slate-400">{question.conceptName}</span>
-          )}
-        </div>
-        <p
-          className="mt-1 text-sm text-slate-800 [&_img]:max-w-full"
-          dangerouslySetInnerHTML={{ __html: question.title }}
-        />
-      </div>
-      <span className={`shrink-0 text-xs font-semibold ${verdict.className}`}>{verdict.label}</span>
-    </li>
   );
 }
 

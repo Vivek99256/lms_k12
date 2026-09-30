@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Info, X } from 'lucide-react';
@@ -228,7 +229,7 @@ function ScenarioShowContent() {
             {activePoint.description ? (
               <div
                 className="prose prose-sm mt-3 max-w-none text-sm text-slate-600 [&_a]:text-indigo-600 [&_iframe]:mt-2 [&_iframe]:rounded-lg"
-                dangerouslySetInnerHTML={{ __html: embedYouTubeLinks(activePoint.description) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(embedYouTubeLinks(activePoint.description)) }}
               />
             ) : (
               <p className="mt-3 text-sm text-slate-500">No description for this point.</p>
@@ -269,7 +270,7 @@ function ScenarioShowContent() {
               {scenario.description ? (
                 <div
                   className="text-sm text-slate-600 [&_a]:text-indigo-600 [&_iframe]:mt-2 [&_iframe]:rounded-lg"
-                  dangerouslySetInnerHTML={{ __html: embedYouTubeLinks(scenario.description) }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(embedYouTubeLinks(scenario.description)) }}
                 />
               ) : (
                 <p className="text-sm text-slate-500">No description provided.</p>
@@ -302,7 +303,7 @@ function ScenarioShowContent() {
                               <div
                                 className="[&_a]:text-indigo-600 [&_iframe]:mt-2 [&_iframe]:rounded-lg"
                                 dangerouslySetInnerHTML={{
-                                  __html: embedYouTubeLinks(point.description),
+                                  __html: sanitizeHtml(embedYouTubeLinks(point.description)),
                                 }}
                               />
                             ) : (

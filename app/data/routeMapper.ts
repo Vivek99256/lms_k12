@@ -34,47 +34,88 @@ const AI_INTELLIGENCE_ROUTES: Record<string, string> = {
  * @returns The Next.js route path, or '#' for invalid links
  */
 /**
+ * Result module: legacy resource name → the Next.js page that replaced it.
+ *
+ * The Result screens were rebuilt at new paths (see app/result/README.md), so the
+ * legacy name is no longer a path that exists. The menu table hands out the same
+ * resource in several spellings - `x.index` (route name), `result/x`, `/result/x`
+ * and, for the exam masters, `/exam/x` - so every spelling is generated from this
+ * one table instead of being typed out once per form.
+ */
+const RESULT_LEGACY_RESOURCES: Record<string, string> = {
+  marks_entry: '/exam/marks-entry',
+  co_scholastic_marks_entry: '/result/co-scholastic-marks',
+  'result-template': '/result/templates',
+  'student-result': '/result/report-card',
+  result_activity_marks: '/result/hpc-activity-entry',
+  result_activity_marks_v1: '/result/hpc-entry-v1',
+  approve_mobile_result: '/result/approve-mobile-result',
+  upload_result: '/result/upload-result',
+  exam_master: '/result/master/exam-master',
+  exam_type_master: '/result/master/exam-master',
+  exam_creation: '/result/master/exam-creation',
+  grade_master: '/result/master/grade-master',
+  std_grd_maping: '/result/master/standard-grade-mapping',
+  result_master: '/result/master/result-master',
+  result_book_master: '/result/master/result-book-master',
+  result_remark_master: '/result/master/student-result-remark',
+  co_scholastic_master: '/result/master/co-scholastic-master',
+  co_scholastic: '/result/master/co-scholastic-setup',
+  working_day_master: '/result/master/working-day-master',
+  student_attendance_master: '/result/student-attendance',
+  result_skillset: '/result/master/hpc-skillset',
+  result_activity_master: '/result/master/hpc-activity',
+  result_report: '/result/reports',
+  show_result_report: '/result/reports',
+  marks_approval_report: '/result/reports/marks-approval',
+  classwise_grade_report: '/result/reports/classwise-grade',
+  student_result_remarks: '/result/student-result-remarks',
+  'student-result-remarks': '/result/student-result-remarks',
+  consolidate_report: '/result/reports/consolidate',
+  wrt_report: '/result/reports/wrt',
+  wrt_progress_report: '/result/reports/wrt-progress',
+  cbse_result: '/result/report-card/cbse-1t5',
+  cbse_result_t2: '/result/report-card/cbse-t2',
+  cbse_11_result: '/result/report-card/cbse-11',
+  cnse_11_result: '/result/report-card/cnse-11',
+};
+
+/**
+ * Menu links whose legacy name differs from the page that replaced them. Only links with a
+ * real page belong here; a link with no page at all is hidden from the sidebar instead
+ * (see `isUnreachableMenuRoute` in menuMappers.ts), never pointed at a guess.
+ */
+const LEGACY_LINK_ROUTES: Record<string, string> = {
+  'hostel_report.index': '/hostel/hostel-report',
+  'show_hostel_visitor_report.index': '/hostel/visitor-details',
+  room_report: '/hostel/available-room-report',
+  'add_fields.index': '/general/fields_configuration',
+  'online_fees.index': '/fees/online-fees-settings',
+  'fees_monthly_report.index': '/fees/reports',
+  'chapter_master.index': '/course-master',
+};
+
+const RESULT_LEGACY_ROUTES: Record<string, string> = Object.fromEntries(
+  Object.entries(RESULT_LEGACY_RESOURCES).flatMap(([resource, route]) => {
+    const name = resource.toLowerCase();
+    return [
+      `${name}.index`,
+      name,
+      `result/${name}`,
+      `/result/${name}`,
+      `exam/${name}`,
+      `/exam/${name}`,
+    ].map((key) => [key, route] as const);
+  }),
+);
+
+/**
  * Result module: legacy Laravel route names → Next.js routes.
  * Path-style links (e.g. "result/marks_entry") already map 1:1 because the
  * Result pages live at the legacy paths; this map covers route-name links.
  */
 const RESULT_ROUTE_NAME_MAP: Record<string, string> = {
-  'marks_entry.index': '/result/marks_entry',
-  'co_scholastic_marks_entry.index': '/result/co_scholastic_marks_entry',
-  'result-template.index': '/result/result-template',
-  'student-result.index': '/result/student-result',
-  'result_activity_marks.index': '/result/result_activity_marks',
-  'result_activity_marks_v1.index': '/result/result_activity_marks_V1',
-  'approve_mobile_result.index': '/result/approve_mobile_result',
-  'upload_result.index': '/result/upload_result',
-  'exam_master.index': '/result/exam_master',
-  'exam_type_master.index': '/result/exam_master',
-  'exam_creation.index': '/result/exam_creation',
-  'grade_master.index': '/result/grade_master',
-  'std_grd_maping.index': '/result/std_grd_maping',
-  'result_master.index': '/result/result_master',
-  'result_book_master.index': '/result/result_book_master',
-  'result_remark_master.index': '/result/result_remark_master',
-  'co_scholastic_master.index': '/result/co_scholastic_master',
-  'working_day_master.index': '/result/working_day_master',
-  'student_attendance_master.index': '/result/student_attendance_master',
-  'result_skillset.index': '/result/result_skillset',
-  'result_activity_master.index': '/result/result_activity_master',
-  'show_result_report': '/result/result_report',
-  'result/show_result_report': '/result/result_report',
-  'marks_approval_report.index': '/result/marks_approval_report',
-  'classwise_grade_report.index': '/result/classwise_grade_report',
-  'student_result_remarks.index': '/result/student_result_remarks',
-  'student-result-remarks.index': '/result/student_result_remarks',
-  'consolidate_report.index': '/result/consolidate_report',
-  'wrt_report.index': '/result/WRT_report',
-  'wrt_progress_report.index': '/result/WRT_progress_report',
-  'result/wrt_report': '/result/WRT_report',
-  'result/wrt_progress_report': '/result/WRT_progress_report',
-  'cbse_result.index': '/result/cbse_result',
-  'cbse_result_t2.index': '/result/cbse_result_t2',
-  'cbse_11_result.index': '/result/cbse_11_result',
-  'cnse_11_result.index': '/result/cnse_11_result',
+  ...RESULT_LEGACY_ROUTES,
   'add_user': '/user/add_user',
   'add_user.index': '/user/add_user',
   'add_user.create': '/user/add_user',
@@ -586,6 +627,51 @@ const ENTERPRISE_BRAIN_ROUTE_NAME_MAP: Record<string, string> = {
   'brain': '/enterprise-brain',
 };
 
+/**
+ * Library module (see app/library) — App\Http\Controllers\library\* in
+ * next_lms_erp. The generic fallback at the end of this function (prepend a
+ * leading slash to whatever tblmenumaster's `link` holds) only produces the
+ * right route for entries whose link already happens to equal the Next.js
+ * path exactly (e.g. "library/scan_book"). Most of this module's Laravel
+ * route names/paths don't match this module's Next.js slugs 1:1 (e.g.
+ * "scan_books_remarks.index" vs. /library/add_book_remark), so those links
+ * fall through to a route that doesn't exist and render as disabled tabs.
+ * Both the dotted route name and the raw path are listed for each screen,
+ * matching this file's established convention for every other module.
+ */
+const LIBRARY_ROUTE_NAME_MAP: Record<string, string> = {
+  'books.index': '/library/book_resources',
+  'books': '/library/book_resources',
+  'library/books': '/library/book_resources',
+  'quick_return.index': '/library/quick_return',
+  'quick_return': '/library/quick_return',
+  'library/quick_return': '/library/quick_return',
+  'scan_books.index': '/library/scan_book',
+  'scan_books': '/library/scan_book',
+  'library/scan_books': '/library/scan_book',
+  'scan_books_remarks.index': '/library/add_book_remark',
+  'scan_books_remarks': '/library/add_book_remark',
+  'library/scan_books_remarks': '/library/add_book_remark',
+  'library_report.index': '/library/report',
+  'library_report': '/library/report',
+  'library/library_report': '/library/report',
+  'book_issue_report.index': '/library/issue_overdue_report',
+  'book_issue_report': '/library/issue_overdue_report',
+  'library/book_issue_report': '/library/issue_overdue_report',
+  'print_barcode.index': '/library/print_barcode',
+  'print_barcode': '/library/print_barcode',
+  'library/print_barcode': '/library/print_barcode',
+  'verified_report.index': '/library/scanned_book_report',
+  'verified_book_report': '/library/scanned_book_report',
+  'library/verified_book_report': '/library/scanned_book_report',
+  'verifiypending_report.index': '/library/pending_scan_report',
+  'verified_book_report_pending': '/library/pending_scan_report',
+  'library/verified_book_report_pending': '/library/pending_scan_report',
+  'lost_and_damage.index': '/library/lost_damage_report',
+  'lost_and_damage': '/library/lost_damage_report',
+  'library/lost_and_damage': '/library/lost_damage_report',
+};
+
 export function mapApiLinkToRoute(link: string | null | undefined): string {
   if (!link) return '#';
 
@@ -750,9 +836,19 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return lmsEntryRoute;
   }
 
+  const legacyLinkRoute = LEGACY_LINK_ROUTES[cleanLink.toLowerCase()];
+  if (legacyLinkRoute) {
+    return legacyLinkRoute;
+  }
+
   const resultRoute = RESULT_ROUTE_NAME_MAP[cleanLink.toLowerCase()];
   if (resultRoute) {
     return resultRoute;
+  }
+
+  const libraryRoute = LIBRARY_ROUTE_NAME_MAP[cleanLink.toLowerCase().replace(/\/index$/, '')];
+  if (libraryRoute) {
+    return libraryRoute;
   }
 
   // LMS → H5P content: legacy Laravel route-name / path links → Next routes.

@@ -29,7 +29,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     setGoogleClientId(
-      process.env.NEXT_GOOGLE_CLIENT_ID?.trim() || ''
+      // Only NEXT_PUBLIC_ variables reach the browser; the old name was always empty here.
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || ''
     );
   }, []);
 

@@ -18,6 +18,13 @@
 // }
 // Check if the current host is NOT a local development environment
 const isProductionEnvironment = () => {
+  // An explicit build-time choice beats guessing from the hostname, so a staging or
+  // preview host can never silently read and write production data. Unset keeps the
+  // hostname rule below.
+  const declared = (process.env.NEXT_PUBLIC_APP_ENV || '').trim().toLowerCase();
+  if (declared === 'production') return true;
+  if (declared === 'development' || declared === 'staging') return false;
+
   if (typeof window === 'undefined') {
     // Server-side - use NODE_ENV as fallback
     return process.env.NODE_ENV === 'production';
