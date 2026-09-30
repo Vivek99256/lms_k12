@@ -2613,6 +2613,15 @@ export default function ChapterListPage() {
     router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
   };
 
+  const openChapterCoherenceMapView = (chapter: Chapter) => {
+    const nextParams = new URLSearchParams(searchParams?.toString());
+    nextParams.set('view', 'coherence-map');
+    nextParams.set('chapterId', chapter.id);
+    nextParams.set('expandedChapterId', chapter.id);
+
+    router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
+  };
+
   const closeContentDrawer = () => {
     setSelectedContentItem(null);
   };
@@ -5408,6 +5417,7 @@ export default function ChapterListPage() {
             standardId={standardId}
             title={`${course.subject} - ${getCourseGradeLabel(course.classGrade)}`}
             onClose={() => router.push(`/course-master/${courseId}/chapters`)}
+            initialChapterId={activeChapterId ? `chapter:${activeChapterId}` : undefined}
           />
         </div>
       </div>
@@ -6322,7 +6332,7 @@ export default function ChapterListPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+                      onClick={() => openChapterCoherenceMapView(chapter)}
                       className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                     >
                       <Network size={16} className="mr-2" />
