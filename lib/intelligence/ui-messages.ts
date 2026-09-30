@@ -54,6 +54,11 @@ export type PanelMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
   module?: string;
+  /**
+   * The answer's own sentence, apart from the sections it sits above. Empty until the
+   * turn finishes; the bubble draws it as the lead line over the details.
+   */
+  headline: string;
   citations: ChatShapedReply['response']['citations'];
   actions: AnswerAction[];
   followUps: string[];
@@ -145,6 +150,7 @@ export function toPanelMessage(message: AskUIMessage): PanelMessage {
     // for the other on the last chunk would re-render the bubble for no reason.
     content: content || reply.message.content,
     module: reply.response.data.module,
+    headline: reply.response.data.headline ?? '',
     citations: reply.response.citations,
     actions: reply.actions,
     followUps: reply.response.followUpSuggestions,

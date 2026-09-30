@@ -58,6 +58,12 @@ export interface ChatShapedReply {
     data: {
       module?: string;
       pipeline?: string;
+      /**
+       * The answer's one-line statement, on its own. `message` is the headline and every
+       * section flattened together, which is right for a transcript and wrong for a bubble
+       * that also draws the sections — showing it would print everything twice.
+       */
+      headline?: string;
       depthReached?: number;
       /** Present so the panel can render the ladder beside the reply. */
       lifecycleTrace?: TraceStage[];
@@ -266,6 +272,7 @@ export function toChatShapedReply(result: AskResult, messageId: string): ChatSha
       citations: citationsFrom(trace, moduleKey),
       data: {
         module: moduleKey,
+        headline: result.answer.headline?.trim() || undefined,
         pipeline: result.pipeline,
         depthReached: result.depth_reached,
         lifecycleTrace: trace,
