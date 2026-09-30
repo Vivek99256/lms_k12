@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Copy, FileUp, Loader2, Plus, Trash2 } from 'lucide-react';
 import {
@@ -367,7 +369,7 @@ export function CoursePresentationEditor({
     try {
       patchSlide({ background_image: await coursePresentationApi.uploadMedia(file, 'slide_background') });
     } catch (err: unknown) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to upload image');
+      setUploadError(friendlyError(err, 'We couldn’t upload the image. Please try again.'));
     } finally {
       setUploading(false);
     }
@@ -402,7 +404,7 @@ export function CoursePresentationEditor({
           value={state.description}
           onChange={(v) => set('description', v)}
           disabled={disabled}
-          hint="For teachers, in the content list. Learners do not see this."
+          hint="For teachers, in the content list. Students do not see this."
           rows={2}
         />
       </FieldGroup>
@@ -612,7 +614,7 @@ export function CoursePresentationEditor({
                 value={slide.notes}
                 onChange={(v) => patchSlide({ notes: v })}
                 disabled={disabled}
-                hint="For you and other teachers. Learners never see these."
+                hint="For you and other teachers. Students never see these."
                 rows={2}
               />
             </div>

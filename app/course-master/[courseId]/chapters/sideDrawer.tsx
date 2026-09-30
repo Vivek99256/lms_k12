@@ -798,7 +798,7 @@ ${groundTruthContent}`;
       const isSuccess = raw.success === true || Number(raw.status_code) === 1;
 
       if (!res.ok || !isSuccess) {
-        return { ok: false, message: readErrorMessage(raw) || `Failed to generate ${typeValue}` };
+        return { ok: false, message: readErrorMessage(raw) || `Couldn’t generate ${typeValue}` };
       }
 
       onSuccess?.(raw);

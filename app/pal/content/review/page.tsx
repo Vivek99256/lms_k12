@@ -79,7 +79,7 @@ export default function PalContentReviewPage() {
         setDrafts({});
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        setError((err as Error).message || 'Could not load the review queue.');
+        setError((err as Error).message || 'Couldn’t load the review queue.');
         setItems([]);
       } finally {
         setLoading(false);
@@ -307,8 +307,7 @@ export default function PalContentReviewPage() {
               Nothing in “{status}” for {entityType}s.
             </p>
             <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
-              Run <code className="rounded bg-slate-100 px-1">php artisan pal:tag-content</code> on the
-              server to generate proposals.
+              Ask your administrator to generate proposals.
             </p>
           </div>
         ) : (

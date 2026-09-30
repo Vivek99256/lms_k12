@@ -24,6 +24,7 @@ import {
   type ModuleCategory,
   type ModuleCategoryItem,
 } from '@/app/_lib/module-categories-api';
+import { friendlyError } from '@/lib/user-messages';
 import { getModuleScreenRegistry } from '@/app/_lib/module-screen-registry';
 
 /**
@@ -384,7 +385,7 @@ export function ModuleCategoryPage({
         setState('ready');
       } catch (caught) {
         if (controller.signal.aborted) return;
-        setError(caught instanceof Error ? caught.message : 'Unable to load this category.');
+        setError(friendlyError(caught, "We couldn't load this section. Please try again."));
         setState('error');
       }
     })();
@@ -520,7 +521,7 @@ export function ModuleCategoryPage({
     return [
       {
         id: 'module-intelligence',
-        label: 'Intelligence',
+        label: 'AI insights',
         icon: Brain,
         render: () =>
           contractEntry?.loadContract ? (
@@ -665,7 +666,7 @@ export function ModuleCategoryPage({
         <PageFrame>
           <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error || 'Unable to load this category.'}</span>
+            <span>{error || "We couldn't load this section. Please try again."}</span>
           </div>
         </PageFrame>
       );
@@ -735,14 +736,14 @@ export function ModuleCategoryPage({
       {state === 'loading' && tabs.length === 0 ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 shadow-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading screens…
+          Loading pages…
         </div>
       ) : null}
 
       {state === 'error' ? (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error || 'Unable to load this category.'}</span>
+          <span>{error || "We couldn't load this section. Please try again."}</span>
         </div>
       ) : null}
 
@@ -756,9 +757,9 @@ export function ModuleCategoryPage({
         // Most categories start empty by design — no such screens exist for
         // this module yet, and none are invented.
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
-          <p className="text-sm font-medium text-slate-700">No screens available yet</p>
+          <p className="text-sm font-medium text-slate-700">Nothing here yet.</p>
           <p className="mt-1 text-sm text-slate-500">
-            {`There are no ${category.label} screens available for your account.`}
+            {`There are no ${category.label} pages available for your account.`}
           </p>
         </div>
       ) : null}
@@ -821,7 +822,7 @@ export function ModuleCategoryPage({
              * a second step would be the dead end this replaced.
              */
             <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
-              <p className="text-sm text-slate-500">Choose a screen above to open it.</p>
+              <p className="text-sm text-slate-500">Choose a page above to open it.</p>
             </div>
           )}
         </>

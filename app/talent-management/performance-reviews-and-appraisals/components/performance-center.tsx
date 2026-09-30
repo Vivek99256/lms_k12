@@ -962,7 +962,7 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
                               columns={10}
                               tone="error"
                               title={reviewsError}
-                              description="The employee reviews could not be loaded."
+                              description="Couldn't load the employee reviews. Try again."
                               action={
                                 <Button variant="outline" size="sm" onClick={retryReviews}>
                                   Retry
@@ -1245,7 +1245,7 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
           const session = buildSessionContext()
 
           if (!isPerformanceSessionReady(session)) {
-            setResult({ ok: false, message: 'Your session could not be resolved. Please sign in again.' })
+            setResult({ ok: false, message: 'Your session has expired. Please sign in again.' })
             setCycleDialogOpen(false)
             return
           }
@@ -1272,7 +1272,7 @@ export function PerformanceCenter({ comingSoon }: PerformanceCenterProps = {}) {
           } catch (error) {
             setResult({
               ok: false,
-              message: error instanceof Error ? error.message : 'Failed to create the review cycle.',
+              message: error instanceof Error ? error.message : "Couldn't create the review cycle. Try again.",
             })
           }
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AlertTriangle, ImagePlus, Loader2, Plus, Trash2, X } from 'lucide-react';
@@ -435,7 +437,7 @@ export function TextActivityEditor({
       const url = await uploadTextActivityImage(type, file);
       onChange({ ...state, mediaImage: url });
     } catch (err: unknown) {
-      setUploadError(err instanceof Error ? err.message : 'Could not upload that image');
+      setUploadError(friendlyError(err, 'We couldn’t upload that image. Please try again.'));
     } finally {
       setUploading(false);
       if (imageInputRef.current) imageInputRef.current.value = '';
@@ -506,7 +508,7 @@ export function TextActivityEditor({
                 />
                 {bankSize > 0 ? (
                   <p className="mt-1.5 text-[11px] text-slate-400">
-                    Learners will choose from {bankSize} {bankSize === 1 ? 'word' : 'words'}.
+                    Students will choose from {bankSize} {bankSize === 1 ? 'word' : 'words'}.
                   </p>
                 ) : null}
               </Field>
@@ -619,7 +621,7 @@ export function TextActivityEditor({
             />
             <Toggle
               label="Retry"
-              hint="Learners can clear their answers and try the whole activity again."
+              hint="Students can clear their answers and try the whole activity again."
               checked={state.enableRetry}
               onChange={(value) => set('enableRetry', value)}
             />

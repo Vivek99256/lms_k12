@@ -96,7 +96,7 @@ export function AnalyseTab({
       // stage strip has moved.
       onCompleted?.();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The analysis could not be completed.');
+      setError(caught instanceof Error ? caught.message : 'The analysis couldn’t be completed.');
     } finally {
       setBusyKey(null);
     }
@@ -258,7 +258,7 @@ function FindingCard({
       {explanation?.governance_passed === false ? (
         <p className="mt-1.5 text-[11px] leading-5 text-amber-800">
           {explanation.reason_refused ||
-            'The reason could not be backed by verified evidence, so it is not shown.'}
+            'The reason couldn’t be backed by verified evidence, so it is not shown.'}
         </p>
       ) : explanation?.narrative ? (
         <p className="mt-1.5 text-[11px] leading-5 text-gray-600">{explanation.narrative}</p>

@@ -33,7 +33,7 @@ export function RequisitionApprovalPage() {
         remarks: text(record, "requisition_approved_remarks"),
       }])));
       setSelected(new Set());
-    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Requisitions could not be loaded."); }
+    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't load requisitions. Try again."); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => {
@@ -72,12 +72,12 @@ export function RequisitionApprovalPage() {
       }));
       setNotice(await saveInventory("requisition-approvals", { approvals }));
       await load();
-    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Requisitions could not be approved."); }
+    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't approve requisitions. Try again."); }
     finally { setBusy(false); }
   }
 
   return <main className="min-h-screen p-4 sm:p-6"><div className="mx-auto max-w-[1700px] space-y-5">
-    <div><h1 className="text-2xl font-bold">Requisition Form Approval</h1><p className="mt-1 text-sm text-slate-500">Review and approve inventory requisitions.</p></div>
+    <div><h1 className="text-2xl font-bold">Requisition form approval</h1><p className="mt-1 text-sm text-slate-500">Review and approve inventory requisitions.</p></div>
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
     {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
     <Card><CardHeader className="border-b"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div className="relative w-full sm:max-w-md"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input className="pl-9" placeholder="Search requisitions..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Button variant="outline" onClick={() => void load()}><RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} /> Refresh</Button></div></CardHeader>
@@ -96,7 +96,7 @@ export function RequisitionApprovalPage() {
             <TableCell><select className="h-10 min-w-36 rounded-xl border border-slate-200 bg-white px-2 text-sm" disabled={disabled} value={row.status} onChange={(event) => update(record.id, { status: event.target.value })}><option value="">Select</option>{data.options.statuses?.map((status) => <option key={status.id} value={status.id}>{status.label}</option>)}</select></TableCell>
             <TableCell>{text(record, "requisition_approved_by")}</TableCell>
             <TableCell><Textarea className="min-w-48" rows={2} disabled={disabled} value={row.remarks} onChange={(event) => update(record.id, { remarks: event.target.value })} /></TableCell>
-            <TableCell><a href="/Inventory/item_direct_purchase" target="_blank" rel="noreferrer"><Button type="button" variant="outline">Direct Purchase</Button></a></TableCell>
+            <TableCell><a href="/Inventory/item_direct_purchase" target="_blank" rel="noreferrer"><Button type="button" variant="outline">Direct purchase</Button></a></TableCell>
           </TableRow>;
         })}
       </TableBody></Table></div><div className="border-t p-4 text-center"><Button onClick={() => void save()} disabled={busy}>{busy && <LoaderCircle className="size-4 animate-spin" />} Save</Button></div></CardContent>

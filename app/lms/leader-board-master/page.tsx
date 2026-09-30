@@ -33,8 +33,10 @@ import './page.css';
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
 }
+import { friendlyError } from "@/lib/user-messages";
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return friendlyError(error, "We couldn’t load the leaderboard setup. Please try again.");
 }
 
 const inputClass =
@@ -218,7 +220,7 @@ export default function LeaderBoardMasterPage() {
               <Medal className="size-5" />
             </span>
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Leader Board Master</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Leaderboard setup</h1>
               <p className="mt-0.5 text-sm text-slate-500">
                 Configure how many points each activity earns, per class.
               </p>
@@ -333,7 +335,7 @@ export default function LeaderBoardMasterPage() {
                   onChange={(e) => patch({ showHide: e.target.checked })}
                   className="size-4 rounded border-slate-300 text-indigo-600 accent-indigo-600"
                 />
-                Show on leader board
+                Show on leaderboard
               </label>
             </div>
 
@@ -361,8 +363,8 @@ export default function LeaderBoardMasterPage() {
             serialColumn
             searchPlaceholder="Search master…"
             exportFilename="leader-board-master"
-            exportTitle="Leader Board Master"
-            emptyTitle="No leader board rules"
+            exportTitle="Leaderboard setup"
+            emptyTitle="No leaderboard rules"
             emptyHint="Use “Add Master” to configure activity points."
             actions={(row) => (
               <div className="flex justify-end gap-1.5">

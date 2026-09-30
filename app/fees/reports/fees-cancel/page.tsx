@@ -75,8 +75,8 @@ export default function FeesCancelReportPage() {
   const pagination = useMemo(() => paginateRows(rows, page, REPORT_PAGE_SIZE), [page, rows]);
   const totalAmount = useMemo(() => rows.reduce((sum, row) => sum + row.amountPaid, 0), [rows]);
   const exportColumns = useMemo<TableExportColumn[]>(() => [
-    { key: 'receiptId', label: 'Receipt no' },
-    { key: 'enrollmentNo', label: 'GR No' },
+    { key: 'receiptId', label: 'Receipt no.' },
+    { key: 'enrollmentNo', label: 'GR no.' },
     { key: 'studentName', label: 'Student name', width: '220px' },
     { key: 'admissionYear', label: 'Admission year' },
     { key: 'quota', label: 'Quota' },
@@ -108,7 +108,7 @@ export default function FeesCancelReportPage() {
       const typesRecord = payload.fees_cancel_type && typeof payload.fees_cancel_type === 'object' ? payload.fees_cancel_type as Record<string, unknown> : {};
       setCancelTypes(Object.entries(typesRecord).map(([key, value]) => ({ value: readString(value || key), label: readString(value || key) })));
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load cancellation types.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load cancellation types. Try again." });
     } finally {
       setLoadingFilters(false);
     }
@@ -152,7 +152,7 @@ export default function FeesCancelReportPage() {
       });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to fetch fees cancel report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load fees cancel report. Try again." });
     } finally {
       setLoading(false);
     }
@@ -172,14 +172,14 @@ export default function FeesCancelReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Fees Cancel Report"
+        title="Fee cancellation report"
         description="Track regular fee receipt cancellations by cancel type, student, date range, and cancelling user."
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'fees-cancel-report.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-cancel-report.xls', title: 'Fees Cancel Report', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-cancel-report.pdf', title: 'Fees Cancel Report', subtitle: 'Legacy parity export', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Fees Cancel Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-cancel-report.xls', title: 'Fee cancellation report', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-cancel-report.pdf', title: 'Fee cancellation report', subtitle: 'Export', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Fee cancellation report', subtitle: 'Print view', columns: exportColumns, rows: exportRows })}
           />
         }
       />
@@ -226,7 +226,7 @@ export default function FeesCancelReportPage() {
             <TableHeader>
               <TableRow className="bg-slate-100 text-xs uppercase text-slate-700 hover:bg-slate-100">
                 <TableHead>Sr no</TableHead>
-                <TableHead>Receipt no</TableHead>
+                <TableHead>Receipt no.</TableHead>
                 <TableHead>GR no</TableHead>
                 <TableHead>Student name</TableHead>
                 <TableHead>Admission year</TableHead>

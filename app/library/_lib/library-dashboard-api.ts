@@ -90,17 +90,17 @@ export async function fetchLibraryDashboardSummary(
     payload = JSON.parse(text) as LibraryDashboardPayload;
   } catch {
     throw new Error(
-      `Library dashboard proxy returned a non-JSON response (${response.headers.get('content-type') || 'unknown content type'}).`
+      "Couldn't load the dashboard. Try again."
     );
   }
 
   if (!response.ok) {
     throw new Error(
-      readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to load the library dashboard summary.`
+      readString(asRecord(payload).message) || `Couldn't load the library dashboard summary. Try again.`
     );
   }
 
-  assertApiSuccess(payload, 'Unable to load the library dashboard summary.');
+  assertApiSuccess(payload, "Couldn't load the library dashboard summary. Try again.");
 
   return payload;
 }

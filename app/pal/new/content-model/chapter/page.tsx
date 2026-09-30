@@ -65,7 +65,7 @@ function ChapterModelContent() {
         setModel(await fetchChapterModel(semanticId, signal));
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        setError((err as Error).message || 'Could not load this chapter.');
+        setError((err as Error).message || 'Couldn’t load this chapter.');
       } finally {
         setLoading(false);
       }

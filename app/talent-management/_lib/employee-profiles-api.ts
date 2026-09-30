@@ -83,7 +83,7 @@ async function request<T>(
     const errors = payload && typeof payload === 'object' && 'errors' in (payload as Record<string, unknown>)
       ? (payload as { errors?: Record<string, string[]> }).errors
       : undefined;
-    throw new ApiError(messageFrom(payload, `API Error: ${response.status} ${response.statusText}`), response.status, errors);
+    throw new ApiError(messageFrom(payload, "Couldn't complete that request. Try again."), response.status, errors);
   }
 
   return payload as T;

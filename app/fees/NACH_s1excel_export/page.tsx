@@ -91,13 +91,13 @@ export default function NachS1ExcelExportPage() {
       if (toDate) params.set('to_date', toDate);
 
       const payload = await fetchLaravelJson<S1Response>(currentSession, `${getApiBaseUrl(currentSession)}/fees/NACH_s1excel_export/create?${params.toString()}`);
-      assertApiSuccess(payload, 'Unable to export S1 NACH data.');
+      assertApiSuccess(payload, "Couldn't export S1 NACH data. Try again.");
       const nextRows = toS1Rows(payload.student_data);
       setRows(nextRows);
       setDownloadPath(readString(payload.excelFile_path));
       setMessage({ type: nextRows.length ? 'success' : 'info', text: payload.message || (nextRows.length ? `Loaded ${nextRows.length} mandate record${nextRows.length === 1 ? '' : 's'}.` : 'No records found.') });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to export S1 NACH data.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't export S1 NACH data. Try again." });
     } finally {
       setLoading(false);
     }
@@ -107,7 +107,7 @@ export default function NachS1ExcelExportPage() {
     <PageFrame>
       <PageHeader
         title="S1-NACH excel export"
-        description="Export unregistered NACH mandate records from Laravel for the selected registration date range."
+        description="Export unregistered NACH mandate records for the selected registration date range."
         action={downloadPath ? (
           <a
             href={joinUrl(getApiBaseUrl(session), downloadPath)}

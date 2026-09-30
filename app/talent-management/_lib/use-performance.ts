@@ -77,7 +77,7 @@ function resolveSession(): SessionContext | null {
   return isPerformanceSessionReady(session) ? session : null
 }
 
-const SESSION_ERROR = 'Your session could not be resolved. Please sign in again.'
+const SESSION_ERROR = 'Your session has expired. Please sign in again.'
 
 export interface MutationResult {
   ok: boolean
@@ -114,7 +114,7 @@ export function usePerformanceOverview(cycleId: string | undefined, refreshKey: 
       setKpis(response.data.kpis)
       setTotals(response.data.totals)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load performance metrics.'))
+      setError(toMessage(loadError, "Couldn't load performance metrics. Try again."))
       setKpis([])
       setTotals(null)
     } finally {
@@ -156,7 +156,7 @@ export function usePerformanceFilters() {
       const response = await performanceService.getFilters(session)
       setOptions(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load filter options.'))
+      setError(toMessage(loadError, "Couldn't load filter options. Try again."))
       setOptions(null)
     } finally {
       setLoading(false)
@@ -210,7 +210,7 @@ export function usePerformanceReviews(filters: ReviewFilters, refreshKey: number
       setReviews(response.data)
       setPagination(response.pagination ?? EMPTY_PAGINATION)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load employee reviews.'))
+      setError(toMessage(loadError, "Couldn't load employee reviews. Try again."))
       setReviews([])
       setPagination(EMPTY_PAGINATION)
     } finally {
@@ -255,7 +255,7 @@ export function usePerformanceBoard(filters: ReviewFilters, enabled: boolean, re
       const response = await performanceService.getBoard(session, JSON.parse(filterKey) as ReviewFilters)
       setColumns(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the review board.'))
+      setError(toMessage(loadError, "Couldn't load the review board. Try again."))
       setColumns([])
     } finally {
       setLoading(false)
@@ -299,7 +299,7 @@ export function usePerformanceTimeline(cycleId: string | undefined, enabled: boo
       const response = await performanceService.getTimeline(session)
       setCycles(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the cycle timeline.'))
+      setError(toMessage(loadError, "Couldn't load the cycle timeline. Try again."))
       setCycles([])
     } finally {
       setLoading(false)
@@ -368,7 +368,7 @@ export function useReviewDetail(reviewId: number | null, refreshKey: number) {
         setTeam(null)
       }
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the employee overview.'))
+      setError(toMessage(loadError, "Couldn't load the employee overview. Try again."))
       setDetail(null)
       setTeam(null)
     } finally {
@@ -469,7 +469,7 @@ export function useReviewActivity(reviewId: number | null, tab: ActivityTab, ref
         setEntries(response.data)
       }
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load activity.'))
+      setError(toMessage(loadError, "Couldn't load activity. Try again."))
       setEntries([])
       setNotes([])
       setAttachments([])
@@ -531,7 +531,7 @@ export function usePerformanceGoals(
       setSummary(response.summary ?? null)
       setPagination(response.pagination ?? EMPTY_PAGINATION)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load goals.'))
+      setError(toMessage(loadError, "Couldn't load goals. Try again."))
       setGoals([])
       setSummary(null)
       setPagination(EMPTY_PAGINATION)
@@ -583,7 +583,7 @@ export function usePerformanceAppraisals(
       setSummary(response.summary ?? null)
       setPagination(response.pagination ?? EMPTY_PAGINATION)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load appraisals.'))
+      setError(toMessage(loadError, "Couldn't load appraisals. Try again."))
       setAppraisals([])
       setSummary(null)
       setPagination(EMPTY_PAGINATION)
@@ -635,7 +635,7 @@ export function usePerformanceCompensation(
       setSummary(response.summary ?? null)
       setPagination(response.pagination ?? EMPTY_PAGINATION)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load compensation revisions.'))
+      setError(toMessage(loadError, "Couldn't load compensation revisions. Try again."))
       setRevisions([])
       setSummary(null)
       setPagination(EMPTY_PAGINATION)
@@ -690,7 +690,7 @@ export function usePerformanceBonus(
       setPayoutMonths(response.payout_months ?? [])
       setPagination(response.pagination ?? EMPTY_PAGINATION)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load bonus awards.'))
+      setError(toMessage(loadError, "Couldn't load bonus awards. Try again."))
       setAwards([])
       setSummary(null)
       setPayoutMonths([])
@@ -739,7 +739,7 @@ export function usePerformanceCalibration(filters: ReviewFilters, enabled: boole
       setSummary(response.summary ?? null)
       setPagination(response.pagination ?? EMPTY_PAGINATION)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load calibration sessions.'))
+      setError(toMessage(loadError, "Couldn't load calibration sessions. Try again."))
       setSessions([])
       setSummary(null)
       setPagination(EMPTY_PAGINATION)
@@ -784,7 +784,7 @@ export function useCalibrationGrid(sessionId: number | null, refreshKey: number)
       const response = await performanceService.getCalibrationGrid(session, sessionId)
       setGrid(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the calibration grid.'))
+      setError(toMessage(loadError, "Couldn't load the calibration grid. Try again."))
       setGrid(null)
     } finally {
       setLoading(false)
@@ -825,7 +825,7 @@ export function useSavedViews(tab: PerfTab, refreshKey: number) {
       const response = await performanceService.getSavedViews(session, tab)
       setViews(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load saved views.'))
+      setError(toMessage(loadError, "Couldn't load saved views. Try again."))
       setViews([])
     } finally {
       setLoading(false)

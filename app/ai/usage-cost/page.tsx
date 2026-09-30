@@ -163,7 +163,7 @@ function ModuleUsageCost() {
               </p>
             ) : (
               <p className="mt-1 text-sm text-muted-foreground">
-                {(usage.provider as { reason?: string }).reason ?? 'Not available on this estate.'}
+                {(usage.provider as { reason?: string }).reason ?? 'Not available yet.'}
               </p>
             )}
           </div>

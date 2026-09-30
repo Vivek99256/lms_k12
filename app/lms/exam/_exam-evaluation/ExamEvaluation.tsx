@@ -110,7 +110,7 @@ export default function ExamEvaluation() {
     try {
       setBatches(await fetchBatches());
     } catch (loadError) {
-      setError(errorMessage(loadError, 'Unable to load evaluations.'));
+      setError(errorMessage(loadError, 'Couldn’t load evaluations.'));
     } finally {
       setBatchesLoading(false);
     }
@@ -125,7 +125,7 @@ export default function ExamEvaluation() {
       setDetail(await fetchBatch(batchId));
     } catch (loadError) {
       if (!quiet) {
-        setError(errorMessage(loadError, 'Unable to load this evaluation.'));
+        setError(errorMessage(loadError, 'Couldn’t load this evaluation.'));
       }
     } finally {
       if (!quiet) {
@@ -188,7 +188,7 @@ export default function ExamEvaluation() {
     try {
       setPapers(await fetchExamPapers());
     } catch (loadError) {
-      setError(errorMessage(loadError, 'Unable to load your exams.'));
+      setError(errorMessage(loadError, 'Couldn’t load your exams.'));
     } finally {
       setPapersLoading(false);
     }
@@ -223,7 +223,7 @@ export default function ExamEvaluation() {
         if (cancelled) return;
 
         setAnswerKey(null);
-        setAnswerKeyError(errorMessage(keyError, 'This paper could not be read as a marking key.'));
+        setAnswerKeyError(errorMessage(keyError, 'This paper couldn’t be read as a marking key.'));
       })
       .finally(() => {
         if (!cancelled) {
@@ -264,7 +264,7 @@ export default function ExamEvaluation() {
       setNotice('Evaluation started. Upload the scanned answer sheets to begin.');
       await loadBatches();
     } catch (createError) {
-      setError(errorMessage(createError, 'Unable to start this evaluation.'));
+      setError(errorMessage(createError, 'Couldn’t start this evaluation.'));
     } finally {
       setBusy(false);
     }
@@ -290,7 +290,7 @@ export default function ExamEvaluation() {
 
         if (rejected.length > 0) {
           setError(
-            `${rejected.length} file(s) could not be used: ` +
+            `${rejected.length} file(s) couldn’t be used: ` +
               rejected.map((row) => `${row.file} — ${row.reason}`).join('; ')
           );
         }
@@ -299,7 +299,7 @@ export default function ExamEvaluation() {
           setNotice(`${next.uploaded} sheet(s) uploaded. Reading and scoring them now…`);
         }
       } catch (uploadError) {
-        setError(errorMessage(uploadError, 'Unable to upload these answer sheets.'));
+        setError(errorMessage(uploadError, 'Couldn’t upload these answer sheets.'));
       } finally {
         setBusy(false);
 
@@ -323,7 +323,7 @@ export default function ExamEvaluation() {
           await loadDetail(selectedId, true);
         }
       } catch (rerunError) {
-        setError(errorMessage(rerunError, 'Unable to re-run this sheet.'));
+        setError(errorMessage(rerunError, 'Couldn’t re-run this sheet.'));
       } finally {
         setBusy(false);
       }
@@ -349,7 +349,7 @@ export default function ExamEvaluation() {
 
         await loadBatches();
       } catch (removeError) {
-        setError(errorMessage(removeError, 'Unable to remove this sheet.'));
+        setError(errorMessage(removeError, 'Couldn’t remove this sheet.'));
       } finally {
         setBusy(false);
       }
@@ -373,7 +373,7 @@ export default function ExamEvaluation() {
         await loadBatches();
         setNotice('Evaluation removed.');
       } catch (removeError) {
-        setError(errorMessage(removeError, 'Unable to remove this evaluation.'));
+        setError(errorMessage(removeError, 'Couldn’t remove this evaluation.'));
       } finally {
         setBusy(false);
       }
@@ -409,7 +409,7 @@ export default function ExamEvaluation() {
       await loadDetail(detail.batch.id);
       await loadBatches();
     } catch (publishError) {
-      setError(errorMessage(publishError, 'Unable to publish this evaluation.'));
+      setError(errorMessage(publishError, 'Couldn’t publish this evaluation.'));
     } finally {
       setBusy(false);
     }

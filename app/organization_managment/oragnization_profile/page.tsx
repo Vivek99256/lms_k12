@@ -545,7 +545,7 @@ export default function OrganizationProfilePage() {
       // eslint-disable-next-line no-console
       console.error("[OrganizationProfile] load failed", error)
       setLoadError(
-        error instanceof Error ? error.message : "Unable to load organization profile."
+        error instanceof Error ? error.message : "Couldn't load organization profile. Try again."
       )
     } finally {
       setIsLoading(false)
@@ -614,7 +614,7 @@ export default function OrganizationProfilePage() {
       const result = await saveOrganizationProfile(session, formData)
 
       if (!result.success) {
-        setMessage(result.message || "Unable to save organization profile.")
+        setMessage(result.message || "Couldn't save organization profile. Try again.")
         return
       }
 
@@ -624,7 +624,7 @@ export default function OrganizationProfilePage() {
       await loadProfile()
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Unable to save organization profile."
+        error instanceof Error ? error.message : "Couldn't save organization profile. Try again."
       )
     }
   }
@@ -755,7 +755,7 @@ export default function OrganizationProfilePage() {
       const result = await saveOrganizationProfile(session, formData)
 
       if (!result.success) {
-        setMessage(result.message || "Unable to save sister company.")
+        setMessage(result.message || "Couldn't save sister company. Try again.")
         return
       }
 
@@ -766,7 +766,7 @@ export default function OrganizationProfilePage() {
       await loadProfile()
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Unable to save sister company."
+        error instanceof Error ? error.message : "Couldn't save sister company. Try again."
       )
     }
   }
@@ -850,7 +850,7 @@ export default function OrganizationProfilePage() {
 
           <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(240px,304px)_minmax(0,1fr)]">
             <Card className={cn(cardSurfaceClass, "min-h-[432px] border-x border-b border-t-0")}>
-              <h2 className="text-base font-semibold">Company Logo</h2>
+              <h2 className="text-base font-semibold">Company logo</h2>
               <div className="mt-6 flex flex-col items-center">
                 <div className="flex size-[102px] items-center justify-center rounded-xl bg-[#2f66e8] text-2xl font-bold text-white shadow-lg shadow-blue-500/20">
                   {sisterDraft.brandName || "SC"}
@@ -864,33 +864,33 @@ export default function OrganizationProfilePage() {
               </div>
               <div className="mt-6 space-y-4">
                 <ReadField label="Founded" value={sisterDraft.establishedDate || "Pending"} />
-                <ReadField label="Total Employees" value={sisterDraft.totalEmployees} />
+                <ReadField label="Total employees" value={sisterDraft.totalEmployees} />
               </div>
             </Card>
 
             <Card className={cn(cardSurfaceClass, "border-x border-b border-t-0")}>
               <SectionTitle
-                title="Company Details"
+                title="Company details"
                 description="Core registration and identity information."
               />
               <div className="mt-5 grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
                 <EditableField
                   id="sisterOrganizationName"
-                  label="Company Name"
+                  label="Company name"
                   value={sisterDraft.organizationName}
                   required
                   onChange={(value) => updateSisterFormField("organizationName", value)}
                 />
                 <EditableField
                   id="sisterOrganizationCode"
-                  label="Company Code"
+                  label="Company code"
                   value={sisterDraft.organizationCode}
                   required
                   onChange={(value) => updateSisterFormField("organizationCode", value)}
                 />
                 <EditableField
                   id="sisterRegistrationNo"
-                  label="Registration Number"
+                  label="Registration number"
                   value={sisterDraft.registrationNo}
                   required
                   autoFocus
@@ -904,14 +904,14 @@ export default function OrganizationProfilePage() {
                   onChange={(value) => updateSisterFormField("industryType", value)}
                 />
                 <EditableSelect
-                  label="Organization Type"
+                  label="Organization type"
                   value={sisterDraft.organizationType}
                   options={options.organizationType}
                   required
                   onChange={(value) => updateSisterFormField("organizationType", value)}
                 />
                 <EditableSelect
-                  label="Business Type"
+                  label="Business type"
                   value={sisterDraft.businessType}
                   options={options.businessType}
                   required
@@ -919,7 +919,7 @@ export default function OrganizationProfilePage() {
                 />
                 <EditableField
                   id="sisterEstablishedDate"
-                  label="Established Date"
+                  label="Established date"
                   type="date"
                   value={sisterDraft.establishedDate}
                   required
@@ -927,7 +927,7 @@ export default function OrganizationProfilePage() {
                 />
                 <EditableField
                   id="sisterTotalEmployees"
-                  label="Total Employees"
+                  label="Total employees"
                   value={sisterDraft.totalEmployees}
                   required
                   onChange={(value) => updateSisterFormField("totalEmployees", value)}
@@ -954,7 +954,7 @@ export default function OrganizationProfilePage() {
                 />
                 <EditableTextarea
                   id="sisterCompanyDescription"
-                  label="Company Description"
+                  label="Company description"
                   value={sisterDraft.companyDescription}
                   className="md:col-span-2"
                   required
@@ -966,11 +966,11 @@ export default function OrganizationProfilePage() {
 
           <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
             <Card className={cn(cardSurfaceClass, "min-h-[344px]")}>
-              <SectionTitle title="Contact Information" />
+              <SectionTitle title="Contact information" />
               <div className="mt-6 grid grid-cols-1 gap-4">
                 <EditableField
                   id="sisterEmail"
-                  label="Email Address"
+                  label="Email address"
                   type="email"
                   value={sisterDraft.email}
                   required
@@ -978,7 +978,7 @@ export default function OrganizationProfilePage() {
                 />
                 <EditableField
                   id="sisterPhone"
-                  label="Phone Number"
+                  label="Phone number"
                   value={sisterDraft.phone}
                   required
                   onChange={(value) => updateSisterFormField("phone", value)}
@@ -987,7 +987,7 @@ export default function OrganizationProfilePage() {
             </Card>
 
             <Card className={cn(cardSurfaceClass, "min-h-[344px]")}>
-              <SectionTitle title="Registered Address" />
+              <SectionTitle title="Registered address" />
               <div className="mt-6 grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
                 <EditableField
                   id="sisterAddressLine1"
@@ -1020,7 +1020,7 @@ export default function OrganizationProfilePage() {
                 />
                 <EditableField
                   id="sisterPostalCode"
-                  label="Postal Code"
+                  label="Postal code"
                   value={sisterDraft.postalCode}
                   required
                   onChange={(value) => updateSisterFormField("postalCode", value)}
@@ -1046,7 +1046,7 @@ export default function OrganizationProfilePage() {
                 onChange={(value) => updateSisterFormField("status", value)}
               />
               <EditableSelect
-                label="Time Zone"
+                label="Time zone"
                 value={sisterDraft.timeZone}
                 options={options.timeZone}
                 onChange={(value) => updateSisterFormField("timeZone", value)}
@@ -1058,13 +1058,13 @@ export default function OrganizationProfilePage() {
                 onChange={(value) => updateSisterFormField("currency", value)}
               />
               <EditableSelect
-                label="Financial Year"
+                label="Financial year"
                 value={sisterDraft.financialYear}
                 options={options.financialYear}
                 onChange={(value) => updateSisterFormField("financialYear", value)}
               />
               <EditableSelect
-                label="Date Format"
+                label="Date format"
                 value={sisterDraft.dateFormat}
                 options={options.dateFormat}
                 onChange={(value) => updateSisterFormField("dateFormat", value)}
@@ -1090,7 +1090,7 @@ export default function OrganizationProfilePage() {
             </Button>
             <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
               <Send className="size-4" aria-hidden="true" />
-              Save Sister Company
+              Save sister company
             </Button>
           </Card>
         </div>
@@ -1114,7 +1114,7 @@ export default function OrganizationProfilePage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold text-slate-950">
-                Organization Profile
+                Organization profile
               </h1>
               <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">
                 Manage your institute&apos;s core information
@@ -1132,7 +1132,7 @@ export default function OrganizationProfilePage() {
               isEditing && "min-h-[432px]"
             )}
           >
-            <h2 className="text-base font-semibold">Company Logo</h2>
+            <h2 className="text-base font-semibold">Company logo</h2>
             <div className={cn("flex flex-col items-center", isEditing ? "mt-6" : "mt-5")}>
               <div className="flex size-[102px] items-center justify-center rounded-xl bg-[#2f66e8] text-2xl font-bold text-white shadow-lg shadow-blue-500/20">
                 {currentProfile.brandName || "ATP"}
@@ -1148,19 +1148,19 @@ export default function OrganizationProfilePage() {
             </div>
             <div className={cn("space-y-4", isEditing ? "mt-6" : "mt-5")}>
               <ReadField label="Founded" value={currentProfile.establishedDate || "Pending"} />
-              <ReadField label="Total Employees" value={currentProfile.totalEmployees} />
+              <ReadField label="Total employees" value={currentProfile.totalEmployees} />
             </div>
           </Card>
 
           <Card className={cn(cardSurfaceClass, "border-x border-b border-t-0")}>
             <SectionTitle
-              title="Company Details"
+              title="Company details"
               description="Core registration and identity information."
             />
             <div className="mt-5 grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
               <EditableField
                 id="organizationName"
-                label="Company Name"
+                label="Company name"
                 value={currentProfile.organizationName}
                 required
                 disabled={!isEditing}
@@ -1168,7 +1168,7 @@ export default function OrganizationProfilePage() {
               />
               <EditableField
                 id="organizationCode"
-                label="Company Code"
+                label="Company code"
                 value={currentProfile.organizationCode}
                 required
                 disabled={!isEditing}
@@ -1176,7 +1176,7 @@ export default function OrganizationProfilePage() {
               />
               <EditableField
                 id="registrationNo"
-                label="Registration Number"
+                label="Registration number"
                 value={currentProfile.registrationNo}
                 required
                 autoFocus={isEditing}
@@ -1192,7 +1192,7 @@ export default function OrganizationProfilePage() {
                 onChange={(value) => updateField("industryType", value)}
               />
               <EditableSelect
-                label="Organization Type"
+                label="Organization type"
                 value={currentProfile.organizationType}
                 options={options.organizationType}
                 required
@@ -1200,7 +1200,7 @@ export default function OrganizationProfilePage() {
                 onChange={(value) => updateField("organizationType", value)}
               />
               <EditableSelect
-                label="Business Type"
+                label="Business type"
                 value={currentProfile.businessType}
                 options={options.businessType}
                 required
@@ -1209,7 +1209,7 @@ export default function OrganizationProfilePage() {
               />
               <EditableField
                 id="establishedDate"
-                label="Established Date"
+                label="Established date"
                 type="date"
                 value={currentProfile.establishedDate}
                 required
@@ -1218,7 +1218,7 @@ export default function OrganizationProfilePage() {
               />
               <EditableField
                 id="totalEmployees"
-                label="Total Employees"
+                label="Total employees"
                 value={currentProfile.totalEmployees}
                 required
                 disabled={!isEditing}
@@ -1249,7 +1249,7 @@ export default function OrganizationProfilePage() {
               />
               <EditableTextarea
                 id="companyDescription"
-                label="Company Description"
+                label="Company description"
                 value={currentProfile.companyDescription}
                 className="md:col-span-2"
                 disabled={!isEditing}
@@ -1262,11 +1262,11 @@ export default function OrganizationProfilePage() {
 
         <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
           <Card className={cn(cardSurfaceClass, isEditing && "min-h-[344px]")}>
-            <SectionTitle title="Contact Information" />
+            <SectionTitle title="Contact information" />
             <div className="mt-6 grid grid-cols-1 gap-4">
               <EditableField
                 id="email"
-                label="Email Address"
+                label="Email address"
                 type="email"
                 value={currentProfile.email}
                 required
@@ -1275,7 +1275,7 @@ export default function OrganizationProfilePage() {
               />
               <EditableField
                 id="phone"
-                label="Phone Number"
+                label="Phone number"
                 value={currentProfile.phone}
                 required
                 disabled={!isEditing}
@@ -1285,7 +1285,7 @@ export default function OrganizationProfilePage() {
           </Card>
 
           <Card className={cn(cardSurfaceClass, isEditing && "min-h-[344px]")}>
-            <SectionTitle title="Registered Address" />
+            <SectionTitle title="Registered address" />
             <div className="mt-6 grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
               <EditableField
                 id="addressLine1"
@@ -1322,7 +1322,7 @@ export default function OrganizationProfilePage() {
               />
               <EditableField
                 id="postalCode"
-                label="Postal Code"
+                label="Postal code"
                 value={currentProfile.postalCode}
                 required
                 disabled={!isEditing}
@@ -1343,7 +1343,7 @@ export default function OrganizationProfilePage() {
         <Card className={cardSurfaceClass}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SectionTitle
-              title="Sister Companies"
+              title="Sister companies"
               icon={<Building2 className="size-4 text-blue-600" aria-hidden="true" />}
             />
             <Button
@@ -1353,7 +1353,7 @@ export default function OrganizationProfilePage() {
               onClick={openNewSisterCompany}
             >
               <Plus className="size-4" aria-hidden="true" />
-              Add Sister Company
+              Add sister company
             </Button>
           </div>
 
@@ -1387,10 +1387,10 @@ export default function OrganizationProfilePage() {
               <TableHeader>
                 <TableRow className="bg-slate-50 hover:bg-slate-50">
                   <TableHead className="h-9 px-4 text-[11px] font-semibold text-slate-950">
-                    Company Name
+                    Company name
                   </TableHead>
                   <TableHead className="h-9 px-4 text-[11px] font-semibold text-slate-950">
-                    Relationship Type
+                    Relationship type
                   </TableHead>
                   <TableHead className="h-9 px-4 text-[11px] font-semibold text-slate-950">
                     Status
@@ -1525,7 +1525,7 @@ export default function OrganizationProfilePage() {
           <SectionTitle title="Settings" />
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <EditableSelect
-              label="Time Zone"
+              label="Time zone"
               value={currentProfile.timeZone}
               options={options.timeZone}
               disabled={!isEditing}
@@ -1539,14 +1539,14 @@ export default function OrganizationProfilePage() {
               onChange={(value) => updateField("currency", value)}
             />
             <EditableSelect
-              label="Financial Year"
+              label="Financial year"
               value={currentProfile.financialYear}
               options={options.financialYear}
               disabled={!isEditing}
               onChange={(value) => updateField("financialYear", value)}
             />
             <EditableSelect
-              label="Date Format"
+              label="Date format"
               value={currentProfile.dateFormat}
               options={options.dateFormat}
               disabled={!isEditing}
@@ -1560,7 +1560,7 @@ export default function OrganizationProfilePage() {
               onChange={(value) => updateField("language", value)}
             />
             <EditableSelect
-              label="Number Format"
+              label="Number format"
               value={currentProfile.numberFormat}
               options={options.numberFormat}
               disabled={!isEditing}
@@ -1871,7 +1871,7 @@ function WorkingDays({
 }) {
   return (
     <div className="md:col-span-2 lg:col-span-3">
-      <Label className="text-xs font-semibold text-slate-950">Working Days</Label>
+      <Label className="text-xs font-semibold text-slate-950">Working days</Label>
       <div className="mt-2 flex flex-wrap gap-2">
         {allDays.map((day) =>
           isEditing ? (

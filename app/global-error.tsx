@@ -19,7 +19,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           <h1 style={{ fontSize: 20, marginBottom: 12 }}>The application could not load</h1>
           <p style={{ color: '#475569', lineHeight: 1.6 }}>
             Something went wrong on our side. Please try again. If this keeps happening, contact your school
-            administrator{error.digest ? ` and quote reference ${error.digest}` : ''}.
+            administrator{error.digest ? ` and quote error code ${error.digest}` : ''}.
           </p>
           <button
             type="button"

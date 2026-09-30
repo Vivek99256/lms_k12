@@ -110,7 +110,7 @@ function LearnerSupportView() {
         })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'This could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'This couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -139,7 +139,7 @@ function LearnerSupportView() {
       setNote('');
       load();
     } catch (reason: unknown) {
-      setNoteError(reason instanceof Error ? reason.message : 'That note could not be saved.');
+      setNoteError(reason instanceof Error ? reason.message : 'That note couldn’t be saved.');
     } finally {
       setSavingNote(false);
     }
@@ -163,7 +163,7 @@ function LearnerSupportView() {
       }
       load();
     } catch (reason: unknown) {
-      setNoteError(reason instanceof Error ? reason.message : 'That could not be sent.');
+      setNoteError(reason instanceof Error ? reason.message : 'That couldn’t be sent.');
     } finally {
       setRaising(false);
     }

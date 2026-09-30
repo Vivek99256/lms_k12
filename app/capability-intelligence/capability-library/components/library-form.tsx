@@ -172,7 +172,7 @@ export function LibraryForm({
       })
       .catch((e: unknown) => {
         setRoleLibrary([])
-        setRoleLibraryError(e instanceof Error ? e.message : 'Could not load the competency library.')
+        setRoleLibraryError(e instanceof Error ? e.message : 'Couldn’t load the competency library.')
       })
   }, [isJobRole, editing])
   const editable = useMemo(() => config.fields.filter((field) => !field.readOnly), [config])
@@ -444,7 +444,7 @@ export function LibraryForm({
                     const id = Number(next)
                     if (id && !pickedComps.includes(id)) setPickedComps((current) => [...current, id])
                   }}
-                  placeholder={roleLibrary.length ? "Add a competency this role requires…" : roleLibraryError ? "Competency library could not be loaded" : "No competencies in this library yet"}
+                  placeholder={roleLibrary.length ? "Add a competency this role requires…" : roleLibraryError ? "Competency library couldn’t be loaded" : "No competencies in this library yet"}
                   searchPlaceholder="Search competencies…"
                   emptyMessage="No competency matches that search"
                   disabled={!roleLibrary.length}

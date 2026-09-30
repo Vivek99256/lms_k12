@@ -371,7 +371,7 @@ export function RecruitmentCenter() {
     return (
       <Card className="m-6 border-destructive/30">
         <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
-          <p className="font-semibold text-destructive">Recruitment data could not be loaded</p>
+          <p className="font-semibold text-destructive">Couldn't load recruitment data</p>
           <p className="max-w-xl text-sm text-muted-foreground">{error}</p>
           <Button variant="outline" onClick={() => void refresh()}>Try again</Button>
         </CardContent>
@@ -431,7 +431,7 @@ export function RecruitmentCenter() {
                 ? ['Draft', 'Sent', 'Accepted', 'Declined']
                 : activeTab === 'interviews'
                   ? ['Scheduled', 'Completed', 'Cancelled']
-                  : ['Open', 'Closed']).map((status) => ({ label: status, value: status })),
+                  : ['Open', 'Closed']).map((status) => ({ label: status === 'Declined' ? 'Rejected' : status, value: status })),
             ]} />
           )}
         </div>
@@ -887,7 +887,7 @@ export function RecruitmentCenter() {
                         <DropdownMenuItem onClick={() => { setSelectedJobRecord(jobRecords.find((record) => String(record.id) === job.id) ?? null); setActiveAction('job-edit') }}>Edit job</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setConfirmation({
                           title: 'Delete job opening?',
-                          description: 'Laravel will soft-delete the job and its related applications, interviews, feedback, and offers.',
+                          description: 'The job and its related applications, interviews, feedback, and offers will be removed.',
                           run: async () => { await recruitmentService.deleteJob(buildSessionContext(), job.id); await refresh() },
                         })}>Delete job</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -1007,7 +1007,7 @@ export function RecruitmentCenter() {
                       variant={offer.status === 'Accepted' ? 'active' : offer.status === 'Sent' ? 'processing' : offer.status === 'Declined' ? 'error' : 'pending'}
                       size="sm"
                     >
-                      {offer.status}
+                      {offer.status === 'Declined' ? 'Rejected' : offer.status}
                     </StatusBadge>
                   </TableCell>
                   <TableCell>

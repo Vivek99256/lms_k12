@@ -371,7 +371,7 @@ export default function StudentIcardPage() {
         const payload = normalizePayload(responseBody);
 
         if (!response.ok || readStatus(payload) !== 1) {
-          throw new Error(readMessage(payload, 'Unable to load Student I-card metadata.'));
+          throw new Error(readMessage(payload, "Couldn't load student I-card metadata. Try again."));
         }
 
         if (!active) {
@@ -392,7 +392,7 @@ export default function StudentIcardPage() {
 
         setMessage({
           type: 'error',
-          text: error instanceof Error ? error.message : 'Unable to load Student I-card metadata.',
+          text: error instanceof Error ? error.message : "Couldn't load student I-card metadata. Try again.",
         });
       } finally {
         if (active) {
@@ -466,7 +466,7 @@ export default function StudentIcardPage() {
       const payload = normalizePayload(responseBody);
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, 'Unable to fetch students for I-card generation.'));
+        throw new Error(readMessage(payload, "Couldn't load students for I-card generation. Try again."));
       }
 
       const nextStudents = parseStudentRows(payload);
@@ -484,7 +484,7 @@ export default function StudentIcardPage() {
       setStudents([]);
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to fetch students for I-card generation.',
+        text: error instanceof Error ? error.message : "Couldn't load students for I-card generation. Try again.",
       });
     } finally {
       setSearchLoading(false);
@@ -560,12 +560,12 @@ export default function StudentIcardPage() {
       const payload = normalizePayload(responseBody);
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, 'Unable to generate Student I-cards.'));
+        throw new Error(readMessage(payload, "Couldn't generate student I-cards. Try again."));
       }
 
       const html = readString(payload.html);
       if (!html) {
-        throw new Error('Student I-card preview HTML was not returned by Laravel.');
+        throw new Error("Couldn't generate the I-card preview. Try again.");
       }
 
       setPreview({
@@ -583,7 +583,7 @@ export default function StudentIcardPage() {
       setPreview(null);
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to generate Student I-cards.',
+        text: error instanceof Error ? error.message : "Couldn't generate student I-cards. Try again.",
       });
     } finally {
       setPreviewLoading(false);
@@ -600,14 +600,14 @@ export default function StudentIcardPage() {
     <PageFrame>
       <PageHeader
         title="Student I-card"
-        description="Compare the Laravel Student I-card workflow against the new frontend, then preserve the same filter, template, and print behavior through the current Next.js architecture."
+        description="Choose filters and a template, then generate and print student I-cards."
       />
 
       {message && <InlineMessage type={message.type} text={message.text} />}
 
       <SectionPanel
         title="Search Filters"
-        description="Reuse the existing academic dropdowns and load matching students with the optional driver filter from Laravel."
+        description="Choose academic filters to list matching students. Driver filter is optional."
       >
         <div className="space-y-4">
           <SearchDropdown
@@ -705,8 +705,8 @@ export default function StudentIcardPage() {
                       onChange={(event) => handleSelectAll(event.target.checked)}
                     />
                   </TableHead>
-                  <TableHead>GR No</TableHead>
-                  <TableHead>Student Name</TableHead>
+                  <TableHead>GR no.</TableHead>
+                  <TableHead>Student name</TableHead>
                   <TableHead>Standard</TableHead>
                   <TableHead>Division</TableHead>
                 </TableRow>
@@ -742,7 +742,7 @@ export default function StudentIcardPage() {
 
       <SectionPanel
         title="Preview"
-        description="Laravel still owns the I-card HTML template rendering, and the Next.js frontend reuses that rendered output for preview and print."
+        description="Preview the I-cards here, then print them."
         footer={(
           <div className="flex justify-end">
             <Button
@@ -775,7 +775,7 @@ export default function StudentIcardPage() {
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-600">
-            Generate Student I-cards to preview the rendered Laravel template output here.
+            Generate Student I-cards to preview them here.
           </div>
         )}
       </SectionPanel>

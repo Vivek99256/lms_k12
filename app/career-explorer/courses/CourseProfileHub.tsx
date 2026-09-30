@@ -26,7 +26,7 @@ export default function CourseProfileHub() {
     try {
       setCourses(await loadCourses());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load courses.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load courses.');
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ export default function CourseProfileHub() {
           )}
 
           {!loading && error && (
-            <ErrorState title="Unable to load courses" description={error} retry={() => void refresh()} />
+            <ErrorState title="Couldn’t load courses" description={error} retry={() => void refresh()} />
           )}
 
           {!loading && !error && filtered.length === 0 && (

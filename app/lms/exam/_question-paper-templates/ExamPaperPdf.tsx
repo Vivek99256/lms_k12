@@ -59,7 +59,7 @@ export function useExamPaperPdf() {
       } catch (loadError) {
         if (cancelled) return;
         setError(
-          loadError instanceof Error ? loadError.message : 'Unable to load question paper templates.'
+          loadError instanceof Error ? loadError.message : 'Couldn’t load question paper templates.'
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -114,7 +114,7 @@ export function useExamPaperPdf() {
         });
       } catch (pdfError) {
         setError(
-          pdfError instanceof Error ? pdfError.message : 'Unable to generate the question paper.'
+          pdfError instanceof Error ? pdfError.message : 'Couldn’t generate the question paper.'
         );
       } finally {
         setBusyPaperId(null);

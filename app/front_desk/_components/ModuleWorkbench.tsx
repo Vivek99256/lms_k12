@@ -76,7 +76,7 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
       .catch((loadError) => {
         if (active) {
           setFieldOptions({});
-          setError(loadError instanceof Error ? loadError.message : 'Unable to load options.');
+          setError(loadError instanceof Error ? loadError.message : "Couldn't load options. Try again.");
         }
       });
 
@@ -114,7 +114,7 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
       setSearched(true);
     } catch (loadError) {
       const message =
-        loadError instanceof Error ? loadError.message : 'Unable to load records.';
+        loadError instanceof Error ? loadError.message : "Couldn't load records. Try again.";
       setError(message);
       setRows([]);
       setSearched(true);
@@ -171,7 +171,7 @@ export default function ModuleWorkbench({ module }: { module: FrontDeskModule })
       await load();
     } catch (saveError) {
       const message =
-        saveError instanceof Error ? saveError.message : 'Unable to save the record.';
+        saveError instanceof Error ? saveError.message : "Couldn't save the record. Try again.";
       setError(message);
       toast.error('Save failed', message);
     } finally {

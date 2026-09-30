@@ -647,7 +647,7 @@ function BuildReportPanel({
         },
       });
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : 'The report could not be built.');
+      onError(cause instanceof Error ? cause.message : "Couldn't build the report. Try again.");
     } finally {
       setBuilding(false);
     }

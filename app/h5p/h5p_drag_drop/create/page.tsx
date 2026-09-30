@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -61,7 +63,7 @@ function DragDropCreateContent() {
         try {
           await publishDragDrop(result.id, ctx, true);
         } catch (err: unknown) {
-          const reason = err instanceof Error ? err.message : 'Could not publish';
+          const reason = friendlyError(err, 'We couldn’t publish. Please try again.');
           router.push(
             `/h5p/h5p_drag_drop?${h5pContextQuery(ctx, { flash: `Saved as a draft. ${reason}` })}`
           );
@@ -75,7 +77,7 @@ function DragDropCreateContent() {
         })}`
       );
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create activity');
+      setError(friendlyError(err, 'We couldn’t create activity. Please try again.'));
       setSaving(false);
     }
   };
@@ -85,7 +87,7 @@ function DragDropCreateContent() {
       <div className="mx-auto max-w-6xl">
         <H5pPageHeader
           title="New drag and drop activity"
-          description="Learners drag text or images into the correct drop zones"
+          description="Students drag text or images into the correct drop zones"
           ctx={ctx}
           backHref={returnTo ?? `/h5p/h5p_drag_drop?${contextQuery}`}
         />

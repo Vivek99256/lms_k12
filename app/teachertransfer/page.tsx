@@ -24,7 +24,7 @@ export default function TeacherTransferPage() {
     try {
       setTeachers(await loadTransferTeachers());
     } catch (value: unknown) {
-      setError(value instanceof Error ? value.message : "Teachers could not be loaded.");
+      setError(value instanceof Error ? value.message : "Couldn't load teachers. Try again.");
     } finally {
       setLoading(false);
     }
@@ -73,7 +73,7 @@ export default function TeacherTransferPage() {
       setNewTeacherId("");
       await load();
     } catch (value: unknown) {
-      setError(value instanceof Error ? value.message : "The teacher transfer could not be completed.");
+      setError(value instanceof Error ? value.message : "Couldn't complete the teacher transfer. Try again.");
     } finally {
       setSaving(false);
     }

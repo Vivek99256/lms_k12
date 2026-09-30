@@ -90,7 +90,7 @@ async function request<T>(
       headers: createAuthHeaders(session, 'application/json'),
     });
   } catch {
-    throw new Error('Could not reach the server. Check your connection and try again.');
+    throw new Error("Couldn't reach the server. Check your connection and try again.");
   }
 
   let payload: unknown = null;
@@ -107,7 +107,7 @@ async function request<T>(
       readString(envelope.message) ||
         (response.status === 401
           ? 'Your session has expired. Sign in again to continue.'
-          : `Request failed (${response.status}).`)
+          : "Couldn't complete that request. Try again.")
     );
   }
 

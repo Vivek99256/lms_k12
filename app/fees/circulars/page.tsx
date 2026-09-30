@@ -259,7 +259,7 @@ export default function FeesCircularsPage() {
         fetchChallanConfig(currentSession).catch(() => emptyChallanConfig),
       ]);
 
-      assertApiSuccess(payload, 'Unable to load fee circular filters.');
+      assertApiSuccess(payload, "Couldn't load fee circular filters. Try again.");
       setFilters({
         months: toMonthOptions(payload.months),
         receiptBooks: toReceiptBookOptions(payload.receipt_books),
@@ -267,7 +267,7 @@ export default function FeesCircularsPage() {
       setChallanConfig(config);
     } catch (error) {
       setFilters({ months: [], receiptBooks: [] });
-      setMessage({ type: 'error', text: toErrorMessage(error, 'Unable to load fee circular filters.') });
+      setMessage({ type: 'error', text: toErrorMessage(error, "Couldn't load fee circular filters. Try again.") });
     } finally {
       setLoadingFilters(false);
     }
@@ -334,7 +334,7 @@ export default function FeesCircularsPage() {
       form.append('receipt_id', selectedReceiptId);
 
       const payload = await postCircularApi<StudentsResponse>('fees-circular/students', form, currentSession);
-      assertApiSuccess(payload, 'Unable to search fee circular students.');
+      assertApiSuccess(payload, "Couldn't search fee circular students. Try again.");
 
       const nextStudents = toFeeCircularStudents(payload.data);
       const rawStudentCount = getPayloadItemCount(payload.data);
@@ -342,12 +342,12 @@ export default function FeesCircularsPage() {
       setMessage({
         type: rawStudentCount > 0 && nextStudents.length === 0 ? 'info' : 'success',
         text: rawStudentCount > 0 && nextStudents.length === 0
-          ? `Laravel returned ${rawStudentCount} row${rawStudentCount === 1 ? '' : 's'}, but none included fee circular student details. Please check fee breakoff for the selected class/month.`
+          ? `Found ${rawStudentCount} row${rawStudentCount === 1 ? '' : 's'}, but none included fee circular student details. Please check fee breakoff for the selected class/month.`
           : payload.message || `Loaded ${nextStudents.length} student${nextStudents.length === 1 ? '' : 's'} for fee circular generation.`,
       });
     } catch (error) {
       setStudents([]);
-      setMessage({ type: 'error', text: toErrorMessage(error, 'Unable to search fee circular students.') });
+      setMessage({ type: 'error', text: toErrorMessage(error, "Couldn't search fee circular students. Try again.") });
     } finally {
       setSearching(false);
     }
@@ -427,7 +427,7 @@ export default function FeesCircularsPage() {
       });
 
       const payload = await postCircularApi<GenerateResponse>('fees-circular/generate', form, currentSession);
-      assertApiSuccess(payload, 'Unable to generate fee circulars.');
+      assertApiSuccess(payload, "Couldn't generate fee circulars. Try again.");
 
       const selectedReceiptBook = filters.receiptBooks.find((book) => book.receiptId === selectedReceiptId);
       const result = toGeneratedCircularResult(payload, {
@@ -439,7 +439,7 @@ export default function FeesCircularsPage() {
         type: result.html ? 'success' : 'info',
         text: result.html
           ? result.message || 'Fee circulars generated successfully.'
-          : 'Fee circular records were generated, but the Laravel JSON response did not include printable circular HTML.',
+          : 'Fee circular records were generated, but the response did not include a printable circular.',
       });
 
       // Recorded in the Fees AI Stack ledger after the circulars exist. Fire-and-forget:
@@ -456,7 +456,7 @@ export default function FeesCircularsPage() {
         },
       });
     } catch (error) {
-      setMessage({ type: 'error', text: toErrorMessage(error, 'Unable to generate fee circulars.') });
+      setMessage({ type: 'error', text: toErrorMessage(error, "Couldn't generate fee circulars. Try again.") });
     } finally {
       setGenerating(false);
     }
@@ -481,14 +481,14 @@ export default function FeesCircularsPage() {
           <MetricCard title="Receipt books" value={String(metrics.receiptBooks)} icon={<FileText className="h-4 w-4" />} />
           <MetricCard title="Students found" value={String(metrics.students)} icon={<Search className="h-4 w-4" />} />
           <MetricCard title="Students selected" value={String(metrics.selectedStudents)} icon={<CheckCircle2 className="h-4 w-4" />} />
-          <MetricCard title="Selected remain" value={currencyFormatter.format(metrics.selectedPending)} icon={<WalletCards className="h-4 w-4" />} />
+          <MetricCard title="Selected outstanding" value={currencyFormatter.format(metrics.selectedPending)} icon={<WalletCards className="h-4 w-4" />} />
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-base font-bold leading-none text-slate-950">Fees circular</h1>
-              <p className="mt-2 text-xs text-slate-700">Generate fee circular records from the Laravel fee breakoff workflow.</p>
+              <p className="mt-2 text-xs text-slate-700">Generate fee circular records from the fee breakoff.</p>
             </div>
             <Button type="button" variant="outline" onClick={loadFilters} disabled={loadingFilters}>
               {loadingFilters ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
@@ -595,7 +595,7 @@ export default function FeesCircularsPage() {
                     <TableHead>Student</TableHead>
                     <TableHead>Standard</TableHead>
                     <TableHead className="text-right">Pending</TableHead>
-                    <TableHead className="text-right">Selected remain</TableHead>
+                    <TableHead className="text-right">Selected outstanding</TableHead>
                     <TableHead className="text-right">Imprest balance</TableHead>
                     {isHillsInstitute && (
                       <>
@@ -677,7 +677,7 @@ export default function FeesCircularsPage() {
                                       related={{
                                         Student: student.studentName,
                                         Class: student.standardDivision,
-                                        'Pending amount': currencyFormatter.format(student.pendingAmount),
+                                        'Outstanding amount': currencyFormatter.format(student.pendingAmount),
                                       }}
                                     />
                                   </div>
@@ -790,7 +790,7 @@ function MonthPicker({
           ))
         ) : (
           <div className="col-span-full flex h-16 items-center justify-center text-sm text-slate-600">
-            No months returned by Laravel for the selected academic year.
+            No months found for the selected academic year.
           </div>
         )}
       </div>
@@ -839,7 +839,7 @@ function GeneratedCircularModal({
           <div>
             <h2 className="text-sm font-bold text-slate-950">Generated fee circulars</h2>
             <p className="mt-1 text-xs text-slate-500">
-              {result.lastInsertedIds ? `Log IDs ${result.lastInsertedIds}` : 'Generated records returned by Laravel'}
+              {result.lastInsertedIds ? `Log IDs ${result.lastInsertedIds}` : 'Generated records'}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -929,7 +929,7 @@ async function postCircularApi<T extends ApiStatusPayload>(endpoint: string, for
   const payload = await parseJsonResponse<T>(response);
 
   if (!response.ok) {
-    throw new Error(payload.message || `HTTP ${response.status}: Laravel rejected the fee circular request.`);
+    throw new Error(payload.message || `Couldn't generate fee circulars. Try again.`);
   }
 
   return payload;
@@ -947,7 +947,7 @@ async function fetchChallanConfig(session: SessionContext): Promise<FeeChallanCo
       ...(session.token ? { Authorization: `Bearer ${session.token}` } : {}),
     },
   });
-  if (!response.ok) throw new Error('Unable to load challan configuration.');
+  if (!response.ok) throw new Error("Couldn't load challan configuration. Try again.");
 
   const payload = await parseJsonResponse<{ data?: unknown }>(response);
   const config = toRecordList(payload.data)[0] ?? {};
@@ -968,7 +968,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error(text.slice(0, 240) || 'Laravel returned a non-JSON response.');
+    throw new Error(text.slice(0, 240) || "Couldn't read the response. Try again.");
   }
 }
 
@@ -1242,7 +1242,7 @@ function buildLegacyChallanSet(row: GeneratedCircularStudent, config: FeeChallan
         <div><b>Student Name :</b><div class="student-name">${studentName}</div></div>
         <div class="student-grid"><div><b>G.R. No. :</b><br><span class="value-line">${grNo}</span></div><div><b>Class/Div. :</b><br><span class="value-line">${standard}</span></div></div>
         <div style="margin-top:14px"><b>Father Name :</b><br><span class="value-line" style="float:right">-</span></div>
-        <table class="fee-table"><thead><tr><th>Fee Heads</th><th>Amount</th><th>Cash Deposit</th><th>Amount</th></tr></thead><tbody>${feeRows}</tbody></table>
+        <table class="fee-table"><thead><tr><th>Fee heads</th><th>Amount</th><th>Cash deposit</th><th>Amount</th></tr></thead><tbody>${feeRows}</tbody></table>
         <div class="total">Total: ${escapeHtml(String(row.totalAmount))}</div>
       </div>
     </article>`).join('')}</section>`;

@@ -71,7 +71,7 @@ export async function legacyFetchStudents(
     body: form.toString(),
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load students.`);
+  if (!res.ok) throw new Error(`Couldn’t load students. Try again.`);
   const payload = toRecord(await res.json());
   return toArray(payload.data).map((entry) => {
     const r = toRecord(entry);
@@ -117,7 +117,7 @@ async function loadCatalog(session: SessionContext): Promise<CatalogSubject[]> {
       client_id: extras.clientId,
     }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the subject catalog.`);
+  if (!res.ok) throw new Error(`Couldn’t load the subject catalog. Try again.`);
   const payload = toRecord(await res.json());
   const grouped = toRecord(payload.lms_subject);
   const deduped = new Map<string, CatalogSubject>();
@@ -186,7 +186,7 @@ async function legacyAttempts(learnerId: string, signal?: AbortSignal): Promise<
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load PAL subjects.`);
+  if (!res.ok) throw new Error(`Couldn’t load PAL subjects. Try again.`);
   const payload = toRecord(await res.json());
   const attemptsByChapter: Record<string, PalAttempt[]> = {};
   const attemptSubjectByChapter: Record<string, string> = {};

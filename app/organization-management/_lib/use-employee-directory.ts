@@ -99,7 +99,7 @@ export function useEmployeeDirectory(filters?: EmployeeListFilters) {
       }
     } catch (err) {
       console.error('Failed to fetch employees:', err)
-      setError(toMessage(err, 'Failed to load employees'))
+      setError(toMessage(err, "Couldn't load employees. Try again."))
       setEmployeesData([])
       setPagination(null)
     } finally {

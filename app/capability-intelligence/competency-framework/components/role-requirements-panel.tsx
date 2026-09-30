@@ -87,7 +87,7 @@ export function RoleRequirementsPanel() {
         is_mandatory: r.is_mandatory,
       })))
     } catch {
-      setError('Could not load this role’s requirements.')
+      setError('Couldn’t load this role’s requirements.')
       setRows([])
     } finally {
       setLoading(false)

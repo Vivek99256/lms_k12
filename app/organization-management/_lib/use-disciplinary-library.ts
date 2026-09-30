@@ -47,7 +47,7 @@ export function useDisciplinaryLibrary() {
       setDepartments(response.departments ?? []);
       setEmployees(response.employees ?? []);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load disciplinary records.'));
+      setError(toMessage(loadError, "Couldn't load disciplinary records. Try again."));
       setRecords([]);
       setDepartments([]);
       setEmployees([]);

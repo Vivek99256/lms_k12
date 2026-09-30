@@ -134,7 +134,7 @@ export function LibraryDetailModal({
         setUsage(response.data)
       }
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Could not load the details.')
+      setError(loadError instanceof Error ? loadError.message : 'Couldn’t load the details.')
     } finally {
       setLoading(false)
     }

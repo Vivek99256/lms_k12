@@ -80,7 +80,7 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
       await contract.actions.run();
       refresh();
     } catch (err) {
-      setRunError(err instanceof Error ? err.message : 'The analysis could not be run.');
+      setRunError(err instanceof Error ? err.message : 'The analysis couldn’t be run.');
     } finally {
       setRunning(false);
     }
@@ -153,7 +153,7 @@ export function ModuleIntelligence({ contract }: { contract: ModuleIntelligenceC
         <Surface className="flex items-start gap-3 px-4 py-4">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
           <div>
-            <p className="text-[13px] font-semibold text-slate-800">{contract.label} could not be loaded</p>
+            <p className="text-[13px] font-semibold text-slate-800">{contract.label} couldn’t be loaded</p>
             <p className="mt-1 text-[13px] leading-5 text-slate-600">{error || 'The request returned nothing.'}</p>
             <div className="mt-3">
               <AccentButton onClick={refresh}>

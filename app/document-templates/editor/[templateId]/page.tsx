@@ -187,7 +187,7 @@ function EditorShell({
       } catch (error) {
         if (cancelled || controller.signal.aborted) return;
         setLoadError(
-          error instanceof Error ? error.message : 'Could not open this template.'
+          error instanceof Error ? error.message : "Couldn't open this template. Try again."
         );
         applyContent(createEmptyDocument());
         hasLoaded.current = true;

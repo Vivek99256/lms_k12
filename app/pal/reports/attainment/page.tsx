@@ -82,7 +82,7 @@ function AttainmentReportView() {
         setReport(await fetchAttainmentReport(standardId, syear, undefined, signal));
       } catch (caught) {
         if ((caught as Error)?.name === 'AbortError') return;
-        setError(caught instanceof Error ? caught.message : 'Could not load the report.');
+        setError(caught instanceof Error ? caught.message : 'Couldn’t load the report.');
         setReport(null);
       } finally {
         setLoading(false);

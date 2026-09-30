@@ -66,7 +66,7 @@ export default function SubsystemPage({
       setState(next.subsystem.panels.length === 0 ? 'empty' : 'ready');
     } catch (err) {
       setDetail(null);
-      setError(err instanceof Error ? err.message : 'This subsystem could not be loaded.');
+      setError(err instanceof Error ? err.message : 'This subsystem couldn’t be loaded.');
       setState('error');
     }
   }, [subsystemKey]);
@@ -93,7 +93,7 @@ export default function SubsystemPage({
         setDetail(await saveSubsystemGroup(subsystemKey, group, value));
         setNotice('Saved. The change applies to every learner scored from now on.');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'That change could not be saved.');
+        setError(err instanceof Error ? err.message : 'That change couldn’t be saved.');
       } finally {
         setBusyGroup(null);
       }
@@ -110,7 +110,7 @@ export default function SubsystemPage({
         setDetail(await resetSubsystemGroup(subsystemKey, group));
         setNotice('Reset. This group tracks the shipped blueprint default again.');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'That group could not be reset.');
+        setError(err instanceof Error ? err.message : 'That group couldn’t be reset.');
       } finally {
         setBusyGroup(null);
       }
@@ -136,7 +136,7 @@ export default function SubsystemPage({
         <StatusPanel
           kind="error"
           title="Subsystem is not available"
-          message={error || 'The backend did not return this subsystem.'}
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={retry}
         />
       </PageShell>
@@ -149,7 +149,7 @@ export default function SubsystemPage({
         <StatusPanel
           kind="empty"
           title="Nothing to configure here yet"
-          message="The backend returned this subsystem with no panels. Check that config/pal_architecture.php is deployed on the API."
+          message="This section has no content yet."
           onRetry={retry}
         />
       </PageShell>

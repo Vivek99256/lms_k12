@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -84,7 +86,7 @@ function InteractiveVideoListContent() {
     setError('');
     fetchVideos(ctx)
       .then((list) => setVideos(list))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load videos'))
+      .catch((err: unknown) => setError(friendlyError(err, 'We couldn’t load videos. Please try again.')))
       .finally(() => setLoading(false));
   }, [ctx]);
 
@@ -117,7 +119,7 @@ function InteractiveVideoListContent() {
       setSuccess(result.message);
       loadVideos();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete video');
+      setError(friendlyError(err, 'We couldn’t delete video. Please try again.'));
     } finally {
       setDeletingId(null);
     }

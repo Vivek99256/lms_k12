@@ -764,7 +764,7 @@ export default function SopsModule({
         const payload = (await response.json().catch(() => null)) as ListSopsResponse | null;
 
         if (!response.ok || !payload || String(payload.status_code ?? "1") === "0") {
-          throw new Error(getApiErrorMessage(payload, "Unable to load SOPs. Please try again."));
+          throw new Error(getApiErrorMessage(payload, "Couldn't load SOPs. Try again."));
         }
 
         setSops(resolveListRecords(payload).map(mapApiSop));
@@ -774,7 +774,7 @@ export default function SopsModule({
         setSops([]);
         setFeedback({
           kind: "error",
-          message: error instanceof Error ? error.message : "Unable to load SOPs. Please try again.",
+          message: error instanceof Error ? error.message : "Couldn't load SOPs. Try again.",
         });
       } finally {
         if (!controller.signal.aborted) {
@@ -854,7 +854,7 @@ export default function SopsModule({
     const payload = (await response.json().catch(() => null)) as StoreSopResponse | null;
 
     if (!response.ok || !payload || String(payload.status_code ?? "0") !== "1") {
-      throw new Error(getApiErrorMessage(payload, "Unable to publish SOP. Please try again."));
+      throw new Error(getApiErrorMessage(payload, "Couldn't publish the SOP. Try again."));
     }
 
     return {

@@ -126,7 +126,7 @@ export function useSessions(): SessionsState {
       setStats(statsResponse.data ?? null)
       setDeadlines(deadlineResult?.data ?? [])
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the session schedule.'))
+      setError(toMessage(loadError, "Couldn't load the session schedule. Try again."))
       setSessions([])
       setDeadlines([])
     } finally {
@@ -168,7 +168,7 @@ export function useSessions(): SessionsState {
       run(async () => {
         await lmsSessionsCalendarService.create(resolveSession(), payload)
         return `"${payload.room_name}" scheduled.`
-      }, 'Failed to schedule the session.'),
+      }, "Couldn't schedule the session. Try again."),
     [run, resolveSession],
   )
 
@@ -177,7 +177,7 @@ export function useSessions(): SessionsState {
       run(async () => {
         await lmsSessionsCalendarService.update(resolveSession(), id, payload)
         return `"${payload.room_name}" updated.`
-      }, 'Failed to update the session.'),
+      }, "Couldn't update the session. Try again."),
     [run, resolveSession],
   )
 
@@ -186,7 +186,7 @@ export function useSessions(): SessionsState {
       run(async () => {
         await lmsSessionsCalendarService.remove(resolveSession(), id)
         return 'Session cancelled.'
-      }, 'Failed to cancel the session.'),
+      }, "Couldn't cancel the session. Try again."),
     [run, resolveSession],
   )
 
@@ -195,7 +195,7 @@ export function useSessions(): SessionsState {
       run(async () => {
         await lmsSessionsCalendarService.register(resolveSession(), id, learnerId)
         return learnerId ? 'Learner registered.' : 'You are registered for this session.'
-      }, 'Failed to register.'),
+      }, "Couldn't register. Try again."),
     [run, resolveSession],
   )
 
@@ -204,7 +204,7 @@ export function useSessions(): SessionsState {
       run(async () => {
         await lmsSessionsCalendarService.cancelRegistration(resolveSession(), id, learnerId)
         return 'Registration cancelled.'
-      }, 'Failed to cancel the registration.'),
+      }, "Couldn't cancel the registration. Try again."),
     [run, resolveSession],
   )
 

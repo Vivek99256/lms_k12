@@ -141,7 +141,7 @@ function StudentHomeworkReport() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Report could not be loaded."
+          : "Report couldn’t be loaded."
       );
     } finally {
       setLoading(false);
@@ -231,7 +231,7 @@ function StudentHomeworkReport() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : "Homework could not be deleted."
+          : "Homework couldn’t be deleted."
       );
     } finally {
       setDeleting(false);

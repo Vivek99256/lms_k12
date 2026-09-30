@@ -149,7 +149,7 @@ function ConceptFeedbackView() {
         })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'This could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'This couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -206,7 +206,7 @@ function ConceptFeedbackView() {
 
       router.push(`/pal/intervention/concept/${conceptId}`);
     } catch (reason: unknown) {
-      setRaiseError(reason instanceof Error ? reason.message : 'That could not be sent.');
+      setRaiseError(reason instanceof Error ? reason.message : 'That couldn’t be sent.');
     } finally {
       setRaising(false);
     }
@@ -253,7 +253,7 @@ function ConceptFeedbackView() {
       <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
-            <p className="text-sm text-rose-800">{error ?? 'This could not be loaded.'}</p>
+            <p className="text-sm text-rose-800">{error ?? 'This couldn’t be loaded.'}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={load}>
                 Try again

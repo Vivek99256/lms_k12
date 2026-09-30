@@ -91,7 +91,7 @@ export default function Page() {
       setPage(1);
       setHasSearched(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load students");
+      setError(err instanceof Error ? err.message : "Couldn't load students. Try again.");
     } finally {
       setLoading(false);
     }
@@ -157,7 +157,7 @@ export default function Page() {
       setMessage(resultMessage);
       setRowState({});
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit student requests");
+      setError(err instanceof Error ? err.message : "Couldn't submit student requests. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -263,10 +263,10 @@ export default function Page() {
                   <tr>
                     <th className="w-10 px-4 py-3" />
                     <th className="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                      GR No.
+                      GR no.
                     </th>
                     <th className="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                      Student Name
+                      Student name
                     </th>
                     <th className="min-w-44 px-3 py-3 text-left text-xs font-semibold uppercase text-slate-500">
                       Request Type

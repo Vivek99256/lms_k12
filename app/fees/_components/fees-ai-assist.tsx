@@ -148,7 +148,7 @@ export function FeesAiAssist({
       if (!mounted.current) return;
 
       const refused = cause instanceof AiGenerationError && cause.refusedByPolicy;
-      const message = cause instanceof Error ? cause.message : 'The draft could not be generated.';
+      const message = cause instanceof Error ? cause.message : "Couldn't generate the draft. Try again.";
       setError(message);
 
       // A refusal is the guardrail working, and is recorded as such — `denied` rather

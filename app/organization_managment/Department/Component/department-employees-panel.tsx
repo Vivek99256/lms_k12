@@ -96,7 +96,7 @@ export function DepartmentEmployeesPanel({
       const data = await getDepartmentEmployees(session, { departmentId: department.id });
       setCurrent(data);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Failed to load current employees.");
+      setError(cause instanceof Error ? cause.message : "Couldn't load current employees. Try again.");
     }
   }, [department.id]);
 
@@ -115,7 +115,7 @@ export function DepartmentEmployeesPanel({
         setCandidates([]);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Failed to load employees.");
+      setError(cause instanceof Error ? cause.message : "Couldn't load employees. Try again.");
       setCandidates([]);
     } finally {
       setIsLoading(false);
@@ -185,7 +185,7 @@ export function DepartmentEmployeesPanel({
       await Promise.all([loadCurrent(), loadCandidates()]);
       onChanged?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Failed to update employees.");
+      setError(cause instanceof Error ? cause.message : "Couldn't update employees. Try again.");
     } finally {
       setIsSaving(false);
     }

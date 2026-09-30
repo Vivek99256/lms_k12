@@ -361,7 +361,7 @@ export default function SideDrawer({
                   Student Profile
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Field label="Enquiry Number"><Input value={formState.enquiry_no || ''} onChange={(event) => handleChange('enquiry_no', event.target.value)} /></Field>
+                  <Field label="Enquiry no."><Input value={formState.enquiry_no || ''} onChange={(event) => handleChange('enquiry_no', event.target.value)} /></Field>
                   <Field label="Admission Standard"><Input value={formState.admission_standard || ''} onChange={(event) => handleChange('admission_standard', event.target.value)} /></Field>
                   <Field label="First Name"><Input value={formState.first_name || ''} onChange={(event) => handleChange('first_name', event.target.value)} /></Field>
                   <Field label="Middle Name"><Input value={formState.middle_name || ''} onChange={(event) => handleChange('middle_name', event.target.value)} /></Field>
@@ -572,8 +572,8 @@ export default function SideDrawer({
                 </div>
                 <div className="space-y-3 text-sm text-slate-600">
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="font-medium text-slate-800">Inquiry linked</div>
-                    <div className="mt-1 text-xs text-slate-500">Inquiry #{data.enquiryNo || '-'} is connected to this registration record.</div>
+                    <div className="font-medium text-slate-800">Enquiry linked</div>
+                    <div className="mt-1 text-xs text-slate-500">Enquiry no. {data.enquiryNo || '-'} is connected to this registration record.</div>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="font-medium text-slate-800">Safe update mode</div>

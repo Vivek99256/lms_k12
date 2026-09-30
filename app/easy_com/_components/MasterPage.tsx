@@ -42,7 +42,7 @@ export default function MasterPage({ config }: { config: MasterConfig }) {
       const response = await getJson(config.path);
       setRows(records(response.data));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load settings.');
+      setError(cause instanceof Error ? cause.message : "Couldn't load settings. Try again.");
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ export default function MasterPage({ config }: { config: MasterConfig }) {
         if (active) setRows(records(response.data));
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load settings.');
+        if (active) setError(cause instanceof Error ? cause.message : "Couldn't load settings. Try again.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -131,7 +131,7 @@ export default function MasterPage({ config }: { config: MasterConfig }) {
         setFieldErrors(cause.fieldErrors);
         setError(Object.keys(cause.fieldErrors).length ? '' : cause.message);
       } else {
-        setError(cause instanceof Error ? cause.message : 'Unable to save the configuration.');
+        setError(cause instanceof Error ? cause.message : "Couldn't save the configuration. Try again.");
       }
     } finally {
       setSaving(false);
@@ -149,7 +149,7 @@ export default function MasterPage({ config }: { config: MasterConfig }) {
       setDeleteRow(null);
       await loadRows();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to delete the configuration.');
+      setError(cause instanceof Error ? cause.message : "Couldn't delete the configuration. Try again.");
     } finally {
       setSaving(false);
     }
@@ -169,7 +169,7 @@ export default function MasterPage({ config }: { config: MasterConfig }) {
       const response = await postForm(config.testPath, { to_email: testEmail });
       toast.success(response.message);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to send the test email.');
+      setError(cause instanceof Error ? cause.message : "Couldn't send the test email. Try again.");
     } finally {
       setSaving(false);
     }

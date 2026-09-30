@@ -13,7 +13,7 @@ import type { Incident } from './page';
 type ApiEnvelope = { status?: string | number; message?: string; data?: unknown };
 
 function assertSuccess(payload: ApiEnvelope) {
-  if (Number(payload.status) !== 1) throw new Error(payload.message || 'Unable to load discipline records.');
+  if (Number(payload.status) !== 1) throw new Error(payload.message || "Couldn't load discipline records. Try again.");
 }
 
 function sessionParams() {

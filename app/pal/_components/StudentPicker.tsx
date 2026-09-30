@@ -74,7 +74,7 @@ export default function StudentPicker({
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted || id !== requestId.current) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load students.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load students.');
         setStudents([]);
       })
       .finally(() => {

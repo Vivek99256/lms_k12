@@ -56,7 +56,7 @@ export default function CapabilitiesPage() {
       setCreating(false);
       resource.refresh();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Could not create the capability.');
+      setSaveError(err instanceof Error ? err.message : 'Couldn’t create the capability.');
     } finally {
       setSaving(false);
     }

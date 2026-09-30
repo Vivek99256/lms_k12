@@ -144,7 +144,7 @@ export default function OtherFeesCollectPage() {
         setMessage({ type: 'info', text: `No active other fees titles found for academic year ${nextSession.academicYearId}.` });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load other fees heads.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load other fees heads. Try again." });
     } finally {
       setLoadingTitles(false);
     }
@@ -209,7 +209,7 @@ export default function OtherFeesCollectPage() {
       setAmounts(Object.fromEntries(nextRows.map((row) => [row.studentId, String(row.defaultAmount || '')])));
       setMessage({ type: 'success', text: payload.message || `Loaded ${nextRows.length} student${nextRows.length === 1 ? '' : 's'}.` });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to search other fees students.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't search other fees students. Try again." });
     } finally {
       setLoading(false);
     }
@@ -277,7 +277,7 @@ export default function OtherFeesCollectPage() {
       setSelectedStudentIds([]);
       setMessage({ type: 'success', text: payload.message || 'Other fees collected successfully.' });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to collect other fees.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't collect other fees. Try again." });
     } finally {
       setSubmitting(false);
     }
@@ -287,7 +287,7 @@ export default function OtherFeesCollectPage() {
     <PageFrame>
       <PageHeader
         title="Other fees collect"
-        description="Search students by other fees head, select eligible rows, and collect the amount through Laravel."
+        description="Search students by other fees head, select eligible rows, and collect the amount."
         action={
           <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-right">
             <p className="text-xs font-medium text-emerald-700">Selected value</p>
@@ -433,7 +433,7 @@ export default function OtherFeesCollectPage() {
               <TableHead>Mobile</TableHead>
               <TableHead>Quota</TableHead>
               <TableHead className="text-right">Paid</TableHead>
-              <TableHead className="text-right">Remaining</TableHead>
+              <TableHead className="text-right">Outstanding</TableHead>
               <TableHead>Amount of deduction</TableHead>
             </TableRow>
           </TableHeader>

@@ -156,7 +156,7 @@ export function MyTasksCenter() {
         ) : error ? (
           <div className="flex h-64 flex-col items-center justify-center gap-4 rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center">
             <AlertCircle className="size-9 text-destructive" />
-            <div><p className="font-semibold">Unable to load tasks</p><p className="text-sm text-muted-foreground">{error}</p></div>
+            <div><p className="font-semibold">Couldn't load tasks</p><p className="text-sm text-muted-foreground">{error}</p></div>
             <Button variant="outline" onClick={refresh}>Try again</Button>
           </div>
         ) : view === 'list' ? (

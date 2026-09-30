@@ -316,7 +316,7 @@ export function EmployeeProfilesCenter({ userId }: { userId?: string }) {
 
   if (!effectiveUserId) return <div className="p-12 text-center text-muted-foreground">No user ID provided or authenticated.</div>
   if (loading) return <div className="p-12 text-center text-muted-foreground">Loading employee profile...</div>
-  if (error || !data) return <div className="p-12 text-center text-destructive">Error: {error || 'Failed to load data'}</div>
+  if (error || !data) return <div className="p-12 text-center text-destructive">Error: {error || "Couldn't load data. Try again."}</div>
 
   const { employee, metrics } = data
 

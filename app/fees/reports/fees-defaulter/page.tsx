@@ -94,7 +94,7 @@ export default function FeesDefaulterReportPage() {
 
   const exportColumns = useMemo<TableExportColumn[]>(() => ([
     { key: 'rollNo', label: 'Roll no' },
-    { key: 'enrollmentNo', label: 'GR No' },
+    { key: 'enrollmentNo', label: 'GR no.' },
     { key: 'studentName', label: 'Student name', width: '220px' },
     { key: 'standardDivision', label: 'Std / Div' },
     { key: 'quota', label: 'Quota' },
@@ -166,7 +166,7 @@ export default function FeesDefaulterReportPage() {
     } catch (error) {
       setRows([]);
       setFeesTitles([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to fetch fees defaulter report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load fees defaulter report. Try again." });
     } finally {
       setLoading(false);
     }
@@ -186,19 +186,19 @@ export default function FeesDefaulterReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Fees Defaulter Report"
-        description="Review unpaid, partially paid, and inactive student fee positions exactly from the legacy Laravel calculations."
+        title="Fee defaulter report"
+        description="Review unpaid, partially paid, and inactive student fee positions."
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'fees-defaulter-report.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-defaulter-report.xls', title: 'Fees Defaulter Report', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-defaulter-report.pdf', title: 'Fees Defaulter Report', subtitle: 'Legacy parity export', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Fees Defaulter Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-defaulter-report.xls', title: 'Fee defaulter report', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-defaulter-report.pdf', title: 'Fee defaulter report', subtitle: 'Export', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Fee defaulter report', subtitle: 'Print view', columns: exportColumns, rows: exportRows })}
             // Records each export in the Fees AI Stack ledger, against the published
             // Fees defaulter layout. The export itself is unchanged.
             activity={{
               operation: 'defaulter_report',
-              label: 'Fees Defaulter Report',
+              label: 'Fee defaulter report',
               rowCount: rows.length,
               filters: {
                 section: academicFilters.section || null,

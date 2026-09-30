@@ -156,7 +156,7 @@ export default function PayrollTypePage() {
       {loading ? (
         <PayrollTableSkeleton />
       ) : error && payrollTypes.length === 0 ? (
-        <ErrorState title="Unable to load payroll types" description={error} retry={retry} />
+        <ErrorState title="Couldn't load payroll types. Try again." description={error} retry={retry} />
       ) : payrollTypes.length === 0 ? (
         <Card>
           <CardContent>

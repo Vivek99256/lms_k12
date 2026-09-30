@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ImagePlus,
@@ -599,7 +601,7 @@ export function DragDropEditor({
         );
       } else addElement('image', url);
     } catch (err: unknown) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to upload image');
+      setUploadError(friendlyError(err, 'We couldn’t upload the image. Please try again.'));
     } finally {
       setUploading(null);
     }

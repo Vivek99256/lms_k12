@@ -66,7 +66,7 @@ export default function PalMisconceptionsPage() {
       setItems(await fetchMisconceptions({ limit: 200 }, signal));
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      setError((err as Error).message || 'Could not load the misconception library.');
+      setError((err as Error).message || 'Couldn’t load the misconception library.');
       setItems([]);
     } finally {
       setLoading(false);
@@ -140,7 +140,7 @@ export default function PalMisconceptionsPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-[22px] font-semibold text-[#1F2A44]">Misconception library</h1>
+              <h1 className="text-[22px] font-semibold text-[#1F2A44]">Common mistakes library</h1>
               <p className="mt-0.5 text-sm text-slate-500">
                 Known error patterns and the corrective content served when a learner hits one.
               </p>
@@ -213,10 +213,9 @@ export default function PalMisconceptionsPage() {
           </div>
         ) : visible.length === 0 ? (
           <div className="rounded-2xl border border-[#DFE6F2] bg-white px-6 py-14 text-center">
-            <p className="text-sm font-medium text-slate-700">No misconceptions found.</p>
+            <p className="text-sm font-medium text-slate-700">No common mistakes found.</p>
             <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
-              Run <code className="rounded bg-slate-100 px-1">php artisan pal:seed-misconceptions</code>{' '}
-              on the server to load the starter library.
+              Ask your administrator to load the starter library.
             </p>
           </div>
         ) : (

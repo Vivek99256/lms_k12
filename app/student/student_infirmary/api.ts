@@ -38,7 +38,7 @@ export type InfirmaryForm = Omit<InfirmaryRecord, 'id' | 'student_name'> & {
 type ApiEnvelope = { status?: string | number; message?: string; data?: unknown };
 
 function assertSuccess(payload: ApiEnvelope) {
-  if (Number(payload.status) !== 1) throw new Error(payload.message || 'Unable to complete request.');
+  if (Number(payload.status) !== 1) throw new Error(payload.message || "Couldn't complete request. Try again.");
 }
 
 function sessionParams() {

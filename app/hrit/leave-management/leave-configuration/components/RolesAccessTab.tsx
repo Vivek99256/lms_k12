@@ -130,7 +130,7 @@ export default function RolesAccessTab({ isLoading }: { isLoading: boolean }) {
   }
 
   if (error && draft.length === 0) {
-    return <ErrorState title="Unable to load role permissions" description={error} retry={retry} />
+    return <ErrorState title="Couldn't load role permissions. Try again." description={error} retry={retry} />
   }
 
   return (

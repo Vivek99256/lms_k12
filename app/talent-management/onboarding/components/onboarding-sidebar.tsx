@@ -68,7 +68,7 @@ export function OnboardingSidebar({
     return (
       <Card className="border-destructive/30 bg-destructive/5 shadow-sm">
         <CardContent className="flex flex-col items-center gap-2 p-6 text-center">
-          <p className="text-sm font-semibold text-destructive">Could not load this hire</p>
+          <p className="text-sm font-semibold text-destructive">Couldn't load this hire</p>
           <p className="text-xs text-muted-foreground">{error}</p>
           <Button variant="outline" size="sm" onClick={onRetry}>
             Retry

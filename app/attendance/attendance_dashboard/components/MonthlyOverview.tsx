@@ -47,7 +47,7 @@ export function MonthlyOverview({ selectedDate, selectedClass, section, totalStu
         if (!cancelled) setDays(rows);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load the month overview.');
+        if (!cancelled) setError(err instanceof Error ? err.message : "Couldn't load the month overview. Try again.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

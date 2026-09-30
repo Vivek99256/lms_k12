@@ -131,7 +131,7 @@ function todayIsoDate() {
 
 function createCsv(records: IncidentRecord[]) {
   const headers = [
-    'Sr. No.',
+    'No.',
     'Department',
     'Employee',
     'Incident Date & Time',
@@ -573,7 +573,7 @@ export function DisciplinaryManagement() {
                 <Table className="min-w-[1750px]">
                   <TableHeader className="sticky top-0 z-10 bg-card shadow-sm">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-16">Sr. No.</TableHead>
+                      <TableHead className="w-16">No.</TableHead>
                       <TableHead>Department</TableHead>
                       <TableHead>Employee</TableHead>
                       <TableHead>Incident Date & Time</TableHead>

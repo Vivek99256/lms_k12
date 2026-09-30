@@ -32,8 +32,10 @@ import {
 
 const PER_PAGE = 10;
 
+import { friendlyError } from "@/lib/user-messages";
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return friendlyError(error, "We couldn’t load this page. Please try again.");
 }
 
 function initials(name: string): string {

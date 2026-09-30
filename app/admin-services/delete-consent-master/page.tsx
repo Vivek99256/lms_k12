@@ -40,7 +40,7 @@ export default function DeleteConsentMasterPage() {
     try {
       setClassOptions(await loadClassOptions());
     } catch (value: unknown) {
-      setError(errorMessage(value, "The class list could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the class list. Try again."));
     } finally {
       setLoading(false);
     }
@@ -69,7 +69,7 @@ export default function DeleteConsentMasterPage() {
     } catch (value: unknown) {
       setConsents([]);
       setSearched(true);
-      setError(errorMessage(value, "Consents could not be loaded."));
+      setError(errorMessage(value, "Couldn't load consents. Try again."));
     } finally {
       setSearching(false);
     }
@@ -102,7 +102,7 @@ export default function DeleteConsentMasterPage() {
       setSelectedIds([]);
       await search();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The consents could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the consents. Try again."));
     } finally {
       setDeleting(false);
     }

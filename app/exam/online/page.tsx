@@ -47,7 +47,7 @@ export default function OnlineExamListPage() {
       })
       .catch((reason: unknown) => {
         if (cancelled || controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load exams.');
+        setError(reason instanceof Error ? reason.message : "Couldn't load exams. Try again.");
         setLoading(false);
       });
     return () => {

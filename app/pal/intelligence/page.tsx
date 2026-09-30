@@ -134,7 +134,7 @@ export default function PalIntelligencePage() {
         setError(
           state.reason instanceof Error
             ? state.reason.message
-            : 'The PAL V4 API is unavailable. Ensure the backend is deployed.'
+            : 'PAL isn’t available right now.'
         );
       }
       setLoading(false);
@@ -185,7 +185,7 @@ export default function PalIntelligencePage() {
       } catch (reason) {
         if (controller.signal.aborted) return;
         setRosterError(
-          reason instanceof Error ? reason.message : 'Unable to load your students.'
+          reason instanceof Error ? reason.message : 'Couldn’t load your students.'
         );
       } finally {
         if (!controller.signal.aborted) setRosterLoading(false);
@@ -225,9 +225,9 @@ export default function PalIntelligencePage() {
             <Brain className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">PAL Intelligence</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Student insights</h1>
             <p className="text-sm text-slate-500">
-              PAL V4 learner intelligence, velocity, risk prediction and misconception analysis.
+              How each student is progressing, who may need support, and common mistakes.
             </p>
           </div>
         </div>
@@ -280,17 +280,17 @@ export default function PalIntelligencePage() {
 
             {!isStudent && (
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500">Learner id</span>
+                <span className="text-xs font-medium text-slate-500">Student ID</span>
                 <Input
                   value={learnerId}
                   onChange={(event) => setLearnerId(event.target.value)}
-                  placeholder="Learner id"
+                  placeholder="Student ID"
                   className="h-9 w-40"
                 />
               </label>
             )}
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-500">Velocity period</span>
+              <span className="text-xs font-medium text-slate-500">Pace period</span>
               <select
                 value={period}
                 onChange={(event) => setPeriod(event.target.value)}
@@ -365,7 +365,7 @@ export default function PalIntelligencePage() {
                   icon={<Users className="h-4 w-4" />}
                   dimensions={bundle.state.social}
                   hasData={bundle.state.socialHasData}
-                  emptyNote="No peer-collaboration, classroom-participation or discussion capture is wired up for this estate yet, so these cannot be measured."
+                  emptyNote="No peer-collaboration, classroom-participation or discussion capture is wired up for your school yet, so these cannot be measured."
                 />
                 <DimensionPanel
                   title="Metacognition"
@@ -453,12 +453,12 @@ function CompetencyPanel({ state }: { state: V4LearnerState }) {
             ) : null
           }
         />
-        <Metric label="Learning velocity" value={fmtValue(competency.learningVelocity)} />
+        <Metric label="Learning pace" value={fmtValue(competency.learningVelocity)} />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 text-xs">
         <Chip label="Knowledge gaps" value={String(competency.knowledgeGaps)} />
-        <Chip label="Active misconceptions" value={String(competency.activeMisconceptions.length)} />
+        <Chip label="Current common mistakes" value={String(competency.activeMisconceptions.length)} />
         <Chip label="Prerequisites flagged" value={String(competency.conceptDependencies)} />
         <Chip label="Device" value={contextual.preferredDevice.join(', ') || NOT_TRACKED} />
         <Chip label="Bandwidth" value={contextual.bandwidthQuality ?? NOT_TRACKED} />
@@ -556,7 +556,7 @@ function VelocityCard({ velocity }: { velocity: V4Velocity }) {
     <Panel>
       <PanelTitle
         icon={<TrendingUp className="h-4 w-4" />}
-        title="Learning velocity"
+        title="Learning pace"
         badge={
           <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold capitalize text-slate-600">
             {velocity.classification ?? NOT_TRACKED}
@@ -577,7 +577,7 @@ function VelocityCard({ velocity }: { velocity: V4Velocity }) {
       )}
       <div className="space-y-1.5 text-xs">
         <Row label="Concepts mastered" value={fmtValue(velocity.conceptsMastered)} />
-        <Row label="Velocity" value={fmtValue(velocity.velocity)} />
+        <Row label="Pace" value={fmtValue(velocity.velocity)} />
         <Row
           label="Cohort rank"
           value={
@@ -611,8 +611,8 @@ function PlateauCard({ plateau }: { plateau: V4Plateau }) {
       />
       <div className="space-y-1.5 text-xs">
         <Row label="Days in plateau" value={fmtValue(plateau.daysInPlateau)} />
-        <Row label="Recent velocity" value={fmtValue(plateau.recentVelocity)} />
-        <Row label="Older velocity" value={fmtValue(plateau.olderVelocity)} />
+        <Row label="Recent pace" value={fmtValue(plateau.recentVelocity)} />
+        <Row label="Older pace" value={fmtValue(plateau.olderVelocity)} />
       </div>
       <ActionList actions={plateau.recommendedActions} />
     </Panel>
@@ -769,7 +769,7 @@ function ConceptLens({ learnerId }: { learnerId: string }) {
     try {
       setClusters(await fetchMisconceptionCluster(conceptId.trim()));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to load misconceptions.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t load common mistakes.');
       setClusters(null);
     } finally {
       setLoading(false);
@@ -778,7 +778,7 @@ function ConceptLens({ learnerId }: { learnerId: string }) {
 
   return (
     <Panel>
-      <PanelTitle icon={<Brain className="h-4 w-4" />} title="Misconception analysis by concept" />
+      <PanelTitle icon={<Brain className="h-4 w-4" />} title="Common mistakes by concept" />
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-slate-500">Concept id</span>
@@ -936,7 +936,7 @@ function RemediationModal({
         );
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load remediation.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load remediation.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }

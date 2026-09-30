@@ -161,7 +161,7 @@ export async function readApiJson(res: Response, fallback: string): Promise<Reco
     throw new Error(`${fallback}: ${trimmed}`);
   }
 
-  throw new Error(`${fallback} (HTTP ${res.status}): the server returned a non-JSON response.`);
+  throw new Error(`${fallback}. Please try again later.`);
 }
 
 export function getApiErrorMessage(raw: Record<string, unknown>, fallback: string): string {
@@ -388,8 +388,8 @@ export const H5P_ROUTE_MAP: Record<string, string> = {
 export async function fetchHubModules(ctx: H5pContext): Promise<H5pHubModule[]> {
   const url = buildGetUrl('/h5p/html_contents', contextParams(ctx));
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load H5P modules');
-  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Failed to load H5P modules'));
+  const raw = await readApiJson(res, 'Couldn’t load H5P modules');
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Couldn’t load H5P modules'));
   return (raw.contentLists as H5pHubModule[]) ?? [];
 }
 
@@ -405,8 +405,8 @@ export async function fetchScenarios(ctx: H5pContext): Promise<H5pScenario[]> {
     user_profile_name: session.user_profile_name,
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load scenarios');
-  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Failed to load scenarios'));
+  const raw = await readApiJson(res, 'Couldn’t load scenarios');
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Couldn’t load scenarios'));
   return (raw.scenarioLists as H5pScenario[]) ?? [];
 }
 
@@ -414,7 +414,7 @@ export async function fetchScenarios(ctx: H5pContext): Promise<H5pScenario[]> {
 export async function fetchScenario(id: number | string, ctx: H5pContext): Promise<H5pScenario> {
   const url = buildGetUrl(`/h5p/scenario_based/${id}`, contextParams(ctx));
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load scenario');
+  const raw = await readApiJson(res, 'Couldn’t load scenario');
   if (!res.ok || !raw.scenario) {
     throw new Error(getApiErrorMessage(raw, (raw.error as string) || 'Scenario not found'));
   }
@@ -445,9 +445,9 @@ export async function createScenario(ctx: H5pContext, payload: ScenarioSavePaylo
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to create scenario');
+  const raw = await readApiJson(res, 'Couldn’t create scenario');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to create scenario'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t create scenario'));
   }
   return { status: true, message: (raw.message as string) || 'Scenario created successfully' };
 }
@@ -479,7 +479,7 @@ export async function updateScenario(
     body: fd,
   });
   if (!res.ok && !res.redirected) {
-    throw new Error(`Failed to update scenario (HTTP ${res.status}).`);
+    throw new Error("We couldn’t update the scenario. Please try again.");
   }
   return { status: true, message: 'Scenario updated successfully!' };
 }
@@ -496,9 +496,9 @@ export async function deleteScenario(id: number | string, ctx: H5pContext): Prom
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to delete scenario');
+  const raw = await readApiJson(res, 'Couldn’t delete scenario');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to delete scenario'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t delete scenario'));
   }
   return { status: true, message: (raw.message as string) || 'Scenario deleted successfully!' };
 }
@@ -620,8 +620,8 @@ export async function fetchVideos(ctx: H5pContext): Promise<H5pInteractiveVideo[
     sub_institute_id: session.sub_institute_id,
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load videos');
-  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Failed to load videos'));
+  const raw = await readApiJson(res, 'Couldn’t load videos');
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Couldn’t load videos'));
   return (raw.videolists as H5pInteractiveVideo[]) ?? [];
 }
 
@@ -629,7 +629,7 @@ export async function fetchVideos(ctx: H5pContext): Promise<H5pInteractiveVideo[
 export async function fetchVideo(id: number | string, ctx: H5pContext): Promise<H5pInteractiveVideo> {
   const url = buildGetUrl(`/h5p/h5p_interactive_video/${id}`, contextParams(ctx));
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load video');
+  const raw = await readApiJson(res, 'Couldn’t load video');
   const video = (raw.videos ?? raw.video) as H5pInteractiveVideo | undefined;
   if (!res.ok || !video) {
     throw new Error(getApiErrorMessage(raw, 'Interactive video not found'));
@@ -679,9 +679,9 @@ export async function createVideo(ctx: H5pContext, payload: VideoSavePayload): P
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to create video');
+  const raw = await readApiJson(res, 'Couldn’t create video');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to create video'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t create video'));
   }
   return { status: true, message: (raw.message as string) || 'Video created successfully' };
 }
@@ -711,9 +711,9 @@ export async function updateVideo(
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to update video');
+  const raw = await readApiJson(res, 'Couldn’t update video');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to update video'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t update video'));
   }
   return { status: true, message: (raw.message as string) || 'Video updated successfully' };
 }
@@ -732,9 +732,9 @@ export async function deleteVideo(id: number | string, ctx: H5pContext): Promise
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to delete video');
+  const raw = await readApiJson(res, 'Couldn’t delete video');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to delete video'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t delete video'));
   }
   return { status: true, message: (raw.message as string) || 'Video deleted successfully' };
 }
@@ -854,8 +854,8 @@ export async function fetchH5pQuestionBank(
   });
 
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load question bank content');
-  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Failed to load question bank content'));
+  const raw = await readApiJson(res, 'Couldn’t load question bank content');
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Couldn’t load question bank content'));
 
   return {
     h5p_type: (raw.h5p_type as string) ?? h5pType,
@@ -875,8 +875,8 @@ export async function fetchMcqIndex(ctx: H5pContext, selectedLevel?: string): Pr
     selectedLevel,
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load MCQ data');
-  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Failed to load MCQ data'));
+  const raw = await readApiJson(res, 'Couldn’t load MCQ data');
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Couldn’t load MCQ data'));
   return {
     mcq_levels: (raw.mcq_levels as McqLevel[]) ?? [],
     selectedLevel: (raw.selectedLevel as string | null) ?? null,
@@ -896,8 +896,8 @@ export async function fetchFlashcards(ctx: H5pContext): Promise<H5pFlashcard[]> 
     sub_institute_id: session.sub_institute_id,
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load flashcards');
-  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Failed to load flashcards'));
+  const raw = await readApiJson(res, 'Couldn’t load flashcards');
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Couldn’t load flashcards'));
   return (raw.flashCards as H5pFlashcard[]) ?? [];
 }
 
@@ -910,7 +910,7 @@ export async function fetchFlashcard(id: number | string, ctx: H5pContext): Prom
     sub_institute_id: session.sub_institute_id,
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load flashcard');
+  const raw = await readApiJson(res, 'Couldn’t load flashcard');
   if (!res.ok || !raw.card) {
     throw new Error(getApiErrorMessage(raw, 'Flashcard not found'));
   }
@@ -936,9 +936,9 @@ export async function createFlashcards(ctx: H5pContext, cards: FlashcardInput[])
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to create flashcards');
+  const raw = await readApiJson(res, 'Couldn’t create flashcards');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to create flashcards'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t create flashcards'));
   }
   return { status: true, message: (raw.message as string) || 'Flashcards created successfully!' };
 }
@@ -966,9 +966,9 @@ export async function updateFlashcard(
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to update flashcard');
+  const raw = await readApiJson(res, 'Couldn’t update flashcard');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to update flashcard'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t update flashcard'));
   }
   return { status: true, message: (raw.message as string) || 'Flashcard updated successfully!' };
 }
@@ -987,9 +987,9 @@ export async function deleteFlashcard(id: number | string, ctx: H5pContext): Pro
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to delete flashcard');
+  const raw = await readApiJson(res, 'Couldn’t delete flashcard');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to delete flashcard'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t delete flashcard'));
   }
   // The Laravel destroy response message says "updated"; show the intended copy.
   return { status: true, message: 'Flashcard deleted successfully!' };
@@ -1181,8 +1181,8 @@ export async function fetchDragDrops(ctx: H5pContext): Promise<H5pDragDrop[]> {
     user_profile_name: session.user_profile_name,
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load drag and drop activities');
-  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Failed to load drag and drop activities'));
+  const raw = await readApiJson(res, 'Couldn’t load drag and drop activities');
+  if (!res.ok) throw new Error(getApiErrorMessage(raw, 'Couldn’t load drag and drop activities'));
   return (raw.dragDropLists as H5pDragDrop[]) ?? [];
 }
 
@@ -1194,7 +1194,7 @@ export async function fetchDragDrop(id: number | string, ctx: H5pContext): Promi
     user_profile_name: session.user_profile_name,
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load activity');
+  const raw = await readApiJson(res, 'Couldn’t load activity');
   if (!res.ok || !raw.dragDrop) {
     throw new Error(getApiErrorMessage(raw, 'Activity not found'));
   }
@@ -1215,7 +1215,7 @@ export async function createDragDrop(
       syear: session.syear,
       ...payload,
     },
-    'Failed to create activity'
+    'Couldn’t create activity'
   );
   return {
     status: true,
@@ -1238,7 +1238,7 @@ export async function updateDragDrop(
       user_id: session.user_id,
       ...payload,
     },
-    'Failed to update activity'
+    'Couldn’t update activity'
   );
   return { status: true, message: (raw.message as string) || 'Activity updated successfully!' };
 }
@@ -1252,7 +1252,7 @@ export async function deleteDragDrop(id: number | string, ctx: H5pContext): Prom
       sub_institute_id: session.sub_institute_id,
       user_id: session.user_id,
     },
-    'Failed to delete activity'
+    'Couldn’t delete activity'
   );
   return { status: true, message: (raw.message as string) || 'Activity deleted successfully!' };
 }
@@ -1278,7 +1278,7 @@ export async function publishDragDrop(
       user_id: session.user_id,
       published,
     },
-    published ? 'Failed to publish activity' : 'Failed to unpublish activity'
+    published ? 'Couldn’t publish activity' : 'Couldn’t unpublish activity'
   );
   return { status: true, message: (raw.message as string) || 'Saved.' };
 }
@@ -1298,9 +1298,9 @@ export async function uploadDragDropImage(file: File, role: 'background' | 'elem
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to upload image');
+  const raw = await readApiJson(res, 'Couldn’t upload image');
   if (!res.ok || !isApiSuccess(raw) || !raw.url) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to upload image'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t upload image'));
   }
   return String(raw.url);
 }
@@ -1320,8 +1320,8 @@ export async function exportDragDropPackage(id: number | string, ctx: H5pContext
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
   if (!res.ok) {
-    const raw = await readApiJson(res, 'Failed to export package');
-    throw new Error(getApiErrorMessage(raw, 'Failed to export package'));
+    const raw = await readApiJson(res, 'Couldn’t export package');
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t export package'));
   }
 
   const blob = await res.blob();
@@ -1360,9 +1360,9 @@ export async function importDragDropPackage(ctx: H5pContext, file: File): Promis
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to import package');
+  const raw = await readApiJson(res, 'Couldn’t import package');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to import package'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t import package'));
   }
   return {
     status: true,
@@ -1420,9 +1420,9 @@ export const TEXT_ACTIVITY_LABELS: Record<TextActivityType, string> = {
 
 /** Type -> what the activity asks a learner to do, for page descriptions. */
 export const TEXT_ACTIVITY_DESCRIPTIONS: Record<TextActivityType, string> = {
-  drag_text: 'Learners drag words into the correct blanks within a sentence or paragraph',
-  fill_in_the_blanks: 'Learners type the correct answers into missing blanks',
-  mark_the_words: 'Learners identify and mark the correct words within a text passage',
+  drag_text: 'Students drag words into the correct blanks within a sentence or paragraph',
+  fill_in_the_blanks: 'Students type the correct answers into missing blanks',
+  mark_the_words: 'Students identify and mark the correct words within a text passage',
 };
 
 /** Type -> the official H5P library it exports as. */
@@ -1535,7 +1535,7 @@ export async function fetchTextActivities(
     sub_institute_id: session.sub_institute_id,
     user_profile_name: session.user_profile_name,
   });
-  const fallback = `Failed to load ${TEXT_ACTIVITY_LABELS[type].toLowerCase()} activities`;
+  const fallback = `Couldn’t load ${TEXT_ACTIVITY_LABELS[type].toLowerCase()} activities`;
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
   const raw = await readApiJson(res, fallback);
   if (!res.ok) throw new Error(getApiErrorMessage(raw, fallback));
@@ -1554,7 +1554,7 @@ export async function fetchTextActivity(
     user_profile_name: session.user_profile_name,
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
-  const raw = await readApiJson(res, 'Failed to load activity');
+  const raw = await readApiJson(res, 'Couldn’t load activity');
   if (!res.ok || !raw.activity) {
     throw new Error(getApiErrorMessage(raw, 'Activity not found'));
   }
@@ -1576,7 +1576,7 @@ export async function createTextActivity(
       syear: session.syear,
       ...payload,
     },
-    'Failed to create activity'
+    'Couldn’t create activity'
   );
   return {
     status: true,
@@ -1600,7 +1600,7 @@ export async function updateTextActivity(
       user_id: session.user_id,
       ...payload,
     },
-    'Failed to update activity'
+    'Couldn’t update activity'
   );
   return { status: true, message: (raw.message as string) || 'Activity updated successfully!' };
 }
@@ -1618,7 +1618,7 @@ export async function deleteTextActivity(
       sub_institute_id: session.sub_institute_id,
       user_id: session.user_id,
     },
-    'Failed to delete activity'
+    'Couldn’t delete activity'
   );
   return { status: true, message: (raw.message as string) || 'Activity deleted successfully!' };
 }
@@ -1645,7 +1645,7 @@ export async function publishTextActivity(
       user_id: session.user_id,
       published,
     },
-    published ? 'Failed to publish activity' : 'Failed to unpublish activity'
+    published ? 'Couldn’t publish activity' : 'Couldn’t unpublish activity'
   );
   return { status: true, message: (raw.message as string) || 'Saved.' };
 }
@@ -1664,7 +1664,7 @@ export async function duplicateTextActivity(
       sub_institute_id: session.sub_institute_id,
       user_id: session.user_id,
     },
-    'Failed to duplicate activity'
+    'Couldn’t duplicate activity'
   );
   return {
     status: true,
@@ -1687,9 +1687,9 @@ export async function uploadTextActivityImage(type: TextActivityType, file: File
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to upload image');
+  const raw = await readApiJson(res, 'Couldn’t upload image');
   if (!res.ok || !isApiSuccess(raw) || !raw.url) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to upload image'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t upload image'));
   }
   return String(raw.url);
 }
@@ -1722,8 +1722,8 @@ export async function exportTextActivityPackage(
   });
   const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
   if (!res.ok) {
-    const raw = await readApiJson(res, 'Failed to export package');
-    throw new Error(getApiErrorMessage(raw, 'Failed to export package'));
+    const raw = await readApiJson(res, 'Couldn’t export package');
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t export package'));
   }
 
   const blob = await res.blob();
@@ -1768,9 +1768,9 @@ export async function importTextActivityPackage(
     headers: authHeaders(),
     body: fd,
   });
-  const raw = await readApiJson(res, 'Failed to import package');
+  const raw = await readApiJson(res, 'Couldn’t import package');
   if (!res.ok || !isApiSuccess(raw)) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to import package'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t import package'));
   }
   return {
     status: true,

@@ -89,7 +89,7 @@ export default function NegotiatePoPage() {
     try {
       setData(await loadInventory("purchase-order-negotiations", {}));
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : "Negotiate PO data could not be loaded.");
+      setError(reason instanceof Error ? reason.message : "Couldn't load negotiate PO data. Try again.");
     } finally {
       setLoading(false);
     }
@@ -220,7 +220,7 @@ export default function NegotiatePoPage() {
       reset();
       await load();
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : "Negotiate PO could not be saved.");
+      setError(reason instanceof Error ? reason.message : "Couldn't save negotiate PO. Try again.");
     } finally {
       setBusy(false);
     }
@@ -233,7 +233,7 @@ export default function NegotiatePoPage() {
       await deleteInventory("purchase-order-negotiations", record.id);
       await load();
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : "Negotiate PO could not be deleted.");
+      setError(reason instanceof Error ? reason.message : "Couldn't delete negotiate PO. Try again.");
     } finally {
       setBusy(false);
     }
@@ -278,7 +278,7 @@ export default function NegotiatePoPage() {
                   <Input className="mt-1" value={header.poNumber} readOnly />
                 </div>
                 <div>
-                  <Label>Vendor Name</Label>
+                  <Label>Vendor name</Label>
                   <Input className="mt-1" value={header.vendorName} readOnly />
                 </div>
                 <div>
@@ -291,7 +291,7 @@ export default function NegotiatePoPage() {
                   />
                 </div>
                 <div>
-                  <Label>Place of Delivery</Label>
+                  <Label>Place of delivery</Label>
                   <Textarea
                     className="mt-1"
                     rows={2}
@@ -300,7 +300,7 @@ export default function NegotiatePoPage() {
                   />
                 </div>
                 <div>
-                  <Label>Payment Terms</Label>
+                  <Label>Payment terms</Label>
                   <Textarea
                     className="mt-1"
                     rows={2}
@@ -318,7 +318,7 @@ export default function NegotiatePoPage() {
                   />
                 </div>
                 <div>
-                  <Label>Transportation Charge</Label>
+                  <Label>Transportation charge</Label>
                   <Input
                     className="mt-1"
                     type="number"
@@ -328,7 +328,7 @@ export default function NegotiatePoPage() {
                   />
                 </div>
                 <div>
-                  <Label>Installation Charge</Label>
+                  <Label>Installation charge</Label>
                   <Input
                     className="mt-1"
                     type="number"
@@ -349,10 +349,10 @@ export default function NegotiatePoPage() {
                         <TableHead>Qty</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Discount %</TableHead>
-                        <TableHead>Discount Amount</TableHead>
-                        <TableHead>After Discount</TableHead>
+                        <TableHead>Discount amount</TableHead>
+                        <TableHead>After discount</TableHead>
                         <TableHead>Tax %</TableHead>
-                        <TableHead>Tax Amount</TableHead>
+                        <TableHead>Tax amount</TableHead>
                         <TableHead>Total</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -411,7 +411,7 @@ export default function NegotiatePoPage() {
                     value={header.approvalStatus}
                     onChange={(event) => updateHeader({ approvalStatus: event.target.value })}
                   >
-                    <option value="">Select Status</option>
+                    <option value="">Select status</option>
                     {data.options.statuses?.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.label}
@@ -420,7 +420,7 @@ export default function NegotiatePoPage() {
                   </select>
                 </div>
                 <div>
-                  <Label>Approval Remark</Label>
+                  <Label>Approval remark</Label>
                   <Textarea
                     className="mt-1"
                     rows={2}
@@ -470,7 +470,7 @@ export default function NegotiatePoPage() {
                     <TableHead>Qty</TableHead>
                     <TableHead>Discount %</TableHead>
                     <TableHead>Tax %</TableHead>
-                    <TableHead>Approval Status</TableHead>
+                    <TableHead>Approval status</TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>

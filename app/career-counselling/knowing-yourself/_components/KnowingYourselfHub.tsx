@@ -142,7 +142,7 @@ export function KnowingYourselfHub() {
       const data = await loadInterestQuestions();
       setQuestions(data);
     } catch {
-      setQuestionsError('Could not load the interest profile questions.');
+      setQuestionsError('Couldn’t load the interest profile questions.');
     } finally {
       setQuestionsLoading(false);
     }
@@ -161,7 +161,7 @@ export function KnowingYourselfHub() {
       const data = await loadInterestResults(currentAnswers);
       setResult(data);
     } catch {
-      setResultsError('Could not load your interest profile results.');
+      setResultsError('Couldn’t load your interest profile results.');
     } finally {
       setResultsLoading(false);
     }
@@ -274,7 +274,7 @@ export function KnowingYourselfHub() {
                 Loading questions…
               </div>
             ) : questionsError ? (
-              <CenterMessage title="Unable to load questions" description={questionsError} retry={() => void refreshQuestions()} />
+              <CenterMessage title="Couldn’t load questions" description={questionsError} retry={() => void refreshQuestions()} />
             ) : (
               <QuizPanel
                 questions={questions}
@@ -300,7 +300,7 @@ export function KnowingYourselfHub() {
           ) : resultsError ? (
             <Card>
               <CardContent>
-                <CenterMessage title="Unable to load your results" description={resultsError} retry={() => void refreshResults(answers)} />
+                <CenterMessage title="Couldn’t load your results" description={resultsError} retry={() => void refreshResults(answers)} />
               </CardContent>
             </Card>
           ) : (

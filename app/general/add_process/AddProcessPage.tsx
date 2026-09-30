@@ -247,7 +247,7 @@ export function AddProcessPage({
     try {
       setRows(await loadProcessRows());
     } catch (value: unknown) {
-      setError(errorMessage(value, "Saved processes could not be loaded."));
+      setError(errorMessage(value, "Couldn't load saved processes. Try again."));
     } finally {
       setLoading(false);
     }
@@ -281,7 +281,7 @@ export function AddProcessPage({
       } catch (value: unknown) {
         if (cancelled) return;
         setSops([]);
-        setSopsError(errorMessage(value, "The institute SOP library could not be loaded."));
+        setSopsError(errorMessage(value, "Couldn't load the institute SOP library. Try again."));
       }
     })();
 
@@ -344,7 +344,7 @@ export function AddProcessPage({
       if (!from.allowAi) {
         setSpec(null);
         setIssues(local.issues);
-        setError("The text could not be converted. Fix the errors below, or allow AI normalisation.");
+        setError("Couldn't convert the text. Fix the errors below, or allow AI clean-up.");
         return;
       }
 
@@ -372,7 +372,7 @@ export function AddProcessPage({
       if (!response.ok || !payload.spec) {
         setSpec(null);
         setIssues(payload.issues ?? local.issues);
-        setError(payload.error ?? "The text could not be converted into a process.");
+        setError(payload.error ?? "Couldn't convert the text into a process. Try again.");
         return;
       }
 
@@ -433,7 +433,7 @@ export function AddProcessPage({
       setSavedSnapshot(snapshot(saved));
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The process could not be saved."));
+      setError(errorMessage(value, "Couldn't save the process. Try again."));
     } finally {
       setSaving(false);
     }
@@ -488,7 +488,7 @@ export function AddProcessPage({
   async function remove(row: StoredProcessRow) {
     const what = row.processes.length
       ? row.processes.map((process) => `${process.ref} ${process.title}`).join(", ")
-      : `the legacy free-text process on "${row.record.menuName}"`;
+      : `the free-text process on "${row.record.menuName}"`;
     if (!window.confirm(`Delete ${what}?`)) return;
 
     setDeletingId(row.record.id);
@@ -498,7 +498,7 @@ export function AddProcessPage({
       setNotice(await deleteAddProcess(row.record.id));
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The record could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the record. Try again."));
     } finally {
       setDeletingId(null);
     }
@@ -511,7 +511,7 @@ export function AddProcessPage({
       value: (row) =>
         row.processes.length
           ? row.processes.map((process) => `${process.ref} ${process.title}`).join(", ")
-          : `${row.record.menuName} (legacy free text)`,
+          : `${row.record.menuName} (free text)`,
       render: (row) =>
         row.processes.length ? (
           <div className="flex flex-wrap gap-1.5">
@@ -530,7 +530,7 @@ export function AddProcessPage({
           </div>
         ) : (
           <span className="text-sm text-slate-500">
-            {row.record.menuName} - legacy free text, not converted
+            {row.record.menuName} - free text, not converted
           </span>
         ),
     },
@@ -550,7 +550,7 @@ export function AddProcessPage({
       value: (row) =>
         row.processes.length
           ? [...new Set(row.processes.map((process) => STATUS_LABELS[process.status]))].join(", ")
-          : "Legacy",
+          : "Free text",
     },
     { key: "created_by_name", label: "Created by", value: (row) => row.record.createdByName },
   ];
@@ -682,7 +682,7 @@ export function AddProcessPage({
 
       <ErpSection
         title="Saved processes"
-        description="Converted processes, plus any legacy free-text entries that have not been converted yet."
+        description="Converted processes, plus any free-text entries that have not been converted yet."
         icon={<FileText className="size-5" />}
       >
         {loading ? (
@@ -719,7 +719,7 @@ export function AddProcessPage({
       <p className="flex items-center gap-2 text-xs text-slate-400">
         <GitBranchPlus className="size-3.5" aria-hidden />
         Each process is stored in its own row of the existing requirements record, keyed by module and procedure number.
-        Legacy free-text entries are left untouched, and no schema change was needed.
+        Free-text entries are left untouched.
       </p>
     </main>
   );

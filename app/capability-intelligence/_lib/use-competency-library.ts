@@ -89,7 +89,7 @@ export function useCompetencyDetail(id: number | null) {
         if (!cancelled) setDetail(res.data);
       } catch (err) {
         if (!cancelled) {
-          setError(toMessage(err, 'Failed to load competency detail.'));
+          setError(toMessage(err, 'Couldn’t load competency detail.'));
           setDetail(null);
         }
       } finally {
@@ -131,7 +131,7 @@ export function useCompetencyLibrary(params: CompetencyLibraryListParams): UseCo
       setItems(response.data ?? []);
       setPagination(response.pagination ?? null);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load competencies.'));
+      setError(toMessage(loadError, 'Couldn’t load competencies.'));
       setItems([]);
       setPagination(null);
     } finally {
@@ -172,7 +172,7 @@ export function useCompetencyLibrary(params: CompetencyLibraryListParams): UseCo
     (payload: CompetencyLibraryPayload) =>
       runMutation(
         () => competencyLibraryService.create(buildSessionContext(), payload),
-        'Failed to create the competency.',
+        'Couldn’t create the competency.',
       ),
     [runMutation],
   );
@@ -181,7 +181,7 @@ export function useCompetencyLibrary(params: CompetencyLibraryListParams): UseCo
     (id: number, payload: CompetencyLibraryPayload) =>
       runMutation(
         () => competencyLibraryService.update(buildSessionContext(), id, payload),
-        'Failed to update the competency.',
+        'Couldn’t update the competency.',
       ),
     [runMutation],
   );
@@ -190,7 +190,7 @@ export function useCompetencyLibrary(params: CompetencyLibraryListParams): UseCo
     (id: number) =>
       runMutation(
         () => competencyLibraryService.remove(buildSessionContext(), id),
-        'Failed to delete the competency.',
+        'Couldn’t delete the competency.',
       ),
     [runMutation],
   );
@@ -199,7 +199,7 @@ export function useCompetencyLibrary(params: CompetencyLibraryListParams): UseCo
     (id: number, restore = false) =>
       runMutation(
         () => competencyLibraryService.archive(buildSessionContext(), id, restore),
-        restore ? 'Failed to restore the competency.' : 'Failed to archive the competency.',
+        restore ? 'Couldn’t restore the competency.' : 'Couldn’t archive the competency.',
       ),
     [runMutation],
   );
@@ -208,7 +208,7 @@ export function useCompetencyLibrary(params: CompetencyLibraryListParams): UseCo
     (id: number, name?: string) =>
       runMutation(
         () => competencyLibraryService.clone(buildSessionContext(), id, name),
-        'Failed to clone the competency.',
+        'Couldn’t clone the competency.',
       ),
     [runMutation],
   );
@@ -225,7 +225,7 @@ export function useCompetencyLibrary(params: CompetencyLibraryListParams): UseCo
         await load();
         return { ok: true, message: response.message, result: response.data };
       } catch (importError) {
-        const message = toMessage(importError, 'Failed to import competencies.');
+        const message = toMessage(importError, 'Couldn’t import competencies.');
         setActionError(message);
         return { ok: false, message };
       } finally {
@@ -246,7 +246,7 @@ export function useCompetencyLibrary(params: CompetencyLibraryListParams): UseCo
       );
       return response.data ?? [];
     } catch (exportError) {
-      setActionError(toMessage(exportError, 'Failed to export the library.'));
+      setActionError(toMessage(exportError, 'Couldn’t export the library.'));
       return [];
     } finally {
       setExporting(false);

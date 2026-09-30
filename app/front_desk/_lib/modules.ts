@@ -38,7 +38,7 @@ export type FrontDeskModule = {
 
 export const frontDeskModules = {
   gallery: {
-    title: 'Photo video gallery',
+    title: 'Photo and video gallery',
     description: 'Publish class-targeted photo albums and video links.',
     endpoint: 'api/front-desk/photo-video-gallery',
     storeEndpoint: 'api/front-desk/photo-video-gallery',

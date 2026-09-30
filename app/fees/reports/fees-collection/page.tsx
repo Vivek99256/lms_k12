@@ -143,13 +143,13 @@ export default function FeesCollectionReportPage() {
   }, [rows]);
 
   const exportColumns = useMemo<TableExportColumn[]>(() => [
-    { key: 'enrollmentNo', label: 'GR No' },
+    { key: 'enrollmentNo', label: 'GR no.' },
     { key: 'studentName', label: 'Student name', width: '220px' },
     { key: 'standardDivision', label: separateDetails ? 'Standard / Division' : 'Std / Div' },
     { key: 'quota', label: 'Quota' },
     { key: 'uniqueId', label: 'Unique ID' },
     { key: 'monthLabel', label: 'Month', width: '200px' },
-    { key: 'receiptNo', label: 'Receipt no' },
+    { key: 'receiptNo', label: 'Receipt no.' },
     { key: 'paymentMode', label: 'Payment mode' },
     { key: 'bankDetails', label: groupBankDetails ? 'Bank fields' : 'Bank details', width: '220px' },
     { key: 'remarks', label: 'Remarks', width: '220px' },
@@ -192,7 +192,7 @@ export default function FeesCollectionReportPage() {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to load fees collection report filters.',
+        text: error instanceof Error ? error.message : "Couldn't load fees collection report filters. Try again.",
       });
     } finally {
       setLoadingFilters(false);
@@ -244,7 +244,7 @@ export default function FeesCollectionReportPage() {
       setRows([]);
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to fetch fees collection report.',
+        text: error instanceof Error ? error.message : "Couldn't load fees collection report. Try again.",
       });
     } finally {
       setLoading(false);
@@ -265,19 +265,19 @@ export default function FeesCollectionReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Fees Collection Report"
+        title="Fee collection report"
         description="Review collected regular and other-fee receipts with payment summaries and export actions."
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'fees-collection-report.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-collection-report.xls', title: 'Fees Collection Report', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-collection-report.pdf', title: 'Fees Collection Report', subtitle: `Academic year ${academicYearId || '-'}`, columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Fees Collection Report', subtitle: `Academic year ${academicYearId || '-'}`, columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-collection-report.xls', title: 'Fee collection report', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-collection-report.pdf', title: 'Fee collection report', subtitle: `Academic year ${academicYearId || '-'}`, columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Fee collection report', subtitle: `Academic year ${academicYearId || '-'}`, columns: exportColumns, rows: exportRows })}
             // Records each export in the Fees AI Stack ledger, against the published
             // Fees report layout. The export itself is unchanged.
             activity={{
               operation: 'fee_report',
-              label: 'Fees Collection Report',
+              label: 'Fee collection report',
               rowCount: rows.length,
               filters: {
                 from_date: fromDate || null,
@@ -353,7 +353,7 @@ export default function FeesCollectionReportPage() {
 
       <SectionPanel
         title="Results"
-        description="Legacy parity includes receipt grouping, month labels, bank details, and payment-mode totals."
+        description="Includes receipt grouping, month labels, bank details and payment-mode totals."
         footer={<PaginationFooter pagination={pagination} onPageChange={setPage} />}
       >
         {rows.length > 0 && (
@@ -379,7 +379,7 @@ export default function FeesCollectionReportPage() {
                 <TableHead>Quota</TableHead>
                 <TableHead>Unique ID</TableHead>
                 <TableHead>Month</TableHead>
-                <TableHead>Receipt no</TableHead>
+                <TableHead>Receipt no.</TableHead>
                 <TableHead>Payment mode</TableHead>
                 {groupBankDetails ? (
                   <>

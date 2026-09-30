@@ -349,7 +349,7 @@ export function buildMenuTree(
                   id: -Math.abs(sub.id),
                   parentId: sub.id,
                   menuType: sub.menu_type,
-                  label: 'Intelligence',
+                  label: 'AI insights',
                   href: intelligenceRouteFor(intelligenceModule, moduleSlugs?.get(sub.id)),
                   link: intelligenceRouteFor(intelligenceModule, moduleSlugs?.get(sub.id)),
                 },

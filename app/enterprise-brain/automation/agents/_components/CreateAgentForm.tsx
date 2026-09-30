@@ -71,7 +71,7 @@ export function CreateAgentForm({
       setTools([]);
       onCreated(agent);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The agent could not be created.');
+      setError(cause instanceof Error ? cause.message : 'The agent couldn’t be created.');
     } finally {
       setBusy(false);
     }

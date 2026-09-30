@@ -111,7 +111,7 @@ export function CandidateApplicationForm({
         if (!cancelled) setJobs(rows)
       })
       .catch((cause) => {
-        if (!cancelled) setJobsError(cause instanceof Error ? cause.message : 'Unable to load open job postings.')
+        if (!cancelled) setJobsError(cause instanceof Error ? cause.message : "Couldn't load open job postings. Try again.")
       })
       .finally(() => {
         if (!cancelled) setLoadingJobs(false)
@@ -242,7 +242,7 @@ export function CandidateApplicationForm({
         })
         setErrors((current) => ({ ...current, ...serverErrors }))
       }
-      setMessage(`Failed to submit application. ${cause instanceof Error ? cause.message : 'Unknown error'}`)
+      setMessage("Couldn't submit the application. Try again.")
     } finally {
       setSubmitting(false)
     }

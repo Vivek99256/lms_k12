@@ -106,7 +106,7 @@ export default function TeacherDashboard() {
                 <QuickActionLink href="/lms/lmsAnnotate_assignment" label="Grade assignments" icon={PenSquare} />
                 <QuickActionLink href="/front_desk/circular" label="Post circular" icon={Megaphone} />
                 <QuickActionLink href="/lms/teacher-timetable" label="My timetable" icon={Clock} />
-                <QuickActionLink href="/fees/teacher-dues" label="Fee dues (my class)" icon={Wallet} />
+                <QuickActionLink href="/fees/teacher-dues" label="Fee dues for my class" icon={Wallet} />
                 <QuickActionLink href="/student/my_icard" label="My ID card" icon={IdCard} />
               </div>
             </SectionPanel>

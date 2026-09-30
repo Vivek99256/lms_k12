@@ -93,7 +93,7 @@ export default function RequestCenterPage() {
         <AlertDescription>
           Work From Home is applied as a leave type, and attendance corrections use the same regularization
           workflow — so they appear here under Leave and Regularization respectively rather than as separate
-          duplicate lists. Regularization data is session-only until its backend endpoint exists.
+          duplicate lists. Regularization data is kept for this session only for now.
         </AlertDescription>
       </Alert>
 

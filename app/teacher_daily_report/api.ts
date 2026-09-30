@@ -85,7 +85,7 @@ async function request(
     (isRecord(payload) &&
       ["0", "2"].includes(normalizeApiStatus(payload as ApiEnvelope)))
   ) {
-    throw new Error(message(payload, `Request failed (${response.status}).`));
+    throw new Error(message(payload, "Couldn't complete the request. Try again."));
   }
   return isRecord(payload) ? payload : {};
 }

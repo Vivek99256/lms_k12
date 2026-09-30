@@ -76,7 +76,7 @@ export default function LibraryDashboardPage() {
         setPayload(result);
       } catch (caught) {
         if (signal?.aborted) return;
-        setError(caught instanceof Error ? caught.message : 'Unable to load the library dashboard summary.');
+        setError(caught instanceof Error ? caught.message : "Couldn't load the library dashboard summary. Try again.");
       } finally {
         if (!signal?.aborted) setLoading(false);
       }

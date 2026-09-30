@@ -129,14 +129,14 @@ export function JobPostingForm({
     if (orgType) params.set('filters[industries]', orgType)
     fetch(`${session.baseUrl}/table_data?${params}`, { headers: { Authorization: `Bearer ${session.token}` } })
       .then(async (response) => {
-        if (!response.ok) throw new Error(`Failed to fetch departments: ${response.status}`)
+        if (!response.ok) throw new Error("Couldn't load departments. Try again.")
         const items = flattenResponse(await response.json())
         setDepartments(items.map((item, index) => ({
           id: String(item.department_id ?? item.id ?? index + 1),
           department: String(item.department ?? ''),
         })).filter((item) => item.department))
       })
-      .catch((cause) => setMessage(cause instanceof Error ? cause.message : 'Failed to fetch departments.'))
+      .catch((cause) => setMessage(cause instanceof Error ? cause.message : "Couldn't load departments. Try again."))
       .finally(() => setLoadingDepartments(false))
   }, [])
 
@@ -158,7 +158,7 @@ export function JobPostingForm({
     if (orgType) params.set('filters[industries]', orgType)
     fetch(`${session.baseUrl}/table_data?${params}`, { headers: { Authorization: `Bearer ${session.token}` } })
       .then(async (response) => {
-        if (!response.ok) throw new Error(`Failed to fetch job roles: ${response.status}`)
+        if (!response.ok) throw new Error("Couldn't load job roles. Try again.")
         const items = flattenResponse(await response.json())
         const next = items.map((item, index) => ({
           id: String(item.id ?? index + 1), jobrole: String(item.jobrole ?? ''),
@@ -171,7 +171,7 @@ export function JobPostingForm({
           if (match) setForm((current) => ({ ...current, title: match.id }))
         }
       })
-      .catch((cause) => setMessage(cause instanceof Error ? cause.message : 'Failed to fetch job roles.'))
+      .catch((cause) => setMessage(cause instanceof Error ? cause.message : "Couldn't load job roles. Try again."))
       .finally(() => setLoadingRoles(false))
   }, [departments, editingJob, form.department])
 
@@ -195,7 +195,7 @@ export function JobPostingForm({
     })
     fetch(`${session.baseUrl}/table_data?${params}`, { headers: { Authorization: `Bearer ${session.token}` } })
       .then(async (response) => {
-        if (!response.ok) throw new Error(`Failed to fetch job role skills: ${response.status}`)
+        if (!response.ok) throw new Error("Couldn't load job role skills. Try again.")
         const items = flattenResponse(await response.json())
         const next = items
           .map((item, index) => ({ id: String(item.id ?? index), SkillName: String(item.skill ?? '') }))
@@ -207,7 +207,7 @@ export function JobPostingForm({
           setForm((current) => ({ ...current, skillsRequired: names.join(', ') }))
         }
       })
-      .catch((cause) => setMessage(cause instanceof Error ? cause.message : 'Failed to fetch skills.'))
+      .catch((cause) => setMessage(cause instanceof Error ? cause.message : "Couldn't load skills. Try again."))
       .finally(() => setLoadingSkills(false))
   }, [editingJob, form.title, roles])
 
@@ -281,7 +281,7 @@ export function JobPostingForm({
       await onSaved()
       onClose()
     } catch (cause) {
-      const raw = cause instanceof Error ? cause.message : `Failed to ${editingJob ? 'update' : 'create'} job posting`
+      const raw = cause instanceof Error ? cause.message : `Couldn't ${editingJob ? 'update' : 'create'} the job posting. Try again.`
       setMessage(raw.includes('No talent records found for this department')
         ? "Department validation failed. The selected department doesn't have any talent records. Please contact support."
         : raw)

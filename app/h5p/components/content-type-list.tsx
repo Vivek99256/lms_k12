@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import {
   Suspense,
   useCallback,
@@ -284,7 +286,7 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
       .list(ctx)
       .then(setRows)
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : `Failed to load ${noun}s`);
+        setError(friendlyError(err, `We couldn’t load ${noun}s. Please try again.`));
       })
       .finally(() => setLoading(false));
   }, [ctx, api, noun]);
@@ -318,7 +320,7 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
       setSuccess(await work());
       load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : fallback);
+      setError(friendlyError(err, fallback));
     } finally {
       setBusyId(null);
     }
@@ -326,18 +328,18 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
 
   const handleDelete = (row: TRow) => {
     if (!window.confirm(`Delete "${row.title}"? This cannot be undone from here.`)) return;
-    void run(row, async () => (await api.remove(row.id, ctx)).message, `Failed to delete ${noun}`);
+    void run(row, async () => (await api.remove(row.id, ctx)).message, `We couldn’t delete this ${noun}. Please try again.`);
   };
 
   const handlePublish = (row: TRow) =>
     void run(
       row,
       async () => (await api.publish(row.id, ctx, row.status !== 'published')).message,
-      'Failed to change publish state'
+      'We couldn’t publish or unpublish this activity. Please try again.'
     );
 
   const handleDuplicate = (row: TRow) =>
-    void run(row, async () => (await api.duplicate(row.id, ctx)).message, `Failed to duplicate ${noun}`);
+    void run(row, async () => (await api.duplicate(row.id, ctx)).message, `We couldn’t duplicate this ${noun}. Please try again.`);
 
   const handleExport = (row: TRow) =>
     void run(
@@ -349,7 +351,7 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
         // needs at the moment they hand the file over and never afterwards.
         return warnings.length > 0 ? `Package downloaded. ${warnings.join(' ')}` : 'Package downloaded.';
       },
-      'Failed to export package'
+      'We couldn’t export the file. Please try again.'
     );
 
   const handleImport = async (file: File) => {
@@ -364,7 +366,7 @@ function ContentTypeListInner<TRow extends H5pContentRow>({
       setSuccess(result.warnings.length > 0 ? `${result.message} ${result.warnings.join(' ')}` : result.message);
       load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to import package');
+      setError(friendlyError(err, 'We couldn’t import the file. Please try again.'));
     } finally {
       setImporting(false);
     }

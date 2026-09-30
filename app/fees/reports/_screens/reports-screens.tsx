@@ -20,7 +20,7 @@ import FeesAuditTrailPage from '@/app/fees/audit-trail/page';
 export const FEES_REPORTS_SCREENS: ModuleStaticScreen[] = [
   {
     id: 'audit-trail',
-    label: 'Audit Trail',
+    label: 'Audit trail',
     icon: History,
     render: () => <FeesAuditTrailPage />,
   },

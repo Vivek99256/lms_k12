@@ -83,7 +83,7 @@ export default function StudentTransportMappingPage() {
       setSelected(new Set());
       setSearched(true);
     } catch (loadError: unknown) {
-      setError(loadError instanceof Error ? loadError.message : "Student mappings could not be loaded.");
+      setError(loadError instanceof Error ? loadError.message : "Couldn't load student mappings. Try again.");
     } finally {
       setLoading(false);
     }
@@ -258,7 +258,7 @@ export default function StudentTransportMappingPage() {
       setNotice(result);
       await load(filters);
     } catch (saveError: unknown) {
-      setError(saveError instanceof Error ? saveError.message : "Student mappings could not be saved.");
+      setError(saveError instanceof Error ? saveError.message : "Couldn't save student mappings. Try again.");
     } finally {
       setBusy(false);
     }
@@ -281,7 +281,7 @@ export default function StudentTransportMappingPage() {
       setNotice(result);
       await load(filters);
     } catch (deleteError: unknown) {
-      setError(deleteError instanceof Error ? deleteError.message : "Student mappings could not be removed.");
+      setError(deleteError instanceof Error ? deleteError.message : "Couldn't remove student mappings. Try again.");
     } finally {
       setBusy(false);
     }
@@ -310,7 +310,7 @@ export default function StudentTransportMappingPage() {
     exportRowsAsCsv({
       filename: "student-transport-mapping.csv",
       columns: [
-        { key: "student_name", label: "Student" }, { key: "enrollment_no", label: "GR No." },
+        { key: "student_name", label: "Student" }, { key: "enrollment_no", label: "GR no." },
         { key: "standard_division", label: "Std / Div" }, { key: "mobile", label: "Mobile" },
         { key: "from_shift", label: "From shift" }, { key: "from_bus", label: "From bus" },
         { key: "from_stop", label: "From stop" }, { key: "distance", label: "Distance" },
@@ -423,7 +423,7 @@ export default function StudentTransportMappingPage() {
                     <TableHead>Sr.</TableHead>
                     <TableHead>Student</TableHead>
                     <TableHead>Std / Div</TableHead>
-                    <TableHead>GR No.</TableHead>
+                    <TableHead>GR no.</TableHead>
                     <TableHead>Mobile</TableHead>
                     <TableHead>From shift</TableHead>
                     <TableHead>From bus</TableHead>

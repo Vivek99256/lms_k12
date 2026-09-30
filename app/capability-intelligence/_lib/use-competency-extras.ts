@@ -34,7 +34,7 @@ export function useSubmitForApproval() {
         });
         return { ok: true, message: response.message };
       } catch (error) {
-        return { ok: false, message: toMessage(error, 'Failed to submit for approval.') };
+        return { ok: false, message: toMessage(error, 'Couldn’t submit for approval.') };
       } finally {
         setSubmitting(false);
       }

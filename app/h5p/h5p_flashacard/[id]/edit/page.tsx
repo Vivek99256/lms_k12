@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Save } from 'lucide-react';
@@ -63,7 +65,7 @@ function FlashcardEditContent() {
         });
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load flashcard');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load flashcard. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -103,7 +105,7 @@ function FlashcardEditContent() {
       const result = await updateFlashcard(cardId, ctx, card);
       router.push('/h5p/h5p_flashacard?' + h5pContextQuery(ctx, { flash: result.message }));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update flashcard');
+      setError(friendlyError(err, 'We couldn’t update flashcard. Please try again.'));
       setSaving(false);
     }
   };

@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -90,7 +92,7 @@ function FlashcardListContent() {
     try {
       setCards(await fetchFlashcards(ctx));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load flashcards');
+      setError(friendlyError(err, 'We couldn’t load flashcards. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -117,7 +119,7 @@ function FlashcardListContent() {
       setSuccess(result.message);
       await load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete flashcard');
+      setError(friendlyError(err, 'We couldn’t delete flashcard. Please try again.'));
     } finally {
       setDeletingId(null);
     }

@@ -231,7 +231,7 @@ export function AdmissionsAutomationsScreen() {
         );
         refreshAll();
       } catch (cause) {
-        setNote(cause instanceof Error ? cause.message : 'The agent could not be enabled.');
+        setNote(cause instanceof Error ? cause.message : "Couldn't enable the agent. Try again.");
       } finally {
         setBusy(null);
       }
@@ -249,7 +249,7 @@ export function AdmissionsAutomationsScreen() {
         setNote(`${agent.name} is now ${next}.`);
         refreshAll();
       } catch (cause) {
-        setNote(cause instanceof Error ? cause.message : 'The status could not be changed.');
+        setNote(cause instanceof Error ? cause.message : "Couldn't change the status. Try again.");
       } finally {
         setBusy(null);
       }
@@ -429,7 +429,7 @@ function AdmissionsAgentPanel() {
         );
       } else {
         setManifestError(
-          agentList.reason instanceof Error ? agentList.reason.message : 'The agent registry could not be read.',
+          agentList.reason instanceof Error ? agentList.reason.message : "Couldn't read the agent registry. Try again.",
         );
       }
 
@@ -488,7 +488,7 @@ function AdmissionsAgentPanel() {
 
       reload();
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'The agent could not be run.';
+      const message = cause instanceof Error ? cause.message : "Couldn't run the agent. Try again.";
       setRunError(message);
       // Recorded as a failure rather than swallowed: a run that was refused is a thing the
       // Activity tab should show, and it is the only place the reason survives.
@@ -511,7 +511,7 @@ function AdmissionsAgentPanel() {
       );
       reload();
     } catch (cause) {
-      setApprovalNote(cause instanceof Error ? cause.message : 'The decision could not be recorded.');
+      setApprovalNote(cause instanceof Error ? cause.message : "Couldn't record the decision. Try again.");
     } finally {
       setDeciding(null);
     }
@@ -777,7 +777,7 @@ function buildStages(
       detail:
         awaiting.length > 0 || pendingApprovals > 0
           ? `Waiting on a person. ${pendingApprovals} approval(s) in the queue below.`
-          : 'Nothing is waiting at this gate.',
+          : 'No items waiting for approval.',
     },
     {
       key: 'action',

@@ -61,7 +61,7 @@ export default function MyIcardPage() {
       .then((summary) => setData(summary))
       .catch((err: unknown) => {
         if (signal?.aborted) return;
-        setError(err instanceof Error ? err.message : 'Unable to load your I-card.');
+        setError(err instanceof Error ? err.message : "Couldn't load your I-card. Try again.");
       })
       .finally(() => {
         if (!signal?.aborted) setLoading(false);

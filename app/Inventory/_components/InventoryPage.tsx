@@ -40,7 +40,7 @@ export function InventoryPage({ config }: { config: InventoryConfig }) {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { setData(await loadInventory(config.module, filters)); }
-    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Inventory data could not be loaded."); }
+    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't load inventory data. Try again."); }
     finally { setLoading(false); }
   }, [config.module, filters]);
   useEffect(() => {
@@ -65,14 +65,14 @@ export function InventoryPage({ config }: { config: InventoryConfig }) {
     if (missing) { setError(`${missing.label} is required.`); return; }
     setBusy(true); setError("");
     try { setNotice(await saveInventory(config.module, form, editing?.id, files)); reset(); await load(); }
-    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Record could not be saved."); }
+    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't save record. Try again."); }
     finally { setBusy(false); }
   }
   async function remove(row: InventoryRecord) {
     if (!window.confirm(`Delete this ${config.singular.toLowerCase()}?`)) return;
     setBusy(true);
     try { setNotice(await deleteInventory(config.module, row.id)); await load(); }
-    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Record could not be deleted."); }
+    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't delete record. Try again."); }
     finally { setBusy(false); }
   }
   function exportCsv() {

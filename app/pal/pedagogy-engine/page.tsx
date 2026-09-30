@@ -1,7 +1,7 @@
 import PedagogyEngine from './_components/PedagogyEngine';
 
 export const metadata = {
-  title: 'Pedagogy Engine | PAL',
+  title: 'Teaching methods | PAL',
 };
 
 /**

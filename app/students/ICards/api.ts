@@ -70,7 +70,7 @@ export async function getStudentIdCardPreview(signal?: AbortSignal): Promise<Stu
     },
   );
 
-  if (Number(payload.status) !== 1) throw new Error(payload.message || 'Unable to load student profile.');
+  if (Number(payload.status) !== 1) throw new Error(payload.message || "Couldn't load student profile. Try again.");
 
   const rows = toArray(payload.data).map(asRecord);
   const student = rows[0];

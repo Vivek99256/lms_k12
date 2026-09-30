@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Plus, Trash2, X } from 'lucide-react';
@@ -196,7 +198,7 @@ function InteractiveVideoEditContent() {
         setRows(loadedRows.length > 0 ? loadedRows : [newRow()]);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load video');
+        if (!cancelled) setLoadError(friendlyError(err, 'We couldn’t load video. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -299,7 +301,7 @@ function InteractiveVideoEditContent() {
       });
       router.push(`/h5p/h5p_interactive_video?${h5pContextQuery(ctx, { flash: 'Video updated successfully' })}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update video');
+      setError(friendlyError(err, 'We couldn’t update video. Please try again.'));
       setSaving(false);
     }
   };

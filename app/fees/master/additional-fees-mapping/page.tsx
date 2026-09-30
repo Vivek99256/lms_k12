@@ -299,7 +299,7 @@ export default function AdditionalFeesMappingPage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to load additional fees mapping filters (${response.status})`
+          "Couldn't load additional fee mapping filters. Try again."
         );
       }
 
@@ -338,7 +338,7 @@ export default function AdditionalFeesMappingPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load additional fee mapping filters.'
+          : "Couldn't load additional fee mapping filters. Try again."
       );
     } finally {
       setLoading(false);
@@ -421,14 +421,14 @@ export default function AdditionalFeesMappingPage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to load additional fee mapping matrix (${response.status})`
+          `Couldn't load additional fee mapping. Try again.`
         );
       }
 
       const payload = (await response.json()) as ApiEnvelope & Record<string, unknown>;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to load additional fee mapping matrix.');
+        throw new Error(payload.message || "Couldn't load additional fee mapping. Try again.");
       }
 
       const payloadData =
@@ -578,7 +578,7 @@ export default function AdditionalFeesMappingPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load additional fee mapping matrix.'
+          : "Couldn't load additional fee mapping. Try again."
       );
     } finally {
       setSearching(false);
@@ -642,14 +642,14 @@ export default function AdditionalFeesMappingPage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to save additional fee mapping (${response.status})`
+          "Couldn't save additional fee mapping. Try again."
         );
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to save additional fee mapping.');
+        throw new Error(payload.message || "Couldn't save additional fee mapping. Try again.");
       }
 
       // Re-run the search so the grid shows what was actually persisted rather
@@ -664,7 +664,7 @@ export default function AdditionalFeesMappingPage() {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : 'Failed to save additional fee mapping.'
+          : "Couldn't save additional fee mapping. Try again."
       );
     } finally {
       setSaving(false);
@@ -814,7 +814,7 @@ export default function AdditionalFeesMappingPage() {
 
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-medium text-slate-700">
-                  GR No.
+                  GR no.
                 </Label>
                 <Input
                   value={form.grno}
@@ -935,10 +935,10 @@ export default function AdditionalFeesMappingPage() {
                           />
                         </TableHead>
                         <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                          Sr. No.
+                          No.
                         </TableHead>
                         <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                          Student Name
+                          Student name
                         </TableHead>
                         <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                           Std / Div

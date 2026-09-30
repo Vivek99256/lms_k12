@@ -41,7 +41,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(`${fallback}.`);
   }
 }
 
@@ -112,8 +112,8 @@ export async function fetchQuestionWiseReport(
     body: body.toString(),
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the report.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the report'));
+  if (!res.ok) throw new Error(`Couldn’t load the report. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load the report'));
 
   // Flatten results[qpId][studentId][onlineExamId][] into matrix + ordered lists.
   const questionOrder: QwQuestion[] = [];

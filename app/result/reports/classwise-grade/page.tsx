@@ -72,7 +72,7 @@ export default function ClasswiseGradeReportPage() {
       setRows(extractRows(payload, 'studentMarks'));
     } catch (err) {
       setRows([]);
-      setError(err instanceof Error ? err.message : 'Failed to load the classwise grade report.');
+      setError(err instanceof Error ? err.message : "Couldn't load the classwise grade report. Try again.");
     } finally {
       setLoading(false);
       setSearched(true);
@@ -119,7 +119,7 @@ export default function ClasswiseGradeReportPage() {
                 exportName="classwise-grade-report"
                 exportTitle="Classwise grade report"
                 emptyTitle="No report data"
-                emptyMessage="No records were returned for the selected criteria."
+                emptyMessage="No records match your filters."
               />
             </CardContent>
           </Card>

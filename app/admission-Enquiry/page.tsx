@@ -169,12 +169,12 @@ export default function AdmissionEnquiryPage() {
 
       const responseBody = await response.json().catch(() => null) as { status_code?: number | string; message?: string } | null;
       if (!response.ok || (responseBody?.status_code != null && String(responseBody.status_code) !== '1')) {
-        throw new Error(responseBody?.message || `Unable to submit the enquiry (HTTP ${response.status}).`);
+        throw new Error(responseBody?.message || `Couldn't submit the enquiry. Try again.`);
       }
 
       router.push('/admissions/registration');
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Unable to submit the enquiry. Please try again.');
+      setSubmitError(error instanceof Error ? error.message : "Couldn't submit the enquiry. Try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -204,7 +204,7 @@ export default function AdmissionEnquiryPage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-1 rounded-full bg-gradient-to-b from-[#0D6EFD] to-[#7ED957]" />
-                <h1 className="text-2xl font-bold tracking-tight text-gray-900">Admission Inquiry</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900">Admission enquiry</h1>
               </div>
               <p className="ml-3 text-sm text-gray-500">
                 Fill in the details below to submit a new admission enquiry.
@@ -231,15 +231,15 @@ export default function AdmissionEnquiryPage() {
               )}
 
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                <FormField icon={ClipboardList} label="Enquiry Number" htmlFor="enquiryNumber">
+                <FormField icon={ClipboardList} label="Enquiry no." htmlFor="enquiryNumber">
                   <Input id="enquiryNumber" value={formValues.enquiryNumber} onChange={updateField('enquiryNumber')} placeholder="e.g. ENQ-2024-001" className="h-10 rounded-lg border-gray-200 bg-gray-50/50 transition-colors focus:bg-white" />
                 </FormField>
 
-                <FormField icon={User} label="Student Name" htmlFor="studentName">
+                <FormField icon={User} label="Student name" htmlFor="studentName">
                   <Input id="studentName" value={formValues.studentName} onChange={updateField('studentName')} placeholder="Enter student name" className="h-10 rounded-lg border-gray-200 bg-gray-50/50 transition-colors focus:bg-white" />
                 </FormField>
 
-                <FormField icon={User} label="Father Name" htmlFor="middleName">
+                <FormField icon={User} label="Father's name" htmlFor="middleName">
                   <Input id="middleName" value={formValues.fatherName} onChange={updateField('fatherName')} placeholder="Enter father name" className="h-10 rounded-lg border-gray-200 bg-gray-50/50 transition-colors focus:bg-white" />
                 </FormField>
 

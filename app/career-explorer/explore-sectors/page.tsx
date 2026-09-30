@@ -27,7 +27,7 @@ export default function ExploreSectorsPage() {
       setData(await loadExploreSector(title));
     } catch (err) {
       setData({ title });
-      setError(err instanceof Error ? err.message : 'Unable to load this sector.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load this sector.');
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,7 @@ export default function ExploreSectorsPage() {
           {loading && <Skeleton className="h-64 w-full rounded-xl" />}
 
           {!loading && error && (
-            <ErrorState title="Unable to load this sector" description={error} retry={() => void refresh()} />
+            <ErrorState title="Couldn’t load this sector" description={error} retry={() => void refresh()} />
           )}
 
           {!loading && !error && (

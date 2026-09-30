@@ -65,7 +65,7 @@ export default function CoherenceMapPage() {
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : 'Could not load the scope list.');
+        setError(err instanceof Error ? err.message : 'Couldn’t load the scope list.');
         setLoading(false);
       });
 
@@ -91,7 +91,7 @@ export default function CoherenceMapPage() {
         })
         .catch((err: unknown) => {
           if (signal?.aborted) return;
-          setError(err instanceof Error ? err.message : 'Could not load the coherence map.');
+          setError(err instanceof Error ? err.message : 'Couldn’t load the coherence map.');
           setMap(null);
           setLoading(false);
         });

@@ -78,7 +78,7 @@ function StudentHomeworkSubmissionView() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Your homework could not be loaded."
+          : "Your homework couldn’t be loaded."
       );
     } finally {
       setLoading(false);
@@ -174,7 +174,7 @@ function StudentHomeworkSubmissionView() {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "Your homework could not be submitted."
+          : "Your homework couldn’t be submitted."
       );
     } finally {
       setSaving(false);
@@ -419,7 +419,7 @@ function StaffHomeworkSubmissionPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Homework could not be loaded."
+          : "Homework couldn’t be loaded."
       );
     } finally {
       setLoading(false);

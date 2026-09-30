@@ -154,7 +154,7 @@ export default function MarksEntryPage() {
       }));
     } catch (err) {
       console.error('MarksEntry search error:', err);
-      setError('Failed to load students. Please try again.');
+      setError("Couldn't load students. Try again.");
       setStudents([]);
     } finally {
       setLoading(false);
@@ -213,15 +213,15 @@ export default function MarksEntryPage() {
         body: form.toString(),
       });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to save marks`);
+      if (!res.ok) throw new Error(`Couldn't save marks. Try again.`);
 
       const payload = await res.json().catch(() => ({})) as { status?: string | number; message?: string };
-      if (String(payload.status ?? '') !== '1') throw new Error(payload.message || 'Laravel did not confirm that marks were saved.');
+      if (String(payload.status ?? '') !== '1') throw new Error(payload.message || "Couldn't save marks. Try again.");
       setError(null);
       setSuccess(payload.message || 'Marks saved successfully.');
     } catch (err) {
       console.error('Save marks error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save marks. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't save marks. Try again.");
     } finally {
       setLoading(false);
     }
@@ -439,9 +439,9 @@ export default function MarksEntryPage() {
                 <table className="w-full min-w-[880px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
-                      <th className="px-5 py-3 font-semibold">Sr. No</th>
-                      <th className="px-5 py-3 font-semibold">GR No</th>
-                      <th className="px-5 py-3 font-semibold">Student Name</th>
+                      <th className="px-5 py-3 font-semibold">No.</th>
+                      <th className="px-5 py-3 font-semibold">GR no.</th>
+                      <th className="px-5 py-3 font-semibold">Student name</th>
                       <th className="px-5 py-3 font-semibold">Standard</th>
                       <th className="px-5 py-3 font-semibold">Division</th>
                       <th className="px-5 py-3 text-center font-semibold">Marks</th>
@@ -611,7 +611,7 @@ async function proxyRequest(path: string, params: Record<string, string>): Promi
   });
   const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
   if (!response.ok) {
-    throw new Error(readString(payload.message) || `HTTP ${response.status}: Request failed`);
+    throw new Error(readString(payload.message) || "Couldn't complete the request. Try again.");
   }
   return payload;
 }

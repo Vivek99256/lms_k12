@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Check, CheckCircle2, Eye, Lightbulb, X } from 'lucide-react';
@@ -163,7 +165,7 @@ function DragDropPlayerContent() {
         });
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load activity');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load activity. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

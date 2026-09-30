@@ -455,7 +455,7 @@ function Row({ label, value }: { label: string; value: string }) {
  * inventing one would make a provider bill unreconcilable with this screen.
  */
 function formatUsd(value: number): string {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: value > 0 && value < 0.01 ? 6 : 2,

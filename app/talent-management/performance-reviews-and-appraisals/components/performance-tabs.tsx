@@ -309,7 +309,7 @@ export function GoalsTab({
                   columns={columns}
                   tone="error"
                   title={error}
-                  description="The goals could not be loaded."
+                  description="Couldn't load the goals. Try again."
                   action={
                     <Button variant="outline" size="sm" onClick={retry}>
                       Retry

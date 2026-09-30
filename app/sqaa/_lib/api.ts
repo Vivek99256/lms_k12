@@ -52,10 +52,10 @@ async function request(path: string, params = new URLSearchParams(), init?: Requ
   try {
     payload = text ? JSON.parse(text) : {};
   } catch {
-    throw new Error(text.replace(/\s+/g, ' ').slice(0, 300) || `HTTP ${response.status}`);
+    throw new Error(text.replace(/\s+/g, ' ').slice(0, 300) || "Couldn’t complete the request. Try again.");
   }
   if (!response.ok) {
-    throw new Error(messageFrom(payload, `Request failed with HTTP ${response.status}.`));
+    throw new Error(messageFrom(payload, `Couldn’t complete the request. Try again.`));
   }
   return payload;
 }

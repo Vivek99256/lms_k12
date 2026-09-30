@@ -40,7 +40,7 @@ async function counsellingRequest<T = unknown>(
       headers: createAuthHeaders(session, 'application/json'),
     });
   } catch {
-    throw new Error('The career counselling service could not be reached. Check your connection and try again.');
+    throw new Error('The career counselling service couldn’t be reached. Check your connection and try again.');
   }
   const text = await response.text();
   let payload: unknown = {};
@@ -52,7 +52,7 @@ async function counsellingRequest<T = unknown>(
   const envelope = payload as { status_code?: number | string; status?: number | string };
   const envelopeStatus = String(envelope.status_code ?? envelope.status ?? '');
   if (!response.ok || ['0', '2'].includes(envelopeStatus)) {
-    throw new Error(messageFrom(payload, `Request failed (HTTP ${response.status}).`));
+    throw new Error(messageFrom(payload, `Request failed.`));
   }
   return payload as T;
 }

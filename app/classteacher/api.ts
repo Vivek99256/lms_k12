@@ -99,13 +99,13 @@ async function request(
   );
   const payload = (await response.json()) as unknown;
   if (!response.ok) {
-    throw new Error(messageFrom(payload, `Request failed (${response.status}).`));
+    throw new Error(messageFrom(payload, "Couldn't complete the request. Try again."));
   }
   if (
     isRecord(payload) &&
     ["0", "2"].includes(normalizeApiStatus(payload as ApiEnvelope))
   ) {
-    throw new Error(messageFrom(payload, "The request could not be completed."));
+    throw new Error(messageFrom(payload, "Couldn't complete the request. Try again."));
   }
   return payload;
 }

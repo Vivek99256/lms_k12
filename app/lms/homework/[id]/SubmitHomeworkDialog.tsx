@@ -139,7 +139,7 @@ export default function SubmitHomeworkDialog({
       setError(
         submitError instanceof Error
           ? submitError.message
-          : "The submission could not be uploaded. Please try again."
+          : "The submission couldn’t be uploaded. Please try again."
       );
     }
   }

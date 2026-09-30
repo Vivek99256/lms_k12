@@ -19,8 +19,10 @@ import {
   type BucketKey,
 } from '@/app/lms/data/activityStream';
 
+import { friendlyError } from "@/lib/user-messages";
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return friendlyError(error, "We couldn’t load the activity stream. Please try again.");
 }
 
 const BUCKETS: { key: BucketKey; label: string; hint: string }[] = [

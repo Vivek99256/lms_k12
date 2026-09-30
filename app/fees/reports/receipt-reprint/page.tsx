@@ -63,7 +63,7 @@ export default function ReceiptReprintPage() {
       setResult({ pdfUrl, receiptNo });
       setMessage({ type: 'success', text: `Receipt ${receiptNo || receiptId} is ready to view or print.` });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to reprint this receipt.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't reprint this receipt. Try again." });
     } finally {
       setLoading(false);
     }

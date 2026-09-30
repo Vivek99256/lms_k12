@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Save, Trash2, X } from 'lucide-react';
@@ -102,7 +104,7 @@ function ScenarioEditContent() {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : 'Failed to load scenario');
+          setLoadError(friendlyError(err, 'We couldn’t load scenario. Please try again.'));
         }
       })
       .finally(() => {
@@ -203,7 +205,7 @@ function ScenarioEditContent() {
       });
       router.push(`/h5p/scenario_based?${h5pContextQuery(ctx, { flash: result.message })}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update scenario');
+      setError(friendlyError(err, 'We couldn’t update scenario. Please try again.'));
       setSaving(false);
     }
   };

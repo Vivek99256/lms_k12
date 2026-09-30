@@ -85,7 +85,7 @@ export function useCompetencyEmployeeProfile(userId: string | null) {
       setEvidence(evidenceRes?.data ?? [])
       setCareerPath(careerRes?.data ?? null)
     } catch (err) {
-      setError(toMessage(err, 'Failed to load employee profile.'))
+      setError(toMessage(err, "Couldn't load employee profile. Try again."))
     } finally {
       setLoading(false)
       setNotesLoading(false)
@@ -119,7 +119,7 @@ export function useCompetencyEmployeeProfile(userId: string | null) {
       await loadData()
       return { ok: true }
     } catch (err) {
-      return { ok: false, message: toMessage(err, 'Failed to add competency.') }
+      return { ok: false, message: toMessage(err, "Couldn't add competency. Try again.") }
     } finally {
       setSaving(false)
     }
@@ -133,7 +133,7 @@ export function useCompetencyEmployeeProfile(userId: string | null) {
       await loadData()
       return { ok: true }
     } catch (err) {
-      return { ok: false, message: toMessage(err, 'Failed to update rating.') }
+      return { ok: false, message: toMessage(err, "Couldn't update rating. Try again.") }
     } finally {
       setSaving(false)
     }
@@ -160,7 +160,7 @@ export function useCompetencyEmployeeProfile(userId: string | null) {
       await loadData()
       return { ok: true, message: 'Evidence added.' }
     } catch (err) {
-      return { ok: false, message: toMessage(err, 'Failed to add evidence.') }
+      return { ok: false, message: toMessage(err, "Couldn't add evidence. Try again.") }
     } finally {
       setSaving(false)
     }
@@ -174,7 +174,7 @@ export function useCompetencyEmployeeProfile(userId: string | null) {
       await loadData()
       return { ok: true, message: 'Evidence removed.' }
     } catch (err) {
-      return { ok: false, message: toMessage(err, 'Failed to remove evidence.') }
+      return { ok: false, message: toMessage(err, "Couldn't remove evidence. Try again.") }
     } finally {
       setSaving(false)
     }
@@ -188,7 +188,7 @@ export function useCompetencyEmployeeProfile(userId: string | null) {
       setNotes(note)
       return { ok: true, message: 'Notes saved.' }
     } catch (err) {
-      return { ok: false, message: toMessage(err, 'Failed to save notes.') }
+      return { ok: false, message: toMessage(err, "Couldn't save notes. Try again.") }
     } finally {
       setSaving(false)
     }
@@ -201,7 +201,7 @@ export function useCompetencyEmployeeProfile(userId: string | null) {
       await employeeProfileService.requestReassessment(resolveContext(), { ...payload, user_id: userId })
       return { ok: true, message: 'Re-assessment requested.' }
     } catch (err) {
-      return { ok: false, message: toMessage(err, 'Failed to request re-assessment.') }
+      return { ok: false, message: toMessage(err, "Couldn't request re-assessment. Try again.") }
     } finally {
       setSaving(false)
     }
@@ -215,7 +215,7 @@ export function useCompetencyEmployeeProfile(userId: string | null) {
       await loadData()
       return { ok: true, message: 'Development plan assigned.' }
     } catch (err) {
-      return { ok: false, message: toMessage(err, 'Failed to assign development plan.') }
+      return { ok: false, message: toMessage(err, "Couldn't assign development plan. Try again.") }
     } finally {
       setSaving(false)
     }
@@ -229,7 +229,7 @@ export function useCompetencyEmployeeProfile(userId: string | null) {
       await loadData()
       return { ok: true, message: 'Certification added.' }
     } catch (err) {
-      return { ok: false, message: toMessage(err, 'Failed to add certification.') }
+      return { ok: false, message: toMessage(err, "Couldn't add certification. Try again.") }
     } finally {
       setSaving(false)
     }

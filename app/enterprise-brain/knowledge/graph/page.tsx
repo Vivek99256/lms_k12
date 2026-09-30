@@ -52,7 +52,7 @@ export default function GraphExplorerPage() {
       setSelected(payload.organization ?? null);
       setTrail(payload.organization?.node ? [{ type: 'organization', id: payload.organization.node.id, label: payload.organization.node.label }] : []);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not load the graph.');
+      setError(cause instanceof Error ? cause.message : 'Couldn’t load the graph.');
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,7 @@ export default function GraphExplorerPage() {
       setType(nextType);
       setNodes(payload.nodes ?? []);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not list those nodes.');
+      setError(cause instanceof Error ? cause.message : 'Couldn’t list those nodes.');
     } finally {
       setBusy(false);
     }
@@ -96,7 +96,7 @@ export default function GraphExplorerPage() {
         return existing >= 0 ? current.slice(0, existing + 1) : [...current, node];
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not expand that node.');
+      setError(cause instanceof Error ? cause.message : 'Couldn’t expand that node.');
     } finally {
       setBusy(false);
     }

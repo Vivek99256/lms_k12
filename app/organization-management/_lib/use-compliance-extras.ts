@@ -50,7 +50,7 @@ export function useComplianceDashboard() {
       const response = await complianceLibraryService.getDashboard(buildSessionContext());
       setData(response.data);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the compliance dashboard.'));
+      setError(toMessage(loadError, "Couldn't load the compliance dashboard. Try again."));
       setData(null);
     } finally {
       setLoading(false);
@@ -80,7 +80,7 @@ export function useComplianceCalendar(year: number, month: number) {
       const response = await complianceLibraryService.getCalendar(buildSessionContext(), year, month);
       setEvents(response.data ?? []);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the compliance calendar.'));
+      setError(toMessage(loadError, "Couldn't load the compliance calendar. Try again."));
       setEvents([]);
     } finally {
       setLoading(false);
@@ -110,7 +110,7 @@ export function useMyCompliance(filters?: ComplianceFilters) {
       const response = await complianceLibraryService.getMy(buildSessionContext(), filters);
       setData(response.data);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load your compliance items.'));
+      setError(toMessage(loadError, "Couldn't load your compliance items. Try again."));
       setData(null);
     } finally {
       setLoading(false);
@@ -140,7 +140,7 @@ export function useOverdueCompliance(filters?: ComplianceFilters) {
       const response = await complianceLibraryService.getOverdue(buildSessionContext(), filters);
       setRecords(response.data ?? []);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load overdue compliance.'));
+      setError(toMessage(loadError, "Couldn't load overdue compliance. Try again."));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -174,7 +174,7 @@ export function useComplianceDetail(id: string | number | null) {
       const response = await complianceLibraryService.getDetail(buildSessionContext(), id);
       setData(response.data);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load compliance details.'));
+      setError(toMessage(loadError, "Couldn't load compliance details. Try again."));
       setData(null);
     } finally {
       setLoading(false);
@@ -270,7 +270,7 @@ export function useComplianceCategories() {
       const response = await complianceLibraryService.getCategories(buildSessionContext());
       setCategories(response.data ?? []);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load categories.'));
+      setError(toMessage(loadError, "Couldn't load categories. Try again."));
       setCategories([]);
     } finally {
       setLoading(false);
@@ -329,7 +329,7 @@ export function useComplianceTemplates() {
       const response = await complianceLibraryService.getTemplates(buildSessionContext());
       setTemplates(response.data ?? []);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load templates.'));
+      setError(toMessage(loadError, "Couldn't load templates. Try again."));
       setTemplates([]);
     } finally {
       setLoading(false);

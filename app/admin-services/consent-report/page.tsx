@@ -42,7 +42,7 @@ export default function ConsentReportPage() {
     try {
       setClassOptions(await loadClassOptions());
     } catch (value: unknown) {
-      setError(errorMessage(value, "The class list could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the class list. Try again."));
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export default function ConsentReportPage() {
     } catch (value: unknown) {
       setConsents([]);
       setSearched(true);
-      setError(errorMessage(value, "The consent report could not be generated."));
+      setError(errorMessage(value, "Couldn't generate the consent report. Try again."));
     } finally {
       setSearching(false);
     }

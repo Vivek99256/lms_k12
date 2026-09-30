@@ -120,7 +120,7 @@ export function displayDate(value?: string | null) {
 }
 
 export function createCsv(records: ComplianceRecord[]) {
-  const headers = ['Sr No.', 'Name', 'Category', 'Department', 'Assigned To', 'Due Date', 'Frequency', 'Priority', 'Status', 'Evidence']
+  const headers = ['No.', 'Name', 'Category', 'Department', 'Assigned To', 'Due Date', 'Frequency', 'Priority', 'Status', 'Evidence']
   const rows = records.map((record, index) => [
     String(index + 1),
     record.name,

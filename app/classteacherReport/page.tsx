@@ -44,9 +44,9 @@ const emptyData: ClassTeacherBootstrap = {
   teachers: [],
 };
 const exportColumns: TableExportColumn[] = [
-  { key: "serial", label: "Sr. No." },
-  { key: "teacher", label: "Class Teacher" },
-  { key: "section", label: "Academic Section" },
+  { key: "serial", label: "No." },
+  { key: "teacher", label: "Class teacher" },
+  { key: "section", label: "Academic section" },
   { key: "standard", label: "Standard" },
   { key: "division", label: "Division" },
 ];
@@ -97,7 +97,7 @@ export default function ClassTeacherReportPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Class-teacher report data could not be loaded."
+          : "Couldn't load class-teacher report data. Try again."
       );
     } finally {
       setLoading(false);
@@ -273,9 +273,9 @@ export default function ClassTeacherReportPage() {
             <Table>
               <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead>Sr. No.</TableHead>
-                  <TableHead>Class Teacher</TableHead>
-                  <TableHead>Academic Section</TableHead>
+                  <TableHead>No.</TableHead>
+                  <TableHead>Class teacher</TableHead>
+                  <TableHead>Academic section</TableHead>
                   <TableHead>Standard</TableHead>
                   <TableHead>Division</TableHead>
                 </TableRow>
@@ -388,7 +388,7 @@ function ExportButtons({
         onClick={() =>
           exportRowsAsExcel({
             filename: "class-teacher-report.xls",
-            title: "Class Teacher Report",
+            title: "Class teacher report",
             columns,
             rows,
           })
@@ -402,7 +402,7 @@ function ExportButtons({
         disabled={!rows.length}
         onClick={() =>
           openPrintPreview({
-            title: "Class Teacher Report",
+            title: "Class teacher report",
             subtitle: "Class-teacher assignments",
             columns,
             rows,

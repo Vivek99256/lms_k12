@@ -110,7 +110,7 @@ export async function fetchPalReport(signal?: AbortSignal): Promise<PalReportRes
   );
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load the PAL report.`);
+    throw new Error(`Couldn’t load the PAL report. Try again.`);
   }
 
   const payload = (await response.json()) as PalReportEnvelope;
@@ -399,7 +399,7 @@ export async function fetchPalLanding(
     throw new Error(readString(denied.message) || 'You are not allowed to view this learner.');
   }
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load PAL subjects.`);
+    throw new Error(`Couldn’t load PAL subjects. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -432,7 +432,7 @@ export async function fetchPalPreview(
     throw new Error(readString(denied.message) || 'You are not allowed to preview this class.');
   }
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load the class preview.`);
+    throw new Error(`Couldn’t load the class preview. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -488,7 +488,7 @@ export async function fetchPedagogySuggestedContent(
     { headers: ajaxHeaders(session), signal }
   );
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load suggested content.`);
+    throw new Error(`Couldn’t load suggested content. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -560,7 +560,7 @@ export async function fetchMisconceptions(
     { headers: ajaxHeaders(session), signal }
   );
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load misconceptions.`);
+    throw new Error(`Couldn’t load misconceptions. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -594,7 +594,7 @@ export async function generateMisconceptionContent(
     }
   );
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to generate misconception content.`);
+    throw new Error(`Couldn’t generate misconception content. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -713,7 +713,7 @@ export async function fetchPalQuiz(
     signal,
   });
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to start the quiz.`);
+    throw new Error(`Couldn’t start the quiz. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -878,7 +878,7 @@ export async function submitPalQuiz(
   const status = normalizeApiStatus(payload) || (response.ok ? '1' : '0');
   const message = readString(payload.message);
   if (!response.ok || status === '0') {
-    throw new Error(message || `HTTP ${response.status}: Unable to submit the quiz.`);
+    throw new Error(message || `Couldn’t submit the quiz. Try again.`);
   }
 
   return {
@@ -963,7 +963,7 @@ export async function fetchPalResult(
     { headers: ajaxHeaders(session), signal }
   );
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load the quiz result.`);
+    throw new Error(`Couldn’t load the quiz result. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -1170,7 +1170,7 @@ export async function fetchAdaptivePractice(
     { headers: ajaxHeaders(session), signal }
   );
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load practice questions.`);
+    throw new Error(`Couldn’t load practice questions. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -1260,7 +1260,7 @@ export async function submitAdaptivePractice(input: {
     body: body.toString(),
   });
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to submit practice.`);
+    throw new Error(`Couldn’t submit practice. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -1344,7 +1344,7 @@ export async function fetchDiagnosticAssessment(
     { headers: ajaxHeaders(session), signal }
   );
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load diagnostic assessment.`);
+    throw new Error(`Couldn’t load diagnostic assessment. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -1425,7 +1425,7 @@ export async function submitDiagnosticAssessment(input: {
     body: body.toString(),
   });
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to submit diagnostic assessment.`);
+    throw new Error(`Couldn’t submit diagnostic assessment. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -1499,7 +1499,7 @@ export async function fetchChapterGate(
     signal,
   });
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load prerequisite status.`);
+    throw new Error(`Couldn’t load prerequisite status. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -1570,7 +1570,7 @@ export async function fetchSpacedRepetition(
     { headers: ajaxHeaders(session), signal }
   );
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load review schedule.`);
+    throw new Error(`Couldn’t load review schedule. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -1617,7 +1617,7 @@ export async function fetchPracticeHistory(
     { headers: ajaxHeaders(session), signal }
   );
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load practice history.`);
+    throw new Error(`Couldn’t load practice history. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -1676,7 +1676,7 @@ export async function fetchPersonalizeMarksOptions(
     { headers: ajaxHeaders(session), signal }
   );
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load standard/division list.`);
+    throw new Error(`Couldn’t load standard/division list. Try again.`);
   }
 
   const payload = toRecord(await response.json());
@@ -1734,14 +1734,14 @@ export async function submitPersonalizeMarks(
     body: body.toString(),
   });
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to save marks.`);
+    throw new Error(`Couldn’t save marks. Try again.`);
   }
 
   const payload = toRecord(await response.json());
   const status = normalizeApiStatus(payload);
   const message = readString(payload.message);
   if (status !== '1' && status !== 'SUCCESS') {
-    throw new Error(message || 'Failed to save marks.');
+    throw new Error(message || 'Couldn’t save marks.');
   }
   return {
     status,

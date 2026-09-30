@@ -112,7 +112,7 @@ export function useAssignments(): UseAssignmentsReturn {
       setAssignments(assignmentsResponse?.data ?? [])
       setStats(statsResponse?.data ?? null)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load assignments'
+      const message = err instanceof Error ? err.message : "Couldn't load assignments. Try again."
       setError(message)
       console.error('[useAssignments] load failed:', err)
     } finally {

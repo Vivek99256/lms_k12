@@ -156,8 +156,8 @@ export default function MonthlyPayrollPage() {
     downloadCsv(
       `monthly-payroll-${lastQuery?.month}-${lastQuery?.year}.csv`,
       [
-        'Sr. No',
-        'Employee No',
+        'No.',
+        'Employee ID',
         'Employee',
         'Department',
         'Total Days',
@@ -239,7 +239,7 @@ export default function MonthlyPayrollPage() {
         <CardHeader>
           <CardTitle className="text-base sm:text-lg">Payroll Period</CardTitle>
           <CardDescription className="text-xs sm:text-sm">
-            January to March belong to the previous financial year, so Laravel stores them against
+            January to March belong to the previous financial year, so they are stored against
             year + 1 automatically.
           </CardDescription>
         </CardHeader>
@@ -299,7 +299,7 @@ export default function MonthlyPayrollPage() {
       {loading ? (
         <PayrollTableSkeleton />
       ) : error && rows.length === 0 ? (
-        <ErrorState title="Unable to load the monthly payroll" description={error} retry={retry} />
+        <ErrorState title="Couldn't load the monthly payroll. Try again." description={error} retry={retry} />
       ) : rows.length === 0 && searched ? (
         <Card>
           <CardContent>
@@ -337,7 +337,7 @@ export default function MonthlyPayrollPage() {
               <Table className="[&_td]:p-2 [&_th]:p-2">
                 <TableHeader className="bg-surface-muted">
                   <TableRow>
-                    <TableHead className="font-semibold">Sr. No</TableHead>
+                    <TableHead className="font-semibold">No.</TableHead>
                     <TableHead className="font-semibold">Employee</TableHead>
                     <TableHead className="font-semibold">Department</TableHead>
                     <TableHead className="font-semibold">Total Days</TableHead>

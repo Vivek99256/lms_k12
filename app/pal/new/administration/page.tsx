@@ -73,8 +73,8 @@ export default function AdministrationPage() {
       <PageShell>
         <StatusPanel
           kind="loading"
-          title="Loading Administration"
-          message="Probing the nine architecture subsystems on this estate."
+          title="Loading administration"
+          message="Checking PAL's nine building blocks for your school."
         />
       </PageShell>
     );
@@ -85,8 +85,8 @@ export default function AdministrationPage() {
       <PageShell>
         <StatusPanel
           kind="error"
-          title="Administration is not available"
-          message={error || 'The backend did not return an architecture payload.'}
+          title="Administration isn’t available"
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={retry}
         />
       </PageShell>
@@ -98,8 +98,8 @@ export default function AdministrationPage() {
       <PageShell>
         <StatusPanel
           kind="empty"
-          title="No architecture subsystems registered"
-          message="The backend responded but declared no subsystems. Deploy the New PAL Administration module and run its migrations on the API."
+          title="No PAL building blocks set up yet"
+          message="Nothing is set up here yet. Contact your administrator."
           onRetry={retry}
         />
       </PageShell>
@@ -114,8 +114,8 @@ export default function AdministrationPage() {
         breadcrumb={['New PAL', 'Administration']}
         icon={SlidersHorizontal}
         title="Administration"
-        description="The PAL V4 architecture control plane. Configure the nine subsystems the Master Blueprint specifies, and see which of them this estate is actually running."
-        badge="PAL V4"
+        description="Set up and monitor PAL's nine building blocks for your school."
+        badge="PAL"
         chips={overview.subsystems.map((subsystem) => (
           <HeroChip key={subsystem.key} href={`/pal/new/administration/${subsystem.key}`}>
             {subsystem.label}
@@ -129,8 +129,8 @@ export default function AdministrationPage() {
         ]}
         source={
           scope.estateWide
-            ? 'pal_architecture_settings — estate-wide scope'
-            : `pal_architecture_settings — sub_institute_id ${scope.subInstituteId}`
+            ? 'Applies to all schools'
+            : 'Applies to this school'
         }
         onRefresh={retry}
       />

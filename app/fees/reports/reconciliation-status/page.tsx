@@ -127,7 +127,7 @@ export default function ReconciliationStatusPage() {
       });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to fetch reconciliation status.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load reconciliation status. Try again." });
     } finally {
       setLoading(false);
     }
@@ -148,9 +148,9 @@ export default function ReconciliationStatusPage() {
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'reconciliation-status.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'reconciliation-status.xls', title: 'Reconciliation Status', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'reconciliation-status.pdf', title: 'Reconciliation Status', subtitle: 'Read-only status view', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Reconciliation Status', subtitle: 'Read-only status view', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'reconciliation-status.xls', title: 'Reconciliation status', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'reconciliation-status.pdf', title: 'Reconciliation status', subtitle: 'Read-only status view', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Reconciliation status', subtitle: 'Read-only status view', columns: exportColumns, rows: exportRows })}
           />
         }
       />

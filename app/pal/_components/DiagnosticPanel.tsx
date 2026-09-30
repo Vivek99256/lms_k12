@@ -121,7 +121,7 @@ function DiagnosticModal({
         if (!controller.signal.aborted) setData(response);
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load the chapter diagnostic assessment.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load the chapter diagnostic assessment.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -157,7 +157,7 @@ function DiagnosticModal({
     try {
       setResult(await submitDiagnosticAssessment({ studentId, answers }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit the chapter diagnostic assessment.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit the chapter diagnostic assessment.');
     } finally {
       setSubmitting(false);
     }

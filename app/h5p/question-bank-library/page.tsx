@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, Layers3, Loader2, X } from 'lucide-react';
@@ -158,7 +160,7 @@ function QuestionBankLibrary() {
         .catch((error: unknown) => {
           if (controller.signal.aborted) return;
           setChapters([]);
-          setFlash({ kind: 'error', message: error instanceof Error ? error.message : 'Could not load the chapters.' });
+          setFlash({ kind: 'error', message: friendlyError(error, 'We couldn’t load the chapters.. Please try again.') });
         })
         .finally(() => {
           if (!controller.signal.aborted) setChaptersLoading(false);
@@ -207,7 +209,7 @@ function QuestionBankLibrary() {
         }
       } catch (error: unknown) {
         if (signal?.aborted) return;
-        setFlash({ kind: 'error', message: error instanceof Error ? error.message : 'Could not load the questions.' });
+        setFlash({ kind: 'error', message: friendlyError(error, 'We couldn’t load the questions.. Please try again.') });
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
