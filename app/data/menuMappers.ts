@@ -12,6 +12,7 @@ import type { ComponentType } from 'react';
 import { MenuItem, SubmenuItem, Level3Item } from './menuItems';
 import { createMdIcon } from '@/app/components/MdIcon';
 import { mapApiLinkToRoute } from './routeMapper';
+import { isDeferredModuleRoute } from '@/lib/roadmap';
 
 export interface ApiMenuItem {
   id: number;
@@ -189,8 +190,43 @@ function normalizeMenuLink(link: string | null | undefined): string {
   return (link || '').toLowerCase().trim().replace(/\/+$/, '');
 }
 
-function isVisibleMenuLink(link: string | null | undefined): boolean {
-  return !HIDDEN_MENU_LINKS.has(normalizeMenuLink(link));
+/**
+ * Menu rows the backend still grants but the Next.js app has no screen for (the legacy
+ * Blade-only HRMS/payroll/skills screens, the AI admin containers). Showing them is a
+ * guaranteed 404, so they stay out of the sidebar until a screen exists.
+ */
+const NO_SCREEN_MENU_LINKS = new Set([
+  'my-leave',
+  'import-leave',
+  'matrix',
+  'assessment_library',
+  'gap_analysis',
+  'admissionai',
+  // LMS > Message: a deliberate "Not yet available" placeholder with no backend behind it.
+  'lmscommunication.index',
+  'ai_admin',
+  'ai_agents',
+  'platform_services',
+]);
+
+/**
+ * A legacy route name ("leave.report", "ai_agents.fees", "payroll_type.index") that no
+ * mapping claimed falls through resolveRoute() as "/leave.report". No page can live at a
+ * path ending in ".something", so such a link is known dead - hide it rather than show a 404.
+ */
+function isUnreachableMenuRoute(route: string): boolean {
+  if (!route.startsWith('/')) return false;
+  const last = route.split(/[?#]/)[0].split('/').filter(Boolean).pop() ?? '';
+  return /\.[A-Za-z_-]+$/.test(last);
+}
+
+export function isVisibleMenuLink(link: string | null | undefined): boolean {
+  if (HIDDEN_MENU_LINKS.has(normalizeMenuLink(link))) return false;
+  if (!link) return true;
+  if (NO_SCREEN_MENU_LINKS.has(normalizeMenuLink(link))) return false;
+  const route = resolveRoute(link);
+  // V1 scope: modules that are not part of the launch set stay out of the sidebar.
+  return !isDeferredModuleRoute(route) && !isUnreachableMenuRoute(route);
 }
 
 function overrideMenuLabel(link: string | null | undefined, fallback: string): string {

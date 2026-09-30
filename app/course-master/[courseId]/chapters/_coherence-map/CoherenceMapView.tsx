@@ -74,6 +74,8 @@ type Props = {
   /** Header text, so the map matches the page it opened from. */
   title: string;
   onClose: () => void;
+  /** Opens the deck straight into this chapter's concepts instead of the full subject. */
+  initialChapterId?: string | null;
 };
 
 export default function CoherenceMapView(props: Props) {
@@ -84,7 +86,7 @@ export default function CoherenceMapView(props: Props) {
   );
 }
 
-function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
+function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChapterId }: Props) {
   const { map, session, loading, error, reload, viewYear, applyEdge, removeEdge } = useCoherenceMap(
     subjectId,
     standardId
@@ -640,6 +642,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
           {!rootId ? (
             <ConceptDeck
               map={map}
+              initialChapterId={initialChapterId}
               onPick={(id) => {
                 // The deck always lists the hook's own map, so any walk must already be
                 // cleared by the time a pick from it is laid out.

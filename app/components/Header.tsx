@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { resolveDashboardRole } from '@/app/dashboard/_lib/resolveDashboardRole';
+import { showDeferredModules } from '@/lib/roadmap';
 import { publishSelectedAcademicYear } from '@/lib/academic-year';
 import { useRouter } from 'next/navigation';
 import HeaderMenuSearch from '@/app/components/HeaderMenuSearch';
@@ -209,7 +211,7 @@ export default function Header({
   menuItems?: MenuItem[];
   onMenuSearchNavigate?: (entry: MenuSearchEntry) => void;
 }) {
-  const { user, logout, refreshAcademicTerms, academicTerms, academicYears } = useAuth();
+  const { user, logout, refreshAcademicTerms, academicTerms, academicYears, menuContext } = useAuth();
   const router = useRouter();
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showTermDropdown, setShowTermDropdown] = useState(false);
@@ -324,6 +326,33 @@ export default function Header({
       icons: aiIntelligenceIcons,
     },
   ];
+
+  // V1: the AI section and the roadmap screens are not part of the launch set, and the
+  // platform setup screens are for administrators. This only decides what the menu
+  // advertises; the routes behind it are still guarded by the backend.
+  const isAdminProfile = resolveDashboardRole(menuContext?.user_profile_name) === 'admin';
+  const v1MenuGroups = !isAdminProfile
+    ? []
+    : showDeferredModules()
+      ? menuGroups
+      : menuGroups
+          .filter((group) => group.label !== 'AI & Intelligence')
+          .map((group) =>
+            group.label === 'Platform Services'
+              ? {
+                  ...group,
+                  href: undefined,
+                  columns: [
+                    {
+                      label: 'Setup & configuration',
+                      items: platformSetupItems.filter(
+                        (item) => item !== 'Platform Administration' && item !== "What's Coming"
+                      ),
+                    },
+                  ],
+                }
+              : group
+          );
 
   // Seeded only from what this browser last chose. Anything else is adopted from
   // the institute's own rows once they resolve, below.
@@ -625,7 +654,7 @@ const logoUrl = (() => {
               width — which is also why a section's span is only applied from sm up.
             */}
             <div className="grid max-h-[70vh] grid-cols-1 gap-x-3 gap-y-5 overflow-y-auto p-3 sm:grid-cols-[repeat(3,220px)]">
-              {menuGroups.map((group) => {
+              {v1MenuGroups.map((group) => {
                 // Read out of the group before the closures below capture it, so
                 // the optional href narrows to a string for the click handler.
                 const groupHref = group.href;

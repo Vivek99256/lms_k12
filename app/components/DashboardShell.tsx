@@ -19,7 +19,7 @@ import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
 import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
-import { canSeeInternalItems } from '@/lib/roadmap';
+import { canSeeInternalItems, showDeferredModules } from '@/lib/roadmap';
 import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useModuleLevel3Nav } from '@/app/_lib/use-module-level3-nav';
@@ -327,7 +327,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, []);
 
   const displayedMenuItems = useMemo<MenuItem[]>(() => {
-    if (!hasBrainAccess) return menuItems;
+    if (!hasBrainAccess || !showDeferredModules()) return menuItems; // Enterprise Brain is not part of V1
     const alreadyPresent = menuItems.some((item) => normalizeMenuLabel(item.label) === 'enterprise brain');
     if (alreadyPresent) return menuItems;
 

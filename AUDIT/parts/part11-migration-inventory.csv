@@ -1,0 +1,1085 @@
+file,kind,tables_created,tables_altered,tables_dropped_in_up,has_down,down_empty,down_drops_table,hasTable_guard,hasColumn_guard,raw_db_statements,data_dml_ops,risk_patterns_in_up
+2014_10_12_100000_create_password_resets_table.php,create,password_resets,,,Y,N,Y,N,N,0,,unguarded create
+2019_08_19_000000_create_failed_jobs_table.php,create,failed_jobs,,,Y,N,Y,N,N,0,,unguarded create
+2019_12_14_000001_create_personal_access_tokens_table.php,create,personal_access_tokens,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_academic_section_table.php,create,academic_section,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_academic_year_table.php,create,academic_year,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_access_log_route_table.php,create,access_log_route,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_access_log_table.php,create,access_log,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_activity_log_table.php,create,activity_log,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_admission_category_master_table.php,create,admission_category_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_admission_enquiry_table.php,create,admission_enquiry,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_admission_form_table.php,create,admission_form,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_admission_registration_table.php,create,admission_registration,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_answer_master_table.php,create,answer_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_app_notification_table.php,create,app_notification,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_app_notification_teacher_table.php,create,app_notification_teacher,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_application_forms_table.php,create,application_forms,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_attendance_json_result_table.php,create,attendance_json_result,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_attendance_student_table.php,create,attendance_student,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_bank_master_table.php,create,bank_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_batch_table.php,create,batch,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_biomatrix_table.php,create,biomatrix,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_blood_group_table.php,create,blood_group,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_book_list_table.php,create,book_list,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_calendar_events_table.php,create,calendar_events,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_cast_table.php,create,cast,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_caste_table.php,create,caste,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_certificate_history_table.php,create,certificate_history,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_chapter_master_table.php,create,chapter_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_circular_table.php,create,circular,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_circular_type_table.php,create,circular_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_class_teacher_table.php,create,class_teacher,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_college_timetable_table.php,create,college_timetable,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_complaint_status_table.php,create,complaint_status,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_complaint_table.php,create,complaint,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_consent_master_table.php,create,consent_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_content_mapping_type_table.php,create,content_mapping_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_content_master_table.php,create,content_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_counselling_answer_master_table.php,create,counselling_answer_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_counselling_course_table.php,create,counselling_course,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_counselling_online_exam_answer_table.php,create,counselling_online_exam_answer,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_counselling_online_exam_table.php,create,counselling_online_exam,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_counselling_question_mapping_table.php,create,counselling_question_mapping,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_counselling_question_master_table.php,create,counselling_question_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_dashboard_master_table.php,create,dashboard_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_dicipline_dd_table.php,create,dicipline_dd,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_dicipline_table.php,create,dicipline,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_division_capacity_master_table.php,create,division_capacity_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_division_table.php,create,division,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_dynamic_dashboard_table.php,create,dynamic_dashboard,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_email_sent_parents_table.php,create,email_sent_parents,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_enrollment_prefix_master_table.php,create,enrollment_prefix_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_erp_status_table.php,create,erp_status,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_erptour_table.php,create,erptour,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_err_log_table.php,create,err_log,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_exam_schedule_table.php,create,exam_schedule,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_aggre_pay_table.php,create,fees_aggre_pay,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_axis_table.php,create,fees_axis,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_breackoff_table.php,create,fees_breackoff,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_breakoff_other_table.php,create,fees_breakoff_other,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_cancel_table.php,create,fees_cancel,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_cancel_type_table.php,create,fees_cancel_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_circular_log_table.php,create,fees_circular_log,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_circular_master_table.php,create,fees_circular_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_collect_table.php,create,fees_collect,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_config_master_table.php,create,fees_config_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_hdffc_table.php,create,fees_hdffc,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_head_master_table.php,create,fees_head_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_icici_table.php,create,fees_icici,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_late_master_table.php,create,fees_late_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_map_years_table.php,create,fees_map_years,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_online_maping_table.php,create,fees_online_maping,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_online_split_table.php,create,fees_online_split,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_other_cancel_table.php,create,fees_other_cancel,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_other_collection_table.php,create,fees_other_collection,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_other_head_table.php,create,fees_other_head,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_paid_other_table.php,create,fees_paid_other,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_payment_table.php,create,fees_payment,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_razorpay_table.php,create,fees_razorpay,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_receipt_book_master_table.php,create,fees_receipt_book_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_receipt_css_table.php,create,fees_receipt_css,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_receipt_table.php,create,fees_receipt,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_refund_table.php,create,fees_refund,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_title_master_table.php,create,fees_title_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_fees_title_table.php,create,fees_title,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_follow_up_table.php,create,follow_up,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_form_builder_table.php,create,form_builder,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_form_submit_data_table.php,create,form_submit_data,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_front_desk_table.php,create,front_desk,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_gcm_users_table.php,create,gcm_users,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_general_data_table.php,create,general_data,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_grade_master_data_table.php,create,grade_master_data,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_grade_master_table.php,create,grade_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_homework_table.php,create,homework,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_hostel_building_master_table.php,create,hostel_building_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_hostel_floor_master_table.php,create,hostel_floor_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_hostel_master_table.php,create,hostel_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_hostel_room_allocation_table.php,create,hostel_room_allocation,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_hostel_room_master_table.php,create,hostel_room_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_hostel_type_master_table.php,create,hostel_type_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_hostel_visitor_master_table.php,create,hostel_visitor_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_house_master_table.php,create,house_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_implementation_master_table.php,create,implementation_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_import_table_fields_table.php,create,import_table_fields,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_imprest_fees_cancel_table.php,create,imprest_fees_cancel,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_institute_detail_table.php,create,institute_detail,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_allocation_details_table.php,create,inventory_allocation_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_generate_po_details_table.php,create,inventory_generate_po_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_category_master_table.php,create,inventory_item_category_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_defective_details_table.php,create,inventory_item_defective_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_direct_purchase_table.php,create,inventory_item_direct_purchase,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_lost_details_table.php,create,inventory_item_lost_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_master_table.php,create,inventory_item_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_quotation_details_table.php,create,inventory_item_quotation_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_receivable_details_table.php,create,inventory_item_receivable_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_return_details_table.php,create,inventory_item_return_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_sub_category_master_table.php,create,inventory_item_sub_category_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_item_type_table.php,create,inventory_item_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_master_setup_table.php,create,inventory_master_setup,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_negotiate_po_details_table.php,create,inventory_negotiate_po_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_requisition_details_table.php,create,inventory_requisition_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_requisition_status_master_table.php,create,inventory_requisition_status_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_tax_master_table.php,create,inventory_tax_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inventory_vendor_master_table.php,create,inventory_vendor_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_inward_table.php,create,inward,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_knowledge_base_detail_table.php,create,knowledge_base_detail,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_knowledge_base_table.php,create,knowledge_base,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lb_master_table.php,create,lb_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lb_points_table.php,create,lb_points,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_learning_outcome_exam_type_master_table.php,create,learning_outcome_exam_type_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_learning_outcome_indicator_table.php,create,learning_outcome_indicator,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_learning_outcome_pdf_table.php,create,learning_outcome_pdf,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_learning_outcome_question_master_table.php,create,learning_outcome_question_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_learning_outcome_student_marks_table.php,create,learning_outcome_student_marks,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_leave_applications_table.php,create,leave_applications,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lessonplan_execution_table.php,create,lessonplan_execution,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lessonplan_table.php,create,lessonplan,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_assignment_table.php,create,lms_assignment,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_content_category_table.php,create,lms_content_category,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_doubt_conversation_table.php,create,lms_doubt_conversation,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_doubt_table.php,create,lms_doubt,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_flashcard_table.php,create,lms_flashcard,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_lesson_plan_table.php,create,lms_lesson_plan,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_lessonplan_dayswise_table.php,create,lms_lessonplan_dayswise,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_mapping_type_table.php,create,lms_mapping_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_offline_exam_answer_table.php,create,lms_offline_exam_answer,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_offline_exam_table.php,create,lms_offline_exam,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_online_exam_answer_table.php,create,lms_online_exam_answer,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_online_exam_table.php,create,lms_online_exam,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_portfolio_table.php,create,lms_portfolio,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_question_mapping_table.php,create,lms_question_mapping,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_question_master_table.php,create,lms_question_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_teacher_resource_table.php,create,lms_teacher_resource,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lms_virtual_classroom_table.php,create,lms_virtual_classroom,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lo_category_table.php,create,lo_category,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lo_indicator_table.php,create,lo_indicator,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_lo_master_table.php,create,lo_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_mbti_answer_table.php,create,mbti_answer,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_mbti_paper_table.php,create,mbti_paper,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_mobile_homescreen_table.php,create,mobile_homescreen,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_nach_ac_type_table.php,create,nach_ac_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_nach_master_table.php,create,nach_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_new_admission_inquiry_registration_table.php,create,new_admission_inquiry_registration,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_new_client_rights_table.php,create,new_client_rights,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_old_question_category_master_table.php,create,old_question_category_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_old_question_level_master_table.php,create,old_question_level_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_outward_table.php,create,outward,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_parent_communication_table.php,create,parent_communication,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_period_table.php,create,period,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_petty_cash_master_table.php,create,petty_cash_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_petty_cash_table.php,create,petty_cash,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_photo_video_gallary_table.php,create,photo_video_gallary,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_physical_file_location_table.php,create,physical_file_location,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_place_master_table.php,create,place_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_proxy_master_table.php,create,proxy_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_ptm_booking_master_table.php,create,ptm_booking_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_ptm_time_slots_master_table.php,create,ptm_time_slots_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_question_master_table.php,create,question_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_question_paper_table.php,create,question_paper,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_question_type_master_table.php,create,question_type_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_relation_table_fields_table.php,create,relation_table_fields,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_religion_table.php,create,religion,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_report_module_data_table.php,create,report_module_data,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_report_module_fields_table.php,create,report_module_fields,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_report_module_table.php,create,report_module,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_book_master_table.php,create,result_book_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_co_scholastic_grades_table.php,create,result_co_scholastic_grades,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_co_scholastic_marks_entries_table.php,create,result_co_scholastic_marks_entries,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_co_scholastic_parent_table.php,create,result_co_scholastic_parent,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_co_scholastic_table.php,create,result_co_scholastic,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_create_exam_table.php,create,result_create_exam,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_exam_master_table.php,create,result_exam_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_exam_type_master_table.php,create,result_exam_type_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_html_table.php,create,result_html,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_marks_table.php,create,result_marks,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_master_confrigration_table.php,create,result_master_confrigration,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_remark_masters_table.php,create,result_remark_masters,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_std_grd_maping_table.php,create,result_std_grd_maping,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_student_attendance_master_table.php,create,result_student_attendance_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_trust_master_table.php,create,result_trust_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_result_working_day_master_table.php,create,result_working_day_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_rightside_menumaster_table.php,create,rightside_menumaster,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_room_type_master_table.php,create,room_type_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_s2_log_table.php,create,s2_log,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_school_detail_table.php,create,school_detail,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_school_sections_table.php,create,school_sections,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_school_setup_table.php,create,school_setup,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_sms_api_details_table.php,create,sms_api_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_sms_sent_parents_table.php,create,sms_sent_parents,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_sms_sent_staff_table.php,create,sms_sent_staff,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_smtp_details_table.php,create,smtp_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_standard_table.php,create,standard,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_std_div_map_table.php,create,std_div_map,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_capture_attendance_table.php,create,student_capture_attendance,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_capture_photos_table.php,create,student_capture_photos,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_change_req_type_table.php,create,student_change_req_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_change_request_table.php,create,student_change_request,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_document_type_table.php,create,student_document_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_health_table.php,create,student_health,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_height_weight_table.php,create,student_height_weight,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_infirmary_table.php,create,student_infirmary,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_optional_subject_table.php,create,student_optional_subject,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_quota_table.php,create,student_quota,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_student_vaccination_table.php,create,student_vaccination,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_sub_std_map_table.php,create,sub_std_map,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_subject_table.php,create,subject,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_syllabus_table.php,create,syllabus,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_table_relation_table.php,create,table_relation,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_task_table.php,create,task,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblapplications_table.php,create,tblapplications,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblcity_table.php,create,tblcity,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblclient_table.php,create,tblclient,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblcustom_fields_table.php,create,tblcustom_fields,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblfields_data_table.php,create,tblfields_data,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblgroupwise_rights_table.php,create,tblgroupwise_rights,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblindividual_rights_table.php,create,tblindividual_rights,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblmenumaster_new_table.php,create,tblmenumaster_new,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblmenumaster_old_table.php,create,tblmenumaster_old,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblmenumaster_table.php,create,tblmenumaster,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstate_table.php,create,tblstate,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_bank_detail_log_table.php,create,tblstudent_bank_detail_log,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_bank_detail_table.php,create,tblstudent_bank_detail,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_document_table.php,create,tblstudent_document,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_enrollment_table.php,create,tblstudent_enrollment,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_family_history_table.php,create,tblstudent_family_history,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_fees_failure_table.php,create,tblstudent_fees_failure,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_parent_feedback_table.php,create,tblstudent_parent_feedback,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_past_education_table.php,create,tblstudent_past_education,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_payment_method_mapping_table.php,create,tblstudent_payment_method_mapping,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_siblings_table.php,create,tblstudent_siblings,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_table.php,create,tblstudent,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tblstudent_tc_details_table.php,create,tblstudent_tc_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tbluser_past_education_table.php,create,tbluser_past_education,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tbluser_table.php,create,tbluser,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_tbluserprofilemaster_table.php,create,tbluserprofilemaster,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_teacher_mobile_homescreen_table.php,create,teacher_mobile_homescreen,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_temp_signup_table.php,create,temp_signup,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_template_master_table.php,create,template_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_timetable_table.php,create,timetable,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_topic_master_table.php,create,topic_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_driver_detail_table.php,create,transport_driver_detail,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_kilometer_rate_table.php,create,transport_kilometer_rate,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_map_student_table.php,create,transport_map_student,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_route_bus_table.php,create,transport_route_bus,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_route_stop_table.php,create,transport_route_stop,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_route_table.php,create,transport_route,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_school_shift_table.php,create,transport_school_shift,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_stop_table.php,create,transport_stop,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_vehicle_table.php,create,transport_vehicle,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_transport_vehicle_type_table.php,create,transport_vehicle_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_upload_result_table.php,create,upload_result,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_users_table.php,create,users,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_visitor_master_settings_table.php,create,visitor_master_settings,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_visitor_master_table.php,create,visitor_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_visitor_type_table.php,create,visitor_type,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_wk_condition_table.php,create,wk_condition,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_wk_execute_schedule_table.php,create,wk_execute_schedule,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_wk_log_table.php,create,wk_log,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_wk_mail_table.php,create,wk_mail,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_wk_main_table.php,create,wk_main,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_wk_module_table.php,create,wk_module,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_wk_sms_table.php,create,wk_sms,,,Y,N,Y,N,N,0,,unguarded create
+2023_03_05_115658_create_wk_updatequery_table.php,create,wk_updatequery,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_04_074959_add_column_to_import_table_fields_table.php,alter,,import_table_fields,,Y,N,N,N,N,0,,
+2023_05_04_075127_create_csv_data_table.php,create,csv_data,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_07_201451_create_payroll_types_table.php,create,payroll_types,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_08_165717_create_employee_salary_structures_table.php,create,employee_salary_structures,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_10_233617_add_foreign_key_into_access_log_route_table.php,FK-STUB(create-without-columns),activity_log;admission_form;admission_registration;answer_master;app_notification;app_notification_teacher;attendance_student,access_log;access_log_route,,Y,N,N,N,N,0,,unguarded create
+2023_05_10_233617_add_foreign_key_into_batch_table.php,FK-STUB(create-without-columns),batch;book_list;certificate_history;chapter_master;circular;class_teacher;college_timetable;consent_master;counselling_answer_master;counselling_online_exam_answer;counselling_online_exam,,,Y,N,N,N,N,0,,unguarded create
+2023_05_12_075237_add_column_to_employee_salary_structures_table.php,alter,,employee_salary_structures,,Y,N,N,N,N,0,,
+2023_05_13_172418_create_employee_monthly_salary_data_table.php,create,employee_monthly_salary_data,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_15_220543_create_hrms_leave_types_table.php,create,hrms_leave_types,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_16_205540_add_column_to_tbluser_table.php,alter,,tbluser,,Y,N,N,N,N,0,,
+2023_05_18_073538_add_column_to_payroll_types.php,alter,,payroll_types,,Y,N,N,N,N,0,,
+2023_05_20_002145_create_hrms_weekdays_table.php,create,hrms_weekdays,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_20_002322_create_hrms_holidays_table.php,create,hrms_holidays,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_20_230342_create_hrms_departments_table.php,create,hrms_departments,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_21_151219_create_hrms_emp_leaves_table.php,create,hrms_emp_leaves,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_25_073830_create_hrms_job_titles_table.php,create,hrms_job_titles,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_25_084729_create_hrms_in_out_times_table.php,create,hrms_in_out_times,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_25_120628_create_hrms_attendances_table.php,create,hrms_attendances,,,Y,N,Y,N,N,0,,unguarded create
+2023_05_25_203554_add_column_details_to_tbluser_table.php,alter,,tbluser,,Y,N,N,N,N,0,,
+2023_06_01_234714_create_library_books_table.php,create,library_books,,,Y,N,Y,N,N,0,,unguarded create
+2023_06_01_235854_create_library_items_table.php,create,library_items,,,Y,N,Y,N,N,0,,unguarded create
+2023_06_10_233617_add_foreign_key_into_exam_schedule_table.php,FK-STUB(create-without-columns),exam_schedule;fees_breackoff;fees_cancel;fees_circular_master;fees_collect;fees_late_master;fees_other_cancel;fees_other_collection;fees_paid_other;fees_payment;fees_receipt_book_master,,,Y,N,N,N,N,0,,unguarded create
+2023_06_10_233617_add_foreign_key_into_fees_refund_table.php,FK-STUB(create-without-columns),fees_refund;fees_title;follow_up;homework;hostel_building_master;hostel_floor_master;hostel_room_allocation;implementation_master;imprest_fees_cancel;inventory_item_master,,,Y,N,N,N,N,0,,unguarded create
+2023_06_11_233617_add_foreign_key_into_inventory_item_quotation_details_table.php,FK-STUB(create-without-columns),inventory_item_quotation_details;inventory_item_sub_category_master;inward;lb_master;lessonplan;lessonplan_execution;lms_assignment;lms_doubt;lms_flashcard;lms_lesson_plan,,,Y,N,N,N,N,0,,unguarded create
+2023_06_12_233617_add_foreign_key_into_inventory_item_lms_mapping_type_table.php,FK-STUB(create-without-columns),lms_mapping_type;lms_offline_exam_answer;lms_question_master;lms_teacher_resource;lms_virtual_classroom;lo_category;period;proxy_master;question_master;question_paper,,,Y,N,N,N,N,0,,unguarded create
+2023_06_12_233618_add_foreign_key_into_inventory_item_lms_mapping_type_table.php,FK-STUB(create-without-columns),result_co_scholastic_marks_entries;result_create_exam;result_create_exam;result_student_attendance_master;sms_sent_parents;student_capture_attendance;student_change_request;student_height_weight;student_optional_subject;student_vaccination,,,Y,N,N,N,N,0,,unguarded create
+2023_06_16_152306_add_sort_order_to_fees_title.php,alter,,fees_title,,Y,N,N,N,N,0,,
+2023_06_17_144701_create_app_language_table.php,create,app_language,,,Y,N,Y,N,N,0,,unguarded create
+2023_06_18_165836_create_library_book_circulations_table.php,create,library_book_circulations,,,Y,N,Y,N,N,0,,unguarded create
+2023_06_29_142644_add_show_month_to_fees_config_master.php,alter,,fees_config_master,,Y,N,N,N,N,0,,
+2023_06_30_152208_add_institute_type_to_school_setup.php,alter,,school_setup,,Y,N,N,N,N,0,,
+2023_07_07_160745_add_marking_period_id_to_tables.php,alter,,batch;period;standard;subject;tblstudent;timetable,,Y,N,N,N,N,0,,
+2023_07_10_112409_add_reply_to_task.php,alter,,task,,Y,N,N,N,N,0,,
+2023_07_24_172236_add_amount.php,alter,,transport_map_student;transport_school_shift,,Y,N,N,N,N,0,,
+2023_07_26_234851_add_return_date_to_library_book_circulations.php,alter,,library_book_circulations,,Y,N,N,N,N,0,,
+2023_07_27_154103_create_fees_breackoff_logs_table.php,create,fees_breackoff_logs,,,Y,N,Y,N,N,0,,unguarded create
+2023_08_03_115659_create_result_exam_approve_table.php,create,result_exam_approve,,,Y,N,Y,N,N,0,,unguarded create
+2023_08_05_133224_add_column_text_tblmenumaster.php,alter,,tblmenumaster,,Y,N,N,N,N,0,,
+2023_08_09_113536_add_columns_to_result_exam_master.php,alter,,result_exam_master,,Y,N,N,N,N,0,,
+2023_08_10_102730_add_fine_to_fees_payment.php,alter,,fees_payment,,Y,N,N,N,N,0,,
+2023_08_28_122954_add_reason_to_lms_questionmaster.php,alter,,lms_question_mapping;lms_question_master,,Y,N,N,N,N,0,,
+2023_08_31_165504_add_standard_id_to_result_co_scholastic.php,alter,,result_co_scholastic,,Y,N,N,N,N,0,,
+2023_09_02_120300_create_sqaa_master_table.php,create,sqaa_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_09_02_120344_create_sqaa_marks_table.php,create,sqaa_marks,,,Y,N,Y,N,N,0,,unguarded create
+2023_09_06_162421_create_sqaa_documents_table.php,create,sqaa_documents,,,Y,N,Y,N,N,0,,unguarded create
+2023_09_08_145910_create_result_template_master_table.php,create,result_template_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_09_13_110054_add_columns_closure_date_to_tblstudent_bank_detail.php,alter,,tblstudent_bank_detail,,Y,N,N,N,N,0,,
+2023_09_22_115343_create_fees_payphi_table.php,create,fees_payphi,,,Y,N,Y,N,N,0,,unguarded create
+2023_09_23_123306_add_payphi_fields_to_fees_payment_table.php,alter,,fees_payment,,Y,N,N,N,N,0,,
+2023_09_26_121212_create_result_co_scholatic_range_table.php,create,result_co_scholatic_range,,,Y,N,Y,N,N,0,,unguarded create
+2023_10_05_142707_add_columns_type_to_fees_map_years.php,alter,,fees_map_years,,Y,N,N,N,N,0,,
+2023_10_06_112100_create_sharebazar_position_table.php,create,sharebazar_position,,sharebazar_position,Y,N,Y,N,N,0,,dropIfExists/drop table;unguarded create
+2023_10_06_112251_create_sharebazar_margin_table.php,create,sharebazar_margin,,,Y,N,Y,N,N,0,,unguarded create
+2023_10_06_112413_create_sharebazar_pnl_table.php,create,sharebazar_pnl,,,Y,N,Y,N,N,0,,unguarded create
+2023_10_06_130947_create_sqaa_documant_master_table.php,create,sqaa_documant_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_10_10_141549_add_columns_update_date_to_sharebazar_position.php,alter,,sharebazar_position,,Y,N,N,N,N,0,,
+2023_10_10_144532_add_columns_update_date_to_sharebazar_margin.php,alter,,sharebazar_margin,,Y,N,N,N,N,0,,
+2023_10_10_144932_add_columns_update_date_to_sharebazar_pnl.php,alter,,sharebazar_pnl,,Y,N,N,N,N,0,,
+2023_10_23_124834_create_fees_month_header_table.php,create,fees_month_header,,,Y,N,Y,N,N,0,,unguarded create
+2023_10_28_105158_create_anacdotal_table.php,create,student_anacdotal,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_101252_create_o_net_data_categories_table.php,create,o_net_data_categories,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_102327_create_o_net_data_occupations_table.php,create,o_net_data_occupations,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_104535_create_o_net_occupation_details_table.php,create,o_net_occupation_details,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_110833_create_o_net_occupation_detail_lists_table.php,create,o_net_occupation_detail_lists,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_115925_create_o_net_occupation_detail_list_summaries_table.php,create,o_net_occupation_detail_list_summaries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_121919_create_o_net_occupation_detail_tech_skill_summeries_table.php,create,o_net_occupation_detail_tech_skill_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_123949_create_o_net_occupation_detail_knowledge_summeries_table.php,create,o_net_occupation_detail_knowledge_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_124627_create_o_net_occupation_detail_skill_summeries_table.php,create,o_net_occupation_detail_skill_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_125538_create_o_net_occupation_detail_abilities_summeries_table.php,create,o_net_occupation_detail_abilities_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_125949_create_o_net_occupation_detail_work_activity_summeries_table.php,create,o_net_occupation_detail_work_activity_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_130428_create_o_net_occupation_detail_job_zone_summeries_table.php,create,o_net_occupation_detail_job_zone_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_131339_create_o_net_occupation_detail_education_summeries_table.php,create,o_net_occupation_detail_education_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_132210_create_o_net_occupation_detail_interest_summeries_table.php,create,o_net_occupation_detail_interest_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_132518_create_o_net_occupation_detail_work_style_summeries_table.php,create,o_net_occupation_detail_work_style_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_07_132816_create_o_net_occupation_detail_work_value_summeries_table.php,create,o_net_occupation_detail_work_value_summeries,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_09_153655_add_column_to_o_net_occupation_details_table.php,alter,,o_net_occupation_details,,Y,N,N,N,N,0,,
+2023_11_09_155218_add_column_to_o_net_occupation_detail_lists_table.php,alter,,o_net_occupation_detail_lists,,Y,N,N,N,N,0,,
+2023_11_27_162445_create_o_net_data_sub_categories_table.php,create,o_net_data_sub_categories,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_27_184747_create_o_net_data_tables_table.php,create,o_net_data_tables,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_27_223219_create_o_net_data_table_lists_table.php,create,o_net_data_table_lists,,,Y,N,Y,N,N,0,,unguarded create
+2023_11_28_131007_add_column_to_o_net_occupation_detail_job_zone_summeries.php,alter,,o_net_occupation_detail_job_zone_summeries,,Y,N,N,N,N,0,,
+2023_11_28_132005_add_column_to_o_net_occupation_detail_education_summeries.php,alter,,o_net_occupation_detail_education_summeries,,Y,N,N,N,N,0,,
+2023_12_02_164827_add_column_to_o_net_data_sub_categories.php,alter,,o_net_data_sub_categories,,Y,N,N,N,N,0,,
+2023_12_03_174328_add_column_to_o_net_data_tables.php,alter,,o_net_data_tables,,Y,N,N,N,N,0,,
+2023_12_09_092446_add_column_to_o_net_data_tables.php,alter,,o_net_data_tables,,Y,N,N,N,N,0,,
+2023_12_09_145915_add_column_to_o_net_data_tables.php,alter,,o_net_data_tables,,Y,N,N,N,N,0,,
+2023_12_13_151321_create_role_responsibility_table.php,create,role_responsibility,,,Y,N,Y,N,N,0,,unguarded create
+2023_12_15_121805_create_fees_reconciliation_table.php,create,fees_reconciliation,,,Y,N,Y,N,N,0,,unguarded create
+2023_12_15_125455_add_conciliation_to_fees_collect.php,alter,,fees_collect,,Y,N,N,N,N,0,,
+2023_12_23_103502_create_result_activity_group_table.php,create,result_activity_group,,,Y,N,Y,N,N,0,,unguarded create
+2023_12_23_111218_create_result_skillset_table.php,create,result_skillset,,,Y,N,Y,N,N,0,,unguarded create
+2023_12_23_111645_create_result_activity_master_table.php,create,result_activity_master,,,Y,N,Y,N,N,0,,unguarded create
+2023_12_23_112014_create_result_activity_marks_table.php,create,result_activity_marks,,,Y,N,Y,N,N,0,,unguarded create
+2023_12_27_170232_add_new_field_to_result_skillset_table.php,alter,,result_skillset,,Y,N,N,N,N,0,,
+2024_01_10_173555_create_hrms_leave_allocation_table.php,create,hrms_leave_allocation,,,Y,N,Y,N,N,0,,unguarded create
+2024_01_24_103459_add_portal_user_to_tbluser.php,alter,,tbluser,,Y,N,N,N,N,0,,
+2024_02_06_151639_add_pancard_to_tbluser.php,alter,,tbluser,,Y,N,N,N,N,0,,
+2024_02_15_143441_create_hrms_salary_certificate_table.php,create,hrms_salary_certificate,,,Y,N,Y,N,N,0,,unguarded create
+2024_02_20_135218_create_result_remarks_table.php,create,result_remarks,,,Y,N,Y,N,N,0,,unguarded create
+2024_02_21_102837_create_subject_elective_table.php,create,subject_elective,,,Y,N,Y,N,N,0,,unguarded create
+2024_02_21_105933_add_remarks_to_student_health_table.php,alter,,student_health,,Y,N,N,N,N,0,,
+2024_02_21_110403_modify_result_remarks_table.php,alter,,result_remarks,,Y,Y,N,N,N,0,,change() column
+2024_02_21_153213_add_status_to_transport_driver_detail_table.php,alter,,transport_driver_detail,,Y,N,N,N,N,0,,
+2024_02_27_151323_add_column_item_code_library_book_circulation.php,alter,,library_book_circulations,,Y,N,N,N,N,0,,
+2024_03_19_163441_add_column_login_ip.php,alter,,tbluser,,Y,N,N,N,N,0,,
+2024_03_21_102237_create_create_timetable.php,create,create_timetable,,,Y,N,Y,N,N,0,,unguarded create
+2024_03_30_123353_create_lms_online_exam_answer_student_table.php,create,lms_online_exam_answer_student,,,Y,N,Y,N,N,0,,unguarded create
+2024_03_30_130801_create_lms_online_exam_student_table.php,create,lms_online_exam_student,,,Y,N,Y,N,N,0,,unguarded create
+2024_04_02_122447_create_whatapp_user_details_table.php,create,whatapp_user_details,,,Y,N,Y,N,N,0,,unguarded create
+2024_04_08_150853_create_whatsapp_sent_messages_table.php,create,whatsapp_sent_messages,,,Y,N,Y,N,N,0,,unguarded create
+2024_04_11_163611_add_employee_no_column.php,alter,,tbluser,,Y,N,N,N,N,0,,
+2024_04_15_162312_add_roll_no_column.php,alter,,tblstudent_enrollment,,Y,N,N,N,N,0,,
+2024_04_18_121851_create_mapped_teachers_table.php,create,mapped_teachers,sub_std_map;tbluser,,Y,N,Y,N,N,0,,unguarded create
+2024_05_09_113502_add_columns_tbluser_and_payroll_type.php,alter,,payroll_types;tbluser,,Y,N,N,N,N,0,,
+2024_05_09_135148_create_announcement_table.php,create,announcement,,,Y,N,Y,N,N,0,,unguarded create
+2024_05_13_104220_add_column_user_type.php,alter,,student_document_type,,Y,N,N,N,N,0,,
+2024_05_13_122517_create_staff_document_table.php,create,staff_document,,,Y,N,Y,N,N,0,,unguarded create
+2024_05_14_104624_add_column_to_tblcustom_fileds.php,alter,,tblcustom_fields,,Y,N,N,N,N,0,,
+2024_05_14_160824_add_column_to_hrms_leave_allocation.php,alter,,hrms_leave_allocation,,Y,N,N,N,N,0,,
+2024_05_16_173349_add_column_to_hrms_departments.php,alter,,hrms_departments,,Y,N,N,N,N,0,,
+2024_05_18_110317_add_column_level_to_student_optional_subject.php,alter,,student_optional_subject,,Y,N,N,N,N,0,,
+2024_05_22_150650_add_columns_type_id_to_student_capture_photos.php,alter,,student_capture_photos,,Y,N,N,N,N,0,,
+2024_06_03_113101_create_requirement_gathering_table.php,create,requirement_gathering,,,Y,N,Y,N,N,0,,unguarded create
+2024_06_13_151201_add_column_extar_fields.php,alter,,general_data,,Y,N,N,N,N,0,,
+2024_06_14_153458_add_column_discount.php,alter,,fees_payment,,Y,N,N,N,N,0,,
+2024_06_14_174829_add_column_created_by.php,alter,,visitor_master,,Y,N,N,N,N,0,,
+2024_06_17_182325_add_column_annual_income.php,alter,,tblstudent_family_history,,Y,N,N,N,N,0,,
+2024_06_19_111651_create_tblstudent_doc_std_mapping_table.php,create,tblstudent_doc_std_mapping,,,Y,N,Y,N,N,0,,unguarded create
+2024_06_20_120045_create_hrms_departments_mapping_table.php,create,hrms_departments_mapping,,,Y,N,Y,N,N,0,,unguarded create
+2024_06_25_144125_create_hrms_emp_payroll_deduction_table.php,create,hrms_emp_payroll_deduction,,,Y,N,Y,N,N,0,,unguarded create
+2024_06_27_153430_add_column_others.php,alter,,task,,Y,N,N,N,N,0,,
+2024_07_02_170109_create_tblemp_skills_table.php,create,tblemp_skills,task,,Y,N,Y,N,N,0,,unguarded create
+2024_07_11_140552_add_column_sub_institute_id.php,alter,,payroll_types,,Y,N,N,N,N,0,,
+2024_07_16_140316_create_master_setup_select_table.php,create,master_setup_select,,,Y,N,Y,N,N,0,,unguarded create
+2024_07_17_160237_add_column_extras_table.php,alter,,task,,Y,N,N,N,N,0,,
+2024_07_17_173241_add_column_department_extras_table.php,alter,,hrms_departments,,Y,N,N,N,N,0,,
+2024_07_22_140001_create_custom_module_tables_table.php,create,custom_module_tables,,,Y,N,Y,N,N,0,,unguarded create
+2024_07_22_140116_create_custom_module_table_columns_table.php,create,custom_module_table_columns,,,Y,N,Y,N,N,0,,unguarded create
+2024_07_30_164238_add_column_hrms_leave_type.php,alter,,hrms_leave_types,,Y,N,N,N,N,0,,
+2024_08_01_124452_add_column_tbluser.php,alter,,tbluser,,Y,N,N,N,N,0,,
+2024_08_12_144828_onet_institute_data.php,create,onet_institute_data,,,Y,N,Y,N,N,0,,unguarded create
+2024_08_12_151325_onet_institute_courses.php,create,onet_institute_courses,,,Y,N,Y,N,N,0,,unguarded create
+2024_08_14_152406_onet_employer.php,create,onet_employer,,,Y,N,Y,N,N,0,,unguarded create
+2024_08_20_120337_create_onet_explore_sector.php,create,onet_explore_sector,,,Y,N,Y,N,N,0,,unguarded create
+2024_08_20_121045_create_onet_expert_advice.php,create,onet_expert_advice,,,Y,N,Y,N,N,0,,unguarded create
+2024_08_22_130906_add_column_whatsapp_sent_messages.php,alter,,whatsapp_sent_messages,,Y,N,N,N,N,0,,
+2024_08_28_171253_add_column_to_custom_module_tables.php,alter,,custom_module_tables,,Y,N,N,N,N,0,,
+2024_08_29_124044_add_column_syllabus.php,alter,,syllabus,,Y,N,N,N,N,0,,change() column
+2024_09_03_114740_create_result_sub_activity_table.php,create,result_sub_activity,result_activity_marks;result_activity_master;result_skillset,,Y,N,Y,N,N,0,,unguarded create
+2024_09_04_175236_add_column_day_count.php,alter,,payroll_types,,Y,N,N,N,N,0,,
+2024_09_05_113709_create_incoming_messages_table.php,create,incoming_messages,,,Y,N,Y,N,N,0,,unguarded create
+2024_09_05_115107_add_column_to_whatsapp_sent_messages_table.php,alter,,whatsapp_sent_messages,,Y,N,N,N,N,0,,
+2024_09_10_161054_add_columns_hpc_report.php,create,result_sub_activity,result_activity_marks;result_activity_master;result_skillset,,Y,N,Y,N,N,0,,unguarded create
+2024_09_16_161701_add_column_option_type.php,alter,,sub_std_map,,Y,N,N,N,N,0,,
+2024_10_05_142413_add_colums_hills_admission_enquiry.php,alter,,admission_enquiry,,Y,N,N,N,N,0,,
+2024_10_08_151046_create_admission_registration_v1.php,create,admission_registration_v1,,,Y,N,Y,N,N,0,,unguarded create
+2024_10_11_155842_create_lms_curriculum_table.php,create,lms_curriculum,,,Y,N,Y,N,N,0,,unguarded create
+2024_10_14_140908_add_column_result_type.php,alter,,result_html,,Y,N,N,N,N,0,,
+2024_10_14_155609_create_lms_syllabus_table.php,create,lms_syllabus,,,Y,N,Y,N,N,0,,unguarded create
+2024_10_15_171850_add_column_registration_hills.php,alter,,admission_registration_v1,,Y,N,N,N,N,0,,
+2024_10_18_120053_add_column_lms_curriculum.php,alter,,lms_curriculum,,Y,N,N,N,Y,0,,dropColumn
+2024_10_25_172032_add_columns_syllabus.php,alter,,syllabus,,Y,N,N,N,N,0,,
+2024_10_28_144955_add_column_partitions.php,alter,,result_co_scholastic_parent,,Y,N,N,N,N,0,,
+2024_11_14_195000_add_column_to_custom_module_table_columns.php,alter,,custom_module_table_columns,,Y,N,N,N,N,0,,
+2025_01_02_153747_create_contents_table.php,create,contents,,,Y,N,Y,N,N,0,,unguarded create
+2025_01_02_155507_create_user_activities_table.php,create,user_activities,,,Y,N,Y,N,N,0,,unguarded create
+2025_01_02_160147_create_recommendations_table.php,create,recommendations,,,Y,N,Y,N,N,0,,unguarded create
+2025_01_09_130601_add_column_content_librarry.php,alter,,content_master;contents,,Y,N,N,N,N,0,,
+2025_01_09_173010_add_column_lesson_plan.php,alter,,lessonplan,,Y,N,N,N,N,0,,rename table/col
+2025_01_10_143209_add_column_tbluser.php,alter,,tbluser,,Y,N,N,N,N,0,,
+2025_01_15_164229_create_mst_item_status_table.php,create,mst_item_status,,,Y,N,Y,N,N,0,,unguarded create
+2025_01_16_122609_create_item_scan_details_table.php,create,item_scan_details,,,Y,N,Y,N,N,0,,unguarded create
+2025_01_16_164957_create_master_skills_table.php,create,master_skills,,,Y,N,Y,N,N,0,,unguarded create
+2025_01_20_171152_add_pan_card_column.php,alter,,tblstudent,,Y,N,N,N,N,0,,
+2025_01_25_121952_create_master_compliance_table.php,create,master_compliance,,,Y,N,Y,N,N,0,,unguarded create
+2025_02_03_153106_add_columns_fees_late_master.php,alter,,fees_late_master,,Y,N,N,N,N,0,,change() column
+2025_02_04_154521_add_column_parent_details.php,alter,,tblstudent,,Y,N,N,N,N,0,,
+2025_02_06_174323_create_s_skill_matrix_table.php,create,s_skill_matrix,,,Y,N,Y,N,N,0,,unguarded create
+2025_02_10_145241_create_s_assessment_library_table.php,create,s_assessment_library,,,Y,N,Y,N,N,0,,unguarded create
+2025_02_13_144313_add_columns_month_ids.php,alter,,fees_late_master,,Y,N,N,N,N,0,,rename table/col;change() column
+2025_02_14_113042_create_master_fields_table.php,create,master_fields,,,Y,N,Y,N,N,0,,unguarded create
+2025_02_14_153202_add_colum_sort_order.php,alter,,tblgroupwise_rights,,Y,N,N,N,N,0,,
+2025_02_15_114457_create_master_fields_institute_table.php,create,master_fields_institute,,,Y,N,Y,N,N,0,,unguarded create
+2025_02_24_142657_create_master_fields_table_table.php,create,master_fields_table,,,Y,N,Y,N,N,0,,unguarded create
+2025_02_27_174720_add_columns_lms_teacher_resource.php,alter,,lms_lesson_plan;lms_teacher_resource,,Y,N,N,N,N,0,,
+2025_03_13_161022_add_column_dashboard_rights.php,alter,,tblgroupwise_rights,,Y,N,N,N,N,0,,
+2025_03_15_111429_create_subject_optional_type_table.php,create,subject_optional_type,,,Y,N,Y,N,N,0,,unguarded create
+2025_03_19_130411_add_columns_student_family_past.php,alter,,tblstudent_family_history;tblstudent_past_education,,Y,N,N,N,N,0,,
+2025_03_26_105324_create_period_details_table.php,create,period_details,,,Y,N,Y,N,N,0,,unguarded create
+2025_04_10_111831_create_donation_collection_table.php,create,donation_collection,,,Y,N,Y,N,N,0,,unguarded create
+2025_04_18_171932_create_tbluser_contact_details_table.php,create,tbluser_contact_details,,,Y,N,Y,N,N,0,,unguarded create
+2025_04_21_113126_create_dicipline_master_table.php,create,dicipline_master,,,Y,N,Y,N,N,0,,unguarded create
+2025_04_21_113738_add_columns_dicipline_dd.php,alter,,dicipline_dd,,Y,N,N,N,N,0,,
+2025_04_21_120000_add_flag_remarks_dicipline.php,alter,,dicipline,,Y,N,N,N,N,0,,
+2025_04_22_141034_add_columns_custom_module_tables.php,alter,,custom_module_tables,,Y,N,N,N,N,0,,
+2025_05_12_144102_add_column_temp_address.php,alter,,tbluser,,Y,N,N,N,N,0,,
+2025_06_06_070606_create_blogs_table.php,create,blogs,,,Y,N,Y,N,N,0,,unguarded create
+2025_06_20_120120_add_photos_to_hrms_attendances_table.php,alter,,hrms_attendances,,Y,N,N,N,N,0,,
+2025_06_30_122954_create_user_experience_details_table.php,create,user_experience_details,,,Y,N,Y,N,N,0,,unguarded create
+2025_07_04_163547_create_tbluser_shift_master.php,create,tbluser_shift_master,,,Y,N,Y,N,N,0,,unguarded create
+2025_07_04_164122_create_tbluser_shift_records.php,create,tbluser_shift_records,,,Y,N,Y,N,N,0,,unguarded create
+2025_07_14_111129_create_classwork_attachment_table.php,create,classwork_attachment,,,Y,N,Y,N,N,0,,unguarded create
+2025_08_12_161202_create_admission_age_validation_table.php,create,admission_age_validation,,,Y,N,Y,N,N,0,,unguarded create
+2025_11_14_add_missing_columns_to_result_reportcard_marks_table.php,alter,,result_reportcard_marks,,Y,N,N,N,N,0,,
+2026_01_01_000000_organization.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_01_01_000100_audit.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_01_01_000200_department.php,raw-sql/data,,,,Y,N,Y,N,N,5,,
+2026_01_01_000300_person.php,raw-sql/data,,,,Y,N,Y,N,N,8,,
+2026_01_01_000400_capability.php,raw-sql/data,,,,Y,N,Y,N,N,14,,
+2026_01_01_000500_events.php,raw-sql/data,,,,Y,N,Y,N,N,14,,
+2026_01_01_000600_observability.php,raw-sql/data,,,,Y,N,Y,N,N,26,,
+2026_01_01_000700_intelligence_entities.php,raw-sql/data,,,,Y,N,Y,N,N,14,,
+2026_01_01_000800_evidence.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_01_01_000900_outcomes_learnings.php,raw-sql/data,,,,Y,N,Y,N,N,6,,
+2026_01_01_001000_eso_executions.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_01_01_001100_executors.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_01_01_001200_decision_intelligence.php,raw-sql/data,,,,Y,N,Y,Y,Y,16,,DB update;MODIFY/ALTER COLUMN
+2026_01_01_001300_mental_model_reinforcement.php,raw-sql/data,,,,Y,Y,N,N,N,4,,MODIFY/ALTER COLUMN
+2026_01_01_001400_department_scoped_signals.php,raw-sql/data,,,,Y,Y,N,N,Y,3,,MODIFY/ALTER COLUMN
+2026_01_01_001500_case_engine.php,raw-sql/data,,,,Y,N,Y,Y,N,10,,
+2026_01_01_001600_conversation_engine.php,raw-sql/data,,,,Y,N,Y,Y,N,7,,
+2026_01_01_001700_conversation_pinning.php,raw-sql/data,,,,Y,Y,N,N,Y,3,,
+2026_01_01_001800_notifications_and_settings.php,raw-sql/data,,,,Y,N,Y,Y,N,4,,
+2026_01_01_001900_ai_governance.php,raw-sql/data,,,,Y,N,Y,Y,Y,5,,
+2026_01_01_002000_knowledge_assets.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_01_01_002100_kasba_task_hierarchy.php,raw-sql/data,,,,Y,N,Y,Y,N,5,,
+2026_01_01_002200_eso_execution_evidence.php,raw-sql/data,,,,Y,N,Y,Y,N,2,,
+2026_01_01_002300_career_taxonomy.php,raw-sql/data,,,,Y,N,Y,Y,N,6,,
+2026_01_01_002400_accreditation_framework.php,raw-sql/data,,,,Y,N,Y,Y,N,5,,
+2026_01_01_002500_placement_taxonomy.php,raw-sql/data,,,,Y,N,Y,Y,N,5,,
+2026_01_01_002600_api_keys.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_01_01_002700_guardians.php,raw-sql/data,,,,Y,N,Y,Y,N,2,,
+2026_01_01_002800_auth_users.php,raw-sql/data,,,,Y,N,Y,Y,N,1,,
+2026_01_01_002900_tenants.php,raw-sql/data,,,,Y,N,Y,Y,N,1,,
+2026_01_01_003000_process_library.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_01_01_003100_context_library.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_01_01_003200_reasoning_pattern_library.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_01_01_003300_eso_definition_library.php,raw-sql/data,,,,Y,N,Y,Y,Y,7,,
+2026_01_01_003400_evidence_ledger.php,raw-sql/data,,,,Y,Y,N,N,Y,1,,
+2026_01_01_003500_learning_efficacy.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_01_01_003600_policy_library_additions.php,raw-sql/data,,,,Y,Y,N,N,Y,3,,
+2026_01_01_003700_telemetry_library.php,raw-sql/data,,,,Y,N,Y,Y,N,5,,
+2026_02_18_122332_create_ai_interaction_logs_table.php,create,ai_interaction_logs,,,Y,N,Y,N,N,0,,unguarded create
+2026_02_21_121534_add_column_homework_table.php,alter,,homework,,Y,N,N,N,N,0,,
+2026_02_21_145542_create_api_details_table.php,create,api_details,,,Y,N,Y,N,N,0,,unguarded create
+2026_02_21_145636_create_ai_daily_used_api_table.php,create,ai_daily_used_api,,,Y,N,Y,N,N,0,,unguarded create
+2026_02_24_102900_add_column_result_personalize_marks.php,alter,,result_personalize_marks,,Y,N,N,N,N,0,,
+2026_02_27_111117_add_column_homework_table.php,alter,,homework,,Y,N,N,N,N,0,,
+2026_03_07_170942_create_h5p_scenarios_table.php,create,h5p_scenarios,,,Y,N,Y,N,N,0,,unguarded create
+2026_03_07_171024_create_h5p_scenario_points_table.php,create,h5p_scenario_points,,,Y,N,Y,N,N,0,,unguarded create
+2026_03_26_102143_create_h5p_interactive_video_table.php,create,h5p_interactive_video,,,Y,N,Y,N,N,0,,unguarded create
+2026_03_26_102237_create_h5p_video_interactions_table.php,create,h5p_video_interactions,,,Y,N,Y,N,N,0,,unguarded create
+2026_03_31_162849_create_h5p_flashcard_table.php,create,h5p_flashcard,,,Y,N,Y,N,N,0,,unguarded create
+2026_04_01_120000_seed_ai_questionpaper_tables.php,alter,,question_paper,,Y,N,N,N,Y,0,"delete,updateOrInsert",
+2026_04_18_113937_create_suggested_content_table.php,create,suggested_content,,,Y,N,Y,N,N,0,,unguarded create
+2026_04_28_145954_create_ai_api_keys_table.php,create,ai_api_keys,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_12_000001_add_user_profile_to_content_master_and_update_suggested_content.php,alter,,content_master;suggested_content,,Y,N,N,N,Y,2,,MODIFY/ALTER COLUMN
+2026_05_15_114234_rename_user_profile_to_user_profile_name_in_content_master_table.php,alter,,content_master,,Y,N,N,N,Y,0,,rename table/col
+2026_05_15_120342_create_lms_misconceptions_table.php,create,lms_misconceptions,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_15_122300_add_fields_to_tblstudent_enrollment_table.php,alter,,tblstudent_enrollment,,Y,N,N,N,Y,0,,
+2026_05_15_122657_add_fields_to_content_master_table.php,alter,,content_master,,Y,N,N,N,Y,0,,
+2026_05_15_123538_add_syear_and_status_to_lms_curriculum_table.php,alter,,lms_curriculum,,Y,N,N,N,Y,0,,
+2026_05_15_123723_add_fields_to_lessonplan_table.php,alter,,lessonplan,,Y,N,N,N,Y,0,,
+2026_05_15_123925_add_learning_fields_to_question_paper_table.php,alter,,question_paper,,Y,N,N,N,Y,0,,
+2026_05_15_124211_add_learning_fields_to_suggested_content_table.php,alter,,suggested_content,,Y,N,N,N,Y,0,,
+2026_05_16_105830_add_updated_at_to_lms_mapping_type_table.php,alter,,lms_mapping_type,,Y,N,N,N,N,0,,
+2026_05_16_153546_create_lms_concept_table.php,create,lms_concept,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_16_161301_add_fields_to_lms_misconceptions_table.php,alter,,lms_misconceptions,,Y,N,N,N,N,0,,
+2026_05_16_162854_add_fields_to_lms_lesson_plan_table.php,alter,,lms_lesson_plan,,Y,N,N,N,N,0,,
+2026_05_19_000001_add_lesson_id_to_lms_concept_table.php,alter,,lms_concept,,Y,N,N,N,Y,0,,
+2026_05_19_000002_add_concept_id_to_question_paper_table.php,alter,,question_paper,,Y,N,N,N,Y,0,,
+2026_05_20_000001_add_concept_id_to_suggested_content_table.php,alter,,suggested_content,,Y,N,N,Y,Y,0,update,DB update
+2026_05_20_000002_add_misconception_id_to_suggested_content_table.php,alter,,suggested_content,,Y,N,N,Y,Y,0,update,DB update
+2026_05_21_095310_add_fields_to_lms_curriculum_table.php,alter,,lms_curriculum,,Y,N,N,N,N,0,,
+2026_05_21_095949_create_lms_units_table.php,create,lms_units,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_21_100134_add_fields_to_chapter_master_table.php,alter,,chapter_master,,Y,N,N,N,N,0,,
+2026_05_21_100453_create_lms_learning_outcomes_table.php,create,lms_learning_outcomes,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_21_101524_create_lms_competency_standards_table.php,create,lms_competency_standards,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_21_101743_create_lms_chapter_standard_map_table.php,create,lms_chapter_standard_map,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_21_102502_create_lms_assessment_typology_table.php,create,lms_assessment_typology,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_22_000001_add_planned_periods_to_lms_units_table.php,alter,,lms_units,,Y,N,N,N,N,0,,
+2026_05_22_000002_add_concept_id_to_lms_question_master_table.php,alter,,lms_question_master,,Y,N,N,N,Y,0,,
+2026_05_27_000001_create_lms_master_mapping_table.php,create,lms_master_mapping,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_28_121237_create_lms_learning_objectives_table.php,create,lms_learning_objectives,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_28_165851_create_lms_competency_standards_table.php,create,lms_competency_standards,,,Y,N,Y,N,N,2,,unguarded create
+2026_05_30_103234_create_lms_chapter_topic_mapping_table.php,create,lms_chapter_topic_mapping,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_30_103534_create_chapter_topics_table.php,create,chapter_topics,,,Y,N,Y,N,N,0,,unguarded create
+2026_05_30_114503_create_document_extractions_table.php,create,document_extractions,,,Y,N,Y,N,N,0,,unguarded create
+2026_06_08_000001_add_standard_subject_chapter_and_sub_institute_id_to_document_extractions_table.php,alter,,document_extractions,,Y,N,N,N,N,0,,
+2026_06_08_000002_add_extraction_id_to_lms_curriculum_table.php,alter,,lms_curriculum,,Y,N,N,N,N,0,,
+2026_06_08_000003_add_extraction_id_to_lms_units_table.php,alter,,lms_units,,Y,N,N,N,N,0,,
+2026_06_08_000004_add_extraction_id_to_chapter_master_table.php,alter,,chapter_master,,Y,N,N,N,N,0,,
+2026_06_08_000005_add_unit_chapters_to_lms_units_table.php,alter,,lms_units,,Y,N,N,N,N,0,,
+2026_06_08_100001_add_use_table_data_to_master_fields.php,alter,,master_fields,,Y,N,N,N,N,0,,
+2026_06_08_110000_seed_master_fields_admission_enquiry.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_06_08_110100_seed_master_fields_table_admission_enquiry.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_06_09_000001_add_updated_at_to_chapter_master_table.php,alter,,chapter_master,,Y,N,N,N,N,0,,
+2026_06_10_000000_create_semantic_intelligence_table.php,create,semantic_intelligence,,,Y,N,Y,N,N,0,,unguarded create
+2026_06_11_131905_create_pal_tables.php,create,pal_subjects;pal_concepts;pal_competencies;pal_learning_sessions;pal_session_events;pal_assessment_results;pal_misconceptions;pal_learner_misconceptions;pal_remediations;pal_remediation_sessions;pal_contents;pal_content_recommendations;pal_telemetry_events;pal_reflections;pal_pedagogy_effectiveness;pal_learner_preferences;pal_learner_states;pal_collaboration_activities;pal_classroom_activities;pal_discussions;pal_group_activities;pal_self_corrections;pal_learning_plans;pal_strategy_selections;pal_learning_journals;pal_learning_events;pal_learning_patterns,,,Y,N,Y,N,N,0,,unguarded create
+2026_06_11_132105_fix_telemetry_event_columns.php,alter,,pal_telemetry_events,,Y,N,N,N,N,0,,change() column
+2026_06_11_145554_add_cloud_api_columns_to_whatapp_user_details_table.php,alter,,whatapp_user_details,,Y,N,N,N,N,0,,
+2026_06_15_000001_add_semantic_fields_to_semantic_intelligence_table.php,alter,,semantic_intelligence,,Y,N,N,N,N,0,,
+2026_06_15_000002_add_extraction_id_to_lms_concept_table.php,alter,,lms_concept,,Y,N,N,N,Y,0,,
+2026_06_15_000002_add_extraction_id_to_lms_learning_outcomes_table.php,alter,,lms_learning_outcomes,,Y,N,N,N,Y,0,,
+2026_06_15_000003_add_description_to_lms_concept_table.php,alter,,lms_concept,,Y,N,N,N,Y,0,,
+2026_06_16_000000_add_sub_institute_id_to_semantic_intelligence_table.php,alter,,semantic_intelligence,,Y,N,N,N,Y,1,,
+2026_06_17_114424_create_lms_intelligence_lesson_plans_table.php,create,lms_intelligence_lesson_plans,,,Y,N,Y,N,N,0,,unguarded create
+2026_06_17_114650_create_lms_lesson_plan_periods_table.php,create,lms_lesson_plan_periods,,,Y,N,Y,N,N,0,,unguarded create
+2026_06_17_114853_create_lms_lesson_plan_concepts_table.php,create,lms_lesson_plan_concepts,,,Y,N,Y,N,N,0,,unguarded create
+2026_06_17_120407_rename_foreign_keys_in_lesson_plan_tables.php,alter,,lms_lesson_plan_concepts;lms_lesson_plan_periods,,Y,N,N,N,N,0,,rename table/col;DROP trigger/index/fk
+2026_06_18_151107_create_lms_concept_mastery_log_table.php,create,lms_concept_mastery_log;lms_concept_mastery;lms_practice_sessions,,,Y,N,Y,N,N,0,,unguarded create
+2026_06_18_153544_create_lms_student_profile_table.php,create,lms_student_profile;lms_forgetting_curve;lms_student_engagement;lms_class_insights;lms_teacher_interventions;lms_peer_tutoring_groups;lms_knowledge_graph;lms_content_recommendations;lms_content_metadata,,,Y,N,Y,N,N,0,,unguarded create
+2026_07_11_130651_create_gamma_ppt_table.php,create,gamma_ppt,,,Y,N,Y,N,N,0,,unguarded create
+2026_07_13_000000_add_generated_columns_and_unique_index_to_lms_question_master.php,alter,,lms_question_master,,Y,N,N,Y,Y,0,,
+2026_07_13_000001_add_deleted_at_to_admission_enquiry_table.php,alter,,admission_enquiry,,Y,N,N,N,N,0,,
+2026_07_13_000001_widen_learning_outcome_on_lms_question_master.php,alter,,lms_question_master,,Y,N,N,Y,Y,0,,change() column
+2026_07_17_000001_create_ai_sops_table.php,create,ai_sops,,,Y,N,Y,N,N,0,,unguarded create
+2026_07_21_000000_add_assessment_rubrics_to_semantic_intelligence_table.php,alter,,semantic_intelligence,,Y,N,N,N,Y,0,,
+2026_07_22_000001_add_concept_id_to_content_master_table.php,alter,,content_master,,Y,N,N,Y,Y,0,,
+2026_07_24_000001_add_content_type_and_presentation_type_to_content_master_table.php,alter,,content_master,,Y,N,N,N,Y,0,,
+2026_07_24_120000_add_pal_tracking_columns.php,alter,,pal_pedagogy_effectiveness;pal_reflections,,Y,N,N,N,Y,0,,
+2026_07_24_130000_add_pal_telemetry_session_id.php,alter,,pal_telemetry_events,,Y,N,N,N,Y,0,,
+2026_07_29_000001_create_document_templates_table.php,create,document_templates,,,Y,N,Y,N,N,0,,unguarded create
+2026_07_29_000002_create_document_template_versions_table.php,create,document_template_versions,,,Y,N,Y,N,N,0,,unguarded create
+2026_07_30_000001_create_mcp_audit_logs_table.php,create,mcp_audit_logs,,,Y,N,Y,N,N,0,,unguarded create
+2026_07_30_000002_create_mcp_confirmation_requests_table.php,create,mcp_confirmation_requests,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_03_100000_add_database_table_to_tblmenumaster.php,alter,,tblmenumaster,,Y,Y,N,Y,Y,0,,
+2026_08_03_100100_create_onboarding_module_table.php,create,onboarding_module,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_03_100200_create_onboarding_step_table.php,create,onboarding_step,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_03_100300_create_onboarding_progress_table.php,create,onboarding_progress,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_07_000001_add_indexes_to_content_master_and_teacher_resource_tables.php,alter,,content_master;lms_teacher_resource,,Y,N,N,N,N,0,,
+2026_08_07_000001_add_source_to_content_master_table.php,alter,,content_master,,Y,N,N,N,Y,0,,
+2026_08_10_163830_add_status_columns_student_change_request.php,alter,,student_change_request,,Y,N,N,N,N,0,,
+2026_08_13_100000_add_pal_framework_metadata.php,create,pal_learning_evidence;pal_framework_progress,pal_contents;pal_learning_events;pal_telemetry_events,,Y,N,Y,N,Y,0,,unguarded create
+2026_08_13_100000_create_pal_content_intelligence_tables.php,create,pal_question_metadata;pal_content_metadata;pal_concept_metadata;pal_concept_relations;pal_misconception_library;pal_misconception_corrective;pal_learner_content_exposure;pal_content_review_log,,,Y,N,Y,Y,N,0,,
+2026_08_13_110000_add_chapter_linkage_to_pal_content_metadata.php,alter,,pal_content_metadata;pal_learner_content_exposure;pal_misconception_library;pal_question_metadata,,Y,N,N,N,Y,0,,
+2026_08_13_120000_create_pal_unified_learning_units_table.php,create,pal_unified_learning_units,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_14_100000_create_pal_content_model_tables.php,create,pal_cm_node_overrides;pal_cm_node_revisions;pal_cm_enrichment,,,Y,N,Y,Y,N,0,,
+2026_08_14_110000_add_new_pal_menu_under_homework.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_14_120000_create_pal_pedagogy_engine_tables.php,create,pal_pedagogy_engine_sections;pal_pedagogy_engine_rules,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_14_120000_grant_new_pal_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_14_130000_create_pal_pedagogy_engine_modules_table.php,create,pal_pedagogy_engine_modules,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_14_130000_move_new_pal_under_lms_pal.php,raw-sql/data,,,,Y,N,N,Y,N,0,"insert,update",DB update
+2026_08_14_140000_add_new_pal_submodule_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_14_140000_seed_pal_h5p_model_registry.php,other,,,,Y,N,N,N,N,0,,
+2026_08_14_150000_create_pal_h5p_node_metadata_table.php,create,pal_h5p_node_metadata,,,Y,N,Y,Y,N,0,,
+2026_08_14_150000_repair_new_pal_menu_link_and_submodules.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_08_14_160000_create_pal_architecture_settings_table.php,create,pal_architecture_settings,,,Y,N,Y,Y,N,0,,
+2026_08_14_160100_add_administration_submodule_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_17_100000_create_pal_gamification_tables.php,create,pal_badges;pal_learner_badges;pal_personal_bests;pal_personal_best_events;pal_learner_streaks;pal_streak_days;pal_team_challenges;pal_team_challenge_contributions;pal_challenge_mode_optins;pal_challenge_mode_settings;pal_challenge_mode_scores;pal_career_quest_states;pal_gamification_notifications,,,Y,N,Y,Y,N,0,"insert,update",
+2026_08_17_100100_create_hrms_leave_workflow_settings_table.php,create,hrms_leave_workflow_settings,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_17_100200_create_hrms_leave_role_permissions_table.php,create,hrms_leave_role_permissions,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_17_100300_add_carry_forward_to_hrms_leave_types_table.php,alter,,hrms_leave_types,,Y,N,N,N,Y,0,,
+2026_08_17_100400_extend_hrms_emp_leaves_status_enum.php,raw-sql/data,,,,Y,N,N,Y,N,3,,
+2026_08_17_110000_add_hrit_management_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_17_110000_add_new_pal_gamification_submodule_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_17_110100_grant_hrit_management_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_17_120000_fix_hrit_menu_link_collisions.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_17_130000_add_deleted_at_to_hrms_attendances_and_leave_allocation.php,alter,,hrms_attendances;hrms_leave_allocation,,Y,N,N,Y,Y,0,,
+2026_08_17_140000_add_start_end_date_to_transport_map_student_table.php,alter,,transport_map_student,,Y,N,N,N,N,0,,
+2026_08_17_140000_create_org_details_table.php,create,org_details,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_17_140100_add_contact_fields_to_org_details_table.php,alter,,org_details,,Y,N,N,N,N,0,,
+2026_08_17_140200_create_org_sister_details_table.php,create,org_sister_details,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_17_140300_add_contact_fields_to_org_sister_details_table.php,alter,,org_sister_details,,Y,N,N,N,N,0,,
+2026_08_17_150000_add_missing_audit_columns_to_hrit_leave_tables.php,alter,,hrms_holidays,,Y,N,N,Y,Y,0,,
+2026_08_18_100000_add_audit_columns_to_payroll_types.php,alter,,payroll_types,,Y,N,N,Y,Y,0,,
+2026_08_18_110000_create_talent_recruitment_tables.php,create,talent_job_postings;talent_job_applications;talent_interview_schedules;talent_interview_panel;talent_screening_results;talent_evaluation_form;talent_offers;talent_offer_templates,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_18_111000_create_talent_onboarding_tables.php,create,talent_onboarding_journeys;talent_onboarding_tasks;talent_onboarding_documents;talent_onboarding_journey_stages;talent_onboarding_notes;talent_onboarding_activity_log,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_18_112000_create_talent_performance_tables.php,create,s_performance_cycles;s_performance_reviews;s_performance_goals;s_performance_appraisals;s_performance_compensation_revisions;s_performance_bonus_awards;s_performance_calibration_sessions;s_performance_activity_log;s_performance_notes;s_performance_attachments;s_performance_saved_views,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_18_113000_create_talent_mobility_succession_tables.php,create,s_mobility_jobs;s_mobility_applications;s_mobility_transfers;s_mobility_promotions;s_mobility_succession_plans;s_mobility_talent_pools;s_mobility_talent_pool_members,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_18_114000_create_talent_offboarding_tables.php,create,talent_offboarding_cases,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_18_115000_create_talent_administration_tables.php,create,talent_workflows;talent_workflow_stages;talent_workflow_approvers,,,Y,N,Y,Y,N,0,,
+2026_08_18_120000_add_talent_management_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_18_120100_grant_talent_management_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_18_130000_create_pal_chapter_alignment_table.php,create,pal_chapter_alignment,,,Y,N,Y,Y,N,0,,
+2026_08_18_172423_alter_tblstudent_password_column_length.php,raw-sql/data,,,,Y,N,N,N,N,2,,MODIFY/ALTER COLUMN
+2026_08_19_090000_create_s_users_skills_table.php,create,s_users_skills,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_19_120000_create_pal_recommendation_log_table.php,create,pal_recommendation_log,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_19_175453_create_org_compliance_library_table.php,create,org_compliance_library,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_19_175454_create_org_disciplinary_library_table.php,create,org_disciplinary_library,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_19_175500_add_hr_columns_to_tbluser_table.php,alter,,tbluser,,Y,N,N,Y,Y,0,,
+2026_08_19_175501_add_role_keys_and_is_mobile_rights_columns.php,alter,,tblgroupwise_rights;tblindividual_rights;tbluserprofilemaster,,Y,N,N,Y,Y,0,,
+2026_08_20_000001_create_jobs_table.php,create,jobs;job_batches,,,Y,N,Y,Y,N,0,,
+2026_08_20_000002_create_ontology_tables.php,create,ontology_entities;ontology_relationships,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_000003_create_ai_intelligence_tables.php,create,ai_signal_definitions;ai_signals;ai_evidence;ai_cases;ai_case_signals;ai_case_evidence;ai_hypotheses;ai_explanations;ai_recommendations;ai_decisions;ai_outcomes;ai_audit_logs,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_000004_create_ai_agent_tables.php,create,ai_agents;ai_agent_tools;ai_agent_runs,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_000005_create_workflow_tables.php,create,workflow_definitions;workflow_versions;workflow_runs;workflow_steps;workflow_approvals;workflow_outcomes,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_000006_create_ai_generation_tables.php,create,ai_templates;ai_generation_requests;ai_generation_outputs,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_000007_seed_core_ontology.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_08_20_000008_create_academic_interventions_table.php,create,academic_interventions;academic_intervention_activities,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_000009_seed_academic_risk_intelligence.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,update,upsert",
+2026_08_20_000010_add_ai_administration_menu.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert",
+2026_08_20_000011_create_ai_workspace_tables.php,create,ai_modules;ai_suggestions;ai_ontology_views,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_000012_seed_ai_workspace_config.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update,upsert",DB delete
+2026_08_20_000013_gate_ai_suggestions_by_role.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_08_20_090000_create_s_level_responsibility_table.php,create,s_level_responsibility,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_090100_create_s_user_skill_jobrole_table.php,create,s_user_skill_jobrole,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_090200_create_s_skill_knowledge_ability_table.php,create,s_skill_knowledge_ability,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_090300_create_s_user_jobrole_task_table.php,create,s_user_jobrole_task,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_20_091000_add_missing_columns_to_skill_jobrole_task_tables.php,alter,,s_skill_knowledge_ability;s_user_jobrole_task;s_user_skill_jobrole,,Y,N,N,N,N,0,,
+2026_08_20_091100_add_sector_track_to_s_user_skill_jobrole_table.php,alter,,s_user_skill_jobrole,,Y,N,N,N,N,0,,
+2026_08_20_100000_add_planning_columns_to_task_table.php,alter,,task,,Y,N,N,N,Y,0,,
+2026_08_20_100100_create_task_management_project_tables.php,create,task_management_projects;task_management_project_members;task_management_workstreams;task_management_project_tasks,,,Y,N,Y,Y,N,0,,
+2026_08_20_100200_create_task_management_dependency_tables.php,create,task_management_dependencies;task_management_milestones,,,Y,N,Y,Y,N,0,,
+2026_08_20_100300_create_task_management_support_tables.php,create,task_management_comments;task_management_audit_logs;task_management_notifications;task_management_subtasks;task_management_time_entries;task_management_templates;task_management_recurrences;task_management_attachment_versions;task_management_idempotency_keys;task_deadline_extensions,,,Y,N,Y,Y,N,0,,
+2026_08_20_100400_create_task_option_sets.php,create,task_management_statuses;task_management_priorities,task,,Y,N,Y,Y,Y,0,,
+2026_08_20_100500_create_task_status_history.php,create,task_status_history,,,Y,N,Y,Y,N,0,,
+2026_08_20_100600_add_task_management_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_20_100700_grant_task_management_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_20_100800_add_task_management_missing_columns_to_task_table.php,alter,,task,,Y,N,N,N,Y,0,,
+2026_08_20_100800_add_workflow_columns_to_task_table.php,alter,,task,,Y,N,N,N,Y,0,,
+2026_08_20_100900_create_task_management_project_departments_table.php,create,task_management_project_departments,,,Y,N,Y,Y,N,0,insert,
+2026_08_20_101000_create_competency_task_map_tables.php,create,competency;competency_kasba_item;competency_kasba_rating;jobrole_task_competency_map,,,Y,N,Y,Y,N,0,,
+2026_08_20_101100_add_project_workstream_columns_to_task_management_dependencies_table.php,alter,,task_management_dependencies,,Y,N,N,N,Y,0,update,DB update
+2026_08_21_000001_seed_ai_module_coverage.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_21_000002_seed_course_catalog_ai.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB delete;DB update
+2026_08_21_000003_seed_page_type_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_21_090000_create_competency_module_tables.php,create,s_competency_certifications;s_competency_development_plans;s_competency_activity_log,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_21_090100_create_competency_employee_notes_table.php,create,s_competency_employee_notes,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_21_090200_create_competency_evidence_table.php,create,s_competency_evidence,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_21_090300_create_competency_career_path_tables.php,create,s_competency_career_paths;s_competency_career_path_steps,,,Y,N,Y,Y,N,0,,
+2026_08_21_090400_create_competency_plan_actions_table.php,create,s_competency_plan_actions,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_21_090500_add_plan_detail_columns_to_competency_development_plans.php,alter,,s_competency_development_plans,,Y,N,N,N,Y,0,,
+2026_08_21_090600_add_competency_link_to_lms_assignments_table.php,create,lms_assignments,lms_assignments,,Y,N,N,Y,Y,0,,
+2026_08_21_090700_create_competency_certification_requirements_table.php,create,s_competency_certification_requirements,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_21_090800_add_compliance_columns_to_competency_certifications.php,alter,,s_competency_certifications,,Y,N,N,N,Y,0,,
+2026_08_21_090900_add_certification_link_to_competency_evidence.php,alter,,s_competency_evidence,,Y,N,N,N,Y,0,,
+2026_08_21_091000_add_audit_columns_to_competency_activity_log.php,alter,,s_competency_activity_log,,Y,N,N,N,Y,0,,
+2026_08_21_091100_add_kasba_and_audit_columns_to_s_skill_matrix.php,alter,,s_skill_matrix,,Y,Y,N,Y,Y,0,,
+2026_08_21_100000_optimise_neo4j_sync_tables.php,raw-sql/data,,,,Y,N,N,N,N,4,,
+2026_08_21_100100_create_neo4j_sync_triggers.php,raw-sql/data,,,,Y,N,N,N,N,4,,
+2026_08_21_120000_add_competency_management_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_21_120100_grant_competency_management_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_21_130000_add_kasba_rating_support_columns.php,create,jobrole_competency_map,competency_kasba_item;competency_kasba_rating,,Y,Y,N,Y,Y,0,,
+2026_08_21_140000_create_missing_talent_onboarding_activity_log.php,create,talent_onboarding_activity_log,,,Y,N,Y,Y,N,0,,
+2026_08_21_150000_create_missing_performance_tables.php,create,s_performance_goals;s_performance_appraisals;s_performance_compensation_revisions;s_performance_bonus_awards;s_performance_calibration_sessions;s_performance_activity_log;s_performance_notes;s_performance_attachments;s_performance_saved_views,,,Y,Y,N,Y,N,0,,
+2026_08_22_000001_create_ai_conversation_tables.php,create,ai_conversations;ai_conversation_turns,,,Y,N,Y,Y,N,0,,
+2026_08_22_000002_fix_course_catalog_summary_template.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_08_22_100000_create_lms_concept_intelligence_tab_labels_table.php,create,lms_concept_intelligence_tab_labels,,,Y,N,Y,Y,N,0,,
+2026_08_24_090000_create_competency_framework_studio_tables.php,create,s_competency_frameworks;s_competency_framework_items;s_competency_framework_weights;s_competency_mapping_reviews,,,Y,N,Y,Y,N,0,,
+2026_08_24_090000_create_system_audit_logs_table.php,create,system_audit_logs,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_24_090100_create_competency_studio_support_tables.php,create,s_competency_settings;s_proficiency_levels;$table,,,Y,N,Y,Y,N,0,,
+2026_08_24_090100_create_result_locks_table.php,create,result_locks,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_24_090200_create_capability_library_support_tables.php,create,s_invisible_library;s_user_skill_application;s_library_map,,,Y,N,Y,Y,N,0,,
+2026_08_24_090300_add_competency_library_crud_columns.php,alter,,competency;competency_kasba_item,,Y,Y,N,N,Y,0,,
+2026_08_24_120000_add_capability_intelligence_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_24_120100_grant_capability_intelligence_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_24_130000_create_s_competency_approvals_table.php,create,s_competency_approvals,,,Y,N,Y,Y,N,0,,
+2026_08_24_130100_add_rejected_to_skills_approve_status.php,raw-sql/data,,,,Y,N,N,N,Y,2,,
+2026_08_24_140000_add_taxonomy_columns_to_competency.php,alter,,competency,,Y,Y,N,N,Y,0,,
+2026_08_24_150000_seed_default_proficiency_scale.php,raw-sql/data,,,,Y,Y,N,Y,N,0,insert,
+2026_08_25_100000_add_deleted_at_to_lms_question_master.php,alter,,lms_question_master,,Y,N,N,Y,Y,0,,
+2026_08_25_150000_grant_student_role_full_workflow_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_25_150100_fix_student_role_menu_link_conventions.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_25_150200_grant_student_lms_dashboard_menu_right.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_25_160000_add_department_management_fields.php,alter,,hrms_departments,,Y,N,N,Y,Y,2,update,
+2026_08_25_160000_correct_student_role_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB delete;DB update
+2026_08_25_170000_grant_student_menu_container_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_08_26_000001_create_student_aspirations_table.php,create,student_aspirations,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_26_000002_create_evidence_events_table.php,create,evidence_events,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_26_100000_add_new_pal_framework_ulu_pedagogy_engine_submodule_menus.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_08_27_100000_make_pal_competency_bloom_level_nullable.php,raw-sql/data,,,,Y,Y,N,Y,Y,1,,
+2026_08_27_120000_add_context_columns_to_pal_learning_sessions.php,alter,,pal_learning_sessions,,Y,N,N,Y,Y,0,,
+2026_08_31_000001_add_display_id_to_evidence_events_table.php,raw-sql/data,,,,Y,N,N,N,N,1,,
+2026_08_31_000001_add_turn_sequence_unique_index.php,alter,,ai_conversation_turns,,Y,N,N,Y,N,0,,
+2026_08_31_000002_drop_display_id_from_evidence_events_table.php,alter,,evidence_events,,Y,N,N,N,N,1,,dropColumn
+2026_08_31_000003_convert_evidence_id_to_autoincrement.php,raw-sql/data,,,,Y,N,N,N,N,19,update,dropColumn;MODIFY/ALTER COLUMN;DROP trigger/index/fk
+2026_08_31_000004_add_grade_scoped_index_to_evidence_events_table.php,alter,,evidence_events,,Y,N,N,N,N,0,,
+2026_08_31_100100_add_misconception_id_to_answer_master_table.php,alter,,answer_master,,Y,N,N,N,Y,0,,
+2026_08_31_100200_add_item_type_to_pal_question_metadata_table.php,alter,,pal_question_metadata,,Y,N,N,N,Y,0,,
+2026_08_31_100300_add_learning_pattern_to_lms_concept_table.php,alter,,lms_concept,,Y,N,N,N,Y,0,,
+2026_08_31_100400_create_pal_concept_nodes_table.php,create,pal_concept_nodes,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_31_100500_create_learner_node_state_table.php,create,learner_node_state,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_31_100600_create_eso_decision_log_table.php,create,eso_decision_log,,,Y,N,Y,N,N,0,,unguarded create
+2026_08_31_100700_add_node_id_to_pal_question_metadata_table.php,alter,,pal_question_metadata,,Y,N,N,N,Y,0,,
+2026_08_31_100800_add_consecutive_correct_to_learner_node_state_table.php,alter,,learner_node_state,,Y,N,N,N,Y,0,,
+2026_08_31_100900_add_active_misconception_id_to_learner_node_state_table.php,alter,,learner_node_state,,Y,N,N,N,Y,0,,
+2026_08_31_120000_create_pal_pilot_enrollments_table.php,create,pal_pilot_enrollments,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_01_000001_add_unique_enrollment_no_to_tblstudent.php,alter,,tblstudent,,Y,N,N,N,N,0,,
+2026_09_01_000001_enable_student_intervention_workflow.php,raw-sql/data,,,,Y,Y,N,Y,N,0,update,DB update
+2026_09_01_000002_publish_single_approval_academic_intervention_workflow.php,raw-sql/data,,,,Y,Y,N,Y,N,0,update,DB update
+2026_09_01_100000_add_sub_institute_id_to_lesson_plan_child_tables.php,alter,,lms_lesson_plan_concepts;lms_lesson_plan_periods,,Y,N,N,Y,Y,2,,
+2026_09_02_100000_create_eso_response_log_table.php,create,eso_response_log,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_03_000100_brain_organization.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_000200_brain_audit.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_000300_brain_department.php,raw-sql/data,,,,Y,N,Y,N,N,5,,
+2026_09_03_000400_brain_person.php,raw-sql/data,,,,Y,N,Y,N,N,8,,
+2026_09_03_000500_brain_capability.php,raw-sql/data,,,,Y,N,Y,N,N,14,,
+2026_09_03_000600_brain_events.php,raw-sql/data,,,,Y,N,Y,N,N,14,,
+2026_09_03_000700_brain_observability.php,raw-sql/data,,,,Y,N,Y,N,N,26,,
+2026_09_03_000800_brain_intelligence_entities.php,raw-sql/data,,,,Y,N,Y,N,N,14,,
+2026_09_03_000900_brain_evidence.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_001000_brain_outcomes_learnings.php,raw-sql/data,,,,Y,N,Y,N,N,6,,
+2026_09_03_001100_brain_eso_executions.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_001200_brain_executors.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_001300_brain_decision_intelligence.php,raw-sql/data,,,,Y,N,Y,Y,Y,16,,DB update;MODIFY/ALTER COLUMN
+2026_09_03_001400_brain_mental_model_reinforcement.php,raw-sql/data,,,,Y,Y,N,N,N,4,,MODIFY/ALTER COLUMN
+2026_09_03_001500_brain_department_scoped_signals.php,raw-sql/data,,,,Y,Y,N,N,Y,3,,MODIFY/ALTER COLUMN
+2026_09_03_001600_brain_case_engine.php,raw-sql/data,,,,Y,N,Y,Y,N,10,,
+2026_09_03_001700_brain_conversation_engine.php,raw-sql/data,,,,Y,N,Y,Y,N,7,,
+2026_09_03_001800_brain_conversation_pinning.php,raw-sql/data,,,,Y,Y,N,N,Y,3,,
+2026_09_03_001900_brain_notifications_and_settings.php,raw-sql/data,,,,Y,N,Y,Y,N,4,,
+2026_09_03_002000_brain_ai_governance.php,raw-sql/data,,,,Y,N,Y,Y,Y,5,,
+2026_09_03_002100_brain_knowledge_assets.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_09_03_002200_brain_kasba_task_hierarchy.php,raw-sql/data,,,,Y,N,Y,Y,N,5,,
+2026_09_03_002300_brain_eso_execution_evidence.php,raw-sql/data,,,,Y,N,Y,Y,N,2,,
+2026_09_03_002400_brain_career_taxonomy.php,raw-sql/data,,,,Y,N,Y,Y,N,6,,
+2026_09_03_002500_brain_accreditation_framework.php,raw-sql/data,,,,Y,N,Y,Y,N,5,,
+2026_09_03_002600_brain_placement_taxonomy.php,raw-sql/data,,,,Y,N,Y,Y,N,5,,
+2026_09_03_002700_brain_api_keys.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_09_03_002800_brain_guardians.php,raw-sql/data,,,,Y,N,Y,Y,N,2,,
+2026_09_03_002900_brain_auth_users.php,raw-sql/data,,,,Y,N,Y,Y,N,1,,
+2026_09_03_003000_brain_tenants.php,raw-sql/data,,,,Y,N,Y,Y,N,1,,
+2026_09_03_003100_brain_process_library.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_09_03_003200_brain_context_library.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_09_03_003300_brain_reasoning_pattern_library.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_09_03_003400_brain_eso_definition_library.php,raw-sql/data,,,,Y,N,Y,Y,Y,7,,
+2026_09_03_003500_brain_evidence_ledger.php,raw-sql/data,,,,Y,Y,N,N,Y,1,,
+2026_09_03_003600_brain_learning_efficacy.php,raw-sql/data,,,,Y,N,Y,Y,N,3,,
+2026_09_03_003700_brain_policy_library_additions.php,raw-sql/data,,,,Y,Y,N,N,Y,3,,
+2026_09_03_003800_brain_telemetry_library.php,raw-sql/data,,,,Y,N,Y,Y,N,5,,
+2026_09_03_003900_brain_capability_state.php,alter,,hpbrain_capability_proficiency,,Y,N,N,N,N,0,update,DB update
+2026_09_03_004000_brain_make_org_id_nullable.php,other,,,,Y,Y,N,N,N,0,,
+2026_09_03_004100_brain_make_org_id_nullable.php,raw-sql/data,,,,Y,Y,N,Y,Y,1,,MODIFY/ALTER COLUMN
+2026_09_03_004200_brain_decision_approval.php,raw-sql/data,,,,Y,N,N,N,Y,2,,change() column;MODIFY/ALTER COLUMN
+2026_09_03_004300_brain_learning_domain.php,other,,,,Y,N,N,N,Y,0,,
+2026_09_03_004400_brain_measurement_plans.php,create,hpbrain_measurement_plans,hpbrain_recommendations,,Y,N,Y,Y,Y,9,,
+2026_09_03_004500_brain_add_rollback_reason_to_eso_executions_table.php,alter,,hpbrain_eso_executions,,Y,N,N,N,N,0,,
+2026_09_03_004600_brain_refresh_tokens.php,create,hpbrain_refresh_tokens,,,Y,N,Y,Y,N,0,,
+2026_09_03_004700_brain_industries.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_004800_brain_organization_configs.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_004900_brain_terminology.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_005000_brain_entity_mappings.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_005100_brain_feature_flags.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_005200_brain_modules.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_005300_brain_organization_modules.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_005400_brain_navigation_items.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_005500_brain_dashboards.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_005600_brain_dashboard_widgets.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_005700_brain_dashboard_layouts.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_005800_brain_branding.php,raw-sql/data,,,,Y,N,Y,N,N,2,,
+2026_09_03_005900_brain_themes.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_006000_brain_forms.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_006100_brain_config_versions.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_006200_brain_industry_templates.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_006300_brain_organization_types.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_006400_brain_organization_units.php,raw-sql/data,,,,Y,N,Y,N,N,6,,
+2026_09_03_006500_brain_roles.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_006600_brain_positions.php,raw-sql/data,,,,Y,N,Y,N,N,5,,
+2026_09_03_006700_brain_skills.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_006800_brain_competencies.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_006900_brain_add_org_unit_id_to_capabilities.php,raw-sql/data,,,,Y,N,N,N,N,3,,
+2026_09_03_007000_brain_person_roles.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_007100_brain_person_skills.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_007200_brain_person_competencies.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_007300_brain_location_types.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_007400_brain_locations.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_007500_brain_reporting_structures.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_007600_brain_onboarding_sessions.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_007700_brain_import_jobs.php,raw-sql/data,,,,Y,N,Y,N,N,5,,
+2026_09_03_007800_brain_import_logs.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_007900_brain_readiness_checks.php,raw-sql/data,,,,Y,N,Y,N,N,5,,
+2026_09_03_008000_brain_template_overrides.php,raw-sql/data,,,,Y,N,Y,N,N,4,,
+2026_09_03_008100_brain_ai_providers.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_008200_brain_ai_fallback_chains.php,raw-sql/data,,,,Y,N,Y,N,N,2,,
+2026_09_03_008300_brain_ai_prompt_templates.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_008400_brain_ai_evaluations.php,raw-sql/data,,,,Y,N,Y,N,N,2,,
+2026_09_03_008500_brain_ai_feedback.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_008600_brain_ai_quotas.php,raw-sql/data,,,,Y,N,Y,N,N,2,,
+2026_09_03_008700_brain_ai_safety_rules.php,raw-sql/data,,,,Y,N,Y,N,N,2,,
+2026_09_03_008800_brain_backfill_missing_indexes.php,raw-sql/data,,,,Y,Y,N,Y,N,1,,
+2026_09_03_008900_brain_erp_lookup_indexes.php,raw-sql/data,,,,Y,N,N,Y,Y,2,,
+2026_09_03_009000_brain_entity_mappings_field_unique_key.php,raw-sql/data,,,,Y,N,N,Y,N,3,,DROP trigger/index/fk
+2026_09_03_009100_brain_signal_rules.php,raw-sql/data,,,,Y,N,Y,N,N,3,,
+2026_09_03_009200_brain_industry_assessment_model.php,raw-sql/data,,,,Y,N,N,Y,Y,2,,
+2026_09_03_009300_brain_metric_snapshots.php,raw-sql/data,,,,Y,N,Y,N,N,2,,
+2026_09_03_009400_brain_precision_on_decimal_columns.php,raw-sql/data,,,,Y,Y,N,Y,Y,1,,
+2026_09_03_009500_brain_signal_rule_key.php,alter,,hpbrain_signals,,Y,N,N,Y,Y,0,,
+2026_09_03_009600_brain_operational_records.php,raw-sql/data,,,,Y,N,Y,N,N,7,,
+2026_09_03_009700_brain_ingestion.php,raw-sql/data,,,,Y,N,N,Y,Y,4,,
+2026_09_03_009800_brain_ingestion_data_sources.php,raw-sql/data,,,,Y,N,Y,N,N,2,,
+2026_09_03_009900_brain_recommendation_evidence.php,raw-sql/data,,,,Y,N,Y,Y,N,2,,
+2026_09_03_010000_brain_data_sources_field_map_and_checkpoint.php,raw-sql/data,,,,Y,N,N,Y,Y,3,,
+2026_09_03_010100_brain_queue_jobs_tables.php,create,jobs;job_batches;failed_jobs,,,Y,N,Y,Y,N,0,,
+2026_09_03_010200_brain_signal_rule_root_cause.php,alter,,hpbrain_signal_rules,,Y,N,N,Y,Y,0,,
+2026_09_03_010300_brain_case_signals.php,raw-sql/data,,,,Y,N,Y,Y,N,1,insertOrIgnore,
+2026_09_03_010400_brain_operational_rule_metadata.php,create,hpbrain_operational_rule_metadata,,,Y,N,Y,Y,N,0,,
+2026_09_03_010500_brain_widen_import_job_source_id.php,raw-sql/data,,,,Y,Y,N,Y,Y,1,,MODIFY/ALTER COLUMN
+2026_09_03_010600_brain_operational_records_category_indexes.php,raw-sql/data,,,,Y,N,N,Y,Y,2,,
+2026_09_03_010700_brain_students.php,raw-sql/data,,,,Y,N,Y,Y,N,1,,
+2026_09_03_010800_brain_students_projection_columns.php,raw-sql/data,,,,Y,N,N,Y,Y,4,,
+2026_09_03_010900_brain_operational_records_freshness_index.php,raw-sql/data,,,,Y,N,N,Y,N,3,,
+2026_09_03_011000_brain_intelligence_dashboard_indexes.php,raw-sql/data,,,,Y,N,N,Y,N,3,,
+2026_09_03_011100_brain_signal_dedupe_key.php,alter,,hpbrain_signals,,Y,N,N,Y,Y,1,,
+2026_09_03_011200_brain_students_roster_flag.php,raw-sql/data,,,,Y,N,N,Y,Y,4,,
+2026_09_03_011300_brain_operational_records_measure_indexes.php,raw-sql/data,,,,Y,N,N,Y,Y,2,,
+2026_09_03_011400_brain_operational_records_provenance_indexes.php,raw-sql/data,,,,Y,N,N,Y,Y,2,,
+2026_09_03_011500_brain_operational_records_department_label.php,raw-sql/data,,,,Y,N,N,Y,Y,4,,
+2026_09_03_011600_brain_operational_records_person_link_indexes.php,raw-sql/data,,,,Y,N,N,Y,Y,4,,
+2026_09_03_011700_brain_operational_records_owner_attribution_indexes.php,raw-sql/data,,,,Y,N,N,Y,N,4,,
+2026_09_03_100000_add_retention_stage_to_learner_node_state_table.php,alter,,learner_node_state,,Y,N,N,N,N,0,,
+2026_09_03_110000_add_cfu_columns_to_learner_node_state_table.php,alter,,learner_node_state,,Y,N,N,N,N,0,update,DB update
+2026_09_04_100000_add_lms_engagement_indexes.php,raw-sql/data,,,,Y,N,N,Y,N,2,,
+2026_09_04_130000_add_ai_evaluation_columns_to_lms_assignment_table.php,alter,,lms_assignment,,Y,N,N,N,N,0,,
+2026_09_04_140000_add_edge_key_to_neo4j_sync_queue.php,alter,,neo4j_sync_queue,,Y,N,N,Y,Y,0,,
+2026_09_05_000000_add_category_to_lms_question_master.php,alter,,lms_question_master,,Y,N,N,Y,Y,0,,
+2026_09_05_000001_create_student_ambitions_table.php,create,student_ambitions,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_05_000002_create_student_career_originality_table.php,create,student_career_originality,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_05_100000_add_career_awareness_submodule_menus.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_09_05_110000_create_fees_menu_category_tables.php,create,fees_menu_categories;fees_menu_category_items,,,Y,N,Y,Y,N,0,"insert,update",
+2026_09_05_120000_add_route_to_fees_menu_categories.php,alter,,fees_menu_categories,,Y,N,N,Y,Y,0,update,DB update
+2026_09_05_130000_add_process_builder_fees_category.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_05_140000_reorder_and_extend_fees_categories.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_05_200000_add_career_explorer_submodule_menus.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_09_05_210000_add_g2g_lms_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_05_210100_grant_g2g_lms_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_05_220000_alter_sub_std_map_for_g2g_lms.php,alter,,sub_std_map,,Y,N,N,N,Y,1,,
+2026_09_05_220000_create_lms_certificates_table.php,create,lms_certificates,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_05_220100_create_lms_course_enroll_table.php,create,lms_course_enroll,lms_course_enroll,,Y,N,Y,Y,N,1,,
+2026_09_05_220100_create_lms_course_settings_table.php,create,lms_course_settings,,,Y,N,Y,Y,N,0,,
+2026_09_05_220200_create_lms_content_progress_table.php,create,lms_content_progress,,,Y,N,Y,Y,N,0,,
+2026_09_05_220200_create_lms_course_prerequisites_table.php,create,lms_course_prerequisites,,,Y,N,Y,Y,N,0,,
+2026_09_05_220300_create_ai_course_outlines_table.php,create,ai_course_outlines,,,Y,N,Y,Y,N,0,,
+2026_09_05_220300_create_lms_content_notes_table.php,create,lms_content_notes,,,Y,N,Y,Y,N,0,,
+2026_09_05_220400_create_lms_course_discussions_table.php,create,lms_course_discussions;lms_course_discussion_replies,,,Y,N,Y,Y,N,0,,
+2026_09_05_220400_create_suggested_course_table.php,create,suggested_course,,,Y,N,Y,Y,Y,0,,
+2026_09_05_230100_create_lms_assignments_table.php,create,lms_assignments,lms_assignments,,Y,N,Y,Y,Y,0,,
+2026_09_05_230200_add_g2g_lms_columns_to_lms_virtual_classroom_table.php,alter,,lms_virtual_classroom,,Y,N,N,N,Y,0,,change() column
+2026_09_05_230300_create_lms_session_registrations_table.php,create,lms_session_registrations,,,Y,N,Y,Y,N,0,,
+2026_09_06_100000_create_lms_vendors_table.php,create,lms_vendors,,,Y,N,Y,Y,N,0,,
+2026_09_06_100100_create_lms_trainers_table.php,create,lms_trainers,,,Y,N,Y,Y,N,0,,
+2026_09_06_100200_create_lms_integrations_table.php,create,lms_integrations,,,Y,N,Y,Y,N,0,,
+2026_09_06_100250_align_g2g_lms_course_reference_types.php,raw-sql/data,,,,Y,Y,N,Y,N,1,,
+2026_09_06_100300_create_s_competency_assessment_cycles_table.php,create,s_competency_assessment_cycles,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_06_100400_create_s_competency_assessments_table.php,create,s_competency_assessments,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_06_100500_create_competency_assessment_ai_tables.php,create,competency_assessment_test;competency_assessment_question;competency_assessment_response,,,Y,N,Y,Y,N,0,,
+2026_09_07_100000_create_lms_content_resource_metadata_table.php,create,lms_content_resource_metadata,,,Y,N,Y,Y,N,0,,
+2026_09_07_120000_create_course_jobrole_map_table.php,create,course_jobrole_map,,,Y,N,Y,Y,N,0,,
+2026_09_07_130000_create_course_competency_map_table.php,create,course_competency_map,,,Y,N,Y,Y,N,0,,
+2026_09_07_140000_add_auto_apply_rating_to_lms_course_settings.php,alter,,lms_course_settings,,Y,N,N,N,Y,0,,
+2026_09_07_170000_create_lms_content_provenance_table.php,create,lms_content_provenance,,,Y,N,Y,Y,N,0,,
+2026_09_08_060000_add_homework_columns_to_lms_assignment_table.php,alter,,lms_assignment,,Y,N,N,N,N,0,,
+2026_09_08_090000_create_lms_concept_intelligence_index_table.php,create,lms_concept_intelligence_index,,,Y,N,Y,Y,N,0,,
+2026_09_08_100000_add_new_pal_eso_submodule_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_09_08_100000_move_framework_menu_under_curriculum.php,raw-sql/data,,,,Y,N,N,Y,N,0,update,
+2026_09_08_110000_add_learning_purpose_to_pal_content_metadata.php,alter,,pal_content_metadata,,Y,N,N,Y,Y,0,,
+2026_09_08_120000_add_board_compliance_to_pal_question_metadata.php,alter,,pal_question_metadata,,Y,N,N,Y,Y,0,,
+2026_09_08_120000_create_lms_content_authoring_audit_table.php,create,lms_content_authoring_audit,,,Y,N,Y,Y,N,0,,
+2026_09_08_130000_create_pal_curriculum_versions_table.php,create,pal_curriculum_versions,$table,,Y,N,Y,Y,Y,0,,
+2026_09_08_140000_add_new_pal_reports_submodule_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_09_08_150000_add_rule_keys_to_pal_recommendation_log.php,alter,,pal_recommendation_log,,Y,N,N,Y,Y,0,,
+2026_09_08_160000_fix_curriculum_version_scope_uniqueness.php,alter,,pal_curriculum_versions,,Y,N,N,Y,N,0,update,DB update;change() column
+2026_09_10_000001_add_ai_intelligence_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_10_000001_add_question_bank_columns_to_homework_table.php,alter,,homework,,Y,N,N,N,N,0,,
+2026_09_10_000001_seed_fees_collection_workflow.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,update",DB update
+2026_09_10_000002_seed_field_edit_prompt_template.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_10_000002_update_fees_ai_workspace_capabilities.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_09_10_000003_add_ai_module_configuration.php,raw-sql/data,,,,Y,N,Y,Y,Y,0,insert,
+2026_09_10_000004_add_ai_policies_tables.php,create,ai_policies;ai_policy_rules;ai_policy_assignments;ai_policy_acknowledgements,,,Y,N,Y,Y,N,0,,
+2026_09_10_000004_seed_fees_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_09_10_000005_add_is_example_to_ai_policies_table.php,alter,,ai_policies,,Y,N,N,N,Y,0,,
+2026_09_10_150000_add_module_name_to_fees_menu_category_tables.php,other,,,,Y,N,N,Y,Y,0,,
+2026_09_10_150001_seed_teach_learn_menu_categories.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_10_150002_seed_teach_learn_report_items.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_10_150003_seed_teach_learn_master_items.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,updateOrInsert",
+2026_09_11_000001_add_submission_review_columns_to_homework_table.php,alter,,homework,,Y,N,N,N,N,0,,
+2026_09_11_100000_create_platform_notification_channels_table.php,create,platform_notification_channels,,,Y,N,Y,Y,N,0,,
+2026_09_11_100100_create_platform_notification_preferences_table.php,create,platform_notification_preferences,,,Y,N,Y,Y,N,0,,
+2026_09_11_100200_create_platform_scheduled_tasks_table.php,create,platform_scheduled_tasks,,,Y,N,Y,Y,N,0,,
+2026_09_11_100300_create_platform_workflows_table.php,create,platform_workflows,,,Y,N,Y,Y,N,0,,
+2026_09_11_100400_add_platform_services_menu_rows.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_11_114052_rename_engagement_score_to_exam_accuracy.php,alter,,pal_learning_sessions,,Y,N,N,Y,Y,0,,rename table/col;change() column
+2026_09_11_120000_move_teach_learn_course_catalog_to_onboarding.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,updateOrInsert",DB delete
+2026_09_11_121000_restore_teach_learn_operations_course_catalog.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,update,updateOrInsert",DB delete;DB update
+2026_09_11_122000_set_teach_learn_process_builder_route.php,raw-sql/data,,,,Y,N,N,Y,Y,0,update,DB update
+2026_09_14_000001_add_module_key_to_ai_templates.php,alter,,ai_templates,,Y,N,N,Y,Y,0,update,
+2026_09_14_000002_rename_prompt_management_to_template_management.php,raw-sql/data,,,,Y,N,N,Y,Y,0,update,
+2026_09_14_000003_add_report_layout_to_ai_templates.php,alter,,ai_templates,,Y,N,N,Y,Y,0,update,DB update
+2026_09_14_000004_create_ai_generated_reports_table.php,create,ai_generated_reports,,,Y,N,Y,Y,N,0,,
+2026_09_14_000005_restore_fees_ai_workspace.php,raw-sql/data,,,,Y,Y,N,Y,N,0,"insert,update",DB update
+2026_09_14_000005_seed_sample_fees_report_template.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert",
+2026_09_16_000001_seed_fees_ontology.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_16_000002_enable_fees_agent_capability.php,raw-sql/data,,,,Y,N,N,Y,N,0,update,
+2026_09_16_000003_add_policy_columns_to_kb_detail.php,alter,,knowledge_base_detail,,Y,N,N,Y,Y,0,,
+2026_09_16_000100_brain_year_scope_intelligence.php,alter,,$table,,Y,N,N,Y,Y,0,,
+2026_09_16_100000_create_pal_learning_relations_table.php,create,pal_learning_relations,,,Y,N,Y,Y,N,0,,
+2026_09_16_100100_create_pal_relation_audit_table.php,create,pal_relation_audit,,,Y,N,Y,Y,N,0,,
+2026_09_16_100200_add_topic_id_to_lms_concept_table.php,alter,,lms_concept,,Y,N,N,N,Y,0,,
+2026_09_16_120000_create_pal_concept_video_table.php,create,pal_concept_video,,,Y,N,Y,Y,N,1,,
+2026_09_17_090000_hide_fees_workflow_scheduler_audit_trail_categories.php,raw-sql/data,,,,Y,N,N,Y,Y,0,update,
+2026_09_17_100000_add_level2_menu_id_to_menu_categories.php,alter,,fees_menu_categories,,Y,N,N,Y,Y,2,update,DB update;MODIFY/ALTER COLUMN
+2026_09_17_100000_create_pal_diagnostic_attempt_table.php,create,pal_diagnostic_attempt,,,Y,Y,N,Y,N,0,,
+2026_09_17_100000_register_fees_agent_and_arrears_signal.php,raw-sql/data,,,,Y,N,N,Y,N,0,"insert,update",
+2026_09_17_100001_seed_all_module_menu_categories.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert",
+2026_09_17_100100_create_pal_diagnostic_response_table.php,create,pal_diagnostic_response,,,Y,Y,N,Y,N,0,,
+2026_09_17_100200_create_pal_adaptive_response_table.php,create,pal_adaptive_response,,,Y,Y,N,Y,N,0,,
+2026_09_17_110000_publish_fees_remark_prompt_templates.php,raw-sql/data,,,,Y,N,N,Y,N,0,"insert,update",DB update
+2026_09_17_170000_add_onboarding_module_key_to_menu_categories.php,alter,,fees_menu_categories,,Y,N,N,Y,Y,0,,
+2026_09_17_170001_map_module_bars_to_onboarding_journeys.php,raw-sql/data,,,,Y,N,N,Y,Y,0,update,DB update
+2026_09_17_200000_create_email_templates_table.php,create,email_templates,,,Y,N,Y,Y,N,0,,
+2026_09_17_200001_add_email_template_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_17_200002_grant_email_template_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_18_000001_add_exam_paper_id_to_homework_table.php,alter,,homework,,Y,N,N,N,N,0,,
+2026_09_18_090000_default_gemini_to_a_model_with_free_tier_quota.php,raw-sql/data,,,,Y,N,N,Y,N,0,"insert,update",DB update
+2026_09_18_100000_add_pdf_attachment_to_email_templates.php,alter,,email_templates,,Y,N,N,Y,Y,0,,
+2026_09_18_100001_seed_admission_confirmed_session_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert",
+2026_09_18_120000_add_is_letter_to_email_templates.php,alter,,email_templates,,Y,N,N,Y,Y,0,update,DB update
+2026_09_18_120000_point_fees_report_suggestion_at_the_report_builder.php,raw-sql/data,,,,Y,N,N,Y,N,0,update,
+2026_09_18_120000_reset_cfu_attempts_for_reordered_learning_cycle.php,raw-sql/data,,,,Y,Y,N,Y,N,0,update,DB update
+2026_09_18_130000_add_ai_agents_menu_rows_for_rights.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_19_100000_register_attendance_agent_signal_and_workflow.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_19_100100_add_attendance_ai_agent_menu_row.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_19_100200_publish_attendance_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_19_100300_route_modules_attendance_pages_to_the_attendance_module.php,raw-sql/data,,,,Y,N,N,Y,N,0,update,
+2026_09_19_120000_create_h5p_drag_drop_tables.php,create,h5p_drag_drop;h5p_drag_drop_zones;h5p_drag_drop_elements,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_19_130000_add_work_type_to_lms_assignment_table.php,alter,,lms_assignment,,Y,N,N,N,N,0,,
+2026_09_19_140000_add_image_fit_to_h5p_drag_drop_table.php,alter,,h5p_drag_drop,,Y,N,N,N,N,0,,
+2026_09_19_160000_create_h5p_text_activity_tables.php,create,h5p_text_activity;h5p_text_activity_blanks,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_19_170000_sync_h5p_text_activity_registry.php,other,,,,Y,N,N,N,N,0,,
+2026_09_21_000000_create_exam_evaluation_tables.php,create,exam_evaluation_batch;exam_evaluation_sheet;exam_evaluation_answer,,,Y,N,Y,Y,N,0,,
+2026_09_21_100000_add_workflow_module_key_to_menu_categories.php,alter,,fees_menu_categories,,Y,N,N,Y,Y,0,,
+2026_09_21_100000_create_pal_flow_profile_tables.php,create,pal_flow_profiles;pal_flow_profile_versions;pal_flow_assignments,,,Y,N,Y,Y,N,0,,
+2026_09_21_100000_route_modules_admission_and_student_pages_to_their_modules.php,raw-sql/data,,,,Y,N,N,Y,N,0,update,
+2026_09_21_100001_seed_workflow_category_for_all_modules.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_21_100100_publish_admissions_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_21_100100_seed_pal_flow_shipped_profiles.php,other,,,,Y,Y,N,Y,N,0,,
+2026_09_21_100200_add_flow_version_id_to_learner_node_state.php,alter,,learner_node_state,,Y,N,N,Y,Y,0,update,
+2026_09_21_100200_publish_students_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_21_100300_add_admission_and_student_ai_agent_menu_rows.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_21_100400_register_admissions_agent_signal_and_workflow.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_21_110000_rename_workflow_module_key_to_platform_module_key.php,alter,,fees_menu_categories,,Y,N,N,Y,Y,0,,rename table/col
+2026_09_21_110001_seed_schedular_category_for_all_modules.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_21_120000_add_audit_module_keys_to_menu_categories.php,alter,,fees_menu_categories,,Y,N,N,Y,Y,0,,
+2026_09_21_120000_create_assessment_blueprint_table.php,create,assessment_blueprint,,,Y,N,Y,Y,N,0,,
+2026_09_21_120000_create_h5p_image_hotspots_tables.php,create,h5p_image_hotspots;h5p_image_hotspot_points,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_21_120001_seed_audit_trail_category_for_all_modules.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_21_130000_create_h5p_memory_game_tables.php,create,h5p_memory_game;h5p_memory_game_cards,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_21_140000_create_h5p_course_presentation_tables.php,create,h5p_course_presentation;h5p_presentation_slides;h5p_slide_elements,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_21_140000_rename_admission_pdf_attachment.php,raw-sql/data,,,,Y,N,N,Y,Y,0,update,DB update
+2026_09_21_150000_create_h5p_arithmetic_quiz_table.php,create,h5p_arithmetic_quiz,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_21_160000_share_one_template_across_c_and_ca.php,raw-sql/data,,,,Y,Y,N,Y,N,0,update,DB update
+2026_09_21_160000_sync_h5p_content_type_registry.php,other,,,,Y,N,N,N,N,0,,
+2026_09_21_170000_create_h5p_single_choice_set_tables.php,create,h5p_single_choice_set;h5p_single_choice_questions;h5p_single_choice_options,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_21_180000_create_h5p_true_false_tables.php,create,h5p_true_false;h5p_true_false_questions,,,Y,N,Y,N,N,0,,unguarded create
+2026_09_21_190000_sync_h5p_question_type_registry.php,other,,,,Y,N,N,N,N,0,,
+2026_09_22_090000_add_kind_to_assessment_blueprint_table.php,alter,,assessment_blueprint,,Y,N,N,Y,Y,0,,
+2026_09_22_100000_create_concept_prerequisite_table.php,create,concept_prerequisite,,,Y,N,Y,Y,N,0,,
+2026_09_22_100000_register_exam_ptm_hostel_request_circular_ai_modules.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_22_100100_publish_exam_ptm_hostel_request_circular_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_22_100200_add_circular_ai_stack_menu_category.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert",
+2026_09_22_100300_add_five_module_ai_agent_menu_rows.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_22_100400_seed_example_ai_policy_for_every_ai_stack_module.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_22_140000_create_homework_evaluation_answer_table.php,create,homework_evaluation_answer,homework,,Y,N,Y,Y,Y,0,,
+2026_09_22_160000_add_homework_review_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_22_170000_grant_homework_review_menu_rights.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_22_190000_create_hpc_school_option_table.php,create,hpc_school_option,,,Y,N,Y,Y,N,0,,
+2026_09_22_200000_add_render_type_to_mobile_homescreen_tables.php,alter,,$tableName,,Y,N,N,Y,Y,0,update,DB update
+2026_09_22_210000_create_mobile_web_handoff_token_table.php,create,mobile_web_handoff_token,,,Y,N,Y,Y,N,0,,
+2026_09_23_100000_register_six_module_ai_stacks.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_23_100100_publish_six_module_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_23_100300_add_six_module_ai_agent_menu_rows.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_23_100400_seed_example_ai_policy_for_six_more_modules.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_23_150000_create_mobile_dynamic_page_tables.php,create,mobile_dynamic_page;mobile_dynamic_page_field,,,Y,N,Y,Y,N,0,,
+2026_09_23_180000_add_drill_endpoint_to_mobile_dynamic_page_field.php,alter,,mobile_dynamic_page_field,,Y,N,N,Y,Y,0,,
+2026_09_24_100000_create_mobile_pages_tables.php,create,mobile_pages;mobile_page_versions,,,Y,N,Y,Y,N,0,,
+2026_09_24_100000_register_six_more_module_ai_stacks.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_24_100100_add_page_source_to_mobile_homescreen_tables.php,alter,,$table,,Y,N,N,Y,Y,0,,
+2026_09_24_100100_publish_six_more_module_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_24_100300_add_six_more_module_ai_agent_menu_rows.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_24_100400_seed_example_ai_policy_for_six_final_modules.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_24_120000_create_user_dashboard_preferences_table.php,create,user_dashboard_preferences,,,Y,N,Y,Y,N,0,,
+2026_09_25_100000_register_final_six_module_ai_stacks.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_25_100100_publish_final_six_module_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_25_100300_add_final_six_module_ai_agent_menu_rows.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_25_100400_seed_example_ai_policy_for_the_last_six_modules.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_26_100000_register_remaining_menu_module_ai_stacks.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_26_100100_publish_remaining_module_ai_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",DB update
+2026_09_26_100300_add_remaining_module_ai_agent_menu_rows.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_26_100400_seed_example_ai_policy_for_the_remaining_modules.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_26_100500_claim_institute_suffixed_task_management_routes.php,raw-sql/data,,,,Y,N,N,Y,N,0,update,
+2026_09_26_100600_add_ai_stack_menu_category_for_four_modules.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_27_100000_create_ai_module_model_bindings_table.php,create,ai_module_model_bindings,,,Y,N,Y,Y,N,0,,
+2026_09_28_100000_create_compliance_categories_table.php,create,compliance_categories,,,Y,N,Y,Y,N,0,insertOrIgnore,
+2026_09_28_100000_register_teach_learn_ai_module.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_09_28_100100_add_compliance_management_fields_to_org_compliance_library.php,alter,,org_compliance_library,,Y,N,N,N,Y,0,update,
+2026_09_28_100100_create_interaction_logs_table.php,create,interaction_logs,,,Y,N,Y,Y,N,0,,
+2026_09_28_100200_create_compliance_evidence_table.php,create,compliance_evidence,,,Y,N,Y,Y,N,1,,
+2026_09_28_100200_register_curriculum_engagement_interactions_new_pal_ai_modules.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",DB update
+2026_09_28_100300_add_lms_pal_module_ai_agent_menu_rows.php,raw-sql/data,,,,Y,N,N,N,N,0,"delete,insert",
+2026_09_28_100400_seed_lms_pal_ai_policies_and_templates.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",
+2026_09_28_100500_rename_generic_module_templates_to_specific_names.php,raw-sql/data,,,,Y,Y,N,Y,N,0,update,DB update
+2026_09_28_100600_add_question_format_code_to_lms_question_master.php,alter,,lms_question_master,,Y,N,N,Y,Y,0,,
+2026_09_28_100700_add_h5p_link_to_lms_question_master.php,alter,,lms_question_master,,Y,N,N,Y,Y,0,,
+2026_09_28_150000_create_compliance_templates_table.php,create,compliance_templates,,,Y,N,Y,Y,N,0,insert,
+2026_09_29_100000_register_exam_agent_signal_and_workflow.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_29_100100_register_new_pal_agent_signal_and_workflow.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_29_100200_register_exam_assessment_module.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_29_100300_register_exam_assessment_agent_signal_and_workflow.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert,update",
+2026_09_29_100400_seed_exam_assessment_ai_templates_and_policy.php,raw-sql/data,,,,Y,N,N,Y,Y,0,"delete,insert,update",
+2026_09_29_100500_add_new_pal_ai_stack_submodule_menu.php,raw-sql/data,,,,Y,N,N,Y,N,0,"delete,insert",
+2026_09_29_100600_add_duration_and_knowledge_graph_to_ai_audit_logs.php,alter,,ai_audit_logs,,Y,N,N,N,N,0,,
+2026_09_29_100800_create_ai_assistance_tickets_table.php,create,ai_assistance_tickets,,,Y,N,Y,N,N,0,,unguarded create
