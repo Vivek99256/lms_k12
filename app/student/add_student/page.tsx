@@ -1,3 +1,5 @@
+'use client';
+
 import { FormEvent, useEffect, useState } from 'react';
 import { Loader2, Save } from 'lucide-react';
 import { fetchAcademicSections, fetchDivisions, fetchStandards, type StudentSearchOption } from '@/app/students/search_student/api';
