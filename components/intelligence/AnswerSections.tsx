@@ -267,10 +267,29 @@ function Records({
                   </span>
                 ) : null}
                 {item.meta && Object.keys(item.meta).length ? (
-                  <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
-                    {Object.entries(item.meta)
-                      .map(([key, value]) => `${key} ${value}`)
-                      .join(' · ')}
+                  /*
+                    Labelled pairs, not a run-on string: a bursar scanning twenty rows reads
+                    the amount column by shape. Amounts arrive already formatted as rupees, so
+                    a leading currency sign is what marks the figure worth emphasising.
+                  */
+                  <span className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 font-normal">
+                    {Object.entries(item.meta).map(([key, value]) => {
+                      const isMoney = /^-?₹/.test(String(value));
+
+                      return (
+                        <span key={key} className="text-[11px] text-slate-500">
+                          {key}{' '}
+                          <span
+                            className={cn(
+                              'tabular-nums text-slate-700',
+                              isMoney && 'text-[12px] font-semibold text-slate-900'
+                            )}
+                          >
+                            {value}
+                          </span>
+                        </span>
+                      );
+                    })}
                   </span>
                 ) : null}
               </span>

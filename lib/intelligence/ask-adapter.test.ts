@@ -654,3 +654,30 @@ test("a turn with no sections carries an empty list rather than undefined", () =
 
   assert.deepEqual(reply.response.data.sections, []);
 });
+
+test("the headline travels on its own, so a bubble that draws sections can still show the answer", () => {
+  const reply = toChatShapedReply(
+    result({
+      answer: {
+        headline: "  ₹2,92,299 is pending across 66 of 75 students.  ",
+        sections: [{ type: "text", title: "Note", body: "detail" }],
+        actions: [],
+        follow_ups: [],
+      },
+    }),
+    "m1",
+  );
+
+  assert.equal(reply.response.data.headline, "₹2,92,299 is pending across 66 of 75 students.");
+  // `message` is still the whole flattened answer - the transcript form.
+  assert.match(reply.message.content, /detail/);
+});
+
+test("an empty headline is absent rather than an empty string", () => {
+  const reply = toChatShapedReply(
+    result({ answer: { headline: "   ", sections: [], actions: [], follow_ups: [] } }),
+    "m2",
+  );
+
+  assert.equal(reply.response.data.headline, undefined);
+});

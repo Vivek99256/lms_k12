@@ -510,6 +510,14 @@ export default function ChatbotPanel({
    */
   const dismissStuckPrompt = () => setStuckStage(null);
 
+  /** After "No, I'm fine", leave the confirmation up briefly, then close the panel. */
+  useEffect(() => {
+    if (stuckStage !== 'ticket-done') return;
+    const timer = setTimeout(() => onToggleChatbot(), 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stuckStage]);
+
   /** Lazy-loaded: this popup fires rarely and should not add to every page's bundle. */
   const captureScreenshot = async (): Promise<string | null> => {
     try {
@@ -774,12 +782,24 @@ export default function ChatbotPanel({
                       change what it says when the turn lands, only how it is laid out.
                     */}
                     {message.role === 'assistant' && message.sections.length ? (
-                      <AnswerSections
-                        sections={message.sections}
-                        module={message.module}
-                        onAsk={(question) => sendMessage(question, undefined, message.module)}
-                        className="-mx-1"
-                      />
+                      <>
+                        {/*
+                          The answer itself, above the evidence. The sections are the detail
+                          behind it; without this line the one sentence that actually answers
+                          the question - including a narrated reply - never reached the screen.
+                        */}
+                        {message.headline ? (
+                          <p className="mb-3 whitespace-pre-wrap text-sm font-medium leading-6 text-gray-900">
+                            {message.headline}
+                          </p>
+                        ) : null}
+                        <AnswerSections
+                          sections={message.sections}
+                          module={message.module}
+                          onAsk={(question) => sendMessage(question, undefined, message.module)}
+                          className="-mx-1"
+                        />
+                      </>
                     ) : (
                       message.content
                     )}
@@ -1071,7 +1091,7 @@ export default function ChatbotPanel({
                     {stuckStage === 'submitting-ticket' && <p>Noting this down for the support team&hellip;</p>}
 
                     {stuckStage === 'ticket-done' && (
-                      <p>We&apos;ve noted this for the support team, in case this screen needs improving.</p>
+                      <p>No problem! If you need any help later, I&apos;m always here to assist you.</p>
                     )}
                   </div>
                 </div>
