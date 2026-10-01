@@ -13,6 +13,7 @@ import { MenuItem, SubmenuItem, Level3Item } from './menuItems';
 import { createMdIcon } from '@/app/components/MdIcon';
 import { mapApiLinkToRoute } from './routeMapper';
 import { resolveBrainMenuLinks } from '@/lib/brain/menu-navigation';
+import { isDeferredModuleRoute } from '@/lib/roadmap';
 
 export interface ApiMenuItem {
   id: number;
