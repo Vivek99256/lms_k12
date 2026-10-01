@@ -1,11 +1,34 @@
 'use client';
 
-import { Check, Lock, Minus } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Check, ChevronDown, ListOrdered, Lock, Minus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
+import { SelectedJourneyStepRail } from './SelectedJourneyStepRail';
+import { DEFAULT_STAGE_IMAGES, type JourneyImageInfo } from './H5PJourneyCollage';
+import { fetchJourneyImages, type JourneyStageImage } from '@/app/pal/data/pal-journey-images';
+import {
+  JOURNEY_STAGES,
+  stageHref,
+  stagesBefore,
+  type JourneyStage,
+  type JourneyStageKey,
+} from './journey-stages';
+
 /**
- * The ten stages of the PAL journey, two of them conditional, as a stepper.
+ * The journey rail: the ten stages of the PAL journey as a stepper.
+ *
+ * ---------------------------------------------------------------------------
+ * THE STAGE MODEL LIVES IN ./journey-stages NOW, NOT IN HERE
+ * ---------------------------------------------------------------------------
+ * It used to be declared in this file. The image-based journey map needs the
+ * same stage list — labels, order, and an icon to fall back to when a stage has
+ * no picture — and importing it back out of the component that renders it would
+ * have made a module cycle whose safety depended on nobody reading a value at
+ * import time. The model moved to `journey-stages.ts`; every name this file used
+ * to export is re-exported below, so all 21 call sites are untouched.
  *
  * ---------------------------------------------------------------------------
  * WHY THIS EXISTS AS A SHARED COMPONENT
@@ -24,100 +47,29 @@ import { cn } from '@/lib/utils';
  * by colour alone. So a completed stage is a tick AND a colour AND an
  * accessible label; a locked stage is a padlock AND muted AND `aria-disabled`.
  * Nothing here is legible only to someone who can see hue.
- */
-
-export type JourneyStageKey =
-  | 'diagnostic'
-  | 'adaptive'
-  | 'plan'
-  | 'learn'
-  | 'practice'
-  | 'feedback'
-  | 'check'
-  | 'intervention'
-  | 'mastery'
-  | 'recall';
-
-export interface JourneyStage {
-  key: JourneyStageKey;
-  label: string;
-}
-
-/**
- * Ordered exactly as the product brief specifies the journey. The two entry
- * stages carry their full product names - "Chapter diagnostic" for the
- * fifteen-question chapter paper, "Concept diagnostic" for the per-concept
- * drill that follows - because "Diagnostic" and "Adaptive" on their own gave a
- * learner no way to tell which of the two they were looking at.
  *
- * `practice` sits between Learn and Check because that is the order the engine
- * actually runs (EsoPolicyService::phaseFor(): Learn -> Practice -> Check). It
- * was missing entirely, so the one stage a learner spends the most questions
- * on had no pill of its own and the rail jumped from Learn straight to Check
- * while they were still practising.
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NOW A TOGGLE INSTEAD OF THE ALWAYS-VISIBLE FIRST THING
+ * ---------------------------------------------------------------------------
+ * The image-based map (JourneyImageMap) is the richer view of exactly this
+ * information, and a 320px rail cannot show ten pictures. So the rail renders a
+ * "Your journey" button: closed it is the entry point to the map, open it is
+ * the stepper exactly as it always was, and the two are never on screen at the
+ * same time. Nothing was removed — the stepper is the same component, rendering
+ * the same thing, one click away.
  */
-export const JOURNEY_STAGES: JourneyStage[] = [
-  { key: 'diagnostic', label: 'Chapter diagnostic' },
-  { key: 'adaptive', label: 'Concept diagnostic' },
-  { key: 'plan', label: 'Plan' },
-  { key: 'learn', label: 'Learn' },
-  { key: 'practice', label: 'Practice' },
-  // Between Practice and Check because that is the order a learner needs it
-  // in: a formative read of the set they just did, BEFORE the consequential
-  // gate. After the Check it would be a post-mortem of a decision already
-  // taken - a receipt, not feedback - and too late to change the outcome it
-  // is commenting on.
-  { key: 'feedback', label: 'Feedback' },
-  { key: 'check', label: 'Check' },
-  // CONDITIONAL, and most learners never reach it - that is the success case.
-  //
-  // It is the failure branch of the Check gate, and it is TIER-2 HUMAN
-  // escalation: a teacher opens it, a teacher closes it. It is deliberately
-  // NOT the engine's Tier-1 automatic repair (remediate_prerequisite,
-  // serve_contrast_pair, reteach), which stays off-path exactly as it is
-  // today - see the note on FLOW_STAGES in app/pal/eso/page.tsx.
-  //
-  // Called "Extra support" and not "Intervention" on purpose. Staff screens
-  // and the route say intervention, matching SOP 6.13; a learner reading
-  // their own rail gets the plain word. Same record, two registers.
-  { key: 'intervention', label: 'Extra support' },
-  { key: 'mastery', label: 'Mastery' },
-  { key: 'recall', label: 'Recall' },
-];
 
-/**
- * Stages nobody is guaranteed to pass through.
- *
- * Load-bearing: the rail's "anything before `current` is done" shortcut is a
- * lie for these. A learner standing on Mastery is past Extra support in the
- * array, and without this list it would render with a tick - claiming evidence
- * for something they were never asked to do.
- */
-export const CONDITIONAL_STAGES: readonly JourneyStageKey[] = ['intervention'];
-
-/**
- * Every stage a learner necessarily passed to be standing on `stage`.
- *
- * Derived rather than written out, so adding a stage to JOURNEY_STAGES can
- * never leave a preset behind - which is exactly what happened with the
- * six-key array that ended up pasted into seven call sites. Conditional stages
- * are excluded because `completed` asserts evidence, and most learners have
- * none for Extra support.
- */
-export function stagesBefore(stage: JourneyStageKey): JourneyStageKey[] {
-  const index = JOURNEY_STAGES.findIndex((entry) => entry.key === stage);
-  if (index <= 0) return [];
-
-  return JOURNEY_STAGES.slice(0, index)
-    .map((entry) => entry.key)
-    .filter((key) => !CONDITIONAL_STAGES.includes(key));
-}
-
-/** Diagnostic through Check, minus Extra support. The old six-key literal. */
-export const COMPLETED_THROUGH_CHECK: readonly JourneyStageKey[] = stagesBefore('mastery');
-
-/** ...and Mastery too. The recall screen's seven-key literal. */
-export const COMPLETED_THROUGH_MASTERY: readonly JourneyStageKey[] = stagesBefore('recall');
+export {
+  JOURNEY_STAGES,
+  JOURNEY_STAGE_BY_KEY,
+  CONDITIONAL_STAGES,
+  stagesBefore,
+  COMPLETED_THROUGH_CHECK,
+  COMPLETED_THROUGH_MASTERY,
+  stageHref,
+  resolveChapterStage,
+} from './journey-stages';
+export type { JourneyStage, JourneyStageKey };
 
 export interface JourneyRailProps {
   /** The stage the learner is on now. */
@@ -155,9 +107,14 @@ export interface JourneyRailProps {
    * a learner is.
    */
   orientation?: 'horizontal' | 'vertical';
+  /** Optional context overrides */
+  chapterId?: string | number | null;
+  conceptId?: string | number | null;
+  subjectName?: string | null;
+  chapterName?: string | null;
 }
 
-export function JourneyRail({
+export function JourneyStepList({
   current,
   completed = [],
   locked = [],
@@ -361,34 +318,184 @@ export function JourneyRail({
 }
 
 /**
- * Which stage a chapter is on, from what the backend already reports.
+ * What a PAL screen's rail renders: the image journey, plus the step list
+ * behind a toggle.
  *
- * Deliberately derived rather than stored: every input is persisted evidence,
- * so a stage computed here can never disagree with the data it came from, and
- * there is no extra field to keep in sync.
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS A TOGGLE AND NOT A REPLACEMENT
+ * ---------------------------------------------------------------------------
+ * The brief is to ADD an image-based journey, not to take the stepper away — so
+ * the stepper is all still here, unchanged, one click away. Two entries, never
+ * both on screen at once: the image map (large, ten pictures, the primary
+ * view) and the compact step list, which is what a 320px column can actually
+ * hold.
  *
- * There is no `feedback` branch on purpose. Feedback lives for one screen,
- * between one practice set and one check; a chapter-level rollup that reported
- * it would be wrong the moment the learner navigated away.
+ * The step list starts CLOSED, and the collapsed trigger still names the stage
+ * the learner is on. That is deliberate: the journey rail's whole job is
+ * answering "where am I?" on every screen, and a rail that rendered nothing but
+ * a button would have stopped doing that. The one line of text on the button
+ * keeps the answer on screen while the ten-row list waits to be asked for.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE IDS COME FROM THE ROUTE AND NOT FROM PROPS
+ * ---------------------------------------------------------------------------
+ * All 21 call sites render `<JourneyRail current=… completed=… />` with no
+ * chapter or concept, and none of them has to change for the image map to
+ * work. The route already says what the screen is about: `/pal/plan/chapter/
+ * [chapterId]` is a chapter screen and `/pal/learn/concept/[conceptId]` is a
+ * concept screen. Reading that here is what lets the same component sit behind
+ * every screen, including ones nobody has visited yet.
+ *
+ * `?chapterId=` in the query string is deliberately NOT read for this. Reading
+ * it needs `useSearchParams()`, which forces a Suspense boundary around every
+ * one of those 21 screens, for the sake of an id the backend resolves from the
+ * concept anyway — `JourneyImageService` needs a chapter OR a concept, never
+ * both. Where a chapter genuinely would help — a concept screen's map — the
+ * map still works, just anchored on the concept, which is the more specific of
+ * the two and the better thing to search with.
  */
-export function resolveChapterStage(input: {
-  hasDiagnostic: boolean;
-  practiceAttempts: number;
-  mastered: number;
-  conceptsServable: number;
-  /**
-   * Support cases open against this chapter. Optional: a caller with no
-   * intervention data omits it and gets exactly the old answer, rather than
-   * having to pass a zero it cannot vouch for.
-   */
-  openInterventions?: number;
-}): JourneyStageKey {
-  if (!input.hasDiagnostic) return 'diagnostic';
-  if (input.practiceAttempts === 0) return 'adaptive';
-  if (input.conceptsServable > 0 && input.mastered >= input.conceptsServable) return 'recall';
-  // After the completion check on purpose: a learner who has finished the
-  // chapter is not "being supported", whatever is still open on a record.
-  if ((input.openInterventions ?? 0) > 0) return 'intervention';
-  if (input.mastered > 0) return 'mastery';
-  return 'plan';
+export function JourneyRail(props: JourneyRailProps) {
+  const params = useParams<{ chapterId?: string; conceptId?: string }>();
+  const router = useRouter();
+  const [showSteps, setShowSteps] = useState(false);
+  const [images, setImages] = useState<Record<string, JourneyImageInfo>>(DEFAULT_STAGE_IMAGES);
+
+  // Resolve chapter and concept IDs from props, route params, window or session storage
+  const chapterId =
+    props.chapterId ??
+    params?.chapterId ??
+    (typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('chapterId') ||
+        sessionStorage.getItem('pal_active_chapter_id')
+      : null);
+
+  const conceptId =
+    props.conceptId ??
+    params?.conceptId ??
+    (typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('conceptId') ||
+        sessionStorage.getItem('pal_active_concept_id')
+      : null);
+
+  // Save active chapter in session storage whenever known
+  useEffect(() => {
+    if (chapterId && typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('pal_active_chapter_id', String(chapterId));
+      } catch {}
+    }
+  }, [chapterId]);
+
+  // Save active concept in session storage whenever known
+  useEffect(() => {
+    if (conceptId && typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('pal_active_concept_id', String(conceptId));
+      } catch {}
+    }
+  }, [conceptId]);
+
+  // Load and cache web-searched journey images in the background
+  useEffect(() => {
+    if (!chapterId && !conceptId) return;
+
+    let active = true;
+    const controller = new AbortController();
+
+    fetchJourneyImages({ chapterId, conceptId }, controller.signal)
+      .then((payload) => {
+        if (!active || !payload) return;
+        const mapped: Record<string, JourneyImageInfo> = {};
+        for (const [key, val] of Object.entries(payload.stages) as [string, JourneyStageImage][]) {
+          if (val?.image?.url) {
+            mapped[key] = {
+              url: val.image.url,
+              thumbnailUrl: val.image.thumbnailUrl || undefined,
+              title: val.image.title || undefined,
+              creator: val.image.creator || undefined,
+              license: val.image.license || undefined,
+            };
+          }
+        }
+        if (Object.keys(mapped).length > 0) {
+          setImages((prev) => ({ ...prev, ...mapped }));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [chapterId, conceptId]);
+
+  // Derive completed stages set
+  const completedSet = useMemo(() => {
+    const set = new Set<JourneyStageKey>(props.completed || stagesBefore(props.current));
+    if (typeof window !== 'undefined' && chapterId) {
+      try {
+        const stored = sessionStorage.getItem(`pal_completed_steps_${chapterId}`);
+        if (stored) {
+          const arr: JourneyStageKey[] = JSON.parse(stored);
+          arr.forEach((k) => set.add(k));
+        }
+      } catch {}
+    }
+    return set;
+  }, [props.completed, props.current, chapterId]);
+
+  const handleSelectStep = (stepId: JourneyStageKey) => {
+    if (props.onSelect) {
+      props.onSelect(stepId);
+      return;
+    }
+    const targetHref = stageHref(stepId, { chapterId, conceptId });
+    if (targetHref) {
+      router.push(targetHref);
+    }
+  };
+
+  return (
+    <div className={cn('w-full space-y-3', props.className)}>
+      {/* 1. Interactive Image-Based Journey Card and Sequential Step Switcher */}
+      <SelectedJourneyStepRail
+        selectedStep={props.current}
+        images={images}
+        subjectName={props.subjectName ?? undefined}
+        chapterName={props.chapterName ?? undefined}
+        chapterId={chapterId}
+        conceptId={conceptId}
+        completedSteps={completedSet}
+        lockedSteps={props.locked}
+        bypassedSteps={props.bypassed}
+        onSelectStep={handleSelectStep}
+        onBackToCollage={chapterId ? () => router.push(`/pal/diagnostic/chapter/${chapterId}`) : undefined}
+      />
+
+      {/* 2. Step list toggle button */}
+      <button
+        type="button"
+        onClick={() => setShowSteps((value) => !value)}
+        aria-expanded={showSteps}
+        aria-controls="pal-journey-step-list"
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
+      >
+        <div className="flex items-center gap-2">
+          <ListOrdered aria-hidden className="h-4 w-4 shrink-0 text-indigo-600" />
+          <span>{showSteps ? 'Hide journey list' : 'Show journey list'}</span>
+        </div>
+        <ChevronDown
+          aria-hidden
+          className={cn('h-3.5 w-3.5 transition-transform duration-200', showSteps && 'rotate-180')}
+        />
+      </button>
+
+      {/* 3. The Step List (revealed only on explicit demand) */}
+      {showSteps ? (
+        <div id="pal-journey-step-list" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <JourneyStepList {...props} />
+        </div>
+      ) : null}
+    </div>
+  );
 }

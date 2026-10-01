@@ -223,6 +223,8 @@ function AdaptiveConceptsView() {
               current="adaptive"
               completed={data.hasDiagnostic ? stagesBefore('adaptive') : []}
               orientation="vertical"
+              chapterId={chapterId}
+              chapterName={data.chapterName}
             />
           </PalRailSection>
         </>

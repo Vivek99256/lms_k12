@@ -186,6 +186,9 @@ function ConceptLearnView() {
               completed={COMPLETED_THROUGH_CHECK}
               bypassed={['intervention']}
               orientation="vertical"
+              chapterId={masteryChapterId}
+              conceptId={conceptId}
+              conceptName={completedResult.conceptName}
             />
           </PalRailSection>
         }
@@ -233,6 +236,9 @@ function ConceptLearnView() {
           current="learn"
           completed={stagesBefore('learn')}
           orientation="vertical"
+          chapterId={chapterId}
+          conceptId={conceptId}
+          conceptName={data.conceptName}
         />
       </PalRailSection>
 

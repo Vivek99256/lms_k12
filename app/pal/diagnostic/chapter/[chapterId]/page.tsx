@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion, useReducedMotion as useFramerReducedMotion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -10,7 +10,9 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
+  ListOrdered,
   Loader2,
+  Lock,
   Sparkles,
   ThumbsUp,
   TrendingUp,
@@ -26,6 +28,7 @@ import { QuestionPlayer } from '@/components/h5p/players';
 import type { QuestionResult } from '@/components/h5p/players/types';
 import { canPlay, selectedOptionId, toPlayerQuestion } from '@/lib/pal/diagnostic-answers';
 import {
+  fetchAdaptiveConcepts,
   startChapterDiagnostic,
   submitChapterDiagnostic,
   type ChapterDiagnosticPaper,
@@ -38,11 +41,23 @@ import {
   ReadOnlyBadge,
   useChapterCompletion,
 } from '@/app/pal/_components/CompletionState';
-import { COMPLETED_THROUGH_CHECK, JourneyRail } from '@/app/pal/_components/JourneyRail';
+import { COMPLETED_THROUGH_CHECK, JourneyRail, JourneyStepList } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
 import { BandChip } from '@/app/pal/_components/BandMeter';
 import { FlagToggle, ProgressRing, QuestionNavigator } from '@/app/pal/_components/DiagnosticNavigator';
 import { Celebration, ConfettiRain, PrimaryAction, useCountUp } from '@/app/h5p/components/game';
+import {
+  H5PJourneyCollage,
+  JOURNEY_STEPS,
+  STEP_SEQUENCE,
+  DEFAULT_STAGE_IMAGES,
+  getStageImage,
+  isStepUnlocked,
+  type JourneyImageInfo,
+  type JourneyStepId,
+} from '@/app/pal/_components/H5PJourneyCollage';
+import { SelectedJourneyStepRail } from '@/app/pal/_components/SelectedJourneyStepRail';
+import { JourneyStepContent } from '@/app/pal/_components/JourneyStepContent';
 
 /**
  * Stage 1 - the chapter diagnostic.
@@ -119,6 +134,134 @@ function Centered({ children }: { children: React.ReactNode }) {
   );
 }
 
+function getJourneyStepTitle(step: JourneyStepId | null, chapterName: string): string {
+  switch (step) {
+    case 'diagnostic':
+      return 'Step 1: Chapter Diagnostic';
+    case 'adaptive':
+      return 'Step 2: Concept Diagnostic';
+    case 'plan':
+      return 'Step 3: Personalized Learning Plan';
+    case 'learn':
+      return 'Step 4: Learn Concepts & Theory';
+    case 'practice':
+      return 'Step 5: Adaptive Practice Drills';
+    default:
+      return `${chapterName} Learning Journey`;
+  }
+}
+
+function getJourneyStepDescription(step: JourneyStepId | null): string {
+  switch (step) {
+    case 'diagnostic':
+      return 'Fifteen questions — five easy, five medium and five hard to establish your baseline.';
+    case 'adaptive':
+      return 'Targeted drills per concept to identify precise strengths and gaps.';
+    case 'plan':
+      return 'Built from your own answers. It updates itself as you work.';
+    case 'learn':
+      return 'Deep dive lessons, video explainers, and key theory before practicing.';
+    case 'practice':
+      return 'Interactive question sets that adapt to your performance with instant review.';
+    case 'diagnostic':
+    default:
+      return 'A sequential 5-stage learning path. Complete each stage in order to master this chapter.';
+  }
+}
+
+function MainJourneyOverview({
+  subjectName,
+  chapterName,
+  completedSteps,
+  onStartNextStep,
+}: {
+  subjectName: string;
+  chapterName: string;
+  completedSteps: Set<JourneyStepId>;
+  onStartNextStep: () => void;
+}) {
+  const nextStep = JOURNEY_STEPS.find(
+    (step) => isStepUnlocked(step.id, completedSteps) && !completedSteps.has(step.id)
+  ) || JOURNEY_STEPS[0];
+
+  const allCompleted = completedSteps.size === 5;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-purple-600">
+            Interactive Learning Journey
+          </span>
+          <h2 className="mt-0.5 text-lg font-bold text-slate-900 sm:text-xl">
+            {chapterName} Sequential Roadmap
+          </h2>
+          <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-xl">
+            Each stage unlocks as you complete the previous one. Click any unlocked stage image above or use the button to advance.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            size="lg"
+            onClick={onStartNextStep}
+            className="gap-2 bg-purple-700 px-5 text-sm font-semibold text-white shadow-md hover:bg-purple-800"
+          >
+            {allCompleted ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                <span>Review Chapter Diagnostic</span>
+              </>
+            ) : (
+              <>
+                <span>Continue: Step {nextStep.stepNumber} ({nextStep.label})</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* 5-step milestone progress grid */}
+      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-5 pt-4 border-t border-slate-100">
+        {JOURNEY_STEPS.map((step) => {
+          const isDone = completedSteps.has(step.id);
+          const isUnlocked = isStepUnlocked(step.id, completedSteps);
+
+          return (
+            <div
+              key={step.id}
+              className={cn(
+                'rounded-xl border p-3 transition-colors',
+                isDone
+                  ? 'border-emerald-200 bg-emerald-50/70 text-emerald-950'
+                  : isUnlocked
+                  ? 'border-purple-200 bg-purple-50/60 text-purple-950'
+                  : 'border-slate-200 bg-slate-50 text-slate-400'
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold">Step {step.stepNumber}</span>
+                {isDone ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                ) : isUnlocked ? (
+                  <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                ) : (
+                  <Lock className="h-3.5 w-3.5 text-slate-400" />
+                )}
+              </div>
+              <p className="mt-1 text-xs font-semibold truncate">{step.label}</p>
+              <p className="mt-0.5 text-[10px] opacity-80">
+                {isDone ? 'Completed' : isUnlocked ? 'Unlocked' : 'Locked'}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function DiagnosticExam() {
   const params = useParams();
   const router = useRouter();
@@ -137,11 +280,119 @@ function DiagnosticExam() {
   // from the paper to the score-summary screen. Null the rest of the time.
   const [summary, setSummary] = useState<ChapterDiagnosticResult | null>(null);
 
+  // Image-based journey interactive states
+  const searchParams = useSearchParams();
+  const initialStage = (searchParams?.get('stage') as JourneyStepId) || null;
+  const [selectedStep, setSelectedStep] = useState<JourneyStepId | null>(() => {
+    if (initialStage && JOURNEY_STEPS.some((s) => s.id === initialStage)) {
+      return initialStage;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const stageParam = (searchParams?.get('stage') as JourneyStepId) || null;
+    if (stageParam && JOURNEY_STEPS.some((s) => s.id === stageParam)) {
+      setSelectedStep(stageParam);
+    }
+  }, [searchParams]);
+
+  const [showClassicJourney, setShowClassicJourney] = useState(false);
+  const [subjectName, setSubjectName] = useState<string>('Mathematics');
+
+  // Track completed steps sequentially
+  const [completedSteps, setCompletedSteps] = useState<Set<JourneyStepId>>(() => {
+    try {
+      const saved = sessionStorage.getItem(`pal_completed_steps_${chapterId}`);
+      if (saved) {
+        return new Set<JourneyStepId>(JSON.parse(saved));
+      }
+    } catch {}
+    return new Set<JourneyStepId>();
+  });
+
+  // Cached images initialized with defaults so images ALWAYS exist immediately
+  const [journeyImages, setJourneyImages] = useState<Record<string, JourneyImageInfo>>(() => {
+    try {
+      const cacheKey = `pal_journey_images_math_${chapterId}`.toLowerCase().replace(/\s+/g, '_');
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return DEFAULT_STAGE_IMAGES;
+  });
+
   const {
     mastery,
     completion,
     loading: checkingCompletion,
   } = useChapterCompletion(chapterId);
+
+  const chapterName = mastery?.chapterName || 'Integers';
+
+  // Discover subject name dynamically from syllabus
+  useEffect(() => {
+    if (!chapterId) return;
+    const controller = new AbortController();
+
+    import('@/app/pal/data/pal')
+      .then(({ fetchPalLanding }) => fetchPalLanding({ signal: controller.signal }))
+      .then((landing) => {
+        for (const subj of landing.subjects) {
+          if (subj.chapters.some((c) => String(c.id) === String(chapterId))) {
+            setSubjectName(subj.name);
+            break;
+          }
+        }
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [chapterId]);
+
+  // Persist completed steps to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        `pal_completed_steps_${chapterId}`,
+        JSON.stringify(Array.from(completedSteps))
+      );
+    } catch {}
+  }, [completedSteps, chapterId]);
+
+  // Pre-unlock completed steps if backend shows diagnostic or practice already done
+  useEffect(() => {
+    if (!chapterId) return;
+    try {
+      sessionStorage.setItem('pal_active_chapter_id', chapterId);
+    } catch {}
+    fetchAdaptiveConcepts(chapterId)
+      .then((data) => {
+        if (data?.hasDiagnostic) {
+          setCompletedSteps((prev) => new Set([...prev, 'diagnostic']));
+        }
+        if (data?.concepts?.some((c) => c.practiceAttempts > 0)) {
+          setCompletedSteps((prev) => new Set([...prev, 'adaptive']));
+        }
+      })
+      .catch(() => undefined);
+  }, [chapterId]);
+
+  // Load and cache web-searched journey images for this subject & chapter
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/pal/journey-images?subject=${encodeURIComponent(subjectName)}&chapter=${encodeURIComponent(chapterName)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (active && data?.images) {
+          setJourneyImages(data.images);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [subjectName, chapterName]);
 
   const load = useCallback(() => {
     const controller = new AbortController();
@@ -202,6 +453,7 @@ function DiagnosticExam() {
       if (outcome.result) {
         setSummary(outcome.result);
         setSubmitting(false);
+        setCompletedSteps((prev) => new Set([...prev, 'diagnostic']));
       } else {
         // No score payload to summarise - go straight to the result page,
         // which re-fetches it itself, rather than show a summary with nothing in it.
@@ -258,6 +510,28 @@ function DiagnosticExam() {
   const current = questions[currentIndex] ?? null;
   const isLast = currentIndex >= total - 1;
   const isFirst = currentIndex <= 0;
+
+  const handleStepComplete = useCallback((stepId: JourneyStepId) => {
+    setCompletedSteps((prev) => {
+      const next = new Set(prev);
+      next.add(stepId);
+      return next;
+    });
+  }, []);
+
+  const handleNextStep = useCallback((nextStepId: JourneyStepId) => {
+    setSelectedStep(nextStepId);
+  }, []);
+
+  const handleSelectStep = useCallback(
+    (stepId: JourneyStepId) => {
+      if (!isStepUnlocked(stepId, completedSteps)) {
+        return;
+      }
+      setSelectedStep(stepId);
+    },
+    [completedSteps]
+  );
 
   const goTo = useCallback(
     (index: number) => {
@@ -377,50 +651,116 @@ function DiagnosticExam() {
     answered: answers[question.questionId] != null,
   }));
 
-  // Progress, the clock, the ring and the flagged count are context, not the
-  // task, so on a wide screen they live in the rail where they stay visible
-  // without competing with the one question on screen.
-  const rail = (
+  const currentStepTitle = getJourneyStepTitle(selectedStep, chapterName);
+  const currentStepDescription = getJourneyStepDescription(selectedStep);
+
+  const headerActions = (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => setShowClassicJourney((v) => !v)}
+      className={cn(
+        'border-slate-200 transition-colors',
+        showClassicJourney && 'bg-slate-100 border-indigo-300 text-indigo-700'
+      )}
+    >
+      <ListOrdered className="mr-1.5 h-3.5 w-3.5" />
+      {showClassicJourney ? 'Hide journey list' : 'Show journey list'}
+    </Button>
+  );
+
+  const progressSection = (
+    <PalRailSection title="Progress">
+      <div className="flex items-center gap-3">
+        <ProgressRing value={answered} max={total} />
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{answered} of {total} answered</p>
+          {secondsLeft !== null && (
+            <p className={cn('text-xs font-medium tabular-nums', secondsLeft <= 120 ? 'text-rose-600' : 'text-slate-500')}>
+              {formatClock(secondsLeft)} left
+            </p>
+          )}
+        </div>
+      </div>
+      {answered < total && (
+        <p className="mt-2 text-xs text-slate-500">
+          You can submit before answering them all.
+        </p>
+      )}
+    </PalRailSection>
+  );
+
+  const classicJourneySection = (
+    <PalRailSection title="Journey steps">
+      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+        <JourneyStepList
+          current={selectedStep ?? 'diagnostic'}
+          completed={Array.from(completedSteps)}
+          orientation="vertical"
+        />
+      </div>
+    </PalRailSection>
+  );
+
+  const previousAttemptsLink = (
+    <p className="px-1 text-xs text-slate-400">
+      <Link
+        href={`/pal/diagnostic/chapter/${chapterId}/history`}
+        className="hover:text-slate-600 hover:underline"
+      >
+        Previous attempts
+      </Link>
+    </p>
+  );
+
+  const rail = selectedStep ? (
     <>
-      <PalRailSection title="Progress">
-        <div className="flex items-center gap-3">
-          <ProgressRing value={answered} max={total} />
-          <div>
-            <p className="text-sm font-semibold text-slate-900">{answered} of {total} answered</p>
-            {secondsLeft !== null && (
-              <p className={cn('text-xs font-medium tabular-nums', secondsLeft <= 120 ? 'text-rose-600' : 'text-slate-500')}>
-                {formatClock(secondsLeft)} left
+      <SelectedJourneyStepRail
+        selectedStep={selectedStep}
+        images={journeyImages}
+        subjectName={subjectName}
+        chapterName={chapterName}
+        completedSteps={completedSteps}
+        onSelectStep={handleSelectStep}
+        onBackToCollage={() => setSelectedStep(null)}
+      />
+
+      {selectedStep === 'diagnostic' && progressSection}
+
+      {showClassicJourney && classicJourneySection}
+
+      {previousAttemptsLink}
+    </>
+  ) : (
+    <>
+      <PalRailSection title="Journey Milestones">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <ProgressRing value={completedSteps.size} max={JOURNEY_STEPS.length} />
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                {completedSteps.size} of {JOURNEY_STEPS.length} completed
               </p>
-            )}
+              <p className="text-xs text-slate-500">
+                {completedSteps.size === JOURNEY_STEPS.length ? 'Chapter mastered!' : 'Sequential progress'}
+              </p>
+            </div>
+          </div>
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 text-xs text-slate-600 leading-relaxed">
+            Click any unlocked stage image above to begin or continue your journey.
           </div>
         </div>
-        {answered < total && (
-          <p className="mt-2 text-xs text-slate-500">
-            You can submit before answering them all.
-          </p>
-        )}
       </PalRailSection>
 
-      <PalRailSection title="Your journey">
-        <JourneyRail current="diagnostic" orientation="vertical" />
-      </PalRailSection>
+      {showClassicJourney && classicJourneySection}
 
-      <p className="px-1 text-xs text-slate-400">
-        <Link
-          href={`/pal/diagnostic/chapter/${chapterId}/history`}
-          className="hover:text-slate-600 hover:underline"
-        >
-          Previous attempts
-        </Link>
-      </p>
+      {previousAttemptsLink}
     </>
   );
 
-  return (
-    <Shell chapterId={chapterId} rail={rail}>
+  const diagnosticExamQuestions = (
+    <>
       {paper?.resumed && (
-        // Restoring answers without saying so reads as a glitch, and the clock
-        // restarts on a resume, so both facts are stated plainly.
         <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
           <p className="text-sm font-medium text-indigo-900">
             Picking up where you left off
@@ -435,9 +775,7 @@ function DiagnosticExam() {
         </div>
       )}
 
-      {/* Small screens only. The rail carries the ring on desktop, but it sits
-          BELOW the question there, so a timer that lived only there would
-          scroll out of sight exactly when it matters. */}
+      {/* Small screens only */}
       <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-baseline gap-2">
@@ -538,6 +876,56 @@ function DiagnosticExam() {
           </Button>
         )}
       </div>
+    </>
+  );
+
+  return (
+    <Shell
+      chapterId={chapterId}
+      rail={rail}
+      actions={headerActions}
+      title={currentStepTitle}
+      description={currentStepDescription}
+    >
+      {selectedStep === null ? (
+        <div className="space-y-6">
+          <H5PJourneyCollage
+            subjectName={subjectName}
+            chapterName={chapterName}
+            activeStep={null}
+            completedSteps={completedSteps}
+            onSelectStep={handleSelectStep}
+            images={journeyImages}
+          />
+
+          <MainJourneyOverview
+            subjectName={subjectName}
+            chapterName={chapterName}
+            completedSteps={completedSteps}
+            onStartNextStep={() => {
+              for (const step of JOURNEY_STEPS) {
+                if (isStepUnlocked(step.id, completedSteps) && !completedSteps.has(step.id)) {
+                  handleSelectStep(step.id);
+                  return;
+                }
+              }
+              handleSelectStep('diagnostic');
+            }}
+          />
+        </div>
+      ) : (
+        <JourneyStepContent
+          stepId={selectedStep}
+          chapterId={chapterId}
+          chapterName={chapterName}
+          subjectName={subjectName}
+          diagnosticContent={diagnosticExamQuestions}
+          onStepComplete={handleStepComplete}
+          onNextStep={handleNextStep}
+          onBackToCollage={() => setSelectedStep(null)}
+          isCompleted={completedSteps.has(selectedStep)}
+        />
+      )}
     </Shell>
   );
 }
@@ -883,18 +1271,25 @@ const LEVEL_TONE: Record<string, { bg: string; icon: string; fg: string }> = {
 function Shell({
   chapterId,
   rail,
+  actions,
+  title = 'Chapter diagnostic',
+  description = 'Fifteen questions — five easy, five medium and five hard. This finds where to start; it is not a test you can fail.',
   children,
 }: {
   chapterId: string;
   rail?: React.ReactNode;
+  actions?: React.ReactNode;
+  title?: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <PalWorkspace
-      title="Chapter diagnostic"
-      description="Fifteen questions — five easy, five medium and five hard. This finds where to start; it is not a test you can fail."
+      title={title}
+      description={description}
       backHref="/pal"
       backLabel="Back to subjects"
+      actions={actions}
       rail={
         rail ?? (
           <PalRailSection title="Your journey">
