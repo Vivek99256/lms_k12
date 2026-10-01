@@ -566,11 +566,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, [displayedMenuItems, selectedBranch, pathname, router, isKnownMenuPath]);
 
   const toggleChatbot = () => {
-    setIsChatbotOpen((prev) => {
-      const next = !prev;
-      setIsRightToolbarOpen(!next);
-      return next;
-    });
+    setIsChatbotOpen((prev) => !prev);
   };
 
   // Set by the idle watcher the moment it fires, and consumed exactly once by

@@ -47,7 +47,20 @@ export function moduleHandoffFor(
     return null;
   }
 
+  if (typeof links?.nav_route === 'string' && links.nav_route) {
+    const navLabel = typeof links?.nav_label === 'string' && links.nav_label ? links.nav_label : 'Open';
+    const navTitle = typeof links?.nav_title === 'string' && links.nav_title ? links.nav_title : navLabel;
+    const navDesc = typeof links?.nav_desc === 'string' && links.nav_desc ? links.nav_desc : `Open ${navTitle}.`;
+    return {
+      title: navTitle,
+      description: navDesc,
+      label: navLabel,
+      route: links.nav_route,
+    };
+  }
+
   const studentId = id(links, 'student_id');
+
   const enquiryId = id(links, 'enquiry_id');
 
   // A saved report is checked before the module switch, because the same document can
@@ -135,10 +148,40 @@ export function moduleHandoffFor(
         };
       }
 
+      if (typeof links?.target_route === 'string' && links.target_route) {
+        return {
+          title: 'Fees Onboarding & Process Overview',
+          description:
+            'Open the Fees onboarding process in the Fees module to configure fee structures, master setup, and operations.',
+          label: 'Open Fees Onboarding',
+          route: links.target_route,
+        };
+      }
+
+      if (typeof links?.onboarding_route === 'string' && links.onboarding_route) {
+        return {
+          title: 'Fees Onboarding & Process Overview',
+          description:
+            'Open the Fees onboarding process in the Fees module to configure fee structures, master setup, and operations.',
+          label: 'Open Fees Onboarding',
+          route: links.onboarding_route,
+        };
+      }
+
       return null;
     }
 
-    default:
+    default: {
+      if (typeof links?.target_route === 'string' && links.target_route) {
+        const modName = module ? module.charAt(0).toUpperCase() + module.slice(1) : 'Module';
+        return {
+          title: `${modName} Onboarding & Process`,
+          description: `Open the ${modName} module to continue setup and onboarding workflows.`,
+          label: `Open ${modName}`,
+          route: links.target_route,
+        };
+      }
       return null;
+    }
   }
 }

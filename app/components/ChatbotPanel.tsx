@@ -64,6 +64,7 @@ import { LifecycleTrace } from '@/components/intelligence/LifecycleTrace';
 import { AnswerSections } from '@/components/intelligence/AnswerSections';
 import { moduleHandoffFor } from '@/lib/intelligence/module-handoff';
 import { useAgentActionHandler } from '@/hooks/use-agent-action-handler';
+import { useChatbotNavigation } from '@/hooks/use-chatbot-navigation';
 import { ActionsTab } from './ai-workspace/ActionsTab';
 import { AnalyseTab } from './ai-workspace/AnalyseTab';
 import { ConnectionsTab } from './ai-workspace/ConnectionsTab';
@@ -169,6 +170,7 @@ export default function ChatbotPanel({
 }) {
   const pathname = usePathname() || '/dashboard';
   const { executeNavigation } = useAgentActionHandler();
+  const { tryMatch, evaluateIntent } = useChatbotNavigation();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const session = useMemo(() => readStoredSession(), []);
@@ -459,6 +461,13 @@ export default function ChatbotPanel({
 
     if (!trimmed || isLoading) return;
 
+    const currentModName = actionModule ?? workspace.context?.module ?? pathname;
+    const intentEval = evaluateIntent ? evaluateIntent(trimmed, currentModName) : null;
+
+    if (intentEval?.type === 'navigation' && intentEval.route) {
+      executeNavigation({ route: intentEval.route });
+    }
+
     setInput('');
     setTranscript('');
 
@@ -466,13 +475,8 @@ export default function ChatbotPanel({
       { text: trimmed },
       {
         body: {
-          // Read here rather than inside the transport: this runs in an event
-          // handler, where the thread the user is actually looking at is current.
           conversationId: lifecycleThreadRef.current,
           payload: actionPayload ?? {},
-          // The screen the question was asked from. The backend treats a declared
-          // module as authoritative, so a fees question asked on the fees screen does
-          // not have to say the word "fees" to route there.
           module: actionModule ?? workspace.context?.module ?? null,
           route: pathname,
         },
@@ -584,8 +588,8 @@ export default function ChatbotPanel({
               <BotIcon className="size-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Teach Assistant</h3>
-              <p className="text-[11px] font-medium text-gray-500">Text, voice, and multilingual AI</p>
+              <h3 className="text-sm font-semibold text-gray-900">Edvance AI</h3>
+              <p className="text-[11px] font-medium text-gray-500">Multilingual, voice-enabled school intelligence</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
