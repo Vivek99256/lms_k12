@@ -644,9 +644,10 @@ export interface GenerateIntelligenceQuestionsRequest {
   subject_id: number;
   standard_id: number;
   chapter_id: number;
-  question_type_id: number;
-  question_type: IntelligenceQuestionType;
-  total_questions: number;
+  question_type_id?: number;
+  question_type: IntelligenceQuestionType | 'all';
+  total_questions?: number;
+  questions_per_type?: number;
   grade_id?: number;
   quota?: IntelligenceQuestionQuotaRow[];
 }

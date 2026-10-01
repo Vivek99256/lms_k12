@@ -261,6 +261,8 @@ const CASE_NOTE =
  * what will be made instead, not shown an empty table.
  */
 export const MAPPINGS: TypeMapping[] = [
+  mapping('drag_text', 'Drag the words', ['H5P.DragText'], 'drag_text', true, ''),
+  mapping('mark_the_words', 'Mark the words', ['H5P.MarkTheWords'], 'mark_the_words', true, ''),
   mapping('mcq', 'Multiple choice', ['H5P.MultiChoice'], 'single_choice_set', false,
     'H5P.MultiChoice is not built as a standalone type here -- it exists only inside Course Presentation. Single choice set is the closest built type and scores one-correct-answer questions identically.',
     ['course_presentation', 'flashcards']),
@@ -1020,7 +1022,7 @@ export function toBlanksPayload(question: BankQuestion, context?: string): Blank
     case_sensitive: false,
     // Forgiven on words of four letters or more, so a spelling slip does not
     // read as a wrong answer on a question that was never about spelling.
-    accept_spelling_errors: true,
+    accept_spelling_errors: question.question_type_code !== 'numerical',
     instant_feedback: false,
     show_score_points: true,
     separate_lines: false,

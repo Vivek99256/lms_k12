@@ -51,7 +51,7 @@ test('every catalogue form the brief lists has a mapping', () => {
     'mcq', 'assertion_reason', 'true_false', 'fill_blank', 'match_following',
     'very_short', 'short', 'long', 'case_study_parent', 'case_study_child',
     'proof', 'construction', 'numerical', 'competency_focused',
-    'source_based_integrated', 'case_study',
+    'source_based_integrated', 'case_study', 'drag_text', 'mark_the_words',
   ];
 
   for (const code of expected) {

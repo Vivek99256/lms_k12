@@ -1809,8 +1809,8 @@ export default function ChapterListPage() {
   const isTotalQuestionsValid =
     totalQuestions.trim() !== '' &&
     Number.isInteger(totalQuestionsNumber) &&
-    totalQuestionsNumber >= 1 &&
-    totalQuestionsNumber <= 50;
+    totalQuestionsNumber >= (questionType === 'all' ? 4 : 1) &&
+    totalQuestionsNumber <= (questionType === 'all' ? 5 : 50);
   const bloomCountTotal = BLOOM_LEVEL_META.reduce(
     (sum, meta) => sum + (bloomCounts[meta.level] || 0),
     0
@@ -2645,8 +2645,8 @@ export default function ChapterListPage() {
       conceptTitle,
       conceptIndex,
     });
-    setQuestionType('');
-    setTotalQuestions('');
+    setQuestionType('all');
+    setTotalQuestions('5');
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
@@ -3273,7 +3273,7 @@ export default function ChapterListPage() {
     }
 
     const config = QUESTION_TYPE_API_CONFIG[questionType as (typeof QUESTION_TYPE_OPTIONS)[number]];
-    if (!config) {
+    if (!config && questionType !== 'all') {
       setQuestionGenerationError('Please select a valid question type.');
       return;
     }
@@ -3291,16 +3291,17 @@ export default function ChapterListPage() {
         subject_id: numericSubjectId,
         standard_id: numericStandardId,
         concept_id: conceptId,
-        question_type: config.question_type,
-        question_type_id: config.question_type_id,
-        total_questions: totalQuestionsNumber,
+        question_type: questionType === 'all' ? 'all' : config.question_type,
+        ...(questionType === 'all'
+          ? { questions_per_type: totalQuestionsNumber }
+          : { question_type_id: config.question_type_id, total_questions: totalQuestionsNumber }),
         // sub_institute_id / created_by are no longer sent: the server reads
         // both from the bearer token. requestContext is still checked above so
         // the modal fails early when the user has no usable session at all.
         // Omitted entirely on Auto, so the server keeps deciding the mix exactly
         // as it did before this control existed. Zero-count levels are dropped:
         // the server reads a row's presence as "generate at this level".
-        ...(useAutoQuota
+        ...(useAutoQuota || questionType === 'all'
           ? {}
           : {
               quota: BLOOM_LEVEL_META.filter((meta) => (bloomCounts[meta.level] || 0) > 0).map(
@@ -4342,6 +4343,12 @@ export default function ChapterListPage() {
                   Question type <span className="text-rose-500">*</span>
                 </Label>
                 <div className="grid gap-2.5 sm:grid-cols-2">
+                  <button type="button" aria-pressed={questionType === 'all'}
+                    onClick={() => { setQuestionType('all'); setTotalQuestions('5'); setUseAutoQuota(true); }}
+                    className="rounded-[12px] border border-indigo-300 px-4 py-3 text-left sm:col-span-2">
+                    <strong>All supported H5P types</strong>
+                    <p className="text-xs text-slate-500">Generate 4–5 questions per supported catalog type. Types without a scored player are skipped.</p>
+                  </button>
                   {QUESTION_TYPE_OPTIONS.map((option) => {
                     const selected = questionType === option;
                     return (
@@ -4377,7 +4384,7 @@ export default function ChapterListPage() {
                   htmlFor="total-questions"
                   className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"
                 >
-                  Total questions <span className="text-rose-500">*</span>
+                  {questionType === 'all' ? 'Questions per type' : 'Total questions'} <span className="text-rose-500">*</span>
                 </Label>
                 <div className="flex flex-wrap items-center gap-2">
                   <Input
@@ -4391,7 +4398,7 @@ export default function ChapterListPage() {
                     className="h-11 w-[150px] rounded-[10px] border-slate-300 px-4 text-[15px] text-slate-900 shadow-none"
                   />
                   <div className="flex flex-wrap gap-1.5">
-                    {QUESTION_COUNT_PRESETS.map((preset) => (
+                    {(questionType === 'all' ? [4, 5] : QUESTION_COUNT_PRESETS).map((preset) => (
                       <button
                         key={preset}
                         type="button"
@@ -4408,7 +4415,7 @@ export default function ChapterListPage() {
                     ))}
                   </div>
                 </div>
-                <p className="text-[12px] text-slate-500">Between 1 and 50 per run.</p>
+                <p className="text-[12px] text-slate-500">{questionType === 'all' ? '4 or 5 per supported type; Bloom levels are chosen automatically.' : 'Between 1 and 50 per run.'}</p>
               </div>
 
               <div className="space-y-3 rounded-[14px] border border-slate-200 bg-slate-50/50 p-4">
@@ -4431,6 +4438,7 @@ export default function ChapterListPage() {
                       <button
                         key={option.label}
                         type="button"
+                        disabled={questionType === 'all' && !option.value}
                         onClick={() => handleToggleAutoQuota(option.value)}
                         className={
                           useAutoQuota === option.value
