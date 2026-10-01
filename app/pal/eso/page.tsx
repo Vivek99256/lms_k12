@@ -232,6 +232,7 @@ function EsoConceptFlow() {
         <JourneyRail
           current={esoStage}
           completed={stagesBefore(esoStage)}
+          chapterId={chapterId}
           conceptId={conceptId}
           orientation="vertical"
         />

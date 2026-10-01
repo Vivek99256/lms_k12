@@ -23,6 +23,7 @@ import {
   type JourneyImageInfo,
   type JourneyStepId,
 } from './H5PJourneyCollage';
+import { stageHref } from './journey-stages';
 
 export interface SelectedJourneyStepRailProps {
   selectedStep: JourneyStepId;
@@ -204,8 +205,13 @@ export function SelectedJourneyStepRail({
                 type="button"
                 disabled={!isUnlocked}
                 onClick={() => {
-                  if (isUnlocked && onSelectStep) {
-                    onSelectStep(step.id);
+                  if (isUnlocked) {
+                    if (onSelectStep) {
+                      onSelectStep(step.id);
+                    } else {
+                      const href = stageHref(step.id, { chapterId: effectiveChapterId, conceptId });
+                      if (href) router.push(href);
+                    }
                   }
                 }}
                 className={cn(

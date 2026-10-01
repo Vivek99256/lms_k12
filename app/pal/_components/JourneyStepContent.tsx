@@ -1040,7 +1040,7 @@ function PracticeStepView({
                 <Button
                   size="sm"
                   className="bg-emerald-700 hover:bg-emerald-800 text-white"
-                  onClick={() => router.push(`/pal/eso?conceptId=${activeConcept.conceptId}`)}
+                  onClick={() => router.push(`/pal/eso?conceptId=${activeConcept.conceptId}&chapterId=${chapterId}`)}
                 >
                   Open Engine Session
                 </Button>
@@ -1597,7 +1597,7 @@ function CheckStepView({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => router.push(`/pal/eso?conceptId=${activeCheckConcept.conceptId}`)}
+                  onClick={() => router.push(`/pal/eso?conceptId=${activeCheckConcept.conceptId}&chapterId=${chapterId}`)}
                   className="text-xs"
                 >
                   <Play className="mr-1.5 h-3.5 w-3.5 text-indigo-600" />

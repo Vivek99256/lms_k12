@@ -135,38 +135,15 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 function getJourneyStepTitle(step: JourneyStepId | null, chapterName: string): string {
-  switch (step) {
-    case 'diagnostic':
-      return 'Step 1: Chapter Diagnostic';
-    case 'adaptive':
-      return 'Step 2: Concept Diagnostic';
-    case 'plan':
-      return 'Step 3: Personalized Learning Plan';
-    case 'learn':
-      return 'Step 4: Learn Concepts & Theory';
-    case 'practice':
-      return 'Step 5: Adaptive Practice Drills';
-    default:
-      return `${chapterName} Learning Journey`;
-  }
+  if (!step) return `${chapterName} Learning Journey`;
+  const meta = JOURNEY_STEPS.find((s) => s.id === step);
+  return meta ? `Step ${meta.stepNumber}: ${meta.label}` : `${chapterName} Learning Journey`;
 }
 
 function getJourneyStepDescription(step: JourneyStepId | null): string {
-  switch (step) {
-    case 'diagnostic':
-      return 'Fifteen questions — five easy, five medium and five hard to establish your baseline.';
-    case 'adaptive':
-      return 'Targeted drills per concept to identify precise strengths and gaps.';
-    case 'plan':
-      return 'Built from your own answers. It updates itself as you work.';
-    case 'learn':
-      return 'Deep dive lessons, video explainers, and key theory before practicing.';
-    case 'practice':
-      return 'Interactive question sets that adapt to your performance with instant review.';
-    case 'diagnostic':
-    default:
-      return 'A sequential 5-stage learning path. Complete each stage in order to master this chapter.';
-  }
+  if (!step) return 'A sequential 10-stage learning path. Complete each stage in order to master this chapter.';
+  const meta = JOURNEY_STEPS.find((s) => s.id === step);
+  return meta ? meta.detail : 'Sequential progress along your personalized curriculum.';
 }
 
 function MainJourneyOverview({
@@ -184,7 +161,7 @@ function MainJourneyOverview({
     (step) => isStepUnlocked(step.id, completedSteps) && !completedSteps.has(step.id)
   ) || JOURNEY_STEPS[0];
 
-  const allCompleted = completedSteps.size === 5;
+  const allCompleted = completedSteps.size >= JOURNEY_STEPS.length;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">

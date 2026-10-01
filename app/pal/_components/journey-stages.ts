@@ -215,59 +215,40 @@ export function stageHref(
   stage: JourneyStageKey,
   ids: { chapterId?: string | number | null; conceptId?: string | number | null }
 ): string | null {
-  const chapter = ids.chapterId ? String(ids.chapterId) : null;
+  const chapter = ids.chapterId
+    ? String(ids.chapterId)
+    : typeof window !== 'undefined'
+      ? sessionStorage.getItem('pal_active_chapter_id')
+      : null;
   const concept = ids.conceptId ? String(ids.conceptId) : null;
-  const chapterSuffix = chapter ? `?chapterId=${chapter}` : '';
 
+  // If a chapter is known, always route directly into the unified image-based journey system
+  if (chapter) {
+    return `/pal/diagnostic/chapter/${chapter}?stage=${stage}`;
+  }
+
+  // Fallbacks if only concept is known without chapter context
   switch (stage) {
     case 'diagnostic':
-      return chapter ? `/pal/diagnostic/chapter/${chapter}?stage=diagnostic` : null;
+      return null;
     case 'adaptive':
-      return concept
-        ? `/pal/adaptive/concept/${concept}${chapterSuffix}`
-        : chapter
-          ? `/pal/diagnostic/chapter/${chapter}?stage=adaptive`
-          : null;
+      return concept ? `/pal/adaptive/concept/${concept}` : null;
     case 'plan':
-      return chapter ? `/pal/plan/chapter/${chapter}` : null;
+      return null;
     case 'learn':
-      return concept
-        ? `/pal/learn/concept/${concept}${chapterSuffix}`
-        : chapter
-          ? `/pal/diagnostic/chapter/${chapter}?stage=learn`
-          : null;
+      return concept ? `/pal/learn/concept/${concept}` : null;
     case 'practice':
-      return concept
-        ? `/pal/eso?conceptId=${concept}`
-        : chapter
-          ? `/pal/diagnostic/chapter/${chapter}?stage=practice`
-          : null;
+      return concept ? `/pal/eso?conceptId=${concept}` : null;
     case 'feedback':
-      return concept
-        ? `/pal/feedback/concept/${concept}${chapterSuffix}`
-        : chapter
-          ? `/pal/diagnostic/chapter/${chapter}?stage=feedback`
-          : null;
+      return concept ? `/pal/feedback/concept/${concept}` : null;
     case 'check':
-      return concept
-        ? `/pal/eso?conceptId=${concept}`
-        : chapter
-          ? `/pal/diagnostic/chapter/${chapter}?stage=check`
-          : null;
+      return concept ? `/pal/eso?conceptId=${concept}` : null;
     case 'intervention':
-      return concept
-        ? `/pal/intervention/concept/${concept}${chapterSuffix}`
-        : chapter
-          ? `/pal/diagnostic/chapter/${chapter}?stage=intervention`
-          : null;
+      return concept ? `/pal/intervention/concept/${concept}` : null;
     case 'mastery':
-      return concept
-        ? `/pal/mastery/concept/${concept}${chapterSuffix}`
-        : chapter
-          ? `/pal/mastery/chapter/${chapter}`
-          : null;
+      return concept ? `/pal/mastery/concept/${concept}` : null;
     case 'recall':
-      return chapter ? `/pal/recall?chapterId=${chapter}` : '/pal/recall';
+      return '/pal/recall';
     default:
       return null;
   }

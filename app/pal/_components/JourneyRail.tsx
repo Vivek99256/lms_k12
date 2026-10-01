@@ -112,6 +112,7 @@ export interface JourneyRailProps {
   conceptId?: string | number | null;
   subjectName?: string | null;
   chapterName?: string | null;
+  conceptName?: string | null;
 }
 
 export function JourneyStepList({

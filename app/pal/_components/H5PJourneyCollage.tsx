@@ -66,7 +66,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: '15 Questions Baseline',
     detail: 'Fifteen questions across the chapter to establish your baseline readiness.',
     icon: ClipboardCheck,
-    gridClass: 'md:col-start-1 md:row-start-1 h-[190px] md:h-[210px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
   {
     id: 'adaptive',
@@ -75,7 +75,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Concept-Level Drill',
     detail: 'Targeted drills per concept to identify precise strengths and gaps.',
     icon: Layers,
-    gridClass: 'md:col-start-2 md:row-start-1 h-[190px] md:h-[210px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
   {
     id: 'plan',
@@ -84,7 +84,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Personalized Roadmap',
     detail: 'Curated step-by-step curriculum ordered from weakest to strongest.',
     icon: Compass,
-    gridClass: 'md:col-start-1 md:row-start-2 h-[190px] md:h-[210px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
   {
     id: 'learn',
@@ -93,7 +93,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Theory & Lessons',
     detail: 'Deep dive lessons, video explainers, and key theory before practicing.',
     icon: BookOpen,
-    gridClass: 'md:col-start-2 md:row-start-2 h-[190px] md:h-[210px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
   {
     id: 'practice',
@@ -102,7 +102,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Interactive Drills',
     detail: 'Smart question sets that adapt to your performance with instant review.',
     icon: GraduationCap,
-    gridClass: 'md:col-start-3 md:row-start-1 md:row-span-2 h-[220px] md:h-full min-h-[380px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
   {
     id: 'feedback',
@@ -111,7 +111,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Performance Analysis',
     detail: 'Detailed breakdown of what went well and what concepts to revisit.',
     icon: MessageSquareText,
-    gridClass: 'h-[190px] md:h-[210px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
   {
     id: 'check',
@@ -120,7 +120,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Timed Assessment',
     detail: 'Understanding assessment determining if you have cleared this concept.',
     icon: Timer,
-    gridClass: 'h-[190px] md:h-[210px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
   {
     id: 'intervention',
@@ -129,7 +129,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Teacher Guidance',
     detail: 'Targeted scaffolding and teacher-assisted support when extra help is needed.',
     icon: Lightbulb,
-    gridClass: 'h-[190px] md:h-[210px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
   {
     id: 'mastery',
@@ -138,7 +138,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Milestone Achievement',
     detail: 'Official sign-off and recognition of mastery across the curriculum.',
     icon: Star,
-    gridClass: 'h-[190px] md:h-[210px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
   {
     id: 'recall',
@@ -147,7 +147,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Memory Retention',
     detail: 'Scheduled refresher practice to ensure lasting retention and retrieval.',
     icon: Repeat,
-    gridClass: 'h-[190px] md:h-[210px]',
+    gridClass: 'h-[210px] w-full min-h-[200px]',
   },
 ];
 
@@ -233,6 +233,17 @@ export function isStepUnlocked(
   if (!completedSteps) return false;
   const completedSet = completedSteps instanceof Set ? completedSteps : new Set(completedSteps);
   if (completedSet.has(stepId)) return true;
+
+  // Mastery (Step 9) is unlocked if Check (Step 7) or Extra Support (Step 8) is completed
+  if (stepId === 'mastery') {
+    return completedSet.has('check') || completedSet.has('intervention');
+  }
+
+  // Recall (Step 10) is unlocked if Mastery (Step 9) is completed
+  if (stepId === 'recall') {
+    return completedSet.has('mastery');
+  }
+
   const idx = STEP_SEQUENCE.indexOf(stepId);
   if (idx <= 0) return true;
   const prevStep = STEP_SEQUENCE[idx - 1];
@@ -348,8 +359,8 @@ export function H5PJourneyCollage({
         </p>
       </div>
 
-      {/* The H5P Branching Scenario Mosaic Grid */}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 md:grid-rows-2">
+      {/* The H5P Branching Scenario Mosaic Grid (All 10 Stages) */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         {JOURNEY_STEPS.map((step) => {
           const imageInfo = getStageImage(images, step.id);
           const hasImage = Boolean(imageInfo?.url);
