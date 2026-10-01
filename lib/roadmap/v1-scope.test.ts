@@ -12,7 +12,7 @@ import { isVisibleMenuLink } from '../../app/data/menuMappers';
  */
 
 test('modules outside V1 are hidden, including their sub-routes', () => {
-  for (const route of ['/pal', '/pal/eso/chapter/1014', '/h5p/h5p_mcq', '/ai', '/enterprise-brain/governance', '/hrit/attendance', '/career-explorer']) {
+  for (const route of ['/pal', '/pal/eso/chapter/1014', '/h5p/h5p_mcq', '/ai', '/hrit/attendance', '/career-explorer']) {
     assert.equal(isDeferredModuleRoute(route), true, route);
   }
 });
@@ -20,6 +20,13 @@ test('modules outside V1 are hidden, including their sub-routes', () => {
 test('the V1 core is never hidden', () => {
   for (const route of ['/fees', '/fees/collect', '/students', '/student', '/admissions/admission_enquiry', '/attendance/attendance_dashboard', '/result/master', '/exam', '/lms', '/subjects', '/dashboard', '/settings', '/general/groupwise_rights', '/user', '/reports']) {
     assert.equal(isDeferredModuleRoute(route), false, route);
+  }
+});
+
+test('rights-granted Enterprise Brain menus remain visible without enabling deferred modules', () => {
+  for (const route of ['/enterprise-brain', '/enterprise-brain/automation', '/enterprise-brain/automation/agents', '/enterprise-brain/governance']) {
+    assert.equal(isDeferredModuleRoute(route), false, route);
+    assert.equal(isVisibleMenuLink(route), true, route);
   }
 });
 
