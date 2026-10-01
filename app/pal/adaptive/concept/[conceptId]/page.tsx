@@ -123,7 +123,14 @@ function AdaptivePracticeView() {
       setCurrentIndex(0);
       recorded.current = new Set();
       fetchAdaptiveQuestions(conceptId, undefined, controller.signal)
-        .then(setSet)
+        .then((data) => {
+          setSet(data);
+          if (data?.chapterId) {
+            try {
+              sessionStorage.setItem('pal_active_chapter_id', String(data.chapterId));
+            } catch {}
+          }
+        })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
           setError(reason instanceof Error ? reason.message : 'Practice couldn’t be loaded.');
@@ -287,7 +294,13 @@ function AdaptivePracticeView() {
           </PalRailSection>
 
           <PalRailSection title="Your journey">
-            <JourneyRail current="adaptive" completed={stagesBefore('adaptive')} orientation="vertical" />
+            <JourneyRail
+              current="adaptive"
+              completed={stagesBefore('adaptive')}
+              orientation="vertical"
+              chapterId={set?.chapterId}
+              conceptId={conceptId}
+            />
           </PalRailSection>
         </>
       }
@@ -438,6 +451,8 @@ function CompletedConceptView({
               completed={COMPLETED_THROUGH_CHECK}
               bypassed={['intervention']}
               orientation="vertical"
+              chapterId={chapterId}
+              conceptId={result?.conceptId}
             />
           </PalRailSection>
         </>

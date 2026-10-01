@@ -209,6 +209,9 @@ function LearnerSupportView() {
           current="intervention"
           completed={stagesBefore('intervention')}
           orientation="vertical"
+          chapterId={chapterId}
+          conceptId={conceptId}
+          conceptName={result?.conceptName}
         />
       </PalRailSection>
 
