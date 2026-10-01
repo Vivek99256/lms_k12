@@ -34,6 +34,19 @@ export type PermissionsState = {
   /** False when the session has no usable token; flags are then unknown, not denied. */
   authenticated: boolean;
   error: string | null;
+  /**
+   * Requested modules the server has no entry for at all.
+   *
+   * `GET /api/permissions` intersects the request with the keys registered in
+   * `config/rbac_modules.php` and reports the remainder as `unknown_modules`. A
+   * key it did not answer is a DIFFERENT fact from a key it answered `false`: the
+   * first means the server cannot speak about the capability, the second means it
+   * can and says no. Without this the caller cannot tell "you are not allowed"
+   * from "nobody here knows what this is", and the second gets rendered as the
+   * first — which is how a registered-but-ungranted module and an unregistered
+   * one both produced "Your role cannot change X" for an administrator.
+   */
+  unknownModules: string[];
   refresh: () => void;
 };
 
@@ -47,11 +60,21 @@ const DENY_ALL: ModulePermissions = { view: false, create: false, update: false,
  */
 export function usePermissions(modules: string[]): PermissionsState {
   const key = useMemo(() => [...modules].sort().join(','), [modules]);
+  /**
+   * The same list, read back off the stable `key`.
+   *
+   * `modules` is a fresh array on every render, so it cannot be an effect
+   * dependency — the effect would re-run (and re-fetch) forever. `key` is memoised
+   * off it and changes only when the set of modules actually changes, which makes
+   * it the correct dependency and the correct source for the names.
+   */
+  const requested = useMemo(() => (key ? key.split(',') : []), [key]);
 
   const [permissions, setPermissions] = useState<Record<string, ModulePermissions> | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unknownModules, setUnknownModules] = useState<string[]>([]);
   const [nonce, setNonce] = useState(0);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
@@ -72,6 +95,7 @@ export function usePermissions(modules: string[]): PermissionsState {
           if (!cancelled) {
             setAuthenticated(false);
             setPermissions(undefined);
+            setUnknownModules([...requested]);
           }
           return;
         }
@@ -81,6 +105,17 @@ export function usePermissions(modules: string[]): PermissionsState {
         const body = await res.json().catch(() => null);
 
         if (cancelled) return;
+
+        // Whatever the server reported as unrecognised, plus anything it simply did
+        // not return an entry for. The two agree in practice — it intersects the
+        // request with its registry and lists the remainder — but deriving the list
+        // from the response itself rather than trusting `unknown_modules` alone means
+        // an older or trimmed server still reports the truth.
+        const reported: string[] = Array.isArray(body?.unknown_modules) ? body.unknown_modules.map(String) : [];
+        const answered = new Set(Object.keys((body?.data as Record<string, unknown>) ?? {}));
+        const unanswered = requested.filter((module) => !answered.has(module));
+
+        setUnknownModules([...new Set([...reported, ...unanswered])]);
 
         if (!res.ok || !body || body.status_code !== 1) {
           setAuthenticated(Boolean(body?.authenticated));
@@ -94,6 +129,7 @@ export function usePermissions(modules: string[]): PermissionsState {
       } catch (e) {
         if (!cancelled) {
           setPermissions(undefined);
+          setUnknownModules([...requested]);
           setError(e instanceof Error ? e.message : 'Permission lookup failed');
         }
       } finally {
@@ -106,9 +142,9 @@ export function usePermissions(modules: string[]): PermissionsState {
     return () => {
       cancelled = true;
     };
-  }, [key, nonce]);
+  }, [key, nonce, requested]);
 
-  return { permissions, loading, authenticated, error, refresh };
+  return { permissions, loading, authenticated, error, unknownModules, refresh };
 }
 
 /**

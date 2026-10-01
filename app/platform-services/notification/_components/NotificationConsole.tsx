@@ -74,9 +74,20 @@ export function NotificationConsole() {
   const [draft, setDraft] = useState<Map<string, NotificationEventRow>>(new Map());
 
   const mayEdit = rights.permissions?.[RBAC_KEY]?.update ?? false;
-  const rightsReason = rights.authenticated
-    ? 'Your role cannot change notification settings for this institute.'
-    : "Sign in again. We couldn't check your permissions.";
+  /**
+   * Whether the server actually answered for `platform.notification`.
+   *
+   * `usePermission` collapses "denied" and "not asked" into `false`, and the two
+   * must not be confused here: telling an administrator "your role cannot change
+   * notification settings" is a claim about THEIR role, and if the server had no
+   * entry for the key it has made no such claim. Controls stay disabled either way.
+   */
+  const rightsAnswered = !rights.unknownModules.includes(RBAC_KEY);
+  const rightsReason = !rights.authenticated
+    ? "Sign in again. We couldn't check your permissions."
+    : !rightsAnswered
+      ? 'This ERP does not report permissions for notification settings yet, so they are read-only here. An administrator can enable changes in Group-wise Rights.'
+      : 'Your role cannot change notification settings for this institute.';
 
   const load = useCallback(
     (isRefresh = false) => {
@@ -261,8 +272,15 @@ export function NotificationConsole() {
     >
       {note && <Note tone={note.tone} text={note.text} onDismiss={() => setNote(null)} />}
 
-      {!mayEdit && !rights.loading && (
+      {!mayEdit && rightsAnswered && !rights.loading && (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <Lock size={14} className="mr-1.5 inline align-text-bottom" />
+          You can see this configuration but not change it. {rightsReason}
+        </div>
+      )}
+
+      {!mayEdit && !rightsAnswered && !rights.loading && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <Lock size={14} className="mr-1.5 inline align-text-bottom" />
           You can see this configuration but not change it. {rightsReason}
         </div>
