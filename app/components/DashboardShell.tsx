@@ -328,7 +328,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, []);
 
   const displayedMenuItems = useMemo<MenuItem[]>(() => {
-    if (!hasBrainAccess || !showDeferredModules()) return menuItems; // Enterprise Brain is not part of V1
+    // Keep rights-granted database menus. Only the synthetic fallback is deferred.
+    if (!hasBrainAccess || !showDeferredModules()) return menuItems;
     const alreadyPresent = menuItems.some((item) => normalizeMenuLabel(item.label) === 'enterprise brain');
     if (alreadyPresent) return menuItems;
 
