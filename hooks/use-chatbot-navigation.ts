@@ -73,16 +73,16 @@ export function useChatbotNavigation() {
                 moduleName: entry.moduleName,
                 level2MenuId: entry.level2MenuId,
               });
-              return [entry.moduleName, cats] as const;
+              return [entry.moduleName, cats] as [string, ModuleCategory[]];
             } catch {
-              return [entry.moduleName, []] as const;
+              return [entry.moduleName, [] as ModuleCategory[]] as [string, ModuleCategory[]];
             }
           })
         );
 
         if (cancelled) return;
 
-        const catMap = new Map<string, ModuleCategory[]>(entries);
+        const catMap = new Map<string, ModuleCategory[]>(entries as Array<[string, ModuleCategory[]]>);
 
         // Cache
         cachedRegistry = reg;

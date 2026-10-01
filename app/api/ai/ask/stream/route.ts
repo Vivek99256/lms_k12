@@ -128,15 +128,39 @@ export async function POST(request: Request) {
 
   if (intent.type === 'unsupported') {
     const result: AskResult = {
-      intent: { key: 'unsupported_module_action' },
-      module: { key: intent.currentModule.name },
+      conversation: { id: null, reference: null, turn_id: null, turn: 1 },
+      question,
+      intent: {
+        key: 'unsupported_module_action',
+        label: 'Unsupported Module Action',
+        confidence: 1.0,
+        slots: {},
+      },
+      module: {
+        key: intent.currentModule.name,
+        label: intent.currentModule.label,
+        entity_key: null,
+        capabilities: {},
+        mcp_tools: [],
+        agent_key: null,
+        workflow_key: null,
+        case_type: null,
+        reaches_recommendation: false,
+        reaches_action: false,
+      },
       answer: {
         headline: intent.message || '',
         sections: [],
         follow_ups: [],
         actions: [],
       },
+      trace: [],
+      ladder: [],
+      stage_counts: {},
       lifecycle_trace: [],
+      lifecycle_stage_counts: {},
+      links: {},
+      duration_ms: 0,
     };
 
     return createUIMessageStreamResponse({
@@ -151,15 +175,37 @@ export async function POST(request: Request) {
   }
 
   if (intent.type === 'navigation') {
+    const targetKey = intent.targetModule?.name || 'fees';
+    const targetLabel = intent.targetModule?.label || 'Fees';
+
     const result: AskResult = {
-      intent: { key: 'navigation' },
-      module: { key: intent.targetModule?.name || 'fees' },
+      conversation: { id: null, reference: null, turn_id: null, turn: 1 },
+      question,
+      intent: {
+        key: 'navigation',
+        label: 'Navigation',
+        confidence: 1.0,
+        slots: {},
+      },
+      module: {
+        key: targetKey,
+        label: targetLabel,
+        entity_key: null,
+        capabilities: {},
+        mcp_tools: [],
+        agent_key: null,
+        workflow_key: null,
+        case_type: null,
+        reaches_recommendation: false,
+        reaches_action: false,
+      },
       answer: {
         headline: intent.headline || '',
         sections: intent.message
           ? [
               {
                 type: 'text',
+                title: intent.headline || 'Navigation',
                 body: intent.message,
               },
             ]
@@ -167,13 +213,18 @@ export async function POST(request: Request) {
         follow_ups: [],
         actions: [],
       },
+      trace: [],
+      ladder: [],
+      stage_counts: {},
+      lifecycle_trace: [],
+      lifecycle_stage_counts: {},
       links: {
         nav_route: intent.route,
         nav_title: intent.headline,
         nav_desc: intent.message,
         nav_label: intent.actionLabel,
       },
-      lifecycle_trace: [],
+      duration_ms: 0,
     };
 
     return createUIMessageStreamResponse({
