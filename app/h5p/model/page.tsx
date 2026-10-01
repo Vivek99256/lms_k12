@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -181,7 +183,7 @@ function H5pModelContent() {
       reload(controller.signal)
         .catch((err: unknown) => {
           if (controller.signal.aborted) return;
-          setError(err instanceof Error ? err.message : 'Failed to load the H5P Model.');
+          setError(friendlyError(err, 'We couldn’t load the H5P Model.. Please try again.'));
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -202,7 +204,7 @@ function H5pModelContent() {
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : 'Failed to run the pedagogy selector.');
+          setError(friendlyError(err, 'We couldn’t run the pedagogy selector.. Please try again.'));
         }
       });
     return () => controller.abort();
@@ -219,7 +221,7 @@ function H5pModelContent() {
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : 'Failed to read the H5P event evidence.');
+          setError(friendlyError(err, 'We couldn’t read the H5P event evidence.. Please try again.'));
         }
       });
     return () => controller.abort();
@@ -231,7 +233,7 @@ function H5pModelContent() {
     try {
       setInsights(await fetchInsights(ctx, {}));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Insight generation failed.');
+      setError(friendlyError(err, 'We couldn’t generate the insights. Please try again.'));
     } finally {
       setBusy('');
     }
@@ -253,7 +255,7 @@ function H5pModelContent() {
           : `${result.proposals.length} proposal${result.proposals.length === 1 ? '' : 's'} ready for review${result.cached ? ' (from cache)' : ''}. Nothing has been saved yet.`
       );
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'AI tagging failed.');
+      setError(friendlyError(err, 'We couldn’t tag this content. Please try again.'));
     } finally {
       setBusy('');
     }
@@ -269,7 +271,7 @@ function H5pModelContent() {
         setNotice(`Saved tags for ${proposal.nodeKey}. It is a draft until a reviewer approves it.`);
         await reload();
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Failed to save the proposal.');
+        setError(friendlyError(err, 'We couldn’t save the proposal.. Please try again.'));
       } finally {
         setBusy('');
       }
@@ -286,7 +288,7 @@ function H5pModelContent() {
         setNotice(`${nodeKey} moved to ${humanise(status)}.`);
         await reload();
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Failed to change the review status.');
+        setError(friendlyError(err, 'We couldn’t change the review status.. Please try again.'));
       } finally {
         setBusy('');
       }
@@ -343,7 +345,7 @@ function H5pModelContent() {
         {loading ? (
           <LoadingState label="Loading the H5P Model…" />
         ) : !model || !registry ? (
-          <EmptyState title="The H5P Model could not be loaded" hint={error || undefined} />
+          <EmptyState title="The H5P Model couldn’t be loaded" hint={error || undefined} />
         ) : (
           <>
             <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -1116,7 +1118,7 @@ function InsightsTab({
         />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Events" value={String(evidence.totals.events)} />
-          <Stat label="Learners" value={String(evidence.totals.learners)} />
+          <Stat label="Students" value={String(evidence.totals.learners)} />
           <Stat label="Sessions" value={String(evidence.totals.sessions)} />
           <Stat label="Time on task" value={`${Math.round(evidence.totals.totalSeconds / 60)} min`} />
         </div>
@@ -1311,7 +1313,7 @@ function XapiTab({ registry, model }: { registry: H5pRegistry; model: H5pChapter
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Events" value={String(model.telemetry.totalEvents)} hint={`last ${model.telemetry.windowDays} days`} />
           <Stat label="Typed" value={String(model.telemetry.typedEvents)} hint="resolved to an H5P type" />
-          <Stat label="Learners" value={String(model.telemetry.learners)} />
+          <Stat label="Students" value={String(model.telemetry.learners)} />
           <Stat label="Sessions" value={String(model.telemetry.sessions)} />
         </div>
         {model.telemetry.lastEventAt ? (

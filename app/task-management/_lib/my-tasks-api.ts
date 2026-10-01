@@ -80,7 +80,7 @@ async function legacyGet<T>(session: TaskSession, path: string, params: Record<s
   const url = isBrowser ? buildProxyUrl(path, params) : `${session.baseUrl}${path}${search.toString() ? `?${search.toString()}` : ''}`
   const response = await fetch(url, { headers: createAuthHeaders(session), cache: 'no-store' })
   const payload = (await response.json().catch(() => ({}))) as unknown
-  if (!response.ok) throw new TaskApiError(legacyMessage(payload, `API Error: ${response.status} ${response.statusText}`), response.status)
+  if (!response.ok) throw new TaskApiError(legacyMessage(payload, "Couldn't complete that request. Try again."), response.status)
   return payload as T
 }
 
@@ -93,7 +93,7 @@ async function legacyPostForm<T>(session: TaskSession, path: string, form: FormD
     body: form,
   })
   const payload = (await response.json().catch(() => ({}))) as unknown
-  if (!response.ok) throw new TaskApiError(legacyMessage(payload, `API Error: ${response.status} ${response.statusText}`), response.status)
+  if (!response.ok) throw new TaskApiError(legacyMessage(payload, "Couldn't complete that request. Try again."), response.status)
   return payload as T
 }
 
@@ -106,7 +106,7 @@ async function legacyPost<T>(session: TaskSession, path: string, body: unknown):
     body: JSON.stringify(body),
   })
   const payload = (await response.json().catch(() => ({}))) as unknown
-  if (!response.ok) throw new TaskApiError(legacyMessage(payload, `API Error: ${response.status} ${response.statusText}`), response.status)
+  if (!response.ok) throw new TaskApiError(legacyMessage(payload, "Couldn't complete that request. Try again."), response.status)
   return payload as T
 }
 
@@ -252,7 +252,7 @@ export const myTasksApi = {
     return fetch(url, { method: 'DELETE', headers: createAuthHeaders(session) })
       .then(async (response) => {
         const payload = (await response.json().catch(() => ({}))) as { status_code: string | number; message: string }
-        if (!response.ok) throw new TaskApiError(legacyMessage(payload, `API Error: ${response.status}`), response.status)
+        if (!response.ok) throw new TaskApiError(legacyMessage(payload, "Couldn't complete that request. Try again."), response.status)
         return payload
       })
   },

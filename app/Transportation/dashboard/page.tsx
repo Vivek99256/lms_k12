@@ -69,7 +69,7 @@ export default function TransportationDashboardPage() {
         setPayload(result);
       } catch (caught) {
         if (signal?.aborted) return;
-        setError(caught instanceof Error ? caught.message : 'Unable to load the transportation dashboard summary.');
+        setError(caught instanceof Error ? caught.message : "Couldn't load the transportation dashboard summary. Try again.");
       } finally {
         if (!signal?.aborted) setLoading(false);
       }

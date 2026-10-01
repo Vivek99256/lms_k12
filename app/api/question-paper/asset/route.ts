@@ -34,6 +34,9 @@ export const runtime = 'nodejs';
 /** Bounded so a figure cannot be used to pull something large through. */
 const MAX_BYTES = 8 * 1024 * 1024;
 
+/** Hops a figure url may redirect through, each re-checked against the allow-list. */
+const MAX_REDIRECTS = 3;
+
 const IMAGE_CONTENT_TYPE_RE = /^image\/(png|jpe?g|gif|webp|svg\+xml)$/i;
 
 /**
@@ -85,12 +88,32 @@ export async function GET(request: Request) {
   }
 
   try {
-    const upstream = await fetch(url, {
-      // No Authorization, no Cookie: see the note above.
-      headers: { Accept: 'image/*' },
-      cache: 'no-store',
-      redirect: 'follow',
-    });
+    // Redirects are followed by hand so every hop is held to the same allow-list;
+    // `redirect: 'follow'` would let an open redirect on an allowed host lead anywhere.
+    let upstream: Response | null = null;
+    let target = url;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+      upstream = await fetch(target, {
+        // No Authorization, no Cookie: see the note above.
+        headers: { Accept: 'image/*' },
+        cache: 'no-store',
+        redirect: 'manual',
+      });
+      const location = upstream.status >= 300 && upstream.status < 400 ? upstream.headers.get('location') : null;
+      if (!location) break;
+      const next = new URL(location, target).toString();
+      if (!isAllowedAssetUrl(next, allowedOrigins())) {
+        return NextResponse.json(
+          { error: 'That figure redirects to a host this deployment is not configured to read.', code: 'QUESTION_ASSET_HOST_NOT_ALLOWED' },
+          { status: 403 }
+        );
+      }
+      target = next;
+      upstream = null;
+    }
+    if (!upstream) {
+      return NextResponse.json({ error: 'That figure redirected too many times.' }, { status: 502 });
+    }
 
     if (!upstream.ok) {
       return NextResponse.json(
@@ -110,6 +133,11 @@ export async function GET(request: Request) {
       );
     }
 
+    const declaredLength = Number(upstream.headers.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES) {
+      return NextResponse.json({ error: 'That figure is too large to print.' }, { status: 502 });
+    }
+
     const bytes = await upstream.arrayBuffer();
 
     if (bytes.byteLength > MAX_BYTES) {
@@ -124,12 +152,15 @@ export async function GET(request: Request) {
         // Figures are immutable once extracted, and one export can ask for the
         // same diagram on several questions.
         'Cache-Control': 'private, max-age=3600',
+        // An SVG can carry script. Served from this origin, opening it directly would
+        // run that script here; this policy keeps it a picture (it still draws in <img>).
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'The figure could not be fetched.' },
-      { status: 502 }
-    );
+    // Fetch errors can name internal hosts; keep them in the server log.
+    console.error('[question-paper/asset] fetch failed', error);
+    return NextResponse.json({ error: 'The figure could not be fetched.' }, { status: 502 });
   }
 }

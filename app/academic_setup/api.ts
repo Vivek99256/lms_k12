@@ -160,10 +160,10 @@ async function request(
     if (response.status === 404) {
       throw new Error("Backend API required for this academic setup menu.");
     }
-    throw new Error(messageFrom(payload, `Request failed (${response.status}).`));
+    throw new Error(messageFrom(payload, "Couldn't complete the request. Try again."));
   }
   if (isRecord(payload) && normalizeApiStatus(payload as ApiEnvelope) === "2") {
-    throw new Error(messageFrom(payload, "Authentication failed."));
+    throw new Error(messageFrom(payload, "Your session has expired. Sign in again."));
   }
   return payload;
 }

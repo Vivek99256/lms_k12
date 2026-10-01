@@ -201,3 +201,56 @@ export function appendCommonParams(
     searchParams.set('syear', session.syear);
   }
 }
+
+/**
+ * The ERP API now refuses the `api/*` routes that used to be anonymous
+ * (config/api_guard.php in the Laravel repo). Most screens already send the
+ * bearer token through createAuthHeaders(), but many older ones call fetch()
+ * directly and never did. Rather than patch each of those call sites, this
+ * adds the session token to any fetch aimed at the ERP API origin that did
+ * not set its own Authorization header.
+ *
+ * It only ever touches requests to the ERP origin, so the token cannot leak
+ * to a third party, and it leaves alone any request that already carries an
+ * Authorization header (including the login call, which has no token yet).
+ * Safe to call more than once.
+ */
+export function installErpAuthFetch() {
+  if (typeof window === 'undefined') return;
+  const w = window as Window & { __erpAuthFetchInstalled?: boolean };
+  if (w.__erpAuthFetchInstalled) return;
+  w.__erpAuthFetchInstalled = true;
+
+  const nativeFetch = window.fetch.bind(window);
+
+  const erpOrigins = () => {
+    const origins = new Set<string>();
+    for (const base of [API_BASE_URL, ERP_BASE_URL_OVERRIDE, buildSessionContext().baseUrl]) {
+      try {
+        if (base) origins.add(new URL(base, window.location.origin).origin);
+      } catch {
+        /* ignore an unparseable base */
+      }
+    }
+    return origins;
+  };
+
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    try {
+      const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      const target = new URL(rawUrl, window.location.origin);
+      const sameOriginNextApi = target.origin === window.location.origin;
+      if (!sameOriginNextApi && erpOrigins().has(target.origin)) {
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        const { token } = buildSessionContext();
+        if (token && !headers.has('Authorization')) {
+          headers.set('Authorization', `Bearer ${token}`);
+          return nativeFetch(input, { ...init, headers });
+        }
+      }
+    } catch {
+      /* never let auth decoration break a request */
+    }
+    return nativeFetch(input, init);
+  };
+}

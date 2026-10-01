@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { useEffect, useRef, useState } from 'react';
 import { Eye, PenLine, RotateCcw } from 'lucide-react';
 
@@ -80,7 +81,7 @@ export function EssayPlayer({ question, onResult }: PlayerProps) {
 
       <div
         className="mt-3 text-sm leading-relaxed text-[color:var(--h5p-ink)]"
-        dangerouslySetInnerHTML={{ __html: item.prompt }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.prompt) }}
       />
 
       <label className="mt-4 block">

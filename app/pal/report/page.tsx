@@ -70,7 +70,7 @@ export default function PalReportPage() {
         setError(
           reason instanceof Error
             ? reason.message
-            : 'Unable to load the PAL report.'
+            : 'Couldn’t load the PAL report.'
         );
       } finally {
         if (!controller.signal.aborted) setLoading(false);

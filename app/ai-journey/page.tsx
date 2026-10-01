@@ -86,7 +86,7 @@ export default function AiJourneyPage() {
         setTurns((prev) => [...prev, result]);
         setQuestion('');
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'That question could not be answered.');
+        setError(caught instanceof Error ? caught.message : 'That question couldn’t be answered.');
       } finally {
         setBusy(false);
       }

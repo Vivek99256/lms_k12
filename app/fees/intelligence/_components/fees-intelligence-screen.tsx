@@ -114,7 +114,7 @@ export function FeesIntelligenceScreen() {
       await runFeesIntelligence();
       refresh();
     } catch (caught) {
-      setRunError(caught instanceof Error ? caught.message : 'Unable to recompute the fee findings.');
+      setRunError(caught instanceof Error ? caught.message : "Couldn't recompute the fee findings. Try again.");
     } finally {
       setRunning(false);
     }
@@ -262,7 +262,7 @@ function Hero({
         <div className="max-w-2xl">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#5846EA]">Fees</p>
           <h1 className="mt-1.5 text-[26px] font-bold leading-tight tracking-tight text-slate-950 sm:text-[30px]">
-            Fees Intelligence
+            Fee intelligence
           </h1>
           <p className="mt-2 text-[14px] leading-6 text-slate-600">
             Understand collection health, identify financial risks, and turn fee data into evidence-backed actions.
@@ -340,7 +340,7 @@ function ManagementSummary({ data }: { data: FeesIntelligencePayload }) {
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white px-5 py-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#5846EA]">Management Summary</p>
+      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#5846EA]">Management summary</p>
       {summary.headline ? (
         <h2 className="mt-1.5 text-[19px] font-bold leading-snug tracking-tight text-slate-950">
           {summary.headline}
@@ -350,7 +350,7 @@ function ManagementSummary({ data }: { data: FeesIntelligencePayload }) {
       {position ? (
         <div className="mt-4 grid grid-cols-2 gap-3 border-y border-slate-100 py-3.5 sm:grid-cols-3 lg:grid-cols-6">
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total Fee Demand</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total fee demand</span>
             <p className="mt-0.5 text-[15px] font-bold text-slate-900">{money(position.demandAmount)}</p>
           </div>
           <div>
@@ -362,7 +362,7 @@ function ManagementSummary({ data }: { data: FeesIntelligencePayload }) {
             <p className="mt-0.5 text-[15px] font-bold text-amber-600">{money(position.outstandingAmount)}</p>
           </div>
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Collection Rate</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Collection rate</span>
             <p className="mt-0.5 text-[15px] font-bold text-slate-900">{percent(position.collectionRate)}</p>
           </div>
           <div>
@@ -1027,7 +1027,7 @@ function DecisionDialog({
       await decideRecommendation(recommendation.id, status, rationale.trim());
       onDecided();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to record the decision.');
+      setError(caught instanceof Error ? caught.message : "Couldn't record the decision. Try again.");
     } finally {
       setSaving(false);
     }
@@ -1360,7 +1360,7 @@ function OutcomeDialog({
       });
       onRecorded();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to record the outcome.');
+      setError(caught instanceof Error ? caught.message : "Couldn't record the outcome. Try again.");
     } finally {
       setSaving(false);
     }
@@ -1647,7 +1647,7 @@ function AccountsDrawer({
         const result = await fetchFeesAccounts(offset, 25, standardId);
         if (!cancelled) setPage(result);
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'Unable to load the accounts.');
+        if (!cancelled) setError(caught instanceof Error ? caught.message : "Couldn't load the accounts. Try again.");
       } finally {
         if (!cancelled) setLoading(false);
       }

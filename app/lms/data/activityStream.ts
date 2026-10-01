@@ -36,7 +36,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(`${fallback}.`);
   }
 }
 
@@ -201,8 +201,8 @@ export async function fetchActivityStream(signal?: AbortSignal): Promise<Activit
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the activity stream.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the activity stream'));
+  if (!res.ok) throw new Error(`Couldn’t load the activity stream. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load the activity stream'));
 
   const checklist: ChecklistItem[] = toArray(raw.checkList).map((entry) => {
     const r = toRecord(entry);

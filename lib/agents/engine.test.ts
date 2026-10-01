@@ -197,7 +197,7 @@ test('tenants are isolated: another institute cannot see or run the agent', asyn
   const store = new MemoryAgentStore();
   const agent = await createAgent(context(feesAdmin, allow, store), reminderAgent);
 
-  assert.deepEqual(await listAgents(context(otherSchool, allow, store)), []);
+  assert.deepEqual(await listAgents(context(otherSchool, allow, store), { module: reminderAgent.module }), []);
   await assert.rejects(runAgent(context(otherSchool, allow, store), agent.id), (error: unknown) =>
     error instanceof AgentEngineError && error.status === 404);
   assert.equal((await store.listRuns('202')).length, 0);
@@ -205,5 +205,16 @@ test('tenants are isolated: another institute cannot see or run the agent', asyn
 
 test('a session without an institute or user cannot do anything', async () => {
   const anonymous: ActingUser = { tenant_id: '', user_id: '', user_name: '', profile_id: '', profile_name: '' };
-  await assert.rejects(listAgents(context(anonymous, allow)), (error: unknown) => error instanceof AgentEngineError && error.status === 401);
+  await assert.rejects(listAgents(context(anonymous, allow), { module: reminderAgent.module }), (error: unknown) => error instanceof AgentEngineError && error.status === 401);
+});
+
+test('listing agents needs view rights on a named module', async () => {
+  const store = new MemoryAgentStore();
+  await createAgent(context(feesAdmin, allow, store), reminderAgent);
+
+  await assert.rejects(listAgents(context(feesAdmin, allow, store)), (error: unknown) =>
+    error instanceof AgentEngineError && error.status === 400);
+  await assert.rejects(listAgents(context(feesClerk, deny, store), { module: reminderAgent.module }), (error: unknown) =>
+    error instanceof AgentEngineError && error.status === 403);
+  assert.equal((await listAgents(context(feesAdmin, allow, store), { module: reminderAgent.module })).length, 1);
 });

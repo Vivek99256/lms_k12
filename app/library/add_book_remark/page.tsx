@@ -19,6 +19,7 @@ import {
 } from '@/app/fees/_components/fees-shared';
 import { appendSessionFormData, appendSessionParams, asRecord, getFeesSession, readString, toArray } from '@/app/fees/_lib/fees-api';
 import { downloadFile, escapeCsv, MessageState, normalizePayload, readMessage, readStatus } from '@/app/library/_lib/library-module-utils';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type StatusType = {
   id: string;
@@ -76,20 +77,20 @@ function printRows(rows: RemarkRecord[], statusTypes: StatusType[], remarksMap: 
         </style>
       </head>
       <body>
-        <h2>Add Book Remark</h2>
+        <h2>Add book remark</h2>
         <table>
           <thead>
             <tr>
-              <th>Sr No</th>
-              <th>Item Code</th>
+              <th>No.</th>
+              <th>Item code</th>
               <th>Title</th>
-              <th>Collection Type</th>
+              <th>Collection type</th>
               <th>Remarks</th>
-              <th>Item Status</th>
+              <th>Item status</th>
             </tr>
           </thead>
           <tbody>
-            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td><td>${remarksMap[row.id] || row.remarks || '-'}</td><td>${statusLookup[statusMap[row.id] || row.itemStatusId] || '-'}</td></tr>`).join('')}
+            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(row.title || '-')}</td><td>${escapeHtml(row.collectionType || '-')}</td><td>${escapeHtml(remarksMap[row.id] || row.remarks || '-')}</td><td>${escapeHtml(statusLookup[statusMap[row.id] || row.itemStatusId] || '-')}</td></tr>`).join('')}
           </tbody>
         </table>
       </body>
@@ -143,7 +144,7 @@ export default function AddBookRemarkPage() {
       const payload = normalizePayload(await response.json());
 
       if (!response.ok) {
-        throw new Error(readMessage(payload, 'Unable to load book remarks.'));
+        throw new Error(readMessage(payload, "Couldn't load book remarks. Try again."));
       }
 
       const nextRecords = parseRecords(payload);
@@ -162,7 +163,7 @@ export default function AddBookRemarkPage() {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to load book remarks.',
+        text: error instanceof Error ? error.message : "Couldn't load book remarks. Try again.",
       });
     } finally {
       setLoading(false);
@@ -208,7 +209,7 @@ export default function AddBookRemarkPage() {
     }, {});
 
     return filteredRecords.map((record, index) => ({
-      'Sr No': String(index + 1),
+      'No.': String(index + 1),
       'Item Code': record.itemCode || '-',
       Title: record.title || '-',
       'Collection Type': record.collectionType || '-',
@@ -249,7 +250,7 @@ export default function AddBookRemarkPage() {
       const payload = normalizePayload(await response.json());
 
       if (!response.ok || readStatus(payload) !== 1) {
-        throw new Error(readMessage(payload, 'Unable to save book remarks.'));
+        throw new Error(readMessage(payload, "Couldn't save book remarks. Try again."));
       }
 
       setMessage({ type: 'success', text: readMessage(payload, 'Book verification updated.') });
@@ -257,7 +258,7 @@ export default function AddBookRemarkPage() {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to save book remarks.',
+        text: error instanceof Error ? error.message : "Couldn't save book remarks. Try again.",
       });
     } finally {
       setSubmitting(false);
@@ -267,7 +268,7 @@ export default function AddBookRemarkPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Add Book Remark"
+        title="Add book remark"
         description="Review scanned books, select rows to update, then save verification remarks and item status."
         action={(
           <div className="flex flex-wrap gap-2">
@@ -299,13 +300,13 @@ export default function AddBookRemarkPage() {
 
       {message ? <InlineMessage type={message.type} text={message.text} /> : null}
 
-      <SectionPanel title="Search" description="Laravel filters the verification table by item code and lets you update only the checked rows.">
+      <SectionPanel title="Search" description="Search by item code, then update only the checked rows.">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-          <Field label="Item Code">
+          <Field label="Item code">
             <Input
               value={itemCode}
               onChange={(event) => setItemCode(event.target.value)}
-              placeholder="Search Item Code"
+              placeholder="Search item code"
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
@@ -323,10 +324,10 @@ export default function AddBookRemarkPage() {
         </div>
       </SectionPanel>
 
-      <SectionPanel title="Verification Rows" description="Checked rows unlock the remark and status inputs, matching the legacy verification workflow.">
+      <SectionPanel title="Verification rows" description="Check a row to edit its remark and status.">
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="Global Search">
+            <Field label="Global search">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -343,12 +344,12 @@ export default function AddBookRemarkPage() {
             <Table className="min-w-[1200px]">
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100">
-                  <TableHead>Sr No</TableHead>
-                  <TableHead>Item Code</TableHead>
+                  <TableHead>No.</TableHead>
+                  <TableHead>Item code</TableHead>
                   <TableHead>Title</TableHead>
-                  <TableHead>Collection Type</TableHead>
+                  <TableHead>Collection type</TableHead>
                   <TableHead>Remarks</TableHead>
-                  <TableHead>Item Status</TableHead>
+                  <TableHead>Item status</TableHead>
                 </TableRow>
                 <TableRow className="bg-white hover:bg-white">
                   <TableHead />
@@ -399,7 +400,7 @@ export default function AddBookRemarkPage() {
                             onChange={(value) => setStatusMap((current) => ({ ...current, [record.id]: value }))}
                             disabled={!enabled}
                           >
-                            <option value="">Select Status</option>
+                            <option value="">Select status</option>
                             {statusTypes.map((type) => (
                               <option key={type.id} value={type.id}>
                                 {type.name}

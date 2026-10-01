@@ -938,7 +938,7 @@ export default function DepartmentPage() {
           );
         } catch (err) {
           if (!cancelled) {
-            setHodError(err instanceof Error ? err.message : "Failed to load employees.");
+            setHodError(err instanceof Error ? err.message : "Couldn't load employees. Try again.");
           }
         } finally {
           if (!cancelled) setHodCandidatesLoading(false);
@@ -975,7 +975,7 @@ export default function DepartmentPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load departments (status ${response.status})`);
+        throw new Error("Couldn't load departments. Try again.");
       }
 
       const data: HierarchyResponse = await response.json();
@@ -1254,7 +1254,7 @@ export default function DepartmentPage() {
       await fetchDepartments(undefined, false);
     } catch (err) {
       setDeleteError(
-        err instanceof Error ? err.message : "Could not delete department."
+        err instanceof Error ? err.message : "Couldn't delete department. Try again."
       );
     } finally {
       setDeleteSubmitting(false);
@@ -1295,7 +1295,7 @@ export default function DepartmentPage() {
       await fetchDepartments(undefined, false);
     } catch (err) {
       setDeleteError(
-        err instanceof Error ? err.message : "Could not merge department."
+        err instanceof Error ? err.message : "Couldn't merge department. Try again."
       );
     } finally {
       setMergeSubmitting(false);
@@ -1338,7 +1338,7 @@ export default function DepartmentPage() {
       await fetchDepartments(undefined, false);
     } catch (err) {
       setHodError(
-        err instanceof Error ? err.message : "Could not update department head."
+        err instanceof Error ? err.message : "Couldn't update department head. Try again."
       );
     } finally {
       setHodSubmitting(false);
@@ -1376,7 +1376,7 @@ export default function DepartmentPage() {
     } catch (err) {
       setActionNotice({
         type: "error",
-        message: err instanceof Error ? err.message : "Could not reorder departments.",
+        message: err instanceof Error ? err.message : "Couldn't reorder departments. Try again.",
       });
     } finally {
       setReorderSubmitting(false);
@@ -1402,7 +1402,7 @@ export default function DepartmentPage() {
         <div className="flex max-w-sm flex-col items-center gap-3 rounded-lg border border-destructive/30 bg-card px-6 py-8 text-center shadow-sm">
           <X className="h-6 w-6 text-destructive" />
           <p className="text-[12px] font-semibold text-foreground">
-            Could not load departments
+            Couldn't load departments
           </p>
           <p className="text-[11px] leading-4 text-muted-foreground">{error}</p>
           <Button

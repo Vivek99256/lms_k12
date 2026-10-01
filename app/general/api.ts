@@ -81,8 +81,8 @@ async function request(module: GeneralModule, session: SessionContext, suffix = 
   });
   const payload = (await response.json().catch(() => ({}))) as unknown;
   if (!response.ok) {
-    if (response.status === 404) throw new Error("Backend API required for this General menu.");
-    throw new Error(message(payload, `Request failed (${response.status}).`));
+    if (response.status === 404) throw new Error("This page is not available yet. Contact your administrator.");
+    throw new Error(message(payload, "Couldn't complete that request. Try again."));
   }
   if (isRecord(payload) && normalizeApiStatus(payload as ApiEnvelope) === "2") throw new Error(message(payload, "Authentication failed."));
   return payload;

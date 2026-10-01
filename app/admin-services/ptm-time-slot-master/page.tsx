@@ -55,7 +55,7 @@ export default function PtmTimeSlotMasterPage() {
         setClassOptions(options);
         setSlots(slotRows);
       } catch (value: unknown) {
-        setError(errorMessage(value, "PTM time slots could not be loaded."));
+        setError(errorMessage(value, "Couldn't load PTM time slots. Try again."));
       } finally {
         setLoading(false);
       }
@@ -120,7 +120,7 @@ export default function PtmTimeSlotMasterPage() {
       resetForm();
       await load(filter);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The PTM time slot could not be saved."));
+      setError(errorMessage(value, "Couldn't save the PTM time slot. Try again."));
     } finally {
       setSaving(false);
     }
@@ -137,7 +137,7 @@ export default function PtmTimeSlotMasterPage() {
       if (editing?.id === slot.id) resetForm();
       await load(filter);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The PTM time slot could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the PTM time slot. Try again."));
     } finally {
       setBusy(false);
     }

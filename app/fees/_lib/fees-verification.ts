@@ -244,7 +244,7 @@ export async function getVerificationStatus(): Promise<FeesVerificationStatus> {
         href: report.href,
         verified: result.status === 'fulfilled' && result.value,
         error: result.status === 'rejected'
-          ? (result.reason instanceof Error ? result.reason.message : 'Could not read this report.')
+          ? (result.reason instanceof Error ? result.reason.message : "Couldn't read this report. Try again.")
           : '',
       };
     })

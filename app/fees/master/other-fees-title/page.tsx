@@ -247,19 +247,17 @@ export default function OtherFeesTitlePage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load other fee titles (${response.status})`);
+        throw new Error("Couldn't load other fee titles. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const normalizedRecords = normalizeList(payload);
-      console.log('Other Fees Title API response:', payload);
-      console.log('Other Fees Title records:', normalizedRecords);
       setRecords(normalizedRecords.map(mapRecord));
     } catch (fetchError) {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load other fee titles.'
+          : "Couldn't load other fee titles. Try again."
       );
     } finally {
       setLoading(false);
@@ -403,7 +401,7 @@ export default function OtherFeesTitlePage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to ${editingRecord ? 'update' : 'save'} other fee title (${response.status})`
+          `Couldn't ${editingRecord ? 'update' : 'save'} other fee title. Try again.`
         );
       }
 
@@ -412,7 +410,7 @@ export default function OtherFeesTitlePage() {
       if (apiStatus && apiStatus !== '1') {
         throw new Error(
           payload.message ||
-            `Failed to ${editingRecord ? 'update' : 'save'} other fee title.`
+            `Couldn't ${editingRecord ? 'update' : 'save'} other fee title. Try again.`
         );
       }
 
@@ -426,7 +424,7 @@ export default function OtherFeesTitlePage() {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : 'Failed to save other fee title.'
+          : "Couldn't save other fee title. Try again."
       );
     } finally {
       setSubmitting(false);
@@ -460,14 +458,14 @@ export default function OtherFeesTitlePage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to delete other fee title (${response.status})`
+          "Couldn't delete other fee title. Try again."
         );
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to delete other fee title.');
+        throw new Error(payload.message || "Couldn't delete other fee title. Try again.");
       }
 
       setSuccessMessage(
@@ -478,7 +476,7 @@ export default function OtherFeesTitlePage() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : 'Failed to delete other fee title.'
+          : "Couldn't delete other fee title. Try again."
       );
     } finally {
       setDeletingId('');
@@ -540,7 +538,7 @@ export default function OtherFeesTitlePage() {
                   <TableHeader className="bg-slate-100/90">
                     <TableRow className="border-slate-200 hover:bg-transparent">
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Display Title
+                        Display title
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                         Amount
@@ -549,10 +547,10 @@ export default function OtherFeesTitlePage() {
                         Status
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Include Imprest
+                        Include imprest
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Sort Order
+                        Sort order
                       </TableHead>
                       <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                         Syear

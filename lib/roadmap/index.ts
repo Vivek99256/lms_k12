@@ -220,6 +220,53 @@ export function canSeeInternalItems(): boolean {
   return process.env.NEXT_PUBLIC_SHOW_INTERNAL_ROADMAP === 'true';
 }
 
+/**
+ * Version 1 ships the core school-operations loop (admissions, students, attendance, fees,
+ * exam/result, teaching, communication). These modules are real code but are not part of V1,
+ * so they are left out of the sidebar and the profile menu. Their pages and APIs are
+ * untouched: this decides what V1 advertises, not what is protected (the backend does that).
+ *
+ * Set NEXT_PUBLIC_SHOW_DEFERRED_MODULES=true on an internal or pilot build to show them again.
+ */
+const V1_DEFERRED_ROUTE_PREFIXES = [
+  '/pal',
+  '/new-pal',
+  '/h5p',
+  '/ai',
+  '/ai-journey',
+  '/ai-platforms',
+  '/ai-reports',
+  '/enterprise-brain',
+  '/capability-intelligence',
+  '/career-awareness',
+  '/career-explorer',
+  '/career-counselling',
+  '/career-intelligence',
+  '/talent-management',
+  '/people-competency',
+  '/hrit',
+  '/platform-administration',
+  '/platform-roadmap',
+  '/platform-services',
+  '/migration-modules',
+  '/mobile-apps',
+  '/sqaa',
+  '/sqaa_document_report',
+  '/sqaa_master',
+  '/bazar',
+] as const;
+
+export function showDeferredModules(): boolean {
+  return process.env.NEXT_PUBLIC_SHOW_DEFERRED_MODULES === 'true';
+}
+
+/** True when `route` belongs to a module that is not part of V1 (segment-aware: /ai does not match /airlines). */
+export function isDeferredModuleRoute(route: string | null | undefined): boolean {
+  if (showDeferredModules()) return false;
+  const path = (route || '').toLowerCase().split(/[?#]/)[0].replace(/\/+$/, '');
+  return V1_DEFERRED_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 /** Short label for a badge or chip. */
 export function roadmapStatusLabel(status: RoadmapStatus): string {
   switch (status) {

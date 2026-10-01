@@ -42,7 +42,7 @@ export default function NewPalPage() {
       setCoverage(await fetchEstateCoverage(signal));
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      setError((err as Error).message || 'Could not load the New PAL overview.');
+      setError((err as Error).message || 'Couldn’t load the New PAL overview.');
     } finally {
       setLoading(false);
     }

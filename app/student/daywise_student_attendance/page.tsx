@@ -315,11 +315,10 @@ export default function DaywiseStudentAttendancePage() {
       });
 
       const responseBody = (await response.json()) as unknown;
-      console.log('Daywise Attendance Report API response:', responseBody);
       const payload = normalizePayload(responseBody);
 
       if (!response.ok) {
-        throw new Error(payload.message || `HTTP ${response.status}: Unable to fetch daywise attendance report.`);
+        throw new Error(payload.message || `Couldn't load daywise attendance report. Try again.`);
       }
 
       const nextReport = buildReport(payload);
@@ -336,7 +335,7 @@ export default function DaywiseStudentAttendancePage() {
       setReport(null);
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to fetch daywise attendance report.',
+        text: error instanceof Error ? error.message : "Couldn't load daywise attendance report. Try again.",
       });
     } finally {
       setLoading(false);
@@ -356,7 +355,7 @@ export default function DaywiseStudentAttendancePage() {
     <PageFrame>
       <PageHeader
         title="Boys Girls Daywise Attendance Report"
-        description="Compare daywise attendance totals by boys and girls using the same Laravel filters, grouping, and summary calculations."
+        description="Compare daywise attendance totals for boys and girls."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" onClick={() => exportRowsAsCsv({ filename: 'boys-girls-daywise-attendance-report.csv', columns: exportColumns, rows: exportRows })} disabled={exportRows.length === 0}>
@@ -367,7 +366,7 @@ export default function DaywiseStudentAttendancePage() {
               <Download className="h-4 w-4" />
               Excel
             </Button>
-            <Button type="button" variant="outline" onClick={() => exportRowsAsPdf({ filename: 'boys-girls-daywise-attendance-report.pdf', title: 'Boys Girls Daywise Attendance Report', subtitle: 'Legacy parity summary', columns: exportColumns, rows: exportRows })} disabled={exportRows.length === 0}>
+            <Button type="button" variant="outline" onClick={() => exportRowsAsPdf({ filename: 'boys-girls-daywise-attendance-report.pdf', title: 'Boys Girls Daywise Attendance Report', subtitle: 'Report period and academic year', columns: exportColumns, rows: exportRows })} disabled={exportRows.length === 0}>
               <Download className="h-4 w-4" />
               PDF
             </Button>
@@ -381,7 +380,7 @@ export default function DaywiseStudentAttendancePage() {
 
       {message && <InlineMessage type={message.type} text={message.text} />}
 
-      <SectionPanel title="Filters" description="Use the same Laravel date and taken filters, then search through the existing proxy-based API layer.">
+      <SectionPanel title="Filters" description="Choose a date and attendance status, then search.">
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="Attendance Date">
             <Input type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} required />

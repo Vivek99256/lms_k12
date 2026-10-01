@@ -76,7 +76,7 @@ function KnowledgeMapPageContent() {
         .then(setData)
         .catch((reason: unknown) => {
           if (signal?.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Unable to load the knowledge map.');
+          setError(reason instanceof Error ? reason.message : 'Couldn’t load the knowledge map.');
         })
         .finally(() => {
           if (!signal?.aborted) setLoading(false);

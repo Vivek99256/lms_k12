@@ -74,6 +74,8 @@ type Props = {
   /** Header text, so the map matches the page it opened from. */
   title: string;
   onClose: () => void;
+  /** Opens the deck straight into this chapter's concepts instead of the full subject. */
+  initialChapterId?: string | null;
 };
 
 export default function CoherenceMapView(props: Props) {
@@ -84,7 +86,7 @@ export default function CoherenceMapView(props: Props) {
   );
 }
 
-function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
+function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChapterId }: Props) {
   const { map, session, loading, error, reload, viewYear, applyEdge, removeEdge } = useCoherenceMap(
     subjectId,
     standardId
@@ -225,7 +227,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
       } catch (e) {
         setNotice({
           tone: 'error',
-          text: e instanceof Error ? e.message : 'The prerequisite could not be saved.',
+          text: e instanceof Error ? e.message : 'The prerequisite couldn’t be saved.',
         });
       } finally {
         setBusy(false);
@@ -250,7 +252,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
       } catch (e) {
         setNotice({
           tone: 'error',
-          text: e instanceof Error ? e.message : 'That change could not be saved.',
+          text: e instanceof Error ? e.message : 'That change couldn’t be saved.',
         });
       } finally {
         setBusy(false);
@@ -272,7 +274,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
       } catch (e) {
         setNotice({
           tone: 'error',
-          text: e instanceof Error ? e.message : 'That change could not be saved.',
+          text: e instanceof Error ? e.message : 'That change couldn’t be saved.',
         });
       } finally {
         setBusy(false);
@@ -328,7 +330,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
       } catch (e) {
         setNotice({
           tone: 'error',
-          text: e instanceof Error ? e.message : 'That concept could not be opened.',
+          text: e instanceof Error ? e.message : 'That concept couldn’t be opened.',
         });
       } finally {
         setWalking(false);
@@ -539,7 +541,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
           <AlertTriangle size={26} className="text-amber-500" aria-hidden />
           <p className="max-w-md text-sm text-slate-700">
-            {error ?? 'The coherence map could not be loaded.'}
+            {error ?? 'The coherence map couldn’t be loaded.'}
           </p>
           <button
             type="button"
@@ -640,6 +642,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose }: Props) {
           {!rootId ? (
             <ConceptDeck
               map={map}
+              initialChapterId={initialChapterId}
               onPick={(id) => {
                 // The deck always lists the hook's own map, so any walk must already be
                 // cleared by the time a pick from it is laid out.

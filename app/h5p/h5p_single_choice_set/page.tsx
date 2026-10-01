@@ -24,7 +24,7 @@ export default function SingleChoiceSetListPage() {
       title="Single choice set"
       description="A sequence of single-choice questions with instant feedback"
       noun="single choice set"
-      emptyHint="Write a run of questions with one right answer each. Learners see them one at a time and find out straight away."
+      emptyHint="Write a run of questions with one right answer each. Students see them one at a time and find out straight away."
       api={singleChoiceSetApi as never}
       searchText={(row) => (row.questions ?? []).map((question) => plainText(question.question_text)).join(' ')}
       columns={[

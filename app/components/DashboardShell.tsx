@@ -20,7 +20,7 @@ import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
 import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
 import { isBrainMenu } from '@/lib/brain/menu-navigation';
-import { canSeeInternalItems } from '@/lib/roadmap';
+import { canSeeInternalItems, showDeferredModules } from '@/lib/roadmap';
 import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
 import { useModuleLevel3Nav } from '@/app/_lib/use-module-level3-nav';
@@ -143,17 +143,17 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
   // 2026_09_08_100000_move_framework_menu_under_curriculum.php in next_lms_erp.
   {
     id: 'pal-content-model',
-    label: 'Content Model',
+    label: 'Content structure',
     href: '/pal/new/content-model',
   },
   {
     id: 'pal-ulu',
-    label: 'Unified Learning Units',
+    label: 'Learning units',
     href: '/pal/ulu',
   },
   {
     id: 'pal-pedagogy-engine',
-    label: 'Pedagogy Engine',
+    label: 'Teaching methods',
     href: '/pal/pedagogy-engine',
   },
   {
@@ -168,7 +168,7 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
   },
   {
     id: 'pal-ai-stack',
-    label: 'AI Stack',
+    label: 'AI tools',
     href: '/pal/new/ai-stack',
   },
 ];
@@ -310,7 +310,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         });
         const data = await res.json().catch(() => ({}));
         if (!cancelled) {
-          setHasBrainAccess(Boolean(res.ok && data?.allowed) || isBrainVisibleByLmsSession());
+          // A definite server answer wins, including "no". The local session check
+          // (editable in localStorage) is only a fallback for a host without the endpoint.
+          setHasBrainAccess(
+            res.ok && typeof data?.allowed === 'boolean' ? data.allowed : isBrainVisibleByLmsSession(),
+          );
         }
       } catch {
         if (!cancelled) setHasBrainAccess(isBrainVisibleByLmsSession());
@@ -324,7 +328,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, []);
 
   const displayedMenuItems = useMemo<MenuItem[]>(() => {
-    if (!hasBrainAccess) return menuItems;
+    if (!hasBrainAccess || !showDeferredModules()) return menuItems; // Enterprise Brain is not part of V1
     const alreadyPresent = menuItems.some((item) => normalizeMenuLabel(item.label) === 'enterprise brain');
     if (alreadyPresent) return menuItems;
 
@@ -445,7 +449,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       const res = await fetch(url.toString());
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || 'Failed to fetch master menu rights');
+      if (!res.ok) throw new Error(data.message || "We couldn't load your menu. Please try again.");
 
       const rawData = Array.isArray(data.data) ? data.data : [];
       let mapped: SubmenuItem[] = [];
@@ -827,7 +831,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 className={`group relative -mx-1 hidden w-2 flex-none cursor-col-resize items-center justify-center rounded outline-none md:flex ${
                   assistantPanel.isDragging ? 'bg-[#0D6EFD]/10' : 'hover:bg-[#0D6EFD]/5'
                 } focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40`}
-                title="Drag to resize · arrow keys to nudge"
+                title="Drag or use the arrow keys to resize"
               >
                 <span
                   className={`h-10 w-0.5 rounded-full transition-colors ${

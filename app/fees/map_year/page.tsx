@@ -36,7 +36,7 @@ export default function MapYearPage() {
       const payload = await legacyRequest('fees/map_year', { tolerateStatusZero: true });
       setRows(recordArray(payload.data).map(toMapYear));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to load map year records.');
+      setMessage(error instanceof Error ? error.message : "Couldn't load map year records. Try again.");
     } finally { setLoading(false); }
   }, []);
 
@@ -51,7 +51,7 @@ export default function MapYearPage() {
       if (editingId) await legacyMutation(`fees/map_year/${editingId}`, 'PUT', body);
       else await legacyMutation('fees/map_year', 'POST', body);
       setForm(emptyForm); setEditingId(''); setMessage('Data Saved'); await load();
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save map year.'); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Couldn't save map year. Try again."); }
     finally { setSaving(false); }
   };
 
@@ -62,19 +62,19 @@ export default function MapYearPage() {
   };
 
   const remove = async (id: string) => {
-    if (!window.confirm('Delete this map year record?')) return;
+    if (!window.confirm("Delete this academic year mapping? This can't be undone.")) return;
     try { await legacyMutation(`fees/map_year/${id}`, 'DELETE'); setMessage('Data Deleted'); await load(); }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to delete map year.'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "Couldn't delete map year. Try again."); }
   };
 
   return <main className="mx-auto  space-y-5 p-4 sm:p-6">
-    <div><h1 className="text-xl font-bold text-slate-950">Map Year</h1><p className="mt-1 text-sm text-slate-600">Map the active academic year to its fee interval, exactly as in the old ERP.</p></div>
+    <div><h1 className="text-xl font-bold text-slate-950">Map year</h1><p className="mt-1 text-sm text-slate-600">Map the active academic year to its fee interval, exactly as in the old ERP.</p></div>
     {message && <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">{message}</div>}
     <form onSubmit={save} className="rounded-lg border bg-white p-4 shadow-sm"><div className="mb-4 flex items-center justify-between"><h2 className="font-semibold">{editingId ? 'Edit Map Year' : 'Add New'}</h2>{editingId && <Button type="button" variant="outline" onClick={() => { setEditingId(''); setForm(emptyForm); }}>Cancel</Button>}</div>
-      <div className="grid gap-4 md:grid-cols-3"><SelectField label="Select Fee Type" value={form.feeType} onChange={(feeType) => setForm((current) => ({ ...current, feeType }))} options={feeTypes} /><SelectField label="Starting Month" value={form.startMonth} onChange={(startMonth) => setForm((current) => ({ ...current, startMonth }))} options={months} /><SelectField label="Ending Month" value={form.endMonth} onChange={(endMonth) => setForm((current) => ({ ...current, endMonth }))} options={months} /></div>
+      <div className="grid gap-4 md:grid-cols-3"><SelectField label="Select fee type" value={form.feeType} onChange={(feeType) => setForm((current) => ({ ...current, feeType }))} options={feeTypes} /><SelectField label="Starting month" value={form.startMonth} onChange={(startMonth) => setForm((current) => ({ ...current, startMonth }))} options={months} /><SelectField label="Ending month" value={form.endMonth} onChange={(endMonth) => setForm((current) => ({ ...current, endMonth }))} options={months} /></div>
       <Button type="submit" className="mt-5" disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Plus />}{editingId ? 'Save changes' : 'Save'}</Button>
     </form>
-    <section className="overflow-hidden rounded-lg border bg-white shadow-sm"><Table><TableHeader><TableRow><TableHead>Sr No</TableHead><TableHead>Syear</TableHead><TableHead>From Month</TableHead><TableHead>To Month</TableHead><TableHead>Fees Type</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{loading ? <TableRow><TableCell colSpan={6} className="h-28 text-center"><Loader2 className="mx-auto animate-spin" /></TableCell></TableRow> : rows.length ? rows.map((row, index) => <TableRow key={row.id}><TableCell>{index + 1}</TableCell><TableCell>{row.syear}</TableCell><TableCell>{row.fromMonth}</TableCell><TableCell>{row.toMonth}</TableCell><TableCell>{feeTypeLabel(row.feeType)}</TableCell><TableCell className="text-right"><Button size="icon" variant="ghost" onClick={() => void edit(row)} aria-label="Edit"><Pencil /></Button><Button size="icon" variant="ghost" onClick={() => void remove(row.id)} aria-label="Delete"><Trash2 className="text-red-600" /></Button></TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="h-28 text-center text-slate-500">No Map Year records found.</TableCell></TableRow>}</TableBody></Table></section>
+    <section className="overflow-hidden rounded-lg border bg-white shadow-sm"><Table><TableHeader><TableRow><TableHead>Sr no</TableHead><TableHead>Syear</TableHead><TableHead>From month</TableHead><TableHead>To month</TableHead><TableHead>Fee type</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{loading ? <TableRow><TableCell colSpan={6} className="h-28 text-center"><Loader2 className="mx-auto animate-spin" /></TableCell></TableRow> : rows.length ? rows.map((row, index) => <TableRow key={row.id}><TableCell>{index + 1}</TableCell><TableCell>{row.syear}</TableCell><TableCell>{row.fromMonth}</TableCell><TableCell>{row.toMonth}</TableCell><TableCell>{feeTypeLabel(row.feeType)}</TableCell><TableCell className="text-right"><Button size="icon" variant="ghost" onClick={() => void edit(row)} aria-label="Edit"><Pencil /></Button><Button size="icon" variant="ghost" onClick={() => void remove(row.id)} aria-label="Delete"><Trash2 className="text-red-600" /></Button></TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="h-28 text-center text-slate-500">No Map Year records found.</TableCell></TableRow>}</TableBody></Table></section>
   </main>;
 }
 
@@ -89,5 +89,5 @@ async function legacyMutation(path: string, method: 'POST' | 'PUT' | 'DELETE', v
   Object.entries(values).forEach(([key, value]) => form.set(key, readString(value)));
   const response = await fetch(`/api/proxy?${params}`, { method, headers: createAuthHeaders(session, method === 'DELETE' ? undefined : 'application/x-www-form-urlencoded'), ...(method === 'DELETE' ? {} : { body: form.toString() }) });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(readString(payload.message) || `The ERP could not complete the request (${response.status}).`);
+  if (!response.ok) throw new Error(readString(payload.message) || "Couldn't complete that request. Try again.");
 }

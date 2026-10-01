@@ -40,7 +40,7 @@ export function ModuleIntegrationSection({
       const payload = 'data' in response ? response.data : response;
       setData(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load module integrations.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load module integrations.');
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,7 @@ export function ModuleIntegrationSection({
         <div className="flex items-start gap-2 text-red-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
           <div>
-            <p className="text-[13px] font-semibold">Failed to verify module integration</p>
+            <p className="text-[13px] font-semibold">Couldn’t verify module integration</p>
             <p className="mt-0.5 text-[12.5px] text-slate-600">{error}</p>
           </div>
         </div>

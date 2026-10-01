@@ -215,8 +215,8 @@ export default function PayrollDeductionPage() {
     downloadCsv(
       `payroll-deduction-${selectedHead?.label ?? 'head'}-${lastQuery?.month}-${lastQuery?.year}.csv`,
       [
-        'Sr. No',
-        'Employee Code',
+        'No.',
+        'Employee ID',
         'Employee',
         'Department',
         'Amount',
@@ -428,7 +428,7 @@ export default function PayrollDeductionPage() {
         rows.length === 0 &&
         searched ? (
         <ErrorState
-          title="Unable to load employees"
+          title="Couldn't load employees. Try again."
           description={error}
           retry={retry}
         />
@@ -495,11 +495,11 @@ export default function PayrollDeductionPage() {
                 <TableHeader className="bg-surface-muted">
                   <TableRow>
                     <TableHead className="font-semibold">
-                      Sr. No
+                      No.
                     </TableHead>
 
                     <TableHead className="font-semibold">
-                      Employee Code
+                      Employee ID
                     </TableHead>
 
                     <TableHead className="font-semibold">

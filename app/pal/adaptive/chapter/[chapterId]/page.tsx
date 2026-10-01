@@ -106,7 +106,7 @@ function AdaptiveConceptsView() {
         .then(setData)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Concepts could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'Concepts couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);

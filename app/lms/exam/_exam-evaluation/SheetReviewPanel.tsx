@@ -85,7 +85,7 @@ export default function SheetReviewPanel({ sheetId, roster, readOnly, onClose, o
     try {
       applyDetail(await fetchSheet(sheetId));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Unable to load this answer sheet.');
+      setError(loadError instanceof Error ? loadError.message : 'Couldn’t load this answer sheet.');
     } finally {
       setLoading(false);
     }
@@ -132,7 +132,7 @@ export default function SheetReviewPanel({ sheetId, roster, readOnly, onClose, o
       .catch((loadError: unknown) => {
         if (!cancelled) {
           setFileUrl('');
-          setFileError(loadError instanceof Error ? loadError.message : 'That scan could not be opened.');
+          setFileError(loadError instanceof Error ? loadError.message : 'That scan couldn’t be opened.');
         }
       })
       .finally(() => {
@@ -186,7 +186,7 @@ export default function SheetReviewPanel({ sheetId, roster, readOnly, onClose, o
         applyDetail(next);
         onChanged();
       } catch (saveError) {
-        setError(saveError instanceof Error ? saveError.message : 'Unable to save this review.');
+        setError(saveError instanceof Error ? saveError.message : 'Couldn’t save this review.');
       } finally {
         setSaving(false);
       }
@@ -202,7 +202,7 @@ export default function SheetReviewPanel({ sheetId, roster, readOnly, onClose, o
       applyDetail(await reviewSheet(sheetId, { unapprove: true }));
       onChanged();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Unable to re-open this sheet.');
+      setError(saveError instanceof Error ? saveError.message : 'Couldn’t re-open this sheet.');
     } finally {
       setSaving(false);
     }

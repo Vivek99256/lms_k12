@@ -123,7 +123,7 @@ function InterventionQueueView() {
         .then(setQueue)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Support cases could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'Support cases couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -406,12 +406,12 @@ function CaseRow({
         // Null means the route is not deployed. Reporting success here would
         // tell a teacher they had acted when nothing was written.
         if (!updated) {
-          setActionError(readOnlyMessage ?? 'Nothing was saved - the API is not deployed.');
+          setActionError(readOnlyMessage ?? 'We couldn’t save your changes. Please try again later.');
           return;
         }
         onChanged();
       } catch (reason: unknown) {
-        setActionError(reason instanceof Error ? reason.message : 'That could not be saved.');
+        setActionError(reason instanceof Error ? reason.message : 'That couldn’t be saved.');
       } finally {
         setBusy(false);
       }

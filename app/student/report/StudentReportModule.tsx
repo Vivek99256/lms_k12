@@ -122,11 +122,11 @@ function toTitle(kind: StudentReportKind) {
 function toDescription(kind: StudentReportKind) {
   switch (kind) {
     case 'student_report':
-      return 'Active-student listing with legacy dynamic fields, ordering, export, and visual summaries.';
+      return 'Active students with configurable fields, ordering, export and visual summaries.';
     case 'inactive_student_report':
-      return 'Inactive-student listing with the same dynamic field model as the legacy ERP.';
+      return 'Inactive students with configurable fields, ordering and export.';
     case 'missing_document_report':
-      return 'Student and staff document completeness report using the legacy endpoint and document mapping.';
+      return 'Student and employee document completeness report.';
     case 'student_request_report':
       return 'Date-filtered student request report with request, reason, and description parity.';
     case 'student_health_report':
@@ -134,9 +134,9 @@ function toDescription(kind: StudentReportKind) {
     case 'student_discipline_report':
       return 'Discipline report with both entry-level rows and student summary data from the old ERP.';
     case 'student_strength_report':
-      return 'Strength report with general, gender, religion, cast, and quota slices bound to the Laravel aggregation.';
+      return 'Strength report with general, gender, religion, caste and quota breakdowns.';
     case 'agewise_report':
-      return 'Agewise class matrix recreated from the legacy report with the same totals.';
+      return 'Agewise class matrix with totals.';
   }
 }
 
@@ -199,7 +199,7 @@ function DynamicFieldPicker({
   return (
     <div className="space-y-4">
       {groups.length === 0 ? (
-        <p className="text-sm text-slate-500">No dynamic fields were returned for this report.</p>
+        <p className="text-sm text-slate-500">No extra fields are available for this report.</p>
       ) : null}
       {groups.map((group) => {
         const groupIds = group.options.map((option) => option.id);
@@ -253,8 +253,8 @@ function DynamicFieldPicker({
 
 function buildFlatColumns(headers: LabelledKey[], kind?: StudentReportKind): Array<RecordColumn<FlatRow>> {
   return headers.map((header) => {
-    // Same Student Name + GR No pairing used by the "Add Student Infirmary" picker
-    // (app/student/student_infirmary/page.tsx): bold name, muted GR No alongside it.
+    // Same Student name + GR no. pairing used by the "Add Student Infirmary" picker
+    // (app/student/student_infirmary/page.tsx): bold name, muted GR no. alongside it.
     if (kind === 'student_discipline_report' && header.key === 'student_name') {
       return {
         key: header.key,
@@ -376,7 +376,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
         if (!cancelled) {
           setMessage({
             type: 'error',
-            text: error instanceof Error ? error.message : 'Unable to load report configuration.',
+            text: error instanceof Error ? error.message : "Couldn't load report configuration. Try again.",
           });
         }
       } finally {
@@ -390,7 +390,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
     };
   }, [kind]);
 
-  // Same debounced Student Name + GR No lookup used by the Add Student Infirmary
+  // Same debounced Student name + GR no. lookup used by the Add Student Infirmary
   // picker (app/student/student_infirmary/page.tsx), reused as-is for this report's
   // combined student search filter.
   useEffect(() => {
@@ -615,7 +615,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
           toDate,
         });
         setHeaders([
-          { key: 'student_name', label: 'Student Name' },
+          { key: 'student_name', label: 'Student name' },
           { key: 'standard_name', label: 'Standard' },
           { key: 'division_name', label: 'Division' },
           { key: 'mobile', label: 'Mobile' },
@@ -674,7 +674,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to load report.',
+        text: error instanceof Error ? error.message : "Couldn't load report. Try again.",
       });
     } finally {
       setLoading(false);
@@ -829,7 +829,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
                       setHighlightedIndex(-1);
                     }
                   }}
-                  placeholder="Type student name or GR No."
+                  placeholder="Search by student name or GR no."
                 />
                 {studentOptions.length > 0 && (
                   <div id="student-options" className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
@@ -1155,7 +1155,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
         <Button type="button" variant="outline" onClick={() => exportRowsAsExcel({ filename: `${title.toLowerCase().replace(/\s+/g, '-')}.xls`, title, columns, rows: exportRows })} disabled={exportRows.length === 0}>
           Excel
         </Button>
-        <Button type="button" variant="outline" onClick={() => exportRowsAsPdf({ filename: `${title.toLowerCase().replace(/\s+/g, '-')}.pdf`, title, subtitle: 'Legacy parity export', columns, rows: exportRows })} disabled={exportRows.length === 0}>
+        <Button type="button" variant="outline" onClick={() => exportRowsAsPdf({ filename: `${title.toLowerCase().replace(/\s+/g, '-')}.pdf`, title, subtitle: 'Report period and academic year', columns, rows: exportRows })} disabled={exportRows.length === 0}>
           PDF
         </Button>
         <Button type="button" variant="outline" onClick={() => openPrintPreview({ title, subtitle: selectedClassSummary, columns, rows: exportRows })} disabled={exportRows.length === 0}>
@@ -1275,7 +1275,7 @@ export default function StudentReportModule({ kind }: { kind: StudentReportKind 
 
       <SectionPanel
         title="Filters"
-        description="These filters map to the existing Laravel report endpoints and reuse the established Next.js form patterns."
+        description="Choose filters to narrow this report."
       >
         {renderFilters()}
       </SectionPanel>

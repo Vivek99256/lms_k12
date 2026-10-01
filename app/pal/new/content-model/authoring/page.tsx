@@ -105,7 +105,7 @@ function AuthoringContent() {
         }
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        setError((err as Error).message || 'Could not load this node.');
+        setError((err as Error).message || 'Couldn’t load this node.');
       } finally {
         setLoading(false);
       }
@@ -232,7 +232,7 @@ function AuthoringContent() {
       setNotice('Saved. A new revision was recorded.');
       await load();
     } catch (err) {
-      setError((err as Error).message || 'Could not save this node.');
+      setError((err as Error).message || 'Couldn’t save this node.');
     } finally {
       setSaving(false);
     }
@@ -248,7 +248,7 @@ function AuthoringContent() {
       setNotice(`Moved to ${humanise(toStatus)}.`);
       await load();
     } catch (err) {
-      setError((err as Error).message || 'Could not change the status.');
+      setError((err as Error).message || 'Couldn’t change the status.');
     } finally {
       setBusyAction('');
     }
@@ -310,7 +310,7 @@ function AuthoringContent() {
       setNotice(`Restored version ${version}. The restore is itself a new revision.`);
       await load();
     } catch (err) {
-      setError((err as Error).message || 'Could not restore that version.');
+      setError((err as Error).message || 'Couldn’t restore that version.');
     } finally {
       setBusyAction('');
     }

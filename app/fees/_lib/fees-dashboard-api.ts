@@ -157,11 +157,11 @@ export async function fetchFeesDashboardSummary(
 
   if (!response.ok) {
     throw new Error(
-      readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to load the fees dashboard summary.`
+      readString(asRecord(payload).message) || "Couldn't load the fee dashboard summary. Try again."
     );
   }
 
-  assertApiSuccess(payload, 'Unable to load the fees dashboard summary.');
+  assertApiSuccess(payload, "Couldn't load the fee dashboard summary. Try again.");
 
   return payload;
 }

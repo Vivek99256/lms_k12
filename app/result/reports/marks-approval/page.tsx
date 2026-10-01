@@ -141,7 +141,7 @@ export default function MarksApprovalReportPage() {
     } catch (err) {
       setScholastic({ subjects: [], rows: [] });
       setCoScholastic([]);
-      setError(err instanceof Error ? err.message : 'Failed to load approval data. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't load approval data. Try again.");
     } finally {
       setLoading(false);
       setSearched(true);
@@ -184,7 +184,7 @@ export default function MarksApprovalReportPage() {
                 {loading ? (
                   <TableSkeleton columns={4} />
                 ) : scholastic.rows.length === 0 ? (
-                  <EmptyState title="No scholastic approval data" message="The payload did not contain a recognisable scholastic approval matrix for the selected criteria." />
+                  <EmptyState title="No scholastic approval data" message="No scholastic approval data matches your filters." />
                 ) : (
                   <>
                     <div className="overflow-x-auto">
@@ -242,7 +242,7 @@ export default function MarksApprovalReportPage() {
                 {loading ? (
                   <TableSkeleton columns={2} />
                 ) : coScholastic.length === 0 ? (
-                  <EmptyState title="No co-scholastic approval data" message="The payload did not contain co-scholastic approval entries for the selected criteria." />
+                  <EmptyState title="No co-scholastic approval data" message="No co-scholastic approval data matches your filters." />
                 ) : (
                   <>
                     <div className="overflow-x-auto">

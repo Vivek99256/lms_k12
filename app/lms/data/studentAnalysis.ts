@@ -39,7 +39,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(`${fallback}.`);
   }
 }
 
@@ -123,8 +123,8 @@ export async function fetchStudentList(
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load students.`);
-  const raw = toRecord(await readJson(res, 'Failed to load students'));
+  if (!res.ok) throw new Error(`Couldn’t load students. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load students'));
 
   return toArray(raw.student_data)
     .map((entry) => {
@@ -167,8 +167,8 @@ export async function fetchStudentAnalysis(
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the analysis.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the analysis'));
+  if (!res.ok) throw new Error(`Couldn’t load the analysis. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load the analysis'));
 
   const profileRecord = toRecord(raw.student_data);
   const profile: StudentProfile = {

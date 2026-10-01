@@ -38,7 +38,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(`${fallback}.`);
   }
 }
 
@@ -110,8 +110,8 @@ export async function fetchBookList(signal?: AbortSignal): Promise<BookListRow[]
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the book list.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the book list'));
+  if (!res.ok) throw new Error(`Couldn’t load the book list. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load the book list'));
 
   return toArray(raw.data).map((entry) => {
     const r = toRecord(entry);
@@ -153,7 +153,7 @@ export async function fetchChapters(
     signal,
   });
   if (!res.ok) return [];
-  const raw = await readJson(res, 'Failed to load chapters');
+  const raw = await readJson(res, 'Couldn’t load chapters');
   return toArray(Array.isArray(raw) ? raw : toRecord(raw).data)
     .map((entry) => {
       const r = toRecord(entry);
@@ -177,7 +177,7 @@ export async function fetchTopics(chapterId: string, signal?: AbortSignal): Prom
     signal,
   });
   if (!res.ok) return [];
-  const raw = await readJson(res, 'Failed to load topics');
+  const raw = await readJson(res, 'Couldn’t load topics');
   return toArray(Array.isArray(raw) ? raw : toRecord(raw).data)
     .map((entry) => {
       const r = toRecord(entry);
@@ -217,9 +217,9 @@ export async function createBookList(input: BookListInput): Promise<string> {
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     body: form,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to save the book list entry.`);
-  const raw = toRecord(await readJson(res, 'Failed to save the book list entry'));
-  if (normalizeApiStatus(raw) === '0') throw new Error(readString(raw.message) || 'Failed to save.');
+  if (!res.ok) throw new Error(`Couldn’t save the book list entry. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t save the book list entry'));
+  if (normalizeApiStatus(raw) === '0') throw new Error(readString(raw.message) || 'Couldn’t save.');
   return readString(raw.message) || 'Book list entry added.';
 }
 
@@ -232,7 +232,7 @@ export async function deleteBookList(id: string): Promise<string> {
     method: 'DELETE',
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to delete the entry.`);
-  const raw = toRecord(await readJson(res, 'Failed to delete the entry'));
+  if (!res.ok) throw new Error(`Couldn’t delete the entry. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t delete the entry'));
   return readString(raw.message) || 'Entry deleted.';
 }

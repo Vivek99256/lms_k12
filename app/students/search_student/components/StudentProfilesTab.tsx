@@ -297,7 +297,7 @@ export function StudentProfilesTab({
                   <TableHeader label="Admission No" sortable sortKey="admissionNo" currentSort={sortConfig} onSort={handleSort} />
                 </th>
                 <th className="px-4 py-3 text-left">
-                  <TableHeader label="Student Name" sortable sortKey="name" currentSort={sortConfig} onSort={handleSort} />
+                  <TableHeader label="Student name" sortable sortKey="name" currentSort={sortConfig} onSort={handleSort} />
                 </th>
                 <th className="px-4 py-3 text-left">
                   <TableHeader label="Class" sortable sortKey="class" currentSort={sortConfig} onSort={handleSort} />

@@ -70,7 +70,7 @@ export default function BrainDepartmentsPage() {
       <MetricTiles
         metrics={[
           { key: 'total', label: 'Departments (LMS)', value: data.total, available: true },
-          { key: 'projected', label: 'Projected into Brain', value: data.brainProjected, available: true },
+          { key: 'projected', label: 'Added to insights', value: data.brainProjected, available: true },
           { key: 'shown', label: 'Shown', value: data.data.length, available: true },
         ]}
       />
@@ -117,7 +117,7 @@ function DepartmentIntelligenceSection({
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">Department intelligence</h2>
         <Card className="border-red-100 bg-red-50/50 p-4 text-sm text-red-700">
-          Could not load department intelligence: {error}
+          Couldn’t load department intelligence: {error}
         </Card>
       </section>
     );

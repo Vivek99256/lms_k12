@@ -58,7 +58,7 @@ export default function AutomationPage() {
         );
         await refreshBoth();
       } catch (cause) {
-        setNote(cause instanceof Error ? cause.message : 'The decision could not be recorded.');
+        setNote(cause instanceof Error ? cause.message : 'The decision couldn’t be recorded.');
       } finally {
         setBusy(null);
       }
@@ -79,7 +79,7 @@ export default function AutomationPage() {
         setNote('Outcome recorded — the loop is closed for this decision.');
         await refreshBoth();
       } catch (cause) {
-        setNote(cause instanceof Error ? cause.message : 'The outcome could not be recorded.');
+        setNote(cause instanceof Error ? cause.message : 'The outcome couldn’t be recorded.');
       } finally {
         setBusy(null);
       }

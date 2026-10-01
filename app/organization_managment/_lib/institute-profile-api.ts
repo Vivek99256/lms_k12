@@ -133,7 +133,7 @@ export async function getOrganizationProfile(
       cache: 'no-store',
     });
   } catch {
-    throw new Error('Could not reach the server. Check your connection and try again.');
+    throw new Error("Couldn't reach the server. Check your connection and try again.");
   }
 
   let payload: unknown = null;
@@ -144,7 +144,7 @@ export async function getOrganizationProfile(
   }
 
   if (!response.ok) {
-    throw new Error(messageFrom(payload, `Request failed (${response.status}).`));
+    throw new Error(messageFrom(payload, "Couldn't complete that request. Try again."));
   }
 
   const envelope = record(payload);
@@ -188,7 +188,7 @@ export async function saveOrganizationProfile(
       body: formData,
     });
   } catch {
-    throw new Error('Could not reach the server. Check your connection and try again.');
+    throw new Error("Couldn't reach the server. Check your connection and try again.");
   }
 
   let payload: unknown = null;
@@ -199,13 +199,13 @@ export async function saveOrganizationProfile(
   }
 
   if (!response.ok) {
-    throw new Error(messageFrom(payload, `Request failed (${response.status}).`));
+    throw new Error(messageFrom(payload, "Couldn't complete that request. Try again."));
   }
 
   const envelope = record(payload) as ApiEnvelope;
 
   return {
     success: isSuccess(envelope),
-    message: readString(envelope.message) || (isSuccess(envelope) ? 'Saved successfully.' : 'Failed to save.'),
+    message: readString(envelope.message) || (isSuccess(envelope) ? 'Saved successfully.' : "Couldn't save. Try again."),
   };
 }

@@ -249,7 +249,7 @@ const PRE_STAGES: Stage[] = [
   },
   {
     id: 'quota',
-    label: 'Building Bloom x DOK blueprint',
+    label: 'Planning question difficulty levels',
     detail:
       'Bloom levels weighted from the concept intelligence, DOK clamped to the levels it supports.',
     hold: 550,

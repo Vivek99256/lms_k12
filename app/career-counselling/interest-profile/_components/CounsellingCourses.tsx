@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { useCallback, useEffect, useState } from 'react';
 import {
   Card, CardContent, CardFooter, CardHeader, CardTitle,
@@ -90,7 +91,7 @@ function CourseCard({ course, attempts }: { course: CounsellingCourse; attempts:
             rendered as HTML the same way show_lmsCounselling.blade.php does
             with {!! $val['description'] !!} — trusted staff-entered content,
             not user input. */}
-        <div dangerouslySetInnerHTML={{ __html: course.description }} />
+        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(course.description) }} />
         {attempts.length > 0 ? <AttemptHistory course={course} attempts={attempts} /> : null}
       </CardContent>
       <CardFooter className="justify-center bg-transparent px-(--card-spacing) pb-(--card-spacing)">
@@ -123,7 +124,7 @@ export function CounsellingCourses() {
       setCourses(data.courses);
       setAttemptsByCourse(data.attemptsByCourse);
     } catch {
-      setError('Could not load counselling courses. Please try again.');
+      setError('Couldn’t load counselling courses. Please try again.');
     } finally {
       setLoading(false);
     }

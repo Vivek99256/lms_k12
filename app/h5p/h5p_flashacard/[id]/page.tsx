@@ -1,5 +1,8 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import {
   Suspense,
   useCallback,
@@ -198,7 +201,7 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
         setShowResult(false);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load flashcards');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load flashcards. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -428,7 +431,7 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
                       {card.content && card.content.trim() !== '' ? (
                         <div
                           className="text-sm leading-relaxed text-slate-700 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded-lg"
-                          dangerouslySetInnerHTML={{ __html: card.content }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(card.content) }}
                         />
                       ) : (
                         <p className="text-sm text-slate-400">No content available</p>

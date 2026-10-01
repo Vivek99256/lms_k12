@@ -1,5 +1,8 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowRight, Check, X } from 'lucide-react';
@@ -112,7 +115,7 @@ function newAttempt(set: H5pSingleChoiceSet): Attempt {
 
 /** Question and option text are stored as HTML, because H5P stores them so. */
 function Html({ html, className }: { html: string; className?: string }) {
-  return <span className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <span className={className} dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />;
 }
 
 /**
@@ -222,7 +225,7 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
         if (!cancelled) setFetchedSet(data);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load this set');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load this set. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

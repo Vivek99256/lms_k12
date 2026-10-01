@@ -40,7 +40,7 @@ export default function TransferStudentPage() {
       setCurrentSyear(buildSessionContext().syear);
       setClassOptions(await loadClassOptions());
     } catch (value: unknown) {
-      setError(errorMessage(value, "The class list could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the class list. Try again."));
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ export default function TransferStudentPage() {
     } catch (value: unknown) {
       setStudents([]);
       setSearched(true);
-      setError(errorMessage(value, "Students could not be loaded."));
+      setError(errorMessage(value, "Couldn't load students. Try again."));
     } finally {
       setSearching(false);
     }
@@ -102,7 +102,7 @@ export default function TransferStudentPage() {
       setSelectedIds([]);
       setStudents(await searchPendingStudents(search));
     } catch (value: unknown) {
-      setError(errorMessage(value, "The students could not be transferred."));
+      setError(errorMessage(value, "Couldn't transfer the students. Try again."));
     } finally {
       setSaving(false);
     }

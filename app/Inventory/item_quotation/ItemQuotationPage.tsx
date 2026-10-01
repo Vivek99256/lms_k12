@@ -32,7 +32,7 @@ export function ItemQuotationPage() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { setData(await loadInventory("quotations", {})); }
-    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Quotations could not be loaded."); }
+    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't load quotations. Try again."); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => {
@@ -65,27 +65,27 @@ export function ItemQuotationPage() {
         items: rows.map((row) => ({ item_id: row.itemId, qty: row.quantity, unit: row.unit, price: row.price, tax: row.tax })),
       }, editing?.id));
       reset(); await load();
-    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Quotation could not be saved."); }
+    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't save quotation. Try again."); }
     finally { setBusy(false); }
   }
   async function remove(record: InventoryRecord) {
     if (!window.confirm("Delete this item quotation?")) return;
     setBusy(true);
     try { setNotice(await deleteInventory("quotations", record.id)); await load(); }
-    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Quotation could not be deleted."); }
+    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't delete quotation. Try again."); }
     finally { setBusy(false); }
   }
 
   return <main className="min-h-screen p-4 sm:p-6"><div className="mx-auto max-w-[1700px] space-y-5">
-    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h1 className="text-2xl font-bold">Item Quotation</h1><p className="mt-1 text-sm text-slate-500">Create and manage vendor item quotations.</p></div><Button onClick={startAdd}><Plus className="size-4" /> Add Item Quotation</Button></div>
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h1 className="text-2xl font-bold">Item quotation</h1><p className="mt-1 text-sm text-slate-500">Create and manage vendor item quotations.</p></div><Button onClick={startAdd}><Plus className="size-4" /> Add Item Quotation</Button></div>
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
     {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
     {showForm && <Card><CardHeader className="border-b"><div className="flex items-center justify-between"><CardTitle>{editing ? "Edit Item Quotation" : "Add Item Quotation"}</CardTitle><Button variant="ghost" size="icon" onClick={reset}><X className="size-4" /></Button></div></CardHeader><CardContent>
-      <div className="grid gap-4 md:grid-cols-2"><div><Label>Vendor Name *</Label><select className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={header.vendorId} onChange={(event) => updateHeader({ vendorId: event.target.value })}><option value="">Select Vendor</option>{data.options.quotation_vendors?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div><div><Label>Remarks *</Label><Textarea className="mt-1" rows={2} value={header.remarks} onChange={(event) => updateHeader({ remarks: event.target.value })} /></div></div>
+      <div className="grid gap-4 md:grid-cols-2"><div><Label>Vendor Name *</Label><select className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={header.vendorId} onChange={(event) => updateHeader({ vendorId: event.target.value })}><option value="">Select vendor</option>{data.options.quotation_vendors?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div><div><Label>Remarks *</Label><Textarea className="mt-1" rows={2} value={header.remarks} onChange={(event) => updateHeader({ remarks: event.target.value })} /></div></div>
       <div className="mt-5 space-y-3">{rows.map((row, index) => <div key={index} className="grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-6">
-        <div><Label>Item *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.itemId} onChange={(event) => updateRow(index, { itemId: event.target.value })}><option value="">Select Item</option>{data.options.quotation_items?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+        <div><Label>Item *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.itemId} onChange={(event) => updateRow(index, { itemId: event.target.value })}><option value="">Select item</option>{data.options.quotation_items?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
         <div><Label>Qty *</Label><Input className="mt-1" type="number" min={0.01} step="any" value={row.quantity} onChange={(event) => updateRow(index, { quantity: event.target.value })} /></div>
-        <div><Label>Unit *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.unit} onChange={(event) => updateRow(index, { unit: event.target.value })}><option value="">Select Unit</option>{data.options.units?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+        <div><Label>Unit *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.unit} onChange={(event) => updateRow(index, { unit: event.target.value })}><option value="">Select unit</option>{data.options.units?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
         <div><Label>Price/Piece *</Label><Input className="mt-1" type="number" min={0} step="any" value={row.price} onChange={(event) => updateRow(index, { price: event.target.value })} /></div>
         <div><Label>Tax *</Label><Input className="mt-1" type="number" min={0} step="any" value={row.tax} onChange={(event) => updateRow(index, { tax: event.target.value })} /></div>
         {!editing && <div className="flex items-end"><Button type="button" variant="outline" onClick={() => rows.length === 1 ? setRows((current) => [...current, emptyRow()]) : setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}>{rows.length === 1 ? <Plus className="size-4" /> : <Trash2 className="size-4" />}{rows.length === 1 ? " Add More" : " Remove"}</Button></div>}

@@ -1,51 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-type IntegrationConfig = {
-  id: number;
-  provider_key: string;
-  display_name: string;
-  category: string;
-  description: string | null;
-  status: 'active' | 'inactive' | 'error';
-  config: Record<string, string | number | boolean | null>;
-  last_tested_at: string | null;
-  last_tested_by: string | null;
-  last_updated_at: string | null;
-  last_updated_by: string | null;
-  created_at: string | null;
-};
-
-const records: IntegrationConfig[] = [];
-let nextId = 1;
-
-function authHeader(request: NextRequest): string | null {
-  return request.headers.get('authorization');
-}
+import { callerOf, nextId, present, records, type IntegrationConfig } from './_store';
 
 export async function GET(request: NextRequest) {
-  const authorization = authHeader(request);
-  if (!authorization) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
+  const caller = callerOf(request);
+  if (caller instanceof NextResponse) return caller;
 
   return NextResponse.json({
     status: 1,
     message: 'OK',
-    data: { configs: records },
+    data: { configs: records().filter((r) => r.tenant_id === caller.tenantId).map(present) },
   });
 }
 
 export async function POST(request: NextRequest) {
-  const authorization = authHeader(request);
-  if (!authorization) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
+  const caller = callerOf(request);
+  if (caller instanceof NextResponse) return caller;
 
   const body = await request.json();
   const now = new Date().toISOString();
 
   const record: IntegrationConfig = {
-    id: nextId++,
+    id: nextId(),
+    tenant_id: caller.tenantId,
     provider_key: String(body.provider_key || ''),
     display_name: String(body.display_name || ''),
     category: String(body.category || ''),
@@ -55,15 +32,15 @@ export async function POST(request: NextRequest) {
     last_tested_at: null,
     last_tested_by: null,
     last_updated_at: now,
-    last_updated_by: null,
+    last_updated_by: caller.userId,
     created_at: now,
   };
 
-  records.push(record);
+  records().push(record);
 
   return NextResponse.json({
     status: 1,
     message: 'Configuration saved.',
-    data: record,
+    data: present(record),
   });
 }

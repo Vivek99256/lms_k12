@@ -53,7 +53,7 @@ export function KasbaRatingPanel({ userId, employeeName }: { userId: number; emp
       // through rather than replaced with one generic empty state.
       setEmptyReason(res.empty_is_expected ? res.empty_reason : null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load this person’s capability items.')
+      setError(e instanceof Error ? e.message : "Couldn't load this person’s capability items. Try again.")
     } finally {
       setLoading(false)
     }

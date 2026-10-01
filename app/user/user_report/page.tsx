@@ -48,6 +48,7 @@ import {
   type ReportColumn,
   type ReportField,
 } from "../api";
+import { friendlyError } from '@/lib/user-messages';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
@@ -80,9 +81,7 @@ export default function UserReportPage() {
       setEmployees(data.employees);
     } catch (value: unknown) {
       setError(
-        value instanceof Error
-          ? value.message
-          : "Report filters could not be loaded."
+        friendlyError(value, "We couldn't load the report filters. Please try again.")
       );
     } finally {
       setLoading(false);
@@ -247,9 +246,7 @@ export default function UserReportPage() {
       setRows(data.rows);
     } catch (value: unknown) {
       setError(
-        value instanceof Error
-          ? value.message
-          : "Report could not be generated."
+        friendlyError(value, "We couldn't create the report. Please try again.")
       );
     } finally {
       setSearching(false);
@@ -443,7 +440,7 @@ export default function UserReportPage() {
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   className="h-8 pl-8"
-                  placeholder="Search report..."
+                  placeholder="Search report…"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                 />

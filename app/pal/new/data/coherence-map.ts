@@ -103,7 +103,7 @@ async function callApi(
     }
     throw new Error(
       serverMessage ||
-        `HTTP ${response.status}: the Coherence Map API is unavailable. It ships with the PAL coherence module — the backend may not be deployed yet.`
+        `This feature is not available right now. Please try again later.`
     );
   }
 

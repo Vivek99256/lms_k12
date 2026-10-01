@@ -167,7 +167,7 @@ function EsoConceptFlow() {
       const next = await fetchNextAction(learnerId, conceptId);
       applyAction(next);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to load the next learning step.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t load the next learning step.');
     } finally {
       resolving.current = false;
       setLoading(false);
@@ -1204,7 +1204,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
         if (!cancelled) setPayload(data);
       })
       .catch((reason) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to load the diagnostic.');
+        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Couldn’t load the diagnostic.');
       });
     return () => {
       cancelled = true;
@@ -1246,7 +1246,7 @@ function DiagnosticStep({ learnerId, conceptId, onAdvance }: { learnerId: string
       );
       onAdvance();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit the diagnostic.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit the diagnostic.');
     } finally {
       setSubmitting(false);
     }
@@ -1409,7 +1409,7 @@ function PrerequisiteProbeStep({
       // resolved next action, so it is adopted rather than re-requested.
       onResolved(await recordAttempt(learnerId, action.nodeId, { conceptId, answerMasterId: selected }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit your answer.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit your answer.');
     } finally {
       setSubmitting(false);
     }
@@ -1758,7 +1758,7 @@ function CheckUnderstandingStep({
         )
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit your answers.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit your answers.');
     } finally {
       setSubmitting(false);
     }
@@ -1967,7 +1967,7 @@ function TeachOrPracticeStep({
         })
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit your answer.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit your answer.');
     } finally {
       setSubmitting(false);
     }
@@ -2156,7 +2156,7 @@ function ContrastPairStep({
       // resolved next action, so it is adopted rather than re-requested.
       onResolved(await recordAttempt(learnerId, action.nodeId, { conceptId, answerMasterId: selected }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit your answer.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit your answer.');
     } finally {
       setSubmitting(false);
     }
@@ -2493,7 +2493,7 @@ function RetrievalDueStep({
     if (!action.nodeId) return;
     fetchRetrievalItems(learnerId, action.nodeId)
       .then(setItems)
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Unable to load the review.'));
+      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Couldn’t load the review.'));
   }, [learnerId, action.nodeId]);
 
   const submit = async () => {
@@ -2505,7 +2505,7 @@ function RetrievalDueStep({
       const outcome = await submitRetrievalCheck(learnerId, action.nodeId, conceptId, responses);
       setResult(outcome);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit the review.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit the review.');
     } finally {
       setSubmitting(false);
     }

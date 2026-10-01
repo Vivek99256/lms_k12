@@ -1,5 +1,8 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -248,7 +251,7 @@ function QuizPlayer({
         <div
           className="text-lg font-semibold text-[color:var(--h5p-ink)]"
           // Question titles are stored with HTML entities/tags in the ERP DB.
-          dangerouslySetInnerHTML={{ __html: question.question_text }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.question_text) }}
         />
       </div>
 
@@ -285,7 +288,7 @@ function QuizPlayer({
               >
                 {String.fromCharCode(65 + index)}
               </span>
-              <span className="min-w-0" dangerouslySetInnerHTML={{ __html: option.answer }} />
+              <span className="min-w-0" dangerouslySetInnerHTML={{ __html: sanitizeHtml(option.answer) }} />
             </button>
           );
         })}
@@ -393,7 +396,7 @@ function ReviewModal({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 text-sm font-semibold text-slate-900">
                     <span className="mr-1">Question {index + 1}:</span>
-                    <span dangerouslySetInnerHTML={{ __html: question.question_text }} />
+                    <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(question.question_text) }} />
                   </div>
                   <span
                     className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -408,7 +411,7 @@ function ReviewModal({
                   <p className="text-slate-600">
                     <span className="font-semibold">Correct answer:</span>{' '}
                     {correct ? (
-                      <span className="text-emerald-700" dangerouslySetInnerHTML={{ __html: correct.answer }} />
+                      <span className="text-emerald-700" dangerouslySetInnerHTML={{ __html: sanitizeHtml(correct.answer) }} />
                     ) : (
                       <span className="text-slate-400">N/A</span>
                     )}
@@ -418,7 +421,7 @@ function ReviewModal({
                     {userOption ? (
                       <span
                         className={isCorrect ? 'text-emerald-700' : 'text-red-600'}
-                        dangerouslySetInnerHTML={{ __html: userOption.answer }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(userOption.answer) }}
                       />
                     ) : (
                       <span className="text-slate-400">Not answered</span>
@@ -660,7 +663,7 @@ function McqContent() {
         if (!cancelled) setLevels(payload.mcq_levels);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load MCQ levels');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load MCQ levels. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLevelsLoading(false);
@@ -693,7 +696,7 @@ function McqContent() {
           setView('quiz');
         })
         .catch((err: unknown) => {
-          setError(err instanceof Error ? err.message : 'Failed to load quiz questions');
+          setError(friendlyError(err, 'We couldn’t load quiz questions. Please try again.'));
         })
         .finally(() => {
           setStartingLevelId(null);

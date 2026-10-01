@@ -39,7 +39,7 @@ export default function Cnse11ReportCardPage() {
       setStudents(parseCbse11Students(payload));
     } catch (err) {
       setStudents([]);
-      setError(err instanceof Error ? err.message : 'Failed to load report cards.');
+      setError(err instanceof Error ? err.message : "Couldn't load report cards. Try again.");
     } finally {
       setLoading(false);
       setSearched(true);

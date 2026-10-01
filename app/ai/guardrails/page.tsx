@@ -143,7 +143,7 @@ function ModuleGuardrails() {
               </p>
             ) : (
               <p className="mt-1 text-sm text-muted-foreground">
-                {(data.review as { reason?: string }).reason ?? 'Not available on this estate.'}
+                {(data.review as { reason?: string }).reason ?? 'Not available yet.'}
               </p>
             )}
           </div>

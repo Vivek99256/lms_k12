@@ -736,7 +736,7 @@ export function OnboardingCenter() {
                               <TableMessageRow
                                 colSpan={7}
                                 tone="error"
-                                title="Could not load preboarding tasks"
+                                title="Couldn't load preboarding tasks. Try again."
                                 description={tasksError}
                                 action={
                                   <Button variant="outline" size="sm" onClick={retryTasks}>

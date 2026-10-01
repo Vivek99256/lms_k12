@@ -364,7 +364,7 @@ export default function HolidayCalendarTab({ isLoading }: { isLoading: boolean }
   }
 
   if (error && holidays.length === 0 && weekdays.length === 0) {
-    return <ErrorState title="Unable to load the holiday calendar" description={error} retry={retry} />
+    return <ErrorState title="Couldn't load the holiday calendar. Try again." description={error} retry={retry} />
   }
 
   return (
@@ -434,9 +434,9 @@ export default function HolidayCalendarTab({ isLoading }: { isLoading: boolean }
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent className="w-[calc(100%-2rem)] max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Holiday</AlertDialogTitle>
+            <AlertDialogTitle>Delete holiday</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this holiday? This action cannot be undone.
+              Delete this holiday? This can't be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-0">

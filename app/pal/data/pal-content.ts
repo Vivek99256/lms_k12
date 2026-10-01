@@ -101,10 +101,10 @@ async function callContentApi(
     }
     if (response.status === 404) {
       throw new Error(
-        'The Content Intelligence API is not available on this server. It ships with the PAL V4 content layer — the backend may not be deployed yet.'
+        'This feature is not available right now. Please try again later.'
       );
     }
-    throw new Error(serverMessage || `HTTP ${response.status}: the Content Intelligence API is unavailable.`);
+    throw new Error(serverMessage || `This feature is not available right now. Please try again later.`);
   }
 
   const record = toRecord(payload);

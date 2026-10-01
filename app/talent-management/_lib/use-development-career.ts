@@ -72,7 +72,7 @@ export function usePlanMetrics(refreshKey: number) {
       const response = await developmentCareerService.getMetrics(buildSessionContext())
       setMetrics(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load workspace metrics.'))
+      setError(toMessage(loadError, "Couldn't load workspace metrics. Try again."))
       setMetrics(null)
     } finally {
       setLoading(false)
@@ -173,7 +173,7 @@ export function useDevelopmentPlans(params: DevelopmentPlanListParams): UseDevel
       setPlans(response.data ?? [])
       setPagination(response.pagination ?? null)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load development plans.'))
+      setError(toMessage(loadError, "Couldn't load development plans. Try again."))
       setPlans([])
       setPagination(null)
     } finally {
@@ -220,17 +220,17 @@ export function useDevelopmentPlans(params: DevelopmentPlanListParams): UseDevel
     create: (payload) =>
       runMutation(
         () => developmentCareerService.createPlan(buildSessionContext(), payload),
-        'Failed to create the development plan.',
+        "Couldn't create the development plan. Try again.",
       ),
     update: (id, payload) =>
       runMutation(
         () => developmentCareerService.updatePlan(buildSessionContext(), id, payload),
-        'Failed to update the development plan.',
+        "Couldn't update the development plan. Try again.",
       ),
     remove: (id) =>
       runMutation(
         () => developmentCareerService.deletePlan(buildSessionContext(), id),
-        'Failed to delete the development plan.',
+        "Couldn't delete the development plan. Try again.",
       ),
     clearMessages: () => {
       setActionMessage(null)
@@ -271,7 +271,7 @@ export function usePlanDetail(planId: number | null) {
       const detailResponse = await developmentCareerService.getPlan(session, planId)
       setDetail(detailResponse.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the plan.'))
+      setError(toMessage(loadError, "Couldn't load the plan. Try again."))
       setDetail(null)
       setLoading(false)
       return
@@ -324,17 +324,17 @@ export function usePlanDetail(planId: number | null) {
     createAction: (payload: PlanActionPayload) =>
       runMutation(
         () => developmentCareerService.createAction(buildSessionContext(), planId as number, payload),
-        'Failed to add the action.',
+        "Couldn't add the action. Try again.",
       ),
     updateAction: (actionId: number, payload: Partial<PlanActionPayload>) =>
       runMutation(
         () => developmentCareerService.updateAction(buildSessionContext(), planId as number, actionId, payload),
-        'Failed to update the action.',
+        "Couldn't update the action. Try again.",
       ),
     deleteAction: (actionId: number) =>
       runMutation(
         () => developmentCareerService.deleteAction(buildSessionContext(), planId as number, actionId),
-        'Failed to delete the action.',
+        "Couldn't delete the action. Try again.",
       ),
   }
 }
@@ -363,7 +363,7 @@ export function useCareerPaths(params: { search?: string; status?: string }, ref
       )
       setPaths(response.data ?? [])
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load career paths.'))
+      setError(toMessage(loadError, "Couldn't load career paths. Try again."))
       setPaths([])
     } finally {
       setLoading(false)
@@ -408,17 +408,17 @@ export function useCareerPaths(params: { search?: string; status?: string }, ref
     create: (payload: CareerPathPayload) =>
       runMutation(
         () => developmentCareerService.createCareerPath(buildSessionContext(), payload),
-        'Failed to create the career path.',
+        "Couldn't create the career path. Try again.",
       ),
     update: (id: number, payload: Partial<CareerPathPayload>) =>
       runMutation(
         () => developmentCareerService.updateCareerPath(buildSessionContext(), id, payload),
-        'Failed to update the career path.',
+        "Couldn't update the career path. Try again.",
       ),
     remove: (id: number) =>
       runMutation(
         () => developmentCareerService.deleteCareerPath(buildSessionContext(), id),
-        'Failed to delete the career path.',
+        "Couldn't delete the career path. Try again.",
       ),
     clearMessages: () => {
       setActionMessage(null)
@@ -477,7 +477,7 @@ export function useCareerExplorer(params: { planId?: number | null; careerPathId
       })
       setExplorer(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the career path.'))
+      setError(toMessage(loadError, "Couldn't load the career path. Try again."))
       setExplorer(null)
     } finally {
       setLoading(false)
@@ -543,7 +543,7 @@ export function useLearningAssignments(params: LearningAssignmentListParams, ref
       setAssignments(response.data ?? [])
       setPagination(response.pagination ?? null)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load learning assignments.'))
+      setError(toMessage(loadError, "Couldn't load learning assignments. Try again."))
       setAssignments([])
       setPagination(null)
     } finally {
@@ -590,17 +590,17 @@ export function useLearningAssignments(params: LearningAssignmentListParams, ref
     assign: (payload: LearningAssignmentPayload) =>
       runMutation(
         () => developmentCareerService.assignLearning(buildSessionContext(), payload),
-        'Failed to assign the learning.',
+        "Couldn't assign the learning. Try again.",
       ),
     update: (id: number, payload: { status?: LearningStatus; progress?: number; due_date?: string; assignment_type?: LearningType }) =>
       runMutation(
         () => developmentCareerService.updateLearning(buildSessionContext(), id, payload),
-        'Failed to update the assignment.',
+        "Couldn't update the assignment. Try again.",
       ),
     remove: (id: number) =>
       runMutation(
         () => developmentCareerService.deleteLearning(buildSessionContext(), id),
-        'Failed to remove the assignment.',
+        "Couldn't remove the assignment. Try again.",
       ),
     clearMessages: () => {
       setActionMessage(null)

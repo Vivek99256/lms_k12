@@ -121,7 +121,7 @@ async function taskRequest<T>(
       payload && typeof payload === 'object' && 'errors' in (payload as Record<string, unknown>)
         ? (payload as { errors?: Record<string, string[]> }).errors
         : undefined
-    throw new TaskApiError(messageFrom(payload, `API Error: ${response.status} ${response.statusText}`), response.status, errors)
+    throw new TaskApiError(messageFrom(payload, "Couldn't complete that request. Try again."), response.status, errors)
   }
 
   return payload as T
@@ -235,7 +235,7 @@ export function toMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
-export const TASK_SESSION_ERROR = 'Your session could not be resolved. Please sign in again.'
+export const TASK_SESSION_ERROR = 'Your session has expired. Please sign in again.'
 
 /** Resolves the current session, or `null` when it cannot authenticate a call. */
 export function resolveTaskSession(): TaskSession | null {

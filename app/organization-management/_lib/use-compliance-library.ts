@@ -61,7 +61,7 @@ export function useComplianceLibrary() {
       setTemplates(response.templates ?? []);
       if (response.pagination) setPagination(response.pagination);
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load compliance records.'));
+      setError(toMessage(loadError, "Couldn't load compliance records. Try again."));
       setRecords([]);
     } finally {
       setLoading(false);

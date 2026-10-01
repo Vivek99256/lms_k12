@@ -40,7 +40,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(`${fallback}.`);
   }
 }
 
@@ -74,8 +74,8 @@ export async function fetchGlobalMappings(signal?: AbortSignal): Promise<Mapping
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the global mappings.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the global mappings'));
+  if (!res.ok) throw new Error(`Couldn’t load the global mappings. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load the global mappings'));
 
   // `data` is an object keyed by type id, each with an optional CHILD_ARR.
   const data = toRecord(raw.data);
@@ -124,9 +124,9 @@ export async function createMapping(typeName: string, values: string[]): Promise
     },
     body: body.toString(),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to save the mapping.`);
-  const raw = toRecord(await readJson(res, 'Failed to save the mapping'));
-  if (normalizeApiStatus(raw) === '0') throw new Error(readString(raw.message) || 'Failed to save the mapping.');
+  if (!res.ok) throw new Error(`Couldn’t save the mapping. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t save the mapping'));
+  if (normalizeApiStatus(raw) === '0') throw new Error(readString(raw.message) || 'Couldn’t save the mapping.');
   return readString(raw.message) || 'Mapping saved.';
 }
 
@@ -147,8 +147,8 @@ export async function renameMapping(id: string, name: string): Promise<string> {
     },
     body: body.toString(),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to rename.`);
-  const raw = toRecord(await readJson(res, 'Failed to rename'));
+  if (!res.ok) throw new Error(`Couldn’t rename. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t rename'));
   return readString(raw.message) || 'Renamed.';
 }
 
@@ -161,7 +161,7 @@ export async function deleteMapping(id: string): Promise<string> {
     method: 'DELETE',
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to delete.`);
-  const raw = toRecord(await readJson(res, 'Failed to delete'));
+  if (!res.ok) throw new Error(`Couldn’t delete. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t delete'));
   return readString(raw.message) || 'Deleted.';
 }

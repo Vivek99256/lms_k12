@@ -116,7 +116,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(fallback);
   }
 }
 
@@ -127,8 +127,7 @@ async function unwrap(res: Response, fallback: string): Promise<Record<string, u
   // Say so plainly; "HTTP 404" alone sends people hunting for the wrong bug.
   if (res.status === 404) {
     throw new Error(
-      'The Document Templates API is not available on this ERP server yet. ' +
-        'Deploy the latest backend (routes/api.php + DocumentTemplateApiController) and run its migrations.'
+      'Document templates are not available yet. Contact your administrator.'
     );
   }
 
@@ -137,7 +136,7 @@ async function unwrap(res: Response, fallback: string): Promise<Record<string, u
   const message = readString(raw.message);
 
   if (!res.ok || (status !== '' && status !== '1')) {
-    throw new Error(message || `${fallback} (HTTP ${res.status}).`);
+    throw new Error(message || fallback);
   }
 
   return toRecord(raw.data);
@@ -171,7 +170,7 @@ async function get(path: string, signal?: AbortSignal, params?: Record<string, s
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  return unwrap(res, 'Failed to load document templates');
+  return unwrap(res, "Couldn't load document templates. Try again.");
 }
 
 async function post(path: string, payload: Record<string, unknown>, fallback: string) {
@@ -240,7 +239,7 @@ export async function createTemplate(input: TemplateInput): Promise<TemplateDeta
       content: input.content,
       status: input.status ?? 'draft',
     },
-    'Failed to save the template'
+    "Couldn't save the template. Try again."
   );
   const row = toRecord(data.template);
   return { ...mapSummary(row), content: readString(row.content) };
@@ -259,21 +258,21 @@ export async function updateTemplate(
       content: input.content,
       status: input.status ?? 'draft',
     },
-    'Failed to update the template'
+    "Couldn't update the template. Try again."
   );
   const row = toRecord(data.template);
   return { ...mapSummary(row), content: readString(row.content) };
 }
 
 export async function deleteTemplate(id: string | number): Promise<void> {
-  await post(`/${encodeURIComponent(String(id))}/delete`, {}, 'Failed to delete the template');
+  await post(`/${encodeURIComponent(String(id))}/delete`, {}, "Couldn't delete the template. Try again.");
 }
 
 export async function duplicateTemplate(id: string | number): Promise<TemplateSummary> {
   const data = await post(
     `/${encodeURIComponent(String(id))}/duplicate`,
     {},
-    'Failed to duplicate the template'
+    "Couldn't duplicate the template. Try again."
   );
   return mapSummary(toRecord(data.template));
 }
@@ -309,7 +308,7 @@ export async function restoreVersion(
   const data = await post(
     `/${encodeURIComponent(String(id))}/restore/${version}`,
     {},
-    'Failed to restore that version'
+    "Couldn't restore that version. Try again."
   );
   const row = toRecord(data.template);
   return { ...mapSummary(row), content: readString(row.content) };

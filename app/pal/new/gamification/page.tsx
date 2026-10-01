@@ -73,7 +73,7 @@ export default function GamificationOverviewPage() {
         <StatusPanel
           kind="error"
           title="Gamification is not available"
-          message={error || 'The backend did not return a gamification payload.'}
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={reload}
           retrying={refreshing}
         />
@@ -476,7 +476,7 @@ export default function GamificationOverviewPage() {
             <StatTile
               label="With PAL activity"
               value={String(data.classAggregate.learnersWithActivity)}
-              hint="Learners who have completed at least one practice set"
+              hint="Students who have completed at least one practice set"
             />
             {Object.entries(data.classAggregate.tierCounts)
               .slice(0, 2)

@@ -122,7 +122,7 @@ function ModuleActivity() {
         </div>
       ) : data && !data.available ? (
         <div className="mt-4 rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-          {data.reason ?? 'Activity is not available for this module on this estate.'}
+          {data.reason ?? 'Activity is not available for this section yet.'}
         </div>
       ) : data ? (
         <div className="mt-4 space-y-4">

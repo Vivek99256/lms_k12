@@ -88,7 +88,7 @@ export default function StudentResultRemarksPage() {
       setRemarkOptions(toOptions(asRecord(remarksPayload).data ?? remarksPayload));
     } catch (err) {
       setRows([]);
-      setError(err instanceof Error ? err.message : 'Failed to load students.');
+      setError(err instanceof Error ? err.message : "Couldn't load students. Try again.");
     } finally {
       setLoading(false);
       setSearched(true);
@@ -110,10 +110,10 @@ export default function StudentResultRemarksPage() {
         body[`result_remarks_input[${row.id}]`] = row.customRemark;
       });
       const payload = await resultPost('api/result/student-result-remarks', body);
-      const message = assertOk(payload, 'Failed to save result remarks.');
+      const message = assertOk(payload, "Couldn't save result remarks. Try again.");
       toast.success('Result remarks saved', message || undefined);
     } catch (err) {
-      toast.error('Failed to save result remarks', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't save result remarks. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }
@@ -166,7 +166,7 @@ export default function StudentResultRemarksPage() {
                       <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                         <th className="px-4 py-3 font-semibold">Sr no</th>
                         <th className="px-4 py-3 font-semibold">Roll no</th>
-                        <th className="px-4 py-3 font-semibold">Enrollment no</th>
+                        <th className="px-4 py-3 font-semibold">GR no.</th>
                         <th className="px-4 py-3 font-semibold">Student name</th>
                         <th className="px-4 py-3 font-semibold">Result remarks</th>
                         <th className="px-4 py-3 font-semibold">Custom remark</th>

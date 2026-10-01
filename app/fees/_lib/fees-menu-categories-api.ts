@@ -143,7 +143,7 @@ export async function fetchFeesMenuCategories(
     throw new Error(
       typeof message === 'string' && message
         ? message
-        : 'Unable to load the fees category navigation.'
+        : "Couldn't load the fee category navigation. Try again."
     );
   }
 

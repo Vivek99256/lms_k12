@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -150,7 +152,7 @@ function ListContent({ type }: { type: TextActivityType }) {
       setActivities(await fetchTextActivities(type, ctx));
       setError('');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load activities');
+      setError(friendlyError(err, 'We couldn’t load activities. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -201,7 +203,7 @@ function ListContent({ type }: { type: TextActivityType }) {
       setSuccess(await action());
       await load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'That did not work');
+      setError(friendlyError(err, 'That did not work. Please try again.'));
     } finally {
       setBusyId(null);
     }
@@ -219,7 +221,7 @@ function ListContent({ type }: { type: TextActivityType }) {
       );
       await load();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to import package');
+      setError(friendlyError(err, 'We couldn’t import the file. Please try again.'));
     } finally {
       setImporting(false);
       if (importInputRef.current) importInputRef.current.value = '';
@@ -428,7 +430,7 @@ function ListContent({ type }: { type: TextActivityType }) {
                                       return warningCount > 0
                                         ? `Package downloaded, with ${warningCount} ${
                                             warningCount === 1 ? 'warning' : 'warnings'
-                                          } — some detail could not be carried into ${
+                                          } — some detail couldn’t be carried into ${
                                             TEXT_ACTIVITY_LABELS[type]
                                           }.`
                                         : 'Package downloaded.';
@@ -543,7 +545,7 @@ function CreateContent({ type }: { type: TextActivityType }) {
         try {
           await publishTextActivity(type, result.id, ctx, true);
         } catch (err: unknown) {
-          const reason = err instanceof Error ? err.message : 'Could not publish';
+          const reason = friendlyError(err, 'We couldn’t publish. Please try again.');
           router.push(`${base}?${h5pContextQuery(ctx, { flash: `Saved as a draft. ${reason}` })}`);
           return;
         }
@@ -555,7 +557,7 @@ function CreateContent({ type }: { type: TextActivityType }) {
         })}`
       );
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create activity');
+      setError(friendlyError(err, 'We couldn’t create activity. Please try again.'));
       setSaving(false);
     }
   };
@@ -636,7 +638,7 @@ function EditContent({ type }: { type: TextActivityType }) {
         setActivity(row);
         setState(editorStateFrom(row));
       } catch (err: unknown) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load activity');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load activity. Please try again.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -659,7 +661,7 @@ function EditContent({ type }: { type: TextActivityType }) {
         try {
           await publishTextActivity(type, id, ctx, true);
         } catch (err: unknown) {
-          const reason = err instanceof Error ? err.message : 'Could not publish';
+          const reason = friendlyError(err, 'We couldn’t publish. Please try again.');
           router.push(`${base}?${h5pContextQuery(ctx, { flash: `Changes saved. ${reason}` })}`);
           return;
         }
@@ -671,7 +673,7 @@ function EditContent({ type }: { type: TextActivityType }) {
         })}`
       );
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save changes');
+      setError(friendlyError(err, 'We couldn’t save changes. Please try again.'));
       setSaving(false);
     }
   };
@@ -691,7 +693,7 @@ function EditContent({ type }: { type: TextActivityType }) {
         {loading ? (
           <LoadingState label="Loading activity…" />
         ) : state === null ? (
-          <EmptyState title="That activity could not be opened" />
+          <EmptyState title="That activity couldn’t be opened" />
         ) : (
           <TextActivityEditor
             type={type}
@@ -759,7 +761,7 @@ function ViewContent({ type }: { type: TextActivityType }) {
         const row = await fetchTextActivity(type, id, ctx);
         if (!cancelled) setActivity(row);
       } catch (err: unknown) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load activity');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load activity. Please try again.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -794,7 +796,7 @@ function ViewContent({ type }: { type: TextActivityType }) {
         {loading ? (
           <LoadingState label="Loading activity…" />
         ) : activity === null ? (
-          <EmptyState title="That activity could not be opened" />
+          <EmptyState title="That activity couldn’t be opened" />
         ) : (
           <>
             {/* A teacher previewing a draft should be in no doubt that this is

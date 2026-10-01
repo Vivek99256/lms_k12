@@ -28,6 +28,7 @@ import {
 } from '@/app/fees/_lib/fees-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 type S4Response = ApiStatusPayload & {
   fee_month?: unknown;
@@ -57,7 +58,7 @@ export default function NachS4ExcelImportPage() {
       const payload = await fetchLaravelJson<S4Response>(nextSession, `${getApiBaseUrl(nextSession)}/fees/NACH_s4excel_import?${params.toString()}`);
       setMonths(toMonthOptions(payload.fee_month));
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load fee months.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load fee months. Try again." });
     } finally {
       setLoadingMonths(false);
     }
@@ -110,7 +111,7 @@ export default function NachS4ExcelImportPage() {
       setFile(null);
       setFileInputKey((current) => current + 1);
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to import S4 file.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't import S4 file. Try again." });
     } finally {
       setUploading(false);
     }
@@ -120,7 +121,7 @@ export default function NachS4ExcelImportPage() {
     <PageFrame>
       <PageHeader
         title="S4-NACH excel import"
-        description="Upload the bank debit-return S4 file for a fee month. Laravel records realised payments and failed-return rows."
+        description="Upload the bank debit-return S4 file for a fee month. Realised payments and failed-return rows are recorded."
         action={
           <a
             href={joinUrl(getApiBaseUrl(session), 'sample_sheet/SAMPLE_NACH_S4_Import.xlsx')}
@@ -164,7 +165,7 @@ export default function NachS4ExcelImportPage() {
         <SectionPanel title="Import summary">
           <div
             className="max-h-[420px] overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800"
-            dangerouslySetInnerHTML={{ __html: summaryHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(summaryHtml) }}
           />
         </SectionPanel>
       )}

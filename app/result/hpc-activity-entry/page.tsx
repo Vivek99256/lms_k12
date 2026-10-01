@@ -175,7 +175,7 @@ export default function HpcActivityEntryPage() {
       }
       setSelections(nextSelections);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't load students. Try again.");
       setStudents([]);
       setGroups([]);
       setSelections({});
@@ -198,10 +198,10 @@ export default function HpcActivityEntryPage() {
       data.activity_id = criteria.activity_master;
 
       const payload = await resultPost('api/result/hpc-activity-entry', data);
-      const message = assertOk(payload, 'Laravel did not confirm that the activity marks were saved.');
+      const message = assertOk(payload, "Couldn't save the activity marks. Try again.");
       toast.success('Activity marks saved', message || undefined);
     } catch (err) {
-      toast.error('Could not save activity marks', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't save activity marks. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }

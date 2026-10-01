@@ -76,7 +76,7 @@ export function NotificationConsole() {
   const mayEdit = rights.permissions?.[RBAC_KEY]?.update ?? false;
   const rightsReason = rights.authenticated
     ? 'Your role cannot change notification settings for this institute.'
-    : 'Sign in again — your permissions could not be checked.';
+    : "Sign in again. We couldn't check your permissions.";
 
   const load = useCallback(
     (isRefresh = false) => {
@@ -92,7 +92,7 @@ export function NotificationConsole() {
           setDraft(new Map());
         })
         .catch((cause: unknown) => {
-          setError(cause instanceof PlatformApiError ? cause.message : 'The notification settings could not be loaded.');
+          setError(cause instanceof PlatformApiError ? cause.message : "Couldn't load the notification settings. Try again.");
         })
         .finally(() => setLoading(false));
     },
@@ -173,7 +173,7 @@ export function NotificationConsole() {
     } catch (cause) {
       setNote({
         tone: 'error',
-        text: cause instanceof PlatformApiError ? cause.message : 'The changes could not be saved.',
+        text: cause instanceof PlatformApiError ? cause.message : "Couldn't save the changes. Try again.",
       });
     } finally {
       setSaving(false);
@@ -192,7 +192,7 @@ export function NotificationConsole() {
       } catch (cause) {
         setNote({
           tone: 'error',
-          text: cause instanceof PlatformApiError ? cause.message : 'The channel could not be changed.',
+          text: cause instanceof PlatformApiError ? cause.message : "Couldn't change the channel. Try again.",
         });
       }
     },

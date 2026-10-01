@@ -103,7 +103,7 @@ async function fetchV4Data(path: string, signal?: AbortSignal): Promise<unknown>
     }
     throw new Error(
       serverMessage ||
-        `HTTP ${response.status}: the PAL V4 API is unavailable. Ensure the backend is deployed.`
+        `This feature is not available right now. Please try again later.`
     );
   }
 
@@ -707,7 +707,7 @@ async function fetchV4Mutation(
 
   if (!response.ok) {
     const record = toRecord(payload);
-    throw new Error(readString(record.message) || `HTTP ${response.status}: the PAL V4 API request failed.`);
+    throw new Error(readString(record.message) || `This feature is not available right now. Please try again later.`);
   }
 
   const record = toRecord(payload);

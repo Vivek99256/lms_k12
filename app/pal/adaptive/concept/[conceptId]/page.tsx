@@ -126,7 +126,7 @@ function AdaptivePracticeView() {
         .then(setSet)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Practice could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'Practice couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -218,7 +218,7 @@ function AdaptivePracticeView() {
       router.push(resultHref);
     } catch (reason: unknown) {
       setSubmitError(
-        reason instanceof Error ? reason.message : 'Your answers could not be submitted. Try again.'
+        reason instanceof Error ? reason.message : 'Your answers couldn’t be submitted. Try again.'
       );
       setSubmitting(false);
     }

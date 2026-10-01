@@ -73,7 +73,7 @@ export default function BadgesPage() {
         <StatusPanel
           kind="error"
           title="Badges are not available"
-          message={error || 'The backend did not return a badge payload.'}
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={reload}
           retrying={refreshing}
         />

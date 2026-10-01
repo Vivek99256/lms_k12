@@ -8,6 +8,7 @@ import {
   type DashboardWidget,
   type DashboardWidgetGroup,
 } from '@/app/dashboard/_lib/dashboard-preferences';
+import { friendlyError } from '@/lib/user-messages';
 
 /**
  * The signed-in user's show/hide choices for one dashboard.
@@ -65,7 +66,7 @@ export function useDashboardPreferences<W extends DashboardWidget>(dashboardKey:
         setHiddenIds(await saveDashboardPreferences(dashboardKey, [...nextHidden, ...keptUnknown], getDashboardSession()));
         return true;
       } catch (err) {
-        setSaveError(err instanceof Error ? err.message : 'Unable to save your dashboard layout.');
+        setSaveError(friendlyError(err, "We couldn't save your dashboard layout. Please try again."));
         return false;
       } finally {
         setSaving(false);

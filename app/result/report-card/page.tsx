@@ -17,6 +17,7 @@ import FilterBar, { type FilterFieldDef, type FilterValues } from '@/components/
 import { Banner, Checkbox, EmptyState, Skeleton, TableSkeleton } from '@/components/result/primitives';
 import { toast } from '@/components/result/toast';
 import { printElement } from '@/components/result/print';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { asRecord, extractRows, readString, resultGet, resultPost, toCollection, toOptions } from '@/lib/result/api';
 
 type StudentRow = {
@@ -80,7 +81,7 @@ export default function NewReportCardPage() {
         setBootError(null);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setBootError(err instanceof Error ? err.message : 'Failed to load result templates.');
+        if (!cancelled) setBootError(err instanceof Error ? err.message : "Couldn't load result templates. Try again.");
       })
       .finally(() => {
         if (!cancelled) setBootLoading(false);
@@ -126,7 +127,7 @@ export default function NewReportCardPage() {
     } catch (err) {
       setStudents([]);
       setSelected(new Set());
-      setError(err instanceof Error ? err.message : 'Failed to load students.');
+      setError(err instanceof Error ? err.message : "Couldn't load students. Try again.");
     } finally {
       setLoading(false);
       setSearched(true);
@@ -180,7 +181,7 @@ export default function NewReportCardPage() {
       ));
       toast.success('Report cards generated', `${selected.size} report card(s) ready below.`);
     } catch (err) {
-      toast.error('Failed to generate report cards', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't generate report cards. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setGenerating(false);
     }
@@ -206,7 +207,7 @@ export default function NewReportCardPage() {
       await resultPost('api/result/student-result/save-html', body);
       toast.success('Result HTML saved for mobile app');
     } catch (err) {
-      toast.error('Failed to save result HTML', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't save the result. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSavingMobile(false);
     }
@@ -336,7 +337,7 @@ export default function NewReportCardPage() {
               <div
                 ref={printRef}
                 className="max-h-[70vh] overflow-auto rounded-lg border border-slate-200 bg-white p-4"
-                dangerouslySetInnerHTML={{ __html: reportHtml }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportHtml, { document: true }) }}
               />
             </CardContent>
           </Card>

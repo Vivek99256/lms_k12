@@ -35,7 +35,7 @@ export default function RegisterPage({ kind }: { kind: RegisterKind }) {
   const load = useCallback(async () => {
     setLoading(true);
     try { setRows(await listEntries(kind)); }
-    catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : `Unable to load ${kind} entries.` }); }
+    catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : `Couldn't load ${kind} entries. Try again.` }); }
     finally { setLoading(false); }
   }, [kind]);
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function RegisterPage({ kind }: { kind: RegisterKind }) {
       setPlaces(metadata.places); setFiles(metadata.files);
       setForm({ ...emptyForm(), number: metadata.nextNumber });
       setEditing(null); setShowForm(true);
-    } catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load form options.' }); }
+    } catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load form options. Try again." }); }
   };
   const beginEdit = async (row: RegisterEntry) => {
     try {
@@ -61,7 +61,7 @@ export default function RegisterPage({ kind }: { kind: RegisterKind }) {
       const file = metadata.files.find((item) => item.title === row.fileName);
       setForm({ placeId: place?.id ?? row.placeId, fileLocationId: file?.id ?? row.fileLocationId, date: row.date.slice(0, 10), number: row.number, title: row.title, description: row.description, attachment: null });
       setEditing(row); setShowForm(true); window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load entry.' }); }
+    } catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load entry. Try again." }); }
   };
   const closeForm = () => { setShowForm(false); setEditing(null); setForm(emptyForm()); };
 
@@ -78,13 +78,13 @@ export default function RegisterPage({ kind }: { kind: RegisterKind }) {
       await mutateForm(`inward_outward/add_${kind}${editing ? `/${editing.id}` : ''}`, editing ? 'PUT' : 'POST', data);
       setMessage({ type: 'success', text: `${title} entry ${editing ? 'updated' : 'added'} successfully.` });
       closeForm(); await load();
-    } catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : `Unable to save ${kind} entry.` }); }
+    } catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : `Couldn't save ${kind} entry. Try again.` }); }
     finally { setSaving(false); }
   };
   const remove = async (row: RegisterEntry) => {
     if (!window.confirm(`Delete ${kind} entry ${row.number}?`)) return;
     try { await deleteResource(`inward_outward/add_${kind}/${row.id}`); setMessage({ type: 'success', text: `${title} entry deleted successfully.` }); await load(); }
-    catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : `Unable to delete ${kind} entry.` }); }
+    catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : `Couldn't delete ${kind} entry. Try again.` }); }
   };
   const filtered = useMemo(() => {
     const needle = query.toLowerCase().trim();

@@ -111,17 +111,17 @@ export async function fetchAdmissionsDashboardSummary(
     payload = JSON.parse(text) as AdmissionsDashboardPayload;
   } catch {
     throw new Error(
-      `Admissions dashboard proxy returned a non-JSON response (${response.headers.get('content-type') || 'unknown content type'}).`
+      "Couldn't load the dashboard. Try again."
     );
   }
 
   if (!response.ok) {
     throw new Error(
-      readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to load the admissions dashboard summary.`
+      readString(asRecord(payload).message) || `Couldn't load the admissions dashboard summary. Try again.`
     );
   }
 
-  assertApiSuccess(payload, 'Unable to load the admissions dashboard summary.');
+  assertApiSuccess(payload, "Couldn't load the admissions dashboard summary. Try again.");
 
   return payload;
 }

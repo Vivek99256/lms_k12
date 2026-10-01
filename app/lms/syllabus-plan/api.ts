@@ -39,7 +39,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(`${fallback}.`);
   }
 }
 
@@ -98,8 +98,8 @@ export async function fetchSyllabusList(signal?: AbortSignal): Promise<SyllabusR
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the syllabus list.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the syllabus list'));
+  if (!res.ok) throw new Error(`Couldn’t load the syllabus list. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t load the syllabus list'));
 
   return toArray(raw.allData).map((entry) => {
     const r = toRecord(entry);
@@ -139,7 +139,7 @@ export async function fetchCurriculums(
     signal,
   });
   if (!res.ok) return [];
-  const raw = await readJson(res, 'Failed to load curriculums');
+  const raw = await readJson(res, 'Couldn’t load curriculums');
   return toArray(Array.isArray(raw) ? raw : toRecord(raw).data)
     .map((entry) => {
       const r = toRecord(entry);
@@ -190,12 +190,12 @@ export async function saveSyllabus(input: SyllabusInput, id?: string): Promise<s
     },
     body: body.toString(),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to save the syllabus.`);
-  const raw = toRecord(await readJson(res, 'Failed to save the syllabus'));
+  if (!res.ok) throw new Error(`Couldn’t save the syllabus. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t save the syllabus'));
   // NOTE: Laravel returns status 0 when an update changes no rows (identical
   // values). Treat an explicit "0" as an error only when a message says so.
   if (normalizeApiStatus(raw) === '0' && !isUpdate) {
-    throw new Error(readString(raw.message) || 'Failed to save the syllabus.');
+    throw new Error(readString(raw.message) || 'Couldn’t save the syllabus.');
   }
   return readString(raw.message) || (isUpdate ? 'Syllabus updated.' : 'Syllabus saved.');
 }
@@ -209,7 +209,7 @@ export async function deleteSyllabus(id: string): Promise<string> {
     method: 'DELETE',
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to delete the syllabus.`);
-  const raw = toRecord(await readJson(res, 'Failed to delete the syllabus'));
+  if (!res.ok) throw new Error(`Couldn’t delete the syllabus. Try again.`);
+  const raw = toRecord(await readJson(res, 'Couldn’t delete the syllabus'));
   return readString(raw.message) || 'Syllabus deleted.';
 }

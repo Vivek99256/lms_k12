@@ -59,7 +59,7 @@ async function readJson(res: Response, fallback: string): Promise<Record<string,
       ? (parsed as Record<string, unknown>)
       : { data: parsed };
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(fallback);
   }
 }
 
@@ -168,8 +168,8 @@ export async function fetchMappingLevels(signal?: AbortSignal): Promise<MappingL
     headers: createAuthHeaders(session),
     signal,
   });
-  const raw = await readJson(res, 'Failed to load DOK/Bloom levels');
-  if (!res.ok) throw new Error((raw.message as string) || 'Failed to load DOK/Bloom levels');
+  const raw = await readJson(res, "Couldn't load DOK/Bloom levels. Try again.");
+  if (!res.ok) throw new Error((raw.message as string) || "Couldn't load DOK/Bloom levels. Try again.");
   const data = toRecord(raw.data);
   const map = (list: unknown): MappingLevel[] =>
     toArray(list)
@@ -193,7 +193,7 @@ async function loadCourses(session: SessionContext): Promise<Record<string, unkn
     headers: createAuthHeaders(session),
     body: form,
   });
-  return readJson(res, 'Failed to load chapters');
+  return readJson(res, "Couldn't load chapters. Try again.");
 }
 
 export async function fetchSubjectChapters(
@@ -270,8 +270,8 @@ async function fetchQuestions(
     body: form,
     signal,
   });
-  const raw = await readJson(res, 'Failed to load questions');
-  if (!res.ok) throw new Error((raw.message as string) || 'Failed to load questions');
+  const raw = await readJson(res, "Couldn't load questions. Try again.");
+  if (!res.ok) throw new Error((raw.message as string) || "Couldn't load questions. Try again.");
   let list = toArray(raw.data).map(mapQuestion).filter((q) => q.id);
   // Some deployments ignore the question-type filter param → filter client-side.
   if (scope.questionTypeIds.length > 0) {
@@ -522,10 +522,10 @@ export async function saveAiPaper(input: SavePaperInput): Promise<SaveResult> {
     headers: createAuthHeaders(session, 'application/json'),
     body: JSON.stringify(body),
   });
-  const raw = await readJson(res, 'Failed to save the question paper');
+  const raw = await readJson(res, "Couldn't save the question paper. Try again.");
   const status = String(raw.status_code ?? raw.status ?? '');
   if (!res.ok || (status !== '1' && status.toUpperCase() !== 'SUCCESS')) {
-    throw new Error((raw.message as string) || 'Failed to save the question paper');
+    throw new Error((raw.message as string) || "Couldn't save the question paper. Try again.");
   }
   return { id: readNumber(raw.id), message: (raw.message as string) || 'AI question paper saved successfully.' };
 }

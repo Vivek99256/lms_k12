@@ -151,7 +151,7 @@ export default function AssessmentBlueprints() {
         setSelectedKey(keepKey);
       }
     } catch (loadError) {
-      setError(errorMessage(loadError, 'Unable to load blueprints.'));
+      setError(errorMessage(loadError, 'Couldn’t load blueprints.'));
     } finally {
       setIndexLoading(false);
     }
@@ -248,7 +248,7 @@ export default function AssessmentBlueprints() {
             : `Copied "${blueprint.name}".`
         );
       } catch (cloneError) {
-        setError(errorMessage(cloneError, 'Unable to copy this blueprint.'));
+        setError(errorMessage(cloneError, 'Couldn’t copy this blueprint.'));
       } finally {
         setBusy(false);
       }
@@ -298,7 +298,7 @@ export default function AssessmentBlueprints() {
       await load(blueprintKey(created));
       setNotice('New blueprint created.');
     } catch (createError) {
-      setError(errorMessage(createError, 'Unable to create a blueprint.'));
+      setError(errorMessage(createError, 'Couldn’t create a blueprint.'));
     } finally {
       setBusy(false);
     }
@@ -316,7 +316,7 @@ export default function AssessmentBlueprints() {
       await load(blueprintKey(saved));
       setNotice('Blueprint saved.');
     } catch (saveError) {
-      setError(errorMessage(saveError, 'Unable to save this blueprint.'));
+      setError(errorMessage(saveError, 'Couldn’t save this blueprint.'));
     } finally {
       setBusy(false);
     }
@@ -338,7 +338,7 @@ export default function AssessmentBlueprints() {
         await load();
         setNotice('Blueprint removed.');
       } catch (removeError) {
-        setError(errorMessage(removeError, 'Unable to remove this blueprint.'));
+        setError(errorMessage(removeError, 'Couldn’t remove this blueprint.'));
       } finally {
         setBusy(false);
       }

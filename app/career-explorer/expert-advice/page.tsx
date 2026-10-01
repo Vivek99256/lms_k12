@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -60,7 +61,7 @@ export default function ExpertAdvicePage() {
       setExperts((data.data ?? []) as Expert[]);
     } catch (err) {
       setExperts([]);
-      setError(err instanceof Error ? err.message : 'Unable to load experts.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load experts.');
     } finally {
       setLoading(false);
     }
@@ -110,7 +111,7 @@ export default function ExpertAdvicePage() {
           )}
 
           {!loading && error && (
-            <ErrorState title="Unable to load experts" description={error} retry={() => void refresh()} />
+            <ErrorState title="Couldn’t load experts" description={error} retry={() => void refresh()} />
           )}
 
           {!loading && !error && visible.length === 0 && (
@@ -207,7 +208,7 @@ export default function ExpertAdvicePage() {
           </DialogHeader>
           <div
             className="prose max-w-none text-sm leading-6 text-foreground"
-            dangerouslySetInnerHTML={{ __html: dialog?.content ?? '' }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(dialog?.content ?? '') }}
           />
         </DialogContent>
       </Dialog>

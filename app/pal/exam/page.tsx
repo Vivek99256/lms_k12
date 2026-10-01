@@ -135,7 +135,7 @@ function PalExamContent() {
         }
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to start the quiz.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t start the quiz.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -205,7 +205,7 @@ function PalExamContent() {
         router.push(`/pal/result?${query.toString()}`);
       } catch (reason) {
         submittedRef.current = false;
-        setSubmitError(reason instanceof Error ? reason.message : 'Unable to submit the quiz.');
+        setSubmitError(reason instanceof Error ? reason.message : 'Couldn’t submit the quiz.');
         setSubmitting(false);
       }
     },

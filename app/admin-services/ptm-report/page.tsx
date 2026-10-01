@@ -63,7 +63,7 @@ export default function PtmReportPage() {
     try {
       setClassOptions(await loadClassOptions());
     } catch (value: unknown) {
-      setError(errorMessage(value, "The class list could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the class list. Try again."));
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,7 @@ export default function PtmReportPage() {
     } catch (value: unknown) {
       setRows([]);
       setGenerated(true);
-      setError(errorMessage(value, "The PTM report could not be generated."));
+      setError(errorMessage(value, "Couldn't generate the PTM report. Try again."));
     } finally {
       setSearching(false);
     }

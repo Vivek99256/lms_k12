@@ -49,7 +49,7 @@ export function ExplanationCard({
           <span>
             <strong className="font-medium">Explanation withheld.</strong>{' '}
             {reason ??
-              'The system could not support this explanation with verified evidence, so it is not being shown.'}
+              'The system couldn’t support this explanation with verified evidence, so it is not being shown.'}
           </span>
         </p>
       </div>

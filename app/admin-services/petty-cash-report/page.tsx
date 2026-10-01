@@ -50,7 +50,7 @@ export default function PettyCashReportPage() {
     try {
       setHeads(await loadPettyCashHeads());
     } catch (value: unknown) {
-      setError(errorMessage(value, "Petty cash heads could not be loaded."));
+      setError(errorMessage(value, "Couldn't load petty cash heads. Try again."));
     } finally {
       setLoading(false);
     }
@@ -84,7 +84,7 @@ export default function PettyCashReportPage() {
       setEntries([]);
       setTotal(0);
       setGenerated(true);
-      setError(errorMessage(value, "The petty cash report could not be generated."));
+      setError(errorMessage(value, "Couldn't generate the petty cash report. Try again."));
     } finally {
       setSearching(false);
     }

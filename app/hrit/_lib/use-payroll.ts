@@ -58,7 +58,7 @@ export function usePayrollTypes() {
     // Firing without a token would only ever earn a 401 from the controller.
     if (!isPayrollSessionReady(session)) {
       setPayrollTypes([])
-      setError('Your session could not be resolved. Please sign in again.')
+      setError('Your session has expired. Please sign in again.')
       setLoading(false)
       return
     }
@@ -67,7 +67,7 @@ export function usePayrollTypes() {
       const response = await payrollService.getPayrollTypes(session)
       setPayrollTypes((response.data ?? []).map(normalizePayrollType))
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load payroll types.'))
+      setError(toMessage(loadError, "Couldn't load payroll types. Try again."))
       setPayrollTypes([])
     } finally {
       setLoading(false)
@@ -128,7 +128,7 @@ export function usePayrollTypes() {
     save: (payload: PayrollTypePayload) =>
       run(
         () => payrollService.savePayrollType(buildSessionContext(), payload),
-        'Failed to save the payroll type.',
+        "Couldn't save the payroll type. Try again.",
       ),
     /**
      * There is no dedicated status route - payrollStore is the only writer, and
@@ -141,12 +141,12 @@ export function usePayrollTypes() {
             ...payrollTypeToPayload(row),
             status: row.status === 'Active' ? 'Inactive' : 'Active',
           }),
-        'Failed to change the payroll type status.',
+        "Couldn't change the payroll type status. Try again.",
       ),
     remove: (id: number | string) =>
       run(
         () => payrollService.deletePayrollType(buildSessionContext(), id),
-        'Failed to delete the payroll type.',
+        "Couldn't delete the payroll type. Try again.",
       ),
   }
 }

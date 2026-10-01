@@ -20,7 +20,7 @@ export default function Page() {
           { key: 'notification_date', label: 'Date' },
           { key: 'notification_type', label: 'Type' },
           { key: 'student_name', label: 'Student name' },
-          { key: 'enrollment_no', label: 'GR No.' },
+          { key: 'enrollment_no', label: 'GR no.' },
           { key: 'grade_name', label: 'Academic section' },
           { key: 'standard_name', label: 'Standard' },
           { key: 'division_name', label: 'Division' },

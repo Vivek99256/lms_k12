@@ -104,7 +104,7 @@ export default function AdminDashboard() {
             <SectionPanel title="Quick actions" className="mb-6">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <QuickActionLink href="/student" label="Add student" icon={UserPlus} />
-                <QuickActionLink href="/fees" label="Collect fee" icon={Wallet} />
+                <QuickActionLink href="/fees" label="Collect fees" icon={Wallet} />
                 <QuickActionLink href="/reports" label="View reports" icon={FileText} />
                 <QuickActionLink href="/settings" label="Manage settings" icon={Settings} />
               </div>

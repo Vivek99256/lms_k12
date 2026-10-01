@@ -165,8 +165,8 @@ const yesNoOptions = [
 ];
 
 const nachAccountTypeOptions = [
-  { value: 'saving', label: 'Saving Account' },
-  { value: 'current', label: 'Current Account' },
+  { value: 'saving', label: 'Saving account' },
+  { value: 'current', label: 'Current account' },
   { value: 'cash', label: 'Cash / Credit' },
 ];
 
@@ -573,12 +573,12 @@ export default function FeesConfigMasterPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load fees configurations (${response.status})`);
+        throw new Error("Couldn't load fee configurations. Try again.");
       }
 
       const payload = (await response.json()) as FeeConfigResponse;
       if (normalizeApiStatus(payload) && normalizeApiStatus(payload) !== '1') {
-        throw new Error(payload.message || 'Failed to load fees configurations.');
+        throw new Error(payload.message || "Couldn't load fee configurations. Try again.");
       }
 
       const rows = Array.isArray(payload.data) ? payload.data : [];
@@ -588,7 +588,7 @@ export default function FeesConfigMasterPage() {
       setPageError(
         error instanceof Error
           ? error.message
-          : 'Failed to load fees configurations.'
+          : "Couldn't load fee configurations. Try again."
       );
     } finally {
       setIsLoading(false);
@@ -803,9 +803,9 @@ export default function FeesConfigMasterPage() {
       if (!response.ok) {
         throw new Error(
           parsedPayload?.message ||
-            `Failed to ${
+            `Couldn't ${
               editingRecord ? 'update' : 'save'
-            } fees configuration (${response.status})`
+            } fee configuration. Try again.`
         );
       }
 
@@ -815,7 +815,7 @@ export default function FeesConfigMasterPage() {
       ) {
         throw new Error(
           parsedPayload?.message ||
-            `Failed to ${editingRecord ? 'update' : 'save'} fees configuration.`
+            `Couldn't ${editingRecord ? 'update' : 'save'} fee configuration. Try again.`
         );
       }
 
@@ -831,9 +831,9 @@ export default function FeesConfigMasterPage() {
       setFormErrorMessage(
         error instanceof Error
           ? error.message
-          : `Failed to ${
+          : `Couldn't ${
               editingRecord ? 'update' : 'save'
-            } fees configuration.`
+            } fee configuration. Try again.`
       );
     } finally {
       setIsSaving(false);
@@ -890,7 +890,7 @@ export default function FeesConfigMasterPage() {
       if (!response.ok) {
         throw new Error(
           parsedPayload?.message ||
-            `Failed to delete fees configuration (${response.status})`
+            "Couldn't delete fee configuration. Try again."
         );
       }
 
@@ -899,7 +899,7 @@ export default function FeesConfigMasterPage() {
         normalizeApiStatus(parsedPayload) !== '1'
       ) {
         throw new Error(
-          parsedPayload?.message || 'Failed to delete fees configuration.'
+          parsedPayload?.message || "Couldn't delete fee configuration. Try again."
         );
       }
 
@@ -912,7 +912,7 @@ export default function FeesConfigMasterPage() {
       setPageError(
         error instanceof Error
           ? error.message
-          : 'Failed to delete fees configuration.'
+          : "Couldn't delete fee configuration. Try again."
       );
     } finally {
       setPendingDeleteId(null);
@@ -924,7 +924,7 @@ export default function FeesConfigMasterPage() {
   const downloadPdf = () => {
     exportRowsAsPdf({
       filename: 'fees-config-master.pdf',
-      title: 'Fees Config Master',
+      title: 'Fee configuration',
       subtitle: `Active records: ${configs.length}`,
       columns: [
         { key: 'institute', label: 'Institute' },
@@ -1049,7 +1049,7 @@ export default function FeesConfigMasterPage() {
                           className="inline-flex items-center gap-1"
                           onClick={() => handleSort('serial')}
                         >
-                          Sr. No.
+                          No.
                         </button>
                       </TableHead>
                       <TableHead className="h-9 min-w-[180px] px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
@@ -1058,7 +1058,7 @@ export default function FeesConfigMasterPage() {
                           className="inline-flex items-center gap-1"
                           onClick={() => handleSort('instituteName')}
                         >
-                          Institute Name
+                          Institute name
                         </button>
                       </TableHead>
                       <TableHead className="h-9 min-w-[120px] px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
@@ -1076,7 +1076,7 @@ export default function FeesConfigMasterPage() {
                           className="inline-flex items-center gap-1"
                           onClick={() => handleSort('accountToBeCredited')}
                         >
-                          Account No
+                          Account no
                         </button>
                       </TableHead>
                       <TableHead className="h-9 min-w-[120px] px-3 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
@@ -1085,7 +1085,7 @@ export default function FeesConfigMasterPage() {
                           className="inline-flex items-center gap-1"
                           onClick={() => handleSort('lateFeesAmount')}
                         >
-                          Late Fees
+                          Late fees
                         </button>
                       </TableHead>
                       <TableHead className="h-9 min-w-[140px] px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
@@ -1098,10 +1098,10 @@ export default function FeesConfigMasterPage() {
                         </button>
                       </TableHead>
                       <TableHead className="h-9 min-w-[140px] px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Receipt Template
+                        Receipt template
                       </TableHead>
                       <TableHead className="h-9 min-w-[126px] px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                        Month Beside Fees
+                        Month beside fees
                       </TableHead>
                       <TableHead className="h-9 min-w-[132px] px-3 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                         Action
@@ -1304,7 +1304,7 @@ export default function FeesConfigMasterPage() {
                     {editingRecord ? 'Edit fees configuration' : 'Add fees configuration'}
                   </h2>
                   <p className="mt-1 text-[12px] text-slate-500">
-                    Match the Laravel fee setup fields and receipt configuration.
+                    Set the fee fields and receipt configuration.
                   </p>
                 </div>
 
@@ -1327,7 +1327,7 @@ export default function FeesConfigMasterPage() {
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <DrawerField
-                      label="Late Fees Amount"
+                      label="Late fee amount"
                       required
                       error={formErrors.late_fees_amount}
                     >
@@ -1371,7 +1371,7 @@ export default function FeesConfigMasterPage() {
                     </DrawerField>
 
                     <DrawerField
-                      label="Fees Paid Send Email"
+                      label="Fee paid send email"
                       required
                       error={formErrors.send_email}
                     >
@@ -1400,7 +1400,7 @@ export default function FeesConfigMasterPage() {
                     </DrawerField>
 
                     <DrawerField
-                      label="Fees Receipt Template"
+                      label="Fee receipt template"
                       required
                       error={formErrors.fees_receipt_template}
                     >
@@ -1429,7 +1429,7 @@ export default function FeesConfigMasterPage() {
                     </DrawerField>
 
                     <DrawerField
-                      label="Fees Bank Challan Template"
+                      label="Bank challan template"
                       required
                       error={formErrors.fees_bank_challan_template}
                     >
@@ -1462,7 +1462,7 @@ export default function FeesConfigMasterPage() {
 
                     <div className="sm:col-span-2">
                       <DrawerField
-                        label="Fees Receipt Note"
+                        label="Fee receipt note"
                         error={formErrors.fees_receipt_note}
                         assist={
                           <AiFieldAssistant
@@ -1488,7 +1488,7 @@ export default function FeesConfigMasterPage() {
                     </div>
 
                     <DrawerField
-                      label="Institute Name"
+                      label="Institute name"
                       required
                       error={formErrors.institute_name}
                     >
@@ -1512,7 +1512,7 @@ export default function FeesConfigMasterPage() {
                     </DrawerField>
 
                     <DrawerField
-                      label="Account To Be Credited"
+                      label="Account to be credited"
                       required
                       error={formErrors.account_to_be_credited}
                     >
@@ -1543,7 +1543,7 @@ export default function FeesConfigMasterPage() {
                     </DrawerField>
 
                     <DrawerField
-                      label="Auto Head Counting"
+                      label="Auto head counting"
                       error={formErrors.auto_head_counting}
                     >
                       <Select
@@ -1651,7 +1651,7 @@ export default function FeesConfigMasterPage() {
 
                     <div className="sm:col-span-2">
                       <DrawerField
-                        label="Bank Logo"
+                        label="Bank logo"
                         error={formErrors.fees_bank_logo}
                       >
                         <Input
@@ -1746,14 +1746,14 @@ export default function FeesConfigMasterPage() {
               </div>
               <div className="space-y-1">
                 <h3 className="text-[16px] font-semibold text-slate-950">
-                  Delete fees configuration
+                  Delete fee configuration
                 </h3>
                 <p className="text-[12px] leading-5 text-slate-600">
-                  Are you sure you want to delete the fees configuration for{' '}
+                  Delete the fee configuration for{' '}
                   <span className="font-semibold text-slate-800">
                     {recordToDelete.instituteName || 'this institute'}
                   </span>
-                  ? This action cannot be undone.
+                  ? This can't be undone.
                 </p>
               </div>
             </div>

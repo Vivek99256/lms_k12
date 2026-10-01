@@ -58,7 +58,7 @@ export default function ComplaintManagementPage() {
     try {
       setBoard(await loadComplaintBoard());
     } catch (value: unknown) {
-      setError(errorMessage(value, "Complaints could not be loaded."));
+      setError(errorMessage(value, "Couldn't load complaints. Try again."));
     } finally {
       setLoading(false);
     }
@@ -110,7 +110,7 @@ export default function ComplaintManagementPage() {
       cancelEdit();
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The complaint could not be saved."));
+      setError(errorMessage(value, "Couldn't save the complaint. Try again."));
     } finally {
       setSaving(false);
     }
@@ -127,7 +127,7 @@ export default function ComplaintManagementPage() {
       if (editing?.id === complaint.id) cancelEdit();
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The complaint could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the complaint. Try again."));
     } finally {
       setBusy(false);
     }

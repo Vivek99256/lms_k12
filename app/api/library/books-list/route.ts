@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { upstreamFailure } from '@/lib/security/request-guards';
 
 export const runtime = 'nodejs';
 
@@ -60,8 +61,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(payload, { status: upstream.status });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Proxy request failed';
-    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : undefined;
-    return NextResponse.json({ message, cause, target: url }, { status: 502 });
+    // The target URL and low-level cause name internal hosts: log them, don't return them.
+    return upstreamFailure('api/library/books-list', err);
   }
 }

@@ -147,7 +147,7 @@ function ConceptDiagnosticResultView() {
         .then(setResult)
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Your result could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'Your result couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -165,7 +165,7 @@ function ConceptDiagnosticResultView() {
       <div className="mx-auto w-full space-y-5 p-4 sm:p-6">
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
-            <p className="text-sm text-rose-800">{error ?? 'Your result could not be loaded.'}</p>
+            <p className="text-sm text-rose-800">{error ?? 'Your result couldn’t be loaded.'}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={load}>
                 Try again

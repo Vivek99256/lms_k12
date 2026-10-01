@@ -119,7 +119,7 @@ export default function CoScholasticMarksPage() {
           .filter((student) => student.studentId),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't load students. Try again.");
       setStudents([]);
       setApproved(false);
     } finally {
@@ -160,10 +160,10 @@ export default function CoScholasticMarksPage() {
         }
       }
       const payload = await resultPost('api/result/co-scholastic-marks-entry', data);
-      const message = assertOk(payload, 'Laravel did not confirm that marks were saved.');
+      const message = assertOk(payload, "Couldn't save marks. Try again.");
       toast.success('Co-scholastic marks saved', message || undefined);
     } catch (err) {
-      toast.error('Could not save marks', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't save marks. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }
@@ -186,7 +186,7 @@ export default function CoScholasticMarksPage() {
       setConfirmApprove(false);
       toast.success('Marks approved', message || 'Entries are now locked for this co-scholastic area.');
     } catch (err) {
-      toast.error('Could not approve marks', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't approve marks. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setApproving(false);
     }

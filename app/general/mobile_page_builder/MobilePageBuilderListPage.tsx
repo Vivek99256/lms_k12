@@ -62,7 +62,7 @@ export function MobilePageBuilderListPage() {
     try {
       setPages(await loadPages());
     } catch (value: unknown) {
-      setError(errorMessage(value, 'Mobile pages could not be loaded.'));
+      setError(errorMessage(value, "Couldn't load mobile pages. Try again."));
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ export function MobilePageBuilderListPage() {
       const page = await createPage({ name: 'Untitled Page' });
       router.push(`/general/mobile_page_builder/${page.id}/editor`);
     } catch (value: unknown) {
-      setError(errorMessage(value, 'Could not create the page.'));
+      setError(errorMessage(value, "Couldn't create the page. Try again."));
       setCreateBusy(false);
     }
   }, [router]);
@@ -114,7 +114,7 @@ export function MobilePageBuilderListPage() {
         await saveDraft(page.id, generateLayoutFromSourcePage(detail));
         router.push(`/general/mobile_page_builder/${page.id}/editor`);
       } catch (value: unknown) {
-        setError(errorMessage(value, `Could not create a page from "${fallbackName}".`));
+        setError(errorMessage(value, `Couldn't create a page from "${fallbackName}". Try again.`));
         setCreatingKey(null);
       }
     },
@@ -138,7 +138,7 @@ export function MobilePageBuilderListPage() {
         const page = await createPage({ name: item.name });
         router.push(`/general/mobile_page_builder/${page.id}/editor`);
       } catch (value: unknown) {
-        setError(errorMessage(value, `Could not create a page from "${item.name}".`));
+        setError(errorMessage(value, `Couldn't create a page from "${item.name}". Try again.`));
         setCreatingKey(null);
       }
     },
@@ -165,13 +165,13 @@ export function MobilePageBuilderListPage() {
 
   const deactivate = useCallback(
     async (page: MobilePageSummary) => {
-      if (!window.confirm(`Deactivate "${page.name}"? Any menu row pointing at it will fall back to native.`)) return;
+      if (!window.confirm(`Deactivate ${page.name}? Menu items that link to it will use the built-in page.`)) return;
       try {
         setNotice(await deactivatePage(page.id));
         setError('');
         await load();
       } catch (value: unknown) {
-        setError(errorMessage(value, 'Could not deactivate the page.'));
+        setError(errorMessage(value, "Couldn't deactivate the page. Try again."));
       }
     },
     [load]

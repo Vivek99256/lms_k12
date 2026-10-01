@@ -444,7 +444,7 @@ export default function AiGenerationDrawer({
           throw new Error(
             getFirstValidationError(payload?.errors) ||
               payload?.message ||
-              "Unable to load mapped job roles."
+              "Couldn't load mapped job roles. Try again."
           );
         }
 
@@ -453,7 +453,7 @@ export default function AiGenerationDrawer({
         if (controller.signal.aborted) return;
 
         setSelectedRoles([]);
-        setRolesError(error instanceof Error ? error.message : "Unable to load mapped job roles.");
+        setRolesError(error instanceof Error ? error.message : "Couldn't load mapped job roles. Try again.");
       } finally {
         if (!controller.signal.aborted) {
           setRolesLoading(false);
@@ -568,7 +568,7 @@ export default function AiGenerationDrawer({
         throw new Error(
           getFirstValidationError(payload?.errors) ||
             payload?.message ||
-            "Unable to generate SOP. Please try again."
+            "Couldn't generate the SOP. Try again."
         );
       }
 
@@ -580,7 +580,7 @@ export default function AiGenerationDrawer({
       setContent(stripMarkdown(generatedContent));
       setHasGenerated(true);
     } catch (error) {
-      setGenerationError(error instanceof Error ? error.message : "Unable to generate SOP. Please try again.");
+      setGenerationError(error instanceof Error ? error.message : "Couldn't generate the SOP. Try again.");
     } finally {
       setGenerationMode(null);
     }
@@ -607,7 +607,7 @@ export default function AiGenerationDrawer({
       });
       onClose();
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Unable to save SOP. Please try again.");
+      setSaveError(error instanceof Error ? error.message : "Couldn't save the SOP. Try again.");
     } finally {
       setSaveMode(null);
     }

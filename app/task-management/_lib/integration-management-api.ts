@@ -28,7 +28,7 @@ import type {
 async function apiGet<T>(path: string): Promise<T> {
   const session = buildSessionContext()
   if (!session.token || !session.subInstituteId) {
-    throw new Error('Your session could not be resolved. Please sign in again.')
+    throw new Error('Your session has expired. Please sign in again.')
   }
 
   const url = new URL(path, window.location.origin)
@@ -44,7 +44,7 @@ async function apiGet<T>(path: string): Promise<T> {
   const payload = (await response.json().catch(() => ({}))) as unknown
   if (!response.ok) {
     const message =
-      (payload as { message?: string } | null)?.message || `API Error: ${response.status} ${response.statusText}`
+      (payload as { message?: string } | null)?.message || "Couldn't complete that request. Try again."
     throw new Error(message)
   }
   return payload as T
@@ -53,7 +53,7 @@ async function apiGet<T>(path: string): Promise<T> {
 async function apiSend<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body: unknown): Promise<T> {
   const session = buildSessionContext()
   if (!session.token || !session.subInstituteId) {
-    throw new Error('Your session could not be resolved. Please sign in again.')
+    throw new Error('Your session has expired. Please sign in again.')
   }
 
   const url = new URL(path, window.location.origin)
@@ -71,7 +71,7 @@ async function apiSend<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELE
   const payload = (await response.json().catch(() => ({}))) as unknown
   if (!response.ok) {
     const message =
-      (payload as { message?: string } | null)?.message || `API Error: ${response.status} ${response.statusText}`
+      (payload as { message?: string } | null)?.message || "Couldn't complete that request. Try again."
     throw new Error(message)
   }
   return payload as T

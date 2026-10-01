@@ -67,7 +67,7 @@ export default function ContentModelPage() {
       setSubjectsByStandard(list.subjectsByStandard);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      setError((err as Error).message || 'Could not load the Content Model workspace.');
+      setError((err as Error).message || 'Couldn’t load the Content Model workspace.');
     } finally {
       setLoading(false);
     }

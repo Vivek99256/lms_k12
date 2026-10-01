@@ -29,7 +29,7 @@ export default function ReportPage({ kind }: { kind: RegisterKind }) {
   const load = useCallback(async () => {
     setLoading(true);
     try { setRows(await listEntries(kind)); }
-    catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : `Unable to load ${title.toLowerCase()}.` }); }
+    catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : `Couldn't load ${title.toLowerCase()}. Try again.` }); }
     finally { setLoading(false); }
   }, [kind, title]);
   useEffect(() => {

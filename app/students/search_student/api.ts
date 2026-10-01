@@ -115,7 +115,7 @@ async function requestStudents(
     '/api/proxy?path=get_adminStudentSearch',
     { method: 'POST', body: form, signal },
   );
-  assertApiSuccess(payload, 'Unable to load students.');
+  assertApiSuccess(payload, "Couldn't load students. Try again.");
   return toArray(payload.data).map(normalizeStudent);
 }
 
@@ -154,7 +154,7 @@ export async function updateStudent(student: Student): Promise<void> {
       body: body.toString(),
     },
   );
-  assertApiSuccess(payload, 'Unable to update student.');
+  assertApiSuccess(payload, "Couldn't update student. Try again.");
 }
 
 export async function fetchDivisions(

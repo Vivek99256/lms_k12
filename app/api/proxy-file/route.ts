@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
+import { isSafeRelayPath, rejectOversizedBody } from '@/lib/security/request-guards';
 
 export const runtime = 'nodejs';
 
@@ -8,6 +9,11 @@ export async function POST(request: NextRequest) {
   if (!targetPath) {
     return new Response('Missing path parameter', { status: 400 });
   }
+  if (!isSafeRelayPath(targetPath)) {
+    return new Response('Invalid path parameter', { status: 400 });
+  }
+  const oversized = rejectOversizedBody(request);
+  if (oversized) return oversized;
 
   const base = API_BASE_URL.replace(/\/$/, '');
   const upstreamParams = new URLSearchParams(request.nextUrl.searchParams);
@@ -42,7 +48,8 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Proxy file request failed';
-    return new Response(message, { status: 502 });
+    // Low-level fetch errors can name internal hosts: log them, return a plain message.
+    console.error('[api/proxy-file] upstream request failed', error);
+    return new Response('Proxy file request failed', { status: 502 });
   }
 }

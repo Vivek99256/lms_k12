@@ -74,7 +74,7 @@ function ConceptModelContent() {
         setModel(await fetchConceptModel(semanticId, slug, signal));
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
-        setError((err as Error).message || 'Could not load this concept.');
+        setError((err as Error).message || 'Couldn’t load this concept.');
       } finally {
         setLoading(false);
       }
@@ -347,7 +347,7 @@ function Type2Panel({ model }: { model: ConceptModel }) {
       {model.type2.unmapped.length > 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <span className="font-semibold">
-            {model.type2.unmapped.length} extracted question(s) could not be placed on the ladder.
+            {model.type2.unmapped.length} extracted question(s) couldn’t be placed on the ladder.
           </span>{' '}
           {model.type2.unmapped[0].reason} They are excluded rather than guessed onto a rung.
         </div>

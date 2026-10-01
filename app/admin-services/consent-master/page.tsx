@@ -60,7 +60,7 @@ export default function ConsentMasterPage() {
     try {
       setClassOptions(await loadClassOptions());
     } catch (value: unknown) {
-      setError(errorMessage(value, "The class list could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the class list. Try again."));
     } finally {
       setLoading(false);
     }
@@ -89,7 +89,7 @@ export default function ConsentMasterPage() {
     } catch (value: unknown) {
       setStudents([]);
       setSearched(true);
-      setError(errorMessage(value, "Students could not be loaded."));
+      setError(errorMessage(value, "Couldn't load students. Try again."));
     } finally {
       setSearching(false);
     }
@@ -121,7 +121,7 @@ export default function ConsentMasterPage() {
       setSelectedIds([]);
       setTitle("");
     } catch (value: unknown) {
-      setError(errorMessage(value, "The consent could not be saved."));
+      setError(errorMessage(value, "Couldn't save the consent. Try again."));
     } finally {
       setSaving(false);
     }

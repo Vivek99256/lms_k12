@@ -87,7 +87,7 @@ export function InterviewToolsDrawer({ open, mode, interviewId, candidates, jobs
         setFeedbackRows(feedback.status === 'fulfilled' ? feedback.value : [])
         const realFailure = [panelRows, interviewerRows].find((result) => result.status === 'rejected')
         setError(realFailure && realFailure.status === 'rejected'
-          ? (realFailure.reason instanceof Error ? realFailure.reason.message : 'Unable to load interview panels.')
+          ? (realFailure.reason instanceof Error ? realFailure.reason.message : "Couldn't load interview panels. Try again.")
           : null)
       }).finally(() => setLoadingPanels(false))
     })
@@ -147,7 +147,7 @@ export function InterviewToolsDrawer({ open, mode, interviewId, candidates, jobs
       }
       setValues({})
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The operation could not be completed.')
+      setError(cause instanceof Error ? cause.message : "Couldn't complete the operation. Try again.")
     } finally {
       setSaving(false)
     }

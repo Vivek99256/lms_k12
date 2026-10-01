@@ -187,7 +187,7 @@ export function LessonIntelligencePanel({
       setCapacity(capacityPayload?.data ?? null);
       setPlans(planPayload?.plans ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load lesson intelligence.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load lesson intelligence.');
     } finally {
       setLoading(false);
     }

@@ -34,12 +34,12 @@ import {
 
 const PAGE_SIZE = 10;
 const columns: TableExportColumn[] = [
-  { key: "serial", label: "Sr. No." },
+  { key: "serial", label: "No." },
   { key: "date", label: "Date" },
   { key: "standard", label: "Standard" },
   { key: "division", label: "Division" },
-  { key: "absentTeacher", label: "Absent Teacher" },
-  { key: "proxyTeacher", label: "Proxy Teacher" },
+  { key: "absentTeacher", label: "Absent teacher" },
+  { key: "proxyTeacher", label: "Proxy teacher" },
   { key: "period", label: "Period" },
   { key: "subject", label: "Subject" },
 ];
@@ -221,12 +221,12 @@ export default function TodaysProxyReportPage() {
             <Table className="min-w-[1050px]">
               <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead>Sr. No.</TableHead>
+                  <TableHead>No.</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Standard</TableHead>
                   <TableHead>Division</TableHead>
-                  <TableHead>Absent Teacher</TableHead>
-                  <TableHead>Proxy Teacher</TableHead>
+                  <TableHead>Absent teacher</TableHead>
+                  <TableHead>Proxy teacher</TableHead>
                   <TableHead>Period</TableHead>
                   <TableHead>Subject</TableHead>
                 </TableRow>

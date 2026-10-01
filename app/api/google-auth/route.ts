@@ -1,4 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { resolveBackendBaseUrl } from '@/lib/security/trusted-backend';
+import { rateLimit } from '@/lib/security/rate-limit';
 
 /**
  * Server-side proxy that exchanges a Google ID token for an LMS session.
@@ -31,11 +33,17 @@ function readHeader(request: NextRequest, name: string) {
 }
 
 function summarizeHtml(text: string) {
+  // Upstream HTML (for example a Laravel debug page) never reaches clients in production.
+  if (process.env.NODE_ENV === 'production') return '';
   return text.replace(/\s+/g, ' ').trim().slice(0, 500);
 }
 
 export async function POST(request: NextRequest) {
-  const baseUrl = readHeader(request, 'x-laravel-base-url') || getDefaultBaseUrl();
+  // Unauthenticated by nature, so bounded per client address.
+  const limited = rateLimit(request, 'google-auth', { limit: 20, windowMs: 60_000 });
+  if (limited) return limited;
+
+  const baseUrl = resolveBackendBaseUrl(readHeader(request, 'x-laravel-base-url'), getDefaultBaseUrl());
   if (!baseUrl) {
     return NextResponse.json(
       { status: '0', message: 'Laravel base URL is missing for the Google auth proxy.' },

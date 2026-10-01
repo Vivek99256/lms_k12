@@ -41,7 +41,7 @@ export function ResultsList({ items }: ResultsListProps) {
     try {
       setDetailSections(await loadOccupationDetails(item.onetsoc_code));
     } catch (err) {
-      setDetailError(err instanceof Error ? err.message : 'Unable to load occupation details.');
+      setDetailError(err instanceof Error ? err.message : 'Couldn’t load occupation details.');
     } finally {
       setDetailLoading(false);
     }

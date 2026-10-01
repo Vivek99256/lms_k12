@@ -76,7 +76,7 @@ export function RecommendationCard({
       setShowReason(null);
       setReason('');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The decision could not be recorded.');
+      setError(caught instanceof Error ? caught.message : 'The decision couldn’t be recorded.');
     } finally {
       setBusy(null);
     }

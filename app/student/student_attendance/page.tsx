@@ -276,7 +276,7 @@ async function fetchAcademicSections(session: FeesSession): Promise<Array<Record
   });
   const payload = asRecord(await response.json());
   if (!response.ok || Number(payload.status) !== 1) {
-    throw new Error(readString(payload.message) || 'Unable to load academic sections.');
+    throw new Error(readString(payload.message) || "Couldn't load academic sections. Try again.");
   }
   return toArray(payload.data).map((item) => asRecord(item));
 }
@@ -328,7 +328,7 @@ async function fetchDivisionsByStandard(session: FeesSession, standardId: string
   });
   const payload = asRecord(await response.json());
   if (!response.ok || Number(payload.status) !== 1) {
-    throw new Error(readString(payload.message) || 'Unable to load divisions.');
+    throw new Error(readString(payload.message) || "Couldn't load divisions. Try again.");
   }
 
   return toArray(payload.data)
@@ -468,10 +468,9 @@ export default function StudentAttendancePage() {
           cache: 'no-store',
         });
         const payload = normalizePayload(await response.json());
-        console.log('Student Attendance API response:', payload);
 
         if (!response.ok) {
-          throw new Error(payload.message || `HTTP ${response.status}: Unable to load student attendance options.`);
+          throw new Error(payload.message || `Couldn't load student attendance options. Try again.`);
         }
 
         let options = parseStandardDivisionOptionsFromPayload(payload);
@@ -522,7 +521,7 @@ export default function StudentAttendancePage() {
         setDivisions([]);
         setMessage({
           type: 'error',
-          text: error instanceof Error ? error.message : 'Unable to load student attendance options.',
+          text: error instanceof Error ? error.message : "Couldn't load student attendance options. Try again.",
         });
       } finally {
         if (!cancelled) {
@@ -581,7 +580,7 @@ export default function StudentAttendancePage() {
         setSelectedDivisionId('');
         setMessage({
           type: 'error',
-          text: error instanceof Error ? error.message : 'Unable to load divisions for the selected standard.',
+          text: error instanceof Error ? error.message : "Couldn't load divisions for the selected standard. Try again.",
         });
       } finally {
         if (!cancelled) {
@@ -638,7 +637,7 @@ export default function StudentAttendancePage() {
       const payload = normalizePayload(await response.json());
 
       if (!response.ok) {
-        throw new Error(payload.message || `HTTP ${response.status}: Unable to search student attendance.`);
+        throw new Error(payload.message || `Couldn't search student attendance. Try again.`);
       }
 
       if (readApiStatus(payload) !== 1) {
@@ -667,7 +666,7 @@ export default function StudentAttendancePage() {
       if (toArray(payload.batchs).length > 0) {
         setMessage({
           type: 'info',
-          text: 'Student attendance loaded. Batch filtering exists in Laravel, but the current backend does not expose an API-safe batch-options endpoint for the Next frontend.',
+          text: 'Student attendance loaded. Batch filtering is not available right now.',
         });
       }
     } catch (error) {
@@ -675,7 +674,7 @@ export default function StudentAttendancePage() {
       setAttendanceState({});
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to search student attendance.',
+        text: error instanceof Error ? error.message : "Couldn't search student attendance. Try again.",
       });
     } finally {
       setSearching(false);
@@ -719,11 +718,11 @@ export default function StudentAttendancePage() {
       const payload = normalizePayload(await response.json());
 
       if (!response.ok) {
-        throw new Error(payload.message || `HTTP ${response.status}: Unable to save student attendance.`);
+        throw new Error(payload.message || `Couldn't save student attendance. Try again.`);
       }
 
       if (readApiStatus(payload) !== 1) {
-        throw new Error(payload.message || 'Student attendance could not be saved.');
+        throw new Error(payload.message || "Couldn't save student attendance. Try again.");
       }
 
       setMessage({
@@ -733,7 +732,7 @@ export default function StudentAttendancePage() {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to save student attendance.',
+        text: error instanceof Error ? error.message : "Couldn't save student attendance. Try again.",
       });
     } finally {
       setSaving(false);
@@ -762,7 +761,7 @@ export default function StudentAttendancePage() {
     <PageFrame>
       <PageHeader
         title="Student Attendance"
-        description="Take and update student attendance using the existing Laravel attendance workflow and the current Next.js design system."
+        description="Take and update student attendance."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" onClick={() => handleMarkAll('P')} disabled={!searchResult || saving}>
@@ -785,7 +784,7 @@ export default function StudentAttendancePage() {
 
       <SectionPanel
         title="Filters"
-        description="Load standards first, then divisions for the selected standard, then search attendance by date. Batch selection in Laravel is still a backend API gap for the token-based frontend flow."
+        description="Choose a standard and division, then search attendance by date."
       >
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="Select standard">
@@ -849,7 +848,7 @@ export default function StudentAttendancePage() {
         
       </SectionPanel>
 
-      <SectionPanel title="Register" description="Laravel defaults unmarked students to Present. Existing attendance records are preselected when the register is loaded.">
+      <SectionPanel title="Register" description="Unmarked students are recorded as present. Existing attendance records are preselected when the register loads.">
         {searchResult && (
           <div className="mb-4 flex flex-wrap gap-4 text-sm text-slate-700">
             <span>Total students: <strong className="text-slate-950">{totalStudents}</strong></span>
@@ -863,9 +862,9 @@ export default function StudentAttendancePage() {
           <Table className="min-w-[980px]">
             <TableHeader>
               <TableRow className="bg-slate-100 hover:bg-slate-100">
-                <TableHead>Sr No</TableHead>
-                <TableHead>GR No</TableHead>
-                <TableHead>Roll No</TableHead>
+                <TableHead>No.</TableHead>
+                <TableHead>GR no.</TableHead>
+                <TableHead>Roll no.</TableHead>
                 <TableHead>Last Name</TableHead>
                 <TableHead>First Name</TableHead>
                 <TableHead>Middle Name</TableHead>

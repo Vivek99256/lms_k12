@@ -53,7 +53,7 @@ export default function CareerExplorerHub() {
       setClusters(clusterData);
       setSideMenu(sideMenuData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load career explorer.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load career explorer.');
     } finally {
       setLoading(false);
     }
@@ -160,7 +160,7 @@ export default function CareerExplorerHub() {
   }
 
   if (error) {
-    return <ErrorState title="Unable to load career explorer" description={error} retry={refresh} />;
+    return <ErrorState title="Couldn’t load career explorer" description={error} retry={refresh} />;
   }
 
   const filterPanel = <EduSideMenu sideMenu={sideMenu} selectedFilters={selectedFilters} onChange={handleFiltersChange} />;

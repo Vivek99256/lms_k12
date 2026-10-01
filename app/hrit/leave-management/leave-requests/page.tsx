@@ -43,7 +43,7 @@ const PAGE_SIZE = 10
 const savedFilters = [
   { label: 'My Pending Approvals', filters: { status: 'pending' } },
   { label: 'Approved This Year', filters: { status: 'approved' } },
-  { label: 'Rejected Requests', filters: { status: 'rejected' } },
+  { label: 'Rejected requests', filters: { status: 'rejected' } },
 ]
 
 const statusLabelMap: Record<LeaveRequestStatus, string> = {
@@ -495,7 +495,7 @@ export default function LeaveRequestsPage() {
           ))}
         </div>
       ) : error && rows.length === 0 ? (
-        <ErrorState title="Unable to load leave requests" description={error} retry={retry} />
+        <ErrorState title="Couldn't load leave requests. Try again." description={error} retry={retry} />
       ) : (
         <div className="rounded-xl border border-border bg-card">
           <DataTable

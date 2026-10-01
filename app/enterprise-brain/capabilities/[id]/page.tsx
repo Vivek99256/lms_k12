@@ -54,7 +54,7 @@ export default function CapabilityDetailPage() {
       setTargetId('');
       resource.refresh();
     } catch (err) {
-      setAssignError(err instanceof Error ? err.message : 'Could not assign the capability.');
+      setAssignError(err instanceof Error ? err.message : 'Couldn’t assign the capability.');
     } finally {
       setBusy(false);
     }
@@ -67,7 +67,7 @@ export default function CapabilityDetailPage() {
       await brainFetch(tenantPath(`/capabilities/${id}/assign/${assignmentId}`), { method: 'DELETE' });
       resource.refresh();
     } catch (err) {
-      setAssignError(err instanceof Error ? err.message : 'Could not remove the assignment.');
+      setAssignError(err instanceof Error ? err.message : 'Couldn’t remove the assignment.');
     } finally {
       setBusy(false);
     }
@@ -80,7 +80,7 @@ export default function CapabilityDetailPage() {
       setEditing(false);
       resource.refresh();
     } catch (err) {
-      setAssignError(err instanceof Error ? err.message : 'Could not save the capability.');
+      setAssignError(err instanceof Error ? err.message : 'Couldn’t save the capability.');
     } finally {
       setBusy(false);
     }

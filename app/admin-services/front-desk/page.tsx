@@ -70,7 +70,7 @@ export default function FrontDeskPage() {
       setBoard(nextBoard);
       setStudents(studentList);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The front desk screen could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the front desk screen. Try again."));
     } finally {
       setLoading(false);
     }
@@ -138,7 +138,7 @@ export default function FrontDeskPage() {
       cancelEdit();
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The front desk entry could not be saved."));
+      setError(errorMessage(value, "Couldn't save the front desk entry. Try again."));
     } finally {
       setSaving(false);
     }
@@ -155,7 +155,7 @@ export default function FrontDeskPage() {
       if (editing?.id === entry.id) cancelEdit();
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The entry could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the entry. Try again."));
     } finally {
       setBusy(false);
     }

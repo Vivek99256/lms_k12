@@ -32,8 +32,8 @@ export default function AttendancePolicyPage() {
 
       <Alert>
         <AlertDescription>
-          This page shows static policy text. The live &quot;days until lock&quot; figure is not yet available from the
-          backend — the dashboard alert of the same name is currently a placeholder too.
+          This page shows static policy text. The live &quot;days until lock&quot; figure is not yet available —
+          the dashboard alert of the same name is currently a placeholder too.
         </AlertDescription>
       </Alert>
 

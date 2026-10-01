@@ -26,6 +26,7 @@ import {
   readMessage,
   readStatus,
 } from '@/app/library/_lib/library-module-utils';
+import { escapeHtml } from '@/lib/security/sanitize-html';
 
 type ReturnRecord = {
   id: string;
@@ -75,26 +76,26 @@ function printRows(rows: ReturnRecord[]) {
         </style>
       </head>
       <body>
-        <h2>Quick Return</h2>
+        <h2>Quick return</h2>
         <table>
           <thead>
             <tr>
-              <th>Sr No</th>
-              <th>Student Name</th>
+              <th>No.</th>
+              <th>Student name</th>
               <th>Std / Div</th>
-              <th>Enrollment No</th>
+              <th>GR no.</th>
               <th>Mobile</th>
-              <th>Item Code</th>
-              <th>Book Name</th>
-              <th>Issued Date</th>
-              <th>Due Date</th>
-              <th>Return Date</th>
-              <th>Publisher Name</th>
-              <th>Author Name</th>
+              <th>Item code</th>
+              <th>Book name</th>
+              <th>Issued date</th>
+              <th>Due date</th>
+              <th>Return date</th>
+              <th>Publisher name</th>
+              <th>Author name</th>
             </tr>
           </thead>
           <tbody>
-            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.studentName || '-'}</td><td>${row.standardDivision || '-'}</td><td>${row.enrollmentNo || '-'}</td><td>${row.mobile || '-'}</td><td>${row.itemCode || '-'}</td><td>${row.bookName || '-'}</td><td>${formatDate(row.issuedDate)}</td><td>${formatDate(row.dueDate)}</td><td>${formatDateTime(row.returnDate)}</td><td>${row.publisherName || '-'}</td><td>${row.authorName || '-'}</td></tr>`).join('')}
+            ${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.studentName || '-')}</td><td>${escapeHtml(row.standardDivision || '-')}</td><td>${escapeHtml(row.enrollmentNo || '-')}</td><td>${escapeHtml(row.mobile || '-')}</td><td>${escapeHtml(row.itemCode || '-')}</td><td>${escapeHtml(row.bookName || '-')}</td><td>${escapeHtml(formatDate(row.issuedDate))}</td><td>${escapeHtml(formatDate(row.dueDate))}</td><td>${escapeHtml(formatDateTime(row.returnDate))}</td><td>${escapeHtml(row.publisherName || '-')}</td><td>${escapeHtml(row.authorName || '-')}</td></tr>`).join('')}
           </tbody>
         </table>
       </body>
@@ -156,10 +157,10 @@ export default function QuickReturnPage() {
 
   const exportRows = useMemo(() => {
     return filteredRecords.map((record, index) => ({
-      'Sr No': String(index + 1),
-      'Student Name': record.studentName || '-',
+      'No.': String(index + 1),
+      'Student name': record.studentName || '-',
       'Std / Div': record.standardDivision || '-',
-      'Enrollment No': record.enrollmentNo || '-',
+      'GR no.': record.enrollmentNo || '-',
       Mobile: record.mobile || '-',
       'Item Code': record.itemCode || '-',
       'Book Name': record.bookName || '-',
@@ -199,13 +200,13 @@ export default function QuickReturnPage() {
 
       setMessage({
         type: status === 1 ? 'success' : 'error',
-        text: readMessage(normalized, 'Unable to complete quick return.'),
+        text: readMessage(normalized, "Couldn't complete quick return. Try again."),
       });
       setRecords(parseRecords(normalized));
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to complete quick return.',
+        text: error instanceof Error ? error.message : "Couldn't complete quick return. Try again.",
       });
     } finally {
       setLoading(false);
@@ -215,8 +216,8 @@ export default function QuickReturnPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Quick Return"
-        description="Return a library item by item code and review the circulation row returned by the legacy Laravel workflow."
+        title="Quick return"
+        description="Return a library item by item code and review the circulation row."
         action={(
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={() => {
@@ -247,13 +248,13 @@ export default function QuickReturnPage() {
 
       {message ? <InlineMessage type={message.type} text={message.text} /> : null}
 
-      <SectionPanel title="Return Item" description="Laravel accepts one item code and returns the student circulation row if that issue record is still open.">
+      <SectionPanel title="Return item" description="Enter one item code to return it. The student circulation row appears if the issue is still open.">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-          <Field label="Item Code">
+          <Field label="Item code">
             <Input
               value={itemCode}
               onChange={(event) => setItemCode(event.target.value)}
-              placeholder="Enter Item Id"
+              placeholder="Enter item ID"
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
@@ -271,10 +272,10 @@ export default function QuickReturnPage() {
         </div>
       </SectionPanel>
 
-      <SectionPanel title="Return Results" description="The legacy page only renders the table after a successful return.">
+      <SectionPanel title="Return results" description="Results appear after an item is returned.">
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="Global Search">
+            <Field label="Global search">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -291,18 +292,18 @@ export default function QuickReturnPage() {
             <Table className="min-w-[1600px]">
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100">
-                  <TableHead>Sr No</TableHead>
-                  <TableHead>Student Name</TableHead>
+                  <TableHead>No.</TableHead>
+                  <TableHead>Student name</TableHead>
                   <TableHead>Std / Div</TableHead>
-                  <TableHead>Enrollment No</TableHead>
+                  <TableHead>GR no.</TableHead>
                   <TableHead>Mobile</TableHead>
-                  <TableHead>Item Code</TableHead>
-                  <TableHead>Book Name</TableHead>
-                  <TableHead>Issued Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Return Date</TableHead>
-                  <TableHead>Publisher Name</TableHead>
-                  <TableHead>Author Name</TableHead>
+                  <TableHead>Item code</TableHead>
+                  <TableHead>Book name</TableHead>
+                  <TableHead>Issued date</TableHead>
+                  <TableHead>Due date</TableHead>
+                  <TableHead>Return date</TableHead>
+                  <TableHead>Publisher name</TableHead>
+                  <TableHead>Author name</TableHead>
                 </TableRow>
                 <TableRow className="bg-white hover:bg-white">
                   <TableHead />

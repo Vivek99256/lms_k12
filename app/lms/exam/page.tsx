@@ -571,10 +571,10 @@ function getStudentExamErrorMessage(error: unknown): string {
       ? error.message
       : typeof error === 'string'
         ? error
-        : 'Unable to load question papers.';
+        : 'Couldn’t load question papers.';
 
   if (!message) {
-    return 'Unable to load question papers.';
+    return 'Couldn’t load question papers.';
   }
 
   if (
@@ -582,7 +582,7 @@ function getStudentExamErrorMessage(error: unknown): string {
     message.includes('Unknown column') ||
     message.includes('on clause')
   ) {
-    return 'We could not load exams right now because the exam service returned an invalid response. Please try again shortly or contact your school administrator.';
+    return 'We couldn’t load exams right now because the exam service returned an invalid response. Please try again shortly or contact your school administrator.';
   }
 
   if (
@@ -590,7 +590,7 @@ function getStudentExamErrorMessage(error: unknown): string {
     message.includes('NetworkError') ||
     message.includes('ERR_CONNECTION')
   ) {
-    return 'We could not connect to the exam service. Please check your connection and try again.';
+    return 'We couldn’t connect to the exam service. Please check your connection and try again.';
   }
 
   return message;
@@ -779,13 +779,13 @@ function QuestionPaperView({ paper, onBack }: QuestionPaperViewProps) {
       const result = await response.json().catch(() => null);
 
       if (!response.ok || Number(result?.status_code) !== 1) {
-        throw new Error(result?.message || 'Unable to submit the exam. Please try again.');
+        throw new Error(result?.message || 'Couldn’t submit the exam. Please try again.');
       }
 
       setSubmitSuccess(true);
     } catch (error) {
       setSubmitError(
-        error instanceof Error ? error.message : 'Unable to submit the exam. Please try again.'
+        error instanceof Error ? error.message : 'Couldn’t submit the exam. Please try again.'
       );
     } finally {
       setIsSubmitting(false);
@@ -1189,7 +1189,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       if (Number(result?.status_code) !== 1 || !result?.data) {
         throw new Error(
           getStudentExamErrorMessage(
-            result?.message || 'Unable to load question paper.'
+            result?.message || 'Couldn’t load question paper.'
           )
         );
       }
@@ -1256,7 +1256,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       if (Number(result?.status_code) !== 1 || !result?.data) {
         throw new Error(
           getStudentExamErrorMessage(
-            result?.message || 'Unable to load the question paper.'
+            result?.message || 'Couldn’t load the question paper.'
           )
         );
       }
@@ -1714,7 +1714,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       const payload = (await response.json().catch(() => null)) as AdaptivePracticeApiResponse | null;
 
       if (!response.ok || Number(payload?.status_code) !== 1) {
-        throw new Error(payload?.message || 'Unable to load practice questions.');
+        throw new Error(payload?.message || 'Couldn’t load practice questions.');
       }
 
       const assessment = mapAdaptivePracticeToAssessment(conceptId, payload ?? {});
@@ -1726,7 +1726,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       setPracticeTimeLeft(assessment.durationMinutes * 60);
     } catch (error) {
       setPracticeLoadError(
-        error instanceof Error ? error.message : 'Unable to load practice questions.'
+        error instanceof Error ? error.message : 'Couldn’t load practice questions.'
       );
     } finally {
       setIsPracticeLoading(false);
@@ -1897,7 +1897,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       const result = (await response.json()) as CreateQuestionPaperApiResponse;
 
       if (!response.ok || result.status_code !== 1) {
-        throw new Error(result.message || 'Unable to publish the exam.');
+        throw new Error(result.message || 'Couldn’t publish the exam.');
       }
 
       const successMessage = result.message || 'Question-Paper Added Successfully';
@@ -1909,7 +1909,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
     } catch (error) {
       console.error('Publish exam error:', error);
 
-      const message = error instanceof Error ? error.message : 'Unable to publish the exam.';
+      const message = error instanceof Error ? error.message : 'Couldn’t publish the exam.';
       setPublishError(message);
     } finally {
       setIsPublishing(false);
@@ -1951,7 +1951,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       const payload = (await response.json().catch(() => null)) as SubmitPracticeApiResponse | null;
 
       if (!response.ok || Number(payload?.status_code) !== 1) {
-        throw new Error(payload?.message || 'Unable to submit practice answers.');
+        throw new Error(payload?.message || 'Couldn’t submit practice answers.');
       }
 
       const scorePercent = Math.round(Number(payload?.data?.summary?.percentage ?? 0));
@@ -2003,7 +2003,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
       closePracticeAssessmentModal();
     } catch (error) {
       setPracticeLoadError(
-        error instanceof Error ? error.message : 'Unable to submit practice answers.'
+        error instanceof Error ? error.message : 'Couldn’t submit practice answers.'
       );
     } finally {
       setIsPracticeLoading(false);
@@ -2038,7 +2038,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         const payload = (await response.json().catch(() => null)) as MasteryMapApiResponse | null;
 
         if (!response.ok || payload?.success === false) {
-          throw new Error(payload?.message || 'Unable to load concept mastery.');
+          throw new Error(payload?.message || 'Couldn’t load concept mastery.');
         }
 
         const chapters = mapMasteryMapToChapterProgress(payload ?? {});
@@ -2048,7 +2048,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         if (controller.signal.aborted) return;
         setStudentChapterProgressList([]);
         setStudentMasteryError(
-          error instanceof Error ? error.message : 'Unable to load concept mastery.'
+          error instanceof Error ? error.message : 'Couldn’t load concept mastery.'
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -2108,14 +2108,14 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         const payload = (await response.json()) as LmsCoursesApiResponse;
 
         if (!response.ok || payload.status_code !== 1) {
-          throw new Error(payload.message || 'Failed to load course data');
+          throw new Error(payload.message || 'We couldn’t load the subjects.');
         }
 
         setLmsCourses(getLmsSubjectRows(payload));
       } catch (error) {
         if (controller.signal.aborted) return;
         setLmsCourses([]);
-        setLmsCoursesError(error instanceof Error ? error.message : 'Failed to load course data');
+        setLmsCoursesError(error instanceof Error ? error.message : 'We couldn’t load the subjects.');
       } finally {
         if (!controller.signal.aborted) {
           setIsLoadingLmsCourses(false);
@@ -2171,7 +2171,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         const result = (await response.json()) as ChapterConceptsApiResponse;
 
         if (!response.ok) {
-          throw new Error(result.message || 'Failed to load chapter concepts');
+          throw new Error(result.message || 'Couldn’t load chapter concepts');
         }
 
         const uniqueOptions = new Map<string, ChapterConceptOption>();
@@ -2211,7 +2211,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         if (controller.signal.aborted) return;
         console.error('Concept API error:', error);
         setConceptOptions([]);
-        setConceptError('Concepts could not be loaded. Please try again.');
+        setConceptError('Concepts couldn’t be loaded. Please try again.');
       } finally {
         if (!controller.signal.aborted) {
           setIsConceptLoading(false);
@@ -2273,7 +2273,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         const result = (await response.json()) as QuestionsApiResponse;
 
         if (!response.ok) {
-          throw new Error(result.message || 'Failed to load questions');
+          throw new Error(result.message || 'Couldn’t load questions');
         }
 
         const nextQuestions = result.data ?? [];
@@ -2288,7 +2288,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
         console.error('Question API error:', error);
         setQuestions([]);
         setSelectedQuestions([]);
-        setQuestionsError('Unable to load questions.');
+        setQuestionsError('Couldn’t load questions.');
       } finally {
         if (!controller.signal.aborted) {
           setIsQuestionsLoading(false);
@@ -2514,7 +2514,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                       </div>
                     ) : studentMasteryError ? (
                       <div className="rounded-[18px] border border-red-200 bg-red-50 px-5 py-4">
-                        <p className="text-sm font-semibold text-red-700">Unable to load concept mastery</p>
+                        <p className="text-sm font-semibold text-red-700">Couldn’t load concept mastery</p>
                         <p className="mt-1 text-sm text-red-600">{studentMasteryError}</p>
                       </div>
                     ) : studentChapterProgressList.length === 0 ? (
@@ -2853,7 +2853,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                           {studentExamSearchError ? (
                             <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
                               <p className="text-sm font-semibold text-red-700">
-                                Unable to load exams
+                                Couldn’t load exams
                               </p>
                               <p className="mt-1 text-sm text-red-600">
                                 {studentExamSearchError}
@@ -2873,7 +2873,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                         {paperError ? (
                           <div className="rounded-[18px] border border-red-200 bg-red-50 px-5 py-4">
                             <p className="text-sm font-semibold text-red-700">
-                              Unable to open question paper
+                              Couldn’t open question paper
                             </p>
                             <p className="mt-1 text-sm text-red-600">
                               {paperError}
@@ -2884,7 +2884,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                         {isStudentProfile && studentExamSearchError ? (
                           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
                             <p className="text-sm font-semibold text-red-700">
-                              Unable to load exams
+                              Couldn’t load exams
                             </p>
                             <p className="mt-1 text-sm text-red-600">
                               {studentExamSearchError}
@@ -3031,7 +3031,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                     {offlineExamError ? (
                       <div className="no-print rounded-xl border border-red-200 bg-red-50 px-4 py-3">
                         <p className="text-sm font-semibold text-red-700">
-                          Unable to load offline exams
+                          Couldn’t load offline exams
                         </p>
                         <p className="mt-1 text-sm text-red-600">
                           {offlineExamError}
@@ -3042,7 +3042,7 @@ export function ExamOperationsScreen({ scopedExamType }: ExamOperationsScreenPro
                     {paperError ? (
                       <div className="no-print rounded-[18px] border border-red-200 bg-red-50 px-5 py-4">
                         <p className="text-sm font-semibold text-red-700">
-                          Unable to open question paper
+                          Couldn’t open question paper
                         </p>
                         <p className="mt-1 text-sm text-red-600">
                           {paperError}

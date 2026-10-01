@@ -362,7 +362,7 @@ export default function SearchStudentPage() {
             />
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-medium text-slate-600">GR No.</span>
+            <span className="text-xs font-medium text-slate-600">GR no.</span>
             <input
               type="text"
               value={studentSearch.grNo ?? ''}
@@ -431,7 +431,7 @@ export default function SearchStudentPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Student name</label>
                 <input
                   type="text"
                   placeholder="Enter student name"

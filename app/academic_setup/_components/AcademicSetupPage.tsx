@@ -98,7 +98,7 @@ export function AcademicSetupPage({ config }: { config: AcademicSetupConfig }) {
         setForm(mapped);
       }
     } catch (loadError: unknown) {
-      setError(loadError instanceof Error ? loadError.message : "Records could not be loaded.");
+      setError(loadError instanceof Error ? loadError.message : "Couldn't load records. Try again.");
     } finally {
       setLoading(false);
     }
@@ -192,7 +192,7 @@ export function AcademicSetupPage({ config }: { config: AcademicSetupConfig }) {
       resetForm();
       await load();
     } catch (saveError: unknown) {
-      setError(saveError instanceof Error ? saveError.message : "Record could not be saved.");
+      setError(saveError instanceof Error ? saveError.message : "Couldn't save record. Try again.");
     } finally {
       setBusy(false);
     }
@@ -208,7 +208,7 @@ export function AcademicSetupPage({ config }: { config: AcademicSetupConfig }) {
       );
       await load();
     } catch (deleteError: unknown) {
-      setError(deleteError instanceof Error ? deleteError.message : "Record could not be deleted.");
+      setError(deleteError instanceof Error ? deleteError.message : "Couldn't delete record. Try again.");
     } finally {
       setBusy(false);
     }

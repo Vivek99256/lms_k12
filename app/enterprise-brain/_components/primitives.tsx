@@ -283,7 +283,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
       <div className="flex items-start gap-3">
         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-red-500" />
         <div className="min-w-0">
-          <p className="text-sm font-bold text-red-700">Enterprise Brain could not load this screen</p>
+          <p className="text-sm font-bold text-red-700">We couldn’t load this page</p>
           <p className="mt-1 break-words text-sm text-red-600">{message}</p>
           {onRetry && (
             <button

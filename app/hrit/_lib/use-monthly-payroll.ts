@@ -99,7 +99,7 @@ export function useMonthlyPayroll() {
 
       const session = buildSessionContext()
       if (!isPayrollSessionReady(session)) {
-        setError('Your session could not be resolved. Please sign in again.')
+        setError('Your session has expired. Please sign in again.')
         setLoading(false)
         setSearched(true)
         return
@@ -137,7 +137,7 @@ export function useMonthlyPayroll() {
         }
         setSearched(true)
       } catch (loadError) {
-        setError(toMessage(loadError, 'Failed to load the monthly payroll.'))
+        setError(toMessage(loadError, "Couldn't load the monthly payroll. Try again."))
         setRows([])
         setSearched(true)
       } finally {
@@ -195,7 +195,7 @@ export function useMonthlyPayroll() {
           ),
         )
       } catch (recalcError) {
-        setError(toMessage(recalcError, 'Failed to recalculate this payslip.'))
+        setError(toMessage(recalcError, "Couldn't recalculate this payslip. Try again."))
         setRows((previous) =>
           previous.map((row) =>
             String(row.employeeId) === String(employeeId) ? { ...row, recalculating: false } : row,
@@ -291,7 +291,7 @@ export function useMonthlyPayroll() {
             year: lastQuery.year,
             rows: pending,
           }),
-        'Failed to save the monthly payroll.',
+        "Couldn't save the monthly payroll. Try again.",
       )
     },
     remove: (row: MonthlyPayrollRow) => {
@@ -306,7 +306,7 @@ export function useMonthlyPayroll() {
             year: lastQuery.year,
             entries: [{ dataId: row.savedId as number | string, employeeId: row.employeeId }],
           }),
-        'Failed to delete this payroll record.',
+        "Couldn't delete this payroll record. Try again.",
       )
     },
   }

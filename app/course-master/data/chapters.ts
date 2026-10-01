@@ -817,16 +817,16 @@ export async function uploadChapterContent(
 
   const PERSIST_ENABLED = true;
   if (!PERSIST_ENABLED) {
-    return { status: true, message: 'Saved locally (backend endpoint not wired yet).' };
+    return { status: true, message: 'Saved on this device only.' };
   }
 
   const res = await fetch(`${API_BASE_URL}${CHAPTER_CONTENT_STORE_ENDPOINT}`, {
     method: 'POST',
     body: form,
   });
-  const raw = await readApiJson(res, 'Failed to save content');
+  const raw = await readApiJson(res, 'Couldn’t save content');
   if (!res.ok || Number(raw.status_code) !== 1) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to save content'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t save content'));
   }
   return {
     status: true,
@@ -915,7 +915,7 @@ export async function generateIntelligenceQuestions(
     body: JSON.stringify(request),
   });
 
-  const raw = await readApiJson(res, 'Failed to generate questions');
+  const raw = await readApiJson(res, 'Couldn’t generate questions');
   if (res.status === 401) {
     throw new Error('Your session has expired. Please sign in again.');
   }
@@ -930,7 +930,7 @@ export async function generateIntelligenceQuestions(
     );
   }
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to generate questions'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t generate questions'));
   }
 
   return {
@@ -1235,9 +1235,9 @@ export async function createQuestionBankQuestion(
     body: JSON.stringify(payload),
   });
 
-  const raw = await readApiJson(res, 'Failed to add the question');
+  const raw = await readApiJson(res, 'Couldn’t add the question');
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to add the question'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t add the question'));
   }
 
   const data = raw.data as { id?: number } | undefined;
@@ -1276,9 +1276,9 @@ export async function updateQuestionBankQuestion(
     body: JSON.stringify(payload),
   });
 
-  const raw = await readApiJson(res, 'Failed to save the question');
+  const raw = await readApiJson(res, 'Couldn’t save the question');
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to save the question'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t save the question'));
   }
 }
 
@@ -1306,9 +1306,9 @@ export async function reviewQuestionBankQuestion(
     body: JSON.stringify(payload),
   });
 
-  const raw = await readApiJson(res, 'Failed to update the question');
+  const raw = await readApiJson(res, 'Couldn’t update the question');
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to update the question'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t update the question'));
   }
 }
 
@@ -1331,9 +1331,9 @@ export async function deleteQuestionBankQuestion(
     body: JSON.stringify(payload),
   });
 
-  const raw = await readApiJson(res, 'Failed to delete the question');
+  const raw = await readApiJson(res, 'Couldn’t delete the question');
   if (!res.ok || raw.status === false) {
-    throw new Error(getApiErrorMessage(raw, 'Failed to delete the question'));
+    throw new Error(getApiErrorMessage(raw, 'Couldn’t delete the question'));
   }
 }
 

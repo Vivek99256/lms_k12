@@ -78,11 +78,11 @@ export default function OtherFeesReportPage() {
   const totalAmount = useMemo(() => rows.reduce((sum, row) => sum + row.amount, 0), [rows]);
   const exportColumns = useMemo<TableExportColumn[]>(() => [
     { key: 'studentName', label: 'Student name', width: '220px' },
-    { key: 'enrollmentNo', label: 'GR No' },
+    { key: 'enrollmentNo', label: 'GR no.' },
     { key: 'rollNo', label: 'Roll no' },
     { key: 'standardDivision', label: 'Standard / Division' },
     { key: 'feesHead', label: 'Other title', width: '220px' },
-    { key: 'receiptId', label: 'Receipt no' },
+    { key: 'receiptId', label: 'Receipt no.' },
     { key: 'paymentMode', label: 'Pay mode' },
     { key: 'amount', label: 'Amount', align: 'right' },
     { key: 'receivedDate', label: 'Received date' },
@@ -105,7 +105,7 @@ export default function OtherFeesReportPage() {
       const { payload } = await fetchOtherFeesReportIndex<OtherFeesPayload>();
       setTitles(mapTitleOptions(payload.feesOtherHead_data));
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load other fees heads.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load other fees heads. Try again." });
     } finally {
       setLoadingFilters(false);
     }
@@ -136,7 +136,7 @@ export default function OtherFeesReportPage() {
       });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to fetch other fees report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load other fees report. Try again." });
     } finally {
       setLoading(false);
     }
@@ -150,7 +150,7 @@ export default function OtherFeesReportPage() {
       const html = await fetchReportProxyText(session, '/api/fees/reports/other-fees/ledger', params);
       setPreviewHtml(html);
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load ledger preview.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load ledger preview. Try again." });
     }
   };
 
@@ -168,14 +168,14 @@ export default function OtherFeesReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Other Fees Report"
-        description="Review collected other-fee deductions and open the legacy ledger preview for each student."
+        title="Other fees report"
+        description="Review collected other-fee deductions and open the ledger preview for each student."
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'other-fees-report.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'other-fees-report.xls', title: 'Other Fees Report', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'other-fees-report.pdf', title: 'Other Fees Report', subtitle: 'Legacy parity export', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Other Fees Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'other-fees-report.xls', title: 'Other fees report', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'other-fees-report.pdf', title: 'Other fees report', subtitle: 'Export', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Other fees report', subtitle: 'Print view', columns: exportColumns, rows: exportRows })}
           />
         }
       />
@@ -227,7 +227,7 @@ export default function OtherFeesReportPage() {
                 <TableHead>Roll no</TableHead>
                 <TableHead>Standard / Division</TableHead>
                 <TableHead>Other title</TableHead>
-                <TableHead>Receipt no</TableHead>
+                <TableHead>Receipt no.</TableHead>
                 <TableHead>Pay mode</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Received date</TableHead>
@@ -267,7 +267,7 @@ export default function OtherFeesReportPage() {
       </SectionPanel>
 
       {previewHtml && (
-        <ReceiptPreviewModal title="Student Ledger Report" html={previewHtml} onClose={() => setPreviewHtml('')} />
+        <ReceiptPreviewModal title="Student ledger report" html={previewHtml} onClose={() => setPreviewHtml('')} />
       )}
     </PageFrame>
   );

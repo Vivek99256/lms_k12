@@ -82,7 +82,7 @@ export function useOnboardingOverview(departmentId: string | undefined, refreshK
       setKpis(response.data.kpis)
       setTotals(response.data.totals)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load onboarding metrics.'))
+      setError(toMessage(loadError, "Couldn't load onboarding metrics. Try again."))
       setKpis([])
       setTotals(null)
     } finally {
@@ -115,7 +115,7 @@ export function useOnboardingFilters(refreshKey: number) {
       const response = await onboardingService.getFilters(buildSessionContext())
       setOptions(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load filter options.'))
+      setError(toMessage(loadError, "Couldn't load filter options. Try again."))
       setOptions(null)
     } finally {
       setLoading(false)
@@ -163,7 +163,7 @@ export function useOnboardingJourneys(filters: JourneyFilters, enabled: boolean,
       setJourneys(response.data)
       setPagination(response.pagination ?? EMPTY_PAGINATION)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load onboarding journeys.'))
+      setError(toMessage(loadError, "Couldn't load onboarding journeys. Try again."))
       setJourneys([])
       setPagination(EMPTY_PAGINATION)
     } finally {
@@ -227,7 +227,7 @@ export function useJourneyDetail(journeyId: number | null, refreshKey: number) {
       setDocuments(documentList.data)
       setDocumentSummary('summary' in documentList ? documentList.summary : null)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load this onboarding journey.'))
+      setError(toMessage(loadError, "Couldn't load this onboarding journey. Try again."))
       setJourney(null)
       setStages([])
       setContacts([])
@@ -272,7 +272,7 @@ export function useOnboardingTasks(filters: TaskFilters, refreshKey: number) {
       setPagination(response.pagination ?? EMPTY_PAGINATION)
       setSummary(response.summary ?? null)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load preboarding tasks.'))
+      setError(toMessage(loadError, "Couldn't load preboarding tasks. Try again."))
       setTasks([])
       setPagination(EMPTY_PAGINATION)
       setSummary(null)
@@ -306,7 +306,7 @@ export function useOnboardingWorkstreams(journeyId: string | undefined, refreshK
       const response = await onboardingService.getWorkstreams(buildSessionContext(), journeyId)
       setWorkstreams(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load onboarding workstreams.'))
+      setError(toMessage(loadError, "Couldn't load onboarding workstreams. Try again."))
       setWorkstreams([])
     } finally {
       setLoading(false)
@@ -345,7 +345,7 @@ export function useOnboardingProbation(filters: ProbationFilters, enabled: boole
       setPagination(response.pagination ?? EMPTY_PAGINATION)
       setSummary(response.summary ?? null)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load probation records.'))
+      setError(toMessage(loadError, "Couldn't load probation records. Try again."))
       setRows([])
       setPagination(EMPTY_PAGINATION)
       setSummary(null)
@@ -384,7 +384,7 @@ export function useLifecycleTimeline(journeyId: number | null, enabled: boolean,
       const response = await onboardingService.getTimeline(buildSessionContext(), journeyId)
       setTimeline(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the lifecycle timeline.'))
+      setError(toMessage(loadError, "Couldn't load the lifecycle timeline. Try again."))
       setTimeline(null)
     } finally {
       setLoading(false)

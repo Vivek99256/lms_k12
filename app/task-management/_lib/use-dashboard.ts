@@ -64,7 +64,7 @@ export function useDashboard() {
       setPagination(response.data.pagination)
       setStatusOptions(response.data.filters.status_options)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load the task workspace.'))
+      setError(toMessage(reason, "Couldn't load the task workspace. Try again."))
     } finally {
       setLoading(false)
     }
@@ -109,7 +109,7 @@ export function useDashboard() {
         setMessage(response.message)
         refresh()
       } catch (reason) {
-        setError(toMessage(reason, 'Unable to update approval.'))
+        setError(toMessage(reason, "Couldn't update approval. Try again."))
       }
     },
     [refresh],
@@ -127,7 +127,7 @@ export function useDashboard() {
         setMessage(response.message)
         refresh()
       } catch (reason) {
-        setError(toMessage(reason, 'Unable to archive task.'))
+        setError(toMessage(reason, "Couldn't archive task. Try again."))
       }
     },
     [refresh],

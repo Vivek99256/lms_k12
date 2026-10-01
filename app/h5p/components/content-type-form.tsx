@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -136,7 +138,7 @@ function CreateInner<TRow extends H5pContentRow, TState, TPayload>(spec: Content
           // A refused publish is not a failed save. The draft is already
           // stored, so the author lands on the list with it there and the
           // server's specific reason shown.
-          const reason = err instanceof Error ? err.message : 'Could not publish';
+          const reason = friendlyError(err, 'We couldn’t publish. Please try again.');
           router.push(`/h5p/${spec.path}?${h5pContextQuery(ctx, { flash: `Saved as a draft. ${reason}` })}`);
           return;
         }
@@ -148,7 +150,7 @@ function CreateInner<TRow extends H5pContentRow, TState, TPayload>(spec: Content
         })}`
       );
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : `Failed to create ${spec.noun}`);
+      setError(friendlyError(err, `We couldn’t create ${spec.noun}. Please try again.`));
       setSaving(false);
     }
   };
@@ -250,7 +252,7 @@ function EditInner<TRow extends H5pContentRow, TState, TPayload>(spec: ContentTy
         setState(spec.stateFromRow(data));
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : `Failed to load ${spec.noun}`);
+        if (!cancelled) setError(friendlyError(err, `We couldn’t load ${spec.noun}. Please try again.`));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -281,7 +283,7 @@ function EditInner<TRow extends H5pContentRow, TState, TPayload>(spec: ContentTy
       setRow(fresh);
       setState(spec.stateFromRow(fresh));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : `Failed to save ${spec.noun}`);
+      setError(friendlyError(err, `We couldn’t save ${spec.noun}. Please try again.`));
     } finally {
       setSaving(false);
     }
@@ -298,7 +300,7 @@ function EditInner<TRow extends H5pContentRow, TState, TPayload>(spec: ContentTy
       setSuccess(result.message);
       setRow({ ...row, status: next ? 'published' : 'draft' });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to change publish state');
+      setError(friendlyError(err, 'We couldn’t publish or unpublish this activity. Please try again.'));
     } finally {
       setPublishing(false);
     }
@@ -335,7 +337,7 @@ function EditInner<TRow extends H5pContentRow, TState, TPayload>(spec: ContentTy
         ) : loading ? (
           <LoadingState label={`Loading ${spec.noun}…`} />
         ) : !state ? (
-          <InlineBanner kind="error" message={error || `This ${spec.noun} could not be loaded.`} />
+          <InlineBanner kind="error" message={error || `This ${spec.noun} couldn’t be loaded.`} />
         ) : (
           <>
             <InlineBanner kind="success" message={success} onDismiss={() => setSuccess('')} />

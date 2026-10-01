@@ -51,7 +51,7 @@ export default function PersonalizeMarksPage() {
       } catch (reason) {
         if (controller.signal.aborted) return;
         setOptionsError(
-          reason instanceof Error ? reason.message : 'Unable to load standard/division list.'
+          reason instanceof Error ? reason.message : 'Couldn’t load standard/division list.'
         );
       } finally {
         if (!controller.signal.aborted) setLoadingOptions(false);
@@ -124,7 +124,7 @@ export default function PersonalizeMarksPage() {
     } catch (reason) {
       setMessage({
         type: 'error',
-        text: reason instanceof Error ? reason.message : 'Unable to save marks.',
+        text: reason instanceof Error ? reason.message : 'Couldn’t save marks.',
       });
     } finally {
       setSubmitting(false);

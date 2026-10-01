@@ -69,7 +69,7 @@ export default function GalleryAlbums() {
       const result = await loadModuleRows(galleryModule.endpoint, {}, galleryModule.method ?? 'GET');
       setRows(result.rows);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Unable to load the gallery.');
+      setError(loadError instanceof Error ? loadError.message : "Couldn't load the gallery. Try again.");
       setRows([]);
     } finally {
       setLoading(false);
@@ -130,7 +130,7 @@ export default function GalleryAlbums() {
       setShowForm(false);
       await load();
     } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : 'Unable to save the record.';
+      const message = saveError instanceof Error ? saveError.message : "Couldn't save the record. Try again.";
       setError(message);
       toast.error('Save failed', message);
     } finally {

@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -182,7 +184,7 @@ function CoursePresentationPlayerContent({ preloaded }: { preloaded?: PreloadedC
         }
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load presentation');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load presentation. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

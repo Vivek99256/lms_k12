@@ -1,5 +1,8 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { ArrowRight, Check, X } from 'lucide-react';
@@ -101,7 +104,7 @@ function newAttempt(item: H5pTrueFalse): Attempt {
 
 /** Statements are stored as HTML, because H5P stores them so. */
 function Html({ html, className }: { html: string; className?: string }) {
-  return <span className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <span className={className} dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />;
 }
 
 /**
@@ -207,7 +210,7 @@ function TrueFalsePlayerContent({ preloaded }: { preloaded?: PreloadedTrueFalse 
         if (!cancelled) setFetched(data);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load this activity');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load this activity. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

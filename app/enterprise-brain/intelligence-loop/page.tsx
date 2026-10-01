@@ -70,7 +70,7 @@ export default function IntelligenceLoopPage() {
     try {
       setSelected(await fetchSignalDetail(signal.id));
     } catch (cause) {
-      setRunNote(cause instanceof Error ? cause.message : 'Could not open that signal.');
+      setRunNote(cause instanceof Error ? cause.message : 'Couldn’t open that signal.');
     } finally {
       setDetailLoading(false);
     }

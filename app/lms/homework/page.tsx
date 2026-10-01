@@ -218,7 +218,7 @@ export default function StudentHomeworkPage() {
           setChaptersError(
             loadError instanceof Error
               ? loadError.message
-              : "Chapters could not be loaded."
+              : "Chapters couldn’t be loaded."
           );
         }
       })
@@ -247,7 +247,7 @@ export default function StudentHomeworkPage() {
           setQuestionTypesError(
             loadError instanceof Error
               ? loadError.message
-              : "Question types could not be loaded."
+              : "Question types couldn’t be loaded."
           );
         }
       })
@@ -284,7 +284,7 @@ export default function StudentHomeworkPage() {
           setQuestionsError(
             loadError instanceof Error
               ? loadError.message
-              : "Questions could not be loaded."
+              : "Questions couldn’t be loaded."
           );
         }
       })
@@ -319,7 +319,7 @@ export default function StudentHomeworkPage() {
             setExamPapersError(
               loadError instanceof Error
                 ? loadError.message
-                : "Exam papers could not be loaded."
+                : "Exam papers couldn’t be loaded."
             );
           }
         })
@@ -355,7 +355,7 @@ export default function StudentHomeworkPage() {
             setExamPaperQuestionsError(
               loadError instanceof Error
                 ? loadError.message
-                : "The exam paper's questions could not be loaded."
+                : "The exam paper's questions couldn’t be loaded."
             );
           }
         })
@@ -478,7 +478,7 @@ export default function StudentHomeworkPage() {
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Students could not be loaded."
+            : "Students couldn’t be loaded."
         );
       } finally {
         if (searchRequestRef.current === requestId) setLoading(false);
@@ -646,7 +646,7 @@ export default function StudentHomeworkPage() {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "Homework could not be assigned."
+          : "Homework couldn’t be assigned."
       );
     } finally {
       setSaving(false);

@@ -47,8 +47,8 @@ export const implementationConfig: GeneralConfig = {
     { key: "total_boys", label: "Total Boys", kind: "number", required: true },
     { key: "total_girls", label: "Total Girls", kind: "number", required: true },
     { key: "total_strenght", label: "Total Strength", kind: "number", required: true },
-    { key: "total_male", label: "Male Staff", kind: "number" },
-    { key: "total_female", label: "Female Staff", kind: "number" },
+    { key: "total_male", label: "Male employees", kind: "number" },
+    { key: "total_female", label: "Female employees", kind: "number" },
     { key: "standard_totals", label: "Standard-wise Totals (JSON)", kind: "textarea", rows: 8, required: true },
   ],
   columns: [

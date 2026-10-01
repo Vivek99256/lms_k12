@@ -172,12 +172,12 @@ async function fetchRegistrationDetail(id: string, signal?: AbortSignal): Promis
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to load registration details (${response.status})`);
+    throw new Error(`Couldn't load registration details. Try again.`);
   }
 
   const payload = (await response.json()) as LegacyRegistrationDetailResponse;
   if (normalizeApiStatus(payload) !== '1' || !payload.editData) {
-    throw new Error(payload.message || 'Failed to load registration details.');
+    throw new Error(payload.message || "Couldn't load registration details. Try again.");
   }
 
   return {
@@ -230,12 +230,12 @@ async function saveRegistration(id: string, formState: RegistrationFormState, cu
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update registration (${response.status})`);
+    throw new Error(`Couldn't update registration. Try again.`);
   }
 
   const responsePayload = (await response.json()) as { status_code?: string | number; message?: string };
   if (normalizeApiStatus(responsePayload) !== '1') {
-    throw new Error(responsePayload.message || 'Failed to update registration.');
+    throw new Error(responsePayload.message || "Couldn't update registration. Try again.");
   }
 }
 
@@ -342,7 +342,7 @@ export default function EditRegistrationPage() {
         setFormState(buildInitialFormState(nextDetail.record, nextDetail.customFields));
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load registration details.');
+        setError(loadError instanceof Error ? loadError.message : "Couldn't load registration details. Try again.");
       } finally {
         if (!controller.signal.aborted) setIsLoading(false);
       }
@@ -487,7 +487,7 @@ export default function EditRegistrationPage() {
       await saveRegistration(recordId, formState, detail.customFields);
       router.push(formState.status === 'OPEN' ? '/admissions/confirmation' : '/admissions/admission_registration');
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Failed to update registration.');
+      setError(submitError instanceof Error ? submitError.message : "Couldn't update registration. Try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -561,7 +561,7 @@ export default function EditRegistrationPage() {
                 </h1>
               </div>
               <p className="ml-3 mt-1 text-sm text-slate-500">
-                Legacy admission registration fields and verification flow for{' '}
+                Admission registration details and verification for{' '}
                 <span className="font-medium text-slate-700">{studentName || readString(formState.enquiry_no) || 'selected record'}</span>
               </p>
             </div>
@@ -590,7 +590,7 @@ export default function EditRegistrationPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 xl:grid-cols-3 md:p-6">
-                <FormField icon={ClipboardList} label="Enquiry Number" htmlFor="enquiry_no">
+                <FormField icon={ClipboardList} label="Enquiry no." htmlFor="enquiry_no">
                   <Input id="enquiry_no" value={formState.enquiry_no || ''} onChange={(event) => handleChange('enquiry_no', event.target.value)} className="h-10 rounded-lg border-gray-200 bg-gray-50/50 focus:bg-white" />
                 </FormField>
                 <FormField icon={User} label="First Name" htmlFor="first_name">

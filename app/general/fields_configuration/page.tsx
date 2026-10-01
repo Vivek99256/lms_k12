@@ -245,10 +245,10 @@ export default function FieldsConfigurationPage() {
       try {
         payload = text ? JSON.parse(text) : null;
       } catch {
-        throw new Error(`Expected JSON but received HTML (${response.status}). Check the API endpoint and CORS/proxy configuration.`);
+        throw new Error("Couldn't complete that request. Try again.");
       }
       if (!response.ok) {
-        const message = isRecord(payload) ? readString(payload.message) || `Request failed (${response.status}).` : `Request failed (${response.status}).`;
+        const message = isRecord(payload) ? readString(payload.message) || "Couldn't complete that request. Try again." : "Couldn't complete that request. Try again.";
         throw new Error(message);
       }
       const status = isRecord(payload) ? normalizeApiStatus(payload as ApiEnvelope) : "0";
@@ -258,7 +258,7 @@ export default function FieldsConfigurationPage() {
       const mapped = normalizeList(payload).map(mapRecord);
       setFields(mapped);
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : "Failed to load fields.");
+      setError(fetchError instanceof Error ? fetchError.message : "Couldn't load fields. Try again.");
     } finally {
       setLoading(false);
     }
@@ -433,21 +433,21 @@ export default function FieldsConfigurationPage() {
       try {
         payload = text ? JSON.parse(text) : null;
       } catch {
-        throw new Error(`Expected JSON but received HTML (${response.status}). Check the API endpoint and CORS/proxy configuration.`);
+        throw new Error("Couldn't complete that request. Try again.");
       }
       const status = isRecord(payload) ? normalizeApiStatus(payload as ApiEnvelope) : "0";
       if (status === "2") {
         throw new Error(isRecord(payload) ? readString(payload.message) || "Authentication failed." : "Authentication failed.");
       }
       if (!response.ok || status !== "1") {
-        throw new Error(isRecord(payload) ? readString(payload.message) || `Request failed (${response.status}).` : `Request failed (${response.status}).`);
+        throw new Error(isRecord(payload) ? readString(payload.message) || "Couldn't complete that request. Try again." : "Couldn't complete that request. Try again.");
       }
 
       setSuccess(readString(payload) || (isEdit ? "Record updated." : "Record created."));
       resetForm();
       await loadRecords();
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : "Failed to save field.");
+      setError(fetchError instanceof Error ? fetchError.message : "Couldn't save field. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -468,19 +468,19 @@ export default function FieldsConfigurationPage() {
       try {
         payload = text ? JSON.parse(text) : null;
       } catch {
-        throw new Error(`Expected JSON but received HTML (${response.status}). Check the API endpoint and CORS/proxy configuration.`);
+        throw new Error("Couldn't complete that request. Try again.");
       }
       const status = isRecord(payload) ? normalizeApiStatus(payload as ApiEnvelope) : "0";
       if (status === "2") {
         throw new Error(isRecord(payload) ? readString(payload.message) || "Authentication failed." : "Authentication failed.");
       }
       if (!response.ok || status !== "1") {
-        throw new Error(isRecord(payload) ? readString(payload.message) || `Delete failed (${response.status}).` : `Delete failed (${response.status}).`);
+        throw new Error(isRecord(payload) ? readString(payload.message) || "Couldn't delete this item. Try again." : "Couldn't delete this item. Try again.");
       }
       setSuccess(isRecord(payload) ? readString(payload.message) || "Field deleted." : "Field deleted.");
       await loadRecords();
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : "Failed to delete field.");
+      setError(fetchError instanceof Error ? fetchError.message : "Couldn't delete field. Try again.");
     }
   }
 
@@ -498,19 +498,19 @@ export default function FieldsConfigurationPage() {
       try {
         payload = text ? JSON.parse(text) : null;
       } catch {
-        throw new Error(`Expected JSON but received HTML (${response.status}). Check the API endpoint and CORS/proxy configuration.`);
+        throw new Error("Couldn't complete that request. Try again.");
       }
       const status = isRecord(payload) ? normalizeApiStatus(payload as ApiEnvelope) : "0";
       if (status === "2") {
         throw new Error(isRecord(payload) ? readString(payload.message) || "Authentication failed." : "Authentication failed.");
       }
       if (!response.ok || status !== "1") {
-        throw new Error(isRecord(payload) ? readString(payload.message) || `Sort update failed (${response.status}).` : `Sort update failed (${response.status}).`);
+        throw new Error(isRecord(payload) ? readString(payload.message) || "Couldn't update the order. Try again." : "Couldn't update the order. Try again.");
       }
       setSuccess(isRecord(payload) ? readString(payload.message) || "Sort order updated." : "Sort order updated.");
       await loadRecords();
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : "Failed to update sort order.");
+      setError(fetchError instanceof Error ? fetchError.message : "Couldn't update sort order. Try again.");
     }
   }
 
@@ -631,7 +631,7 @@ export default function FieldsConfigurationPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="student">Student</SelectItem>
-                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="staff">Employee</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

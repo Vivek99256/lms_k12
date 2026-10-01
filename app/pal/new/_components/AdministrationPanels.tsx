@@ -299,7 +299,7 @@ export function LivePanel({ panel, live }: { panel: Panel; live: LivePayload }) 
       <PanelShell title={panel.title}>
         <div className="flex items-start gap-2.5 rounded-xl border border-dashed border-amber-200 bg-amber-50/60 px-4 py-3.5 text-sm leading-6 text-amber-900">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>{live.reason || 'This subsystem cannot be computed on this estate yet.'}</p>
+          <p>{live.reason || 'This can’t be calculated for your school yet.'}</p>
         </div>
       </PanelShell>
     );
@@ -777,7 +777,7 @@ export function GraphSchemaPanel({
         <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            The graph could not be reached, so presence could not be checked. The labels below are the
+            The graph couldn’t be reached, so presence couldn’t be checked. The labels below are the
             schema the blueprint defines, not what exists.
           </span>
         </div>

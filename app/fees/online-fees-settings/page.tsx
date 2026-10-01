@@ -80,7 +80,7 @@ export default function OnlineFeesSettingsPage() {
       setRows(toGatewayRows(payload));
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load payment gateway settings.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load payment gateway settings. Try again." });
     } finally {
       setIsLoading(false);
     }
@@ -126,13 +126,13 @@ export default function OnlineFeesSettingsPage() {
         { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }
       );
       const status = String(payload.status ?? payload.status_code ?? '1');
-      if (status !== '1') throw new Error(payload.message || 'Unable to save payment gateway settings.');
+      if (status !== '1') throw new Error(payload.message || "Couldn't save payment gateway settings. Try again.");
 
       setIsFormOpen(false);
       setMessage({ type: 'success', text: payload.message || 'Payment gateway saved.' });
       await loadRows();
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to save payment gateway settings.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't save payment gateway settings. Try again." });
     } finally {
       setIsSaving(false);
     }
@@ -150,11 +150,11 @@ export default function OnlineFeesSettingsPage() {
         { method: 'DELETE' }
       );
       const status = String(payload.status ?? payload.status_code ?? '1');
-      if (status !== '1') throw new Error(payload.message || 'Unable to delete payment gateway settings.');
+      if (status !== '1') throw new Error(payload.message || "Couldn't delete payment gateway settings. Try again.");
       setMessage({ type: 'success', text: payload.message || 'Payment gateway deleted.' });
       await loadRows();
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to delete payment gateway settings.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't delete payment gateway settings. Try again." });
     } finally {
       setDeletingId('');
     }
@@ -169,7 +169,7 @@ export default function OnlineFeesSettingsPage() {
       />
       {message && <InlineMessage type={message.type} text={message.text} />}
       {isFormOpen && (
-        <SectionPanel title="Payment mapping" description="Fields and defaults follow the existing Laravel payment-mapping forms.">
+        <SectionPanel title="Payment mapping" description="Set the fields and defaults for each payment gateway.">
           <form className="space-y-4" onSubmit={saveGateway}>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <Field label="Payment gateway"><NativeSelect value={gateway} onChange={(value) => setGateway(value as GatewayName)}>{Object.entries(gatewayDefinitions).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}</NativeSelect></Field>

@@ -51,7 +51,7 @@ function singleValue(value: DropdownValue): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return error instanceof Error ? error.message : "Couldn't complete that action. Try again.";
 }
 
 /** Percent for a score against an exam total (0 when the exam has no marks). */

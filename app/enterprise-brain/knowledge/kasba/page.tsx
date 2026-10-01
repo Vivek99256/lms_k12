@@ -42,7 +42,7 @@ export default function KasbaExplorerPage() {
     <div className="pb-8">
       <HeroHeader
         breadcrumb="Enterprise Brain / Knowledge"
-        title="KASBA Explorer"
+        title="Skills explorer"
         description="Knowledge, ability, skill, behaviour and attitude, rolled up across this organization's capabilities."
         actions={
           <button

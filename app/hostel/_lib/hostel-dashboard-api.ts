@@ -87,17 +87,17 @@ export async function fetchHostelDashboardSummary(
     payload = JSON.parse(text) as HostelDashboardPayload;
   } catch {
     throw new Error(
-      `Hostel dashboard proxy returned a non-JSON response (${response.headers.get('content-type') || 'unknown content type'}).`
+      "Couldn't load the dashboard. Try again."
     );
   }
 
   if (!response.ok) {
     throw new Error(
-      readString(asRecord(payload).message) || `HTTP ${response.status}: Unable to load the hostel dashboard summary.`
+      readString(asRecord(payload).message) || `Couldn't load the hostel dashboard summary. Try again.`
     );
   }
 
-  assertApiSuccess(payload, 'Unable to load the hostel dashboard summary.');
+  assertApiSuccess(payload, "Couldn't load the hostel dashboard summary. Try again.");
 
   return payload;
 }

@@ -44,7 +44,7 @@ export default function TeacherFeeDuesPage() {
           </span>
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Fee dues (my class)</h1>
-            <p className="mt-1 text-slate-500">Students with pending fees across the classes you teach, so you can follow up directly.</p>
+            <p className="mt-1 text-slate-500">Students with outstanding fees across the classes you teach, so you can follow up directly.</p>
           </div>
         </div>
 
@@ -66,7 +66,7 @@ export default function TeacherFeeDuesPage() {
 
             <div className="rounded-lg border border-slate-200 bg-white p-6">
               <div className="mb-4">
-                <h3 className="text-base font-semibold text-slate-900">Students with pending fees</h3>
+                <h3 className="text-base font-semibold text-slate-900">Students with outstanding fees</h3>
                 <p className="mt-0.5 text-sm text-slate-500">Read-only — fee collection is handled by the accounts office.</p>
               </div>
 

@@ -2083,7 +2083,7 @@ export default function ChapterListPage() {
         })
         .catch((error: unknown) => {
           if (!cancelled) {
-            setQuestionBankError(error instanceof Error ? error.message : 'Failed to load questions.');
+            setQuestionBankError(error instanceof Error ? error.message : 'Couldn’t load questions.');
             setApiQuestionBankItems([]);
           }
         })
@@ -2142,7 +2142,7 @@ export default function ChapterListPage() {
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setContentError(error instanceof Error ? error.message : 'Failed to load chapter content.');
+          setContentError(error instanceof Error ? error.message : 'Couldn’t load chapter content.');
         }
       })
       .finally(() => {
@@ -2355,7 +2355,7 @@ export default function ChapterListPage() {
       })
       .catch((error: unknown) => {
         setIntelligenceError(
-          error instanceof Error ? error.message : 'Failed to load concept intelligence.'
+          error instanceof Error ? error.message : 'Couldn’t load concept intelligence.'
         );
       })
       .finally(() => {
@@ -2533,7 +2533,7 @@ export default function ChapterListPage() {
       setSuccessMessage(result.message || 'Content saved.');
       closeUploadContentModal();
     } catch (error: unknown) {
-      setUploadError(error instanceof Error ? error.message : 'Failed to save content.');
+      setUploadError(error instanceof Error ? error.message : 'Couldn’t save content.');
     }
   };
 
@@ -2610,6 +2610,15 @@ export default function ChapterListPage() {
     // Categories differ from chapter to chapter, so a selection carried over
     // from the last one can leave the bank looking empty rather than filtered.
     setQuestionBankCategoryFilter('all');
+    router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
+  };
+
+  const openChapterCoherenceMapView = (chapter: Chapter) => {
+    const nextParams = new URLSearchParams(searchParams?.toString());
+    nextParams.set('view', 'coherence-map');
+    nextParams.set('chapterId', chapter.id);
+    nextParams.set('expandedChapterId', chapter.id);
+
     router.push(`/course-master/${courseId}/chapters?${nextParams.toString()}`);
   };
 
@@ -2835,7 +2844,7 @@ export default function ChapterListPage() {
       const hub = await fetchHub(ctx);
       setH5pHubModules(hub.modules);
     } catch (error) {
-      console.error('Failed to load H5P content types', error);
+      console.error('Couldn’t load H5P content types', error);
       setH5pHubLoaded(false);
     }
   };
@@ -3018,7 +3027,7 @@ export default function ChapterListPage() {
       h5pResult = await createH5pContent();
     } catch (error) {
       setManualQuestionError(
-        error instanceof Error ? error.message : `Failed to create the ${typeLabel} content.`
+        error instanceof Error ? error.message : `Couldn’t create the ${typeLabel} content.`
       );
       setIsSavingQuestionBankItem(false);
       return;
@@ -3166,7 +3175,7 @@ export default function ChapterListPage() {
         });
       } catch (error) {
         setManualQuestionError(
-          error instanceof Error ? error.message : 'Failed to save the question.'
+          error instanceof Error ? error.message : 'Couldn’t save the question.'
         );
         setIsSavingQuestionBankItem(false);
         return;
@@ -3231,7 +3240,7 @@ export default function ChapterListPage() {
         })),
       });
     } catch (error) {
-      setManualQuestionError(error instanceof Error ? error.message : 'Failed to add the question.');
+      setManualQuestionError(error instanceof Error ? error.message : 'Couldn’t add the question.');
       setIsSavingQuestionBankItem(false);
       return;
     }
@@ -3327,7 +3336,7 @@ export default function ChapterListPage() {
       });
     } catch (error: unknown) {
       setQuestionGenerationError(
-        error instanceof Error ? error.message : 'Failed to generate questions.'
+        error instanceof Error ? error.message : 'Couldn’t generate questions.'
       );
     } finally {
       setIsGeneratingQuestions(false);
@@ -3767,7 +3776,7 @@ export default function ChapterListPage() {
       dropLocalCopies();
     } catch (error: unknown) {
       setQuestionBankDeleteError(
-        error instanceof Error ? error.message : 'Failed to delete the question.'
+        error instanceof Error ? error.message : 'Couldn’t delete the question.'
       );
     } finally {
       setDeletingQuestionBankItemId(null);
@@ -3815,7 +3824,7 @@ export default function ChapterListPage() {
         });
       } catch (error) {
         setQuestionBankDeleteError(
-          error instanceof Error ? error.message : 'Failed to update the question.'
+          error instanceof Error ? error.message : 'Couldn’t update the question.'
         );
       } finally {
         setReviewingQuestionBankItemId(null);
@@ -5329,7 +5338,7 @@ export default function ChapterListPage() {
             </div>
           ) : questionBankError ? (
             <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-5 py-12 text-center shadow-sm">
-              <h2 className="text-lg font-bold text-rose-900">Unable to load questions</h2>
+              <h2 className="text-lg font-bold text-rose-900">Couldn’t load questions</h2>
               <p className="mt-2 text-sm text-rose-700">{questionBankError}</p>
               <button
                 type="button"
@@ -5410,6 +5419,7 @@ export default function ChapterListPage() {
             standardId={standardId}
             title={`${course.subject} - ${getCourseGradeLabel(course.classGrade)}`}
             onClose={() => router.push(`/course-master/${courseId}/chapters`)}
+            initialChapterId={activeChapterId ? `chapter:${activeChapterId}` : undefined}
           />
         </div>
       </div>
@@ -6324,7 +6334,7 @@ export default function ChapterListPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => router.push(`/course-master/${courseId}/chapters?view=coherence-map`)}
+                      onClick={() => openChapterCoherenceMapView(chapter)}
                       className="h-10 shrink-0 rounded-xl border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
                     >
                       <Network size={16} className="mr-2" />
@@ -6687,7 +6697,7 @@ export default function ChapterListPage() {
 
                 <div className="flex flex-col gap-3 border-t border-slate-200/80 bg-slate-50/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-slate-500">
-                    Changes are local to this prototype view until backend save is connected.
+                    Changes are saved on this device only for now.
                   </p>
                   <div className="flex items-center gap-3">
                     <Button

@@ -96,7 +96,7 @@ export function usePayrollDeduction() {
     const load = async () => {
       const session = buildSessionContext()
       if (!isPayrollSessionReady(session)) {
-        setError('Your session could not be resolved. Please sign in again.')
+        setError('Your session has expired. Please sign in again.')
         setOptionsLoading(false)
         return
       }
@@ -109,7 +109,7 @@ export function usePayrollDeduction() {
         })
         if (!cancelled) applyOptions(response)
       } catch (loadError) {
-        if (!cancelled) setError(toMessage(loadError, 'Failed to load payroll deduction options.'))
+        if (!cancelled) setError(toMessage(loadError, "Couldn't load payroll deduction options. Try again."))
       } finally {
         if (!cancelled) setOptionsLoading(false)
       }
@@ -130,7 +130,7 @@ export function usePayrollDeduction() {
 
       const session = buildSessionContext()
       if (!isPayrollSessionReady(session)) {
-        setError('Your session could not be resolved. Please sign in again.')
+        setError('Your session has expired. Please sign in again.')
         setLoading(false)
         return
       }
@@ -156,7 +156,7 @@ export function usePayrollDeduction() {
         )
         setSearched(true)
       } catch (loadError) {
-        setError(toMessage(loadError, 'Failed to load employees for this payroll head.'))
+        setError(toMessage(loadError, "Couldn't load employees for this payroll head. Try again."))
         setRows([])
         setSearched(true)
       } finally {
@@ -223,7 +223,7 @@ export function usePayrollDeduction() {
         await search(lastQuery)
         return { ok: true as const, message: response.message }
       } catch (saveError) {
-        const message = toMessage(saveError, 'Failed to save the deduction amounts.')
+        const message = toMessage(saveError, "Couldn't save the deduction amounts. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {

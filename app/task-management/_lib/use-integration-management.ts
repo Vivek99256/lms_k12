@@ -40,7 +40,7 @@ export function useIntegrationManagement() {
       const response = await fetchIntegrationConfigs()
       setConfigs(response.data.configs)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load integration configs.'))
+      setError(toMessage(reason, "Couldn't load integration configs. Try again."))
     } finally {
       setLoading(false)
     }
@@ -69,7 +69,7 @@ export function useIntegrationManagement() {
         setMessage(response.message)
         await load()
       } catch (reason) {
-        setError(toMessage(reason, 'Unable to save the integration config.'))
+        setError(toMessage(reason, "Couldn't save the integration config. Try again."))
       } finally {
         setSaving(false)
       }
@@ -91,7 +91,7 @@ export function useIntegrationManagement() {
         setMessage(response.message)
         await load()
       } catch (reason) {
-        setError(toMessage(reason, 'Unable to remove the integration config.'))
+        setError(toMessage(reason, "Couldn't remove the integration config. Try again."))
       } finally {
         setSaving(false)
       }

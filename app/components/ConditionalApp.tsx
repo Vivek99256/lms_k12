@@ -5,6 +5,10 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginPage from '@/app/login/page';
 import DashboardShell from './DashboardShell';
+import { installErpAuthFetch } from '@/lib/erp-client';
+
+// Module scope, so it is in place before any page's first fetch (see lib/erp-client.ts).
+installErpAuthFetch();
 
 /**
  * Routes that own the whole viewport and so render outside the dashboard

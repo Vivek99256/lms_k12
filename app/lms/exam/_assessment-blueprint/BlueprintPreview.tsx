@@ -62,7 +62,7 @@ export default function BlueprintPreview({ blueprint, branding, onClose }: Props
         await generateBlueprintPdf({ blueprint, branding, action });
       } catch (exportError) {
         setError(
-          exportError instanceof Error ? exportError.message : 'The PDF could not be produced.'
+          exportError instanceof Error ? exportError.message : 'The PDF couldn’t be produced.'
         );
       } finally {
         setBusy('');

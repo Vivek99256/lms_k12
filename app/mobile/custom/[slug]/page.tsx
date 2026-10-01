@@ -36,7 +36,7 @@ function getPageActionChannel(): { postMessage: (message: string) => void } | un
 async function proxyRequest(path: string, init?: RequestInit): Promise<Record<string, unknown>> {
   const session = buildSessionContext();
   if (!session.token || !session.subInstituteId) {
-    throw new Error('Your session could not be found. Please reopen this page from the app.');
+    throw new Error('Your session has expired. Please reopen this page from the app.');
   }
 
   const params = new URLSearchParams();
@@ -54,7 +54,7 @@ async function proxyRequest(path: string, init?: RequestInit): Promise<Record<st
   const payload: unknown = await response.json();
   const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
   if (!response.ok || ['0', '2'].includes(normalizeApiStatus(record as ApiEnvelope))) {
-    throw new Error(readString(record.message) || `Request failed (${response.status}).`);
+    throw new Error(readString(record.message) || "Couldn't complete that request. Try again.");
   }
   return record;
 }
@@ -155,7 +155,7 @@ export default function CustomMobilePage() {
       } catch (actionError: unknown) {
         setBanner({
           tone: 'error',
-          text: action.errorMessage || (actionError instanceof Error ? actionError.message : 'Something went wrong.'),
+          text: action.errorMessage || (actionError instanceof Error ? actionError.message : "Couldn't complete that action. Try again."),
         });
       }
     },

@@ -7,6 +7,7 @@ import { IdCard, Printer } from 'lucide-react';
 import { isStudentSession } from '@/app/pal/data/pal-lookups';
 import { fetchMyIcard, getDashboardSession, type MyIcardSummary } from '@/app/dashboard/_lib/dashboard-api';
 import { DashboardError, DashboardSkeleton, SectionPanel } from '@/app/dashboard/_components/DashboardPrimitives';
+import { sanitizeHtml } from '@/lib/security/sanitize-html';
 
 /**
  * Self-service "My ID card" — lets any signed-in staff member (teacher or
@@ -60,7 +61,7 @@ export default function MyIcardPage() {
       .then((summary) => setData(summary))
       .catch((err: unknown) => {
         if (signal?.aborted) return;
-        setError(err instanceof Error ? err.message : 'Unable to load your I-card.');
+        setError(err instanceof Error ? err.message : "Couldn't load your I-card. Try again.");
       })
       .finally(() => {
         if (!signal?.aborted) setLoading(false);
@@ -89,7 +90,7 @@ export default function MyIcardPage() {
             body { margin: 0; padding: 16px; background: #ffffff; }
           </style>
         </head>
-        <body onload="window.print()">${data.html}</body>
+        <body onload="window.print()">${sanitizeHtml(data.html, { document: true })}</body>
       </html>
     `);
     printWindow.document.close();
@@ -130,7 +131,7 @@ export default function MyIcardPage() {
         >
           {data.html ? (
             <div className="overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="mx-auto w-fit bg-white p-4 shadow-sm" dangerouslySetInnerHTML={{ __html: data.html }} />
+              <div className="mx-auto w-fit bg-white p-4 shadow-sm" dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.html, { document: true }) }} />
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-600">

@@ -420,7 +420,7 @@ export function useCoherenceMap(
           setResult({
             key,
             map: null,
-            error: e instanceof Error ? e.message : 'The coherence map could not be loaded.',
+            error: e instanceof Error ? e.message : 'The coherence map couldn’t be loaded.',
           });
         }
       });

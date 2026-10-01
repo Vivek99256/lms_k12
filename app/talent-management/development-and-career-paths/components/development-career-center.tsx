@@ -1160,7 +1160,7 @@ function CareerPathExplorerCard({
             ))}
           </div>
         ) : error ? (
-          <ErrorState title="Could not load the career path" description={error} retry={retry} className="py-10" />
+          <ErrorState title="Couldn't load the career path. Try again." description={error} retry={retry} className="py-10" />
         ) : !explorer || explorer.nodes.length === 0 ? (
           <EmptyState
             icon={<Route className="w-8 h-8" />}
@@ -1256,7 +1256,7 @@ function PlanDetailPanel({
   if (error || !detail) {
     return (
       <Card className="flex-1 flex flex-col overflow-hidden h-full p-5">
-        <ErrorState title="Could not load this plan" description={error ?? 'Plan not found.'} retry={retry} />
+        <ErrorState title="Couldn't load this plan. Try again." description={error ?? 'Plan not found.'} retry={retry} />
       </Card>
     )
   }
@@ -1686,7 +1686,7 @@ function CareerPathsTab({
             )}
           </Table>
 
-          {!loading && error && <ErrorState title="Could not load career paths" description={error} retry={retry} className="m-4" />}
+          {!loading && error && <ErrorState title="Couldn't load career paths. Try again." description={error} retry={retry} className="m-4" />}
 
           {!loading && !error && paths.length === 0 && (
             <EmptyState
@@ -1907,7 +1907,7 @@ function LearningTab({
           )}
         </Table>
 
-        {!loading && error && <ErrorState title="Could not load learning assignments" description={error} retry={retry} className="m-4" />}
+        {!loading && error && <ErrorState title="Couldn't load learning assignments. Try again." description={error} retry={retry} className="m-4" />}
 
         {!loading && !error && assignments.length === 0 && (
           <EmptyState
@@ -2396,7 +2396,7 @@ export function DevelopmentCareerCenter() {
                   )}
                 </Table>
 
-                {!loading && error && <ErrorState title="Could not load development plans" description={error} retry={retry} className="m-4" />}
+                {!loading && error && <ErrorState title="Couldn't load development plans. Try again." description={error} retry={retry} className="m-4" />}
 
                 {!loading && !error && plans.length === 0 && (
                   <EmptyState

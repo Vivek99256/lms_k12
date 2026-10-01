@@ -129,7 +129,7 @@ export function ActionsTab({
       await loadRuns();
       onChanged?.();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The decision could not be recorded.');
+      setError(caught instanceof Error ? caught.message : 'The decision couldn’t be recorded.');
     } finally {
       setBusyId(null);
     }
@@ -153,7 +153,7 @@ export function ActionsTab({
       await loadRuns();
       onChanged?.();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The process could not be started.');
+      setError(caught instanceof Error ? caught.message : 'The process couldn’t be started.');
     } finally {
       setBusyKey(null);
     }
@@ -329,7 +329,7 @@ function WorkflowProgress({
       await onResolved();
     } catch (error) {
       setResolveError(
-        error instanceof Error ? error.message : 'That approval could not be resolved.'
+        error instanceof Error ? error.message : 'That approval couldn’t be resolved.'
       );
     } finally {
       setResolving(false);
