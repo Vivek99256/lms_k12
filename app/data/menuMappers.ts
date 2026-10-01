@@ -12,7 +12,7 @@ import type { ComponentType } from 'react';
 import { MenuItem, SubmenuItem, Level3Item } from './menuItems';
 import { createMdIcon } from '@/app/components/MdIcon';
 import { mapApiLinkToRoute } from './routeMapper';
-import { isDeferredModuleRoute } from '@/lib/roadmap';
+import { resolveBrainMenuLinks } from '@/lib/brain/menu-navigation';
 
 export interface ApiMenuItem {
   id: number;
@@ -376,7 +376,7 @@ export function buildMenuTree(
         href: resolveRoute(item.link),
         submenus: submenus.length > 0 ? submenus : undefined,
       };
-    });
+    }).map(resolveBrainMenuLinks);
 }
 
 export function mapApiIconToComponent(iconString: string | null, level: number = 1): MenuIcon {
