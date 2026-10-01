@@ -503,7 +503,7 @@ export default function FormBuilderEditor({
         form_active: false,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save form.');
+      setError(err instanceof Error ? err.message : "Couldn't save form. Try again.");
     } finally {
       setSaving(false);
     }

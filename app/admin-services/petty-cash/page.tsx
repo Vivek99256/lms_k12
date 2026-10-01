@@ -50,7 +50,7 @@ export default function PettyCashPage() {
     try {
       setBoard(await loadPettyCashBoard());
     } catch (value: unknown) {
-      setError(errorMessage(value, "Petty cash entries could not be loaded."));
+      setError(errorMessage(value, "Couldn't load petty cash entries. Try again."));
     } finally {
       setLoading(false);
     }
@@ -105,7 +105,7 @@ export default function PettyCashPage() {
       cancelEdit();
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The petty cash entry could not be saved."));
+      setError(errorMessage(value, "Couldn't save the petty cash entry. Try again."));
     } finally {
       setSaving(false);
     }
@@ -122,7 +122,7 @@ export default function PettyCashPage() {
       if (editing?.id === entry.id) cancelEdit();
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The entry could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the entry. Try again."));
     } finally {
       setBusy(false);
     }

@@ -61,7 +61,7 @@ function printRows(rows: Row[]) {
     th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
     th { background: #f1f5f9; }
   </style></head><body><h2>Issue / Overdue Report</h2><table><thead><tr>
-  <th>Sr No</th><th>Student Name</th><th>GR No</th><th>Mobile</th><th>Std / Div</th><th>Book Name</th><th>Item Code</th><th>Issued Date</th><th>Due Date</th><th>Return Date</th>
+  <th>No.</th><th>Student name</th><th>GR no.</th><th>Mobile</th><th>Std / Div</th><th>Book name</th><th>Item code</th><th>Issued date</th><th>Due date</th><th>Return date</th>
   </tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.studentName || '-'}</td><td>${row.enrollmentNo || '-'}</td><td>${row.mobile || '-'}</td><td>${row.standardDivision || '-'}</td><td>${row.bookTitle || '-'}</td><td>${row.itemCode || '-'}</td><td>${formatDate(row.issuedDate)}</td><td>${formatDate(row.dueDate)}</td><td>${formatDateTime(row.returnDate)}</td></tr>`).join('')}</tbody></table></body></html>`;
   const printWindow = window.open('', '_blank', 'width=1400,height=900');
   if (!printWindow) return;
@@ -92,9 +92,9 @@ export default function IssueOverdueReportPage() {
   }, [globalSearch, rows]);
 
   const exportRows = useMemo<Record<string, string>[]>(() => filteredRows.map((row, index) => ({
-    'Sr No': String(index + 1),
-    'Student Name': row.studentName || '-',
-    'GR No': row.enrollmentNo || '-',
+    'No.': String(index + 1),
+    'Student name': row.studentName || '-',
+    'GR no.': row.enrollmentNo || '-',
     Mobile: row.mobile || '-',
     'Std / Div': row.standardDivision || '-',
     'Book Name': row.bookTitle || '-',
@@ -136,7 +136,7 @@ export default function IssueOverdueReportPage() {
       setMessage({ type: nextRows.length > 0 ? 'success' : 'info', text: nextRows.length > 0 ? `Loaded ${nextRows.length} row${nextRows.length === 1 ? '' : 's'}.` : 'No rows found for the selected filters.' });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load issue/overdue report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load issue/overdue report. Try again." });
     } finally {
       setLoading(false);
     }
@@ -146,7 +146,7 @@ export default function IssueOverdueReportPage() {
     <PageFrame>
       <PageHeader
         title="Issue/Overdue Report"
-        description="Search the legacy loan or overdue circulation report by academic filters, student details, and date range."
+        description="Search the loan or overdue report by academic filters, student details and date range."
         action={<div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => {
             if (exportRows.length === 0) return;
@@ -168,10 +168,10 @@ export default function IssueOverdueReportPage() {
 
       <SectionPanel title="Filters">
         <div className="grid gap-4 lg:grid-cols-4">
-          <Field label="Report Type">
+          <Field label="Report type">
             <NativeSelect value={reportType} onChange={(value) => setReportType(value as 'loan' | 'overdue')}>
-              <option value="loan">Loan Report</option>
-              <option value="overdue">Overdue Report</option>
+              <option value="loan">Loan report</option>
+              <option value="overdue">Overdue report</option>
             </NativeSelect>
           </Field>
           <div className="lg:col-span-3">
@@ -183,11 +183,11 @@ export default function IssueOverdueReportPage() {
               onChange={(values) => setAcademicFilters(values)}
             />
           </div>
-          <Field label="Student Name"><Input value={studentName} onChange={(event) => setStudentName(event.target.value)} /></Field>
+          <Field label="Student name"><Input value={studentName} onChange={(event) => setStudentName(event.target.value)} /></Field>
           <Field label="Mobile"><Input value={mobile} onChange={(event) => setMobile(event.target.value)} /></Field>
-          <Field label="GR No"><Input value={grNo} onChange={(event) => setGrNo(event.target.value)} /></Field>
-          <Field label="From Date"><Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></Field>
-          <Field label="To Date"><Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></Field>
+          <Field label="GR no."><Input value={grNo} onChange={(event) => setGrNo(event.target.value)} /></Field>
+          <Field label="From date"><Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></Field>
+          <Field label="To date"><Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></Field>
           <div className="flex items-end">
             <Button type="button" onClick={() => void handleSearch()} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -199,7 +199,7 @@ export default function IssueOverdueReportPage() {
 
       <SectionPanel title="Results">
         <div className="space-y-4">
-          <Field label="Global Search">
+          <Field label="Global search">
             <div className="relative max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} className="pl-9" placeholder="Search all columns" />
@@ -209,16 +209,16 @@ export default function IssueOverdueReportPage() {
             <Table className="min-w-[1400px]">
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100">
-                  <TableHead>Sr No</TableHead>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead>GR No</TableHead>
+                  <TableHead>No.</TableHead>
+                  <TableHead>Student name</TableHead>
+                  <TableHead>GR no.</TableHead>
                   <TableHead>Mobile</TableHead>
                   <TableHead>Std / Div</TableHead>
-                  <TableHead>Book Name</TableHead>
-                  <TableHead>Item Code</TableHead>
-                  <TableHead>Issued Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Return Date</TableHead>
+                  <TableHead>Book name</TableHead>
+                  <TableHead>Item code</TableHead>
+                  <TableHead>Issued date</TableHead>
+                  <TableHead>Due date</TableHead>
+                  <TableHead>Return date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

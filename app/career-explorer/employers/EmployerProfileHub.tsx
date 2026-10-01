@@ -27,7 +27,7 @@ export default function EmployerProfileHub() {
     try {
       setEmployers(await loadEmployers());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load employers.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load employers.');
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,7 @@ export default function EmployerProfileHub() {
           )}
 
           {!loading && error && (
-            <ErrorState title="Unable to load employers" description={error} retry={() => void refresh()} />
+            <ErrorState title="Couldn’t load employers" description={error} retry={() => void refresh()} />
           )}
 
           {!loading && !error && filtered.length === 0 && (

@@ -237,12 +237,12 @@ export default function RegistrationPipelineContent() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load admission enquiries (${response.status})`);
+        throw new Error(`Couldn't load admission enquiries. Try again.`);
       }
 
       const payload = (await response.json()) as AdmissionEnquiryApiResponse;
       if (normalizeApiStatus(payload) !== '1') {
-        throw new Error(payload.message || 'Failed to load admission enquiries.');
+        throw new Error(payload.message || "Couldn't load admission enquiries. Try again.");
       }
 
       const baseRows = Array.isArray(payload.data) ? payload.data.map(mapEnquiryRowToPipelineRow) : [];
@@ -261,7 +261,7 @@ export default function RegistrationPipelineContent() {
     } catch (loadError) {
       if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
       setRows([]);
-      setError(loadError instanceof Error ? loadError.message : 'Failed to load admission enquiries.');
+      setError(loadError instanceof Error ? loadError.message : "Couldn't load admission enquiries. Try again.");
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
@@ -311,7 +311,7 @@ export default function RegistrationPipelineContent() {
       setRows((currentRows) => currentRows.map((row) => (row.id === rowData.id ? nextRow : row)));
       setSelectedRow(nextRow);
     } catch (detailError) {
-      setError(detailError instanceof Error ? detailError.message : 'Failed to load registration details.');
+      setError(detailError instanceof Error ? detailError.message : "Couldn't load registration details. Try again.");
     } finally {
       setIsDrawerLoading(false);
     }
@@ -345,7 +345,7 @@ export default function RegistrationPipelineContent() {
       setRows((currentRows) => currentRows.map((row) => (row.id === selectedRow.id ? nextRow : row)));
       setSelectedRow(nextRow);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Failed to update registration.');
+      setError(saveError instanceof Error ? saveError.message : "Couldn't update registration. Try again.");
     } finally {
       setIsSaving(false);
     }

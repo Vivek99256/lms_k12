@@ -49,7 +49,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(fallback);
   }
 }
 
@@ -140,7 +140,7 @@ export async function fetchExamsForSubject(
       signal,
     });
     if (res.ok) {
-      const raw = await readJson(res, 'Failed to load exams');
+      const raw = await readJson(res, "Couldn't load exams. Try again.");
       const rows = Array.isArray(raw) ? raw : toArray(toRecord(raw).data);
       const exams = rows.map(mapExam).filter((e): e is ReportExam => e !== null);
       if (exams.length > 0) return exams;
@@ -169,8 +169,8 @@ async function fetchExamsFallback(
   url.searchParams.set('subject_id', subjectId);
 
   const res = await fetch(url.toString(), { headers: createAuthHeaders(session), signal });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load exams.`);
-  const raw = toRecord(await readJson(res, 'Failed to load exams'));
+  if (!res.ok) throw new Error(`Couldn't load exams. Try again.`);
+  const raw = toRecord(await readJson(res, "Couldn't load exams. Try again."));
   return toArray(raw.data)
     .map((entry) => {
       const r = toRecord(entry);
@@ -205,8 +205,8 @@ export async function fetchProgressReport(
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load the report.`);
-  const raw = toRecord(await readJson(res, 'Failed to load the report'));
+  if (!res.ok) throw new Error(`Couldn't load the report. Try again.`);
+  const raw = toRecord(await readJson(res, "Couldn't load the report. Try again."));
 
   const exams: ReportExam[] = toArray(raw.exams_data)
     .map(mapExam)

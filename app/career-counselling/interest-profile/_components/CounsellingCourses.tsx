@@ -124,7 +124,7 @@ export function CounsellingCourses() {
       setCourses(data.courses);
       setAttemptsByCourse(data.attemptsByCourse);
     } catch {
-      setError('Could not load counselling courses. Please try again.');
+      setError('Couldn’t load counselling courses. Please try again.');
     } finally {
       setLoading(false);
     }

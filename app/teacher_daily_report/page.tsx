@@ -39,13 +39,13 @@ import {
 
 const PAGE_SIZE = 10;
 const summaryColumns: TableExportColumn[] = [
-  { key: "serial", label: "Sr. No." },
+  { key: "serial", label: "No." },
   { key: "teacher", label: "Teacher" },
   { key: "attendance", label: "Attendance" },
-  { key: "homeworkAssigned", label: "Homework Assigned" },
-  { key: "homeworkChecked", label: "Homework Checked" },
-  { key: "parentCommunication", label: "Parent Communication" },
-  { key: "studentLeave", label: "Student Leave Approval" },
+  { key: "homeworkAssigned", label: "Homework assigned" },
+  { key: "homeworkChecked", label: "Homework checked" },
+  { key: "parentCommunication", label: "Parent communication" },
+  { key: "studentLeave", label: "Student leave approval" },
 ];
 const actions: Array<{
   key: ActivityAction;
@@ -62,22 +62,22 @@ const actions: Array<{
   { key: "attendance", label: "Attendance", field: "attendance" },
   {
     key: "homework_assign",
-    label: "Homework Assigned",
+    label: "Homework assigned",
     field: "homeworkAssigned",
   },
   {
     key: "homework_check",
-    label: "Homework Checked",
+    label: "Homework checked",
     field: "homeworkChecked",
   },
   {
     key: "parent_comm",
-    label: "Parent Communication",
+    label: "Parent communication",
     field: "parentCommunication",
   },
   {
     key: "student_leave",
-    label: "Student Leave Approval",
+    label: "Student leave approval",
     field: "studentLeave",
   },
 ];
@@ -152,7 +152,7 @@ export default function TeacherDailyReportPage() {
       setError(
         searchError instanceof Error
           ? searchError.message
-          : "Teacher daily report could not be loaded."
+          : "Couldn't load teacher daily report. Try again."
       );
     } finally {
       setLoading(false);
@@ -181,7 +181,7 @@ export default function TeacherDailyReportPage() {
       setError(
         detailError instanceof Error
           ? detailError.message
-          : "Activity details could not be loaded."
+          : "Couldn't load activity details. Try again."
       );
       setDetailTitle("");
     } finally {
@@ -286,7 +286,7 @@ export default function TeacherDailyReportPage() {
                 onClick={() =>
                   exportRowsAsExcel({
                     filename: "teacher-daily-report.xls",
-                    title: "Teacher Wise Daily Report",
+                    title: "Teacher wise daily report",
                     columns: summaryColumns,
                     rows: exportRows,
                   })
@@ -300,7 +300,7 @@ export default function TeacherDailyReportPage() {
                 disabled={!exportRows.length}
                 onClick={() =>
                   openPrintPreview({
-                    title: "Teacher Wise Daily Report",
+                    title: "Teacher wise daily report",
                     subtitle: date,
                     columns: summaryColumns,
                     rows: exportRows,
@@ -316,7 +316,7 @@ export default function TeacherDailyReportPage() {
             <Table className="min-w-[1050px]">
               <TableHeader className="bg-slate-50">
                 <TableRow>
-                  <TableHead>Sr. No.</TableHead>
+                  <TableHead>No.</TableHead>
                   <TableHead>Teacher</TableHead>
                   {actions.map((action) => (
                     <TableHead key={action.key}>{action.label}</TableHead>
@@ -432,7 +432,7 @@ export default function TeacherDailyReportPage() {
                 <Table>
                   <TableHeader className="bg-slate-50">
                     <TableRow>
-                      <TableHead>Sr. No.</TableHead>
+                      <TableHead>No.</TableHead>
                       {detailColumns.map((column) => (
                         <TableHead key={column.key}>{column.label}</TableHead>
                       ))}

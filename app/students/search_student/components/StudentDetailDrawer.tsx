@@ -52,7 +52,7 @@ function EditProfileForm({ student, onSave, onCancel }: EditProfileFormProps) {
     try {
       await onSave(formData);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Unable to update student.');
+      setSaveError(error instanceof Error ? error.message : "Couldn't update student. Try again.");
     } finally {
       setIsSaving(false);
     }
@@ -62,7 +62,7 @@ function EditProfileForm({ student, onSave, onCancel }: EditProfileFormProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Student Name</label>
+          <label className="block text-xs font-medium text-slate-700 mb-1">Student name</label>
           <input
             type="text"
             name="name"
@@ -113,7 +113,7 @@ function EditProfileForm({ student, onSave, onCancel }: EditProfileFormProps) {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Roll Number</label>
+          <label className="block text-xs font-medium text-slate-700 mb-1">Roll no.</label>
           <input
             type="number"
             name="rollNo"
@@ -345,7 +345,7 @@ function DummyIDCard({ student }: { student: Student }) {
                 <p className="font-medium text-slate-800">{student.admissionNo}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Roll No</p>
+                <p className="text-xs text-slate-500">Roll no.</p>
                 <p className="font-medium text-slate-800">{student.rollNo}</p>
               </div>
               <div>
@@ -558,7 +558,7 @@ export function StudentDetailDrawer({
                   <p className="font-medium">{student.admissionNo}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Roll Number</p>
+                  <p className="text-xs text-slate-500">Roll no.</p>
                   <p className="font-medium">{student.rollNo}</p>
                 </div>
                 <div>

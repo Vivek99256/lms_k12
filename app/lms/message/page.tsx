@@ -32,9 +32,7 @@ export default function LmsMessagePage() {
           <MessageSquare className="mx-auto mb-3 size-9 text-slate-300" />
           <p className="text-base font-semibold text-slate-700">Not yet available</p>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-            The LMS Message module does not have a backend data source yet — it exists only as a
-            placeholder in the legacy system. Once a messaging API and data model are defined, this
-            screen will surface real notifications, messages and chat.
+            Messages are not available yet. Notifications, messages and chat will appear here once they are set up.
           </p>
         </div>
       </div>

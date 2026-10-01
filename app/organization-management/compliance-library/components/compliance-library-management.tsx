@@ -396,7 +396,7 @@ export function ComplianceLibraryManagement() {
                     <Table className="min-w-[1200px]">
                       <TableHeader className="sticky top-0 z-10 bg-card shadow-sm">
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="w-16">Sr No.</TableHead>
+                          <TableHead className="w-16">No.</TableHead>
                           <TableHead>Name</TableHead>
                           <TableHead>Category</TableHead>
                           <TableHead>Department</TableHead>

@@ -142,7 +142,7 @@ export function EmployeeDirectory() {
       await reload()
       setNotice(response?.message || 'Status updated.')
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : 'Failed to update status.')
+      setNotice(cause instanceof Error ? cause.message : "Couldn't update status. Try again.")
     } finally {
       setStatusChangingId(null)
     }
@@ -375,7 +375,7 @@ export function EmployeeDirectory() {
           </Button>
           <div className="mx-2 hidden h-6 w-px bg-border sm:block" />
           <Button size="sm" onClick={() => setIsAddSheetOpen(true)} className="cursor-pointer rounded-md px-5 shadow-sm">
-            <Plus className="mr-2 h-4 w-4" /> Add Employee
+            <Plus className="mr-2 h-4 w-4" /> Add New People
           </Button>
         </div>
       </div>
@@ -428,6 +428,10 @@ export function EmployeeDirectory() {
           onAddSheetOpenChange={setIsAddSheetOpen}
           activeEmployee={activeEmployee}
           onCloseEmployeeSheet={() => setActiveEmployee(null)}
+          onEmployeeCreated={(message) => {
+            setNotice(message)
+            void reload()
+          }}
         />
       </Suspense>
     </div>

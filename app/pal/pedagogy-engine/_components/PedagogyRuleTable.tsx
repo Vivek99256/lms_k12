@@ -80,7 +80,7 @@ export default function PedagogyRuleTable({ rules }: { rules: PedagogyRule[] }) 
   if (rules.length === 0) {
     return (
       <div className="rounded-[26px] border border-dashed border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
-        <p className="text-sm text-slate-600">This rule group has no rows in the backend yet.</p>
+        <p className="text-sm text-slate-600">This rule group has no rules yet.</p>
       </div>
     );
   }

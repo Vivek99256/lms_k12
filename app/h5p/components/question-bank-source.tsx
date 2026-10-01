@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -113,7 +115,7 @@ export function QuestionBankSource({ kind, unavailableReason, ctx, noun }: Quest
         })
         .catch((err: unknown) => {
           if (signal.aborted) return;
-          setError(err instanceof Error ? err.message : 'Failed to read the question bank');
+          setError(friendlyError(err, 'We couldn’t read the question bank. Please try again.'));
         })
         .finally(() => {
           if (!signal.aborted) setLoading(false);

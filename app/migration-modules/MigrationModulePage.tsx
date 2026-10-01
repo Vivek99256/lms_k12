@@ -24,9 +24,9 @@ export function MigrationModulePage({ module }: { module: string }) {
       const query = new URLSearchParams({ type: 'API', sub_institute_id: session.subInstituteId, syear: session.syear, user_id: session.userId });
       const response = await fetch(`${session.baseUrl}/api/migration-modules/${module}?${query}`, { cache: 'no-store', headers: createAuthHeaders(session) });
       const payload = await response.json();
-      if (!response.ok || payload.status_code !== 1) throw new Error(payload.message || 'Unable to load this module.');
+      if (!response.ok || payload.status_code !== 1) throw new Error(payload.message || "Couldn't load this module. Try again.");
       setRecords(Array.isArray(payload.data?.records) ? payload.data.records : []);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load this module.'); } finally { setLoading(false); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Couldn't load this module. Try again."); } finally { setLoading(false); }
   }, [module]);
   useEffect(() => { void load(); }, [load]);
   const columns = [...new Set(records.flatMap((row) => Object.keys(row)))].slice(0, 10);

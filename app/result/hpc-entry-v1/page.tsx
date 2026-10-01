@@ -225,7 +225,7 @@ export default function HpcEntryV1Page() {
 
       setMarks(buildExistingMarks(source.studentMarks, studentRows, nextActivities));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load the activity matrix. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't load the activity matrix. Try again.");
       setGroups([]);
       setFlatActivities([]);
       setStudents([]);
@@ -254,10 +254,10 @@ export default function HpcEntryV1Page() {
         }
       }
       const payload = await resultPost('api/result/hpc-entry-v1', data);
-      const message = assertOk(payload, 'Laravel did not confirm that the entries were saved.');
+      const message = assertOk(payload, "Couldn't save the entries. Try again.");
       toast.success('HPC entries saved', message || undefined);
     } catch (err) {
-      toast.error('Could not save entries', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't save entries. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }
@@ -338,7 +338,7 @@ export default function HpcEntryV1Page() {
                 !error && (
                   <EmptyState
                     icon={<Users />}
-                    title="Nothing to show"
+                    title="No data to show"
                     message="No activities or students matched the selected class. Adjust the filters and search again."
                   />
                 )

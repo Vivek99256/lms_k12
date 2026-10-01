@@ -101,7 +101,7 @@ export function CourseBuilderPanel({ data, title, record }: CourseBuilderPanelPr
       const response = await courseBuilderService.generateOutline(buildSessionContext(), buildRequest())
       setOutline(response.data)
     } catch (draftError) {
-      setError(draftError instanceof Error ? draftError.message : 'Could not generate the outline.')
+      setError(draftError instanceof Error ? draftError.message : 'Couldn’t generate the outline.')
     } finally {
       setDrafting(false)
     }
@@ -147,7 +147,7 @@ export function CourseBuilderPanel({ data, title, record }: CourseBuilderPanelPr
           if (state === 'failed') {
             setProgress(null)
             setRendering(false)
-            setError('Gamma could not render these slides.')
+            setError('We couldn’t create the slides.')
             return
           }
 
@@ -164,7 +164,7 @@ export function CourseBuilderPanel({ data, title, record }: CourseBuilderPanelPr
     } catch (renderError) {
       setProgress(null)
       setRendering(false)
-      setError(renderError instanceof Error ? renderError.message : 'Could not start the slide render.')
+      setError(renderError instanceof Error ? renderError.message : 'Couldn’t start the slide render.')
     }
   }
 

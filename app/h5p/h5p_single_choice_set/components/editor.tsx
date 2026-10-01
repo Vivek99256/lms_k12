@@ -188,7 +188,7 @@ export function SingleChoiceSetEditor({
           value={state.description}
           onChange={(v) => set('description', v)}
           disabled={disabled}
-          hint="For teachers, in the content list. Learners do not see this."
+          hint="For teachers, in the content list. Students do not see this."
           rows={2}
         />
         <TextAreaField
@@ -326,7 +326,7 @@ function QuestionList({
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Questions</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Each question has exactly one right answer. Learners see them one at a time.
+            Each question has exactly one right answer. Students see them one at a time.
           </p>
         </div>
         <button

@@ -205,7 +205,7 @@ export default function FeesCircularMasterPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to load circular masters (${response.status})`);
+        throw new Error("Couldn't load circular masters. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
@@ -215,7 +215,7 @@ export default function FeesCircularMasterPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load circular masters.'
+          : "Couldn't load circular masters. Try again."
       );
     } finally {
       setLoading(false);
@@ -338,14 +338,14 @@ export default function FeesCircularMasterPage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to ${editingRecord ? 'update' : 'save'} circular master (${response.status})`
+          `Couldn't ${editingRecord ? 'update' : 'save'} circular master. Try again.`
         );
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to save circular master.');
+        throw new Error(payload.message || "Couldn't save circular master. Try again.");
       }
 
       setSuccessMessage(
@@ -360,7 +360,7 @@ export default function FeesCircularMasterPage() {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : 'Failed to save circular master.'
+          : "Couldn't save circular master. Try again."
       );
     } finally {
       setSubmitting(false);
@@ -396,13 +396,13 @@ export default function FeesCircularMasterPage() {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to delete circular master (${response.status})`);
+        throw new Error("Couldn't delete circular master. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to delete circular master.');
+        throw new Error(payload.message || "Couldn't delete circular master. Try again.");
       }
 
       setSuccessMessage(payload.message || 'Circular master deleted successfully.');
@@ -411,7 +411,7 @@ export default function FeesCircularMasterPage() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : 'Failed to delete circular master.'
+          : "Couldn't delete circular master. Try again."
       );
     } finally {
       setDeletingId('');
@@ -426,7 +426,7 @@ export default function FeesCircularMasterPage() {
             <CardHeader className="gap-4 border-b border-slate-200/80 px-4 py-4 sm:px-5">
               <div>
                 <CardTitle className="text-[16px] font-semibold text-slate-950">
-                  Fees Circular Master
+                  Fee circular master
                 </CardTitle>
                 <CardDescription className="text-[12px] leading-5 text-slate-600">
                   Bank and payment details printed on fee circulars, per section and
@@ -474,7 +474,7 @@ export default function FeesCircularMasterPage() {
                   <TableHeader className="bg-slate-100/90">
                     <TableRow className="border-slate-200 hover:bg-transparent">
                       {[
-                        'Sr.No.',
+                        'No.',
                         'Academic Section',
                         'Standard',
                         'Bank Name',

@@ -43,18 +43,18 @@ async function decode(response: Response): Promise<ApiEnvelope & JsonRecord> {
     payload = text ? JSON.parse(text) : {};
   } catch {
     throw new Error(
-      'Laravel returned an HTML response. This action requires an authenticated JSON endpoint.'
+      "Your session has expired. Sign in again."
     );
   }
   if (!payload || typeof payload !== 'object') {
-    throw new Error('Laravel returned an invalid response.');
+    throw new Error("Couldn't read the response. Try again.");
   }
   const result = payload as ApiEnvelope & JsonRecord;
   if (!response.ok || ['0', '2'].includes(String(result.status ?? result.status_code ?? ''))) {
     throw new Error(
       typeof result.message === 'string'
         ? result.message
-        : `Laravel rejected the request (HTTP ${response.status}).`
+        : "Couldn't complete the request. Try again."
     );
   }
   return result;

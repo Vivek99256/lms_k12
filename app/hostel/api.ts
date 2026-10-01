@@ -86,7 +86,7 @@ function normalizeStatus(payload: unknown): string {
 export function getHostelSession(): HostelSession {
   const session = buildSessionContext();
   if (!session.token || !session.subInstituteId || !session.userId) {
-    throw new Error("Your login session is missing hostel API credentials.");
+    throw new Error("Your session has expired. Sign in again.");
   }
   return session;
 }
@@ -103,10 +103,10 @@ async function postProxy<T>(path: string, session: HostelSession, body: BodyInit
 
   const payload = (await response.json().catch(() => ({}))) as HostelApiResult<T>;
   if (!response.ok) {
-    throw new Error(messageFrom(payload, `Request failed (${response.status}).`));
+    throw new Error(messageFrom(payload, "Couldn't complete the request. Try again."));
   }
   if (normalizeStatus(payload) === "2") {
-    throw new Error(messageFrom(payload, "Authentication failed."));
+    throw new Error(messageFrom(payload, "Your session has expired. Sign in again."));
   }
   return payload;
 }

@@ -48,7 +48,7 @@ export default function ChallengeModePage() {
       await setChallengeModeOptIn(next, scope.scope);
       reload();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not change the opt-in.');
+      setActionError(err instanceof Error ? err.message : 'Couldn’t change the opt-in.');
     } finally {
       setBusy(false);
     }
@@ -76,7 +76,7 @@ export default function ChallengeModePage() {
         <StatusPanel
           kind="error"
           title="Challenge mode is not available"
-          message={error || 'The backend did not return a challenge mode payload.'}
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={reload}
           retrying={refreshing}
         />

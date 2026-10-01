@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -102,7 +104,7 @@ function ScenarioListContent() {
     fetchScenarios(ctx)
       .then(setScenarios)
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Failed to load scenarios');
+        setError(friendlyError(err, 'We couldn’t load scenarios. Please try again.'));
       })
       .finally(() => setLoading(false));
   }, [ctx]);
@@ -137,7 +139,7 @@ function ScenarioListContent() {
       setSuccess(result.message);
       loadScenarios();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete scenario');
+      setError(friendlyError(err, 'We couldn’t delete scenario. Please try again.'));
     } finally {
       setDeletingId(null);
     }

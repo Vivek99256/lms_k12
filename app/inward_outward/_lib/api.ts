@@ -52,7 +52,7 @@ async function request(path: string, init?: RequestInit, params?: URLSearchParam
   } catch {
     throw new Error(text.replace(/\s+/g, ' ').slice(0, 300) || `HTTP ${response.status}`);
   }
-  if (!response.ok) throw new Error(messageFrom(payload, `Request failed with HTTP ${response.status}.`));
+  if (!response.ok) throw new Error(messageFrom(payload, "Couldn't complete the request. Try again."));
   const envelope = asRecord(payload) as ApiEnvelope;
   if (normalizeApiStatus(envelope) === '2') throw new Error(messageFrom(payload, 'The request was rejected.'));
   return payload;

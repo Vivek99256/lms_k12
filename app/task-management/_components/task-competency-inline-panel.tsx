@@ -67,7 +67,7 @@ export function TaskCompetencyInlinePanel({
     try {
       setView(await competencyApi.forTask(getTaskSession(), jobroleTaskId, userId ?? null))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load what this task exercises.')
+      setError(e instanceof Error ? e.message : "Couldn't load the skills for this task. Try again.")
     } finally {
       setLoading(false)
     }

@@ -21,9 +21,9 @@ export default function PageError({ error, reset }: { error: Error & { digest?: 
         </div>
         <h1 className="mb-4 text-xl font-semibold text-gray-800">This page could not be displayed</h1>
         <p className="mb-8 text-gray-500">
-          Something went wrong while loading this screen. Your data has not been changed. Try again, or go back
+          Something went wrong while loading this page. Your data has not been changed. Try again, or go back
           to the dashboard.
-          {error.digest ? <span className="mt-2 block font-mono text-xs text-gray-400">Reference: {error.digest}</span> : null}
+          {error.digest ? <span className="mt-2 block font-mono text-xs text-gray-400">Error code: {error.digest}</span> : null}
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Button

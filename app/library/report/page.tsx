@@ -101,8 +101,8 @@ function printRows(rows: ReportRow[]) {
       th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; vertical-align: top; }
       th { background: #f1f5f9; }
     </style></head><body>
-      <h2>Library Report</h2>
-      <table><thead><tr><th>Sr No</th>${headers.map((header) => `<th>${header}</th>`).join('')}</tr></thead><tbody>
+      <h2>Library report</h2>
+      <table><thead><tr><th>No.</th>${headers.map((header) => `<th>${header}</th>`).join('')}</tr></thead><tbody>
       ${rows.map((row, index) => `<tr><td>${index + 1}</td>${columnOrder.map((key) => `<td>${row[key] || '-'}</td>`).join('')}</tr>`).join('')}
       </tbody></table>
     </body></html>
@@ -152,7 +152,7 @@ export default function LibraryReportPage() {
           subject: toOptions(payload, optionMap.subject, 'subject'),
         });
       } catch (error) {
-        setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load library report filters.' });
+        setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load library report filters. Try again." });
       } finally {
         setLoadingFilters(false);
       }
@@ -166,7 +166,7 @@ export default function LibraryReportPage() {
   }, [globalSearch, rows]);
 
   const exportRows = useMemo(() => filteredRows.map((row, index) => {
-    const exportRow: Record<string, string> = { 'Sr No': String(index + 1) };
+    const exportRow: Record<string, string> = { 'No.': String(index + 1) };
     columnOrder.forEach((key) => {
       exportRow[columnLabels[key]] = row[key] || '-';
     });
@@ -211,7 +211,7 @@ export default function LibraryReportPage() {
       });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load library report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load library report. Try again." });
     } finally {
       setLoading(false);
     }
@@ -221,7 +221,7 @@ export default function LibraryReportPage() {
     <PageFrame>
       <PageHeader
         title="Report"
-        description="Filter library books by one legacy report dimension at a time and review the matching item-level rows."
+        description="Filter library books by one report type at a time and review the matching items."
         action={(
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={() => {
@@ -244,9 +244,9 @@ export default function LibraryReportPage() {
 
       {message ? <InlineMessage type={message.type} text={message.text} /> : null}
 
-      <SectionPanel title="Filters" description="The Laravel report exposes one active dimension at a time: material resource, author, publisher, publishing place, language, or subject.">
+      <SectionPanel title="Filters" description="Filter by one of material resource, author, publisher, publishing place, language or subject at a time.">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="Select Report">
+          <Field label="Select report">
             <NativeSelect value={reportOf} onChange={(value) => { setReportOf(value); setFieldValue(''); }}>
               <option value="">{loadingFilters ? 'Loading reports...' : 'Select Report'}</option>
               {reportOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
@@ -259,7 +259,7 @@ export default function LibraryReportPage() {
             </NativeSelect>
           </Field>
           {session.subInstituteId === '47' && reportOf === 'material_resource' && fieldValue === 'book' ? (
-            <Field label="Book Type">
+            <Field label="Book type">
               <NativeSelect value={bookType} onChange={setBookType}>
                 <option value="all">All</option>
                 <option value="purchase">Purchase</option>
@@ -278,7 +278,7 @@ export default function LibraryReportPage() {
 
       <SectionPanel title="Results">
         <div className="space-y-4">
-          <Field label="Global Search">
+          <Field label="Global search">
             <div className="relative max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} className="pl-9" placeholder="Search all columns" />
@@ -288,7 +288,7 @@ export default function LibraryReportPage() {
             <Table className="min-w-[2200px]">
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100">
-                  <TableHead>Sr No</TableHead>
+                  <TableHead>No.</TableHead>
                   {columnOrder.map((key) => <TableHead key={key}>{columnLabels[key]}</TableHead>)}
                 </TableRow>
               </TableHeader>

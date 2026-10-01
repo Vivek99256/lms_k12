@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Save, Sparkles, Trash2, X } from 'lucide-react';
@@ -188,7 +190,7 @@ function ScenarioCreateContent() {
       }));
       setPoints(mapped);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'AI generation failed');
+      setError(friendlyError(err, 'We couldn’t generate the content. Please try again.'));
     } finally {
       setAiLoading(false);
     }
@@ -214,7 +216,7 @@ function ScenarioCreateContent() {
       });
       router.push(`/h5p/scenario_based?${h5pContextQuery(ctx, { flash: result.message })}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create scenario');
+      setError(friendlyError(err, 'We couldn’t create scenario. Please try again.'));
       setSaving(false);
     }
   };

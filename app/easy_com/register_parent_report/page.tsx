@@ -16,7 +16,7 @@ export default function Page() {
         mobile: true,
         columns: [
           { key: 'student_name', label: 'Student name' },
-          { key: 'enrollment_no', label: 'GR No.' },
+          { key: 'enrollment_no', label: 'GR no.' },
           { key: 'grade_name', label: 'Academic section' },
           { key: 'standard_name', label: 'Standard' },
           { key: 'division_name', label: 'Division' },

@@ -77,7 +77,7 @@ export default function BrainPeoplePage() {
       <MetricTiles
         metrics={[
           { key: 'total', label: 'People (LMS)', value: data.total, available: true },
-          { key: 'projected', label: 'Projected into Brain', value: data.brainProjected, available: true },
+          { key: 'projected', label: 'Added to insights', value: data.brainProjected, available: true },
           { key: 'incomplete', label: 'Incomplete records', value: data.incomplete, available: true, hint: 'shown page' },
           { key: 'shown', label: 'Shown', value: data.data.length, available: true },
         ]}
@@ -126,7 +126,7 @@ function TeachingIntelligenceSection({
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold tracking-tight text-slate-800">Teaching intelligence</h2>
         <Card className="border-red-100 bg-red-50/50 p-4 text-sm text-red-700">
-          Could not load teaching intelligence: {error}
+          Couldn’t load teaching intelligence: {error}
         </Card>
       </section>
     );

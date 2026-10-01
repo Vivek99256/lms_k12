@@ -22,7 +22,7 @@ export default function ResolvedEvidence({ resolved }: { resolved: PedagogyResol
         <div className="flex items-center gap-2">
           <Database className="h-3.5 w-3.5 text-violet-600" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-600">
-            Resolved from semantic_intelligence
+            Resolved from the chapter concepts
           </span>
         </div>
         <span

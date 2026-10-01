@@ -227,7 +227,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <ErrorState
-        title="Unable to load the leave dashboard"
+        title="Couldn't load the leave dashboard. Try again."
         description={error}
         retry={retry}
       />

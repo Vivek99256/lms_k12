@@ -307,7 +307,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
               {masterLoading && (
                 <div className="flex items-center justify-center py-12">
                   <div className="w-6 h-6 border-2 border-[#0D6EFD] border-t-transparent rounded-full animate-spin mr-3" />
-                  <span className="text-sm font-medium text-gray-500">Loading master menu...</span>
+                  <span className="text-sm font-medium text-gray-500">Loading menu…</span>
                 </div>
               )}
               {!masterLoading && (
@@ -357,7 +357,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                           if (!children || children.length === 0) {
                             return (
                               <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                                <p className="text-sm font-medium">No items in this category</p>
+                                <p className="text-sm font-medium">No pages in this category</p>
                               </div>
                             );
                           }
@@ -404,7 +404,7 @@ export default function Level3Subheader({ items, parentLabel, masterItems = [], 
                     <div className="p-2 min-w-[280px]">
                       {!masterLoading && masterItems.length === 0 && (
                         <div className="px-4 py-8 text-center text-sm font-medium text-gray-500">
-                          No master items available for this menu.
+                          No pages available for this menu.
                         </div>
                       )}
                       {!masterLoading && masterItems.map((item) => {

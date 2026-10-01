@@ -380,7 +380,7 @@ export function MobileAppRightsPage() {
         setEditInput(emptyConfigInput(data.configProfiles[0]));
       }
     } catch (value: unknown) {
-      setError(errorMessage(value, "Mobile App Menu Rights could not be loaded."));
+      setError(errorMessage(value, "Couldn't load mobile app rights. Try again."));
     } finally {
       setLoading(false);
     }
@@ -416,7 +416,7 @@ export function MobileAppRightsPage() {
         Object.fromEntries(data.selected.map((screenName) => [screenName, true]))
       );
     } catch (value: unknown) {
-      setError(errorMessage(value, "The mobile app rights matrix could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the mobile app rights. Try again."));
       setRightsRows([]);
       setSelectedRights({});
     } finally {
@@ -431,7 +431,7 @@ export function MobileAppRightsPage() {
     try {
       setConfigRows(await loadMobileConfig(configProfile, includeInactive));
     } catch (value: unknown) {
-      setError(errorMessage(value, "The mobile app menu configuration could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the mobile app menu configuration. Try again."));
       setConfigRows([]);
     } finally {
       setConfigLoading(false);
@@ -464,7 +464,7 @@ export function MobileAppRightsPage() {
       setNotice(await saveMobileRights(selectedRightsProfileId, selectedRights));
       await loadRights(selectedRightsProfileId);
     } catch (value: unknown) {
-      setError(errorMessage(value, "Mobile app rights could not be saved."));
+      setError(errorMessage(value, "Couldn't save mobile app rights. Try again."));
     } finally {
       setRightsSaving(false);
     }
@@ -501,7 +501,7 @@ export function MobileAppRightsPage() {
       setEditing(null);
       await searchConfig();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The mobile app menu record could not be updated."));
+      setError(errorMessage(value, "Couldn't update the mobile app menu record. Try again."));
     } finally {
       setEditSaving(false);
     }
@@ -524,7 +524,7 @@ export function MobileAppRightsPage() {
         await searchConfig();
       }
     } catch (value: unknown) {
-      setError(errorMessage(value, "The mobile app menu item could not be created."));
+      setError(errorMessage(value, "Couldn't create the mobile app menu item. Try again."));
     } finally {
       setCreateSaving(false);
     }
@@ -590,7 +590,7 @@ export function MobileAppRightsPage() {
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <ErpPageHeader
         title="Mobile App Menu Rights"
-        description="Configure mobile app home screen rights and visibility per profile using the legacy ERP rules."
+        description="Configure mobile app home screen rights and visibility per profile using the standard rules."
         onRefresh={() => void load()}
         refreshing={loading || rightsLoading || rightsSaving || configLoading || editSaving}
       />
@@ -653,7 +653,7 @@ export function MobileAppRightsPage() {
             ) : rightsRows.length === 0 ? (
               <ErpEmpty
                 title="No mobile app rights template was returned for this profile."
-                hint="The legacy module only supports Student, Admin, and Teacher profiles with default rows stored under sub_institute_id = 1."
+                hint="Only the Student, Admin and Teacher profiles are supported."
               />
             ) : (
               <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -705,7 +705,7 @@ export function MobileAppRightsPage() {
 
       <ErpSection
         title="Mobile App Menu Configuration"
-        description="Search the saved mobile app menu records by profile and update the menu metadata using the same Laravel behavior."
+        description="Search the saved mobile app menu records by profile and update the menu metadata using the same rules as mobile app rights."
         icon={<ImageIcon className="size-5" />}
       >
         {loading ? (
@@ -796,7 +796,7 @@ export function MobileAppRightsPage() {
           if (!editSaving) setEditing(null);
         }}
         title="Update Menu Sub-menu"
-        description="This updates the selected record and cascades grouped main-title fields the same way the old Laravel controller does."
+        description="Updates the selected record and all records in the same group."
         size="lg"
         footer={
           <>

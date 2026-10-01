@@ -26,7 +26,7 @@ export default function CollegeProfileHub() {
     try {
       setColleges(await loadInstitutes());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load colleges.');
+      setError(err instanceof Error ? err.message : 'Couldn’t load colleges.');
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ export default function CollegeProfileHub() {
           )}
 
           {!loading && error && (
-            <ErrorState title="Unable to load colleges" description={error} retry={() => void refresh()} />
+            <ErrorState title="Couldn’t load colleges" description={error} retry={() => void refresh()} />
           )}
 
           {!loading && !error && filtered.length === 0 && (

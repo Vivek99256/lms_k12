@@ -284,7 +284,7 @@ export function FrameworkMapping() {
       setCatForm({ category: '', competency: '' })
       retry()
     } catch (e) {
-      setCatError(e instanceof Error ? e.message : 'Failed to add category.')
+      setCatError(e instanceof Error ? e.message : 'Couldn’t add category.')
     } finally {
       setCatSaving(false)
     }

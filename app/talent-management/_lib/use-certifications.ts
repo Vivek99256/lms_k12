@@ -101,7 +101,7 @@ export function useCertifications(params: CertificationListParams): UseCertifica
       setItems(response.data ?? [])
       setPagination(response.pagination ?? null)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load certifications.'))
+      setError(toMessage(loadError, "Couldn't load certifications. Try again."))
       setItems([])
       setPagination(null)
     } finally {
@@ -168,7 +168,7 @@ export function useCertifications(params: CertificationListParams): UseCertifica
     (payload: CertificationPayload) =>
       runMutation(
         () => certificationService.create(buildSessionContext(), payload),
-        'Failed to add the certification.',
+        "Couldn't add the certification. Try again.",
       ),
     [runMutation],
   )
@@ -177,7 +177,7 @@ export function useCertifications(params: CertificationListParams): UseCertifica
     (id: number, payload: Partial<CertificationPayload>) =>
       runMutation(
         () => certificationService.update(buildSessionContext(), id, payload),
-        'Failed to update the certification.',
+        "Couldn't update the certification. Try again.",
       ),
     [runMutation],
   )
@@ -186,7 +186,7 @@ export function useCertifications(params: CertificationListParams): UseCertifica
     (id: number) =>
       runMutation(
         () => certificationService.remove(buildSessionContext(), id),
-        'Failed to delete the certification.',
+        "Couldn't delete the certification. Try again.",
       ),
     [runMutation],
   )
@@ -301,7 +301,7 @@ export function useCertificationDetail(
         if (!cancelled) setDetail(response.data)
       } catch (err) {
         if (!cancelled) {
-          setError(toMessage(err, 'Failed to load the certification.'))
+          setError(toMessage(err, "Couldn't load the certification. Try again."))
           setDetail(null)
         }
       } finally {
@@ -342,7 +342,7 @@ export function useCertificationDetail(
           }
         }
       } catch (err) {
-        if (!cancelled) setTabError(toMessage(err, 'Failed to load this tab.'))
+        if (!cancelled) setTabError(toMessage(err, "Couldn't load this tab. Try again."))
       } finally {
         if (!cancelled) setTabLoading(false)
       }
@@ -371,7 +371,7 @@ export function useCertificationDetail(
     (note: string) =>
       runMutation(
         () => certificationService.addNote(buildSessionContext(), id as number, note),
-        'Failed to add the note.',
+        "Couldn't add the note. Try again.",
       ),
     [runMutation, id],
   )
@@ -380,7 +380,7 @@ export function useCertificationDetail(
     (payload: { title: string; description?: string; link?: string; file?: File | null }) =>
       runMutation(
         () => certificationService.addDocument(buildSessionContext(), id as number, payload),
-        'Failed to attach the document.',
+        "Couldn't attach the document. Try again.",
       ),
     [runMutation, id],
   )
@@ -389,7 +389,7 @@ export function useCertificationDetail(
     (documentId: number) =>
       runMutation(
         () => certificationService.removeDocument(buildSessionContext(), id as number, documentId),
-        'Failed to remove the document.',
+        "Couldn't remove the document. Try again.",
       ),
     [runMutation, id],
   )
@@ -442,7 +442,7 @@ export function useCertificationRequirements(enabled: boolean): UseCertification
       const response = await certificationService.listRequirements(buildSessionContext(), { per_page: 200 })
       setRequirements(response.data ?? [])
     } catch (err) {
-      setError(toMessage(err, 'Failed to load certification requirements.'))
+      setError(toMessage(err, "Couldn't load certification requirements. Try again."))
       setRequirements([])
     } finally {
       setLoading(false)
@@ -475,7 +475,7 @@ export function useCertificationRequirements(enabled: boolean): UseCertification
     (payload: CertificationRequirementPayload) =>
       runMutation(
         () => certificationService.createRequirement(buildSessionContext(), payload),
-        'Failed to create the requirement.',
+        "Couldn't create the requirement. Try again.",
       ),
     [runMutation],
   )
@@ -484,7 +484,7 @@ export function useCertificationRequirements(enabled: boolean): UseCertification
     (id: number, payload: Partial<CertificationRequirementPayload>) =>
       runMutation(
         () => certificationService.updateRequirement(buildSessionContext(), id, payload),
-        'Failed to update the requirement.',
+        "Couldn't update the requirement. Try again.",
       ),
     [runMutation],
   )
@@ -493,7 +493,7 @@ export function useCertificationRequirements(enabled: boolean): UseCertification
     (id: number) =>
       runMutation(
         () => certificationService.removeRequirement(buildSessionContext(), id),
-        'Failed to delete the requirement.',
+        "Couldn't delete the requirement. Try again.",
       ),
     [runMutation],
   )

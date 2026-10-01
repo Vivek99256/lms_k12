@@ -78,7 +78,7 @@ export default function AddVisitorPage() {
       setSources(formSources);
       setVisitors(register);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The visitor screen could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the visitor screen. Try again."));
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export default function AddVisitorPage() {
       cancelEdit();
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The visitor could not be saved."));
+      setError(errorMessage(value, "Couldn't save the visitor. Try again."));
     } finally {
       setSaving(false);
     }
@@ -190,7 +190,7 @@ export default function AddVisitorPage() {
       setNotice(message);
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The visitor could not be checked out."));
+      setError(errorMessage(value, "Couldn't check out the visitor. Try again."));
     } finally {
       setBusy(false);
     }
@@ -206,7 +206,7 @@ export default function AddVisitorPage() {
       setNotice(await deleteVisitor(visitor.id));
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The visitor could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the visitor. Try again."));
     } finally {
       setBusy(false);
     }
@@ -245,7 +245,7 @@ export default function AddVisitorPage() {
           No visitor type could be resolved, so a visitor cannot be added yet. The ERP has no API
           that lists the visitor type master — the only endpoint that reads it fails for API callers
           — so the options here are recovered from types already used in the register, and this
-          institute has none. A backend endpoint for the visitor type master is needed.
+          institute has none. Ask your administrator to set up visitor types.
         </ErpAlert>
       ) : null}
 

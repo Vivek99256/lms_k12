@@ -73,7 +73,7 @@ export default function HomeworkDetailPage() {
 
   const load = useCallback(async () => {
     if (!homeworkId || Number.isNaN(homeworkId)) {
-      setError("Invalid homework reference.");
+      setError("This homework link isn’t valid. Go back and try again.");
       setLoading(false);
       return;
     }
@@ -87,7 +87,7 @@ export default function HomeworkDetailPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "This homework could not be loaded."
+          : "This homework couldn’t be loaded."
       );
     } finally {
       setLoading(false);
@@ -166,7 +166,7 @@ export default function HomeworkDetailPage() {
         !error ? (
           <section className="rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
             <ClipboardList className="mx-auto mb-2 size-8 text-slate-300" />
-            This homework could not be found.
+            This homework couldn’t be found.
           </section>
         ) : null
       ) : (

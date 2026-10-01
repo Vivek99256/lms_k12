@@ -349,7 +349,7 @@ export function TalentDashboard() {
   if (error || !data) {
     return (
       <ErrorState
-        title="Could not load the talent dashboard"
+        title="Couldn't load the talent dashboard. Try again."
         description={error ?? 'The dashboard returned no data.'}
         retry={() => void refresh()}
       />

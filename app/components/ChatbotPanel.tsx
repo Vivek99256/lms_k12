@@ -151,8 +151,8 @@ function readStoredSession() {
  */
 const FALLBACK_PROMPTS = [
   'Show my homework updates',
-  'What is in my activity stream today?',
-  'Show my LMS dashboard progress',
+  "What's new today?",
+  'Show my learning progress',
   'Which students have unpaid fees?',
 ];
 
@@ -987,7 +987,7 @@ export default function ChatbotPanel({
                                   )}
                                   aria-hidden
                                 />
-                                {traceOpen ? 'Hide agent activity' : live ? 'Agent working' : 'Agent activity'}
+                                {traceOpen ? 'Hide details' : live ? 'Working…' : 'Show details'}
                                 <span className="tabular-nums text-gray-400">
                                   {/*
                                     While the turn runs the denominator is only the
@@ -1100,7 +1100,7 @@ export default function ChatbotPanel({
               {error ? (
                 <div className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  <span>{error.message || 'The AI assistant request failed.'}</span>
+                  <span>The AI assistant couldn't answer. Please try again.</span>
                 </div>
               ) : null}
 
@@ -1132,7 +1132,7 @@ export default function ChatbotPanel({
                 }
               }}
               value={transcript || input}
-              placeholder="Ask about homework, dashboard, results, fees, or workflows..."
+              placeholder="Ask about homework, results, fees, or attendance…"
               disabled={isLoading}
               className={cn(
                 'h-11 min-w-0 flex-1 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-900 shadow-sm',

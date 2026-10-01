@@ -37,7 +37,7 @@ export default function PettyCashMasterPage() {
     try {
       setHeads(await loadPettyCashHeads());
     } catch (value: unknown) {
-      setError(errorMessage(value, "Petty cash heads could not be loaded."));
+      setError(errorMessage(value, "Couldn't load petty cash heads. Try again."));
     } finally {
       setLoading(false);
     }
@@ -72,7 +72,7 @@ export default function PettyCashMasterPage() {
       cancelEdit();
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The petty cash head could not be saved."));
+      setError(errorMessage(value, "Couldn't save the petty cash head. Try again."));
     } finally {
       setSaving(false);
     }
@@ -95,7 +95,7 @@ export default function PettyCashMasterPage() {
       if (editing?.id === head.id) cancelEdit();
       await load();
     } catch (value: unknown) {
-      setError(errorMessage(value, "The petty cash head could not be deleted."));
+      setError(errorMessage(value, "Couldn't delete the petty cash head. Try again."));
     } finally {
       setBusy(false);
     }

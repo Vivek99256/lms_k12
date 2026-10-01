@@ -153,12 +153,12 @@ export async function fetchRegistrationDetail(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to load registration details (${response.status})`);
+    throw new Error(`Couldn't load registration details. Try again.`);
   }
 
   const payload = (await response.json()) as LegacyRegistrationDetailResponse;
   if (normalizeApiStatus(payload) !== '1' || !payload.editData) {
-    throw new Error(payload.message || 'Failed to load registration details.');
+    throw new Error(payload.message || "Couldn't load registration details. Try again.");
   }
 
   return {
@@ -215,12 +215,12 @@ export async function saveRegistration(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update registration (${response.status})`);
+    throw new Error(`Couldn't update registration. Try again.`);
   }
 
   const responsePayload = (await response.json()) as { status_code?: string | number; message?: string };
   if (normalizeApiStatus(responsePayload) !== '1') {
-    throw new Error(responsePayload.message || 'Failed to update registration.');
+    throw new Error(responsePayload.message || "Couldn't update registration. Try again.");
   }
 
   const refreshedDetail = await fetchRegistrationDetail(id);
@@ -272,12 +272,12 @@ export async function confirmAdmission(input: {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to confirm admission (${response.status})`);
+    throw new Error(`Couldn't confirm admission. Try again.`);
   }
 
   const responsePayload = (await response.json()) as { status_code?: string | number; message?: string };
   if (normalizeApiStatus(responsePayload) !== '1') {
-    throw new Error(responsePayload.message || 'Failed to confirm admission.');
+    throw new Error(responsePayload.message || "Couldn't confirm admission. Try again.");
   }
 
   return responsePayload;

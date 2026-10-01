@@ -83,7 +83,7 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
   const mayEdit = rights.permissions?.[RBAC_KEY]?.update ?? false;
   const rightsReason = rights.authenticated
     ? 'Your role cannot change scheduled tasks for this institute.'
-    : 'Sign in again — your permissions could not be checked.';
+    : "Sign in again. We couldn't check your permissions.";
 
   const load = useCallback(
     (isRefresh = false) => {
@@ -93,7 +93,7 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
       fetchScheduledTasks({ module: moduleKey ?? undefined, component: componentKey ?? undefined })
         .then(setPayload)
         .catch((cause: unknown) => {
-          setError(cause instanceof PlatformApiError ? cause.message : 'The scheduled tasks could not be loaded.');
+          setError(cause instanceof PlatformApiError ? cause.message : "Couldn't load the scheduled tasks. Try again.");
         })
         .finally(() => setLoading(false));
     },
@@ -124,7 +124,7 @@ export function SchedulerConsole({ module: pinnedModule, breadcrumb, title, desc
       } catch (cause) {
         setNote({
           tone: 'error',
-          text: cause instanceof PlatformApiError ? cause.message : 'The task could not be saved.',
+          text: cause instanceof PlatformApiError ? cause.message : "Couldn't save the task. Try again.",
         });
         return false;
       }

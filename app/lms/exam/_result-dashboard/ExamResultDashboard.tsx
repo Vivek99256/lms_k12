@@ -132,7 +132,7 @@ export default function ExamResultDashboard() {
         .catch((reason: unknown) => {
           // An abort just means a newer filter selection took over.
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'Unable to load the result dashboard.');
+          setError(reason instanceof Error ? reason.message : 'Couldn’t load the result dashboard.');
         })
         .finally(() => {
           if (controller.signal.aborted) return;

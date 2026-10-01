@@ -51,7 +51,7 @@ async function request(path: string, init?: RequestInit): Promise<RecordValue> {
 
   const payload: unknown = await response.json();
   if (!response.ok || (isRecord(payload) && ['0', '2'].includes(normalizeApiStatus(payload as ApiEnvelope)))) {
-    throw new Error(message(payload, `Request failed (${response.status}).`));
+    throw new Error(message(payload, "Couldn't complete that request. Try again."));
   }
 
   return isRecord(payload) ? payload : {};
@@ -195,7 +195,7 @@ export async function uploadPageAsset(id: number, file: File): Promise<string> {
 
   const payload: unknown = await response.json();
   if (!response.ok || (isRecord(payload) && ['0', '2'].includes(normalizeApiStatus(payload as ApiEnvelope)))) {
-    throw new Error(message(payload, `Upload failed (${response.status}).`));
+    throw new Error(message(payload, "Couldn't upload the file. Try again."));
   }
 
   const data = isRecord(payload) && isRecord(payload.data) ? payload.data : {};

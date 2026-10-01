@@ -131,7 +131,7 @@ export async function fetchTeachLearnMenuCategories(
     throw new Error(
       typeof message === 'string' && message
         ? message
-        : 'Unable to load the teach/learn category navigation.'
+        : 'Couldn’t load the teach/learn category navigation.'
     );
   }
 

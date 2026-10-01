@@ -12,7 +12,7 @@ export default function AdmissionReportsIndexPage() {
         <PageHeader
           icon={reportConfigs[0].icon}
           title="Admission Reports"
-          subtitle="Open each legacy-aligned admissions report from its own separate module file."
+          subtitle="Open an admissions report."
           breadcrumbs={[
             { label: 'Admissions', href: '/admissions/admission_enquiry' },
             { label: 'Admission Reports' },

@@ -62,7 +62,7 @@ export default function SessionSummaryPage() {
         <StatusPanel
           kind="error"
           title="Session summary is not available"
-          message={error || 'The backend did not return a session summary.'}
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={reload}
           retrying={refreshing}
         />

@@ -215,7 +215,7 @@ function AdaptivePracticeModal({
         if (!controller.signal.aborted) setData(response);
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load practice questions.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load practice questions.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -243,7 +243,7 @@ function AdaptivePracticeModal({
     try {
       setResult(await submitAdaptivePractice({ studentId, answers }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to submit practice.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t submit practice.');
     } finally {
       setSubmitting(false);
     }
@@ -505,7 +505,7 @@ function SpacedRepetitionModal({
         if (!controller.signal.aborted) setData(response);
       } catch (reason) {
         if (controller.signal.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load review schedule.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load review schedule.');
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -597,7 +597,7 @@ function PracticeHistoryModal({
         if (!signal?.aborted) setData(response);
       } catch (reason) {
         if (signal?.aborted) return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load practice history.');
+        setError(reason instanceof Error ? reason.message : 'Couldn’t load practice history.');
       } finally {
         if (!signal?.aborted) setLoading(false);
       }

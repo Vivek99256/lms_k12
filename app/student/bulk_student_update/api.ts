@@ -40,7 +40,7 @@ export type BulkSearchFilters = {
 
 function assertSuccess(payload: ApiEnvelope) {
   if (Number(payload.status) !== 1) {
-    throw new Error(payload.message || 'Unable to complete the request.');
+    throw new Error(payload.message || "Couldn't complete the request. Try again.");
   }
 }
 

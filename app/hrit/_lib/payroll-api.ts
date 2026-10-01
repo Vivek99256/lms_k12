@@ -54,7 +54,7 @@ async function webRequest<T>(
 
   const payload = (await response.json().catch(() => ({}))) as unknown;
   if (!response.ok) {
-    throw new Error(messageFrom(payload, `API Error: ${response.status} ${response.statusText}`));
+    throw new Error(messageFrom(payload, "Couldn't complete that request. Try again."));
   }
 
   return payload as T;
@@ -77,7 +77,7 @@ async function apiGet<T>(session: SessionContext, path: string, params: Record<s
   const response = await fetch(url, { method: 'GET', cache: 'no-store', headers: createAuthHeaders(session) });
   const payload = (await response.json().catch(() => ({}))) as unknown;
   if (!response.ok) {
-    throw new Error(messageFrom(payload, `API Error: ${response.status} ${response.statusText}`));
+    throw new Error(messageFrom(payload, "Couldn't complete that request. Try again."));
   }
   return payload as T;
 }

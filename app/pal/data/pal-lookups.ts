@@ -105,7 +105,7 @@ export async function fetchClassStudents(
     throw new Error(readString(payload.message) || 'You are not allowed to list these students.');
   }
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: Unable to load students.`);
+    throw new Error(`Couldn’t load students. Try again.`);
   }
 
   const payload = toRecord(await response.json());

@@ -171,7 +171,7 @@ export function FeesKnowledgeBaseScreen() {
       const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
 
       if (!response.ok) {
-        const message = typeof payload?.error === 'string' ? payload.error : `The call failed (${response.status}).`;
+        const message = typeof payload?.error === 'string' ? payload.error : "Couldn't load the data. Try again.";
         setChecks((current) => ({ ...current, [source.name]: { state: 'failed', detail: message } }));
         return;
       }
@@ -226,13 +226,12 @@ export function FeesKnowledgeBaseScreen() {
       />
 
       <FeesAiHint>
-        Every source below is read-only by construction — the backend filters the catalogue on each tool&apos;s own
-        annotation, so a tool that changes a fee record cannot appear here or be bound to a template.
+        Every source below is read-only by construction — the list only includes tools that cannot change a record, so a tool that changes a fee record cannot appear here or be bound to a template.
       </FeesAiHint>
 
       {sources.length === 0 ? (
         <FeesAiEmpty icon={Database} title="No Fees knowledge sources registered">
-          The backend reported no read-only Fees tools. Until one is registered, Fees AI has no fee records to ground an
+          No read-only Fees tools are available. Until one is registered, Fees AI has no fee records to ground an
           answer in.
         </FeesAiEmpty>
       ) : (

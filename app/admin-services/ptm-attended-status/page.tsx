@@ -60,7 +60,7 @@ export default function PtmAttendedStatusPage() {
     try {
       setClassOptions(await loadClassOptions());
     } catch (value: unknown) {
-      setError(errorMessage(value, "The class list could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the class list. Try again."));
     } finally {
       setLoading(false);
     }
@@ -131,7 +131,7 @@ export default function PtmAttendedStatusPage() {
     } catch (value: unknown) {
       setRows([]);
       setSearched(true);
-      setError(errorMessage(value, "Students could not be loaded."));
+      setError(errorMessage(value, "Couldn't load students. Try again."));
     } finally {
       setSearching(false);
     }
@@ -158,7 +158,7 @@ export default function PtmAttendedStatusPage() {
       const message = await savePtmAttendance(rows, chosen);
       setNotice(`${message} (${chosen.length} student(s))`);
     } catch (value: unknown) {
-      setError(errorMessage(value, "The PTM attendance could not be saved."));
+      setError(errorMessage(value, "Couldn't save the PTM attendance. Try again."));
     } finally {
       setSaving(false);
     }

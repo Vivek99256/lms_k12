@@ -148,7 +148,7 @@ export function useLeaveDashboard(departmentId?: string): LeaveDashboardState {
       setRecent(recentResponse.data ?? [])
       setUpcoming(upcomingResponse.data ?? [])
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the leave dashboard.'))
+      setError(toMessage(loadError, "Couldn't load the leave dashboard. Try again."))
       setSummary(null)
       setTrend([])
       setDepartments([])
@@ -181,7 +181,7 @@ export function useLeaveDashboard(departmentId?: string): LeaveDashboardState {
         await load()
         return { ok: true, message: response.message }
       } catch (decisionError) {
-        const message = toMessage(decisionError, 'Failed to update the leave request.')
+        const message = toMessage(decisionError, "Couldn't update the leave request. Try again.")
         setActionError(message)
         return { ok: false, message }
       } finally {
@@ -228,7 +228,7 @@ export function useLeaveOptions(departmentId?: string) {
       const response = await leaveService.getOptions(resolveSession(), departmentId)
       setOptions(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load leave options.'))
+      setError(toMessage(loadError, "Couldn't load leave options. Try again."))
       setOptions(null)
     } finally {
       setLoading(false)
@@ -271,7 +271,7 @@ export function useLeaveRequests(filters: LeaveRequestFilters) {
       setTotal(response.pagination?.total ?? 0)
       setLastPage(response.pagination?.last_page ?? 1)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load leave requests.'))
+      setError(toMessage(loadError, "Couldn't load leave requests. Try again."))
       setRequests([])
       setTotal(0)
       setLastPage(1)
@@ -298,7 +298,7 @@ export function useLeaveRequests(filters: LeaveRequestFilters) {
         await load()
         return { ok: true as const, message: response.message }
       } catch (submitError) {
-        const message = toMessage(submitError, 'Failed to submit the leave request.')
+        const message = toMessage(submitError, "Couldn't submit the leave request. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -320,7 +320,7 @@ export function useLeaveRequests(filters: LeaveRequestFilters) {
         await load()
         return { ok: true as const, message: response.message }
       } catch (decisionError) {
-        const message = toMessage(decisionError, 'Failed to update the leave request.')
+        const message = toMessage(decisionError, "Couldn't update the leave request. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -342,7 +342,7 @@ export function useLeaveRequests(filters: LeaveRequestFilters) {
         await load()
         return { ok: true as const, message: response.message }
       } catch (decisionError) {
-        const message = toMessage(decisionError, 'Failed to update the selected leave requests.')
+        const message = toMessage(decisionError, "Couldn't update the selected leave requests. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -391,7 +391,7 @@ export function useLeaveRequestDetail(id: number | string | null) {
       const response = await leaveService.getRequest(resolveSession(), id)
       setDetail(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the leave request.'))
+      setError(toMessage(loadError, "Couldn't load the leave request. Try again."))
       setDetail(null)
     } finally {
       setLoading(false)
@@ -439,7 +439,7 @@ export function useLeaveReports(filters: LeaveReportFilters) {
       setRegister(registerResponse.data ?? [])
       setBalance(balanceResponse.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the leave report.'))
+      setError(toMessage(loadError, "Couldn't load the leave report. Try again."))
       setSummary(null)
       setRegister([])
       setBalance(null)
@@ -477,7 +477,7 @@ export function useLeaveTypes() {
       const response = await leaveService.getLeaveTypes(resolveSession())
       setLeaveTypes(response.data ?? [])
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load leave types.'))
+      setError(toMessage(loadError, "Couldn't load leave types. Try again."))
       setLeaveTypes([])
     } finally {
       setLoading(false)
@@ -524,14 +524,14 @@ export function useLeaveTypes() {
       setActionMessage(null)
     },
     save: (payload: LeaveTypePayload) =>
-      run(() => leaveService.saveLeaveType(resolveSession(), payload), 'Failed to save the leave type.'),
+      run(() => leaveService.saveLeaveType(resolveSession(), payload), "Couldn't save the leave type. Try again."),
     toggleStatus: (id: number | string, status: boolean) =>
       run(
         () => leaveService.toggleLeaveTypeStatus(resolveSession(), id, status),
-        'Failed to change the leave type status.',
+        "Couldn't change the leave type status. Try again.",
       ),
     remove: (id: number | string) =>
-      run(() => leaveService.deleteLeaveType(resolveSession(), id), 'Failed to delete the leave type.'),
+      run(() => leaveService.deleteLeaveType(resolveSession(), id), "Couldn't delete the leave type. Try again."),
   }
 }
 
@@ -562,7 +562,7 @@ export function useHolidays(calendarYear?: string) {
       setHolidays(holidayResponse.data ?? [])
       setWeekdays(weekdayResponse.data ?? [])
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load holidays.'))
+      setError(toMessage(loadError, "Couldn't load holidays. Try again."))
       setHolidays([])
       setWeekdays([])
     } finally {
@@ -611,11 +611,11 @@ export function useHolidays(calendarYear?: string) {
       setActionMessage(null)
     },
     save: (payload: HolidayPayload, id?: number | string) =>
-      run(() => leaveService.saveHoliday(resolveSession(), payload, id), 'Failed to save the holiday.'),
+      run(() => leaveService.saveHoliday(resolveSession(), payload, id), "Couldn't save the holiday. Try again."),
     remove: (id: number | string) =>
-      run(() => leaveService.deleteHoliday(resolveSession(), id), 'Failed to delete the holiday.'),
+      run(() => leaveService.deleteHoliday(resolveSession(), id), "Couldn't delete the holiday. Try again."),
     saveWeekdays: (pattern: Record<string, string>) =>
-      run(() => leaveService.saveWeekdays(resolveSession(), pattern), 'Failed to save the weekly off pattern.'),
+      run(() => leaveService.saveWeekdays(resolveSession(), pattern), "Couldn't save the weekly off pattern. Try again."),
   }
 }
 
@@ -639,7 +639,7 @@ export function useLeaveWorkflow() {
       const response = await leaveService.getWorkflow(resolveSession())
       setWorkflow(response.data)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the approval workflow.'))
+      setError(toMessage(loadError, "Couldn't load the approval workflow. Try again."))
       setWorkflow(null)
     } finally {
       setLoading(false)
@@ -664,7 +664,7 @@ export function useLeaveWorkflow() {
         setActionMessage(response.message)
         return { ok: true as const, message: response.message }
       } catch (saveError) {
-        const message = toMessage(saveError, 'Failed to save the approval workflow.')
+        const message = toMessage(saveError, "Couldn't save the approval workflow. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -705,7 +705,7 @@ export function useLeaveRoles() {
       const response = await leaveService.getRoles(resolveSession())
       setRoles(response.data ?? [])
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load role permissions.'))
+      setError(toMessage(loadError, "Couldn't load role permissions. Try again."))
       setRoles([])
     } finally {
       setLoading(false)
@@ -730,7 +730,7 @@ export function useLeaveRoles() {
         setActionMessage(response.message)
         return { ok: true as const, message: response.message }
       } catch (saveError) {
-        const message = toMessage(saveError, 'Failed to save role permissions.')
+        const message = toMessage(saveError, "Couldn't save role permissions. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {

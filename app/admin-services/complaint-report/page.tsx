@@ -30,7 +30,7 @@ export default function ComplaintReportPage() {
     } catch (value: unknown) {
       setComplaints([]);
       setGenerated(true);
-      setError(errorMessage(value, "The complaint report could not be generated."));
+      setError(errorMessage(value, "Couldn't generate the complaint report. Try again."));
     } finally {
       setLoading(false);
     }

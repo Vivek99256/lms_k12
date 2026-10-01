@@ -157,7 +157,7 @@ export async function fetchEnquiryOptions(): Promise<EnquiryOption[]> {
 
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok || normalizeApiStatus(payload) !== '1') {
-    throw new Error(readString(payload.message) || 'Failed to load enquiries.');
+    throw new Error(readString(payload.message) || "Couldn't load enquiries. Try again.");
   }
 
   return toArray(payload.data)
@@ -204,7 +204,7 @@ export async function createFollowUp(input: NewFollowUpInput): Promise<void> {
 
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok || normalizeApiStatus(payload) !== '1') {
-    throw new Error(readString(payload.message) || 'Failed to create the reminder.');
+    throw new Error(readString(payload.message) || "Couldn't create the reminder. Try again.");
   }
 }
 

@@ -3,7 +3,7 @@ import { AcademicSetupPage } from "../_components/AcademicSetupPage";
 export default function StandardDivisionMappingPage() {
   return <AcademicSetupPage config={{
     module: "standard-division-mapping",
-    title: "Standard Division Mapping",
+    title: "Standard division mapping",
     description: "Map the divisions available for each standard.",
     singular: "Mapping",
     fields: [],

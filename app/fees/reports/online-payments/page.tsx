@@ -129,7 +129,7 @@ export default function OnlinePaymentsReportPage() {
       });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to fetch online payments.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load online payments. Try again." });
     } finally {
       setLoading(false);
     }
@@ -150,9 +150,9 @@ export default function OnlinePaymentsReportPage() {
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'online-payments.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'online-payments.xls', title: 'Online Payments', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'online-payments.pdf', title: 'Online Payments', subtitle: 'Gateway transaction log', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Online Payments', subtitle: 'Gateway transaction log', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'online-payments.xls', title: 'Online payments', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'online-payments.pdf', title: 'Online payments', subtitle: 'Gateway transaction log', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Online payments', subtitle: 'Gateway transaction log', columns: exportColumns, rows: exportRows })}
           />
         }
       />

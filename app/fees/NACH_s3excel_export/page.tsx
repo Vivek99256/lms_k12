@@ -106,7 +106,7 @@ export default function NachS3ExcelExportPage() {
       const payload = await fetchLaravelJson<S3Response>(nextSession, `${getApiBaseUrl(nextSession)}/fees/NACH_s3excel_export?${params.toString()}`);
       setMonths(toMonthOptions(payload.fee_month));
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load fee months.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load fee months. Try again." });
     } finally {
       setLoadingMonths(false);
     }
@@ -153,7 +153,7 @@ export default function NachS3ExcelExportPage() {
       setDownloadPath(readString(payload.excelFile_path));
       setMessage({ type: nextRows.length ? 'success' : 'info', text: payload.message || (nextRows.length ? `Loaded ${nextRows.length} S3 row${nextRows.length === 1 ? '' : 's'}.` : 'No records found.') });
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to export S3 NACH data.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't export S3 NACH data. Try again." });
     } finally {
       setLoading(false);
     }

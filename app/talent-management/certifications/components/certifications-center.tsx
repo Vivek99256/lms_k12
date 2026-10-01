@@ -588,7 +588,7 @@ function RequirementDialog({
               ))}
             </div>
           ) : error ? (
-            <ErrorState title="Could not load requirements" description={error} retry={retry} className="border-0" />
+            <ErrorState title="Couldn't load requirements. Try again." description={error} retry={retry} className="border-0" />
           ) : requirements.length === 0 ? (
             <EmptyState
               icon={<ClipboardList className="w-8 h-8" />}
@@ -967,7 +967,7 @@ export function CertificationsCenter() {
     const headers = [
       'Certification Name',
       'Employee',
-      'Employee No',
+      'Employee ID',
       'Department',
       'Job Role',
       'Certification Type',
@@ -1370,7 +1370,7 @@ export function CertificationsCenter() {
               </div>
             ) : error ? (
               <ErrorState
-                title="Could not load certifications"
+                title="Couldn't load certifications. Try again."
                 description={error}
                 retry={retry}
                 className="border-0 h-full"
@@ -1641,7 +1641,7 @@ export function CertificationsCenter() {
             <CardContent className="flex-1 overflow-auto g2g-scrollbar relative z-10 p-5 bg-card">
               {detail.error ? (
                 <ErrorState
-                  title="Could not load this certification"
+                  title="Couldn't load this certification. Try again."
                   description={detail.error}
                   retry={detail.reload}
                   className="border-0"
@@ -1671,7 +1671,7 @@ export function CertificationsCenter() {
                       </div>
                       <div className="text-xs text-muted-foreground flex flex-col gap-1 items-end">
                         <div className="flex gap-2">
-                          <span>Emp ID</span>
+                          <span>Employee ID</span>
                           <span className="font-semibold text-foreground">
                             {cert.employee?.employee_no ?? '--'}
                           </span>
@@ -1809,7 +1809,7 @@ export function CertificationsCenter() {
                 </div>
               ) : detail.tabError ? (
                 <ErrorState
-                  title="Could not load this tab"
+                  title="Couldn't load this tab. Try again."
                   description={detail.tabError}
                   retry={detail.reload}
                   className="border-0"

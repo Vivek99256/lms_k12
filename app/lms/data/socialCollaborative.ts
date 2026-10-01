@@ -127,7 +127,7 @@ async function request(
   url: URL,
   session: SessionContext,
   init: RequestInit = {},
-  fallback = 'Unable to load the discussions.'
+  fallback = 'Couldn’t load the discussions.'
 ): Promise<Record<string, unknown>> {
   const res = await fetch(url.toString(), {
     ...init,
@@ -140,13 +140,13 @@ async function request(
     try {
       body = toRecord(JSON.parse(text));
     } catch {
-      throw new Error(`The server returned an unexpected response (HTTP ${res.status}).`);
+      throw new Error(`The server returned an unexpected response.`);
     }
   }
 
   if (!res.ok || body.success === false) {
     if (res.status === 401) throw new Error('Your session has expired. Please sign in again.');
-    throw new Error(firstFieldError(body.errors) || readString(body.message) || `${fallback} (HTTP ${res.status})`);
+    throw new Error(firstFieldError(body.errors) || readString(body.message) || `${fallback}`);
   }
 
   return body;
@@ -235,7 +235,7 @@ export async function fetchFeed(filters: ScFeedFilters = {}, signal?: AbortSigna
 
 export async function fetchThread(id: number, signal?: AbortSignal): Promise<ScPost> {
   const session = requireSession();
-  const body = await request(apiUrl(session, `/${id}`), session, { signal }, 'Unable to open this discussion.');
+  const body = await request(apiUrl(session, `/${id}`), session, { signal }, 'Couldn’t open this discussion.');
   return mapPost(body.data);
 }
 
@@ -255,7 +255,7 @@ export async function createPost(input: ScNewPost): Promise<ScPost> {
     apiUrl(session, ''),
     session,
     { method: 'POST', body: form },
-    'Unable to post this discussion.'
+    'Couldn’t post this discussion.'
   );
 
   return mapPost(body.data);
@@ -271,7 +271,7 @@ export async function createComment(id: number, message: string): Promise<ScComm
     apiUrl(session, `/${id}/comments`),
     session,
     { method: 'POST', body: form },
-    'Unable to post your reply.'
+    'Couldn’t post your reply.'
   );
 
   return mapComment(body.data);
@@ -279,7 +279,7 @@ export async function createComment(id: number, message: string): Promise<ScComm
 
 export async function fetchSubjects(signal?: AbortSignal): Promise<ScOption[]> {
   const session = requireSession();
-  const body = await request(apiUrl(session, '/lookups/subjects'), session, { signal }, 'Unable to load subjects.');
+  const body = await request(apiUrl(session, '/lookups/subjects'), session, { signal }, 'Couldn’t load subjects.');
   return mapOptions(body.data, 'subject_id');
 }
 
@@ -289,7 +289,7 @@ export async function fetchChapters(subjectId: string, signal?: AbortSignal): Pr
     apiUrl(session, '/lookups/chapters', { subject_id: subjectId }),
     session,
     { signal },
-    'Unable to load chapters.'
+    'Couldn’t load chapters.'
   );
   return mapOptions(body.data);
 }
@@ -300,7 +300,7 @@ export async function fetchTopics(chapterId: string, signal?: AbortSignal): Prom
     apiUrl(session, '/lookups/topics', { chapter_id: chapterId }),
     session,
     { signal },
-    'Unable to load topics.'
+    'Couldn’t load topics.'
   );
   return mapOptions(body.data);
 }

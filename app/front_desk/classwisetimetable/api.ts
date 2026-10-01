@@ -71,7 +71,7 @@ export async function getClasswiseTimetable(
   );
   const payload = (await response.json()) as unknown;
   if (!response.ok || (isRecord(payload) && (normalizeApiStatus(payload as ApiEnvelope) === "2" || readString(payload.status) === "ERROR"))) {
-    throw new Error(messageFrom(payload, `Request failed (${response.status}).`));
+    throw new Error(messageFrom(payload, "Couldn't complete the request. Try again."));
   }
   const record = isRecord(payload) ? payload : {};
   const className = isRecord(record.class) ? record.class : {};

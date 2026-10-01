@@ -267,7 +267,7 @@ export default function Form16Page() {
               <ReadOnlyField label="Employer PAN" value={form16.organizationPan} />
               <ReadOnlyField label="Employer TAN" value={form16.organizationTan} />
               <ReadOnlyField label="Department" value={form16.department} />
-              <ReadOnlyField label="Employee Code" value={form16.employeeNo} />
+              <ReadOnlyField label="Employee ID" value={form16.employeeNo} />
               <ReadOnlyField label="Employee PAN" value={form16.panNo} />
             </div>
 

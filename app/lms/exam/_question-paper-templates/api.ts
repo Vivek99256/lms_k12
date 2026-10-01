@@ -59,7 +59,7 @@ async function readJson(response: Response): Promise<ApiEnvelope & { data?: unkn
   } catch {
     throw new Error(
       response.ok
-        ? 'The exam service returned a response we could not read.'
+        ? 'The exam service returned a response we couldn’t read.'
         : `Request failed with status ${response.status}`
     );
   }
@@ -119,7 +119,7 @@ export async function fetchTemplateIndex(): Promise<TemplateIndex> {
 
   const payload = await readJson(response);
 
-  return unwrap<TemplateIndex>(payload as never, 'Unable to load question paper templates.');
+  return unwrap<TemplateIndex>(payload as never, 'Couldn’t load question paper templates.');
 }
 
 export type SaveTemplateInput = {
@@ -156,7 +156,7 @@ export async function saveTemplate(input: SaveTemplateInput): Promise<QuestionPa
 
   const payload = await readJson(response);
 
-  return unwrap<QuestionPaperTemplate>(payload as never, 'Unable to save the template.');
+  return unwrap<QuestionPaperTemplate>(payload as never, 'Couldn’t save the template.');
 }
 
 export async function deleteTemplate(id: number): Promise<void> {
@@ -173,7 +173,7 @@ export async function deleteTemplate(id: number): Promise<void> {
   const status = normalizeApiStatus(payload);
 
   if (status !== '1' && status !== '200') {
-    throw new Error(payload?.message || 'Unable to remove the template.');
+    throw new Error(payload?.message || 'Couldn’t remove the template.');
   }
 }
 
@@ -190,7 +190,7 @@ export async function fetchPaperContext(paperId: number): Promise<PaperContext> 
 
   const payload = await readJson(response);
 
-  return unwrap<PaperContext>(payload as never, 'Unable to load the question paper.');
+  return unwrap<PaperContext>(payload as never, 'Couldn’t load the question paper.');
 }
 
 type ApiPaperRow = {
@@ -264,7 +264,7 @@ export async function fetchExamPapers(examType?: string): Promise<ExamPaperOptio
   const status = normalizeApiStatus(payload);
 
   if (status !== '1' && status !== '200') {
-    throw new Error(payload?.message || 'Unable to load exams.');
+    throw new Error(payload?.message || 'Couldn’t load exams.');
   }
 
   const rows = Array.isArray(payload?.data) ? (payload.data as ApiPaperRow[]) : [];

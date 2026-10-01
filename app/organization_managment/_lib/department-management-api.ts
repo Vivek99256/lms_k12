@@ -62,7 +62,7 @@ async function request(
   const payload = (await response.json().catch(() => ({}))) as DepartmentManagementResponse;
 
   if (!response.ok || !isSuccess(payload)) {
-    throw new Error(messageFrom(payload, `API Error: ${response.status} ${response.statusText}`));
+    throw new Error(messageFrom(payload, "Couldn't complete that request. Try again."));
   }
 
   return payload;
@@ -181,7 +181,7 @@ export async function getDepartmentImpact(
   };
 
   if (!response.ok || !isSuccess(payload) || !payload.data) {
-    throw new Error(messageFrom(payload, `API Error: ${response.status} ${response.statusText}`));
+    throw new Error(messageFrom(payload, "Couldn't complete that request. Try again."));
   }
 
   return payload.data;
@@ -273,7 +273,7 @@ export async function getDepartmentEmployees(
   };
 
   if (!response.ok || !isSuccess(payload)) {
-    throw new Error(messageFrom(payload, `API Error: ${response.status} ${response.statusText}`));
+    throw new Error(messageFrom(payload, "Couldn't complete that request. Try again."));
   }
 
   return payload.data ?? [];

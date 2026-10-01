@@ -76,7 +76,7 @@ export default function AnnotateAssignmentPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Assignments could not be loaded."
+          : "Assignments couldn’t be loaded."
       );
     } finally {
       setLoading(false);

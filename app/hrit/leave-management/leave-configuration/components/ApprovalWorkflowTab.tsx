@@ -59,8 +59,8 @@ export default function ApprovalWorkflowTab() {
   if (!draft) {
     return (
       <ErrorState
-        title="Unable to load the approval workflow"
-        description={error ?? 'The approval workflow settings could not be loaded.'}
+        title="Couldn't load the approval workflow. Try again."
+        description={error ?? "Couldn't load the approval workflow settings. Try again."}
         retry={retry}
       />
     )

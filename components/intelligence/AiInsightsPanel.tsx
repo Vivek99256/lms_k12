@@ -87,7 +87,7 @@ export function AiInsightsPanel({
 
       setDetail(openCase ? await getCase(context, openCase.id) : null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Insights could not be loaded.');
+      setError(caught instanceof Error ? caught.message : 'Insights couldn’t be loaded.');
     } finally {
       setLoading(false);
     }
@@ -112,7 +112,7 @@ export function AiInsightsPanel({
 
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The analysis could not be run.');
+      setError(caught instanceof Error ? caught.message : 'The analysis couldn’t be run.');
     } finally {
       setAnalysing(false);
     }

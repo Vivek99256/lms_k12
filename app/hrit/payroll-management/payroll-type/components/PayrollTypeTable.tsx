@@ -55,7 +55,7 @@ const dayCountFilterOptions = [
 type SortKey = 'srNo' | 'kind' | 'name' | 'amountType' | 'amountOrPercentage' | 'sortOrder' | 'status'
 
 const sortOptions: { label: string; value: SortKey }[] = [
-  { label: 'Sort: Sr. No', value: 'srNo' },
+  { label: 'Sort: No.', value: 'srNo' },
   { label: 'Sort: Type', value: 'kind' },
   { label: 'Sort: Payroll Name', value: 'name' },
   { label: 'Sort: Amount Type', value: 'amountType' },
@@ -142,7 +142,7 @@ export default function PayrollTypeTable({
   const columns: Column<PayrollTypeRow>[] = [
     {
       id: 'srNo',
-      header: 'Sr. No',
+      header: 'No.',
       render: (value) => <span className="text-sm text-muted-foreground">{String(value)}</span>,
     },
     {

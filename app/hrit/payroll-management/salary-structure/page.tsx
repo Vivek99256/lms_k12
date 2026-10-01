@@ -176,7 +176,7 @@ export default function SalaryStructurePage() {
   const handleExport = () => {
     downloadCsv(
       `salary-structure-${year}.csv`,
-      ['Sr. No', 'Employee No', 'Employee', 'Department', 'Status', ...payrollTypes.map((type) => type.payroll_name ?? ''), 'Net Monthly'],
+      ['No.', 'Employee ID', 'Employee', 'Department', 'Status', ...payrollTypes.map((type) => type.payroll_name ?? ''), 'Net Monthly'],
       visibleRows.map((row, index) => [
         index + 1,
         row.employeeNo,
@@ -315,7 +315,7 @@ export default function SalaryStructurePage() {
       {loading ? (
         <PayrollTableSkeleton />
       ) : error && rows.length === 0 ? (
-        <ErrorState title="Unable to load salary structures" description={error} retry={retry} />
+        <ErrorState title="Couldn't load salary structures. Try again." description={error} retry={retry} />
       ) : payrollTypes.length === 0 ? (
         <Card>
           <CardContent>
@@ -360,7 +360,7 @@ export default function SalaryStructurePage() {
               <Table className="[&_td]:p-2 [&_th]:p-2">
                 <TableHeader className="bg-surface-muted">
                   <TableRow>
-                    <TableHead className="font-semibold">Sr. No</TableHead>
+                    <TableHead className="font-semibold">No.</TableHead>
                     <TableHead className="font-semibold">Employee</TableHead>
                     <TableHead className="font-semibold">Department</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>

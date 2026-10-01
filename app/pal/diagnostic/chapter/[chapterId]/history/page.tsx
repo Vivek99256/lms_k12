@@ -66,7 +66,7 @@ function DiagnosticHistoryView() {
         })
         .catch((reason: unknown) => {
           if (controller.signal.aborted) return;
-          setError(reason instanceof Error ? reason.message : 'History could not be loaded.');
+          setError(reason instanceof Error ? reason.message : 'History couldn’t be loaded.');
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);

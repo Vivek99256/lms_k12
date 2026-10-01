@@ -69,7 +69,7 @@ export function DepartmentJobRolesPanel({
       setRoles(data);
       onRolesLoaded?.(data);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Failed to load job roles.");
+      setError(cause instanceof Error ? cause.message : "Couldn't load job roles. Try again.");
       setRoles([]);
     } finally {
       setIsLoading(false);

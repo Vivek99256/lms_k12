@@ -99,7 +99,7 @@ export default function CurriculumPlanningPage() {
         setApiData(Array.isArray(payload.data) ? null : payload.data ?? null);
       } catch (error) {
         if ((error as Error)?.name === 'AbortError') return;
-        setLoadError(error instanceof Error ? error.message : 'Unable to load curriculum plan.');
+        setLoadError(error instanceof Error ? error.message : 'Couldn’t load curriculum plan.');
         setApiData(null);
       } finally {
         if (!controller.signal.aborted) setIsLoading(false);

@@ -79,7 +79,7 @@ export default function AdmissionsDashboardPage() {
         setPayload(result);
       } catch (caught) {
         if (signal?.aborted) return;
-        setError(caught instanceof Error ? caught.message : 'Unable to load the admissions dashboard summary.');
+        setError(caught instanceof Error ? caught.message : "Couldn't load the admissions dashboard summary. Try again.");
       } finally {
         if (!signal?.aborted) setLoading(false);
       }

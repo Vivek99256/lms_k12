@@ -123,7 +123,7 @@ export function useTalentDashboard() {
       setMeta(response.meta);
       hasDataRef.current = true;
     } catch (loadError) {
-      setError(errorMessage(loadError, 'Failed to load the talent dashboard.'));
+      setError(errorMessage(loadError, "Couldn't load the talent dashboard. Try again."));
     } finally {
       setLoading(false);
       setFetching(false);

@@ -57,7 +57,7 @@ export function useStatuses() {
       const response = await fetchStatuses(session)
       setStatuses(response.data.statuses)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load statuses.'))
+      setError(toMessage(reason, "Couldn't load statuses. Try again."))
     } finally {
       setLoading(false)
     }
@@ -80,7 +80,7 @@ export function useStatuses() {
         setMessage(response.message)
         await load()
       } catch (reason) {
-        setError(toMessage(reason, 'Unable to save the status.'))
+        setError(toMessage(reason, "Couldn't save the status. Try again."))
       } finally {
         setBusy(false)
       }
@@ -99,7 +99,7 @@ export function useStatuses() {
         setMessage(response.message)
         await load()
       } catch (reason) {
-        setError(toMessage(reason, 'Unable to deactivate the status.'))
+        setError(toMessage(reason, "Couldn't deactivate the status. Try again."))
       } finally {
         setBusy(false)
       }
@@ -134,7 +134,7 @@ export function usePriorities() {
       const response = await fetchPriorities(session)
       setPriorities(response.data.priorities)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load priorities.'))
+      setError(toMessage(reason, "Couldn't load priorities. Try again."))
     } finally {
       setLoading(false)
     }
@@ -157,7 +157,7 @@ export function usePriorities() {
         setMessage(response.message)
         await load()
       } catch (reason) {
-        setError(toMessage(reason, 'Unable to save the priority.'))
+        setError(toMessage(reason, "Couldn't save the priority. Try again."))
       } finally {
         setBusy(false)
       }
@@ -176,7 +176,7 @@ export function usePriorities() {
         setMessage(response.message)
         await load()
       } catch (reason) {
-        setError(toMessage(reason, 'Unable to deactivate the priority.'))
+        setError(toMessage(reason, "Couldn't deactivate the priority. Try again."))
       } finally {
         setBusy(false)
       }
@@ -214,7 +214,7 @@ export function usePermissionsMatrix() {
         setAbilities(response.data.abilities)
         setNote(response.data.note)
       } catch (reason) {
-        if (active) setError(toMessage(reason, 'Unable to load the permission matrix.'))
+        if (active) setError(toMessage(reason, "Couldn't load the permissions. Try again."))
       } finally {
         if (active) setLoading(false)
       }
@@ -247,7 +247,7 @@ export function useIntegrations() {
         const response = await fetchIntegrations(session)
         if (active) setIntegrations(response.data.integrations)
       } catch (reason) {
-        if (active) setError(toMessage(reason, 'Unable to load integration status.'))
+        if (active) setError(toMessage(reason, "Couldn't load integration status. Try again."))
       } finally {
         if (active) setLoading(false)
       }
@@ -283,7 +283,7 @@ export function useAuditLogs() {
       setLogs(response.data.logs)
       setPagination(response.data.pagination)
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load audit logs.'))
+      setError(toMessage(reason, "Couldn't load audit logs. Try again."))
     } finally {
       setLoading(false)
     }

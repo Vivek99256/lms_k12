@@ -254,9 +254,9 @@ export default function YearlyStudentAttendancePage() {
     }));
 
     return [
-      { key: 'srNo', label: 'Sr No', align: 'center' },
-      { key: 'enrollmentNo', label: 'GR No' },
-      { key: 'studentName', label: 'Student Name', width: '220px' },
+      { key: 'srNo', label: 'No.', align: 'center' },
+      { key: 'enrollmentNo', label: 'GR no.' },
+      { key: 'studentName', label: 'Student name', width: '220px' },
       ...monthColumns,
       { key: 'totalSchoolYearDay', label: 'Total School Year Day', align: 'center' },
       { key: 'percentage', label: 'Per %', align: 'center' },
@@ -369,7 +369,7 @@ export default function YearlyStudentAttendancePage() {
       const payload = normalizePayload(responseBody);
 
       if (!response.ok) {
-        throw new Error(payload.message || `HTTP ${response.status}: Unable to fetch yearly attendance report.`);
+        throw new Error(payload.message || `Couldn't load yearly attendance report. Try again.`);
       }
 
       const normalizedReport = buildReport(payload);
@@ -382,7 +382,7 @@ export default function YearlyStudentAttendancePage() {
       setReport(null);
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to fetch yearly attendance report.',
+        text: error instanceof Error ? error.message : "Couldn't load yearly attendance report. Try again.",
       });
     } finally {
       setLoading(false);
@@ -413,7 +413,7 @@ export default function YearlyStudentAttendancePage() {
               <Download className="h-4 w-4" />
               Excel
             </Button>
-            <Button type="button" variant="outline" onClick={() => exportRowsAsPdf({ filename: 'yearly-attendance-report.pdf', title: 'Yearly Attendance Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })} disabled={exportRows.length === 0}>
+            <Button type="button" variant="outline" onClick={() => exportRowsAsPdf({ filename: 'yearly-attendance-report.pdf', title: 'Yearly Attendance Report', subtitle: 'Report period and academic year', columns: exportColumns, rows: exportRows })} disabled={exportRows.length === 0}>
               <Download className="h-4 w-4" />
               PDF
             </Button>
@@ -427,7 +427,7 @@ export default function YearlyStudentAttendancePage() {
 
       {message && <InlineMessage type={message.type} text={message.text} />}
 
-      <SectionPanel title="Filters" description="Reuse the existing section, standard, and division selectors, then load the legacy yearly attendance data through the current proxy layer.">
+      <SectionPanel title="Filters" description="Choose a grade, standard and division to view yearly attendance.">
         <div className="space-y-4">
           <SearchDropdown
             fields={['section', 'standard', 'division']}
@@ -473,9 +473,9 @@ export default function YearlyStudentAttendancePage() {
           <Table className="min-w-[980px]">
             <TableHeader>
               <TableRow className="bg-slate-100 hover:bg-slate-100">
-                <TableHead className="text-center">Sr No</TableHead>
-                <TableHead>GR No</TableHead>
-                <TableHead>Student Name</TableHead>
+                <TableHead className="text-center">No.</TableHead>
+                <TableHead>GR no.</TableHead>
+                <TableHead>Student name</TableHead>
                 {(report?.months || []).map((month) => (
                   <TableHead key={month} className="text-center">
                     {MONTH_LABELS[month] || `Month ${month}`}

@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -199,7 +201,7 @@ function H5pHubContent() {
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : 'Failed to load H5P modules');
+          setError(friendlyError(err, 'We couldn’t load H5P modules. Please try again.'));
         }
       })
       .finally(() => {

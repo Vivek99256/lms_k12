@@ -75,13 +75,13 @@ export default function OtherFeesCancelReportPage() {
   const pagination = useMemo(() => paginateRows(rows, page, REPORT_PAGE_SIZE), [page, rows]);
   const totalAmount = useMemo(() => rows.reduce((sum, row) => sum + row.amount, 0), [rows]);
   const exportColumns = useMemo<TableExportColumn[]>(() => [
-    { key: 'enrollmentNo', label: 'GR No' },
+    { key: 'enrollmentNo', label: 'GR no.' },
     { key: 'studentName', label: 'Student name', width: '220px' },
     { key: 'standardName', label: 'Standard' },
     { key: 'divisionName', label: 'Division' },
     { key: 'mobile', label: 'Mobile no' },
     { key: 'feesHead', label: 'Fees head', width: '220px' },
-    { key: 'receiptId', label: 'Receipt no' },
+    { key: 'receiptId', label: 'Receipt no.' },
     { key: 'remark', label: 'Remark', width: '220px' },
     { key: 'cancelledDate', label: 'Cancelled date' },
     { key: 'cancelledBy', label: 'Cancelled by' },
@@ -112,7 +112,7 @@ export default function OtherFeesCancelReportPage() {
         })).filter((item) => item.id && item.label)
       );
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load other fees heads.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load other fees heads. Try again." });
     } finally {
       setLoadingFilters(false);
     }
@@ -155,7 +155,7 @@ export default function OtherFeesCancelReportPage() {
       });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to fetch other fees cancel report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load other fees cancel report. Try again." });
     } finally {
       setLoading(false);
     }
@@ -175,14 +175,14 @@ export default function OtherFeesCancelReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Other Fees Cancel Report"
+        title="Other fee cancellation report"
         description="Track cancelled other-fee receipts by date, head, student, and cancelling user."
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'other-fees-cancel-report.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'other-fees-cancel-report.xls', title: 'Other Fees Cancel Report', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'other-fees-cancel-report.pdf', title: 'Other Fees Cancel Report', subtitle: 'Legacy parity export', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Other Fees Cancel Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'other-fees-cancel-report.xls', title: 'Other fee cancellation report', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'other-fees-cancel-report.pdf', title: 'Other fee cancellation report', subtitle: 'Export', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Other fee cancellation report', subtitle: 'Print view', columns: exportColumns, rows: exportRows })}
           />
         }
       />
@@ -235,7 +235,7 @@ export default function OtherFeesCancelReportPage() {
                 <TableHead>Division</TableHead>
                 <TableHead>Mobile no</TableHead>
                 <TableHead>Fees head</TableHead>
-                <TableHead>Receipt no</TableHead>
+                <TableHead>Receipt no.</TableHead>
                 <TableHead>Remark</TableHead>
                 <TableHead>Cancelled date</TableHead>
                 <TableHead>Cancelled by</TableHead>

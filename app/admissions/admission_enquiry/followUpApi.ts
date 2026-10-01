@@ -63,7 +63,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new Error(`${fallback} (HTTP ${res.status}).`);
+    throw new Error(fallback);
   }
 }
 
@@ -82,10 +82,10 @@ export async function fetchAdmissionFollowUps(
     headers: { ...createAuthHeaders(session), 'X-Requested-With': 'XMLHttpRequest' },
     signal,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to load admission follow-ups.`);
-  const raw = toRecord(await readJson(res, 'Failed to load admission follow-ups'));
+  if (!res.ok) throw new Error(`Couldn't load admission follow-ups. Try again.`);
+  const raw = toRecord(await readJson(res, "Couldn't load admission follow-ups. Try again."));
   if (normalizeApiStatus(raw) !== '1') {
-    throw new Error(readString(raw.message) || 'Failed to load admission follow-ups.');
+    throw new Error(readString(raw.message) || "Couldn't load admission follow-ups. Try again.");
   }
 
   const enquiryData = toRecord(raw.data);
@@ -129,10 +129,10 @@ export async function saveAdmissionFollowUp(input: AdmissionFollowUpInput): Prom
     },
     body: body.toString(),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: Unable to save the follow-up.`);
-  const raw = toRecord(await readJson(res, 'Failed to save the follow-up'));
+  if (!res.ok) throw new Error(`Couldn't save the follow-up. Try again.`);
+  const raw = toRecord(await readJson(res, "Couldn't save the follow-up. Try again."));
   if (normalizeApiStatus(raw) !== '1') {
-    throw new Error(readString(raw.message) || 'Failed to save the follow-up.');
+    throw new Error(readString(raw.message) || "Couldn't save the follow-up. Try again.");
   }
   return readString(raw.message) || 'Follow-up added successfully.';
 }

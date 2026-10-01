@@ -80,7 +80,7 @@ export function TalentProfileView({ profileId, onBack }: TalentProfileViewProps)
     return <div className="p-12 text-center text-sm text-muted-foreground">Loading profile…</div>
   }
   if (error || !data) {
-    return <div className="p-12 text-center text-sm text-destructive">{error || 'Failed to load this profile.'}</div>
+    return <div className="p-12 text-center text-sm text-destructive">{error || "Couldn't load this profile. Try again."}</div>
   }
 
   const { employee, metrics } = data

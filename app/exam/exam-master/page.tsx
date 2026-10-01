@@ -67,7 +67,7 @@ export default function ExamMasterPage() {
           headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           signal: controller.signal,
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}: Unable to load exam masters`);
+        if (!response.ok) throw new Error(`Couldn't load exam masters. Try again.`);
         const payload = (await response.json()) as { data?: unknown[] };
         const rows = Array.isArray(payload.data) ? payload.data : [];
         setData(rows.map((value, index) => {
@@ -87,7 +87,7 @@ export default function ExamMasterPage() {
           };
         }).filter((row) => row.id));
       } catch (reason) {
-        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Unable to load exam masters.');
+        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Couldn't load exam masters. Try again.");
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -190,11 +190,11 @@ export default function ExamMasterPage() {
         body: body.toString(),
       });
       const payload = await readWriteResponse(response);
-      if (!response.ok || String(payload.status ?? '') !== '1') throw new Error(payload.message || `HTTP ${response.status}: Unable to save exam master`);
+      if (!response.ok || String(payload.status ?? '') !== '1') throw new Error(payload.message || `Couldn't save exam master. Try again.`);
       setShowModal(false);
       window.location.reload();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save exam master.');
+      setError(reason instanceof Error ? reason.message : "Couldn't save exam master. Try again.");
       setShowModal(false);
     } finally {
       setSubmitting(false);
@@ -219,11 +219,11 @@ export default function ExamMasterPage() {
         body: body.toString(),
       });
       const payload = await readWriteResponse(response);
-      if (!response.ok || String(payload.status ?? '') !== '1') throw new Error(payload.message || `HTTP ${response.status}: Unable to delete exam master`);
+      if (!response.ok || String(payload.status ?? '') !== '1') throw new Error(payload.message || `Couldn't delete exam master. Try again.`);
       setShowDeleteModal(false);
       window.location.reload();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to delete exam master.');
+      setError(reason instanceof Error ? reason.message : "Couldn't delete exam master. Try again.");
       setShowDeleteModal(false);
     } finally {
       setSubmitting(false);
@@ -288,7 +288,7 @@ export default function ExamMasterPage() {
             <table className="w-full min-w-[880px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3 font-semibold">SrNo.</th>
+                  <th className="px-5 py-3 font-semibold">No.</th>
                   <th className="px-5 py-3 font-semibold">
                     <button onClick={() => handleSort('examType')} className="flex items-center gap-1 font-semibold text-slate-700 hover:text-blue-600">
                       Exam Type
@@ -511,6 +511,6 @@ async function readWriteResponse(response: Response): Promise<{ status?: string 
   try {
     return JSON.parse(text) as { status?: string | number; message?: string };
   } catch {
-    throw new Error(response.ok ? 'Laravel returned an invalid response.' : `HTTP ${response.status}: ${text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)}`);
+    throw new Error(response.ok ? "Couldn't read the response. Try again." : `${text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)}`);
   }
 }

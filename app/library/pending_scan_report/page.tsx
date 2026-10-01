@@ -44,7 +44,7 @@ function printRows(rows: Row[]) {
   table { border-collapse: collapse; width: 100%; }
   th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
   th { background: #f1f5f9; }
-  </style></head><body><h2>Pending Scan Report</h2><table><thead><tr><th>Sr No</th><th>SYear</th><th>Item Code</th><th>Title</th><th>Collection Type</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.syear || '-'}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td></tr>`).join('')}</tbody></table></body></html>`;
+  </style></head><body><h2>Pending scan report</h2><table><thead><tr><th>No.</th><th>SYear</th><th>Item code</th><th>Title</th><th>Collection type</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${row.syear || '-'}</td><td>${row.itemCode || '-'}</td><td>${row.title || '-'}</td><td>${row.collectionType || '-'}</td></tr>`).join('')}</tbody></table></body></html>`;
   const printWindow = window.open('', '_blank', 'width=1200,height=900');
   if (!printWindow) return;
   printWindow.document.open();
@@ -71,7 +71,7 @@ export default function PendingScanReportPage() {
   }, [globalSearch, rows]);
 
   const exportRows = useMemo<Record<string, string>[]>(() => filteredRows.map((row, index) => ({
-    'Sr No': String(index + 1),
+    'No.': String(index + 1),
     SYear: row.syear || '-',
     'Item Code': row.itemCode || '-',
     Title: row.title || '-',
@@ -98,7 +98,7 @@ export default function PendingScanReportPage() {
       setMessage({ type: nextRows.length > 0 ? 'success' : 'info', text: nextRows.length > 0 ? `Loaded ${nextRows.length} row${nextRows.length === 1 ? '' : 's'}.` : 'No pending scan rows found.' });
     } catch (error) {
       setRows([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load pending scan report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load pending scan report. Try again." });
     } finally {
       setLoading(false);
     }
@@ -107,7 +107,7 @@ export default function PendingScanReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Pending Scan Report"
+        title="Pending scan report"
         description="Review item codes that have not yet been verified in the scan workflow."
         action={<div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={() => {
@@ -130,8 +130,8 @@ export default function PendingScanReportPage() {
 
       <SectionPanel title="Filters">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem_auto]">
-          <Field label="Item Code"><Input value={itemCode} onChange={(event) => setItemCode(event.target.value)} placeholder="Search item code" /></Field>
-          <Field label="Academic Year">
+          <Field label="Item code"><Input value={itemCode} onChange={(event) => setItemCode(event.target.value)} placeholder="Search item code" /></Field>
+          <Field label="Academic year">
             <NativeSelect value={year} onChange={setYear}>
               <option value="">All</option>
               {academicYears.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
@@ -148,7 +148,7 @@ export default function PendingScanReportPage() {
 
       <SectionPanel title="Results">
         <div className="space-y-4">
-          <Field label="Global Search">
+          <Field label="Global search">
             <div className="relative max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} className="pl-9" placeholder="Search all columns" />
@@ -156,7 +156,7 @@ export default function PendingScanReportPage() {
           </Field>
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <Table className="min-w-[760px]">
-              <TableHeader><TableRow className="bg-slate-100 hover:bg-slate-100"><TableHead>Sr No</TableHead><TableHead>SYear</TableHead><TableHead>Item Code</TableHead><TableHead>Title</TableHead><TableHead>Collection Type</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow className="bg-slate-100 hover:bg-slate-100"><TableHead>No.</TableHead><TableHead>SYear</TableHead><TableHead>Item code</TableHead><TableHead>Title</TableHead><TableHead>Collection type</TableHead></TableRow></TableHeader>
               <TableBody>
                 {loading ? <LoadingRows colSpan={5} label="Loading pending scan report" /> : filteredRows.length > 0 ? filteredRows.map((row, index) => (
                   <TableRow key={`${row.itemCode}-${index}`} className="odd:bg-white even:bg-slate-50/60">

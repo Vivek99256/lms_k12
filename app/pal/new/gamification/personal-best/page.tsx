@@ -48,7 +48,7 @@ export default function PersonalBestPage() {
     try {
       setHistory(await fetchPersonalBestHistory(scope.scope, 50));
     } catch (err) {
-      setHistoryError(err instanceof Error ? err.message : 'Could not load the record history.');
+      setHistoryError(err instanceof Error ? err.message : 'Couldn’t load the record history.');
     } finally {
       setLoadingHistory(false);
     }
@@ -76,7 +76,7 @@ export default function PersonalBestPage() {
         <StatusPanel
           kind="error"
           title="Personal bests are not available"
-          message={error || 'The backend did not return a personal-best payload.'}
+          message={error || 'We couldn’t load this page right now. Please try again.'}
           onRetry={reload}
           retrying={refreshing}
         />

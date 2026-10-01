@@ -103,6 +103,7 @@ type EmployeeDirectorySheetsProps = {
   onAddSheetOpenChange: (open: boolean) => void
   activeEmployee: Employee | null
   onCloseEmployeeSheet: () => void
+  onEmployeeCreated?: (message: string) => void
 }
 
 type CompetencyCategory = 'Skill' | 'Knowledge' | 'Ability' | 'Attitude' | 'Behaviour'
@@ -222,8 +223,21 @@ const tabFallback = (
   </div>
 )
 
-function AddEmployeeSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function AddEmployeeSheet({
+  open,
+  onOpenChange,
+  onEmployeeCreated,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onEmployeeCreated?: (message: string) => void
+}) {
   const [addStep, setAddStep] = useState(1)
+
+  const handleFinish = () => {
+    onOpenChange(false)
+    onEmployeeCreated?.('Employee onboarded.')
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -287,7 +301,7 @@ function AddEmployeeSheet({ open, onOpenChange }: { open: boolean; onOpenChange:
                 <Select placeholder="Select Department" options={[{ label: 'Engineering', value: 'eng' }, { label: 'Product', value: 'prod' }]} />
               </div>
               <div className="space-y-2">
-                <Label>Job Role / Designation</Label>
+                <Label>Designation</Label>
                 <Select placeholder="Select Job Role" options={[{ label: 'Senior Full Stack Engineer', value: 'se' }, { label: 'Product Designer', value: 'pd' }]} />
               </div>
               <div className="space-y-2">
@@ -388,7 +402,7 @@ function AddEmployeeSheet({ open, onOpenChange }: { open: boolean; onOpenChange:
                 Next Step
               </Button>
             ) : (
-              <Button onClick={() => onOpenChange(false)} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button onClick={handleFinish} className="bg-emerald-600 hover:bg-emerald-700">
                 <CheckCircle2 className="mr-2 h-4 w-4" /> Finish Onboarding
               </Button>
             )}
@@ -768,10 +782,16 @@ export function EmployeeDirectorySheets({
   onAddSheetOpenChange,
   activeEmployee,
   onCloseEmployeeSheet,
+  onEmployeeCreated,
 }: EmployeeDirectorySheetsProps) {
   return (
     <>
-      <AddEmployeeSheet key={isAddSheetOpen ? 'open' : 'closed'} open={isAddSheetOpen} onOpenChange={onAddSheetOpenChange} />
+      <AddEmployeeSheet
+        key={isAddSheetOpen ? 'open' : 'closed'}
+        open={isAddSheetOpen}
+        onOpenChange={onAddSheetOpenChange}
+        onEmployeeCreated={onEmployeeCreated}
+      />
       {activeEmployee && (
         <EmployeeOverviewSheet
           key={activeEmployee.id}

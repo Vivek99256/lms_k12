@@ -70,7 +70,7 @@ export function useMobilityOverview() {
     const session = resolveSession()
     if (!isMobilitySessionReady(session)) {
       setOverview(null)
-      setError('Your session could not be resolved. Please sign in again.')
+      setError('Your session has expired. Please sign in again.')
       setLoading(false)
       return
     }
@@ -79,7 +79,7 @@ export function useMobilityOverview() {
       const response = await mobilityService.getOverview(session)
       setOverview(response.status === 1 ? response.data : null)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load the mobility overview.'))
+      setError(toMessage(loadError, "Couldn't load the mobility overview. Try again."))
       setOverview(null)
     } finally {
       setLoading(false)
@@ -109,7 +109,7 @@ export function useMobilityFilters() {
       const response = await mobilityService.getFilters(resolveSession())
       setFilters(response.status === 1 ? response.data : null)
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load mobility filters.'))
+      setError(toMessage(loadError, "Couldn't load mobility filters. Try again."))
       setFilters(null)
     } finally {
       setLoading(false)
@@ -151,7 +151,7 @@ export function useMobilityJobs(filters?: Record<string, string>) {
         setTotal(response.total)
       }
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load internal jobs.'))
+      setError(toMessage(loadError, "Couldn't load internal jobs. Try again."))
       setJobs([])
       setTotal(0)
     } finally {
@@ -200,15 +200,15 @@ export function useMobilityJobs(filters?: Record<string, string>) {
       setActionMessage(null)
     },
     create: (data: Partial<MobilityJob>) =>
-      run((session) => mobilityService.createJob(session, data), 'Failed to create job posting.'),
+      run((session) => mobilityService.createJob(session, data), "Couldn't create job posting. Try again."),
     update: (id: number, data: Partial<MobilityJob>) =>
-      run((session) => mobilityService.updateJob(session, id, data), 'Failed to update job posting.'),
+      run((session) => mobilityService.updateJob(session, id, data), "Couldn't update job posting. Try again."),
     close: (id: number) =>
-      run((session) => mobilityService.updateJob(session, id, { status: 'Closed' }), 'Failed to close job.'),
+      run((session) => mobilityService.updateJob(session, id, { status: 'Closed' }), "Couldn't close job. Try again."),
     remove: (id: number) =>
       run(
         (session) => mobilityService.deleteJob(session, id).then((response) => ({ ...response, data: undefined })),
-        'Failed to delete job posting.',
+        "Couldn't delete job posting. Try again.",
       ),
   }
 }
@@ -239,7 +239,7 @@ export function useMobilityApplications(filters?: Record<string, string>) {
         setTotal(response.total)
       }
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load applications.'))
+      setError(toMessage(loadError, "Couldn't load applications. Try again."))
       setApplications([])
       setTotal(0)
     } finally {
@@ -261,11 +261,11 @@ export function useMobilityApplications(filters?: Record<string, string>) {
 
       try {
         const response = await mobilityService.createApplication(resolveSession(), data)
-        if (response.status !== 1) throw new Error('Failed to submit application.')
+        if (response.status !== 1) throw new Error("Couldn't submit application. Try again.")
         await load()
         return { ok: true as const, data: response.data }
       } catch (applyError) {
-        const message = toMessage(applyError, 'Failed to submit application.')
+        const message = toMessage(applyError, "Couldn't submit application. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -283,11 +283,11 @@ export function useMobilityApplications(filters?: Record<string, string>) {
 
       try {
         const response = await mobilityService.updateApplication(resolveSession(), id, { status, remarks })
-        if (response.status !== 1) throw new Error('Failed to update status.')
+        if (response.status !== 1) throw new Error("Couldn't update status. Try again.")
         await load()
         return { ok: true as const, data: response.data }
       } catch (updateError) {
-        const message = toMessage(updateError, 'Failed to update status.')
+        const message = toMessage(updateError, "Couldn't update status. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -340,7 +340,7 @@ export function useMobilityTransfers(filters?: Record<string, string>) {
         setTotal(response.total)
       }
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load transfers.'))
+      setError(toMessage(loadError, "Couldn't load transfers. Try again."))
       setTransfers([])
       setTotal(0)
     } finally {
@@ -362,11 +362,11 @@ export function useMobilityTransfers(filters?: Record<string, string>) {
 
       try {
         const response = await mobilityService.createTransfer(resolveSession(), data)
-        if (response.status !== 1) throw new Error('Failed to record transfer.')
+        if (response.status !== 1) throw new Error("Couldn't record transfer. Try again.")
         await load()
         return { ok: true as const, data: response.data }
       } catch (recordError) {
-        const message = toMessage(recordError, 'Failed to record transfer.')
+        const message = toMessage(recordError, "Couldn't record transfer. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -384,11 +384,11 @@ export function useMobilityTransfers(filters?: Record<string, string>) {
 
       try {
         const response = await mobilityService.updateTransfer(resolveSession(), id, { status })
-        if (response.status !== 1) throw new Error('Failed to update transfer status.')
+        if (response.status !== 1) throw new Error("Couldn't update transfer status. Try again.")
         await load()
         return { ok: true as const, data: response.data }
       } catch (updateError) {
-        const message = toMessage(updateError, 'Failed to update transfer status.')
+        const message = toMessage(updateError, "Couldn't update transfer status. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -441,7 +441,7 @@ export function useMobilityPromotions(filters?: Record<string, string>) {
         setTotal(response.total)
       }
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load promotions.'))
+      setError(toMessage(loadError, "Couldn't load promotions. Try again."))
       setPromotions([])
       setTotal(0)
     } finally {
@@ -463,11 +463,11 @@ export function useMobilityPromotions(filters?: Record<string, string>) {
 
       try {
         const response = await mobilityService.createPromotion(resolveSession(), data)
-        if (response.status !== 1) throw new Error('Failed to record promotion.')
+        if (response.status !== 1) throw new Error("Couldn't record promotion. Try again.")
         await load()
         return { ok: true as const, data: response.data }
       } catch (recordError) {
-        const message = toMessage(recordError, 'Failed to record promotion.')
+        const message = toMessage(recordError, "Couldn't record promotion. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -485,11 +485,11 @@ export function useMobilityPromotions(filters?: Record<string, string>) {
 
       try {
         const response = await mobilityService.updatePromotion(resolveSession(), id, { status })
-        if (response.status !== 1) throw new Error('Failed to update promotion status.')
+        if (response.status !== 1) throw new Error("Couldn't update promotion status. Try again.")
         await load()
         return { ok: true as const, data: response.data }
       } catch (updateError) {
-        const message = toMessage(updateError, 'Failed to update promotion status.')
+        const message = toMessage(updateError, "Couldn't update promotion status. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -542,7 +542,7 @@ export function useMobilitySuccessions(filters?: Record<string, string>) {
         setTotal(response.total)
       }
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load succession plans.'))
+      setError(toMessage(loadError, "Couldn't load succession plans. Try again."))
       setSuccessions([])
       setTotal(0)
     } finally {
@@ -564,11 +564,11 @@ export function useMobilitySuccessions(filters?: Record<string, string>) {
 
       try {
         const response = await mobilityService.createSuccession(resolveSession(), data)
-        if (response.status !== 1) throw new Error('Failed to nominate successor.')
+        if (response.status !== 1) throw new Error("Couldn't nominate successor. Try again.")
         await load()
         return { ok: true as const, data: response.data }
       } catch (nominateError) {
-        const message = toMessage(nominateError, 'Failed to nominate successor.')
+        const message = toMessage(nominateError, "Couldn't nominate successor. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -586,11 +586,11 @@ export function useMobilitySuccessions(filters?: Record<string, string>) {
 
       try {
         const response = await mobilityService.deleteSuccession(resolveSession(), id)
-        if (response.status !== 1) throw new Error('Failed to delete nomination.')
+        if (response.status !== 1) throw new Error("Couldn't delete nomination. Try again.")
         await load()
         return { ok: true as const }
       } catch (removeError) {
-        const message = toMessage(removeError, 'Failed to delete nomination.')
+        const message = toMessage(removeError, "Couldn't delete nomination. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -643,7 +643,7 @@ export function useMobilityPools(filters?: Record<string, string>) {
         setTotal(response.total)
       }
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load talent pools.'))
+      setError(toMessage(loadError, "Couldn't load talent pools. Try again."))
       setPools([])
       setTotal(0)
     } finally {
@@ -665,11 +665,11 @@ export function useMobilityPools(filters?: Record<string, string>) {
 
       try {
         const response = await mobilityService.createPool(resolveSession(), data)
-        if (response.status !== 1) throw new Error('Failed to create talent pool.')
+        if (response.status !== 1) throw new Error("Couldn't create talent pool. Try again.")
         await load()
         return { ok: true as const, data: response.data }
       } catch (createError) {
-        const message = toMessage(createError, 'Failed to create talent pool.')
+        const message = toMessage(createError, "Couldn't create talent pool. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -715,7 +715,7 @@ export function useMobilityPoolMembers(poolId: number | null) {
       const response = await mobilityService.getPoolMembers(resolveSession(), poolId)
       setMembers(response.status === 1 ? response.data : [])
     } catch (loadError) {
-      setError(toMessage(loadError, 'Failed to load pool members.'))
+      setError(toMessage(loadError, "Couldn't load pool members. Try again."))
       setMembers([])
     } finally {
       setLoading(false)
@@ -736,11 +736,11 @@ export function useMobilityPoolMembers(poolId: number | null) {
 
       try {
         const response = await mobilityService.addPoolMember(resolveSession(), poolId, userId)
-        if (response.status !== 1) throw new Error('Failed to add member to pool.')
+        if (response.status !== 1) throw new Error("Couldn't add member to pool. Try again.")
         await load()
         return { ok: true as const, data: response.data }
       } catch (addError) {
-        const message = toMessage(addError, 'Failed to add member to pool.')
+        const message = toMessage(addError, "Couldn't add member to pool. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
@@ -758,11 +758,11 @@ export function useMobilityPoolMembers(poolId: number | null) {
 
       try {
         const response = await mobilityService.removePoolMember(resolveSession(), poolId, userId)
-        if (response.status !== 1) throw new Error('Failed to remove pool member.')
+        if (response.status !== 1) throw new Error("Couldn't remove pool member. Try again.")
         await load()
         return { ok: true as const }
       } catch (removeError) {
-        const message = toMessage(removeError, 'Failed to remove pool member.')
+        const message = toMessage(removeError, "Couldn't remove pool member. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {

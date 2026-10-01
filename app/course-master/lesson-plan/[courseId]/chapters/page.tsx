@@ -224,7 +224,7 @@ export default function ChaptersPage() {
       <div className="flex min-h-screen items-center justify-center bg-slate-50/50">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-slate-900 mb-2">Course not found</h2>
-          <p className="text-slate-500">The requested course could not be found.</p>
+          <p className="text-slate-500">The requested course couldn’t be found.</p>
         </div>
       </div>
     );
@@ -278,7 +278,7 @@ export default function ChaptersPage() {
               <div className="flex flex-wrap items-center gap-6 text-sm">
                 <div className="flex items-center gap-2">
                   <Users size={16} className="text-slate-400" />
-                  <span className="text-slate-600">Instructor:</span>
+                  <span className="text-slate-600">Teacher:</span>
                   <span className="font-medium text-slate-800">{course.instructor}</span>
                 </div>
                 <div className="flex items-center gap-2">

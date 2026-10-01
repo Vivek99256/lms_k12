@@ -35,7 +35,7 @@ export function RequisitionFormPage() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try { setData(await loadInventory("requisitions", {})); }
-    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Requisitions could not be loaded."); }
+    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't load requisitions. Try again."); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => {
@@ -86,32 +86,32 @@ export function RequisitionFormPage() {
       };
       setNotice(await saveInventory("requisitions", payload, editing?.id));
       reset(); await load();
-    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Requisition could not be saved."); }
+    } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't save requisition. Try again."); }
     finally { setBusy(false); }
   }
   async function remove(record: InventoryRecord) {
     if (!window.confirm("Delete this requisition?")) return;
     setBusy(true);
     try { setNotice(await deleteInventory("requisitions", record.id)); await load(); }
-    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Requisition could not be deleted."); }
+    catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Couldn't delete requisition. Try again."); }
     finally { setBusy(false); }
   }
 
   return <main className="min-h-screen p-4 sm:p-6"><div className="mx-auto max-w-[1600px] space-y-5">
-    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h1 className="text-2xl font-bold">Requisition Form</h1><p className="mt-1 text-sm text-slate-500">Create and manage inventory requisitions.</p></div><Button onClick={startAdd}><Plus className="size-4" /> Add Requisition Form</Button></div>
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h1 className="text-2xl font-bold">Requisition form</h1><p className="mt-1 text-sm text-slate-500">Create and manage inventory requisitions.</p></div><Button onClick={startAdd}><Plus className="size-4" /> Add Requisition Form</Button></div>
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
     {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
     {showForm && <Card><CardHeader className="border-b"><div className="flex items-center justify-between"><CardTitle>{editing ? "Edit Requisition" : "Add Requisition"}</CardTitle><Button variant="ghost" size="icon" onClick={reset}><X className="size-4" /></Button></div></CardHeader><CardContent>
       {!setting && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Please add Master setup for add requisition.</div>}
-      <div className="grid gap-4 md:grid-cols-3"><div><Label>Requisition By *</Label><select className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={requester} disabled={Boolean(editing)} onChange={(event) => setRequester(event.target.value)}><option value="">Select Requisition By</option>{data.options.requisition_users?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
-        <div><Label>Requisition Date</Label><Input className="mt-1" type="datetime-local" value={requisitionDate} readOnly /></div><div><Label>Requisition No.</Label><Input className="mt-1" value={requisitionNumber} readOnly /></div></div>
+      <div className="grid gap-4 md:grid-cols-3"><div><Label>Requisition By *</Label><select className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={requester} disabled={Boolean(editing)} onChange={(event) => setRequester(event.target.value)}><option value="">Select requisition by</option>{data.options.requisition_users?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+        <div><Label>Requisition date</Label><Input className="mt-1" type="datetime-local" value={requisitionDate} readOnly /></div><div><Label>Requisition No.</Label><Input className="mt-1" value={requisitionNumber} readOnly /></div></div>
       <div className="mt-5 space-y-3">{rows.map((row, index) => <div key={index} className="grid gap-3 rounded-xl border border-slate-200 p-3 md:grid-cols-2 xl:grid-cols-8">
-        {setting === "items_with_chain" && <><div><Label>Item Category *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.categoryId} onChange={(event) => updateRow(index, { categoryId: event.target.value, subCategoryId: "", itemId: "" })}><option value="">Select Category</option>{data.options.requisition_categories?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
-          <div><Label>Item Sub Category *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.subCategoryId} onChange={(event) => updateRow(index, { subCategoryId: event.target.value, itemId: "" })}><option value="">Select Sub Category</option>{data.options.requisition_sub_categories?.filter((option) => option.parentId === Number(row.categoryId)).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div></>}
-        <div><Label>Item *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.itemId} onChange={(event) => updateRow(index, { itemId: event.target.value })}><option value="">Select Item</option>{data.options.requisition_items?.filter((option) => setting !== "items_with_chain" || option.parentId === Number(row.subCategoryId)).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+        {setting === "items_with_chain" && <><div><Label>Item Category *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.categoryId} onChange={(event) => updateRow(index, { categoryId: event.target.value, subCategoryId: "", itemId: "" })}><option value="">Select category</option>{data.options.requisition_categories?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+          <div><Label>Item Sub Category *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.subCategoryId} onChange={(event) => updateRow(index, { subCategoryId: event.target.value, itemId: "" })}><option value="">Select sub category</option>{data.options.requisition_sub_categories?.filter((option) => option.parentId === Number(row.categoryId)).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div></>}
+        <div><Label>Item *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.itemId} onChange={(event) => updateRow(index, { itemId: event.target.value })}><option value="">Select item</option>{data.options.requisition_items?.filter((option) => setting !== "items_with_chain" || option.parentId === Number(row.subCategoryId)).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
         <div><Label>Qty *</Label><Input className="mt-1" type="number" min={1} value={row.quantity} onChange={(event) => updateRow(index, { quantity: event.target.value })} /></div>
-        <div><Label>Unit *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.unit} onChange={(event) => updateRow(index, { unit: event.target.value })}><option value="">Select Unit</option>{data.options.units?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
-        <div><Label>Expected Delivery</Label><Input className="mt-1" type="datetime-local" value={row.expectedDelivery} onChange={(event) => updateRow(index, { expectedDelivery: event.target.value })} /></div>
+        <div><Label>Unit *</Label><select className="mt-1 h-10 w-full rounded-xl border px-2 text-sm" value={row.unit} onChange={(event) => updateRow(index, { unit: event.target.value })}><option value="">Select unit</option>{data.options.units?.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
+        <div><Label>Expected delivery</Label><Input className="mt-1" type="datetime-local" value={row.expectedDelivery} onChange={(event) => updateRow(index, { expectedDelivery: event.target.value })} /></div>
         <div><Label>Remarks *</Label><Input className="mt-1" value={row.remarks} onChange={(event) => updateRow(index, { remarks: event.target.value })} /></div>
         {!editing && <div className="flex items-end"><Button type="button" variant="outline" onClick={() => rows.length === 1 ? setRows((current) => [...current, emptyRow()]) : setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))}>{rows.length === 1 ? <Plus className="size-4" /> : <Trash2 className="size-4" />}{rows.length === 1 ? " Add Row" : " Remove"}</Button></div>}
       </div>)}</div>

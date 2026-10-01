@@ -42,7 +42,7 @@ function NewReminderModal({
         setEnquiries(options);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setEnquiriesError(err instanceof Error ? err.message : 'Failed to load enquiries.');
+        if (!cancelled) setEnquiriesError(err instanceof Error ? err.message : "Couldn't load enquiries. Try again.");
       })
       .finally(() => {
         if (!cancelled) setEnquiriesLoading(false);
@@ -63,7 +63,7 @@ function NewReminderModal({
       onCreated();
       onClose();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to create the reminder.');
+      setSubmitError(err instanceof Error ? err.message : "Couldn't create the reminder. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -210,7 +210,7 @@ export default function FollowUpsContentOnly() {
         setCommunicationLogs(logRows);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load follow-ups.');
+        if (!cancelled) setError(err instanceof Error ? err.message : "Couldn't load follow-ups. Try again.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

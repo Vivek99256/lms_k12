@@ -167,7 +167,7 @@ export async function fetchResultDashboard(
     !response.ok ||
     (isRecord(payload) && ['0', '2'].includes(normalizeApiStatus(payload as ApiEnvelope)))
   ) {
-    throw new Error(message(payload, `Unable to load the result dashboard (${response.status}).`));
+    throw new Error(message(payload, `Couldn’t load the result dashboard (${response.status}).`));
   }
 
   const data = isRecord(payload) ? payload : {};

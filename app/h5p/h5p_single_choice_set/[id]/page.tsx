@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -223,7 +225,7 @@ function SingleChoiceSetPlayerContent({ preloaded }: { preloaded?: PreloadedSing
         if (!cancelled) setFetchedSet(data);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load this set');
+        if (!cancelled) setError(friendlyError(err, 'We couldn’t load this set. Please try again.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

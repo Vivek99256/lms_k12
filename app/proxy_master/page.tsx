@@ -110,7 +110,7 @@ export default function ProxyManagementPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Proxy assignments could not be loaded."
+          : "Couldn't load proxy assignments. Try again."
       );
     } finally {
       setLoading(false);
@@ -194,7 +194,7 @@ export default function ProxyManagementPage() {
       setError(
         findError instanceof Error
           ? findError.message
-          : "Available lectures could not be loaded."
+          : "Couldn't load available lectures. Try again."
       );
     } finally {
       setBusy(false);
@@ -232,7 +232,7 @@ export default function ProxyManagementPage() {
       setError(
         createError instanceof Error
           ? createError.message
-          : "Proxy assignments could not be added."
+          : "Couldn't add proxy assignments. Try again."
       );
     } finally {
       setBusy(false);
@@ -259,7 +259,7 @@ export default function ProxyManagementPage() {
       setError(
         updateError instanceof Error
           ? updateError.message
-          : "The proxy assignment could not be updated."
+          : "Couldn't update the proxy assignment. Try again."
       );
     } finally {
       setBusy(false);
@@ -284,7 +284,7 @@ export default function ProxyManagementPage() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : "The proxy assignment could not be deleted."
+          : "Couldn't delete the proxy assignment. Try again."
       );
     } finally {
       setBusy(false);

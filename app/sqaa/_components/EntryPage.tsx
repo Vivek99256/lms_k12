@@ -29,7 +29,7 @@ export default function EntryPage() {
   useEffect(() => {
     loadSqaaLevel1()
       .then(setLevel1)
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Unable to load SQAA hierarchy.'))
+      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Couldn’t load SQAA hierarchy.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -55,7 +55,7 @@ export default function EntryPage() {
       setLoadedMark(result.mark);
       setFiles({});
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to load SQAA documents.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t load SQAA documents.');
     } finally {
       setLoadingDocuments(false);
     }
@@ -92,7 +92,7 @@ export default function EntryPage() {
       await searchDocuments();
       setSuccess('SQAA entry saved successfully.');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save the SQAA entry.');
+      setError(reason instanceof Error ? reason.message : 'Couldn’t save the SQAA entry.');
     } finally {
       setSaving(false);
     }

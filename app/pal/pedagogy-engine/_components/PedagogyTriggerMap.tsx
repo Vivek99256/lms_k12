@@ -14,7 +14,7 @@ export default function PedagogyTriggerMap({ triggers }: { triggers: PedagogyTri
   if (triggers.length === 0) {
     return (
       <div className="rounded-[26px] border border-dashed border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
-        <p className="text-sm text-slate-600">No trigger mappings are configured in the backend yet.</p>
+        <p className="text-sm text-slate-600">No trigger mappings are set up yet.</p>
       </div>
     );
   }

@@ -43,7 +43,7 @@ async function readJson(response: Response): Promise<ApiEnvelope & { data?: unkn
   } catch {
     throw new Error(
       response.ok
-        ? 'The blueprint service returned a response we could not read.'
+        ? 'The blueprint service returned a response we couldn’t read.'
         : `Request failed with status ${response.status}`
     );
   }
@@ -92,7 +92,7 @@ export async function fetchBlueprintIndex(): Promise<BlueprintIndex> {
     headers: createAuthHeaders(session),
   });
 
-  return unwrap<BlueprintIndex>((await readJson(response)) as never, 'Unable to load blueprints.');
+  return unwrap<BlueprintIndex>((await readJson(response)) as never, 'Couldn’t load blueprints.');
 }
 
 /** Chapters for a class and subject, so a weightage row can point at a real one. */
@@ -108,7 +108,7 @@ export async function fetchChapters(standardId: number, subjectId: number): Prom
 
   const data = unwrap<{ chapters: ChapterOption[] }>(
     (await readJson(response)) as never,
-    'Unable to load chapters for that subject.'
+    'Couldn’t load chapters for that subject.'
   );
 
   return data.chapters ?? [];
@@ -152,7 +152,7 @@ export async function saveBlueprint(draft: BlueprintDraft): Promise<Blueprint> {
 
   const data = unwrap<{ blueprint: Blueprint }>(
     (await readJson(response)) as never,
-    'Unable to save this blueprint.'
+    'Couldn’t save this blueprint.'
   );
 
   return data.blueprint;
@@ -183,7 +183,7 @@ export async function cloneBlueprint(input: {
 
   const data = unwrap<{ blueprint: Blueprint }>(
     (await readJson(response)) as never,
-    'Unable to copy this blueprint.'
+    'Couldn’t copy this blueprint.'
   );
 
   return data.blueprint;
@@ -201,7 +201,7 @@ export async function deleteBlueprint(id: number): Promise<void> {
   const status = normalizeApiStatus(payload);
 
   if (status !== '1' && status !== '200') {
-    throw new Error(payload?.message || 'Unable to remove this blueprint.');
+    throw new Error(payload?.message || 'Couldn’t remove this blueprint.');
   }
 }
 
@@ -224,7 +224,7 @@ export async function fetchHpcOptions(): Promise<HpcSchoolOptions> {
 
   return unwrap<HpcSchoolOptions>(
     (await readJson(response)) as never,
-    "Unable to load your school's HPC options."
+    "Couldn’t load your school's HPC options."
   );
 }
 
@@ -243,7 +243,7 @@ export async function saveHpcOptions(
 
   const data = unwrap<{ options: HpcSchoolOption[] }>(
     (await readJson(response)) as never,
-    'Unable to save these options.'
+    'Couldn’t save these options.'
   );
 
   return data.options ?? [];
@@ -261,7 +261,7 @@ export async function resetHpcOptions(optionType: HpcOptionType): Promise<HpcSch
 
   const data = unwrap<{ options: HpcSchoolOption[] }>(
     (await readJson(response)) as never,
-    'Unable to reset these options.'
+    'Couldn’t reset these options.'
   );
 
   return data.options ?? [];

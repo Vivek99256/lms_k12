@@ -68,7 +68,7 @@ function LearningPathView() {
         setPath(await fetchLearningPath(learnerId, syear, signal));
       } catch (caught) {
         if ((caught as Error)?.name === 'AbortError') return;
-        setError(caught instanceof Error ? caught.message : 'Could not load the learning path.');
+        setError(caught instanceof Error ? caught.message : 'Couldn’t load the learning path.');
         setPath(null);
       } finally {
         setLoading(false);
@@ -102,7 +102,7 @@ function LearningPathView() {
         <Card className="border-amber-200 bg-amber-50">
           <CardHeader className="flex flex-row items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-600" />
-            <CardTitle className="text-base text-amber-900">Your plan could not be loaded</CardTitle>
+            <CardTitle className="text-base text-amber-900">Your plan couldn’t be loaded</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-amber-800">{error}</p>

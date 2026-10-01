@@ -29,8 +29,10 @@ import RequireStaff from '@/app/lms/_shared/RequireStaff';
 function singleValue(value: DropdownValue): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
 }
+import { friendlyError } from "@/lib/user-messages";
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return friendlyError(error, "We couldn’t load the syllabus plan. Please try again.");
 }
 
 const inputClass =

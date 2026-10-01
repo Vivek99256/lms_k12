@@ -168,7 +168,7 @@ function normalize(value: unknown): TransportationData {
 export function getTransportationSession(): SessionContext {
   const session = buildSessionContext();
   if (!session.token || !session.subInstituteId || !session.syear || !session.userId) {
-    throw new Error("Your login session is missing transport API credentials.");
+    throw new Error("Your session has expired. Sign in again.");
   }
   return session;
 }
@@ -195,9 +195,9 @@ async function request(
     },
   });
   const payload = (await response.json().catch(() => ({}))) as unknown;
-  if (!response.ok) throw new Error(messageFrom(payload, `Request failed (${response.status}).`));
+  if (!response.ok) throw new Error(messageFrom(payload, "Couldn't complete the request. Try again."));
   if (isRecord(payload) && normalizeApiStatus(payload as ApiEnvelope) === "2") {
-    throw new Error(messageFrom(payload, "Authentication failed."));
+    throw new Error(messageFrom(payload, "Your session has expired. Sign in again."));
   }
   return payload;
 }

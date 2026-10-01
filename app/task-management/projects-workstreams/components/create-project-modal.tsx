@@ -96,7 +96,7 @@ export function CreateProjectModal({ isOpen, onClose, options, project, onSaved 
         ? await projectsService.updateProjectRecord(session, project.id, form)
         : await projectsService.createProjectRecord(session, form)
       onSaved(response.message); close()
-    } catch (reason) { setError(toMessage(reason, 'Unable to save project.')) }
+    } catch (reason) { setError(toMessage(reason, "Couldn't save project. Try again.")) }
     finally { setSaving(false) }
   }
 

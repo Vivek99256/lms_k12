@@ -92,7 +92,7 @@ export function useRolePermissions(): RolePermissionsResult {
       const response = await menuRightsService.getRoles(session)
       setRoles(response.data ?? [])
     } catch (loadError) {
-      setRolesError(toMessage(loadError, 'Failed to load roles'))
+      setRolesError(toMessage(loadError, "Couldn't load roles. Try again."))
       setRoles([])
     } finally {
       setRolesLoading(false)
@@ -122,7 +122,7 @@ export function useRolePermissions(): RolePermissionsResult {
       setHasChanges(false)
       setAnimateKey((previous) => previous + 1)
     } catch (loadError) {
-      setRightsError(toMessage(loadError, 'Failed to load permissions'))
+      setRightsError(toMessage(loadError, "Couldn't load permissions. Try again."))
       setDraft([])
     } finally {
       setPermissionsLoading(false)
@@ -155,7 +155,7 @@ export function useRolePermissions(): RolePermissionsResult {
       .saveRights(session, activeRoleId, toRightsPayload(draft))
       .then((response) => {
         if (Number(response.status_code) !== 1) {
-          setActionError(response.message || 'Failed to save permissions')
+          setActionError(response.message || "Couldn't save permissions. Try again.")
           return
         }
         setActionError(null)
@@ -163,7 +163,7 @@ export function useRolePermissions(): RolePermissionsResult {
         // No query cache here - a fresh fetch takes the place of invalidation.
         loadRights()
       })
-      .catch((saveError) => setActionError(toMessage(saveError, 'Failed to save permissions')))
+      .catch((saveError) => setActionError(toMessage(saveError, "Couldn't save permissions. Try again.")))
       .finally(() => setSaving(false))
   }, [session, activeRoleId, draft, loadRights])
 
@@ -178,7 +178,7 @@ export function useRolePermissions(): RolePermissionsResult {
         setActiveRoleId(String(response.data.id))
         return response.data
       } catch (createError) {
-        setActionError(toMessage(createError, 'Failed to create role'))
+        setActionError(toMessage(createError, "Couldn't create role. Try again."))
         return null
       }
     },

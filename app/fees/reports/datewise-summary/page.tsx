@@ -90,7 +90,7 @@ export default function DatewiseSummaryReportPage() {
   const exportColumns = useMemo<TableExportColumn[]>(() => [
     { key: 'date', label: 'Date' },
     { key: 'paymentMode', label: 'Payment mode' },
-    { key: 'receiptNo', label: 'Receipt no' },
+    { key: 'receiptNo', label: 'Receipt no.' },
     { key: 'studentName', label: 'Student name', width: '220px' },
     { key: 'standardDivision', label: 'Std / Div' },
     { key: 'bankName', label: 'Bank name' },
@@ -139,7 +139,7 @@ export default function DatewiseSummaryReportPage() {
         });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load fee heads.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load fee heads. Try again." });
     } finally {
       setLoadingHeads(false);
     }
@@ -218,7 +218,7 @@ export default function DatewiseSummaryReportPage() {
       });
     } catch (error) {
       setGroups([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to fetch datewise summary report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load datewise summary report. Try again." });
     } finally {
       setLoading(false);
     }
@@ -252,7 +252,7 @@ export default function DatewiseSummaryReportPage() {
           await loadFeesHeads(titles[0].heads, undefined, titles[0].id);
         }
       } catch (error) {
-        setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load datewise summary filters.' });
+        setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load datewise summary filters. Try again." });
       } finally {
         setLoadingFilters(false);
       }
@@ -264,14 +264,14 @@ export default function DatewiseSummaryReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="DateWise Summary Report"
+        title="Date-wise summary report"
         description="Group fee receipts by date and payment mode with receipt-title driven fee-head selection."
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'datewise-summary-report.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'datewise-summary-report.xls', title: 'DateWise Summary Report', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'datewise-summary-report.pdf', title: 'DateWise Summary Report', subtitle: 'Legacy parity export', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'DateWise Summary Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'datewise-summary-report.xls', title: 'Date-wise summary report', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'datewise-summary-report.pdf', title: 'Date-wise summary report', subtitle: 'Export', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Date-wise summary report', subtitle: 'Print view', columns: exportColumns, rows: exportRows })}
           />
         }
       />
@@ -349,7 +349,7 @@ export default function DatewiseSummaryReportPage() {
                   <TableHeader>
                     <TableRow className="bg-slate-100 text-xs uppercase text-slate-700 hover:bg-slate-100">
                       <TableHead>Sr no</TableHead>
-                      <TableHead>Receipt no</TableHead>
+                      <TableHead>Receipt no.</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Std</TableHead>
                       {selectedPaymentMode.toUpperCase() !== 'CASH' && <TableHead>Bank name</TableHead>}

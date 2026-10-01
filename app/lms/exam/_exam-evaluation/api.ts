@@ -42,7 +42,7 @@ async function readJson(response: Response): Promise<ApiEnvelope & { data?: unkn
   } catch {
     throw new Error(
       response.ok
-        ? 'The evaluation service returned a response we could not read.'
+        ? 'The evaluation service returned a response we couldn’t read.'
         : `Request failed with status ${response.status}`
     );
   }
@@ -110,27 +110,27 @@ async function post<T>(path: string, body: Record<string, unknown>, fallback: st
 // -- Reads -------------------------------------------------------------------
 
 export async function fetchBatches(): Promise<EvaluationBatch[]> {
-  const data = await get<{ batches: EvaluationBatch[] }>('batches', 'Unable to load evaluations.');
+  const data = await get<{ batches: EvaluationBatch[] }>('batches', 'Couldn’t load evaluations.');
 
   return data.batches ?? [];
 }
 
 export async function fetchBatch(batchId: number): Promise<BatchDetail> {
-  return get<BatchDetail>(`batches/${batchId}`, 'Unable to load this evaluation.');
+  return get<BatchDetail>(`batches/${batchId}`, 'Couldn’t load this evaluation.');
 }
 
 export async function fetchSheet(sheetId: number): Promise<SheetDetail> {
-  return get<SheetDetail>(`sheets/${sheetId}`, 'Unable to load this answer sheet.');
+  return get<SheetDetail>(`sheets/${sheetId}`, 'Couldn’t load this answer sheet.');
 }
 
 export async function fetchAnswerKey(paperId: number): Promise<AnswerKeySummary> {
-  return get<AnswerKeySummary>(`answer-key/${paperId}`, 'Unable to read this paper as a marking key.');
+  return get<AnswerKeySummary>(`answer-key/${paperId}`, 'Couldn’t read this paper as a marking key.');
 }
 
 // -- Writes ------------------------------------------------------------------
 
 export async function createBatch(paperId: number, name: string): Promise<BatchDetail> {
-  return post<BatchDetail>('batches', { question_paper_id: paperId, name }, 'Unable to start this evaluation.');
+  return post<BatchDetail>('batches', { question_paper_id: paperId, name }, 'Couldn’t start this evaluation.');
 }
 
 export async function deleteBatch(batchId: number): Promise<void> {
@@ -145,7 +145,7 @@ export async function deleteBatch(batchId: number): Promise<void> {
   const status = normalizeApiStatus(payload);
 
   if (status !== '1' && status !== '200') {
-    throw new Error(payload?.message || 'Unable to remove this evaluation.');
+    throw new Error(payload?.message || 'Couldn’t remove this evaluation.');
   }
 }
 
@@ -172,7 +172,7 @@ export async function uploadSheets(batchId: number, files: File[]): Promise<Batc
     body: form,
   });
 
-  return unwrap<BatchDetail>((await readJson(response)) as never, 'Unable to upload these answer sheets.');
+  return unwrap<BatchDetail>((await readJson(response)) as never, 'Couldn’t upload these answer sheets.');
 }
 
 /**
@@ -205,11 +205,11 @@ export async function reviewSheet(
     body.unapprove = true;
   }
 
-  return post<SheetDetail>(`sheets/${sheetId}/review`, body, 'Unable to save this review.');
+  return post<SheetDetail>(`sheets/${sheetId}/review`, body, 'Couldn’t save this review.');
 }
 
 export async function reprocessSheet(sheetId: number): Promise<SheetDetail> {
-  return post<SheetDetail>(`sheets/${sheetId}/reprocess`, {}, 'Unable to re-run this sheet.');
+  return post<SheetDetail>(`sheets/${sheetId}/reprocess`, {}, 'Couldn’t re-run this sheet.');
 }
 
 export async function deleteSheet(sheetId: number): Promise<void> {
@@ -224,7 +224,7 @@ export async function deleteSheet(sheetId: number): Promise<void> {
   const status = normalizeApiStatus(payload);
 
   if (status !== '1' && status !== '200') {
-    throw new Error(payload?.message || 'Unable to remove this answer sheet.');
+    throw new Error(payload?.message || 'Couldn’t remove this answer sheet.');
   }
 }
 
@@ -238,7 +238,7 @@ export async function publishBatch(batchId: number): Promise<{ published: number
   });
 
   const payload = await readJson(response);
-  const data = unwrap<{ published: number; skipped: number }>(payload as never, 'Unable to publish this evaluation.');
+  const data = unwrap<{ published: number; skipped: number }>(payload as never, 'Couldn’t publish this evaluation.');
 
   return { ...data, message: payload?.message || '' };
 }
@@ -259,7 +259,7 @@ export async function fetchSheetFileUrl(sheetId: number, annotated: boolean): Pr
 
   if (!response.ok) {
     const payload = await readJson(response).catch(() => null);
-    throw new Error(payload?.message || 'That file could not be opened.');
+    throw new Error(payload?.message || 'That file couldn’t be opened.');
   }
 
   return URL.createObjectURL(await response.blob());

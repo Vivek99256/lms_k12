@@ -50,7 +50,7 @@ export function RoleCompetencyInlinePanel({
       setRows(current.data ?? [])
       setLibrary((lib.data ?? []).map((c) => ({ id: c.id, name: c.name })))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load what this role requires.')
+      setError(e instanceof Error ? e.message : 'Couldn’t load what this role requires.')
     } finally {
       setLoading(false)
     }

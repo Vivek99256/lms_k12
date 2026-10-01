@@ -170,7 +170,7 @@ export default function MarksEntryPage() {
       setApproved(readString(asRecord(source.approve_status).status) === '1');
       setStudents(toStudentRows(source.stu_data));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load students. Please try again.');
+      setError(err instanceof Error ? err.message : "Couldn't load students. Try again.");
       setStudents([]);
       setApproved(false);
     } finally {
@@ -221,10 +221,10 @@ export default function MarksEntryPage() {
         data[`values[${student.studentId}][comment]`] = orSpace(student.comment);
       }
       const payload = await resultPost('api/result/marks-entry', data);
-      const message = assertOk(payload, 'Laravel did not confirm that marks were saved.');
+      const message = assertOk(payload, "Couldn't save marks. Try again.");
       toast.success('Marks saved', message || undefined);
     } catch (err) {
-      toast.error('Could not save marks', err instanceof Error ? err.message : undefined);
+      toast.error("Couldn't save marks. Try again.", err instanceof Error ? err.message : undefined);
     } finally {
       setSaving(false);
     }
@@ -252,7 +252,7 @@ export default function MarksEntryPage() {
       );
     } catch (err) {
       toast.error(
-        nextApproved ? 'Could not approve marks' : 'Could not unapprove marks',
+        nextApproved ? "Couldn't approve marks. Try again." : "Couldn't unapprove marks. Try again.",
         err instanceof Error ? err.message : undefined,
       );
     } finally {

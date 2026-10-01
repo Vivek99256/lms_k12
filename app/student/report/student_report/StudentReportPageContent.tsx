@@ -78,7 +78,7 @@ function DynamicFieldPicker({
   return (
     <div className="space-y-4">
       {groups.length === 0 ? (
-        <p className="text-sm text-slate-500">No dynamic fields were returned for this report.</p>
+        <p className="text-sm text-slate-500">No extra fields are available for this report.</p>
       ) : null}
       {groups.map((group) => {
         const groupIds = group.options.map((option) => option.id);
@@ -165,7 +165,7 @@ export default function StudentReportPageContent() {
         }
       } catch (error) {
         if (!cancelled) {
-          setMessage(error instanceof Error ? error.message : 'Unable to load report configuration.');
+          setMessage(error instanceof Error ? error.message : "Couldn't load report configuration. Try again.");
         }
       } finally {
         if (!cancelled) setBootstrapping(false);
@@ -219,7 +219,7 @@ export default function StudentReportPageContent() {
       setRows(response.rows);
       setMessage(response.rows.length > 0 ? '' : 'No rows match the current filters.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to load report.');
+      setMessage(error instanceof Error ? error.message : "Couldn't load report. Try again.");
       setRows([]);
     } finally {
       setLoading(false);
@@ -273,10 +273,10 @@ export default function StudentReportPageContent() {
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Order By">
               <NativeSelect value={orderBy} onChange={(value) => setOrderBy(value)}>
-                <option value="student_name">Student Name</option>
+                <option value="student_name">Student name</option>
                 <option value="standard_id">Standard</option>
-                <option value="enrollment_no">GR No</option>
-                <option value="roll_no">Roll No</option>
+                <option value="enrollment_no">GR no.</option>
+                <option value="roll_no">Roll no.</option>
                 <option value="last_name">Last Name</option>
               </NativeSelect>
             </Field>

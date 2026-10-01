@@ -80,7 +80,7 @@ export default function EntryPage({ config }: { config: EntryConfig }) {
         );
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load staff groups.');
+        if (active) setError(cause instanceof Error ? cause.message : "Couldn't load staff groups. Try again.");
       });
 
     return () => {
@@ -167,7 +167,7 @@ export default function EntryPage({ config }: { config: EntryConfig }) {
     } catch (cause) {
       setRecipients([]);
       setSelected(new Set());
-      setError(cause instanceof Error ? cause.message : 'Unable to load recipients.');
+      setError(cause instanceof Error ? cause.message : "Couldn't load recipients. Try again.");
     } finally {
       setBusy('');
     }
@@ -252,7 +252,7 @@ export default function EntryPage({ config }: { config: EntryConfig }) {
         const breakdown = asRecord(cause.raw);
         if ('requested' in breakdown) setSummary(breakdown as Summary);
       } else {
-        setError(cause instanceof Error ? cause.message : 'Unable to send the message.');
+        setError(cause instanceof Error ? cause.message : "Couldn't send the message. Try again.");
       }
     } finally {
       setBusy('');
@@ -357,7 +357,7 @@ export default function EntryPage({ config }: { config: EntryConfig }) {
                     />
                   </th>
                   <th className="px-3 py-3 font-semibold">Name</th>
-                  <th className="px-3 py-3 font-semibold">GR No.</th>
+                  <th className="px-3 py-3 font-semibold">GR no.</th>
                   {showClassColumns && <th className="px-3 py-3 font-semibold">Standard</th>}
                   {showClassColumns && <th className="px-3 py-3 font-semibold">Division</th>}
                   <th className="px-3 py-3 font-semibold">{config.contactLabel}</th>

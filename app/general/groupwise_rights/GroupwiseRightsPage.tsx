@@ -94,7 +94,7 @@ export function GroupwiseRightsPage() {
       setSummary(data.summary);
       setPermissions(data.permissions);
     } catch (value: unknown) {
-      setError(errorMessage(value, "Group-wise rights could not be loaded."));
+      setError(errorMessage(value, "Couldn't load group-wise rights. Try again."));
     } finally {
       setLoading(false);
     }
@@ -111,7 +111,7 @@ export function GroupwiseRightsPage() {
     try {
       setMatrix(await loadGroupwiseMatrix(profileId));
     } catch (value: unknown) {
-      setError(errorMessage(value, "The rights matrix could not be loaded."));
+      setError(errorMessage(value, "Couldn't load the rights. Try again."));
       setMatrix(noMatrix);
     } finally {
       setMatrixLoading(false);
@@ -181,7 +181,7 @@ export function GroupwiseRightsPage() {
       setPermissions(latest.permissions);
       await loadMatrix(selectedProfileId);
     } catch (value: unknown) {
-      setError(errorMessage(value, "Group-wise rights could not be saved."));
+      setError(errorMessage(value, "Couldn't save group-wise rights. Try again."));
     } finally {
       setSaving(false);
     }
@@ -209,7 +209,7 @@ export function GroupwiseRightsPage() {
     <main className="mx-auto space-y-5 p-4 sm:p-6">
       <ErpPageHeader
         title="Group-wise Rights"
-        description="Assign view, add, edit, and delete rights to user profiles using the legacy ERP menu tree."
+        description="Assign view, add, edit, and delete rights to user profiles using the menu tree."
         onRefresh={() => void load()}
         refreshing={loading || matrixLoading || saving}
       />
@@ -322,7 +322,7 @@ export function GroupwiseRightsPage() {
 
       <ErpSection
         title="Rights Summary"
-        description="Current rights records already stored in Laravel."
+        description="Current rights records already saved."
         icon={<KeyRound className="size-5" />}
       >
         <div className="mb-4 max-w-sm">

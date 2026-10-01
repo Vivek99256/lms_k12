@@ -78,7 +78,7 @@ export default function AddTransportRatePage() {
       const data = await loadTransportation("rates", getTransportationSession());
       setRecords(data.records);
     } catch (loadError: unknown) {
-      setError(loadError instanceof Error ? loadError.message : "Transport rates could not be loaded.");
+      setError(loadError instanceof Error ? loadError.message : "Couldn't load transport rates. Try again.");
     } finally {
       setLoading(false);
     }
@@ -173,7 +173,7 @@ export default function AddTransportRatePage() {
       reset();
       await load();
     } catch (saveError: unknown) {
-      setError(saveError instanceof Error ? saveError.message : "Transport rate could not be saved.");
+      setError(saveError instanceof Error ? saveError.message : "Couldn't save transport rate. Try again.");
     } finally {
       setBusy(false);
     }
@@ -188,7 +188,7 @@ export default function AddTransportRatePage() {
       if (editing?.id === record.id) reset();
       await load();
     } catch (deleteError: unknown) {
-      setError(deleteError instanceof Error ? deleteError.message : "Transport rate could not be deleted.");
+      setError(deleteError instanceof Error ? deleteError.message : "Couldn't delete transport rate. Try again.");
     } finally {
       setBusy(false);
     }

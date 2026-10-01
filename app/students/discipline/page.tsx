@@ -39,7 +39,7 @@ export default function DisciplineModulePage() {
       })
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
-        setError(reason instanceof Error ? reason.message : 'Unable to load discipline records.');
+        setError(reason instanceof Error ? reason.message : "Couldn't load discipline records. Try again.");
       })
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false);

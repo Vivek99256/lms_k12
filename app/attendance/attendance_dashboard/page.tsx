@@ -115,7 +115,7 @@ export default function AttendancePage() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load class sections.");
+          setError(err instanceof Error ? err.message : "Couldn't load classes. Try again.");
           setLoading(false);
         }
       }
@@ -148,7 +148,7 @@ export default function AttendancePage() {
         setAttendanceTrendData(trend);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load attendance data.");
+          setError(err instanceof Error ? err.message : "Couldn't load attendance data. Try again.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -234,7 +234,7 @@ export default function AttendancePage() {
       );
       setSaveMessage(message);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to save attendance.");
+      setSaveError(err instanceof Error ? err.message : "Couldn't save attendance. Try again.");
     } finally {
       setSaving(false);
     }

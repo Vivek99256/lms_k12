@@ -330,14 +330,14 @@ export default function FeesReceiptBookMasterPage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to load receipt books (${response.status})`
+          "Couldn't load receipt books. Try again."
         );
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to load receipt books.');
+        throw new Error(payload.message || "Couldn't load receipt books. Try again.");
       }
       const rows = Array.isArray(payload.data)
         ? (payload.data as ReceiptBookApiRow[])
@@ -347,7 +347,7 @@ export default function FeesReceiptBookMasterPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load receipt books.'
+          : "Couldn't load receipt books. Try again."
       );
     } finally {
       setLoading(false);
@@ -375,7 +375,7 @@ export default function FeesReceiptBookMasterPage() {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to load grades (${response.status})`);
+        throw new Error("Couldn't load grades. Try again.");
       }
 
       const payload = (await response.json()) as ApiEnvelope;
@@ -467,7 +467,7 @@ export default function FeesReceiptBookMasterPage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to load receipt book form (${response.status})`
+          "Couldn't load receipt book form. Try again."
         );
       }
 
@@ -493,7 +493,7 @@ export default function FeesReceiptBookMasterPage() {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : 'Failed to load receipt book form.'
+          : "Couldn't load receipt book form. Try again."
       );
     } finally {
       setFormLoading(false);
@@ -522,7 +522,7 @@ export default function FeesReceiptBookMasterPage() {
 
         if (!response.ok) {
           throw new Error(
-            `Failed to load receipt book details (${response.status})`
+            "Couldn't load receipt book details. Try again."
           );
         }
 
@@ -583,7 +583,7 @@ export default function FeesReceiptBookMasterPage() {
         setError(
           fetchError instanceof Error
             ? fetchError.message
-            : 'Failed to load receipt book details.'
+            : "Couldn't load receipt book details. Try again."
         );
       } finally {
         setFormLoading(false);
@@ -768,7 +768,7 @@ export default function FeesReceiptBookMasterPage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to ${editingRecord ? 'update' : 'save'} receipt book (${response.status})`
+          `Couldn't ${editingRecord ? 'update' : 'save'} receipt book. Try again.`
         );
       }
 
@@ -778,10 +778,10 @@ export default function FeesReceiptBookMasterPage() {
         if ((payload.message || '').toLowerCase().includes('fees head')) {
           setFormErrors((current) => ({
             ...current,
-            fees_head_id: payload.message || 'Failed to save receipt book.',
+            fees_head_id: payload.message || "Couldn't save receipt book. Try again.",
           }));
         }
-        throw new Error(payload.message || 'Failed to save receipt book.');
+        throw new Error(payload.message || "Couldn't save receipt book. Try again.");
       }
 
       setSuccessMessage(
@@ -794,7 +794,7 @@ export default function FeesReceiptBookMasterPage() {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : 'Failed to save receipt book.'
+          : "Couldn't save receipt book. Try again."
       );
     } finally {
       setSubmitting(false);
@@ -830,14 +830,14 @@ export default function FeesReceiptBookMasterPage() {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to delete receipt book (${response.status})`
+          "Couldn't delete receipt book. Try again."
         );
       }
 
       const payload = (await response.json()) as ApiEnvelope;
       const apiStatus = normalizeApiStatus(payload);
       if (apiStatus && apiStatus !== '1') {
-        throw new Error(payload.message || 'Failed to delete receipt book.');
+        throw new Error(payload.message || "Couldn't delete receipt book. Try again.");
       }
 
       setSuccessMessage(payload.message || 'Receipt book deleted successfully.');
@@ -846,7 +846,7 @@ export default function FeesReceiptBookMasterPage() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : 'Failed to delete receipt book.'
+          : "Couldn't delete receipt book. Try again."
       );
     } finally {
       setDeletingId('');
@@ -1294,7 +1294,7 @@ export default function FeesReceiptBookMasterPage() {
 
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label className="text-[11px] font-medium text-slate-700">
-                        Fee Head
+                        Fee head
                       </Label>
                       <p className="text-[11px] text-slate-500">
                         Select one or more fee heads for this receipt book.
@@ -1334,7 +1334,7 @@ export default function FeesReceiptBookMasterPage() {
                       ) : null}
                       {feeHeadOptions.length === 0 ? (
                         <p className="text-[11px] text-amber-700">
-                          Fee Head options could not be loaded from the backend.
+                          Couldn't load fee head options. Try again.
                         </p>
                       ) : null}
                       {selectedFeeHeads.length > 0 ? (

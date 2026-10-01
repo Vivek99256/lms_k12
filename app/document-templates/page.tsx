@@ -52,7 +52,7 @@ const primaryButtonClass =
   'bg-[#0D6EFD] text-white hover:bg-blue-600 shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30';
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+  return error instanceof Error ? error.message : "Couldn't complete that action. Try again.";
 }
 
 function DocumentTemplatesGallery() {

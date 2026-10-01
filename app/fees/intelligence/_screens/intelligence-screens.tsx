@@ -32,7 +32,7 @@ import { feesIntelligenceContract } from '@/components/intelligence/module/contr
 export const FEES_INTELLIGENCE_SCREENS: ModuleStaticScreen[] = [
   {
     id: 'fees-intelligence',
-    label: 'Fees Intelligence',
+    label: 'Fee intelligence',
     icon: Brain,
     /*
      * FEES NOW RENDERS THROUGH THE SHARED RENDERER, like every other module.

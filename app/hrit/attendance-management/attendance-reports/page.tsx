@@ -742,7 +742,7 @@ function AttendanceReportsPage() {
         }
       } catch (error) {
         if (!cancelled) {
-          setApiError(error instanceof Error ? error.message : 'Failed to load attendance reports.')
+          setApiError(error instanceof Error ? error.message : "Couldn't load attendance reports. Try again.")
           setAttendanceKpis(null)
           setWeeklySummary(null)
           setDepartmentReport([])

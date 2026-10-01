@@ -1,5 +1,7 @@
 'use client';
 
+import { friendlyError } from '@/lib/user-messages';
+
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Plus, Trash2, X } from 'lucide-react';
@@ -215,7 +217,7 @@ function InteractiveVideoCreateContent() {
       const result = await createVideo(ctx, { title: title.trim(), interactions, videoFile: file });
       router.push(`/h5p/h5p_interactive_video?${h5pContextQuery(ctx, { flash: result.message })}`);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create video');
+      setError(friendlyError(err, 'We couldn’t create video. Please try again.'));
       setSaving(false);
     }
   };

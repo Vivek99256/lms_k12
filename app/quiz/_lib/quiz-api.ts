@@ -65,7 +65,7 @@ async function postForm<T>(session: SessionContext, path: string, extraParams?: 
 
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
-    throw new Error(readString(payload.message) || `Request failed (${response.status})`);
+    throw new Error(readString(payload.message) || "Couldn't complete the request. Try again.");
   }
   return payload as T;
 }

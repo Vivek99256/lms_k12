@@ -88,7 +88,7 @@ export default function StudentBreakoffReportPage() {
     return totals;
   }, [feesTitles, rows]);
   const exportColumns = useMemo<TableExportColumn[]>(() => ([
-    { key: 'enrollmentNo', label: 'GR No' },
+    { key: 'enrollmentNo', label: 'GR no.' },
     { key: 'studentName', label: 'Student name', width: '220px' },
     { key: 'standardDivision', label: 'Std / Div' },
     { key: 'quota', label: 'Quota' },
@@ -119,7 +119,7 @@ export default function StudentBreakoffReportPage() {
       const monthsRecord = payload.months_arr && typeof payload.months_arr === 'object' ? payload.months_arr as Record<string, unknown> : {};
       setMonthOptions(Object.entries(monthsRecord).map(([id, label]) => ({ id, label: readString(label) })));
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load month filters.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load month filters. Try again." });
     } finally {
       setLoadingFilters(false);
     }
@@ -164,7 +164,7 @@ export default function StudentBreakoffReportPage() {
     } catch (error) {
       setRows([]);
       setFeesTitles([]);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to fetch student breakoff report.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : "Couldn't load student breakoff report. Try again." });
     } finally {
       setLoading(false);
     }
@@ -184,14 +184,14 @@ export default function StudentBreakoffReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Student Breakoff Report"
+        title="Student breakoff report"
         description="Aggregate each student's fee breakoff across the selected mapped months and other-fee amounts."
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'student-breakoff-report.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'student-breakoff-report.xls', title: 'Student Breakoff Report', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'student-breakoff-report.pdf', title: 'Student Breakoff Report', subtitle: 'Legacy parity export', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Student Breakoff Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'student-breakoff-report.xls', title: 'Student breakoff report', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'student-breakoff-report.pdf', title: 'Student breakoff report', subtitle: 'Export', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Student breakoff report', subtitle: 'Print view', columns: exportColumns, rows: exportRows })}
           />
         }
       />

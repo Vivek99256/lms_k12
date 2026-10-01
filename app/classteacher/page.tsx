@@ -71,7 +71,7 @@ export default function AssignClassTeacherPage() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Class-teacher assignments could not be loaded."
+          : "Couldn't load class-teacher assignments. Try again."
       );
     } finally {
       setLoading(false);
@@ -157,7 +157,7 @@ export default function AssignClassTeacherPage() {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "The class-teacher assignment could not be saved."
+          : "Couldn't save the class-teacher assignment. Try again."
       );
     } finally {
       setSaving(false);
@@ -182,7 +182,7 @@ export default function AssignClassTeacherPage() {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : "The class-teacher assignment could not be deleted."
+          : "Couldn't delete the class-teacher assignment. Try again."
       );
     } finally {
       setSaving(false);

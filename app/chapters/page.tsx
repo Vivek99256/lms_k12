@@ -47,7 +47,7 @@ function ChapterViewContent() {
         }
       } catch (fetchError) {
         if (!cancelled) {
-          setError(fetchError instanceof Error ? fetchError.message : 'Unable to load chapters.');
+          setError(fetchError instanceof Error ? fetchError.message : 'Couldn’t load chapters.');
         }
       } finally {
         if (!cancelled) setLoading(false);

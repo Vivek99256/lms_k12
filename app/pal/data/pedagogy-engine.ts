@@ -239,8 +239,8 @@ export async function fetchPedagogyEngineModule(
   } catch (error) {
     return emptyResponse(
       error instanceof Error
-        ? `Could not reach the Pedagogy Engine API: ${error.message}`
-        : 'Could not reach the Pedagogy Engine API.'
+        ? `Couldn’t reach the Pedagogy Engine API: ${error.message}`
+        : 'Couldn’t reach the Pedagogy Engine API.'
     );
   }
 

@@ -56,7 +56,7 @@ export default function StudentInfirmaryPage() {
       setNextCaseNumber(data.nextCaseNumber);
     }).catch((reason: unknown) => {
       if (reason instanceof DOMException && reason.name === 'AbortError') return;
-      setError(reason instanceof Error ? reason.message : 'Unable to load infirmary records.');
+      setError(reason instanceof Error ? reason.message : "Couldn't load infirmary records. Try again.");
     }).finally(() => {
       if (!controller.signal.aborted) setIsLoading(false);
     });
@@ -138,7 +138,7 @@ export default function StudentInfirmaryPage() {
       setShowForm(false);
       await loadRecords();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save infirmary record.');
+      setError(reason instanceof Error ? reason.message : "Couldn't save infirmary record. Try again.");
     } finally {
       setIsSaving(false);
     }
@@ -151,7 +151,7 @@ export default function StudentInfirmaryPage() {
       setMessage(await deleteInfirmaryRecord(record.id));
       await loadRecords();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to delete infirmary record.');
+      setError(reason instanceof Error ? reason.message : "Couldn't delete infirmary record. Try again.");
     }
   };
 
@@ -243,7 +243,7 @@ export default function StudentInfirmaryPage() {
                     setStudentOptions([]);
                     setHighlightedIndex(-1);
                   }
-                }} placeholder="Type student name or GR No." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 read-only:bg-slate-50" />
+                }} placeholder="Search by student name or GR no." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 read-only:bg-slate-50" />
                 {studentOptions.length > 0 && <div id="infirmary-student-options" className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
                   {studentOptions.map((student, index) => <button key={student.id} type="button" data-index={index} onClick={() => selectStudent(student)} className={`block w-full px-3 py-2 text-left text-sm ${index === highlightedIndex ? 'bg-indigo-100' : 'hover:bg-slate-50'}`}><span className="font-medium">{student.name}</span><span className="ml-2 text-slate-400">{student.enrollmentNo}</span></button>)}
                 </div>}

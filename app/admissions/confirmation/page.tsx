@@ -70,7 +70,7 @@ const columns: ColumnDef[] = [
   { key: 'confirm', label: 'Confirm', sortable: false, width: '100px' },
   { key: 'addStudent', label: 'Add Student', sortable: false, width: '130px' },
   { key: 'registrationNumber', label: 'Registration No', sortable: true },
-  { key: 'enquiryNumber', label: 'Enquiry Number', sortable: true },
+  { key: 'enquiryNumber', label: 'Enquiry no.', sortable: true },
   { key: 'inquiryDate', label: 'Enquiry Date', sortable: true },
   { key: 'followUpDate', label: 'Follow Up Date', sortable: true },
   { key: 'firstName', label: 'First Name', sortable: true },
@@ -156,12 +156,12 @@ export default function AdmissionConfirmationPage() {
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to load admission enquiries (${response.status})`);
+          throw new Error(`Couldn't load admission enquiries. Try again.`);
         }
 
         const payload = (await response.json()) as AdmissionEnquiryApiResponse;
         if (normalizeApiStatus(payload) !== '1') {
-          throw new Error(payload.message || 'Failed to load admission enquiries.');
+          throw new Error(payload.message || "Couldn't load admission enquiries. Try again.");
         }
 
         const detailResults = await Promise.all(
@@ -211,7 +211,7 @@ export default function AdmissionConfirmationPage() {
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === 'AbortError') return;
         setRecords([]);
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load confirmation records.');
+        setError(loadError instanceof Error ? loadError.message : "Couldn't load confirmation records. Try again.");
       } finally {
         if (!controller.signal.aborted) setIsLoading(false);
       }
@@ -279,7 +279,7 @@ export default function AdmissionConfirmationPage() {
       applyRefreshedDetail(record.id, refreshed, { canConfirm: false, confirmReason: '' });
       setNotice('Admission confirmed. You can now add the student.');
     } catch (confirmError) {
-      setActionError(confirmError instanceof Error ? confirmError.message : 'Failed to confirm admission.');
+      setActionError(confirmError instanceof Error ? confirmError.message : "Couldn't confirm admission. Try again.");
     } finally {
       setConfirmingId(null);
     }
@@ -306,7 +306,7 @@ export default function AdmissionConfirmationPage() {
       applyRefreshedDetail(record.id, refreshed);
       setNotice(`Student added successfully for ${record.firstName} ${record.lastName}.`.replace(/\s+/g, ' ').trim());
     } catch (addError) {
-      setActionError(addError instanceof Error ? addError.message : 'Failed to add student.');
+      setActionError(addError instanceof Error ? addError.message : "Couldn't add student. Try again.");
     } finally {
       setAddingStudentId(null);
     }
@@ -475,7 +475,7 @@ export default function AdmissionConfirmationPage() {
                       {[selectedRecord.firstName, selectedRecord.middleName, selectedRecord.lastName].filter(Boolean).join(' ') || 'Admission candidate'}
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Enquiry No. {selectedRecord.enquiryNumber || enquiryId}
+                      Enquiry no. {selectedRecord.enquiryNumber || enquiryId}
                       {selectedRecord.mobile ? ` • Mobile ${selectedRecord.mobile}` : ''}
                       {selectedRecord.admissionStandard ? ` • Standard ${selectedRecord.admissionStandard}` : ''}
                     </p>

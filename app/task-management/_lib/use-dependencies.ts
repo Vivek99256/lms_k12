@@ -40,7 +40,7 @@ export function useDependencies() {
       )
       setData({ ...response.data, tasks: uniqueTasks, dependencies: uniqueDependencies })
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to load dependencies.'))
+      setError(toMessage(reason, "Couldn't load dependencies. Try again."))
     } finally {
       setLoading(false)
     }
@@ -87,7 +87,7 @@ export function useDependencies() {
       setMessage(response.message)
       refresh()
     } catch (reason) {
-      setError(toMessage(reason, 'Unable to delete dependency.'))
+      setError(toMessage(reason, "Couldn't delete dependency. Try again."))
     }
   }, [refresh])
 
@@ -118,7 +118,7 @@ export function useProjectWorkstreams(selectedProjectId: string) {
       setError('')
       dependenciesService.getWorkstreams(session, selectedProjectId)
         .then((response) => { if (active) setWorkstreams(response.data ?? []) })
-        .catch((reason) => { if (active) setError(toMessage(reason, 'Unable to load workstreams.')) })
+        .catch((reason) => { if (active) setError(toMessage(reason, "Couldn't load workstreams. Try again.")) })
         .finally(() => { if (active) setLoading(false) })
     })
     return () => { active = false }

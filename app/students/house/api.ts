@@ -25,7 +25,7 @@ export type HouseData = {
 type ApiEnvelope = { status?: string | number; message?: string; data?: unknown };
 
 function assertSuccess(payload: ApiEnvelope) {
-  if (Number(payload.status) !== 1) throw new Error(payload.message || 'Unable to load houses.');
+  if (Number(payload.status) !== 1) throw new Error(payload.message || "Couldn't load houses. Try again.");
 }
 
 function sessionParams() {

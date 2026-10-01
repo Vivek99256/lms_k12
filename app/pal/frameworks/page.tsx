@@ -11,7 +11,7 @@ export default async function PalFrameworkParentPage({
       emptyTitle="Framework intelligence is not available"
       eyebrow="Framework"
       title="Framework"
-      description="This Framework view is dynamically derived from the same semantic_intelligence payload used by Concept Intelligence. When no chapter is selected, PAL automatically loads the latest available semantic record."
+      description="This view is built from the chapter’s concepts and skills. When no chapter is selected, PAL loads the latest available chapter."
       basePath="/pal/frameworks"
       variant="framework"
       selectModules={(model) => model.frameworkModules}

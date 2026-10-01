@@ -122,7 +122,7 @@ export async function publishTasks(params: {
         key: draft.key,
         title: draft.title,
         ok: false,
-        message: toMessage(error, "The task could not be created."),
+        message: toMessage(error, "Couldn't create the task. Try again."),
       });
     }
   }

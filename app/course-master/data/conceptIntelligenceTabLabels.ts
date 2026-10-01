@@ -145,7 +145,7 @@ async function callApi(
   const envelope = toRecord(payload);
 
   if (!response.ok || envelope.status === false) {
-    throw new Error(readString(envelope.message) || 'Could not load tab names.');
+    throw new Error(readString(envelope.message) || 'Couldn’t load tab names.');
   }
 
   return normalise(payload, subInstituteId);

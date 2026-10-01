@@ -52,7 +52,7 @@ export function PublishPanel({
     try {
       setDirectory(await loadAssignmentDirectory());
     } catch (value: unknown) {
-      setError(value instanceof Error ? value.message : "The assignment directory could not be loaded.");
+      setError(value instanceof Error ? value.message : "Couldn't load the assignment directory. Try again.");
     } finally {
       setLoading(false);
     }
@@ -95,7 +95,7 @@ export function PublishPanel({
         })
       );
     } catch (value: unknown) {
-      setError(value instanceof Error ? value.message : "The tasks could not be published.");
+      setError(value instanceof Error ? value.message : "Couldn't publish the tasks. Try again.");
     } finally {
       setPublishing(false);
     }

@@ -144,7 +144,7 @@ export function DepartmentEditDialog({
           );
         } catch (cause) {
           if (!cancelled) {
-            setError(cause instanceof Error ? cause.message : "Failed to load employees.");
+            setError(cause instanceof Error ? cause.message : "Couldn't load employees. Try again.");
           }
         } finally {
           if (!cancelled) setHeadCandidatesLoading(false);
@@ -228,7 +228,7 @@ export function DepartmentEditDialog({
           : "Department updated successfully."
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update department.");
+      setError(err instanceof Error ? err.message : "Couldn't update department. Try again.");
     } finally {
       setIsSaving(false);
     }

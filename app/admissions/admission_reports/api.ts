@@ -168,7 +168,7 @@ function buildBackendGapMessage(reportId: AdmissionReportId, responseText: strin
     responseText.includes('sub_institute_id =  OR common_to_all = 1') ||
     responseText.includes('tblcustom_fields')
   ) {
-    return `${reportId.replace(/_/g, ' ')} is using a session-only Laravel report controller. The frontend sent type=API, but the controller still reads sub_institute_id/syear from the Laravel session, so this environment needs either an active Laravel session cookie or a backend API fix.`;
+    return `${reportId.replace(/_/g, ' ')} isn't available right now. Contact your administrator.`;
   }
 
   return '';
@@ -222,16 +222,17 @@ async function fetchProxyPayload(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Failed to load ${path} (${response.status}).`);
+    console.error(text);
+    throw new Error("Couldn't load the report. Try again.");
   }
 
   const payload = await readJson<RawAdmissionReportResponse>(
     response,
-    `Failed to parse ${path} response.`
+    "Couldn't load the report. Try again."
   );
 
   if (normalizeApiStatus(payload) !== '1') {
-    throw new Error(readString(payload.message) || `Failed to load ${path}.`);
+    throw new Error(readString(payload.message) || "Couldn't load the report. Try again.");
   }
 
   return payload;
@@ -392,7 +393,7 @@ async function buildWithoutConfirmationFallbackResultV2(
 
   if (rows.length === 0 && listRows.length > 0 && detailErrorCount === listRows.length) {
     throw new Error(
-      `Failed to load ${detailErrorCount} admission record${detailErrorCount === 1 ? '' : 's'} while running this report (a network or database error, not an empty result) - please retry the search.`
+      `Couldn't load ${detailErrorCount} admission record${detailErrorCount === 1 ? '' : 's'} for this report. Try again.`
     );
   }
 
@@ -591,17 +592,17 @@ export async function fetchAdmissionReportContext(
       };
     }
     throw new Error(
-      backendGapMessage || `Failed to load ${reportId.replace(/_/g, ' ')} (${response.status}).`
+      backendGapMessage || "Couldn't load the report. Try again."
     );
   }
 
   const raw = await readJson<RawAdmissionReportResponse>(
     response,
-    'Failed to parse the admission report metadata response.'
+    "Couldn't load the report. Try again."
   );
 
   if (normalizeApiStatus(raw) !== '1') {
-    throw new Error(readString(raw.message) || 'Failed to load report metadata.');
+    throw new Error(readString(raw.message) || "Couldn't load report metadata. Try again.");
   }
 
   const rows = toRows(raw.data);
@@ -652,19 +653,15 @@ export async function runAdmissionReport(
     const backendGapMessage = buildBackendGapMessage(reportId, responseText);
     if (backendGapMessage) {
       return buildWithoutConfirmationFallbackResult(filters);
-    }
-    const sessionHint = sessionDrivenReportIds.includes(reportId)
-      ? ' This report relies on a Laravel web-session controller.'
-      : '';
-    throw new Error(
+    }    throw new Error(
       backendGapMessage ||
-        `Failed to run ${reportId.replace(/_/g, ' ')} (${response.status}).${sessionHint}`
+        "Couldn't run the report. Try again."
     );
   }
 
   const raw = await readJson<RawAdmissionReportResponse>(
     response,
-    'Failed to parse the admission report response.'
+    "Couldn't load the report. Try again."
   );
 
   if (normalizeApiStatus(raw) !== '1') {

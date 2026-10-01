@@ -142,17 +142,17 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
   // 2026_09_08_100000_move_framework_menu_under_curriculum.php in next_lms_erp.
   {
     id: 'pal-content-model',
-    label: 'Content Model',
+    label: 'Content structure',
     href: '/pal/new/content-model',
   },
   {
     id: 'pal-ulu',
-    label: 'Unified Learning Units',
+    label: 'Learning units',
     href: '/pal/ulu',
   },
   {
     id: 'pal-pedagogy-engine',
-    label: 'Pedagogy Engine',
+    label: 'Teaching methods',
     href: '/pal/pedagogy-engine',
   },
   {
@@ -167,7 +167,7 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
   },
   {
     id: 'pal-ai-stack',
-    label: 'AI Stack',
+    label: 'AI tools',
     href: '/pal/new/ai-stack',
   },
 ];
@@ -448,7 +448,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       const res = await fetch(url.toString());
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || 'Failed to fetch master menu rights');
+      if (!res.ok) throw new Error(data.message || "We couldn't load your menu. Please try again.");
 
       const rawData = Array.isArray(data.data) ? data.data : [];
       let mapped: SubmenuItem[] = [];
@@ -830,7 +830,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 className={`group relative -mx-1 hidden w-2 flex-none cursor-col-resize items-center justify-center rounded outline-none md:flex ${
                   assistantPanel.isDragging ? 'bg-[#0D6EFD]/10' : 'hover:bg-[#0D6EFD]/5'
                 } focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40`}
-                title="Drag to resize · arrow keys to nudge"
+                title="Drag or use the arrow keys to resize"
               >
                 <span
                   className={`h-10 w-0.5 rounded-full transition-colors ${

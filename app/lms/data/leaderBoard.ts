@@ -117,7 +117,7 @@ async function getJson(url: URL, session: SessionContext, signal?: AbortSignal):
     try {
       body = toRecord(JSON.parse(text));
     } catch {
-      throw new Error(`The server returned an unexpected response (HTTP ${res.status}).`);
+      throw new Error(`The server returned an unexpected response.`);
     }
   }
 
@@ -125,7 +125,7 @@ async function getJson(url: URL, session: SessionContext, signal?: AbortSignal):
     // Never surface a raw backend error; the API already writes user-safe copy.
     const message = readString(body.message);
     if (res.status === 401) throw new Error('Your session has expired. Please sign in again.');
-    throw new Error(message || `Unable to load the leader board (HTTP ${res.status}).`);
+    throw new Error(message || `Couldn’t load the leaderboard.`);
   }
 
   return body;

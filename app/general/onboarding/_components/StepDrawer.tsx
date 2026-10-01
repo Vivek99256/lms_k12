@@ -120,7 +120,7 @@ export function StepDrawer({
       } catch (caught) {
         if (isActive()) {
           setVerificationError(
-            caught instanceof Error ? caught.message : "Could not check the Fees reports."
+            caught instanceof Error ? caught.message : "Couldn't check the Fees reports. Try again."
           );
         }
       } finally {

@@ -61,7 +61,7 @@ export function TransportationPage({ config }: { config: TransportConfig }) {
     try {
       setData(await loadTransportation(config.module, getTransportationSession(), filters));
     } catch (loadError: unknown) {
-      setError(loadError instanceof Error ? loadError.message : "Transportation data could not be loaded.");
+      setError(loadError instanceof Error ? loadError.message : "Couldn't load transportation data. Try again.");
     } finally {
       setLoading(false);
     }
@@ -131,7 +131,7 @@ export function TransportationPage({ config }: { config: TransportConfig }) {
       reset();
       await load();
     } catch (saveError: unknown) {
-      setError(saveError instanceof Error ? saveError.message : "Record could not be saved.");
+      setError(saveError instanceof Error ? saveError.message : "Couldn't save record. Try again.");
     } finally {
       setBusy(false);
     }
@@ -145,7 +145,7 @@ export function TransportationPage({ config }: { config: TransportConfig }) {
       setNotice(await deleteTransportation(config.module, getTransportationSession(), record.id));
       await load();
     } catch (deleteError: unknown) {
-      setError(deleteError instanceof Error ? deleteError.message : "Record could not be deleted.");
+      setError(deleteError instanceof Error ? deleteError.message : "Couldn't delete record. Try again.");
     } finally {
       setBusy(false);
     }
@@ -207,7 +207,7 @@ export function TransportationPage({ config }: { config: TransportConfig }) {
           <CardContent className="p-0">
             <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Sr.</TableHead>{config.columns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}{!config.report && <TableHead className="text-right">Actions</TableHead>}</TableRow></TableHeader>
               <TableBody>{loading ? <TableRow><TableCell colSpan={config.columns.length + 2} className="h-32 text-center"><LoaderCircle className="mx-auto size-6 animate-spin text-blue-600" /></TableCell></TableRow>
-                : visible.length === 0 ? <TableRow><TableCell colSpan={config.columns.length + 2} className="h-32 text-center text-slate-500">No records found.</TableCell></TableRow>
+                : visible.length === 0 ? <TableRow><TableCell colSpan={config.columns.length + 2} className="h-32 text-center text-slate-500">No records yet.</TableCell></TableRow>
                 : visible.map((record, index) => <TableRow key={`${record.id}-${index}`}><TableCell>{(currentPage - 1) * PAGE_SIZE + index + 1}</TableCell>{config.columns.map((column) => <TableCell key={column.key}>{text(record.values[column.key]) || "—"}</TableCell>)}{!config.report && <TableCell><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" onClick={() => edit(record)}><Pencil className="size-4" /></Button><Button variant="ghost" size="icon" onClick={() => void remove(record)} disabled={busy}><Trash2 className="size-4 text-red-600" /></Button></div></TableCell>}</TableRow>)}</TableBody>
             </Table></div>
             <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-slate-500"><span>{filtered.length} record(s)</span><div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button><span>{currentPage} / {pages}</span><Button variant="outline" size="sm" disabled={currentPage >= pages} onClick={() => setPage((value) => value + 1)}>Next</Button></div></div>

@@ -105,7 +105,7 @@ export default function FeesTypeWiseReportPage() {
   }), [rows]);
 
   const exportColumns = useMemo<TableExportColumn[]>(() => ([
-    { key: 'enrollmentNo', label: 'GR No' },
+    { key: 'enrollmentNo', label: 'GR no.' },
     { key: 'studentName', label: 'Student name', width: '220px' },
     { key: 'standardName', label: 'Standard' },
     { key: 'divisionName', label: 'Division' },
@@ -116,7 +116,7 @@ export default function FeesTypeWiseReportPage() {
     { key: 'bankBranch', label: 'Bank branch' },
     { key: 'chequeNo', label: 'Cheque no' },
     { key: 'chequeDate', label: 'Cheque date' },
-    { key: 'receiptNo', label: 'Receipt no' },
+    { key: 'receiptNo', label: 'Receipt no.' },
     { key: 'receiptDate', label: 'Receipt date' },
     ...feesHeads.map((head) => ({ key: head.feesTitle, label: head.displayName, align: 'right' as const })),
     { key: 'totalFine', label: 'Fine', align: 'right' },
@@ -186,7 +186,7 @@ export default function FeesTypeWiseReportPage() {
       setFeesHeads([]);
       setMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to fetch fees type-wise report.',
+        text: error instanceof Error ? error.message : "Couldn't load fee type-wise report. Try again.",
       });
     } finally {
       setLoading(false);
@@ -207,14 +207,14 @@ export default function FeesTypeWiseReportPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Fees Type Wise Report"
+        title="Fee type-wise report"
         description="Compare collected fee amounts head by head, including fine, discount, and receipt-level totals."
         action={
           <ReportActions
             onExportCsv={() => exportRowsAsCsv({ filename: 'fees-type-wise-report.csv', columns: exportColumns, rows: exportRows })}
-            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-type-wise-report.xls', title: 'Fees Type Wise Report', columns: exportColumns, rows: exportRows })}
-            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-type-wise-report.pdf', title: 'Fees Type Wise Report', subtitle: 'Legacy parity export', columns: exportColumns, rows: exportRows })}
-            onPrint={() => openPrintPreview({ title: 'Fees Type Wise Report', subtitle: 'Legacy parity print view', columns: exportColumns, rows: exportRows })}
+            onExportExcel={() => exportRowsAsExcel({ filename: 'fees-type-wise-report.xls', title: 'Fee type-wise report', columns: exportColumns, rows: exportRows })}
+            onExportPdf={() => exportRowsAsPdf({ filename: 'fees-type-wise-report.pdf', title: 'Fee type-wise report', subtitle: 'Export', columns: exportColumns, rows: exportRows })}
+            onPrint={() => openPrintPreview({ title: 'Fee type-wise report', subtitle: 'Print view', columns: exportColumns, rows: exportRows })}
           />
         }
       />
@@ -232,7 +232,7 @@ export default function FeesTypeWiseReportPage() {
           <Field label="Last name">
             <Input value={lastName} onChange={(event) => setLastName(event.target.value)} />
           </Field>
-          <Field label="Enrollment no">
+          <Field label="GR no.">
             <Input value={enrollmentNo} onChange={(event) => setEnrollmentNo(event.target.value)} />
           </Field>
           <Field label="Mobile no">
@@ -282,7 +282,7 @@ export default function FeesTypeWiseReportPage() {
                 <TableHead>Bank branch</TableHead>
                 <TableHead>Cheque no</TableHead>
                 <TableHead>Cheque date</TableHead>
-                <TableHead>Receipt no</TableHead>
+                <TableHead>Receipt no.</TableHead>
                 <TableHead>Receipt date</TableHead>
                 {feesHeads.map((head) => (
                   <TableHead key={head.feesTitle} className="text-right">{head.displayName}</TableHead>

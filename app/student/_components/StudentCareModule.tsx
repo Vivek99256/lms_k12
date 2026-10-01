@@ -47,7 +47,7 @@ export default function StudentCareModule({ config }: { config: CareConfig }) {
     const controller = new AbortController();
     listCareRecords(config.module, controller.signal).then(setRecords).catch((reason: unknown) => {
       if (reason instanceof DOMException && reason.name === 'AbortError') return;
-      setError(reason instanceof Error ? reason.message : 'Unable to load records.');
+      setError(reason instanceof Error ? reason.message : "Couldn't load records. Try again.");
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [config.module]);
@@ -96,13 +96,13 @@ export default function StudentCareModule({ config }: { config: CareConfig }) {
     }
     setSaving(true); setError('');
     try { setMessage(await saveCareRecord(config.module, form, editingId || undefined)); setShowForm(false); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save record.'); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn't save record. Try again."); }
     finally { setSaving(false); }
   };
   const remove = async (record: CareRecord) => {
     if (!window.confirm(`Delete this ${config.singular.toLowerCase()} record?`)) return;
     try { setMessage(await deleteCareRecord(config.module, record.id)); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to delete record.'); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn't delete record. Try again."); }
   };
   const setValue = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -125,7 +125,7 @@ export default function StudentCareModule({ config }: { config: CareConfig }) {
           <td className="whitespace-nowrap px-3 py-3 text-sm font-semibold text-slate-900">{record.student_name}</td>
           {config.fields.map((field) => <td key={field.key} className="max-w-64 truncate whitespace-nowrap px-3 py-3 text-sm text-slate-600">{field.type === 'file' && record[field.key] ? <span className="text-indigo-600">Attached</span> : record[field.key] || '-'}</td>)}
           <td className="px-3 py-3"><div className="flex"><button type="button" onClick={() => openEdit(record)} className="rounded p-2 text-indigo-600 hover:bg-indigo-50"><Edit3 className="h-4 w-4" /></button><button type="button" onClick={() => remove(record)} className="rounded p-2 text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button></div></td>
-        </tr>)}{shown.length === 0 && <tr><td colSpan={config.fields.length + 2} className="py-14 text-center text-sm text-slate-500"><FileHeart className="mx-auto mb-2 h-8 w-8 text-slate-300" />No records found.</td></tr>}</tbody>
+        </tr>)}{shown.length === 0 && <tr><td colSpan={config.fields.length + 2} className="py-14 text-center text-sm text-slate-500"><FileHeart className="mx-auto mb-2 h-8 w-8 text-slate-300" />No records yet.</td></tr>}</tbody>
       </table></div>
     </section>
     {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center p-4"><button type="button" aria-label="Close" onClick={() => setShowForm(false)} className="absolute inset-0 bg-slate-950/50" /><div className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-2xl">
@@ -146,7 +146,7 @@ export default function StudentCareModule({ config }: { config: CareConfig }) {
             setStudentOptions([]);
             setHighlightedIndex(-1);
           }
-        }} placeholder="Type student name or GR No." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm read-only:bg-slate-50" />{studentOptions.length > 0 && <div id="care-student-options" className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border bg-white shadow-lg">{studentOptions.map((student, index) => <button key={student.id} type="button" data-index={index} onClick={() => selectStudent(student)} className={`block w-full px-3 py-2 text-left text-sm ${index === highlightedIndex ? 'bg-indigo-100' : 'hover:bg-slate-50'}`}>{student.name}<span className="ml-2 text-slate-400">{student.enrollmentNo}</span></button>)}</div>}</label>
+        }} placeholder="Search by student name or GR no." className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm read-only:bg-slate-50" />{studentOptions.length > 0 && <div id="care-student-options" className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-md border bg-white shadow-lg">{studentOptions.map((student, index) => <button key={student.id} type="button" data-index={index} onClick={() => selectStudent(student)} className={`block w-full px-3 py-2 text-left text-sm ${index === highlightedIndex ? 'bg-indigo-100' : 'hover:bg-slate-50'}`}>{student.name}<span className="ml-2 text-slate-400">{student.enrollmentNo}</span></button>)}</div>}</label>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{config.fields.map((field) => <CareInput key={field.key} field={field} value={form[field.key] ?? ''} onChange={(value) => setValue(field.key, value)} onFile={(name, data) => setForm((current) => ({ ...current, file_name: name, file_data: data }))} />)}</div>
         <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowForm(false)} className="h-10 rounded-md border px-4 text-sm font-medium">Cancel</button><button disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-indigo-600 px-5 text-sm font-medium text-white disabled:opacity-60">{saving && <Loader2 className="h-4 w-4 animate-spin" />}{editingId ? 'Update' : 'Save'}</button></div>
       </form>

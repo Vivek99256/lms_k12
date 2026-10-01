@@ -124,7 +124,7 @@ export function useForm16() {
 
       const session = buildSessionContext()
       if (!isPayrollSessionReady(session)) {
-        const message = 'Your session could not be resolved. Please sign in again.'
+        const message = 'Your session has expired. Please sign in again.'
         setError(message)
         setLoading(false)
         return { ok: false as const, message }
@@ -147,7 +147,7 @@ export function useForm16() {
         setForm16(data)
         return { ok: true as const, message: 'Form 16 generated.' }
       } catch (generateError) {
-        const message = toMessage(generateError, 'Failed to generate Form 16.')
+        const message = toMessage(generateError, "Couldn't generate Form 16. Try again.")
         setError(message)
         return { ok: false as const, message }
       } finally {
