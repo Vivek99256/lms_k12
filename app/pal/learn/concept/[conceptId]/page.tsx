@@ -1,12 +1,15 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   BookOpen,
+  CheckCircle2,
   ExternalLink,
   FileText,
   Loader2,
@@ -15,7 +18,11 @@ import {
   Presentation,
   Puzzle,
   School,
+  Sparkles,
+  X,
+  Zap,
 } from 'lucide-react';
+import type { QuestionResult } from '@/components/h5p/players/types';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -28,6 +35,15 @@ import {
   type LearnResourceSection,
 } from '@/app/pal/data/pal-diagnostic';
 import {
+  H5PActivityPlayer,
+  isInlineH5PPlayable,
+  type H5PActivityTarget,
+} from '@/app/pal/_components/H5PActivityPlayer';
+import { loadChapterName } from '@/app/pal/_components/interactive-journey/chapterName';
+import { generateJourneyRecipe } from '@/app/pal/_components/interactive-journey/generate';
+import { JourneyEntryCard, JourneyPlayer } from '@/app/pal/_components/interactive-journey/JourneyPlayer';
+import { WebConceptVisual } from '@/app/pal/_components/WebConceptVisual';
+import {
   CompletedBadge,
   CompletedConceptPanel,
   ReadOnlyBadge,
@@ -35,6 +51,36 @@ import {
 } from '@/app/pal/_components/CompletionState';
 import { COMPLETED_THROUGH_CHECK, JourneyRail, stagesBefore } from '@/app/pal/_components/JourneyRail';
 import { PalRailSection, PalRailStat, PalWorkspace } from '@/app/pal/_components/PalWorkspace';
+
+/**
+ * "Interactive activities" plays in place, directly below the heading, for
+ * every concept — no exceptions by concept id.
+ *
+ * ---------------------------------------------------------------------------
+ * HOW THIS GOT HERE (2026-09-29, four revisions)
+ * ---------------------------------------------------------------------------
+ * Rounds 1–3 built and refined a hand-authored five-step journey
+ * (Hook/Explain/Practice/Check/Complete, see ConceptJourney.tsx) for exactly
+ * two piloted concepts (2294, 2299), reached by tapping the existing
+ * "Interactive activities" resource card. Every other concept's `h5p` card
+ * kept opening `InlineActivityOverlay`'s full-screen portal instead — the
+ * same button meant two different things depending on which concept happened
+ * to be open, and the journey's own Hook/Explain narrative was necessarily
+ * hardcoded per concept (a real scenario, real numbers, real copy — not
+ * something to generate).
+ *
+ * ROUND 4 (this revision): the concept-id gate is gone. `onPlayActivity`
+ * below now resolves whichever H5P node this specific card's own item is
+ * tagged with — `h5pTarget()`, straight off the API response, nothing
+ * hardcoded — and plays it in place (`inlineActivity`) for every concept the
+ * same way `activeActivity`/`InlineActivityOverlay` already did for the
+ * full-screen case. `ConceptJourney` and `IntegerProductVisual` are no longer
+ * wired to this card; nothing here deletes that authored content, it just
+ * isn't reachable from "Interactive activities" anymore, since a per-concept
+ * hardcoded story is the opposite of "every concept, dynamically."
+ * `tests/pal-concept-2294-journey.spec.ts` tested the old journey trigger and
+ * has been updated to match this page's current behavior.
+ */
 
 /**
  * Stage 6 - Learn.
@@ -91,12 +137,63 @@ function ConceptLearnView() {
   const [error, setError] = useState<string | null>(null);
   const [continuing, setContinuing] = useState(false);
   const [continueError, setContinueError] = useState<string | null>(null);
+  // The interactive activity currently open inline, if any — see
+  // `H5PActivityPlayer`. Closing it never navigates; the student stays on
+  // this lesson exactly where they left it.
+  const [activeActivity, setActiveActivity] = useState<{
+    item: LearnResourceItem;
+    target: H5PActivityTarget;
+  } | null>(null);
+  // The "Interactive activities" card's own activity, played in place
+  // directly below the page heading instead of in a full-screen overlay —
+  // resolved fresh from this item's own H5P node every time, for every
+  // concept, never gated on which concept this is. Closing it never
+  // navigates, same as activeActivity above.
+  const [inlineActivity, setInlineActivity] = useState<{
+    item: LearnResourceItem;
+    target: H5PActivityTarget;
+  } | null>(null);
+  // "Learn this concept visually" (additive). Every concept tries a real,
+  // openly-licensed web image explaining it (see WebConceptVisual.tsx) — the
+  // ordinary resource grid and inlineActivity behavior above are untouched
+  // and still render alongside it. Closing it never navigates, same as
+  // inlineActivity/activeActivity.
+  const [journeyOpen, setJourneyOpen] = useState(false);
+  // Flips true the moment WebConceptVisual reports it couldn't find a usable
+  // web image for this concept (an ordinary outcome — most concepts won't
+  // have one — not an error). From then on this same open session shows the
+  // existing rule-based journey (generateJourneyRecipe/JourneyPlayer,
+  // unchanged) instead — automatically, never a second button the student
+  // has to notice and click. Reset on exit so the next open searches again.
+  const [aiVisualUnavailable, setAiVisualUnavailable] = useState(false);
 
   const {
     result: completedResult,
     completed,
     loading: checkingCompletion,
   } = useConceptCompletion(conceptId);
+
+  // The concept's real chapter NAME — used only to classify which generic
+  // visual the journey uses (see interactive-journey/classify.ts); nothing
+  // to do with completion/routing. Started from the URL's chapterId
+  // immediately (rather than waiting on `data.chapterId`) so the journey
+  // classifies correctly on first render instead of reclassifying once the
+  // lesson itself finishes loading. `data?.chapterId` is only a fallback for
+  // the rare case the URL didn't carry one — kept out of the dependency
+  // array on purpose, so this never re-fetches a second time just because
+  // `data` finished loading after chapterHint already resolved it once.
+  const [chapterName, setChapterName] = useState<string | null>(null);
+  const chapterIdForClassification = chapterHint || (data ? String(data.chapterId) : null);
+  useEffect(() => {
+    if (!chapterIdForClassification) return;
+    let cancelled = false;
+    loadChapterName(chapterIdForClassification).then((name) => {
+      if (!cancelled) setChapterName(name);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chapterIdForClassification]);
 
   const load = useCallback(() => {
     const controller = new AbortController();
@@ -219,10 +316,30 @@ function ConceptLearnView() {
 
   const chapterId = data.chapterId || Number(chapterHint) || 0;
   const backHref = chapterId ? `/pal/plan/chapter/${chapterId}` : '/pal';
+  // Always generated, for every concept, from that concept's own real name
+  // + chapter name (+ authored description, when it has one) — never a
+  // concept-id lookup, never defaulting to any one topic's visual (see
+  // interactive-journey/generate.ts and classify.ts).
+  const journeyRecipe = generateJourneyRecipe({
+    conceptId: data.conceptId,
+    conceptName: data.conceptName,
+    chapterName,
+    description: data.content?.body ?? null,
+  });
   // There may be no guided LESSON while there is still plenty to read. Saying
   // "nothing has been prepared" above a list of nine resources is worse than
   // saying nothing at all.
   const hasResources = data.resources.sections.length > 0;
+
+  // Pulled out of the ordinary grid below — see isConceptQuickCheck(). What's
+  // left renders exactly as before, just without these items counted twice.
+  const quickChecks = data.resources.sections
+    .flatMap((section) => section.items)
+    .filter(isConceptQuickCheck);
+  const quickCheckIds = new Set(quickChecks.map((item) => item.id));
+  const remainingSections = data.resources.sections
+    .map((section) => ({ ...section, items: section.items.filter((item) => !quickCheckIds.has(item.id)) }))
+    .filter((section) => section.items.length > 0);
 
   // What the learner has available, summarised beside the lesson rather than
   // only discoverable by scrolling the list.
@@ -269,6 +386,7 @@ function ConceptLearnView() {
   );
 
   return (
+    <>
     <PalWorkspace
       eyebrow="Learn"
       title={data.conceptName || 'Learn'}
@@ -281,6 +399,57 @@ function ConceptLearnView() {
       backLabel={chapterId ? 'Back to my plan' : 'Back to subjects'}
       rail={rail}
     >
+      {journeyOpen && aiVisualUnavailable && journeyRecipe ? (
+        <JourneyPlayer
+          conceptId={conceptId}
+          conceptName={data.conceptName}
+          recipe={journeyRecipe}
+          onExit={() => {
+            setJourneyOpen(false);
+            setAiVisualUnavailable(false);
+          }}
+          onContinue={() => void continueToNextStep()}
+          continuing={continuing}
+          continueError={continueError}
+        />
+      ) : journeyOpen ? (
+        <WebConceptVisual
+          conceptId={conceptId}
+          conceptName={data.conceptName}
+          description={data.content?.body ?? null}
+          onExit={() => {
+            setJourneyOpen(false);
+            setAiVisualUnavailable(false);
+          }}
+          onUnavailable={() => setAiVisualUnavailable(true)}
+          onContinue={() => void continueToNextStep()}
+          continuing={continuing}
+          continueError={continueError}
+        />
+      ) : inlineActivity ? (
+        <div className="space-y-5">
+          <button
+            type="button"
+            onClick={() => setInlineActivity(null)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-700"
+          >
+            <ArrowLeft aria-hidden className="h-4 w-4" />
+            Back to learning
+          </button>
+
+          <div>
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-600">
+              <Sparkles aria-hidden className="h-3.5 w-3.5" />
+              Interactive activity
+            </p>
+            <h2 className="mt-0.5 text-lg font-semibold text-slate-900">{data.conceptName}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">{inlineActivity.item.title}</p>
+          </div>
+
+          <H5PActivityBody target={inlineActivity.target} />
+        </div>
+      ) : (
+        <>
       {/* What tripped this learner up here specifically — routed by
           MisconceptionLibraryService off a wrong diagnostic or practice
           answer (see palController::learnContent()'s own note). Leads the
@@ -307,38 +476,85 @@ function ConceptLearnView() {
         </div>
       )}
 
-      {!hasResources && (
-        // Only when there is nothing at all. Ordinary on this estate - most
-        // concepts have no material authored - so it is said plainly rather
-        // than dressed up as an error, and nothing is invented to fill it.
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BookOpen aria-hidden className="h-4 w-4 text-slate-500" />
-              Nothing prepared for this one yet
-            </CardTitle>
-            <CardDescription>
-              No material has been written for this concept. Continue below to go straight to
-              practice — each answer tells you where you stand.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      {/* Opens the real-web-image visual explanation (WebConceptVisual) first,
+          falling back automatically to the rule-based journey only if no
+          usable image is found. Deliberately independent of the resource grid below — most
+          concepts have nothing authored in `resources` at all, so this
+          cannot be "one more card in the h5p section": it has to stand on
+          its own. Always rendered — every concept gets one. */}
+      <div className="mb-5">
+        <JourneyEntryCard onStart={() => setJourneyOpen(true)} />
+      </div>
+
+      {/* A different kind of interaction from everything below: not one more
+          card in a resource grid, but a short, tappable challenge built from
+          this concept's own question bank (see isConceptQuickCheck()). Sits
+          ahead of the reading material on purpose — try it, then read if it
+          didn't land, rather than only ever reading first. */}
+      {quickChecks.length > 0 && (
+        <div className="mb-5 space-y-2.5">
+          {quickChecks.map((item) => {
+            const target = h5pTarget(item);
+            if (!target) return null;
+            const label = stripQuickCheckPrefix(item.title);
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveActivity({ item, target })}
+                className="group flex w-full items-center gap-3.5 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 via-indigo-50 to-white px-4 py-3.5 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm transition-transform duration-300 group-hover:scale-105">
+                  <Zap aria-hidden className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-violet-600">
+                    <Sparkles aria-hidden className="h-3 w-3" />
+                    Quick check — true or false
+                  </span>
+                  <span className="mt-0.5 block truncate text-sm font-semibold text-slate-900">{label}</span>
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-transform duration-300 group-hover:scale-105">
+                  Try it
+                  <Play aria-hidden className="h-3 w-3 fill-current" />
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
 
-      {data.resources.sections.length > 0 && (
+      {remainingSections.length > 0 && (
         <div className="space-y-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-base font-semibold text-slate-900">Everything for this topic</h2>
             <p className="text-xs text-slate-500">
-              {data.resources.totals.items}{' '}
-              {data.resources.totals.items === 1 ? 'resource' : 'resources'}
+              {data.resources.totals.items - quickChecks.length}{' '}
+              {data.resources.totals.items - quickChecks.length === 1 ? 'resource' : 'resources'}
               {data.resources.totals.conceptScoped > 0 &&
                 ` · ${data.resources.totals.conceptScoped} matched to this concept`}
             </p>
           </div>
 
-          {data.resources.sections.map((section) => (
-            <ResourceSection key={section.key} section={section} />
+          {remainingSections.map((section) => (
+            <ResourceSection
+              key={section.key}
+              section={section}
+              onPlayActivity={(item) => {
+                const target = h5pTarget(item);
+                if (!target) return;
+                // "Interactive activities" plays in place, directly below the
+                // heading, for every concept — resolved fresh from this
+                // item's own H5P node, never a hardcoded concept or activity.
+                // Every other section keeps the full-screen overlay.
+                if (section.key === 'h5p') {
+                  setInlineActivity({ item, target });
+                  return;
+                }
+                setActiveActivity({ item, target });
+              }}
+            />
           ))}
         </div>
       )}
@@ -346,7 +562,10 @@ function ConceptLearnView() {
       {/* Always shown. It used to be gated on there being a lesson card above
           it, which is gone - and "I have read this" is what records the lesson
           as read and moves the learner to practice, so it must not disappear
-          just because a concept has nothing authored. */}
+          just because a concept has nothing authored. Present for a piloted
+          concept too, exactly as before the Interactive Activity card was
+          added — that card is purely additive, so this stays the one way to
+          move on without opening it. */}
       <div className="mt-6 border-t border-slate-200 pt-5">
         {continueError && (
           <div className="mb-3">
@@ -366,7 +585,132 @@ function ConceptLearnView() {
           </Button>
         </div>
       </div>
+        </>
+      )}
     </PalWorkspace>
+
+    {activeActivity && (
+      <InlineActivityOverlay
+        title={activeActivity.item.title}
+        target={activeActivity.target}
+        onClose={() => setActiveActivity(null)}
+      />
+    )}
+    </>
+  );
+}
+
+/**
+ * The activity, mounted in place over the lesson rather than on a page of its
+ * own. Closing it is the only exit — never a navigation, so the student is
+ * exactly back on Learn where they left it. See `H5PActivityPlayer` for what
+ * actually renders inside: the same player the activity's own `/h5p/{type}`
+ * page uses, just embedded here.
+ */
+/**
+ * The player, in place — swapped for a plain completion summary the instant
+ * it reports a result. A native H5P player's own "finished" screen (e.g.
+ * FlashcardPlayerContent's result dialog) is a fixed, full-screen overlay of
+ * its own; left in place it would sit on top of whatever "back"/"close"
+ * control the caller offers, with no way past it. Shared here so both the
+ * full-screen overlay below and the in-page "Interactive activities" view
+ * get the same safe behavior instead of duplicating it.
+ */
+function H5PActivityBody({ target }: { target: H5PActivityTarget }) {
+  const [result, setResult] = useState<QuestionResult | null>(null);
+
+  if (result) {
+    return (
+      <div className="flex flex-col items-center gap-2 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-6 py-16 text-center shadow-sm animate-in fade-in zoom-in-95 duration-300">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+          <CheckCircle2 aria-hidden className="h-7 w-7" />
+        </span>
+        <p className="mt-1 text-base font-semibold text-emerald-900">Nice work — activity complete.</p>
+        {result.score !== null && result.maxScore !== null && (
+          <p className="text-sm text-emerald-700">
+            Score: {result.score}/{result.maxScore}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return <H5PActivityPlayer target={target} onResult={setResult} />;
+}
+
+function InlineActivityOverlay({
+  title,
+  target,
+  onClose,
+}: {
+  title: string;
+  target: H5PActivityTarget;
+  onClose: () => void;
+}) {
+  // A full-screen takeover, not a boxed dialog on a dimmed backdrop: a
+  // guided, multi-step lesson (teach -> try it -> check, repeated per topic)
+  // reads as its own place to be, not a popup interrupting the page behind
+  // it. Still closes back to exactly this Learn page - nothing here
+  // navigates.
+  //
+  // Portalled straight to document.body: DashboardShell (or something
+  // between it and here) puts a transform/filter on an ancestor, which pins
+  // `position: fixed` to THAT box instead of the real viewport - the exact
+  // reason this rendered as a small boxed dialog with page content still
+  // visible around every edge instead of a true full-screen takeover. A
+  // portal renders outside that ancestor entirely, so `fixed` means the
+  // browser viewport again.
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-50 animate-in fade-in duration-200">
+      <div className="relative shrink-0 overflow-hidden bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-5 py-4 sm:px-8 sm:py-5">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 15% 20%, white 0, transparent 35%), radial-gradient(circle at 85% 80%, white 0, transparent 30%)',
+          }}
+        />
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white ring-1 ring-white/30">
+              <Puzzle aria-hidden className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
+                Interactive activity
+              </p>
+              <h2 className="text-base font-semibold text-white sm:text-lg">{title}</h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+            aria-label="Close and continue learning"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+        <div className="mx-auto w-full max-w-5xl">
+          <H5PActivityBody target={target} />
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-end border-t border-slate-200 bg-white px-5 py-3 sm:px-8">
+        <Button
+          onClick={onClose}
+          className="bg-gradient-to-r from-indigo-600 to-fuchsia-600 shadow-md transition-transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.99]"
+        >
+          Continue learning
+          <ArrowRight aria-hidden className="ml-1.5 h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -453,6 +797,41 @@ function formatDuration(seconds: number): string {
 }
 
 /**
+ * The inline-play target for an H5P resource item, or null when it isn't one
+ * (wrong section, a type `H5PActivityPlayer` doesn't cover yet, or the
+ * backend couldn't resolve full chapter/subject/standard context for it —
+ * see ConceptLearningResourceService::h5pPlayableUrl()). Those items still
+ * fall back to `item.url` as an ordinary link further down.
+ */
+/**
+ * A concept-scoped True/False pool generated by
+ * `PalH5PModelController::generateTrueFalseFromChapter()` — the first proof
+ * that a topic can get an interaction shaped by its own content instead of
+ * always landing in the chapter's one course-presentation deck (see that
+ * method's docblock). Pulled out of the ordinary resource grid so it reads as
+ * the quick, tappable challenge it is, not as one more thumbnail among videos
+ * and slides.
+ */
+function isConceptQuickCheck(item: LearnResourceItem): boolean {
+  return item.h5pType === 'true_false' && item.scope === 'concept';
+}
+
+/** "Quick check: Multiplying integers" -> "Multiplying integers" — the concept
+ *  name is already this page's title, so repeating it here would be noise. */
+function stripQuickCheckPrefix(title: string): string {
+  return title.replace(/^Quick check:\s*/i, '');
+}
+
+function h5pTarget(item: LearnResourceItem): H5PActivityTarget | null {
+  if (!isInlineH5PPlayable(item.h5pType)) return null;
+
+  const { h5pNodeId, chapterId, subjectId, standardId } = item.tags;
+  if (!item.h5pType || !h5pNodeId || !chapterId || !subjectId || !standardId) return null;
+
+  return { h5pType: item.h5pType, nodeId: h5pNodeId, chapterId, subjectId, standardId };
+}
+
+/**
  * One kind of resource.
  *
  * The scope badge is not decoration. Only videos are tagged to a concept; the
@@ -460,11 +839,17 @@ function formatDuration(seconds: number): string {
  * concept in that chapter. Saying "for the whole chapter" is the difference
  * between a useful list and a misleading one.
  */
-function ResourceSection({ section }: { section: LearnResourceSection }) {
+function ResourceSection({
+  section,
+  onPlayActivity,
+}: {
+  section: LearnResourceSection;
+  onPlayActivity: (item: LearnResourceItem) => void;
+}) {
   const { icon: Icon, accent } = sectionStyle(section.key);
 
   return (
-    <section>
+    <section data-resource-section={section.key}>
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100', accent)}>
           <Icon aria-hidden className="h-3.5 w-3.5" />
@@ -490,7 +875,7 @@ function ResourceSection({ section }: { section: LearnResourceSection }) {
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {section.items.map((item) => (
           <li key={item.id} className="flex">
-            <ResourceCard item={item} sectionKey={section.key} />
+            <ResourceCard item={item} sectionKey={section.key} onPlay={onPlayActivity} />
           </li>
         ))}
       </ul>
@@ -498,8 +883,17 @@ function ResourceSection({ section }: { section: LearnResourceSection }) {
   );
 }
 
-function ResourceCard({ item, sectionKey }: { item: LearnResourceItem; sectionKey: string }) {
+function ResourceCard({
+  item,
+  sectionKey,
+  onPlay,
+}: {
+  item: LearnResourceItem;
+  sectionKey: string;
+  onPlay: (item: LearnResourceItem) => void;
+}) {
   const { icon: Icon, gradient, border, chip } = sectionStyle(sectionKey);
+  const playableInline = h5pTarget(item) !== null;
   const typeLabel = item.fileType
     ? (FILE_TYPE_LABEL[item.fileType] ?? item.fileType.toUpperCase())
     : null;
@@ -617,7 +1011,17 @@ function ResourceCard({ item, sectionKey }: { item: LearnResourceItem; sectionKe
             {item.scope === 'concept' ? 'This concept' : 'Whole chapter'}
           </span>
 
-          {item.url ? (
+          {playableInline ? (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white',
+                chip,
+              )}
+            >
+              Play
+              <Play aria-hidden className="h-3 w-3 fill-current" />
+            </span>
+          ) : item.url ? (
             <span
               className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white',
@@ -639,26 +1043,36 @@ function ResourceCard({ item, sectionKey }: { item: LearnResourceItem; sectionKe
 
   const shell = cn(
     'group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition-all duration-300',
-    item.url && ['hover:-translate-y-0.5 hover:shadow-lg', border],
+    (item.url || playableInline) && ['hover:-translate-y-0.5 hover:shadow-lg', border],
+  );
+  const interactiveClasses = cn(
+    shell,
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+    'motion-reduce:transition-none',
   );
 
-  // No url means H5P, which has nothing to open yet. Rendered as a plain card
-  // rather than a dead link - a control that goes nowhere is worse than none.
+  // An H5P node PAL Learn knows how to mount inline plays in place - no
+  // navigation, no new tab. See H5PActivityPlayer for the registry of which
+  // types that covers today; everything else falls through to the plain
+  // link (or, with no url at all, the dead-card case) below exactly as
+  // before.
+  if (playableInline) {
+    return (
+      <button type="button" onClick={() => onPlay(item)} className={interactiveClasses}>
+        {inner}
+      </button>
+    );
+  }
+
+  // No url and not inline-playable: nothing to open yet. Rendered as a plain
+  // card rather than a dead link - a control that goes nowhere is worse than
+  // none.
   if (!item.url) {
     return <div className={shell}>{inner}</div>;
   }
 
   return (
-    <Link
-      href={item.url}
-      target="_blank"
-      rel="noreferrer"
-      className={cn(
-        shell,
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
-        'motion-reduce:transition-none',
-      )}
-    >
+    <Link href={item.url} target="_blank" rel="noreferrer" className={interactiveClasses}>
       {inner}
     </Link>
   );

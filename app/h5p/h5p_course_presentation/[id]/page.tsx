@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import DOMPurify from 'isomorphic-dompurify';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Lightbulb, X } from 'lucide-react';
 import {
   h5pContextQuery,
   hasH5pContext,
@@ -34,10 +34,56 @@ import {
   ResultScreen,
   RetryAction,
   SecondaryAction,
+  Verdict,
   deriveAchievements,
 } from '../../components/game';
 import { Input } from '@/components/ui/input';
 import { parsePassage, segmentPassage } from '@/lib/h5p/text-activity-markup';
+
+/**
+ * A generated lesson names its slides 'Topic', 'Try it: Topic', 'Check:
+ * Topic' (see PalH5PModelController::generateCoursePresentationFromChapter);
+ * this groups a flat slide list back into those topics for the sidebar, so a
+ * 96-slide lesson reads as ~35 topics rather than a flat numbered document.
+ * A slide list that never uses the convention (an ordinary hand-authored
+ * deck) still works: every slide starts its own one-slide group, which is
+ * exactly the old flat numbering, just wrapped in the same markup.
+ */
+const STEP_PREFIXES = ['Try it: ', 'Check: '] as const;
+
+function stepLabel(title: string): string {
+  for (const prefix of STEP_PREFIXES) {
+    if (title.startsWith(prefix)) return prefix.slice(0, -2);
+  }
+  return 'Learn';
+}
+
+/** One colour per stage of the teach -> try it -> check journey. */
+const STEP_STYLES: Record<string, { badge: string; ring: string; dot: string }> = {
+  Learn: { badge: 'bg-indigo-100 text-indigo-700', ring: 'ring-indigo-200', dot: 'bg-indigo-500' },
+  'Try it': { badge: 'bg-amber-100 text-amber-700', ring: 'ring-amber-200', dot: 'bg-amber-500' },
+  Check: { badge: 'bg-emerald-100 text-emerald-700', ring: 'ring-emerald-200', dot: 'bg-emerald-500' },
+};
+
+function groupSlidesByTopic<T extends { id: number; title: string | null }>(
+  slides: T[]
+): Array<{ label: string; slides: T[] }> {
+  const groups: Array<{ label: string; slides: T[] }> = [];
+
+  for (const slide of slides) {
+    const title = slide.title ?? '';
+    const continuesGroup = STEP_PREFIXES.some((prefix) => title.startsWith(prefix));
+
+    if (continuesGroup && groups.length > 0) {
+      groups[groups.length - 1].slides.push(slide);
+    } else {
+      const label = continuesGroup ? title : title || `Topic ${groups.length + 1}`;
+      groups.push({ label, slides: [slide] });
+    }
+  }
+
+  return groups;
+}
 
 /**
  * Course presentation — player.
@@ -284,32 +330,75 @@ function CoursePresentationPlayerContent({ preloaded }: { preloaded?: PreloadedC
     const isChecked = checked.has(element.id);
     const graded = isScoredElement(toScorable(element)) ? gradeElement(toScorable(element), response) : null;
 
-    const box = (children: React.ReactNode) => (
-      <div
-        key={element.id}
-        className="absolute overflow-auto"
-        style={{
-          left: `${element.position_x}%`,
-          top: `${element.position_y}%`,
-          width: `${element.width}%`,
-          height: `${element.height}%`,
-        }}
-      >
-        {children}
-      </div>
-    );
+    // A slide-editor canvas (elements pinned at author-chosen % coordinates)
+    // is right for a hand-built multi-element deck, but a generated lesson's
+    // slide has exactly one element - pinning it to a small % box inside a
+    // fixed 16:9 frame is what left most of the slide as dead space. That
+    // one case renders in normal flow instead, filling the space it is
+    // actually given.
+    const singleElement = (slide?.elements ?? []).length === 1 && !slide?.background_image;
+
+    const box = (children: React.ReactNode) =>
+      singleElement ? (
+        <div key={element.id} className="flex h-full w-full flex-col justify-center p-6 sm:p-10">
+          {children}
+        </div>
+      ) : (
+        <div
+          key={element.id}
+          className="absolute overflow-auto"
+          style={{
+            left: `${element.position_x}%`,
+            top: `${element.position_y}%`,
+            width: `${element.width}%`,
+            height: `${element.height}%`,
+          }}
+        >
+          {children}
+        </div>
+      );
 
     switch (element.element_type) {
-      case 'text':
+      case 'text': {
+        // Generated teach slides append the worked example after this
+        // marker (see PalH5PModelController::generateCoursePresentationFromChapter);
+        // split it into its own callout so the example reads as a distinct
+        // step, not a second sentence in the same paragraph. Absent on a
+        // hand-authored slide, which just renders as one block, as before.
+        const marker = '\n\nFor example: ';
+        const splitAt = (element.content_text ?? '').indexOf(marker);
+        const lead = splitAt === -1 ? element.content_text ?? '' : (element.content_text ?? '').slice(0, splitAt);
+        const example = splitAt === -1 ? null : (element.content_text ?? '').slice(splitAt + marker.length);
+
         return box(
-          <div
-            className="prose prose-sm max-w-none text-sm text-slate-800 [&_a]:text-indigo-600 [&_li]:my-0.5 [&_ul]:list-disc [&_ul]:pl-5"
-            // Sanitised, always: an imported package can carry any markup, and
-            // a teacher account is not a reason to run a script in a learner's
-            // browser.
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(element.content_text ?? '') }}
-          />
+          <div className="space-y-4">
+            {singleElement ? (
+              <h3 className="text-lg font-bold text-slate-900 sm:text-xl">{slide?.title}</h3>
+            ) : null}
+            <div
+              className={`prose max-w-none text-slate-800 [&_a]:text-indigo-600 [&_li]:my-0.5 [&_ul]:list-disc [&_ul]:pl-5 ${
+                singleElement ? 'prose-base sm:prose-lg' : 'prose-sm text-sm'
+              }`}
+              // Sanitised, always: an imported package can carry any markup, and
+              // a teacher account is not a reason to run a script in a learner's
+              // browser.
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lead) }}
+            />
+            {example ? (
+              <div className="flex gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
+                <Lightbulb aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-indigo-500" />
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Worked example</p>
+                  <p
+                    className="mt-1 text-sm text-indigo-900 sm:text-base"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(example) }}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
         );
+      }
 
       case 'image':
         return box(
@@ -355,30 +444,80 @@ function CoursePresentationPlayerContent({ preloaded }: { preloaded?: PreloadedC
         return box(
           <fieldset className="rounded-xl border border-slate-200 bg-white/95 p-3">
             <legend className="px-1 text-sm font-medium text-slate-800">{element.content_text}</legend>
-            <div className="mt-1 space-y-1.5">
-              {answers.map((option, i) => (
-                <label key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                  <input
-                    type={single ? 'radio' : 'checkbox'}
-                    name={`mc-${element.id}`}
-                    checked={chosen.includes(i)}
-                    disabled={isChecked}
-                    onChange={(e) =>
-                      answer(element, {
-                        kind: 'multiple_choice',
-                        chosen: single
-                          ? [i]
-                          : e.target.checked
-                            ? [...chosen, i]
-                            : chosen.filter((c) => c !== i),
-                      })
-                    }
-                    className="mt-0.5 h-4 w-4 shrink-0 border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span>{option.text}</span>
-                </label>
-              ))}
+            <div className="mt-2 space-y-1.5">
+              {answers.map((option, i) => {
+                const picked = chosen.includes(i);
+                const state = isChecked
+                  ? option.correct
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                    : picked
+                      ? 'border-rose-300 bg-rose-50 text-rose-900'
+                      : 'border-slate-200 bg-white text-slate-400 opacity-70'
+                  : picked
+                    ? 'border-indigo-300 bg-indigo-50 text-indigo-900'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/50';
+
+                return (
+                  <label
+                    key={i}
+                    className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm transition-colors duration-150 ${
+                      isChecked ? '' : 'cursor-pointer'
+                    } ${state}`}
+                  >
+                    <input
+                      type={single ? 'radio' : 'checkbox'}
+                      name={`mc-${element.id}`}
+                      checked={picked}
+                      disabled={isChecked}
+                      onChange={(e) =>
+                        answer(element, {
+                          kind: 'multiple_choice',
+                          chosen: single
+                            ? [i]
+                            : e.target.checked
+                              ? [...chosen, i]
+                              : chosen.filter((c) => c !== i),
+                        })
+                      }
+                      className="mt-0.5 h-4 w-4 shrink-0 border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="flex-1">{option.text}</span>
+                    {isChecked && option.correct ? (
+                      <Check aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    ) : null}
+                    {isChecked && picked && !option.correct ? (
+                      <X aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                    ) : null}
+                  </label>
+                );
+              })}
             </div>
+            {/* "Show whether correct, show the correct answer, show why" -
+                all three already sit on the option rows this slide was
+                materialised from (answer_master.feedback); nothing here is
+                composed on the fly. */}
+            {isChecked ? (
+              <div className="mt-2.5 border-t border-slate-100 pt-2.5">
+                <Verdict
+                  correct={Boolean(graded?.correct)}
+                  message={
+                    graded?.correct
+                      ? chosen.map((i) => answers[i]?.feedback).filter(Boolean).join(' ') || null
+                      : [
+                          chosen.map((i) => answers[i]?.feedback).filter(Boolean).join(' '),
+                          (() => {
+                            const correctAnswer = answers.find((a) => a.correct);
+                            return correctAnswer
+                              ? `Correct answer: ${correctAnswer.text}${correctAnswer.feedback ? ` — ${correctAnswer.feedback}` : ''}`
+                              : null;
+                          })(),
+                        ]
+                          .filter(Boolean)
+                          .join(' ') || null
+                  }
+                />
+              </div>
+            ) : null}
             {renderCheck(element, graded, isChecked, chosen.length > 0)}
           </fieldset>
         );
@@ -418,10 +557,16 @@ function CoursePresentationPlayerContent({ preloaded }: { preloaded?: PreloadedC
         const slots = parsePassage(passage);
         const typed = response?.kind === 'blanks' ? response.responses : {};
 
+        const blankState = !isChecked
+          ? 'border-amber-300 focus-visible:ring-amber-300'
+          : graded?.correct
+            ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
+            : 'border-rose-400 bg-rose-50 text-rose-900';
+
         return box(
-          <div className="rounded-xl border border-slate-200 bg-white/95 p-3">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-3">
             {options.task_description ? (
-              <p className="mb-2 text-sm font-medium text-slate-800">{String(options.task_description)}</p>
+              <p className="mb-2 text-sm font-medium text-amber-900">{String(options.task_description)}</p>
             ) : null}
             <p className="text-sm leading-8 text-slate-700">
               {segments.map((segment, i) =>
@@ -438,12 +583,17 @@ function CoursePresentationPlayerContent({ preloaded }: { preloaded?: PreloadedC
                         responses: { ...typed, [segment.slot.index]: e.target.value },
                       })
                     }
-                    className="mx-1 inline-block h-7 w-28 align-baseline"
+                    className={`mx-1 inline-block h-7 w-28 align-baseline transition-colors ${blankState}`}
                     aria-label={`Blank ${segment.slot.index + 1}`}
                   />
                 )
               )}
             </p>
+            {isChecked ? (
+              <div className="mt-2.5 border-t border-amber-100 pt-2.5">
+                <Verdict correct={Boolean(graded?.correct)} message={null} />
+              </div>
+            ) : null}
             {renderCheck(element, graded, isChecked, Object.keys(typed).length > 0)}
             {isChecked && deck.enable_show_solution ? (
               <p className="mt-1.5 text-[11px] text-slate-500">
@@ -604,23 +754,48 @@ function CoursePresentationPlayerContent({ preloaded }: { preloaded?: PreloadedC
     return (
       <div className="flex gap-4">
         {deck.show_keywords ? (
-          <nav aria-label="Slides" className="hidden w-40 shrink-0 space-y-1 lg:block">
-            {slides.map((s, i) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => goTo(s.id)}
-                aria-current={s.id === slide.id ? 'true' : undefined}
-                className={`block w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition ${
-                  s.id === slide.id
-                    ? 'bg-indigo-50 font-semibold text-indigo-700'
-                    : visited.has(s.id)
-                      ? 'text-slate-600 hover:bg-slate-50'
-                      : 'text-slate-400 hover:bg-slate-50'
-                }`}
-              >
-                <span className="tabular-nums">{i + 1}.</span> {s.title || `Slide ${i + 1}`}
-              </button>
+          // Sticky and independently scrollable: a lesson with 35+ topics
+          // must not make the whole page as tall as the topic list just to
+          // reach the slide beside it - the topic list scrolls in its own
+          // box, the slide (and the Previous/Next below it) stays exactly
+          // as tall as it needs to be.
+          <nav
+            aria-label="Topics"
+            className="sticky top-0 hidden max-h-[calc(100vh-14rem)] w-48 shrink-0 space-y-1 overflow-y-auto lg:block"
+          >
+            {groupSlidesByTopic(slides).map((group, gi) => (
+              <details key={group.slides[0].id} open={group.slides.some((s) => s.id === slide.id)}>
+                <summary className="cursor-pointer truncate rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 marker:text-slate-400 hover:bg-slate-50">
+                  <span className="tabular-nums">{gi + 1}.</span> {group.label}
+                </summary>
+                <div className="ml-3 mt-0.5 space-y-0.5 border-l border-slate-100 pl-2">
+                  {group.slides.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => goTo(s.id)}
+                      aria-current={s.id === slide.id ? 'true' : undefined}
+                      className={`flex w-full items-center gap-1.5 truncate rounded-lg px-2 py-1 text-left text-[11px] transition ${
+                        s.id === slide.id
+                          ? 'bg-indigo-50 font-semibold text-indigo-700'
+                          : visited.has(s.id)
+                            ? 'text-slate-500 hover:bg-slate-50'
+                            : 'text-slate-400 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span
+                        aria-hidden
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                          visited.has(s.id) || s.id === slide.id
+                            ? STEP_STYLES[stepLabel(s.title ?? '')]?.dot ?? 'bg-slate-300'
+                            : 'bg-slate-200'
+                        }`}
+                      />
+                      {stepLabel(s.title ?? '')}
+                    </button>
+                  ))}
+                </div>
+              </details>
             ))}
           </nav>
         ) : null}
@@ -635,15 +810,32 @@ function CoursePresentationPlayerContent({ preloaded }: { preloaded?: PreloadedC
             </div>
           ) : null}
 
+          {(() => {
+            const step = stepLabel(slide.title ?? '');
+            const stepStyle = STEP_STYLES[step] ?? STEP_STYLES.Learn;
+            return (
+              <span
+                className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${stepStyle.badge}`}
+              >
+                <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${stepStyle.dot}`} />
+                {step === 'Learn' ? 'Learn' : step === 'Try it' ? 'Try it — quick check' : 'Practice question'}
+              </span>
+            );
+          })()}
+
           <div
             // Keyed on the slide, so React replaces the frame instead of
             // reusing it — that is what makes each slide animate in rather
             // than its contents swapping silently inside a static box.
             key={slide.id}
-            className={`h5p-enter relative w-full overflow-hidden rounded-2xl border border-slate-200 shadow-sm ${
-              THEME_SURFACE[deck.theme] ?? THEME_SURFACE.default
-            }`}
-            style={{ aspectRatio: '16 / 9' }}
+            className={`h5p-enter relative w-full overflow-hidden rounded-2xl border border-slate-200 shadow-sm ring-1 transition-shadow ${
+              STEP_STYLES[stepLabel(slide.title ?? '')]?.ring ?? 'ring-slate-100'
+            } ${THEME_SURFACE[deck.theme] ?? THEME_SURFACE.default}`}
+            style={
+              (slide.elements ?? []).length === 1 && !slide.background_image
+                ? { minHeight: 'min(22rem, 50vh)' }
+                : { aspectRatio: '16 / 9' }
+            }
           >
             {slide.background_image ? (
               // eslint-disable-next-line @next/next/no-img-element

@@ -365,14 +365,22 @@ function FlashcardPlayerContent({ preloaded }: { preloaded?: PreloadedFlashcards
   });
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mx-auto">
-        <H5pPageHeader
-          title="Flash cards"
-          description={total > 0 ? `Card ${Math.min(current + 1, total)} of ${total}` : 'Interactive flash card practice'}
-          ctx={ctx}
-          backHref={backHref}
-        />
+    <div className={preloaded?.embedded ? '' : 'p-4 sm:p-6'}>
+      <div className={preloaded?.embedded ? '' : 'mx-auto'}>
+        {/* An embedding surface (PAL Learn) already has its own header and
+            close action - this one's back arrow points at the standalone
+            flashcard list (`backHref`), which would navigate the student
+            straight out of Learn if it rendered inside the inline player.
+            Same rule the true/false and course-presentation players in this
+            same directory already follow for `embedded`. */}
+        {preloaded?.embedded ? null : (
+          <H5pPageHeader
+            title="Flash cards"
+            description={total > 0 ? `Card ${Math.min(current + 1, total)} of ${total}` : 'Interactive flash card practice'}
+            ctx={ctx}
+            backHref={backHref}
+          />
+        )}
 
         {!hasH5pContext(ctx) ? (
           <MissingContextNotice />

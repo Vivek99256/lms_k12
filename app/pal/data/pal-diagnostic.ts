@@ -1255,7 +1255,12 @@ export interface LearnResourceItem {
   scope: 'concept' | 'chapter';
   title: string;
   description: string | null;
-  /** Null only for H5P, which has no direct file to open. */
+  /**
+   * Null when there is nothing to open: an unresolvable content_master file,
+   * or an H5P node whose type isn't a playable native one yet (or is missing
+   * chapter/subject/standard context). A resolvable H5P node gets a real
+   * `/h5p/{type}/{id}?...` player url like anything else here.
+   */
   url: string | null;
   fileType: string | null;
   category: string;
@@ -1278,6 +1283,15 @@ export interface LearnResourceItem {
     fileSize?: string;
     matchScore?: number;
     source?: string;
+    /**
+     * The id of the row in the native H5P table `url` points at (e.g. the
+     * `h5p_memory_game.id` behind `h5p_type: 'memory_game'`). Present only on
+     * `section: 'h5p'` items with a resolvable url — see
+     * ConceptLearningResourceService::h5pPlayableUrl(). What mounts the
+     * inline player: chapter/subject/standard here are that same node's
+     * curriculum context, not the concept's.
+     */
+    h5pNodeId?: number;
   };
 }
 
@@ -1409,6 +1423,7 @@ function readResources(raw: unknown): LearnResources {
               ...(tags.topic_id == null ? {} : { topicId: readNumber(tags.topic_id) }),
               ...(tags.bloom_level == null ? {} : { bloomLevel: readString(tags.bloom_level) }),
               ...(tags.pedagogy_tag == null ? {} : { pedagogyTag: readString(tags.pedagogy_tag) }),
+              ...(tags.h5p_node_id == null ? {} : { h5pNodeId: readNumber(tags.h5p_node_id) }),
               ...(tags.file_size == null ? {} : { fileSize: readString(tags.file_size) }),
               ...(tags.match_score == null ? {} : { matchScore: readNumber(tags.match_score) }),
               ...(tags.source == null ? {} : { source: readString(tags.source) }),
@@ -1499,5 +1514,71 @@ export async function fetchConceptLearn(
     misconceptions: readMisconceptions(payload.misconceptions),
     reason: payload.reason == null ? null : readString(payload.reason),
     message: readString(payload.message),
+  };
+}
+
+// --- concept image (web search) ---------------------------------------------
+
+/** One openly-licensed image Openverse returned for a concept, with real attribution. */
+export interface ConceptImage {
+  url: string;
+  thumbnailUrl: string;
+  title: string | null;
+  sourceUrl: string;
+  creator: string | null;
+  license: string | null;
+  attribution: string | null;
+}
+
+export interface ConceptImageResult {
+  success: boolean;
+  image: ConceptImage | null;
+  query: string | null;
+}
+
+/**
+ * "Learn this concept visually" — a live, openly-licensed image pick for this
+ * concept from `palController::learnConceptImage()` (backed by
+ * `ConceptImageSearchService`, Openverse). `success: false` is an ordinary,
+ * expected outcome (no usable image found for this concept, not an error) —
+ * callers should render their SVG fallback rather than treat it as a failure.
+ *
+ * `description` is passed through from whatever the caller already has
+ * (e.g. `ConceptLearn.content.body`) since the backend has no independent
+ * source for it — omitted entirely when there is none, not sent as "".
+ */
+export async function fetchConceptImage(
+  conceptId: string | number,
+  description?: string | null,
+  signal?: AbortSignal
+): Promise<ConceptImageResult> {
+  const ctx = session();
+  const search = params(ctx);
+  if (description && description.trim() !== '') {
+    search.set('description', description.trim().slice(0, 2000));
+  }
+
+  const response = await fetch(
+    `${ctx.baseUrl}/lms/pal/learn/concept/${conceptId}/image?${search.toString()}`,
+    { headers: headers(ctx), signal }
+  );
+  const payload = await readJson(response, 'find a visual for this concept');
+  const image = toRecord(payload.image);
+  const hasImage = Boolean(payload.success) && Object.keys(image).length > 0;
+
+  return {
+    success: hasImage,
+    image: hasImage
+      ? {
+          url: readString(image.url),
+          thumbnailUrl: readString(image.thumbnail_url) || readString(image.url),
+          title: image.title == null ? null : readString(image.title),
+          sourceUrl: readString(image.source_url) || readString(image.url),
+          creator: image.creator == null ? null : readString(image.creator),
+          license: image.license == null ? null : readString(image.license),
+          attribution: image.attribution == null ? null : readString(image.attribution),
+        }
+      : null,
+    query: payload.query == null ? null : readString(payload.query),
   };
 }
