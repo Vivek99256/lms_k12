@@ -75,6 +75,27 @@ function AdaptiveConceptsView() {
   const [data, setData] = useState<AdaptiveConceptList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [subjectName, setSubjectName] = useState<string>('Mathematics');
+
+  // Discover subject name dynamically from syllabus
+  useEffect(() => {
+    if (!chapterId) return;
+    const controller = new AbortController();
+
+    import('@/app/pal/data/pal')
+      .then(({ fetchPalLanding }) => fetchPalLanding({ signal: controller.signal }))
+      .then((landing) => {
+        for (const subj of landing.subjects) {
+          if (subj.chapters.some((c) => String(c.id) === String(chapterId))) {
+            setSubjectName(subj.name);
+            break;
+          }
+        }
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [chapterId]);
 
   const {
     mastery,
@@ -143,6 +164,7 @@ function AdaptiveConceptsView() {
               completed={COMPLETED_THROUGH_CHECK}
               bypassed={['intervention']}
               orientation="vertical"
+              subjectName={subjectName}
             />
           </PalRailSection>
         }
@@ -225,6 +247,7 @@ function AdaptiveConceptsView() {
               orientation="vertical"
               chapterId={chapterId}
               chapterName={data.chapterName}
+              subjectName={subjectName}
             />
           </PalRailSection>
         </>

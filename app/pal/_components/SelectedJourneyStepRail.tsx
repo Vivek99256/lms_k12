@@ -199,6 +199,14 @@ export function SelectedJourneyStepRail({
                 disabled={!isUnlocked}
                 onClick={() => {
                   if (isUnlocked) {
+                    if (step.id === 'adaptive' && effectiveChapterId) {
+                      router.push(`/pal/adaptive/chapter/${effectiveChapterId}`);
+                      return;
+                    }
+                    if (step.id === 'plan' && effectiveChapterId) {
+                      router.push(`/pal/plan/chapter/${effectiveChapterId}`);
+                      return;
+                    }
                     if (onSelectStep) {
                       onSelectStep(step.id);
                     } else {
