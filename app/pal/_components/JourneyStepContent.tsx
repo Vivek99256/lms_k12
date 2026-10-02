@@ -77,6 +77,7 @@ export function JourneyStepContent({
   onBackToCollage,
   isCompleted = false,
 }: JourneyStepContentProps) {
+  const router = useRouter();
   const currentStep = JOURNEY_STEPS.find((s) => s.id === stepId) || JOURNEY_STEPS[0];
   const nextStepId = getNextStep(stepId);
   const nextStep = nextStepId ? JOURNEY_STEPS.find((s) => s.id === nextStepId) : null;
@@ -95,7 +96,13 @@ export function JourneyStepContent({
                 </div>
                 <Button
                   size="sm"
-                  onClick={() => onNextStep(nextStep.id)}
+                  onClick={() => {
+                    if (chapterId) {
+                      router.push(`/pal/adaptive/chapter/${chapterId}`);
+                    } else {
+                      onNextStep(nextStep.id);
+                    }
+                  }}
                   className="gap-2 bg-emerald-700 text-xs font-semibold text-white hover:bg-emerald-800"
                 >
                   <span>Continue to Step 2: {nextStep.label}</span>
@@ -286,8 +293,6 @@ export function JourneyStepContent({
 function ConceptDiagnosticStepView({
   chapterId,
   chapterName,
-  onStepComplete,
-  onNextStep,
 }: {
   chapterId: string;
   chapterName: string;
@@ -295,164 +300,17 @@ function ConceptDiagnosticStepView({
   onNextStep?: (nextStepId: JourneyStepId) => void;
 }) {
   const router = useRouter();
-  const [data, setData] = useState<AdaptiveConceptList | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    fetchAdaptiveConcepts(chapterId, controller.signal)
-      .then(setData)
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : 'Could not load concepts.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [chapterId]);
 
   useEffect(() => {
-    const cancel = load();
-    return cancel;
-  }, [load]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[350px] items-center justify-center text-sm text-slate-500">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin text-purple-600" />
-        Loading concept diagnostic for {chapterName}…
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <Card className="border-rose-200 bg-rose-50/70 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-medium text-rose-800">{error ?? 'Failed to load concept diagnostic.'}</p>
-          <Button variant="outline" size="sm" onClick={load}>
-            Try again
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  const servable = data.concepts.filter((c) => c.servable);
-  const unavailable = data.concepts.filter((c) => !c.servable);
+    if (chapterId) {
+      router.replace(`/pal/adaptive/chapter/${chapterId}`);
+    }
+  }, [chapterId, router]);
 
   return (
-    <div className="space-y-4">
-      {/* Header card */}
-      <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Concept Diagnostic</h2>
-            <p className="mt-0.5 text-xs text-slate-600">
-              Targeted drills for {data.concepts.length} concepts in {chapterName}.
-            </p>
-          </div>
-          {data.hasDiagnostic && <LevelBadge level={data.diagnosticLevel} />}
-        </div>
-      </div>
-
-      {servable.length === 0 ? (
-        <EmptyState
-          icon={<Brain className="h-8 w-8 text-purple-500" />}
-          title="No concept diagnostic questions available yet"
-          description="None of this chapter's concepts have multiple-choice questions ready."
-        />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {servable.map((concept) => (
-            <Card key={concept.conceptId} className="flex flex-col justify-between border-slate-200">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900">{concept.name}</h3>
-                  {concept.nextDifficulty && <BandChip band={concept.nextDifficulty} />}
-                </div>
-
-                {concept.rationale && (
-                  <p className="mt-2 text-xs text-slate-600 line-clamp-2">{concept.rationale}</p>
-                )}
-
-                <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
-                  {concept.diagnosticPercentage !== null && (
-                    <div className="flex gap-1">
-                      <dt>Chapter diagnostic:</dt>
-                      <dd className="font-semibold text-slate-800">
-                        {Math.round(concept.diagnosticPercentage)}%
-                      </dd>
-                    </div>
-                  )}
-                  {concept.practiceAttempts > 0 && (
-                    <div className="flex gap-1">
-                      <dt>Accuracy:</dt>
-                      <dd className="font-semibold text-slate-800">
-                        {Math.round(concept.practicePercentage)}%
-                      </dd>
-                    </div>
-                  )}
-                </dl>
-
-                <div className="mt-4 pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <Button
-                    size="sm"
-                    className="w-full bg-purple-700 hover:bg-purple-800 text-white"
-                    onClick={() => router.push(`/pal/adaptive/concept/${concept.conceptId}`)}
-                  >
-                    <span>Start Concept Drill</span>
-                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {unavailable.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs font-semibold uppercase text-slate-500">
-            Pending Questions ({unavailable.length})
-          </p>
-          <ul className="mt-2 flex flex-wrap gap-1.5">
-            {unavailable.map((c) => (
-              <li
-                key={c.conceptId}
-                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs text-slate-500"
-              >
-                {c.name}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Completion & Next Step Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
-        <div>
-          <p className="text-xs font-bold text-indigo-950">Finished reviewing Concept Diagnostics?</p>
-          <p className="mt-0.5 text-xs text-indigo-800">Mark this step complete to unlock your Personalized Learning Plan.</p>
-        </div>
-        <Button
-          size="sm"
-          className="gap-2 bg-indigo-700 text-xs font-semibold text-white hover:bg-indigo-800"
-          onClick={() => {
-            onStepComplete?.('adaptive');
-            onNextStep?.('plan');
-          }}
-        >
-          <span>Complete Step & Continue to Plan</span>
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
-      </div>
+    <div className="flex min-h-[350px] items-center justify-center text-sm text-slate-500">
+      <Loader2 className="mr-2 h-5 w-5 animate-spin text-purple-600" />
+      Opening concept diagnostic for {chapterName}…
     </div>
   );
 }
@@ -463,8 +321,6 @@ function ConceptDiagnosticStepView({
 function LearningPlanStepView({
   chapterId,
   chapterName,
-  onStepComplete,
-  onNextStep,
 }: {
   chapterId: string;
   chapterName: string;
@@ -472,153 +328,17 @@ function LearningPlanStepView({
   onNextStep?: (nextStepId: JourneyStepId) => void;
 }) {
   const router = useRouter();
-  const [plan, setPlan] = useState<LearningPlan | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    fetchLearningPlan(chapterId, controller.signal)
-      .then(setPlan)
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : 'Could not build learning plan.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [chapterId]);
 
   useEffect(() => {
-    const cancel = load();
-    return cancel;
-  }, [load]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[350px] items-center justify-center text-sm text-slate-500">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin text-purple-600" />
-        Generating personalized plan for {chapterName}…
-      </div>
-    );
-  }
-
-  if (error || !plan) {
-    return (
-      <Card className="border-rose-200 bg-rose-50/70 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-medium text-rose-800">{error ?? 'Failed to build learning plan.'}</p>
-          <Button variant="outline" size="sm" onClick={load}>
-            Try again
-          </Button>
-        </div>
-      </Card>
-    );
-  }
+    if (chapterId) {
+      router.replace(`/pal/plan/chapter/${chapterId}`);
+    }
+  }, [chapterId, router]);
 
   return (
-    <div className="space-y-4">
-      {/* Header card with summary stats */}
-      <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Personalized Learning Plan</h2>
-            <p className="mt-0.5 text-xs text-slate-600">
-              Ordered sequence based on your diagnostic results. Weakest concepts first.
-            </p>
-          </div>
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-            <Lock className="h-3 w-3 text-slate-400" />
-            Adaptive Plan
-          </span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <div className="rounded-lg bg-white p-2.5 border border-indigo-100">
-            <span className="text-[11px] text-slate-500">Total Concepts</span>
-            <p className="text-base font-bold text-slate-900">{plan.summary.conceptsServable}</p>
-          </div>
-          <div className="rounded-lg bg-white p-2.5 border border-indigo-100">
-            <span className="text-[11px] text-slate-500">In Progress</span>
-            <p className="text-base font-bold text-indigo-700">{plan.summary.inProgress}</p>
-          </div>
-          <div className="rounded-lg bg-white p-2.5 border border-indigo-100">
-            <span className="text-[11px] text-slate-500">Needs Focus</span>
-            <p className="text-base font-bold text-amber-700">{plan.summary.weak}</p>
-          </div>
-          <div className="rounded-lg bg-white p-2.5 border border-indigo-100">
-            <span className="text-[11px] text-slate-500">Mastered</span>
-            <p className="text-base font-bold text-emerald-700">{plan.summary.mastered}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Plan Steps list */}
-      <Card>
-        <CardHeader className="p-4 pb-2">
-          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-slate-600">
-            Curriculum Sequence ({plan.steps.length} Steps)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-1">
-          <ol className="divide-y divide-slate-100">
-            {plan.steps.map((step, idx) => (
-              <li key={`${step.key}-${step.conceptId ?? idx}`} className="py-3 flex items-start gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-800">
-                  {idx + 1}
-                </span>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="text-sm font-semibold text-slate-900">{step.title}</h4>
-                    {step.band && <BandChip band={step.band} />}
-                  </div>
-
-                  {step.detail && (
-                    <p className="mt-1 text-xs text-slate-600 leading-relaxed">{step.detail}</p>
-                  )}
-                </div>
-
-                {step.conceptId && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 text-xs"
-                    onClick={() => router.push(`/pal/adaptive/concept/${step.conceptId}`)}
-                  >
-                    Start
-                    <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ol>
-        </CardContent>
-      </Card>
-
-      {/* Completion & Next Step Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
-        <div>
-          <p className="text-xs font-bold text-indigo-950">Ready to start lessons?</p>
-          <p className="mt-0.5 text-xs text-indigo-800">Accept this plan to unlock Step 4 (Learn Concepts) with curated theory and lessons.</p>
-        </div>
-        <Button
-          size="sm"
-          className="gap-2 bg-indigo-700 text-xs font-semibold text-white hover:bg-indigo-800"
-          onClick={() => {
-            onStepComplete?.('plan');
-            onNextStep?.('learn');
-          }}
-        >
-          <span>Accept Plan & Begin Lessons</span>
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
-      </div>
+    <div className="flex min-h-[350px] items-center justify-center text-sm text-slate-500">
+      <Loader2 className="mr-2 h-5 w-5 animate-spin text-purple-600" />
+      Opening your learning plan for {chapterName}…
     </div>
   );
 }

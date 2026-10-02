@@ -222,6 +222,16 @@ export function stageHref(
       : null;
   const concept = ids.conceptId ? String(ids.conceptId) : null;
 
+  // Step 2 (Concept Diagnostic) routes directly to the dedicated adaptive chapter page
+  if (stage === 'adaptive') {
+    return chapter ? `/pal/adaptive/chapter/${chapter}` : concept ? `/pal/adaptive/concept/${concept}` : null;
+  }
+
+  // Step 3 (Learning Plan) routes directly to the dedicated learning plan page
+  if (stage === 'plan') {
+    return chapter ? `/pal/plan/chapter/${chapter}` : null;
+  }
+
   // If a chapter is known, always route directly into the unified image-based journey system
   if (chapter) {
     return `/pal/diagnostic/chapter/${chapter}?stage=${stage}`;
@@ -230,10 +240,6 @@ export function stageHref(
   // Fallbacks if only concept is known without chapter context
   switch (stage) {
     case 'diagnostic':
-      return null;
-    case 'adaptive':
-      return concept ? `/pal/adaptive/concept/${concept}` : null;
-    case 'plan':
       return null;
     case 'learn':
       return concept ? `/pal/learn/concept/${concept}` : null;

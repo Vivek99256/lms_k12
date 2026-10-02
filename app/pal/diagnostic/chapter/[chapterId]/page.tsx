@@ -224,6 +224,9 @@ function DiagnosticExam() {
   const searchParams = useSearchParams();
   const initialStage = (searchParams?.get('stage') as JourneyStepId) || null;
   const [selectedStep, setSelectedStep] = useState<JourneyStepId | null>(() => {
+    if (initialStage === 'adaptive' || initialStage === 'plan') {
+      return null;
+    }
     if (initialStage && JOURNEY_STEPS.some((s) => s.id === initialStage)) {
       return initialStage;
     }
@@ -232,10 +235,18 @@ function DiagnosticExam() {
 
   useEffect(() => {
     const stageParam = (searchParams?.get('stage') as JourneyStepId) || null;
+    if (stageParam === 'adaptive') {
+      router.replace(`/pal/adaptive/chapter/${chapterId}`);
+      return;
+    }
+    if (stageParam === 'plan') {
+      router.replace(`/pal/plan/chapter/${chapterId}`);
+      return;
+    }
     if (stageParam && JOURNEY_STEPS.some((s) => s.id === stageParam)) {
       setSelectedStep(stageParam);
     }
-  }, [searchParams]);
+  }, [searchParams, chapterId, router]);
 
   const [showClassicJourney, setShowClassicJourney] = useState(false);
   const [subjectName, setSubjectName] = useState<string>('Mathematics');
@@ -459,18 +470,37 @@ function DiagnosticExam() {
     });
   }, []);
 
-  const handleNextStep = useCallback((nextStepId: JourneyStepId) => {
-    setSelectedStep(nextStepId);
-  }, []);
+  const handleNextStep = useCallback(
+    (nextStepId: JourneyStepId) => {
+      if (nextStepId === 'adaptive') {
+        router.push(`/pal/adaptive/chapter/${chapterId}`);
+        return;
+      }
+      if (nextStepId === 'plan') {
+        router.push(`/pal/plan/chapter/${chapterId}`);
+        return;
+      }
+      setSelectedStep(nextStepId);
+    },
+    [chapterId, router]
+  );
 
   const handleSelectStep = useCallback(
     (stepId: JourneyStepId) => {
       if (!isStepUnlocked(stepId, completedSteps)) {
         return;
       }
+      if (stepId === 'adaptive') {
+        router.push(`/pal/adaptive/chapter/${chapterId}`);
+        return;
+      }
+      if (stepId === 'plan') {
+        router.push(`/pal/plan/chapter/${chapterId}`);
+        return;
+      }
       setSelectedStep(stepId);
     },
-    [completedSteps]
+    [completedSteps, chapterId, router]
   );
 
   const goTo = useCallback(
@@ -671,32 +701,7 @@ function DiagnosticExam() {
 
       {previousAttemptsLink}
     </>
-  ) : (
-    <>
-      <PalRailSection title="Journey Milestones">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <ProgressRing value={completedSteps.size} max={JOURNEY_STEPS.length} />
-            <div>
-              <p className="text-sm font-semibold text-slate-900">
-                {completedSteps.size} of {JOURNEY_STEPS.length} completed
-              </p>
-              <p className="text-xs text-slate-500">
-                {completedSteps.size === JOURNEY_STEPS.length ? 'Chapter mastered!' : 'Sequential progress'}
-              </p>
-            </div>
-          </div>
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 text-xs text-slate-600 leading-relaxed">
-            Click any unlocked stage image above to begin or continue your journey.
-          </div>
-        </div>
-      </PalRailSection>
-
-      {showClassicJourney && classicJourneySection}
-
-      {previousAttemptsLink}
-    </>
-  );
+  ) : null;
 
   const diagnosticExamQuestions = (
     <>
@@ -823,9 +828,10 @@ function DiagnosticExam() {
     <Shell
       chapterId={chapterId}
       rail={rail}
-      actions={headerActions}
+      actions={selectedStep !== null ? headerActions : undefined}
       title={currentStepTitle}
       description={currentStepDescription}
+      constrainMeasure={selectedStep !== null}
     >
       {selectedStep === null ? (
         <div className="space-y-6">
@@ -1215,6 +1221,7 @@ function Shell({
   title = 'Chapter diagnostic',
   description = 'Fifteen questions — five easy, five medium and five hard. This finds where to start; it is not a test you can fail.',
   children,
+  constrainMeasure = true,
 }: {
   chapterId: string;
   rail?: React.ReactNode;
@@ -1222,6 +1229,7 @@ function Shell({
   title?: string;
   description?: React.ReactNode;
   children: React.ReactNode;
+  constrainMeasure?: boolean;
 }) {
   return (
     <PalWorkspace
@@ -1231,16 +1239,17 @@ function Shell({
       backLabel="Back to subjects"
       actions={actions}
       rail={
-        rail ?? (
+        rail !== undefined ? rail : (
           <PalRailSection title="Your journey">
             <JourneyRail current="diagnostic" orientation="vertical" />
           </PalRailSection>
         )
       }
+      constrainMeasure={constrainMeasure}
     >
       {children}
 
-      <p className="text-xs text-slate-400 lg:hidden">
+      <p className={cn("text-xs text-slate-400", rail ? "lg:hidden" : "")}>
         <Link
           href={`/pal/diagnostic/chapter/${chapterId}/history`}
           className="hover:text-slate-600 hover:underline"

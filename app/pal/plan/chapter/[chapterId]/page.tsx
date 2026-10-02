@@ -84,6 +84,27 @@ function LearningPlanView() {
   const [plan, setPlan] = useState<LearningPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [subjectName, setSubjectName] = useState<string>('Mathematics');
+
+  // Discover subject name dynamically from syllabus
+  useEffect(() => {
+    if (!chapterId) return;
+    const controller = new AbortController();
+
+    import('@/app/pal/data/pal')
+      .then(({ fetchPalLanding }) => fetchPalLanding({ signal: controller.signal }))
+      .then((landing) => {
+        for (const subj of landing.subjects) {
+          if (subj.chapters.some((c) => String(c.id) === String(chapterId))) {
+            setSubjectName(subj.name);
+            break;
+          }
+        }
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [chapterId]);
 
   const load = useCallback(() => {
     const controller = new AbortController();
@@ -170,6 +191,7 @@ function LearningPlanView() {
                 orientation="vertical"
                 chapterId={chapterId}
                 chapterName={plan?.chapterName}
+                subjectName={subjectName}
               />
             </PalRailSection>
 
@@ -199,6 +221,7 @@ function LearningPlanView() {
           orientation="vertical"
           chapterId={chapterId}
           chapterName={plan.chapterName}
+          subjectName={subjectName}
         />
       </PalRailSection>
 
