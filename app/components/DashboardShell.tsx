@@ -19,6 +19,7 @@ import type { MenuSearchEntry } from '@/app/data/menuSearch';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { BrainCircuit } from 'lucide-react';
 import { BRAIN_MENU_LABEL, BRAIN_ROOT, visibleBrainSections } from '@/lib/brain/navigation';
+import { isBrainMenu } from '@/lib/brain/menu-navigation';
 import { canSeeInternalItems, showDeferredModules } from '@/lib/roadmap';
 import { isStudentProfile } from '@/lib/ai/adapters/shared-utils';
 import { BRAIN_API_BASE_URL } from '@/lib/brain/api';
@@ -327,7 +328,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, []);
 
   const displayedMenuItems = useMemo<MenuItem[]>(() => {
-    if (!hasBrainAccess || !showDeferredModules()) return menuItems; // Enterprise Brain is not part of V1
+    // Keep rights-granted database menus. Only the synthetic fallback is deferred.
+    if (!hasBrainAccess || !showDeferredModules()) return menuItems;
     const alreadyPresent = menuItems.some((item) => normalizeMenuLabel(item.label) === 'enterprise brain');
     if (alreadyPresent) return menuItems;
 
@@ -564,11 +566,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, [displayedMenuItems, selectedBranch, pathname, router, isKnownMenuPath]);
 
   const toggleChatbot = () => {
-    setIsChatbotOpen((prev) => {
-      const next = !prev;
-      setIsRightToolbarOpen(!next);
-      return next;
-    });
+    setIsChatbotOpen((prev) => !prev);
   };
 
   // Set by the idle watcher the moment it fires, and consumed exactly once by
@@ -600,7 +598,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // Each Enterprise Brain section has a landing page of its own listing its
     // screens with live counts, so a section click lands there rather than
     // jumping past it into the first screen. It also has no LMS master menu.
-    if (String(parent.id ?? '') === 'enterprise-brain') {
+    if (isBrainMenu(parent)) {
       if (submenu.href && submenu.href !== '#') router.push(submenu.href);
       return;
     }
@@ -685,7 +683,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (!selectedBranch?.level2Key || !selectedL1 || masterMenuFetchedFor) return;
     // Enterprise Brain screens are not backed by the LMS master-menu rights
     // table, so asking for their master menu only produces a failed request.
-    if (String(selectedL1.id ?? '') === 'enterprise-brain') return;
+    if (isBrainMenu(selectedL1)) return;
 
       const selectedLevel2 = selectedL1.submenus?.find((submenu) => getMenuKey(submenu) === selectedBranch.level2Key);
       if (selectedLevel2) {

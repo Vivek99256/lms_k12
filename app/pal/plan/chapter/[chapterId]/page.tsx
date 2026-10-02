@@ -168,6 +168,8 @@ function LearningPlanView() {
                 completed={COMPLETED_THROUGH_CHECK}
                 bypassed={['intervention']}
                 orientation="vertical"
+                chapterId={chapterId}
+                chapterName={plan?.chapterName}
               />
             </PalRailSection>
 
@@ -195,6 +197,8 @@ function LearningPlanView() {
           current={noDiagnostic ? 'diagnostic' : 'plan'}
           completed={noDiagnostic ? [] : stagesBefore('plan')}
           orientation="vertical"
+          chapterId={chapterId}
+          chapterName={plan.chapterName}
         />
       </PalRailSection>
 

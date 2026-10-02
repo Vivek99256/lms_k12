@@ -236,7 +236,6 @@ const V1_DEFERRED_ROUTE_PREFIXES = [
   '/ai-journey',
   '/ai-platforms',
   '/ai-reports',
-  '/enterprise-brain',
   '/capability-intelligence',
   '/career-awareness',
   '/career-explorer',

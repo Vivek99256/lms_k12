@@ -237,6 +237,9 @@ function ConceptFeedbackView() {
               completed={COMPLETED_THROUGH_CHECK}
               bypassed={['intervention']}
               orientation="vertical"
+              chapterId={completedResult.chapterId || chapterHint}
+              conceptId={conceptId}
+              conceptName={completedResult.conceptName}
             />
           </PalRailSection>
         }
@@ -307,6 +310,9 @@ function ConceptFeedbackView() {
           // never needed it.
           bypassed={openCase ? [] : ['intervention']}
           orientation="vertical"
+          chapterId={chapterId}
+          conceptId={conceptId}
+          conceptName={feedback.conceptName}
         />
       </PalRailSection>
 

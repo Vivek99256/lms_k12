@@ -27,7 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() || '';
 
 const FIELD_CLASS =
-  'w-full rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-[15px] text-gray-900 placeholder-gray-400 ' +
+  'w-full rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-base text-gray-900 placeholder-gray-400 sm:text-[15px] ' +
   'transition-colors hover:border-gray-400 focus:border-[#4169E1] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#4169E1]/15';
 
 const PRIMARY_BUTTON_CLASS =
@@ -103,7 +103,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (isLoading) return;
+    if (isLoading || isGoogleLoading) return;
     setError('');
     setIsLoading(true);
     try {
@@ -127,18 +127,25 @@ export default function LoginPage() {
         setIsGoogleLoading(false);
         return;
       }
-      const result = await loginWithGoogle(response.credential);
-      if (!result.success) {
-        setError(result.error || 'We could not sign you in with Google. Try again.');
+      setIsGoogleLoading(true);
+      try {
+        const result = await loginWithGoogle(response.credential);
+        if (!result.success) {
+          setError(result.error || 'We could not sign you in with Google. Try again.');
+          setIsGoogleLoading(false);
+          return;
+        }
+        finishSignIn();
+      } catch {
+        setError('We could not sign you in with Google. Check your connection and try again.');
         setIsGoogleLoading(false);
-        return;
       }
-      finishSignIn();
     },
     [finishSignIn, loginWithGoogle]
   );
 
   const handleGoogleSignIn = () => {
+    if (isLoading || isGoogleLoading) return;
     setError('');
     const google = getGoogleId();
     if (!google) {
@@ -176,6 +183,7 @@ export default function LoginPage() {
           src="https://accounts.google.com/gsi/client"
           strategy="lazyOnload"
           onReady={() => setGoogleReady(true)}
+          onError={() => setError('Google sign-in is unavailable. You can still sign in with your email and password.')}
         />
       )}
 
@@ -218,8 +226,8 @@ export default function LoginPage() {
         </p>
       </aside>
 
-      <main className="flex flex-1 items-center justify-center bg-slate-50 px-4 py-10 sm:px-6">
-        <div className="login-card w-full max-w-[460px] rounded-2xl border border-gray-200 bg-white p-7 shadow-xl shadow-slate-900/5 sm:p-10">
+      <main className="flex min-w-0 flex-1 items-center justify-center bg-slate-50 px-4 py-6 sm:px-6 sm:py-10">
+        <div className="login-card w-full max-w-[460px] rounded-2xl border border-gray-200 bg-white p-5 shadow-xl shadow-slate-900/5 sm:p-10">
           <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#4169E1] text-white">
               <BookOpen size={18} strokeWidth={2.25} aria-hidden="true" />
@@ -232,7 +240,7 @@ export default function LoginPage() {
             <p className="text-[15px] text-gray-600">Sign in to continue to your account.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" aria-busy={busy}>
             {error && <ErrorBanner message={error} />}
 
             <div>
@@ -249,7 +257,6 @@ export default function LoginPage() {
                   autoComplete="username"
                   autoCapitalize="none"
                   spellCheck={false}
-                  autoFocus
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -260,12 +267,13 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <div className="mb-1.5 flex items-center justify-between">
+              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Password
                 </label>
                 <button
                   type="button"
+                  disabled={busy}
                   onClick={() => setShowForgotModal(true)}
                   className="rounded text-sm font-medium text-[#4169E1] transition-colors hover:text-[#3658c7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4169E1]"
                 >
@@ -279,6 +287,7 @@ export default function LoginPage() {
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
+                  placeholder="Enter your password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -371,14 +380,21 @@ function ForgotPasswordModal({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    dialog?.showModal();
+    dialog?.querySelector<HTMLInputElement>('#forgot-email')?.focus();
+    document.body.style.overflow = 'hidden';
+    return () => {
+      dialog?.close();
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -408,16 +424,19 @@ function ForgotPasswordModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
+      className="fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-[440px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/50"
+      onCancel={onClose}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
+      }}
       aria-labelledby="forgot-password-title"
     >
       <div
-        className="relative w-full max-w-[440px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
+        className="relative w-full"
       >
         <button
           type="button"
@@ -475,7 +494,6 @@ function ForgotPasswordModal({
                     }}
                     placeholder="you@example.com"
                     required
-                    autoFocus
                     className={`${FIELD_CLASS} pl-11`}
                   />
                 </div>
@@ -504,6 +522,6 @@ function ForgotPasswordModal({
           </div>
         )}
       </div>
-    </div>
+    </dialog>
   );
 }
