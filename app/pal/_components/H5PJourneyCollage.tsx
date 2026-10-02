@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   BookOpen,
-  CheckCircle2,
-  ChevronRight,
+  Check,
   ClipboardCheck,
   Compass,
   GraduationCap,
@@ -17,8 +16,8 @@ import {
   Plus,
   Repeat,
   Sparkles,
-  Star,
   Timer,
+  Trophy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { JourneyStageKey } from './journey-stages';
@@ -66,7 +65,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: '15 Questions Baseline',
     detail: 'Fifteen questions across the chapter to establish your baseline readiness.',
     icon: ClipboardCheck,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    gridClass: 'w-full',
   },
   {
     id: 'adaptive',
@@ -75,7 +74,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Concept-Level Drill',
     detail: 'Targeted drills per concept to identify precise strengths and gaps.',
     icon: Layers,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    gridClass: 'w-full',
   },
   {
     id: 'plan',
@@ -84,7 +83,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Personalized Roadmap',
     detail: 'Curated step-by-step curriculum ordered from weakest to strongest.',
     icon: Compass,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    gridClass: 'w-full',
   },
   {
     id: 'learn',
@@ -93,7 +92,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Theory & Lessons',
     detail: 'Deep dive lessons, video explainers, and key theory before practicing.',
     icon: BookOpen,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    gridClass: 'w-full',
   },
   {
     id: 'practice',
@@ -102,7 +101,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Interactive Drills',
     detail: 'Smart question sets that adapt to your performance with instant review.',
     icon: GraduationCap,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    gridClass: 'w-full',
   },
   {
     id: 'feedback',
@@ -111,7 +110,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Performance Analysis',
     detail: 'Detailed breakdown of what went well and what concepts to revisit.',
     icon: MessageSquareText,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    gridClass: 'w-full',
   },
   {
     id: 'check',
@@ -120,7 +119,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Timed Assessment',
     detail: 'Understanding assessment determining if you have cleared this concept.',
     icon: Timer,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    gridClass: 'w-full',
   },
   {
     id: 'intervention',
@@ -129,7 +128,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Teacher Guidance',
     detail: 'Targeted scaffolding and teacher-assisted support when extra help is needed.',
     icon: Lightbulb,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    gridClass: 'w-full',
   },
   {
     id: 'mastery',
@@ -137,8 +136,8 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     label: 'Concept Mastery',
     shortDescription: 'Milestone Achievement',
     detail: 'Official sign-off and recognition of mastery across the curriculum.',
-    icon: Star,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    icon: Trophy,
+    gridClass: 'w-full',
   },
   {
     id: 'recall',
@@ -147,7 +146,7 @@ export const JOURNEY_STEPS: JourneyStepMeta[] = [
     shortDescription: 'Memory Retention',
     detail: 'Scheduled refresher practice to ensure lasting retention and retrieval.',
     icon: Repeat,
-    gridClass: 'h-[210px] w-full min-h-[200px]',
+    gridClass: 'w-full',
   },
 ];
 
@@ -256,6 +255,46 @@ export function getNextStep(stepId: JourneyStepId): JourneyStepId | null {
   return STEP_SEQUENCE[idx + 1];
 }
 
+/**
+ * 4-column interlocking mosaic layout (12 columns x 12 rows).
+ * Matches the reference collage diagram:
+ *
+ * Col 1: Step 1 (height 6), Step 2 (height 6)
+ * Col 2: Step 3 (height 8, tall portrait), Step 4 (height 4)
+ * Col 3: Step 5 (height 7, tall portrait), Step 6 (height 3), Step 7 (height 2)
+ * Col 4: Step 8 (height 4), Step 9 (height 5, mastery hero), Step 10 (height 3)
+ */
+const DESKTOP_MOSAIC_AREAS: Record<JourneyStepId, { gridColumn: string; gridRow: string }> = {
+  diagnostic: { gridColumn: '1 / 4', gridRow: '1 / 7' },
+  adaptive: { gridColumn: '1 / 4', gridRow: '7 / 13' },
+  plan: { gridColumn: '4 / 7', gridRow: '1 / 9' },
+  learn: { gridColumn: '4 / 7', gridRow: '9 / 13' },
+  practice: { gridColumn: '7 / 10', gridRow: '1 / 8' },
+  feedback: { gridColumn: '7 / 10', gridRow: '8 / 11' },
+  check: { gridColumn: '7 / 10', gridRow: '11 / 13' },
+  intervention: { gridColumn: '10 / 13', gridRow: '1 / 5' },
+  mastery: { gridColumn: '10 / 13', gridRow: '5 / 10' },
+  recall: { gridColumn: '10 / 13', gridRow: '10 / 13' },
+};
+
+/**
+ * 2-column mobile mosaic layout (12 columns x 12 rows).
+ * Col 1: Steps 1, 3, 5, 7, 9
+ * Col 2: Steps 2, 4, 6, 8, 10
+ */
+const MOBILE_MOSAIC_AREAS: Record<JourneyStepId, { gridColumn: string; gridRow: string }> = {
+  diagnostic: { gridColumn: '1 / 7', gridRow: '1 / 3' },
+  adaptive: { gridColumn: '7 / 13', gridRow: '1 / 4' },
+  plan: { gridColumn: '1 / 7', gridRow: '3 / 6' },
+  learn: { gridColumn: '7 / 13', gridRow: '4 / 6' },
+  practice: { gridColumn: '1 / 7', gridRow: '6 / 8' },
+  feedback: { gridColumn: '7 / 13', gridRow: '6 / 8' },
+  check: { gridColumn: '1 / 7', gridRow: '8 / 10' },
+  intervention: { gridColumn: '7 / 13', gridRow: '8 / 10' },
+  mastery: { gridColumn: '1 / 7', gridRow: '10 / 13' },
+  recall: { gridColumn: '7 / 13', gridRow: '10 / 13' },
+};
+
 export interface H5PJourneyCollageProps {
   subjectName: string;
   chapterName: string;
@@ -277,6 +316,16 @@ export function H5PJourneyCollage({
 }: H5PJourneyCollageProps) {
   const [images, setImages] = useState<Record<string, JourneyImageInfo>>(propImages || {});
   const [loading, setLoading] = useState(!propImages || Object.keys(propImages).length === 0);
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  // Responsive screen-size tracking for mosaic grid
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    setIsDesktop(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   // Sync prop images if provided
   useEffect(() => {
@@ -286,14 +335,13 @@ export function H5PJourneyCollage({
     }
   }, [propImages]);
 
-  // Fetch dynamic images from web search API (cached per subject & chapter)
+  // Fetch dynamic images from API
   useEffect(() => {
     if (propImages && Object.keys(propImages).length > 0) return;
 
     let isCancelled = false;
     const cacheKey = `pal_journey_images_${subjectName}_${chapterName}`.toLowerCase().replace(/\s+/g, '_');
 
-    // 1. Check browser session cache
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
@@ -332,41 +380,79 @@ export function H5PJourneyCollage({
     };
   }, [subjectName, chapterName, propImages]);
 
+  const completedCount = completedSteps ? completedSteps.size : 0;
+  const progressPercent = Math.round((completedCount / JOURNEY_STEPS.length) * 100);
+
   return (
     <section
-      aria-label="Your Journey - Interactive Branching Path"
+      aria-label="Your Journey - Interactive Image Collage Mosaic"
       className={cn(
-        'overflow-hidden rounded-2xl border border-slate-300/80 bg-slate-950 p-2 sm:p-3 text-white shadow-xl shadow-slate-900/15 transition-all',
+        'relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-3 sm:p-5 lg:p-6 text-slate-900 shadow-sm transition-all',
         className
       )}
     >
-      {/* Header bar of the collage */}
-      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 px-2 pt-1 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500/20 text-purple-300">
-            <Sparkles className="h-3 w-3" />
-          </span>
-          <span className="font-semibold tracking-wider uppercase text-purple-300">
-            YOUR JOURNEY
-          </span>
-          <span className="text-slate-400">•</span>
-          <span className="font-medium text-slate-300">{subjectName}</span>
-          <span className="text-slate-500">›</span>
-          <span className="font-medium text-slate-200">{chapterName}</span>
+      {/* Light Header Bar */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-purple-800 border border-purple-200/80">
+              <Sparkles className="h-3 w-3 text-purple-600" />
+              Your Journey
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="text-xs font-semibold text-slate-700">{subjectName}</span>
+            <span className="text-slate-400">›</span>
+            <span className="text-xs font-bold text-slate-900">{chapterName}</span>
+          </div>
+          <p className="text-xs text-slate-500">
+            Interactive visual learning journey. Click the <span className="font-semibold text-purple-700">+</span> on any unlocked stage image to begin or advance.
+          </p>
         </div>
-        <p className="text-[11px] text-slate-400">
-          Sequential path • Complete each stage to unlock the next
-        </p>
+
+        {/* Progress summary & Status Legend */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs">
+            <span className="font-medium text-slate-500">Progress:</span>
+            <span className="font-bold text-slate-800">
+              {completedCount} / 10 stages ({progressPercent}%)
+            </span>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-3 text-xs text-slate-600">
+            <div className="flex items-center gap-1">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white text-[9px] font-bold">✓</span>
+              <span>Completed</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#862577] text-white text-[10px] font-bold">+</span>
+              <span className="font-medium text-purple-900">Available</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Lock className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-slate-400">Locked</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* The H5P Branching Scenario Mosaic Grid (All 10 Stages) */}
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      {/* ONE LARGE IMAGE COLLAGE / MOSAIC FRAME */}
+      <div
+        className="relative w-full overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200/90 bg-slate-100 p-1 sm:p-1.5 shadow-inner"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+          gridTemplateRows: 'repeat(12, minmax(0, 1fr))',
+          gap: isDesktop ? '6px' : '4px',
+          height: isDesktop ? '640px' : '560px',
+        }}
+      >
         {JOURNEY_STEPS.map((step) => {
           const imageInfo = getStageImage(images, step.id);
           const hasImage = Boolean(imageInfo?.url);
           const isSelected = activeStep === step.id;
           const isUnlocked = isStepUnlocked(step.id, completedSteps);
           const isCompleted = completedSteps?.has(step.id);
+          const gridArea = isDesktop ? DESKTOP_MOSAIC_AREAS[step.id] : MOBILE_MOSAIC_AREAS[step.id];
 
           const handleClick = () => {
             if (!isUnlocked) return;
@@ -386,124 +472,113 @@ export function H5PJourneyCollage({
                   handleClick();
                 }
               }}
+              style={{
+                gridColumn: gridArea.gridColumn,
+                gridRow: gridArea.gridRow,
+              }}
               className={cn(
-                'group relative flex flex-col justify-between overflow-hidden rounded-xl border transition-all duration-300 focus-visible:outline-none',
-                step.gridClass,
+                'group relative flex flex-col justify-between overflow-hidden rounded-lg transition-all duration-300 focus-visible:outline-none',
                 isUnlocked
-                  ? 'cursor-pointer hover:border-purple-400/80 hover:shadow-xl hover:shadow-purple-900/30'
-                  : 'cursor-not-allowed opacity-65 border-white/5 bg-slate-900/50',
-                isSelected && isUnlocked && 'border-purple-400 shadow-lg shadow-purple-500/30 ring-2 ring-purple-400/50'
+                  ? 'cursor-pointer'
+                  : 'cursor-not-allowed opacity-75'
               )}
             >
-              {/* Background Image / Fallback */}
+              {/* Full Tile Dynamic Image (Touches adjacent tiles, NO cards) */}
               {loading && !hasImage ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-900 animate-pulse">
-                  <Loader2 className="h-6 w-6 animate-spin text-slate-600" />
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-200 animate-pulse">
+                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
                 </div>
               ) : hasImage ? (
                 <img
                   src={imageInfo.url}
-                  alt={`${step.label} visual for ${chapterName}`}
+                  alt={`${step.label} visual representation`}
                   className={cn(
                     'absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out',
-                    isUnlocked ? 'group-hover:scale-105' : 'grayscale-[45%]'
+                    isUnlocked ? 'group-hover:scale-106 group-hover:brightness-105' : 'grayscale-[45%] opacity-85'
                   )}
                   loading="lazy"
                 />
               ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900" />
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 via-purple-50 to-slate-100 flex items-center justify-center">
+                  <step.icon className="h-10 w-10 text-indigo-300" />
+                </div>
               )}
 
-              {/* Dark subtle vignette overlay */}
-              <div
-                className={cn(
-                  'absolute inset-0 transition-opacity duration-300',
-                  isUnlocked
-                    ? 'bg-gradient-to-t from-black/85 via-black/35 to-black/25 group-hover:from-black/75'
-                    : 'bg-black/75'
-                )}
-              />
-
-              {/* Top Row: Step Tag Badge & Status */}
-              <div className="relative z-10 flex items-center justify-between p-3">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-white backdrop-blur-md">
-                  <span
-                    className={cn(
-                      'flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-bold text-white',
-                      isUnlocked ? 'bg-purple-500' : 'bg-slate-600'
-                    )}
-                  >
-                    {step.stepNumber}
-                  </span>
-                  <span>Step {step.stepNumber}</span>
+              {/* Top-Right Status Pill (Small, light glass pill on image) */}
+              <div className="relative z-10 flex items-center justify-between p-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold text-slate-800 shadow-xs border border-white/80 backdrop-blur-sm">
+                  Step {step.stepNumber}
                 </span>
 
                 {isCompleted ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/95 border border-emerald-400/30 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-md">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Completed
-                  </span>
-                ) : !isUnlocked ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-900/90 border border-slate-700/80 px-2 py-0.5 text-[10px] font-medium text-slate-300 shadow-sm backdrop-blur-md">
-                    <Lock className="h-3 w-3 text-slate-400" />
-                    Locked
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-sm">
+                    <Check className="h-3 w-3 stroke-[3]" />
+                    <span className="hidden sm:inline">Completed</span>
                   </span>
                 ) : isSelected ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-600/95 border border-purple-400/40 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-sm animate-pulse">
                     <Sparkles className="h-3 w-3" />
-                    Active
+                    <span className="hidden sm:inline">Active</span>
                   </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-indigo-600/80 border border-indigo-400/30 px-2 py-0.5 text-[10px] font-medium text-white shadow-sm backdrop-blur-md">
-                    Available
+                ) : !isUnlocked ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/90 border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 shadow-xs backdrop-blur-sm">
+                    <Lock className="h-3 w-3 text-slate-400" />
+                    <span className="hidden sm:inline">Locked</span>
                   </span>
-                )}
+                ) : null}
               </div>
 
-              {/* Center: Signature H5P Branching Scenario Hotspot Button */}
-              <div className="relative z-10 flex flex-1 items-center justify-center p-2">
+              {/* Center: Signature Circular Hotspot Button (+ Button) */}
+              <div className="relative z-10 flex flex-1 items-center justify-center pointer-events-none p-2">
                 {isUnlocked ? (
-                  <div className="relative flex items-center justify-center">
-                    {/* Subtle outer glow ring */}
-                    <div className="absolute h-13 w-13 rounded-full bg-purple-500/30 blur-sm transition-all duration-300 group-hover:h-15 group-hover:w-15 group-hover:bg-purple-500/50" />
+                  <div className="relative pointer-events-auto">
+                    {/* Outer subtle glow */}
+                    <div className="absolute -inset-2 rounded-full bg-purple-500/25 blur-xs transition-all duration-300 group-hover:bg-purple-500/40 group-hover:scale-115" />
 
-                    {/* Circular H5P Plus Hotspot */}
-                    <div className="relative flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#862577] text-white shadow-lg shadow-black/40 transition-transform duration-300 ease-out group-hover:scale-115 group-hover:bg-[#9d2b8c] group-active:scale-95">
-                      <Plus className="h-6 w-6 stroke-[3.2] transition-transform duration-300 group-hover:rotate-90" />
-                    </div>
+                    {/* Circular Hotspot Button with Plus */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleClick();
+                      }}
+                      className={cn(
+                        'relative flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full',
+                        'border-2 border-white bg-[#862577] text-white shadow-xl shadow-black/40',
+                        'transition-transform duration-300 ease-out group-hover:scale-115 group-hover:bg-[#9d2b8c] active:scale-95',
+                        isCompleted && 'bg-emerald-600 group-hover:bg-emerald-500',
+                        isSelected && 'ring-4 ring-purple-300/60 animate-pulse'
+                      )}
+                      aria-label={`Open Step ${step.stepNumber}: ${step.label}`}
+                    >
+                      {isCompleted ? (
+                        <Check className="h-5 w-5 sm:h-6 sm:w-6 stroke-[3.2]" />
+                      ) : (
+                        <Plus className="h-6 w-6 sm:h-7 sm:w-7 stroke-[3.2] transition-transform duration-300 group-hover:rotate-90" />
+                      )}
+                    </button>
                   </div>
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600/80 bg-slate-900/90 text-slate-400 shadow-inner">
-                    <Lock className="h-4 w-4 text-slate-400" />
+                  <div
+                    className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-white/80 bg-white/85 text-slate-500 shadow-md backdrop-blur-md"
+                    title={`Locked • Complete Step ${step.stepNumber - 1} to unlock`}
+                  >
+                    <Lock className="h-4 w-4 text-slate-500" />
                   </div>
                 )}
               </div>
 
-              {/* Bottom: Step Title & Caption Banner */}
-              <div className="relative z-10 p-3 pt-0">
-                <div
-                  className={cn(
-                    'rounded-lg border p-2 backdrop-blur-md transition-colors',
-                    isUnlocked
-                      ? 'border-white/10 bg-black/60 group-hover:bg-black/75'
-                      : 'border-slate-800 bg-black/70'
-                  )}
-                >
+              {/* Bottom: Floating Light Information Capsule (NO black overlay) */}
+              <div className="relative z-10 p-2 pt-0 pointer-events-none">
+                <div className="rounded-lg bg-white/92 px-2.5 py-1.5 shadow-sm border border-white/80 backdrop-blur-md transition-all duration-300 group-hover:bg-white">
                   <div className="flex items-center justify-between gap-1">
-                    <h3 className="text-sm font-bold tracking-tight text-white drop-shadow-sm sm:text-base">
+                    <p className="truncate text-xs sm:text-sm font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
                       {step.label}
-                    </h3>
-                    {isUnlocked ? (
-                      <ChevronRight className="h-4 w-4 shrink-0 text-purple-300 opacity-70 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
-                    ) : (
-                      <Lock className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                    )}
+                    </p>
+                    <span className="shrink-0 text-[10px] text-slate-500 font-medium hidden sm:inline">
+                      {step.shortDescription}
+                    </span>
                   </div>
-                  <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-300">
-                    {isUnlocked
-                      ? step.shortDescription
-                      : `Complete Step ${step.stepNumber - 1} to unlock`}
-                  </p>
                 </div>
               </div>
             </div>

@@ -104,36 +104,33 @@ export function SelectedJourneyStepRail({
             }
           }}
           className={cn(
-            'relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm',
+            'relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm',
             'cursor-pointer transition-all duration-300 ease-out',
             // Smooth enlargement without pushing layout geometry
-            'hover:scale-[1.04] hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-500/20 hover:border-purple-400 hover:ring-2 hover:ring-purple-400/40',
+            'hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-purple-500/10 hover:border-purple-300 hover:ring-2 hover:ring-purple-400/30',
             'active:scale-[0.98]'
           )}
         >
           {/* Image Container with compact fixed height */}
-          <div className="relative h-48 w-full overflow-hidden bg-slate-950 sm:h-52">
+          <div className="relative m-2 h-44 sm:h-48 overflow-hidden rounded-xl bg-slate-100">
             <img
               src={activeImage.url}
               alt={`${currentStep.label} visual representation`}
-              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-108"
+              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
             />
 
-            {/* Dark vignette overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/20 transition-opacity duration-300 group-hover:from-black/75" />
-
             {/* Top Left: Step number pill */}
-            <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white">
+            <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/95 px-2.5 py-0.5 text-[11px] font-bold text-slate-800 shadow-xs backdrop-blur-md">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-purple-600 text-[10px] font-bold text-white">
                 {currentStep.stepNumber}
               </span>
               <span>Step {currentStep.stepNumber} of {totalSteps}</span>
             </div>
 
             {/* Top Right: Clickable / Active hint badge */}
-            <div className="absolute top-2.5 right-2.5 z-10">
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-black/60 px-2.5 py-0.5 text-[10px] font-medium text-white/95 backdrop-blur-md transition-all group-hover:bg-purple-600 group-hover:border-purple-300">
-                <Maximize2 className="h-3 w-3 text-purple-300" />
+            <div className="absolute top-2 right-2 z-10">
+              <span className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/95 px-2.5 py-0.5 text-[10px] font-semibold text-slate-700 shadow-xs backdrop-blur-md transition-all group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-300">
+                <Maximize2 className="h-3 w-3 text-purple-600 group-hover:text-white" />
                 <span className="hidden sm:inline group-hover:inline">Click to zoom</span>
                 <span className="sm:hidden group-hover:hidden">Active</span>
               </span>
@@ -141,40 +138,36 @@ export function SelectedJourneyStepRail({
 
             {/* Center hover indicator */}
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-purple-600/90 text-white shadow-xl backdrop-blur-sm transition-transform duration-300 group-hover:scale-110">
-                <Sparkles className="h-5 w-5" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-purple-200 bg-white text-purple-600 shadow-lg transition-transform duration-300 group-hover:scale-110">
+                <Sparkles className="h-4 w-4" />
               </div>
-            </div>
-
-            {/* Bottom Title on Image */}
-            <div className="absolute right-3 bottom-2.5 left-3 z-10">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-200">
-                Current Journey Stage
-              </p>
-              <h3 className="text-base font-bold text-white drop-shadow-md">
-                {currentStep.label}
-              </h3>
             </div>
           </div>
 
           {/* Card body information */}
-          <div className="border-t border-slate-100 bg-white p-3.5">
-            <p className="text-xs leading-relaxed text-slate-600">
+          <div className="bg-white p-3.5 pt-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-purple-600">
+              Active Stage
+            </p>
+            <h3 className="text-base font-bold text-slate-900">
+              {currentStep.label}
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
               {currentStep.detail}
             </p>
 
-            <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[11px] text-slate-500">
+            <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500">
               <span className="max-w-[130px] truncate font-medium text-slate-700">
                 {chapterName}
               </span>
               {isCompleted ? (
                 <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
-                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                   Step Completed
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 font-semibold text-purple-700">
-                  <Sparkles className="h-3 w-3 text-purple-600" />
+                  <Sparkles className="h-3.5 w-3.5 text-purple-600" />
                   In Progress
                 </span>
               )}
