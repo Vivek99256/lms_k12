@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { UploadCloud, CheckCircle2, AlertTriangle, Loader2, Sparkles, X, FileText, ChevronRight } from 'lucide-react';
+import { UploadCloud, AlertTriangle, Loader2, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { IdmsApi, type DocumentItem } from '../_lib/idms-api';
+import { IdmsApi, type DocumentItem, type DocumentWarning } from '../_lib/idms-api';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -72,16 +72,16 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
             setReviewDoc(doc);
             setStep('review');
           }
-        } catch (err: any) {
+        } catch (err) {
           if (attempts > 30) {
             clearInterval(interval);
-            setError(err.message);
+            setError(err instanceof Error ? err.message : "Couldn't read the processing status.");
             setStep('select');
           }
         }
       }, 2000);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The upload failed.');
       setStep('select');
     }
   };
@@ -105,8 +105,8 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
       });
       onDocumentConfirmed(res.data);
       onClose();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not confirm the document.');
     } finally {
       setConfirming(false);
     }
@@ -195,7 +195,7 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
             {/* Warnings banner */}
             {reviewDoc.warnings && reviewDoc.warnings.length > 0 && (
               <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800 space-y-1">
-                {reviewDoc.warnings.map((w: any, idx: number) => (
+                {reviewDoc.warnings.map((w: DocumentWarning, idx: number) => (
                   <div key={idx} className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
                     <span>{typeof w === 'string' ? w : w.message || w.type}</span>

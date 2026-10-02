@@ -2,6 +2,54 @@
 
 import { buildSessionContext, createAuthHeaders } from '@/lib/erp-client';
 
+export interface DocumentPermission {
+  type: 'user' | 'role' | 'department';
+  id: number;
+  view: boolean;
+  edit: boolean;
+  download: boolean;
+  share: boolean;
+}
+
+/** A pipeline warning. The pipeline emits bare strings today; objects are accepted too. */
+export type DocumentWarning = string | { type?: string; message?: string };
+
+export interface DocumentTag {
+  name: string;
+  source: 'ai' | 'user';
+  status: 'accepted' | 'suggested' | 'rejected';
+}
+
+export interface DocumentPagination {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+/** One document_history row of entry_type = version. */
+export interface DocumentVersion {
+  id: number;
+  version_number: number;
+  storage_path?: string | null;
+  checksum_sha256?: string | null;
+  size?: number | null;
+  change_note?: string | null;
+  user_id?: number | null;
+  created_at?: string | null;
+}
+
+/** One document_history row of entry_type = audit. */
+export interface AuditEntry {
+  id: number;
+  action: string;
+  document_id?: number | null;
+  user_id?: number | null;
+  ip_address?: string | null;
+  details?: Record<string, unknown> | null;
+  created_at?: string | null;
+}
+
 export interface DocumentItem {
   id: number;
   title: string;
@@ -23,15 +71,23 @@ export interface DocumentItem {
   confidence: number | null;
   people: string[];
   keywords: string[];
-  tags: Array<{ name: string; source: 'ai' | 'user'; status: 'accepted' | 'suggested' | 'rejected' }>;
+  tags: DocumentTag[];
   tag_names: string[];
   owner_id: number;
   owner_name: string | null;
   visibility: 'private' | 'department' | 'organization';
-  permissions: any[];
-  processing_status: 'pending' | 'processing' | 'ready_for_review' | 'done' | 'failed';
+  permissions: DocumentPermission[];
+  /**
+   * The pipeline status.
+   *
+   * Typed nullable on purpose even though the column is NOT NULL: the search
+   * service selects an explicit column list, and a column left out of it is
+   * returned as null rather than omitted. Callers must treat this as possibly
+   * absent instead of assuming the model always populated it.
+   */
+  processing_status: 'pending' | 'processing' | 'ready_for_review' | 'done' | 'failed' | null;
   processing_error: string | null;
-  warnings: any[];
+  warnings: DocumentWarning[];
   logical_location: {
     root: string;
     department: string;
@@ -95,7 +151,7 @@ export const IdmsApi = {
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== '') q.set(k, String(v));
     });
-    return requestApi<{ status: number; data: DocumentItem[]; pagination: any }>(`/documents?${q.toString()}`);
+    return requestApi<{ status: number; data: DocumentItem[]; pagination: DocumentPagination }>(`/documents?${q.toString()}`);
   },
 
   async uploadDocument(file: File, visibility: string = 'organization') {
@@ -132,8 +188,8 @@ export const IdmsApi = {
     });
   },
 
-  async updateTags(id: number, tags: any[]) {
-    return requestApi<{ status: number; tags: any[] }>(`/documents/${id}/tags`, {
+  async updateTags(id: number, tags: DocumentTag[]) {
+    return requestApi<{ status: number; tags: DocumentTag[] }>(`/documents/${id}/tags`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tags }),
@@ -165,7 +221,34 @@ export const IdmsApi = {
   },
 
   async getVersions(id: number) {
-    return requestApi<{ status: number; versions: any[] }>(`/documents/${id}/versions`);
+    return requestApi<{ status: number; versions: DocumentVersion[] }>(`/documents/${id}/versions`);
+  },
+
+  /**
+   * Upload a new version of an existing document.
+   *
+   * FormData is sent without a Content-Type header on purpose: the browser must
+   * set it itself, because the multipart boundary is part of the header value
+   * and a hand-written one produces a body Laravel cannot parse.
+   */
+  async addVersion(id: number, file: File, changeNote: string) {
+    const session = buildSessionContext();
+    const form = new FormData();
+    form.append('file', file);
+    if (changeNote) form.append('change_note', changeNote);
+
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (session.token) headers.Authorization = `Bearer ${session.token}`;
+
+    const res = await fetch(`${session.baseUrl || ''}/api/v1/documents/${id}/versions`, {
+      method: 'POST',
+      body: form,
+      headers,
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.status === 0) throw new Error(json.message || 'Could not add the version.');
+    return json as { status: number; message: string; data: DocumentItem };
   },
 
   async restoreVersion(id: number, versionNumber: number) {
@@ -174,8 +257,12 @@ export const IdmsApi = {
     });
   },
 
+  async getRelated(id: number) {
+    return requestApi<{ status: number; related: DocumentItem[] }>(`/documents/${id}/related`);
+  },
+
   async getAuditLogs(documentId?: number) {
     const q = documentId ? `?document_id=${documentId}` : '';
-    return requestApi<{ status: number; data: any[]; pagination: any }>(`/audit${q}`);
+    return requestApi<{ status: number; data: AuditEntry[]; pagination: DocumentPagination }>(`/audit${q}`);
   },
 };

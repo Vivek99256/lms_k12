@@ -251,10 +251,11 @@ export default function Header({
     'Notification': '/platform-services/notification',
     'Template': '/general/coming-soon?module=Template',
     'Scheduler': '/platform-services/scheduler',
-    // Document has graduated off the coming-soon placeholder to its real screen
-    // at /documents — a read-only aggregation over the document sources every
-    // other module already owns. Template remains a stub.
-    'Document': '/documents',
+    // Document points at the IDMS library, not the older aggregation dashboard
+    // that still sits at /documents. The dashboard reads counts out of tables
+    // other modules own; IDMS is the upload -> classify -> tag -> find module.
+    // Template remains a stub.
+    'Document': '/documents_new',
     'Integration': '/integration',
     'Audit': '/user_log',
     // Event Bus has graduated the same way, to a read-only monitoring plane over

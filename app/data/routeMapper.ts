@@ -724,12 +724,15 @@ export function mapApiLinkToRoute(link: string | null | undefined): string {
     return '/user_log';
    }
 
-  // Document has graduated the same way, to /documents. Intercepted here so
-  // every API-driven surface (sidebar, Level 3 sub-header, master menu) lands on
-  // the live screen rather than the stub. Template still resolves to its
+  // Document has graduated the same way, to the IDMS library at /documents_new.
+  // Intercepted here so every API-driven surface (sidebar, Level 3 sub-header,
+  // master menu) lands on the live screen rather than the stub. Note this is the
+  // IDMS library and NOT the older aggregation dashboard at /documents, which is
+  // still mounted and still reachable by URL and by /documents/[source]; it just
+  // is no longer what the menu advertises. Template still resolves to its
   // coming-soon page.
   if (lowerLink.replace(/^\/+/, '') === 'general/coming-soon?module=document') {
-    return '/documents';
+    return '/documents_new';
   }
 
   // Event Bus has graduated to /platform-services/event-bus — a read-only

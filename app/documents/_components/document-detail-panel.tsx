@@ -16,7 +16,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { IdmsApi, type DocumentItem } from '../_lib/idms-api';
+import { IdmsApi, type AuditEntry, type DocumentItem, type DocumentVersion } from '../_lib/idms-api';
 
 interface DetailPanelProps {
   document: DocumentItem | null;
@@ -26,31 +26,32 @@ interface DetailPanelProps {
 
 export function DocumentDetailPanel({ document, onClose, onRefresh }: DetailPanelProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'versions' | 'related' | 'audit'>('details');
-  const [versions, setVersions] = useState<any[]>([]);
+  const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [related, setRelated] = useState<DocumentItem[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [newVersionFile, setNewVersionFile] = useState<File | null>(null);
   const [changeNote, setChangeNote] = useState('');
   const [uploadingVersion, setUploadingVersion] = useState(false);
 
-  useEffect(() => {
-    if (!document) return;
-    setActiveTab('details');
-    setPreviewUrl(null);
-  }, [document?.id]);
-
+  /*
+   * Per-tab fetches. The panel is mounted with a `key` of the document id by
+   * its parent, so switching documents remounts this component and every tab's
+   * cached state starts empty. That is why there is no "reset on id change"
+   * effect here: remounting already did it, and doing it again in an effect is
+   * the cascading-render pattern React warns about.
+   */
   useEffect(() => {
     if (!document) return;
     if (activeTab === 'versions') {
       IdmsApi.getVersions(document.id).then((res) => setVersions(res.versions || []));
     } else if (activeTab === 'related') {
-      IdmsApi.requestApi?.(`/documents/${document.id}/related`).then((res: any) => setRelated(res.related || []));
+      IdmsApi.getRelated(document.id).then((res) => setRelated(res.related || []));
     } else if (activeTab === 'audit') {
       IdmsApi.getAuditLogs(document.id).then((res) => setAuditLogs(res.data || []));
     }
-  }, [activeTab, document?.id]);
+  }, [activeTab, document]);
 
   if (!document) return null;
 
@@ -58,8 +59,8 @@ export function DocumentDetailPanel({ document, onClose, onRefresh }: DetailPane
     try {
       const res = await IdmsApi.getDownloadUrl(document.id);
       window.open(res.download_url, '_blank');
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not open the download.');
     }
   };
 
@@ -67,8 +68,8 @@ export function DocumentDetailPanel({ document, onClose, onRefresh }: DetailPane
     try {
       const res = await IdmsApi.getPreviewUrl(document.id);
       setPreviewUrl(res.preview_url);
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not build a preview.');
     }
   };
 
@@ -76,22 +77,14 @@ export function DocumentDetailPanel({ document, onClose, onRefresh }: DetailPane
     if (!newVersionFile) return;
     setUploadingVersion(true);
     try {
-      const form = new FormData();
-      form.append('file', newVersionFile);
-      form.append('change_note', changeNote);
-
-      const session = (window as any).localStorage?.getItem('userData');
-      await IdmsApi.requestApi?.(`/documents/${document.id}/versions`, {
-        method: 'POST',
-        body: form,
-      });
+      await IdmsApi.addVersion(document.id, newVersionFile, changeNote);
       setNewVersionFile(null);
       setChangeNote('');
       const v = await IdmsApi.getVersions(document.id);
       setVersions(v.versions || []);
       onRefresh();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not add the version.');
     } finally {
       setUploadingVersion(false);
     }
@@ -231,12 +224,36 @@ export function DocumentDetailPanel({ document, onClose, onRefresh }: DetailPane
         </div>
       )}
 
+      {activeTab === 'related' && (
+        <div className="space-y-2 text-xs">
+          {related.length === 0 ? (
+            <p className="text-slate-500">Nothing similar found yet.</p>
+          ) : (
+            related.map((item) => (
+              <div key={item.id} className="rounded border border-slate-100 p-2 bg-white">
+                <p className="font-semibold text-slate-900">{item.title}</p>
+                <p className="mt-0.5 text-slate-500">{item.original_file_name}</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {item.tag_names?.slice(0, 3).map((tag) => (
+                    <span key={tag} className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {activeTab === 'audit' && (
         <div className="space-y-2 text-xs">
           {auditLogs.map((log, i) => (
             <div key={i} className="rounded border border-slate-100 p-2 bg-slate-50">
               <span className="font-semibold text-slate-800 capitalize">{log.action?.replace('_', ' ')}</span>
-              <p className="text-slate-500 text-[11px]">{new Date(log.created_at).toLocaleString()}</p>
+              <p className="text-slate-500 text-[11px]">
+                {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
+              </p>
             </div>
           ))}
         </div>
