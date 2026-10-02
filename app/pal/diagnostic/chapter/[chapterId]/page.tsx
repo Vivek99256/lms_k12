@@ -198,43 +198,6 @@ function MainJourneyOverview({
           </Button>
         </div>
       </div>
-
-      {/* 5-step milestone progress grid */}
-      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-5 pt-4 border-t border-slate-100">
-        {JOURNEY_STEPS.map((step) => {
-          const isDone = completedSteps.has(step.id);
-          const isUnlocked = isStepUnlocked(step.id, completedSteps);
-
-          return (
-            <div
-              key={step.id}
-              className={cn(
-                'rounded-xl border p-3 transition-colors',
-                isDone
-                  ? 'border-emerald-200 bg-emerald-50/70 text-emerald-950'
-                  : isUnlocked
-                  ? 'border-purple-200 bg-purple-50/60 text-purple-950'
-                  : 'border-slate-200 bg-slate-50 text-slate-400'
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold">Step {step.stepNumber}</span>
-                {isDone ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                ) : isUnlocked ? (
-                  <Sparkles className="h-3.5 w-3.5 text-purple-600" />
-                ) : (
-                  <Lock className="h-3.5 w-3.5 text-slate-400" />
-                )}
-              </div>
-              <p className="mt-1 text-xs font-semibold truncate">{step.label}</p>
-              <p className="mt-0.5 text-[10px] opacity-80">
-                {isDone ? 'Completed' : isUnlocked ? 'Unlocked' : 'Locked'}
-              </p>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
