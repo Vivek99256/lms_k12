@@ -1,0 +1,261 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import {
+  FileText,
+  Download,
+  Eye,
+  Trash2,
+  Clock,
+  History,
+  X,
+  Share2,
+  ExternalLink,
+  Layers,
+  Sparkles,
+  Upload,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { IdmsApi, type DocumentItem } from '../_lib/idms-api';
+
+interface DetailPanelProps {
+  document: DocumentItem | null;
+  onClose: () => void;
+  onRefresh: () => void;
+}
+
+export function DocumentDetailPanel({ document, onClose, onRefresh }: DetailPanelProps) {
+  const [activeTab, setActiveTab] = useState<'details' | 'versions' | 'related' | 'audit'>('details');
+  const [versions, setVersions] = useState<any[]>([]);
+  const [related, setRelated] = useState<DocumentItem[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [newVersionFile, setNewVersionFile] = useState<File | null>(null);
+  const [changeNote, setChangeNote] = useState('');
+  const [uploadingVersion, setUploadingVersion] = useState(false);
+
+  useEffect(() => {
+    if (!document) return;
+    setActiveTab('details');
+    setPreviewUrl(null);
+  }, [document?.id]);
+
+  useEffect(() => {
+    if (!document) return;
+    if (activeTab === 'versions') {
+      IdmsApi.getVersions(document.id).then((res) => setVersions(res.versions || []));
+    } else if (activeTab === 'related') {
+      IdmsApi.requestApi?.(`/documents/${document.id}/related`).then((res: any) => setRelated(res.related || []));
+    } else if (activeTab === 'audit') {
+      IdmsApi.getAuditLogs(document.id).then((res) => setAuditLogs(res.data || []));
+    }
+  }, [activeTab, document?.id]);
+
+  if (!document) return null;
+
+  const handleDownload = async () => {
+    try {
+      const res = await IdmsApi.getDownloadUrl(document.id);
+      window.open(res.download_url, '_blank');
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handlePreview = async () => {
+    try {
+      const res = await IdmsApi.getPreviewUrl(document.id);
+      setPreviewUrl(res.preview_url);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleAddVersion = async () => {
+    if (!newVersionFile) return;
+    setUploadingVersion(true);
+    try {
+      const form = new FormData();
+      form.append('file', newVersionFile);
+      form.append('change_note', changeNote);
+
+      const session = (window as any).localStorage?.getItem('userData');
+      await IdmsApi.requestApi?.(`/documents/${document.id}/versions`, {
+        method: 'POST',
+        body: form,
+      });
+      setNewVersionFile(null);
+      setChangeNote('');
+      const v = await IdmsApi.getVersions(document.id);
+      setVersions(v.versions || []);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setUploadingVersion(false);
+    }
+  };
+
+  return (
+    <div className="w-96 shrink-0 rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 overflow-y-auto max-h-[85vh]">
+      <div className="flex items-start justify-between">
+        <div>
+          <span className="inline-block rounded bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+            {document.document_type || 'Document'}
+          </span>
+          <h3 className="mt-1 font-bold text-slate-900 leading-tight">{document.title}</h3>
+          <p className="text-xs text-slate-500 mt-0.5">{document.original_file_name}</p>
+        </div>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={handlePreview}>
+          <Eye className="mr-1.5 h-3.5 w-3.5" /> Preview
+        </Button>
+        <Button size="sm" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs" onClick={handleDownload}>
+          <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+        </Button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 text-xs font-semibold text-slate-600">
+        {(['details', 'versions', 'related', 'audit'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`pb-2 px-3 capitalize ${
+              activeTab === tab ? 'border-b-2 border-indigo-600 text-indigo-600' : 'hover:text-slate-900'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'details' && (
+        <div className="space-y-3 text-xs">
+          <div>
+            <span className="font-semibold text-slate-500">Logical Location</span>
+            <p className="mt-0.5 text-slate-800 bg-slate-50 p-2 rounded border border-slate-100 font-mono">
+              {document.logical_location.path}
+            </p>
+          </div>
+
+          <div>
+            <span className="font-semibold text-slate-500">Executive Summary</span>
+            <p className="mt-0.5 text-slate-700 leading-relaxed bg-slate-50 p-2 rounded">
+              {document.summary || 'No summary available.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="font-semibold text-slate-500">Department</span>
+              <p className="text-slate-800 font-medium">{document.department_name || 'General'}</p>
+            </div>
+            <div>
+              <span className="font-semibold text-slate-500">Academic Year</span>
+              <p className="text-slate-800 font-medium">{document.academic_year || '-'}</p>
+            </div>
+          </div>
+
+          <div>
+            <span className="font-semibold text-slate-500">Tags</span>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {document.tags?.map((t, i) => (
+                <span key={i} className="rounded bg-slate-100 px-2 py-0.5 text-slate-700">
+                  {t.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2 text-slate-400">
+            <span>Size: {(document.size / 1024).toFixed(1)} KB | Version: v{document.current_version}</span>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'versions' && (
+        <div className="space-y-3 text-xs">
+          <div className="rounded-lg border border-dashed border-slate-200 p-3 bg-slate-50">
+            <span className="font-bold text-slate-800">Upload New Version</span>
+            <input
+              type="file"
+              onChange={(e) => e.target.files && setNewVersionFile(e.target.files[0])}
+              className="mt-2 block w-full text-xs"
+            />
+            <input
+              type="text"
+              placeholder="Version change notes..."
+              value={changeNote}
+              onChange={(e) => setChangeNote(e.target.value)}
+              className="mt-2 w-full rounded border px-2 py-1 text-xs"
+            />
+            <Button
+              size="sm"
+              disabled={!newVersionFile || uploadingVersion}
+              onClick={handleAddVersion}
+              className="mt-2 w-full bg-slate-900 text-white text-xs"
+            >
+              Upload Version
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {versions.map((v, i) => (
+              <div key={i} className="flex items-center justify-between rounded border border-slate-100 p-2 bg-white">
+                <div>
+                  <span className="font-bold text-slate-900">v{v.version_number}</span>
+                  <p className="text-slate-500">{v.change_note || 'Update'}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs text-indigo-600"
+                  onClick={async () => {
+                    await IdmsApi.restoreVersion(document.id, v.version_number);
+                    onRefresh();
+                  }}
+                >
+                  Restore
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'audit' && (
+        <div className="space-y-2 text-xs">
+          {auditLogs.map((log, i) => (
+            <div key={i} className="rounded border border-slate-100 p-2 bg-slate-50">
+              <span className="font-semibold text-slate-800 capitalize">{log.action?.replace('_', ' ')}</span>
+              <p className="text-slate-500 text-[11px]">{new Date(log.created_at).toLocaleString()}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Preview Modal Iframe */}
+      {previewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="relative h-[85vh] w-[80vw] rounded-xl bg-white p-4 shadow-2xl">
+            <button
+              onClick={() => setPreviewUrl(null)}
+              className="absolute right-4 top-4 rounded bg-slate-100 p-1 text-slate-600 hover:bg-slate-200"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <iframe src={previewUrl} className="mt-6 h-[75vh] w-full rounded border border-slate-200" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
