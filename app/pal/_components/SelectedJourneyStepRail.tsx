@@ -221,7 +221,7 @@ export function SelectedJourneyStepRail({
                     ? 'border border-purple-200 bg-purple-50 font-semibold text-purple-900 shadow-sm'
                     : isUnlocked
                     ? 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer'
-                    : 'cursor-not-allowed bg-slate-50/50 text-slate-400 opacity-60'
+                    : 'cursor-not-allowed bg-slate-50/50 text-slate-500'
                 )}
               >
                 {/* Mini thumbnail */}
@@ -229,13 +229,8 @@ export function SelectedJourneyStepRail({
                   <img
                     src={stepImg.thumbnailUrl || stepImg.url}
                     alt=""
-                    className={cn('h-full w-full object-cover', !isUnlocked && 'grayscale-[60%]')}
+                    className="h-full w-full object-cover"
                   />
-                  {!isUnlocked && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <Lock className="h-3.5 w-3.5 text-white/90" />
-                    </div>
-                  )}
                 </div>
 
                 <div className="min-w-0 flex-1">

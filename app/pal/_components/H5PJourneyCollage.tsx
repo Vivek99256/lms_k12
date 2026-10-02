@@ -480,7 +480,7 @@ export function H5PJourneyCollage({
                 'group relative flex flex-col justify-between overflow-hidden rounded-lg transition-all duration-300 focus-visible:outline-none',
                 isUnlocked
                   ? 'cursor-pointer'
-                  : 'cursor-not-allowed opacity-75'
+                  : 'cursor-not-allowed'
               )}
             >
               {/* Full Tile Dynamic Image (Touches adjacent tiles, NO cards) */}
@@ -494,7 +494,7 @@ export function H5PJourneyCollage({
                   alt={`${step.label} visual representation`}
                   className={cn(
                     'absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out',
-                    isUnlocked ? 'group-hover:scale-106 group-hover:brightness-105' : 'grayscale-[45%] opacity-85'
+                    isUnlocked && 'group-hover:scale-106 group-hover:brightness-105'
                   )}
                   loading="lazy"
                 />
@@ -521,9 +521,9 @@ export function H5PJourneyCollage({
                     <span className="hidden sm:inline">Active</span>
                   </span>
                 ) : !isUnlocked ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/90 border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600 shadow-xs backdrop-blur-sm">
-                    <Lock className="h-3 w-3 text-slate-400" />
-                    <span className="hidden sm:inline">Locked</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/95 border border-slate-200/90 px-2 py-0.5 text-[10px] font-medium text-slate-600 shadow-xs backdrop-blur-sm">
+                    <Lock className="h-3 w-3 text-slate-500" />
+                    <span>Locked</span>
                   </span>
                 ) : null}
               </div>
@@ -558,14 +558,7 @@ export function H5PJourneyCollage({
                       )}
                     </button>
                   </div>
-                ) : (
-                  <div
-                    className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-white/80 bg-white/85 text-slate-500 shadow-md backdrop-blur-md"
-                    title={`Locked • Complete Step ${step.stepNumber - 1} to unlock`}
-                  >
-                    <Lock className="h-4 w-4 text-slate-500" />
-                  </div>
-                )}
+                ) : null}
               </div>
 
               {/* Bottom: Floating Light Information Capsule (NO black overlay) */}
