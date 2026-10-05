@@ -116,12 +116,44 @@ const TEACHER_TRAINING_SLIDE_COUNT = 18;
 const MAX_SLIDE_COUNT = 50;
 
 const NOT_SPECIFIED = 'Not specified';
-const PDF_FORMATTING_INSTRUCTIONS = `PDF formatting instructions:
+/**
+ * What a generated document must look like.
+ *
+ * Interpolated into the three document prompts below (remedial class,
+ * classroom activity, revision notes / generic). The presentation prompts
+ * deliberately do NOT carry this: they are consumed by Gamma, which builds its
+ * own slides from prose, so asking those for HTML would break them.
+ *
+ * The class names here are not decoration - both renderers already style them
+ * (RendersGeneratedContent::generatedContentCss for print, `.lms-generated-body`
+ * in globals.css for screen), and until this block named them the model was
+ * only ever asked for bare `<h2>`/`<p>`, so ~270 lines of that CSS styled
+ * classes nothing emitted. The data-* attributes are the Content Design System's
+ * block metadata; `lms:validate-content` reads them to prove a chapter's
+ * concepts were actually covered. See docs/content-design-system/README.md.
+ */
+const PDF_FORMATTING_INSTRUCTIONS = `Formatting instructions:
 - Generate the final answer as clean HTML suitable for direct PDF conversion.
-- Use semantic HTML tags such as <h2>, <h3>, <p>, <strong>, <ul>, <ol>, <li>, and <table> where appropriate.
+- Use semantic HTML tags such as <h2>, <h3>, <p>, <strong>, <ul>, <ol>, <li> and <table>.
 - Do not use Markdown syntax such as #, ##, **, *, backticks, or code fences in the final answer.
-- Use clear section headings, bold emphasis, readable lists, adequate spacing, and a professional document layout.
-- Return only the document body content, without wrapping it in markdown fences.`;
+- Return only the document body content, without wrapping it in markdown fences.
+- Do not use inline styles, colours or emoji. Appearance is handled by the stylesheet.
+
+Use these design-system classes so the document renders correctly:
+- <section class="cover"> with <p class="eyebrow">, <h2> and <p class="lede"> for the opening panel.
+- <section class="callout callout-key"> for a key idea, callout-warn for a misconception or warning, callout-example for a worked example, callout-try for something the student should do or answer.
+- Every callout must open with <span class="callout-label">Short label</span>, so meaning is never carried by colour alone.
+- <table class="tiles"> with <span class="tile-num"> and <span class="tile-label"> for a row of headline figures.
+
+Tag each section with what it teaches, using these attributes:
+- data-block: one of intro, explain, visual, example, real-world, misconception, check, activity, summary, assess
+- data-concept: the concept name exactly as given above
+- data-bloom: remember, understand, apply, analyze, evaluate or create (lowercase)
+- data-dok: 1, 2, 3 or 4
+- data-minutes: an integer
+
+Example:
+<section class="callout callout-warn" data-block="misconception" data-concept="Osmosis" data-bloom="understand" data-dok="2" data-minutes="4"><span class="callout-label">Common misconception</span><p>...</p></section>`;
 
 function readErrorMessage(value: unknown): string {
   if (typeof value === 'string') return value.trim();
