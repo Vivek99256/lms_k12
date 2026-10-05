@@ -27,6 +27,8 @@ export interface NavigationMatch {
   confidence: 'exact' | 'likely';
   moduleName?: string;
   categoryKey?: string;
+  /** Set when the request named one screen inside a tab, e.g. 'Fee Collect'. */
+  itemLabel?: string;
 }
 
 export interface ChatbotModuleContext {
@@ -106,22 +108,85 @@ const MODULE_DISPLAY_NAMES: Record<string, string> = {
 };
 
 const CATEGORY_ALIASES: Record<string, string[]> = {
-  onboarding: ['onboarding', 'onboard', 'setup', 'getting started', 'get started', 'initial setup'],
-  'process-builder': ['process builder', 'process', 'processes', 'workflow', 'workflows', 'approval', 'approvals'],
+  onboarding: ['onboarding', 'onboard', 'getting started', 'get started', 'initial setup'],
+  'process-builder': ['process builder', 'process', 'processes'],
   'master-setup': ['master setup', 'master', 'masters', 'configuration', 'config', 'settings', 'configure'],
-  operations: ['operations', 'operation', 'daily operations', 'manage', 'management'],
-  reports: ['reports', 'report', 'reporting', 'analytics', 'data', 'statistics', 'stats', 'generate report', 'view reports'],
-  intelligence: ['intelligence', 'ai', 'insights', 'smart', 'analysis', 'recommendations', 'ai tools', 'ai stack'],
-  'help-guide': ['help', 'help guide', 'support', 'guide', 'documentation', 'docs', 'faq', 'how to', 'tutorial'],
-  scheduler: ['scheduler', 'schedule', 'scheduling', 'scheduled', 'cron', 'automated'],
-  'audit-trail': ['audit', 'audit trail', 'log', 'logs', 'history', 'activity log'],
+  operations: ['operations', 'operation', 'daily operations'],
+  reports: ['reports', 'report', 'reporting', 'analytics', 'statistics', 'stats', 'generate report', 'view reports'],
+  intelligence: ['intelligence', 'insights', 'recommendations'],
+  'help-guide-support': ['help guide support', 'help guide', 'help', 'support', 'guide', 'documentation', 'docs', 'faq', 'tutorial'],
+  communication: ['communication', 'communications', 'notices', 'announcements'],
+  'ai-stack': ['ai stack', 'ai tools'],
+  workflow: ['workflow', 'workflows', 'approval', 'approvals'],
+  // `schedular` is the key as the menu data spells it.
+  schedular: ['scheduler', 'schedular', 'schedule', 'scheduling', 'scheduled', 'cron'],
+  'audit-trail': ['audit trail', 'audit', 'audit log', 'activity log'],
+  'sop-task': ['sop', 'sop task'],
 };
 
+// Fixed Fees tab pages (app/fees/<tab>/page.tsx), used only when the live tab list
+// is unavailable. Keys are the category keys the menu data uses.
+const FALLBACK_TAB_ROUTES: Record<string, Record<string, string>> = {
+  fees: {
+    onboarding: '/fees/onboarding',
+    'process-builder': '/fees/process-builder',
+    'master-setup': '/fees/master-setup',
+    operations: '/fees/operations',
+    reports: '/fees/reports',
+    intelligence: '/fees/intelligence',
+    'help-guide-support': '/fees/help-guide-support',
+    communication: '/fees/communication',
+    'ai-stack': '/fees/ai-stack',
+    workflow: '/fees/workflow',
+    schedular: '/fees/scheduler',
+    'audit-trail': '/fees/audit-trail',
+  },
+};
+
+const FALLBACK_TAB_LABELS: Record<string, string> = {
+  onboarding: 'Onboarding',
+  'process-builder': 'Process Builder',
+  'master-setup': 'Master Setup',
+  operations: 'Operations',
+  reports: 'Reports',
+  intelligence: 'Intelligence',
+  'help-guide-support': 'Help Guide/Support',
+  communication: 'Communication',
+  'ai-stack': 'AI Stack',
+  workflow: 'Workflow',
+  schedular: 'Scheduler',
+  'audit-trail': 'Audit Trail',
+};
+
+// Where a module's pending approvals are decided. This is the Automations tab of the
+// module's AI Stack, whose queue already carries Approve/Reject (it calls the same
+// resolveApproval the backend exposes), so the chatbot only opens it. Fees only: the
+// other modules are added here once their tab ids have been checked.
+export const APPROVAL_ROUTES: Record<string, string> = {
+  fees: '/fees/ai-stack?tab=automations',
+};
+
+export function approvalsRouteFor(pathOrModule?: string | null): string | null {
+  const moduleName = getCurrentModule(pathOrModule).name;
+  return APPROVAL_ROUTES[moduleName] ?? null;
+}
+
+// "Show me pending approvals", "take me to staff approval", "approve this action",
+// "approve the pending fees action". Questions ("how many…", "why…") are left alone.
+const APPROVAL_PATTERN =
+  /\b(pending approvals?|staff approvals?|approvals? queue|waiting for (staff )?approval|approve (this|the|that|pending|my)\b[\w\s]*\b(action|request|process)|pending (\w+ )?actions?)\b/;
+const APPROVAL_QUESTION_START = /^(how many|what|why|who|which|explain|tell me)\b/;
+
+// Verbs that always mean "take me there".
 const NAVIGATION_VERBS = [
-  'go to', 'take me to', 'open', 'show me', 'show', 'navigate to', 'switch to',
-  'i want to see', 'i need', 'let me see', 'bring up', 'pull up', 'launch',
-  'where is', 'where can i find', 'how do i get to', 'find',
+  'go to', 'take me to', 'open', 'navigate to', 'switch to', 'bring up', 'pull up',
+  'launch', 'where is', 'where can i find', 'how do i get to',
 ];
+
+// Verbs that also mean "give me the data" ("show me the fees report"). They only
+// navigate when the sentence names a destination: tab, page, screen or module.
+const SOFT_NAVIGATION_VERBS = ['show me', 'show', 'i want to see', 'let me see', 'i need', 'find'];
+const DESTINATION_WORDS = ['tab', 'page', 'screen', 'module', 'section'];
 
 function normalize(text: string): string {
   return text.trim().toLowerCase().replace(/[^\w\s/-]/g, '').replace(/\s+/g, ' ');
@@ -286,8 +351,32 @@ function matchCategory(
   return bestMatch;
 }
 
+function matchItem(
+  text: string,
+  categories: ModuleCategory[]
+): { category: ModuleCategory; item: ModuleCategory['items'][number] } | null {
+  let best: { category: ModuleCategory; item: ModuleCategory['items'][number] } | null = null;
+  let bestLength = 0;
+
+  for (const category of categories) {
+    for (const item of category.items ?? []) {
+      const label = normalize(item.label);
+      if (label.length > 3 && item.link && containsPhrase(text, label) && label.length > bestLength) {
+        best = { category, item };
+        bestLength = label.length;
+      }
+    }
+  }
+
+  return best;
+}
+
 function hasNavigationIntent(text: string): boolean {
-  return NAVIGATION_VERBS.some((verb) => containsPhrase(text, verb));
+  if (NAVIGATION_VERBS.some((verb) => containsPhrase(text, verb))) return true;
+  return (
+    SOFT_NAVIGATION_VERBS.some((verb) => containsPhrase(text, verb)) &&
+    DESTINATION_WORDS.some((word) => containsPhrase(text, word))
+  );
 }
 
 export function detectNavigationIntent(
@@ -318,6 +407,25 @@ export function detectNavigationIntent(
 
   const categoryMatch = matchCategory(text, categories);
 
+  // A named screen ("open fee collect") is more specific than its tab. Its link is
+  // the one the tab's own card opens, so the chatbot adds no route of its own.
+  const itemMatch = matchItem(text, categories);
+  if (
+    itemMatch &&
+    hasVerb &&
+    (!categoryMatch || normalize(itemMatch.item.label).length > normalize(categoryMatch.label).length)
+  ) {
+    return {
+      route: itemMatch.item.link,
+      moduleLabel: moduleMatch.label || MODULE_DISPLAY_NAMES[moduleMatch.moduleName] || moduleMatch.moduleName,
+      categoryLabel: itemMatch.category.label,
+      confidence: 'exact',
+      moduleName: moduleMatch.moduleName,
+      categoryKey: itemMatch.category.key,
+      itemLabel: itemMatch.item.label,
+    };
+  }
+
   if (!categoryMatch) {
     if (!hasVerb) return null;
 
@@ -332,10 +440,11 @@ export function detectNavigationIntent(
     };
   }
 
-  if (!hasVerb && !categoryMatch) return null;
+  // No navigation verb means a question about the data, never a request to move.
+  if (!hasVerb) return null;
 
   return {
-    route: categoryMatch.route,
+    route: categoryMatch.route || `${moduleMatch.baseRoute || MODULE_DEFAULT_ROUTES[moduleMatch.moduleName] || ""}/${categoryMatch.key}`.replace(/\/+/g, '/'),
     moduleLabel: moduleMatch.label || MODULE_DISPLAY_NAMES[moduleMatch.moduleName] || moduleMatch.moduleName,
     categoryLabel: categoryMatch.label,
     confidence: hasVerb ? 'exact' : 'likely',
@@ -359,6 +468,32 @@ export function evaluateChatbotIntent(
 
   const lower = text.toLowerCase();
 
+  // 0. Approvals: open the screen where staff decide. The chatbot never approves or
+  // rejects itself — that decision stays with the staff member, on the existing screen.
+  if (APPROVAL_PATTERN.test(lower) && !APPROVAL_QUESTION_START.test(lower)) {
+    const approvalModule = matchModuleSlug(lower.replace(/staff approvals?/g, '')) ?? currentModule.name;
+    const approvalRoute = APPROVAL_ROUTES[approvalModule];
+    if (approvalRoute) {
+      const moduleLabel = MODULE_DISPLAY_NAMES[approvalModule] ?? approvalModule;
+      return {
+        type: 'navigation',
+        currentModule,
+        targetModule: { name: approvalModule, label: moduleLabel },
+        headline: `${moduleLabel} Approvals`,
+        message: `Open the ${moduleLabel} approvals queue.`,
+        route: approvalRoute,
+        actionLabel: `Open ${moduleLabel} Approvals`,
+        navigationMatch: {
+          route: approvalRoute,
+          moduleLabel,
+          categoryLabel: 'Approvals',
+          confidence: 'exact',
+          moduleName: approvalModule,
+        },
+      };
+    }
+  }
+
   // 1. Navigation / Module action intent detection
   const navMatch = detectNavigationIntent(userMessage, registry, categoriesMap);
   const matchedModuleSlug = navMatch?.moduleName || matchModuleSlug(lower);
@@ -374,7 +509,9 @@ export function evaluateChatbotIntent(
     lower.includes('balance') ||
     lower.includes('details');
 
-  if (matchedModuleSlug && (!isDataQuery || lower.includes('onboarding') || isDirectModuleSwitch(lower, matchedModuleSlug))) {
+  const wantsNavigation = hasNavigationIntent(lower) || isDirectModuleSwitch(lower, matchedModuleSlug ?? '');
+
+  if (matchedModuleSlug && wantsNavigation && (!isDataQuery || lower.includes('onboarding') || isDirectModuleSwitch(lower, matchedModuleSlug))) {
     const targetModuleLabel = MODULE_DISPLAY_NAMES[matchedModuleSlug] || navMatch?.moduleLabel || (matchedModuleSlug.charAt(0).toUpperCase() + matchedModuleSlug.slice(1));
     const isDirectSwitch = isDirectModuleSwitch(lower, matchedModuleSlug);
 
@@ -394,13 +531,25 @@ export function evaluateChatbotIntent(
       };
     }
 
-    // Supported navigation / action
-    const categoryLabel = navMatch?.categoryLabel || (matchedCategoryKey === 'onboarding' ? 'Onboarding' : matchedCategoryKey ? matchedCategoryKey.charAt(0).toUpperCase() + matchedCategoryKey.slice(1) : null);
-    
-    let route = navMatch?.route || MODULE_DEFAULT_ROUTES[matchedModuleSlug] || `/${matchedModuleSlug}`;
-    if (matchedCategoryKey === 'onboarding' && matchedModuleSlug === 'fees') {
-      route = '/fees/onboarding';
+    // The live tab list is preferred. Without it (not loaded yet, or the server
+    // route, which has none) fall back to the module's fixed tab pages. A named tab
+    // with no known route is never replaced by the module default — that is what
+    // opened Onboarding for every request.
+    const fallback = matchedCategoryKey ? FALLBACK_TAB_ROUTES[matchedModuleSlug]?.[matchedCategoryKey] : undefined;
+    if (!navMatch && matchedCategoryKey && !fallback) {
+      return { type: 'standard', currentModule };
     }
+
+    const categoryLabel =
+      navMatch?.itemLabel ||
+      navMatch?.categoryLabel ||
+      (matchedCategoryKey
+        ? FALLBACK_TAB_LABELS[matchedCategoryKey] ||
+          matchedCategoryKey.charAt(0).toUpperCase() + matchedCategoryKey.slice(1)
+        : null);
+
+    const route =
+      navMatch?.route || fallback || MODULE_DEFAULT_ROUTES[matchedModuleSlug] || `/${matchedModuleSlug}`;
 
     const headline = categoryLabel
       ? `${targetModuleLabel} ${categoryLabel}`

@@ -62,7 +62,15 @@ export function useChatbotNavigation() {
 
     void (async () => {
       try {
-        const reg = await fetchModuleCategoryRegistry(session);
+        // A failed registry call must not leave the chatbot with no tabs at all:
+        // Fees can always be resolved by name through the same category feed.
+        let reg = await fetchModuleCategoryRegistry(session).catch(() => [] as ModuleRegistryEntry[]);
+        if (!reg.some((entry) => entry.moduleName === 'fees')) {
+          reg = [
+            ...reg,
+            { moduleName: 'fees', level2MenuId: null, label: 'Fees', categoryCount: 0, baseRoute: '/fees', routes: [] },
+          ];
+        }
         if (cancelled) return;
 
         // Fetch categories for each module in parallel
@@ -84,10 +92,12 @@ export function useChatbotNavigation() {
 
         const catMap = new Map<string, ModuleCategory[]>(entries as Array<[string, ModuleCategory[]]>);
 
-        // Cache
-        cachedRegistry = reg;
-        cachedCategories = catMap;
-        cacheSessionKey = sessionKey;
+        // Cache only a usable result, so an empty one is retried on the next open.
+        if (catMap.get('fees')?.length) {
+          cachedRegistry = reg;
+          cachedCategories = catMap;
+          cacheSessionKey = sessionKey;
+        }
 
         setRegistry(reg);
         setCategoriesMap(catMap);

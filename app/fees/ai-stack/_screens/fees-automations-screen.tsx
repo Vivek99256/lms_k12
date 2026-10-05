@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Bot, Lock, Pause, Play, RefreshCw } from 'lucide-react';
 
+import { FeesApprovalQueue } from '@/app/fees/ai-stack/_screens/fees-approval-queue';
 import { AgentManagement } from '@/app/enterprise-brain/automation/agents/_components/AgentManagement';
 import { RunAgentDialog } from '@/app/enterprise-brain/automation/agents/_components/RunAgentDialog';
 import { useBrainResource } from '@/app/enterprise-brain/_components/useBrainResource';
@@ -166,6 +167,8 @@ export function FeesAutomationsScreen() {
 
   return (
     <div className="space-y-6">
+      <FeesApprovalQueue />
+
       <section className="rounded-lg border border-slate-200 bg-white px-5 py-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">

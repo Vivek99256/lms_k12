@@ -356,9 +356,59 @@ export function generateForContext(
  */
 export function generateReportForContext(
   session: WorkspaceSession,
-  input: { route: string; arguments?: Record<string, unknown> }
+  input: {
+    route: string;
+    arguments?: Record<string, unknown>;
+    /** Which published report layout to build when the module has several. */
+    template_id?: number;
+  }
 ) {
   return post<WorkspaceReport>(session, "/report", input);
+}
+
+/** A published report layout the module can build, from `ai_templates` (kind = report). */
+export interface CreateOptionsReport {
+  id: number;
+  template_key: string;
+  name: string;
+  description: string | null;
+  data_source: string | null;
+  scope: "platform" | "school";
+  is_default: boolean;
+  suggested_templates: Array<{
+    template_key: string;
+    name: string;
+    score: number;
+    /** Why it is suggested, e.g. "Both cover: pending". */
+    reason: string;
+    best?: boolean;
+  }>;
+}
+
+/** A published prompt template the module can generate from. */
+export interface CreateOptionsTemplate {
+  template_key: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  scope: "platform" | "school";
+  /** The Create buttons that already offer it. */
+  offered_as: string[];
+  suggested_for_reports: string[];
+  /** What the person must supply; the page fills everything else itself. */
+  inputs: Array<{ key: string; label: string; required: boolean; type: string }>;
+}
+
+export interface CreateOptions {
+  module: string | null;
+  module_label?: string | null;
+  reports: CreateOptionsReport[];
+  templates: CreateOptionsTemplate[];
+}
+
+/** Every report and template this module can create, with suggested pairings. */
+export function fetchCreateOptions(session: WorkspaceSession, input: { route: string }) {
+  return post<CreateOptions>(session, "/create-options", input);
 }
 
 export function fetchOntologyView(
