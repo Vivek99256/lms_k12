@@ -4,6 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { UploadCloud, AlertTriangle, Loader2, Sparkles, X, CheckCircle2, Circle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IdmsApi, type DocumentItem, type DocumentWarning } from '../_lib/idms-api';
+import {
+  collectFromDrop,
+  collectFromInput,
+  expandForUpload,
+  type ExpandedFile,
+} from '../_lib/expand-upload';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -25,6 +31,8 @@ interface Edits {
 interface QueueItem {
   key: string;
   file: File;
+  /** Folder or zip path the file came from; shown instead of the bare name. */
+  path: string;
   status: ItemStatus;
   docId?: number;
   doc?: DocumentItem;
@@ -82,6 +90,8 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
   const [started, setStarted] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [reading, setReading] = useState(false);
+  const [skipped, setSkipped] = useState<string[]>([]);
 
   // Guards against double-starting an upload (strict-mode effects) and against late results after a reset.
   const startedKeys = useRef<Set<string>>(new Set());
@@ -185,20 +195,30 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
 
   if (!isOpen) return null;
 
-  const addFiles = (list: FileList | File[] | null) => {
-    if (!list || list.length === 0) return;
-    const incoming = Array.from(list);
-    setItems((prev) => {
-      const seen = new Set(prev.map((it) => `${it.file.name}:${it.file.size}:${it.file.lastModified}`));
-      const fresh = incoming
-        .filter((f) => !seen.has(`${f.name}:${f.size}:${f.lastModified}`))
-        .map((file) => ({
-          key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          file,
-          status: 'queued' as ItemStatus,
-        }));
-      return [...prev, ...fresh];
-    });
+  /** Accepts loose files, folders and zips; zips are unpacked here so each document uploads on its own. */
+  const addFiles = async (incoming: ExpandedFile[]) => {
+    if (incoming.length === 0) return;
+    const gen = generation.current;
+    setReading(true);
+    try {
+      const { files, skipped: notes } = await expandForUpload(incoming);
+      if (gen !== generation.current) return;
+      setSkipped((prev) => [...prev, ...notes]);
+      setItems((prev) => {
+        const seen = new Set(prev.map((it) => `${it.path}:${it.file.size}`));
+        const fresh = files
+          .filter((f) => !seen.has(`${f.path}:${f.file.size}`))
+          .map((f) => ({
+            key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            file: f.file,
+            path: f.path,
+            status: 'queued' as ItemStatus,
+          }));
+        return [...prev, ...fresh];
+      });
+    } finally {
+      if (gen === generation.current) setReading(false);
+    }
   };
 
   const removeQueued = (key: string) => setItems((prev) => prev.filter((it) => it.key !== key));
@@ -214,6 +234,8 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
     generation.current += 1;
     startedKeys.current = new Set();
     setItems([]);
+    setSkipped([]);
+    setReading(false);
     setStarted(false);
     setActiveKey(null);
     onClose();
@@ -286,14 +308,19 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                addFiles(e.dataTransfer.files);
+                // Collect synchronously: the browser empties the DataTransfer after the handler returns.
+                const pending = collectFromDrop(e.dataTransfer);
+                void pending.then(addFiles);
               }}
               className="mt-6 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center hover:border-indigo-500"
             >
               <UploadCloud className="h-12 w-12 text-slate-400" />
-              <p className="mt-3 text-sm font-medium text-slate-700">Drag and drop files here, or click to browse</p>
+              <p className="mt-3 text-sm font-medium text-slate-700">
+                Drag and drop files, a folder or a zip here, or click to browse
+              </p>
               <p className="mt-1 text-xs text-slate-500">
-                PDF, DOCX, XLSX, PPTX, Images up to 50MB each. You can select several files.
+                PDF, DOCX, XLSX, PPTX, Images up to 50MB each. Zips and folders are opened and every file inside is
+                uploaded on its own.
               </p>
               <input
                 type="file"
@@ -301,27 +328,68 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
                 className="hidden"
                 id="file-upload"
                 onChange={(e) => {
-                  addFiles(e.target.files);
+                  if (e.target.files) void addFiles(collectFromInput(e.target.files));
                   e.target.value = '';
                 }}
               />
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 cursor-pointer"
-                type="button"
-                onClick={() => document.getElementById('file-upload')?.click()}
-              >
-                Browse Device
-              </Button>
+              <input
+                type="file"
+                className="hidden"
+                id="folder-upload"
+                {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+                onChange={(e) => {
+                  if (e.target.files) void addFiles(collectFromInput(e.target.files));
+                  e.target.value = '';
+                }}
+              />
+              <div className="mt-4 flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="cursor-pointer"
+                  type="button"
+                  disabled={reading}
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                >
+                  Browse Device
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="cursor-pointer"
+                  type="button"
+                  disabled={reading}
+                  onClick={() => document.getElementById('folder-upload')?.click()}
+                >
+                  Choose folder
+                </Button>
+              </div>
+              {reading && (
+                <p className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading files and opening zips…
+                </p>
+              )}
             </div>
+
+            {skipped.length > 0 && (
+              <div className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+                <p className="font-semibold">
+                  {skipped.length} {skipped.length === 1 ? 'file was' : 'files were'} not added
+                </p>
+                <ul className="mt-1 max-h-24 list-disc space-y-0.5 overflow-y-auto pl-4">
+                  {skipped.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {items.length > 0 && (
               <ul className="mt-4 max-h-48 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
                 {items.map((it) => (
                   <li key={it.key} className="flex items-center gap-2 px-3 py-2 text-sm">
                     <FileText className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span className="min-w-0 flex-1 truncate text-slate-800">{it.file.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-slate-800" title={it.path}>{it.path}</span>
                     <span className="shrink-0 text-xs text-slate-400">{formatSize(it.file.size)}</span>
                     <button
                       type="button"
@@ -339,7 +407,7 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={handleClose}>Cancel</Button>
               <Button
-                disabled={items.length === 0}
+                disabled={items.length === 0 || reading}
                 onClick={startUpload}
                 className="bg-indigo-600 text-white hover:bg-indigo-700"
               >
@@ -585,7 +653,7 @@ function QueueRow({
         {(status === 'queued' || status === 'review' || status === 'discarded') && (
           <FileText className="h-4 w-4 shrink-0 text-slate-400" />
         )}
-        <span className="min-w-0 flex-1 truncate font-medium text-slate-800">{item.file.name}</span>
+        <span className="min-w-0 flex-1 truncate font-medium text-slate-800" title={item.path}>{item.path}</span>
         <span className="shrink-0 text-xs text-slate-400">{formatSize(item.file.size)}</span>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>{STATUS_LABEL[status]}</span>
       </div>
