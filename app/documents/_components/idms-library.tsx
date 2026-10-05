@@ -10,6 +10,7 @@ import {
   Search,
   Sparkles,
   Tags,
+  Trash2,
   UploadCloud,
   X,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { sanitizeHtml } from '@/lib/security/sanitize-html';
 import { DocumentDetailPanel } from '@/app/documents/_components/document-detail-panel';
 import { UploadReviewModal } from '@/app/documents/_components/upload-review-modal';
+import { TrashDialog } from '@/app/documents/_components/trash-dialog';
 import {
   IdmsApi,
   type BrowseTreeItem,
@@ -203,6 +205,7 @@ export function IdmsLibrary() {
   const [parsing, setParsing] = useState(false);
   const [error, setError] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [selected, setSelected] = useState<DocumentItem | null>(null);
 
   const loadDocuments = useCallback(async () => {
@@ -328,10 +331,16 @@ export function IdmsLibrary() {
         title="Document Library"
         description="Upload once and the system reads, classifies, tags and files it. Search by name, tag, metadata or plain English."
         action={
-          <Button onClick={() => setUploadOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-            <UploadCloud className="mr-2 size-4" />
-            Upload document
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setTrashOpen(true)}>
+              <Trash2 className="mr-2 size-4" />
+              Trash
+            </Button>
+            <Button onClick={() => setUploadOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              <UploadCloud className="mr-2 size-4" />
+              Upload documents
+            </Button>
+          </div>
         }
       />
 
@@ -609,11 +618,14 @@ export function IdmsLibrary() {
         </section>
       )}
 
+      <TrashDialog isOpen={trashOpen} onClose={() => setTrashOpen(false)} onRestored={() => void loadDocuments()} />
+
       <UploadReviewModal
         isOpen={uploadOpen}
         onClose={() => setUploadOpen(false)}
-        onDocumentConfirmed={(doc) => {
-          setSelected(doc);
+        onDocumentConfirmed={(doc, { total }) => {
+          // Only open the detail panel for a single upload; a batch would keep stealing focus.
+          if (total === 1) setSelected(doc);
           void loadDocuments();
         }}
       />

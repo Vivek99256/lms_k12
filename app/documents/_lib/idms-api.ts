@@ -97,6 +97,9 @@ export interface DocumentItem {
     path: string;
   };
   snippet?: string;
+  /** Set only for documents in the trash; purge_at is when they are deleted for good. */
+  deleted_at?: string | null;
+  purge_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -186,6 +189,26 @@ export const IdmsApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(edits),
     });
+  },
+
+  /** Soft delete: the backend moves the document to trash and writes an audit entry. */
+  async deleteDocument(id: number) {
+    return requestApi<{ status: number; message: string }>(`/documents/${id}`, { method: 'DELETE' });
+  },
+
+  async listTrash() {
+    return requestApi<{ status: number; retention_days: number; data: DocumentItem[] }>(`/trash/documents`);
+  },
+
+  async restoreDocument(id: number) {
+    return requestApi<{ status: number; message: string; data: DocumentItem }>(`/trash/documents/${id}/restore`, {
+      method: 'POST',
+    });
+  },
+
+  /** Permanent. Only works on a document that is already in the trash. */
+  async purgeDocument(id: number) {
+    return requestApi<{ status: number; message: string }>(`/trash/documents/${id}`, { method: 'DELETE' });
   },
 
   async updateTags(id: number, tags: DocumentTag[]) {
