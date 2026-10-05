@@ -25,6 +25,8 @@ interface DetailPanelProps {
 }
 
 export function DocumentDetailPanel({ document, onClose, onRefresh }: DetailPanelProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'versions' | 'related' | 'audit'>('details');
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [related, setRelated] = useState<DocumentItem[]>([]);
@@ -73,6 +75,18 @@ export function DocumentDetailPanel({ document, onClose, onRefresh }: DetailPane
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await IdmsApi.deleteDocument(document.id);
+      onRefresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not delete the document.');
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
   const handleAddVersion = async () => {
     if (!newVersionFile) return;
     setUploadingVersion(true);
@@ -114,6 +128,25 @@ export function DocumentDetailPanel({ document, onClose, onRefresh }: DetailPane
           <Download className="mr-1.5 h-3.5 w-3.5" /> Download
         </Button>
       </div>
+
+      {confirmDelete ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+          <p className="font-semibold">Delete this document?</p>
+          <p className="mt-0.5">It moves to Trash and can be restored within 30 days, after which it is deleted permanently.</p>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="outline" className="flex-1 text-xs" disabled={deleting} onClick={() => setConfirmDelete(false)}>
+              Keep document
+            </Button>
+            <Button size="sm" className="flex-1 bg-red-600 text-xs text-white hover:bg-red-700" disabled={deleting} onClick={handleDelete}>
+              {deleting ? 'Deleting…' : 'Delete document'}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="ghost" className="w-full text-xs text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setConfirmDelete(true)}>
+          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete document
+        </Button>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 text-xs font-semibold text-slate-600">
