@@ -479,6 +479,22 @@ export default function ChatbotPanel({
           payload: actionPayload ?? {},
           module: actionModule ?? workspace.context?.module ?? null,
           route: pathname,
+          // The target the panel resolved from the live tab registry, so the answer
+          // card links to the same screen the panel just opened.
+          ...(intentEval?.type === 'navigation' && intentEval.route
+            ? {
+                navigation: {
+                  route: intentEval.route,
+                  headline: intentEval.headline,
+                  message: intentEval.message,
+                  actionLabel: intentEval.actionLabel,
+                  module: intentEval.targetModule,
+                  confirmation: intentEval.navigationMatch
+                    ? `Opening ${intentEval.navigationMatch.moduleLabel} → ${intentEval.navigationMatch.itemLabel || intentEval.navigationMatch.categoryLabel}.`
+                    : undefined,
+                },
+              }
+            : {}),
         },
       }
     );

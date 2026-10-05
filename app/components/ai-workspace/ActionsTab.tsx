@@ -18,6 +18,10 @@ import {
   type WorkspaceSession,
   type WorkspaceSuggestion,
 } from '@/lib/intelligence/workspace';
+import { useRouter } from 'next/navigation';
+
+import { FeesApprovalsPanel } from '@/app/fees/ai-stack/_screens/fees-approvals-panel';
+import { approvalsRouteFor } from '@/lib/intelligence/chatbot-navigation';
 import { cn } from '@/lib/utils';
 
 import { SuggestionButton, TabEmptyState, TabError, TabSection } from './WorkspaceChrome';
@@ -60,6 +64,18 @@ export function ActionsTab({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [startedRunId, setStartedRunId] = useState<number | null>(null);
+  const router = useRouter();
+  const waitingRun = runs.find((run) => run.status === 'awaiting_approval');
+  // Where staff decide this module's approvals, and straight to this run when known:
+  // the destination highlights the run it is given.
+  const approvalsRoute = approvalsRouteFor(context?.module ?? route);
+  const waitingRunId = waitingRun?.id ?? startedRunId;
+  const approvalsHref = approvalsRoute
+    ? waitingRunId
+      ? `${approvalsRoute}&run=${waitingRunId}`
+      : approvalsRoute
+    : null;
 
   const loadRuns = useCallback(async () => {
     if (!context?.entity_type || context.entity_id == null) {
@@ -150,6 +166,9 @@ export function ActionsTab({
       });
 
       setNotice(result.message);
+      setStartedRunId(
+        result.status === 'awaiting_approval' || /approval/i.test(result.message) ? result.run_id : null
+      );
       await loadRuns();
       onChanged?.();
     } catch (caught) {
@@ -163,8 +182,15 @@ export function ActionsTab({
   // and saying so is clearer than showing a button that refuses.
   const startable = suggestions.filter((item) => item.trigger_type !== 'recommendation_approved');
 
+  // Fees lists every approval of the module, not only the open record's, so the tab
+  // always has something to say there.
+  const showsModuleApprovals = approvalsRoute !== null;
+
   const nothingToShow =
-    pendingRecommendations.length === 0 && runs.length === 0 && startable.length === 0;
+    !showsModuleApprovals &&
+    pendingRecommendations.length === 0 &&
+    runs.length === 0 &&
+    startable.length === 0;
 
   if (nothingToShow && !loadingRuns) {
     return (
@@ -180,6 +206,23 @@ export function ActionsTab({
         <p className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-xs leading-5 text-emerald-800">
           {notice}
         </p>
+      ) : null}
+
+      {approvalsHref && (waitingRun || startedRunId || /approval/i.test(notice ?? '')) ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
+          <p className="text-xs font-semibold text-amber-900">Where to approve this</p>
+          <p className="mt-1 text-[11px] leading-5 text-amber-800">
+            Fees → AI Stack → Automations → “Waiting for a person”. Only the staff member or role the approval is
+            assigned to sees it there. Approving lets the process continue; rejecting closes it.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push(approvalsHref)}
+            className="mt-2 rounded-full bg-[#0D6EFD] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#0b5ed7]"
+          >
+            View approval details
+          </button>
+        </div>
       ) : null}
 
       {acceptedDraft ? (
@@ -273,6 +316,8 @@ export function ActionsTab({
           </div>
         </TabSection>
       ) : null}
+
+      {showsModuleApprovals ? <FeesApprovalsPanel key={startedRunId ?? 'fees-approvals'} /> : null}
 
       {loadingRuns ? (
         <p className="flex items-center gap-2 px-1 text-[11px] text-gray-500">

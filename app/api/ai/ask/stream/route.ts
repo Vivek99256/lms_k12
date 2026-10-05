@@ -114,12 +114,21 @@ export async function POST(request: Request) {
   let question = '';
   let routeContext = '';
   let moduleContext = '';
+  let resolvedNav: {
+    route?: string;
+    headline?: string;
+    message?: string;
+    actionLabel?: string;
+    confirmation?: string;
+    module?: { name?: string; label?: string };
+  } | null = null;
 
   try {
     const json = JSON.parse(body);
     question = String(json.question || json.prompt || '').trim();
     routeContext = String(json.route || '').trim();
     moduleContext = String(json.module || '').trim();
+    if (json.navigation && typeof json.navigation === 'object') resolvedNav = json.navigation;
   } catch {
     // plain text body
   }
@@ -174,9 +183,46 @@ export async function POST(request: Request) {
     });
   }
 
-  if (intent.type === 'navigation') {
+  // Navigation ends the pipeline here: no Laravel call, no data query, no follow-ups.
+  // The client resolves the exact tab from the live registry and sends it; this
+  // route has no registry, so the client's target is what makes the request a
+  // navigation. Only same-origin paths are accepted.
+  const clientRoute =
+    typeof resolvedNav?.route === 'string' && /^\/(?!\/)/.test(resolvedNav.route)
+      ? resolvedNav.route
+      : null;
+
+  const navIntent =
+    intent.type === 'navigation'
+      ? intent
+      : clientRoute
+        ? {
+            type: 'navigation' as const,
+            currentModule: intent.currentModule,
+            targetModule: {
+              name: String(resolvedNav?.module?.name || 'fees'),
+              label: String(resolvedNav?.module?.label || 'Fees'),
+            },
+            headline: '',
+            message: '',
+            route: clientRoute,
+            actionLabel: 'Open',
+          }
+        : null;
+
+  if (navIntent) {
+    if (clientRoute) {
+      navIntent.route = clientRoute;
+      if (resolvedNav?.headline) navIntent.headline = String(resolvedNav.headline);
+      if (resolvedNav?.message) navIntent.message = String(resolvedNav.message);
+      if (resolvedNav?.actionLabel) navIntent.actionLabel = String(resolvedNav.actionLabel);
+    }
+    const intent = navIntent;
+
     const targetKey = intent.targetModule?.name || 'fees';
     const targetLabel = intent.targetModule?.label || 'Fees';
+    const confirmation =
+      (resolvedNav?.confirmation ? String(resolvedNav.confirmation) : '') || `Opening ${intent.headline || targetLabel}.`;
 
     const result: AskResult = {
       conversation: { id: null, reference: null, turn_id: null, turn: 1 },
@@ -200,16 +246,10 @@ export async function POST(request: Request) {
         reaches_action: false,
       },
       answer: {
-        headline: intent.headline || '',
-        sections: intent.message
-          ? [
-              {
-                type: 'text',
-                title: intent.headline || 'Navigation',
-                body: intent.message,
-              },
-            ]
-          : [],
+        // One short confirmation line: the tab opens on the client, and nothing about
+        // its content is fetched or described here.
+        headline: confirmation,
+        sections: [],
         follow_ups: [],
         actions: [],
       },
@@ -218,12 +258,7 @@ export async function POST(request: Request) {
       stage_counts: {},
       lifecycle_trace: [],
       lifecycle_stage_counts: {},
-      links: {
-        nav_route: intent.route,
-        nav_title: intent.headline,
-        nav_desc: intent.message,
-        nav_label: intent.actionLabel,
-      },
+      links: {},
       duration_ms: 0,
     };
 
