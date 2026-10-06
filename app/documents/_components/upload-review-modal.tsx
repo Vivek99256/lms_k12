@@ -75,6 +75,13 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** "<file>: <stage> failed because <reason>" so every failure names its file and says why. */
+function failureText(path: string, stage: string, cause: unknown, fallback: string): string {
+  const raw = cause instanceof Error ? cause.message : typeof cause === 'string' ? cause : '';
+  const reason = (raw || fallback).trim().replace(/[.\s]+$/, '');
+  return `${path}: ${stage} failed because ${reason.charAt(0).toLowerCase()}${reason.slice(1)}.`;
+}
+
 function editsFrom(doc: DocumentItem): Edits {
   return {
     title: doc.title,
@@ -136,7 +143,7 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
       })
       .catch((err) => {
         if (gen !== generation.current) return;
-        patch(next.key, { status: 'failed', error: err instanceof Error ? err.message : 'The upload failed.' });
+        patch(next.key, { status: 'failed', error: failureText(next.path, 'Upload', err, 'the upload did not complete') });
       });
   }, [started, items, patch]);
 
@@ -162,16 +169,27 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
             } else if (doc.processing_status === 'failed') {
               patch(it.key, {
                 status: 'failed',
-                error: doc.processing_error || 'Processing pipeline encountered an error.',
+                error: failureText(
+                  it.path,
+                  'Analysis',
+                  doc.processing_error,
+                  'the analysis pipeline reported an error without details',
+                ),
               });
             } else if (waited > POLL_GIVE_UP_MS) {
-              patch(it.key, { status: 'review', doc, edits: editsFrom(doc), readyAt: Date.now() });
+              patch(it.key, {
+                status: 'review',
+                doc,
+                edits: editsFrom(doc),
+                readyAt: Date.now(),
+                error: `${it.path}: analysis is taking longer than expected, so the suggestions below may be incomplete. Check them before publishing.`,
+              });
             }
           } catch (err) {
             if (waited > POLL_GIVE_UP_MS && gen === generation.current) {
               patch(it.key, {
                 status: 'failed',
-                error: err instanceof Error ? err.message : "Couldn't read the processing status.",
+                error: failureText(it.path, 'Analysis', err, "the processing status could not be read"),
               });
             }
           }
@@ -196,14 +214,21 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
   if (!isOpen) return null;
 
   /** Accepts loose files, folders and zips; zips are unpacked here so each document uploads on its own. */
-  const addFiles = async (incoming: ExpandedFile[]) => {
-    if (incoming.length === 0) return;
+  const addFiles = async (incoming: ExpandedFile[], readNotes: string[] = []) => {
+    if (incoming.length === 0 && readNotes.length === 0) return;
     const gen = generation.current;
     setReading(true);
     try {
       const { files, skipped: notes } = await expandForUpload(incoming);
       if (gen !== generation.current) return;
-      setSkipped((prev) => [...prev, ...notes]);
+      const existing = new Set(itemsRef.current.map((it) => `${it.path}:${it.file.size}`));
+      const duplicates = files.filter((f) => existing.has(`${f.path}:${f.file.size}`));
+      setSkipped((prev) => [
+        ...prev,
+        ...readNotes,
+        ...notes,
+        ...duplicates.map((f) => `${f.path}: could not be added because it is already in the list.`),
+      ]);
       setItems((prev) => {
         const seen = new Set(prev.map((it) => `${it.path}:${it.file.size}`));
         const fresh = files
@@ -272,7 +297,7 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
     } catch (err) {
       patch(current.key, {
         confirming: false,
-        error: err instanceof Error ? err.message : 'Could not confirm the document.',
+        error: failureText(current.path, 'Publishing', err, 'the document could not be saved'),
       });
     }
   };
@@ -310,7 +335,7 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
                 e.preventDefault();
                 // Collect synchronously: the browser empties the DataTransfer after the handler returns.
                 const pending = collectFromDrop(e.dataTransfer);
-                void pending.then(addFiles);
+                void pending.then((res) => addFiles(res.files, res.skipped));
               }}
               className="mt-6 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center hover:border-indigo-500"
             >
@@ -374,7 +399,7 @@ export function UploadReviewModal({ isOpen, onClose, onDocumentConfirmed }: Uplo
             {skipped.length > 0 && (
               <div className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
                 <p className="font-semibold">
-                  {skipped.length} {skipped.length === 1 ? 'file was' : 'files were'} not added
+                  {skipped.length} {skipped.length === 1 ? 'file' : 'files'} could not be added
                 </p>
                 <ul className="mt-1 max-h-24 list-disc space-y-0.5 overflow-y-auto pl-4">
                   {skipped.map((s, i) => (

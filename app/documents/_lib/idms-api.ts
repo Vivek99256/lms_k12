@@ -169,13 +169,31 @@ export const IdmsApi = {
     const headers: Record<string, string> = {};
     if (session.token) headers['Authorization'] = `Bearer ${session.token}`;
 
-    const res = await fetch(`${base}/api/v1/documents`, {
-      method: 'POST',
-      body: form,
-      headers,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${base}/api/v1/documents`, {
+        method: 'POST',
+        body: form,
+        headers,
+      });
+    } catch {
+      throw new Error('the server could not be reached. Check your connection and try again');
+    }
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.status === 0) throw new Error(json.message || 'Upload failed');
+    if (!res.ok || json.status === 0) {
+      if (json.message) throw new Error(json.message);
+      const byStatus: Record<number, string> = {
+        401: 'your session has expired. Sign in again',
+        403: 'you do not have permission to upload documents',
+        413: 'the file is larger than the server allows',
+        415: 'the server does not accept this file type',
+        422: 'the server rejected the file',
+        500: 'the server hit an error while saving the file',
+        502: 'the server is temporarily unavailable',
+        503: 'the server is temporarily unavailable',
+      };
+      throw new Error(byStatus[res.status] ?? `the server refused the upload (code ${res.status})`);
+    }
     return json;
   },
 
