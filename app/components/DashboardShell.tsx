@@ -5,6 +5,7 @@ import Sidebar from '@/app/components/Sidebar';
 import Header from '@/app/components/Header';
 import ChatbotPanel from '@/app/components/ChatbotPanel';
 import { StuckUserAssistant } from '@/components/ai/StuckUserAssistant';
+import { StuckNudgePopup } from '@/components/ai/StuckNudgePopup';
 import type { StuckPromptContext } from '@/lib/ai/stuck-assist-types';
 import { PageAiContextProvider } from '@/contexts/PageAiContext';
 import RightFloatingToolbar from '@/app/components/RightFloatingToolbar';
@@ -566,6 +567,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, [displayedMenuItems, selectedBranch, pathname, router, isKnownMenuPath]);
 
   const toggleChatbot = () => {
+    // Opening the assistant by hand answers the nudge, so don't leave it pending.
+    setShowStuckNudge(false);
     setIsChatbotOpen((prev) => !prev);
   };
 
@@ -575,11 +578,22 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   // isChatbotOpen" in one place.
   const [pendingStuckPrompt, setPendingStuckPrompt] = useState<StuckPromptContext | null>(null);
 
-  const handleStuck = (context: StuckPromptContext) => {
-    setPendingStuckPrompt(context);
+  // The idle trigger no longer opens the panel itself: it shows a small popup at the
+  // bottom-right. "Yes" opens the panel the ordinary way (empty chat with the
+  // page-context suggested prompts); "No" just dismisses the popup.
+  const [showStuckNudge, setShowStuckNudge] = useState(false);
+
+  const handleStuck = () => {
+    setShowStuckNudge(true);
+  };
+
+  const handleNudgeYes = () => {
+    setShowStuckNudge(false);
     setIsChatbotOpen(true);
     setIsRightToolbarOpen(false);
   };
+
+  const handleNudgeNo = useCallback(() => setShowStuckNudge(false), []);
 
   const handleLevel1Select = (item: MenuItem) => {
     setSelectedBranch((current) => {
@@ -852,7 +866,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               </div>
             </>
           )}
-          <StuckUserAssistant chatbotOpen={isChatbotOpen} onStuck={handleStuck} />
+          <StuckUserAssistant chatbotOpen={isChatbotOpen || showStuckNudge} onStuck={handleStuck} />
+          {showStuckNudge && !isChatbotOpen && (
+            <StuckNudgePopup onYes={handleNudgeYes} onNo={handleNudgeNo} />
+          )}
         </div>
         <RightFloatingToolbar
           isChatbotOpen={isChatbotOpen}
