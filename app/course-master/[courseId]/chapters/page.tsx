@@ -112,9 +112,24 @@ import {
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import {
+  BLOOM_LEVEL_META,
+  allowedLevelMeta,
+  buildGenerateRequest,
+  defaultPointsFor,
+  evenSplitLabel,
+  orderSelectedFormats,
+  previewExtras,
+  pruneSelection,
+  suggestedBloomCounts,
+  toFormatCards,
+  totalCoversFormats,
+  type GeneratableFormat,
+} from '@/lib/question-generation/generatable-formats';
 import { type Course } from '../../data/courses';
 import {
   fetchChapterContent,
+  fetchGeneratableQuestionFormats,
   fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
   type IntelligenceBloomLevel,
@@ -135,6 +150,7 @@ import {
   type ChapterContentAsset,
   type ChapterSemantic,
   type ConceptIntelEntry,
+  type GeneratedFormatResult,
   type GeneratedQuestionPreview,
   type SubjectWithChapters,
 } from '../../data/chapters';
@@ -160,6 +176,7 @@ import {
   type RunTelemetry,
   type StreamPhase,
 } from './GenerationPipeline';
+import { FormatMultiSelect } from './FormatMultiSelect';
 import { getRequestContext, getSyear } from '../../page';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
@@ -205,29 +222,10 @@ const UPLOAD_METHOD_TABS = ['Upload file', 'Add link'] as const;
 const QUESTION_TYPE_OPTIONS = ['MCQ', 'Narrative'] as const;
 
 /**
- * The Bloom ladder the generator works to, mirroring BLOOM_META in
- * App\Services\QuestionGenerationService. `weight` is that service's own default
- * distribution, used here only to seed the table when a teacher switches from
- * Auto to a custom mix, so "custom" starts from what the server would have done
- * rather than from zeros.
- *
- * Difficulty and marks are the server's defaults per level and are editable:
- * both are honoured when a quota is sent. MCQ marks are not - the service pins
- * every MCQ to 1 mark - so that column is hidden for MCQ.
+ * The Bloom ladder (BLOOM_LEVEL_META), the per-format level limits and the suggested
+ * split live in lib/question-generation/generatable-formats.ts, where they are tested.
+ * The formats themselves come from the backend, not from this file.
  */
-const BLOOM_LEVEL_META: ReadonlyArray<{
-  level: IntelligenceBloomLevel;
-  difficulty: string;
-  points: number;
-  weight: number;
-}> = [
-  { level: 'Remember', difficulty: 'Easy', points: 1, weight: 0.15 },
-  { level: 'Understand', difficulty: 'Easy', points: 2, weight: 0.3 },
-  { level: 'Apply', difficulty: 'Medium', points: 3, weight: 0.3 },
-  { level: 'Analyze', difficulty: 'Hard', points: 4, weight: 0.15 },
-  { level: 'Evaluate', difficulty: 'Hard', points: 5, weight: 0.1 },
-  { level: 'Create', difficulty: 'Hard', points: 5, weight: 0 },
-];
 
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'] as const;
 
@@ -250,40 +248,7 @@ const DEFAULT_BLOOM_POINTS = BLOOM_LEVEL_META.reduce((map, meta) => {
   return map;
 }, {} as BloomPoints);
 
-/**
- * Split `total` across the Bloom levels by weight, largest-remainder style, so
- * the parts always add back up to the total instead of drifting on rounding.
- */
-function suggestedBloomCounts(total: number): BloomCounts {
-  if (!Number.isFinite(total) || total <= 0) return { ...EMPTY_BLOOM_COUNTS };
-
-  const exact = BLOOM_LEVEL_META.map((meta) => ({ level: meta.level, value: total * meta.weight }));
-  const counts = { ...EMPTY_BLOOM_COUNTS };
-  exact.forEach((entry) => {
-    counts[entry.level] = Math.floor(entry.value);
-  });
-
-  let remaining = total - Object.values(counts).reduce((sum, value) => sum + value, 0);
-  const byRemainder = [...exact]
-    .filter((entry) => entry.value > 0)
-    .sort((a, b) => b.value - Math.floor(b.value) - (a.value - Math.floor(a.value)));
-
-  let index = 0;
-  while (remaining > 0 && byRemainder.length > 0) {
-    counts[byRemainder[index % byRemainder.length].level] += 1;
-    remaining -= 1;
-    index += 1;
-  }
-
-  return counts;
-}
 const QUESTION_OPTION_LABELS = ['A', 'B', 'C', 'D'] as const;
-/** One-line explanation of what each type produces, shown on the type cards. */
-const QUESTION_TYPE_BLURBS: Record<(typeof QUESTION_TYPE_OPTIONS)[number], string> = {
-  MCQ: 'Four options with one correct answer. Distractors are built from the concept’s recorded misconceptions.',
-  Narrative: 'Open-response items with a model answer and marking points, weighted per Bloom level.',
-};
-
 /** Common run sizes, offered as chips beside the free-text total. */
 const QUESTION_COUNT_PRESETS = [5, 10, 15, 20] as const;
 
@@ -1293,7 +1258,14 @@ export default function ChapterListPage() {
     conceptTitle: string;
     conceptIndex: number;
   } | null>(null);
-  const [questionType, setQuestionType] = useState('');
+  // The catalogue codes of the formats the teacher picked, in the order picked (empty
+  // until they pick). Several formats can be selected at once.
+  const [selectedFormatCodes, setSelectedFormatCodes] = useState<string[]>([]);
+  // The formats the backend offers: in question_type_catalog AND implemented by the
+  // generator. Loaded the first time the generate modal opens.
+  const [generatableFormats, setGeneratableFormats] = useState<GeneratableFormat[]>([]);
+  const [formatsStatus, setFormatsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [formatsError, setFormatsError] = useState('');
   const [totalQuestions, setTotalQuestions] = useState('');
   // Auto leaves the mix to the generator (which prefers the chapter's own
   // intelligence slice when there is one). Turning it off sends an explicit
@@ -1308,6 +1280,8 @@ export default function ChapterListPage() {
   const [questionGenerationError, setQuestionGenerationError] = useState('');
   const [questionGenerationSuccess, setQuestionGenerationSuccess] = useState('');
   const [generatedQuestionPreviews, setGeneratedQuestionPreviews] = useState<GeneratedQuestionPreview[]>([]);
+  // How each format of a multi-format run went (what it was asked for, what it saved).
+  const [generatedFormatResults, setGeneratedFormatResults] = useState<GeneratedFormatResult[]>([]);
   // Real per-run numbers off the generation response (model, batches, tokens,
   // duplicates dropped). The API already returned these; they were being
   // discarded before the pipeline panel had somewhere to show them.
@@ -1805,21 +1779,39 @@ export default function ChapterListPage() {
   const canSaveUploadContent =
     Boolean(uploadChapterId) &&
     (uploadMethod === 'Upload file' ? Boolean(uploadFile) : uploadLink.trim().length > 0);
+  // Every selected format, in the order the backend lists them (the server splits the
+  // total in its own registry order, so click order never matters).
+  const selectedFormats = useMemo(
+    () => orderSelectedFormats(selectedFormatCodes, generatableFormats),
+    [generatableFormats, selectedFormatCodes]
+  );
+  // The one format that a custom Bloom mix and editable marks apply to. Null when none
+  // or several are selected: a level table cannot be honoured by every format.
+  const selectedFormat = selectedFormats.length === 1 ? selectedFormats[0] : null;
+  const formatCards = useMemo(() => toFormatCards(generatableFormats), [generatableFormats]);
+  // The Bloom levels the selected format can be written at (all six before one is picked).
+  const allowedLevels = useMemo(() => allowedLevelMeta(selectedFormat), [selectedFormat]);
   const totalQuestionsNumber = Number(totalQuestions);
   const isTotalQuestionsValid =
     totalQuestions.trim() !== '' &&
     Number.isInteger(totalQuestionsNumber) &&
     totalQuestionsNumber >= 1 &&
     totalQuestionsNumber <= 50;
-  const bloomCountTotal = BLOOM_LEVEL_META.reduce(
+  const bloomCountTotal = allowedLevels.reduce(
     (sum, meta) => sum + (bloomCounts[meta.level] || 0),
     0
   );
   // A custom mix has to add up: the server writes exactly the counts it is given,
   // so a table summing to 12 when the teacher asked for 10 would quietly produce 12.
-  const isQuotaValid = useAutoQuota || (isTotalQuestionsValid && bloomCountTotal === totalQuestionsNumber);
+  const isQuotaValid =
+    useAutoQuota ||
+    (selectedFormat !== null && isTotalQuestionsValid && bloomCountTotal === totalQuestionsNumber);
   const canGenerateQuestions =
-    questionType !== '' && isTotalQuestionsValid && isQuotaValid && !isGeneratingQuestions;
+    selectedFormats.length > 0 &&
+    isTotalQuestionsValid &&
+    totalCoversFormats(totalQuestionsNumber, selectedFormats.length) &&
+    isQuotaValid &&
+    !isGeneratingQuestions;
 
   /* ------------------------------------------------------------------ *
    * Generator transparency
@@ -1966,16 +1958,32 @@ export default function ChapterListPage() {
 
   /** The Bloom spread this run will ask for - auto split, or the teacher's own. */
   const questionBlueprint = useMemo(() => {
+    // Several formats split the total between them, each over its own allowed levels,
+    // so there is no single Bloom spread to preview.
+    if (selectedFormats.length > 1) return [];
+
     const counts = useAutoQuota
-      ? suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
+      ? suggestedBloomCounts(
+          isTotalQuestionsValid ? totalQuestionsNumber : 0,
+          selectedFormat?.allowed_bloom_levels
+        )
       : bloomCounts;
 
-    return BLOOM_LEVEL_META.map((meta) => ({
+    return allowedLevels.map((meta) => ({
       level: meta.level,
       count: counts[meta.level] ?? 0,
       difficulty: useAutoQuota ? meta.difficulty : bloomDifficulties[meta.level],
     }));
-  }, [bloomCounts, bloomDifficulties, isTotalQuestionsValid, totalQuestionsNumber, useAutoQuota]);
+  }, [
+    allowedLevels,
+    bloomCounts,
+    bloomDifficulties,
+    isTotalQuestionsValid,
+    selectedFormat,
+    selectedFormats.length,
+    totalQuestionsNumber,
+    useAutoQuota,
+  ]);
 
   const questionStreamPhase: StreamPhase = isGeneratingQuestions
     ? 'running'
@@ -1991,17 +1999,29 @@ export default function ChapterListPage() {
     questionRunId
   );
 
-  const generationBatchLabel = `${isTotalQuestionsValid ? totalQuestionsNumber : 0} ${
-    questionType || 'item'
-  } item${totalQuestionsNumber === 1 ? '' : 's'}`;
+  const generationBatchLabel =
+    selectedFormats.length > 1
+      ? `${isTotalQuestionsValid ? totalQuestionsNumber : 0} questions · ${selectedFormats.length} formats`
+      : `${isTotalQuestionsValid ? totalQuestionsNumber : 0} ${
+          selectedFormat?.label ?? 'item'
+        } item${totalQuestionsNumber === 1 ? '' : 's'}`;
 
-  const generationSummaryLabel = !questionType
-    ? 'Pick a question type to begin.'
-    : !isTotalQuestionsValid
-      ? 'Enter how many questions to generate (1-50).'
-      : `${totalQuestionsNumber} ${questionType} question${
-          totalQuestionsNumber === 1 ? '' : 's'
-        } · ${useAutoQuota ? 'auto' : 'custom'} Bloom mix · saved to this concept’s bank`;
+  // How the total divides across the chosen formats, in words ("5 each"). The server
+  // does the actual split and reports it back per format after the run.
+  const formatSplitLabel = evenSplitLabel(totalQuestionsNumber, selectedFormats.length);
+
+  const generationSummaryLabel =
+    selectedFormats.length === 0
+      ? 'Pick at least one question format to begin.'
+      : !isTotalQuestionsValid
+        ? 'Enter how many questions to generate (1-50).'
+        : !totalCoversFormats(totalQuestionsNumber, selectedFormats.length)
+          ? `Generate at least ${selectedFormats.length} questions – one for each selected format.`
+          : selectedFormats.length > 1
+            ? `${totalQuestionsNumber} questions across ${selectedFormats.length} formats (${formatSplitLabel}) · auto Bloom mix · saved to this concept’s bank`
+            : `${totalQuestionsNumber} ${selectedFormats[0].label} question${
+                totalQuestionsNumber === 1 ? '' : 's'
+              } · ${useAutoQuota ? 'auto' : 'custom'} Bloom mix · saved to this concept’s bank`;
 
   const groundingCoverageLabel = useMemo(() => {
     const measurable = questionGroundingSources.filter((source) => source.state !== 'server');
@@ -2017,9 +2037,61 @@ export default function ChapterListPage() {
   const handleToggleAutoQuota = (nextAuto: boolean) => {
     setUseAutoQuota(nextAuto);
     if (!nextAuto) {
-      setBloomCounts(suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0));
+      setBloomCounts(
+        suggestedBloomCounts(
+          isTotalQuestionsValid ? totalQuestionsNumber : 0,
+          selectedFormat?.allowed_bloom_levels
+        )
+      );
     }
   };
+
+  /**
+   * The format selection changed.
+   *
+   * With exactly one format, marks restart from that format's own default (a Short
+   * Answer from 3, not from the Understand rung's 2) and a custom mix is re-split over
+   * the levels it allows, so no count is left sitting on one it excludes. With several
+   * formats a custom mix makes no sense (each format allows different levels), so the
+   * mix returns to Auto.
+   */
+  const handleFormatsChange = (codes: string[]) => {
+    const next = pruneSelection(codes, generatableFormats);
+    setSelectedFormatCodes(next);
+
+    const picked = orderSelectedFormats(next, generatableFormats);
+    if (picked.length === 1) {
+      setBloomPoints(defaultPointsFor(picked[0]));
+      if (!useAutoQuota) {
+        setBloomCounts(
+          suggestedBloomCounts(
+            isTotalQuestionsValid ? totalQuestionsNumber : 0,
+            picked[0].allowed_bloom_levels
+          )
+        );
+      }
+    } else if (!useAutoQuota) {
+      setUseAutoQuota(true);
+      setBloomCounts({ ...EMPTY_BLOOM_COUNTS });
+    }
+  };
+
+  const loadGeneratableFormats = () => {
+    setFormatsStatus('loading');
+    setFormatsError('');
+    fetchGeneratableQuestionFormats()
+      .then((formats) => {
+        setGeneratableFormats(formats);
+        setFormatsStatus('ready');
+      })
+      .catch((error: unknown) => {
+        setFormatsError(
+          error instanceof Error ? error.message : 'Question formats could not be loaded.'
+        );
+        setFormatsStatus('error');
+      });
+  };
+
 
   const handleBloomCountChange = (level: IntelligenceBloomLevel, raw: string) => {
     const digits = raw.replace(/[^\d]/g, '');
@@ -2258,7 +2330,7 @@ export default function ChapterListPage() {
         setEditingQuestionBankItem(null);
         setManualQuestionError('');
         setQuestionModalConcept(null);
-        setQuestionType('');
+        setSelectedFormatCodes([]);
         setTotalQuestions('');
         setQuestionGenerationError('');
         setQuestionGenerationSuccess('');
@@ -2640,16 +2712,22 @@ export default function ChapterListPage() {
     // the panel would report "not extracted" for a chapter that simply had not
     // been opened yet.
     loadChapterIntelligence(chapter.id);
+    // The formats are fetched once, on first open (and again after a failed load);
+    // an opened modal never waits on a request an earlier open already made.
+    if (formatsStatus === 'idle' || formatsStatus === 'error') {
+      loadGeneratableFormats();
+    }
     setQuestionModalConcept({
       chapter,
       conceptTitle,
       conceptIndex,
     });
-    setQuestionType('');
+    setSelectedFormatCodes([]);
     setTotalQuestions('');
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setGeneratedFormatResults([]);
     setQuestionRunTelemetry(null);
     resetQuestionMix();
   };
@@ -2716,11 +2794,12 @@ export default function ChapterListPage() {
 
   const closeGenerateQuestionsModal = () => {
     setQuestionModalConcept(null);
-    setQuestionType('');
+    setSelectedFormatCodes([]);
     setTotalQuestions('');
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setGeneratedFormatResults([]);
     setQuestionRunTelemetry(null);
     resetQuestionMix();
   };
@@ -3251,7 +3330,14 @@ export default function ChapterListPage() {
   };
 
   const submitGenerateQuestions = async () => {
-    if (!questionModalConcept || !isTotalQuestionsValid || !questionType) return;
+    if (
+      !questionModalConcept ||
+      !isTotalQuestionsValid ||
+      selectedFormats.length === 0 ||
+      !totalCoversFormats(totalQuestionsNumber, selectedFormats.length)
+    ) {
+      return;
+    }
 
     const requestContext = getRequestContext();
     if (!requestContext) {
@@ -3272,47 +3358,39 @@ export default function ChapterListPage() {
       return;
     }
 
-    const config = QUESTION_TYPE_API_CONFIG[questionType as (typeof QUESTION_TYPE_OPTIONS)[number]];
-    if (!config) {
-      setQuestionGenerationError('Please select a valid question type.');
-      return;
-    }
-
     setIsGeneratingQuestions(true);
     setQuestionGenerationError('');
     setQuestionGenerationSuccess('');
     setGeneratedQuestionPreviews([]);
+    setGeneratedFormatResults([]);
     setQuestionRunTelemetry(null);
     setQuestionRunId((current) => current + 1);
 
     try {
-      const response = await generateIntelligenceQuestions({
-        chapter_id: chapterId,
-        subject_id: numericSubjectId,
-        standard_id: numericStandardId,
-        concept_id: conceptId,
-        question_type: config.question_type,
-        question_type_id: config.question_type_id,
-        total_questions: totalQuestionsNumber,
-        // sub_institute_id / created_by are no longer sent: the server reads
-        // both from the bearer token. requestContext is still checked above so
-        // the modal fails early when the user has no usable session at all.
-        // Omitted entirely on Auto, so the server keeps deciding the mix exactly
-        // as it did before this control existed. Zero-count levels are dropped:
-        // the server reads a row's presence as "generate at this level".
-        ...(useAutoQuota
-          ? {}
-          : {
-              quota: BLOOM_LEVEL_META.filter((meta) => (bloomCounts[meta.level] || 0) > 0).map(
-                (meta) => ({
-                  level: meta.level,
-                  count: bloomCounts[meta.level],
-                  difficulty: bloomDifficulties[meta.level],
-                  points: bloomPoints[meta.level],
-                })
-              ),
-            }),
-      });
+      // The request names the selected FORMAT and nothing else about type: no
+      // question_type_id (the server resolves it from the catalogue and ignores one
+      // that is sent) and no sub_institute_id / created_by (both come from the
+      // bearer token). requestContext is still checked above so the modal fails
+      // early when the user has no usable session at all. Auto sends no quota, so
+      // the server keeps deciding the mix over the levels the format allows;
+      // zero-count levels are dropped because the server reads a row's presence as
+      // "generate at this level".
+      const response = await generateIntelligenceQuestions(
+        buildGenerateRequest({
+          ids: {
+            chapter_id: chapterId,
+            subject_id: numericSubjectId,
+            standard_id: numericStandardId,
+            concept_id: conceptId,
+          },
+          formats: selectedFormats,
+          total: totalQuestionsNumber,
+          auto: useAutoQuota,
+          counts: bloomCounts,
+          difficulties: bloomDifficulties,
+          points: bloomPoints,
+        })
+      );
 
       const data = response.data;
       const inserted = data?.inserted;
@@ -3322,6 +3400,7 @@ export default function ChapterListPage() {
           : response.message
       );
       setGeneratedQuestionPreviews(data?.questions ?? []);
+      setGeneratedFormatResults(data?.formats ?? []);
       // Straight passthrough of what the service reports for this run - nothing
       // here is estimated on the client.
       setQuestionRunTelemetry({
@@ -3644,6 +3723,7 @@ export default function ChapterListPage() {
     const answer = question.answer ?? {};
     const options = answer.options ?? [];
     const markingPoints = answer.marking_points ?? [];
+    const extras = previewExtras(answer);
 
     return (
       <article
@@ -3654,6 +3734,9 @@ export default function ChapterListPage() {
           <span>Question {index + 1}</span>
           <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">
             ID {question.id}
+          </span>
+          <span className="rounded-full bg-indigo-50 px-2 py-1 font-mono text-[11px] normal-case tracking-normal text-indigo-700">
+            {question.question_type}
           </span>
           {answer.bloom_level ? (
             <span className="rounded-full bg-violet-50 px-2 py-1 text-[11px] text-violet-700">
@@ -3667,7 +3750,7 @@ export default function ChapterListPage() {
           ) : null}
         </div>
 
-        <h3 className="mt-3 text-[15px] font-semibold leading-6 text-slate-950">
+        <h3 className="mt-3 whitespace-pre-line text-[15px] font-semibold leading-6 text-slate-950">
           {question.question_title}
         </h3>
 
@@ -3697,8 +3780,49 @@ export default function ChapterListPage() {
           </div>
         ) : null}
 
+        {extras.pairs.length > 0 ? (
+          <div className="mt-3 rounded-[8px] border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Pairs
+            </p>
+            <ul className="mt-2 space-y-1 text-sm text-slate-700">
+              {extras.pairs.map((pair, pairIndex) => (
+                <li key={`${pair.left}-${pairIndex}`} className="leading-6">
+                  <span className="font-medium text-slate-900">{pair.left}</span>
+                  <span className="px-2 text-slate-400">→</span>
+                  {pair.right}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {extras.answers.length > 0 ? (
+          <p className="mt-3 text-sm text-slate-700">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              {extras.answers.length === 1 ? 'Answer' : 'Answers'}:{' '}
+            </span>
+            {extras.answers.join(' · ')}
+          </p>
+        ) : null}
+
+        {extras.steps.length > 0 ? (
+          <div className="mt-3 rounded-[8px] border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Working{extras.unit ? ` (answer in ${extras.unit})` : ''}
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
+              {extras.steps.map((step, stepIndex) => (
+                <li key={`${stepIndex}-${step}`} className="leading-6">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
+
         {answer.model_answer ? (
-          <div className="mt-3 rounded-[8px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          <div className="mt-3 whitespace-pre-line rounded-[8px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">
               Model answer
             </p>
@@ -4339,37 +4463,49 @@ export default function ChapterListPage() {
             <div className="space-y-6">
               <div className="space-y-2.5">
                 <Label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Question type <span className="text-rose-500">*</span>
+                  Question format(s) <span className="text-rose-500">*</span>
                 </Label>
-                <div className="grid gap-2.5 sm:grid-cols-2">
-                  {QUESTION_TYPE_OPTIONS.map((option) => {
-                    const selected = questionType === option;
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setQuestionType(option)}
-                        aria-pressed={selected}
-                        className={cn(
-                          'rounded-[12px] border px-4 py-3 text-left transition-all',
-                          selected
-                            ? 'border-[#4f46e5] bg-[#eef2ff] shadow-[0_4px_14px_rgba(79,70,229,0.14)]'
-                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                        )}
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="text-[14px] font-semibold text-slate-900">{option}</span>
-                          {selected ? (
-                            <CheckCircle2 size={16} className="shrink-0 text-[#4f46e5]" />
-                          ) : null}
-                        </span>
-                        <span className="mt-1 block text-[12px] leading-[18px] text-slate-500">
-                          {QUESTION_TYPE_BLURBS[option]}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                {formatsStatus === 'idle' || formatsStatus === 'loading' ? (
+                  <div
+                    className="h-[50px] animate-pulse rounded-[7px] border border-slate-200 bg-slate-50"
+                    aria-busy="true"
+                    aria-live="polite"
+                  >
+                    <span className="sr-only">Loading question formats</span>
+                  </div>
+                ) : formatsStatus === 'error' ? (
+                  <div
+                    role="alert"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700"
+                  >
+                    <span>{formatsError || 'Question formats could not be loaded.'}</span>
+                    <button
+                      type="button"
+                      onClick={loadGeneratableFormats}
+                      className="font-semibold text-[#4f46e5] hover:text-[#4338ca]"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : formatCards.length === 0 ? (
+                  <p className="rounded-[12px] border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-600">
+                    No question formats are available to generate yet.
+                  </p>
+                ) : (
+                  <FormatMultiSelect
+                    cards={formatCards}
+                    value={selectedFormatCodes}
+                    onChange={handleFormatsChange}
+                    disabled={isGeneratingQuestions}
+                  />
+                )}
+                <p className="text-[12px] text-slate-500">
+                  {selectedFormats.length > 1
+                    ? isTotalQuestionsValid && totalCoversFormats(totalQuestionsNumber, selectedFormats.length)
+                      ? `The total is split evenly across the ${selectedFormats.length} selected formats (${formatSplitLabel}).`
+                      : `The total is split evenly across the ${selectedFormats.length} selected formats, so it must be at least ${selectedFormats.length}.`
+                    : 'Choose one or more formats. Each question is saved under the format it was written as.'}
+                </p>
               </div>
 
               <div className="space-y-2.5">
@@ -4419,7 +4555,11 @@ export default function ChapterListPage() {
                     </Label>
                     <p className="mt-1 text-[12px] leading-[18px] text-slate-500">
                       {useAutoQuota
-                        ? 'The generator weights Bloom levels from the concept intelligence.'
+                        ? selectedFormats.length > 1
+                          ? 'Several formats are selected, so each is written at the Bloom levels it allows and the mix is chosen for you.'
+                          : selectedFormat && allowedLevels.length < BLOOM_LEVEL_META.length
+                          ? `The generator weights Bloom levels from the concept intelligence, within the levels ${selectedFormat.label} allows.`
+                          : 'The generator weights Bloom levels from the concept intelligence.'
                         : 'You decide how many questions sit at each Bloom level.'}
                     </p>
                   </div>
@@ -4432,11 +4572,18 @@ export default function ChapterListPage() {
                         key={option.label}
                         type="button"
                         onClick={() => handleToggleAutoQuota(option.value)}
-                        className={
+                        disabled={!option.value && selectedFormat === null}
+                        title={
+                          !option.value && selectedFormat === null
+                            ? 'Choose a single format to set a custom Bloom mix.'
+                            : undefined
+                        }
+                        className={cn(
                           useAutoQuota === option.value
                             ? 'bg-[#4f46e5] px-4 py-1.5 text-white'
-                            : 'bg-white px-4 py-1.5 text-slate-600 hover:bg-slate-50'
-                        }
+                            : 'bg-white px-4 py-1.5 text-slate-600 hover:bg-slate-50',
+                          'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white'
+                        )}
                       >
                         {option.label}
                       </button>
@@ -4453,13 +4600,13 @@ export default function ChapterListPage() {
                             <th className="px-3 py-2">Bloom level</th>
                             <th className="px-3 py-2">Difficulty</th>
                             <th className="px-3 py-2 text-right">Questions</th>
-                            {questionType === 'Narrative' ? (
+                            {selectedFormat?.marks_editable ? (
                               <th className="px-3 py-2 text-right">Marks each</th>
                             ) : null}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {BLOOM_LEVEL_META.map((meta) => (
+                          {allowedLevels.map((meta) => (
                             <tr key={meta.level}>
                               <td className="px-3 py-2 font-medium text-slate-900">{meta.level}</td>
                               <td className="px-3 py-2">
@@ -4492,7 +4639,7 @@ export default function ChapterListPage() {
                                   className="h-9 w-20 rounded-[8px] border border-slate-300 px-2 text-right text-sm text-slate-900 outline-none focus:border-[#4f46e5]"
                                 />
                               </td>
-                              {questionType === 'Narrative' ? (
+                              {selectedFormat?.marks_editable ? (
                                 <td className="px-3 py-2 text-right">
                                   <input
                                     aria-label={`Marks per ${meta.level} question`}
@@ -4533,7 +4680,10 @@ export default function ChapterListPage() {
                         type="button"
                         onClick={() =>
                           setBloomCounts(
-                            suggestedBloomCounts(isTotalQuestionsValid ? totalQuestionsNumber : 0)
+                            suggestedBloomCounts(
+                              isTotalQuestionsValid ? totalQuestionsNumber : 0,
+                              selectedFormat?.allowed_bloom_levels
+                            )
                           )
                         }
                         className="text-[13px] font-semibold text-[#4f46e5] hover:text-[#4338ca]"
@@ -4542,10 +4692,18 @@ export default function ChapterListPage() {
                       </button>
                     </div>
 
-                    {questionType === 'MCQ' ? (
+                    {selectedFormat && !selectedFormat.marks_editable ? (
                       <p className="text-[11px] text-slate-500">
-                        MCQs are always scored at 1 mark each, so marks are not editable for this
-                        type.
+                        {selectedFormat.label} questions are always worth {selectedFormat.default_marks}{' '}
+                        mark{selectedFormat.default_marks === 1 ? '' : 's'} each, so marks are not
+                        editable for this format.
+                      </p>
+                    ) : null}
+                    {selectedFormat && allowedLevels.length < BLOOM_LEVEL_META.length ? (
+                      <p className="text-[11px] text-slate-500">
+                        {selectedFormat.label} can only be written at{' '}
+                        {allowedLevels.map((meta) => meta.level).join(', ')}, so those are the only
+                        levels listed.
                       </p>
                     ) : null}
                   </>
@@ -4563,6 +4721,29 @@ export default function ChapterListPage() {
                   <CheckCircle2 size={15} className="mt-px shrink-0" />
                   <span>{questionGenerationSuccess}</span>
                 </p>
+              ) : null}
+
+              {generatedFormatResults.length > 1 ? (
+                <ul className="space-y-1.5 rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-[12.5px]">
+                  {generatedFormatResults.map((result) => (
+                    <li
+                      key={result.question_format_code}
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5"
+                    >
+                      <span className="flex items-center gap-2 font-medium text-slate-800">
+                        {result.label}
+                        <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10.5px] font-normal text-slate-600">
+                          {result.question_format_code}
+                        </code>
+                      </span>
+                      <span className={result.status ? 'text-emerald-700' : 'text-rose-700'}>
+                        {result.status
+                          ? `${result.inserted} of ${result.requested} saved`
+                          : result.message}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
 
               {generatedQuestionPreviews.length > 0 ? (

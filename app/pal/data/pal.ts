@@ -7,6 +7,7 @@ import {
   readString,
   type ApiEnvelope,
 } from '@/lib/erp-client';
+import { readPairs } from '@/lib/h5p/question-bank-h5p-map';
 import type { InteractiveSubmission, PalExamQuestion } from '@/lib/pal/exam-answers';
 
 /**
@@ -768,6 +769,7 @@ export async function fetchPalQuiz(
       difficulty: readString(record.difficulty) || null,
       assertion: readString(record.assertion) || null,
       reason: readString(record.reason) || null,
+      pairs: readPairs(record.pairs),
       standardId: readId(record.standard_id),
       subjectId: readId(record.subject_id),
       chapterId: readId(record.chapter_id),

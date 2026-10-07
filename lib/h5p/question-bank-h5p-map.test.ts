@@ -52,6 +52,11 @@ test('every catalogue form the brief lists has a mapping', () => {
     'very_short', 'short', 'long', 'case_study_parent', 'case_study_child',
     'proof', 'construction', 'numerical', 'competency_focused',
     'source_based_integrated', 'case_study',
+    // Added with the format-driven generator: a row generated as one of these must be
+    // recognised as that form, not fall through to the MCQ type its catalogue row carries.
+    'drag_text', 'mark_the_words',
+    // Image-based drag and drop: the picture and its zones travel in the row.
+    'drag_drop',
   ];
 
   for (const code of expected) {
