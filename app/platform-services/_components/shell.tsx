@@ -190,6 +190,136 @@ export function RefreshButton({ onClick, busy }: { onClick: () => void; busy?: b
   );
 }
 
+/**
+ * Marks a row the backend seeded for demonstration (`is_sample = 1`).
+ *
+ * Every list that can contain seeded rows renders this beside the row, so a
+ * sample is never mistaken for a record somebody actually made.
+ */
+export function SampleBadge({ show = true }: { show?: boolean }) {
+  if (!show) return null;
+  return (
+    <span
+      title="Seeded for demonstration. This is not a real record."
+      className="inline-flex items-center rounded-full border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500"
+    >
+      Sample data
+    </span>
+  );
+}
+
+/** True for the several shapes a boolean-ish `is_sample` column arrives in. */
+export function isSample(row: { is_sample?: unknown } | null | undefined): boolean {
+  const value = row?.is_sample;
+  return value === true || value === 1 || value === '1';
+}
+
+/** Tabs inside a console. Plain buttons with `aria-selected`, like the rest of the platform screens. */
+export function TabStrip<T extends string>({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: Array<{ key: T; label: string }>;
+  active: T;
+  onChange: (key: T) => void;
+}) {
+  return (
+    <div role="tablist" className="flex gap-1 border-b border-slate-200">
+      {tabs.map((tab) => (
+        <button
+          key={tab.key}
+          type="button"
+          role="tab"
+          aria-selected={active === tab.key}
+          onClick={() => onChange(tab.key)}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
+            active === tab.key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Previous / next with the range on show. Server-paginated lists use this. */
+export function Pager({
+  page,
+  perPage,
+  total,
+  onPage,
+}: {
+  page: number;
+  perPage: number;
+  total: number;
+  onPage: (page: number) => void;
+}) {
+  const last = Math.max(1, Math.ceil(total / perPage));
+  const from = total === 0 ? 0 : (page - 1) * perPage + 1;
+  const to = Math.min(total, page * perPage);
+  const btn =
+    'rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40';
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+      <span className="tabular-nums">
+        {from}-{to} of {total}
+      </span>
+      <div className="flex items-center gap-2">
+        <button type="button" className={btn} disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          Previous
+        </button>
+        <span className="text-xs tabular-nums text-slate-500">
+          Page {page} of {last}
+        </span>
+        <button type="button" className={btn} disabled={page >= last} onClick={() => onPage(page + 1)}>
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A page with the platform-services header but no module rail.
+ *
+ * For screens whose subject is not "a setting per module" — the audit viewer and
+ * the integrations store read across every module at once, so a rail of module
+ * counts would imply a per-module breakdown the screen does not have.
+ */
+export function PlainShell({
+  title,
+  description,
+  actions,
+  children,
+}: {
+  title: string;
+  description: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-h-screen bg-slate-50 p-6">
+      <header className="mb-5">
+        <p className="flex flex-wrap items-center gap-1 text-xs font-medium text-slate-500">
+          Platform services
+          <ChevronRight size={12} />
+          {title}
+        </p>
+        <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
+            <p className="mt-1 max-w-3xl text-sm text-slate-600">{description}</p>
+          </div>
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
+        </div>
+      </header>
+      <div className="space-y-4">{children}</div>
+    </div>
+  );
+}
+
 /** A date the way an administrator reads one, or a plain "Never". */
 export function formatWhen(iso: string | null | undefined): string {
   if (!iso) return 'Never';
