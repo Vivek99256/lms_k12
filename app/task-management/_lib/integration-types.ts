@@ -44,6 +44,8 @@ export interface IntegrationConfig {
   last_updated_at: string | null
   last_updated_by: string | null
   created_at: string | null
+  /** Seeded for demonstration by the backend; never a real record. */
+  is_sample?: boolean
 }
 
 export interface IntegrationConfigPayload {

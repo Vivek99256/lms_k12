@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { SampleBadge } from '@/app/platform-services/_components/shell'
 import { PageFrame, PageHeader, InlineMessage } from '@/app/task-management/_components/task-shared'
 import { useIntegrationContext } from '@/app/task-management/_lib/integration-context'
 import { INTEGRATION_CATEGORIES, INTEGRATION_PROVIDERS } from './integration-providers'
@@ -26,6 +27,9 @@ export function IntegrationShell() {
   const visibleProviders = categoryFilter === 'All'
     ? INTEGRATION_PROVIDERS
     : INTEGRATION_PROVIDERS.filter((provider) => provider.category === categoryFilter)
+
+  const knownKeys = new Set(INTEGRATION_PROVIDERS.map((provider) => provider.key))
+  const otherConfigs = configs.filter((config) => !knownKeys.has(config.provider_key))
 
   return (
     <PageFrame>
@@ -87,6 +91,29 @@ export function IntegrationShell() {
             )
           })}
         </div>
+      )}
+
+      {!loading && otherConfigs.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-slate-900">Other saved integrations</h2>
+          <p className="text-xs text-slate-600">
+            Configured for this institute but not one of the providers above.
+          </p>
+          <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
+            {otherConfigs.map((config) => (
+              <li key={config.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                <span className="flex items-center gap-2">
+                  <span className="font-medium text-slate-900">{config.display_name}</span>
+                  <span className="font-mono text-xs text-slate-500">{config.provider_key}</span>
+                  <SampleBadge show={config.is_sample === true} />
+                </span>
+                <span className="text-xs capitalize text-slate-600">
+                  {config.category} - {config.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </PageFrame>
   )

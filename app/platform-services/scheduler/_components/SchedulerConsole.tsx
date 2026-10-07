@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Clock, Lock, Pencil, RotateCcw, Save, X } from 'lucide-react';
 
 import { usePermissions } from '@/app/hooks/usePermission';
-import { fetchScheduledTasks, PlatformApiError, saveScheduledTask } from '@/lib/platform/client';
+import { fetchScheduledTasks, PlatformApiError, runScheduledTaskNow, saveScheduledTask } from '@/lib/platform/client';
 import { CRON_FIELDS, describeSchedule, scheduleProblem, scheduleToString } from '@/lib/platform/cron';
 import type { CronSchedule, ScheduledTaskRow, SchedulerPayload } from '@/lib/platform/types';
 
@@ -312,6 +312,23 @@ function TaskRow({
   const problem = editing ? scheduleProblem(schedule) : null;
   const sentence = editing ? (problem ? null : describeSchedule(schedule)) : task.describes;
 
+  const [runResult, setRunResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Runs the task once through the same dispatcher the minute tick uses. A task
+  // with no registered job says so rather than reporting success.
+  const runNow = async () => {
+    setBusy(true);
+    setRunResult(null);
+    try {
+      const result = await runScheduledTaskNow(task.key);
+      setRunResult({ ok: true, text: result.message });
+    } catch (reason) {
+      setRunResult({ ok: false, text: reason instanceof Error ? reason.message : 'The task could not be run.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const toggleDisabled = async (next: boolean) => {
     setBusy(true);
     await onSave(task, { disabled: !next }, `${task.label} is now ${next ? 'running' : 'switched off'}.`);
@@ -363,6 +380,18 @@ function TaskRow({
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
               <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">{task.expression}</span>
               {sentence && <span>{sentence}</span>}
+              <button
+                type="button"
+                disabled={!mayEdit || busy}
+                title={mayEdit ? 'Run this task once, now' : rightsReason}
+                onClick={runNow}
+                className="rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Run now
+              </button>
+              {runResult && (
+                <span className={runResult.ok ? 'text-emerald-700' : 'text-amber-700'}>{runResult.text}</span>
+              )}
             </div>
           )}
 

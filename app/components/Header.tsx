@@ -257,7 +257,9 @@ export default function Header({
     // Template remains a stub.
     'Document': '/documents_new',
     'Integration': '/integration',
-    'Audit': '/user_log',
+    // Audit graduated from the per-user login log to the shared platform audit
+    // trail (read only), served by Laravel at /api/platform/audit.
+    'Audit': '/platform-services/audit',
     // Event Bus has graduated the same way, to a read-only monitoring plane over
     // the sync_log outbox, the audit tables and the outbound send-logs. It is not
     // an event bus: this product has none, and the standing decision is not to
