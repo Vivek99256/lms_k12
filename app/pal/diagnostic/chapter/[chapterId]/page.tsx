@@ -35,6 +35,7 @@ import {
   type ChapterDiagnosticResult,
   type DiagnosticQuestionItem,
 } from '@/app/pal/data/pal-diagnostic';
+import { DiagnosticAlreadyAttemptedGate } from '@/app/pal/_components/DiagnosticAlreadyAttemptedGate';
 import {
   CompletedBadge,
   CompletedChapterPanel,
@@ -345,7 +346,7 @@ function DiagnosticExam() {
     };
   }, [subjectName, chapterName]);
 
-  const load = useCallback(() => {
+  const load = useCallback((opts?: { retake?: boolean }) => {
     const controller = new AbortController();
     // Deferred so setState never fires synchronously inside the effect body -
     // the convention the rest of app/pal follows, and what
@@ -353,7 +354,7 @@ function DiagnosticExam() {
     queueMicrotask(() => {
       setLoading(true);
       setError(null);
-      startChapterDiagnostic(chapterId, controller.signal)
+      startChapterDiagnostic(chapterId, controller.signal, { retake: opts?.retake ?? false })
         .then((result) => {
           setPaper(result);
           // A resumed attempt comes back with the choices already made, so the
@@ -390,8 +391,15 @@ function DiagnosticExam() {
   // chapter must never reach it in the first place.
   useEffect(() => {
     if (checkingCompletion || completion.isComplete) return;
-    return load();
-  }, [load, checkingCompletion, completion.isComplete]);
+    // ?retake=1 arrives from the history page's "Retake chapter diagnostic"
+    // link - the learner already reviewed their result there and explicitly
+    // chose to retake, so this skips straight past the already-attempted
+    // gate instead of showing it a second time. Harmless if it fires twice
+    // (e.g. once completion resolves): resume() always wins over a forced
+    // retake server-side, so this can never strand or duplicate a paper.
+    const forceNewFromUrl = searchParams?.get('retake') === '1';
+    return load({ retake: forceNewFromUrl });
+  }, [load, checkingCompletion, completion.isComplete, searchParams]);
 
   const submit = useCallback(async () => {
     if (!paper?.attemptId || submitting) return;
@@ -574,8 +582,10 @@ function DiagnosticExam() {
   }
 
   // A chapter without enough tagged questions. Said plainly - this is a gap in
-  // the question bank, not something the learner did.
-  if (paper && !paper.attemptId) {
+  // the question bank, not something the learner did. Excludes
+  // 'already_attempted', which also has a null attemptId (no NEW paper was
+  // drawn) but for a completely different, non-error reason handled below.
+  if (paper && !paper.attemptId && paper.attemptStatus !== 'already_attempted') {
     return (
       <Shell chapterId={chapterId}>
         <Card className="border-amber-200 bg-amber-50">
@@ -599,6 +609,21 @@ function DiagnosticExam() {
             <Link href="/pal" className={cn(buttonVariants({ variant: 'outline' }), 'mt-4')}>Back to subjects</Link>
           </CardContent>
         </Card>
+      </Shell>
+    );
+  }
+
+  // A submitted attempt already exists and no in_progress one is being
+  // resumed - show the previous result and offer a retake instead of
+  // silently drafting a second attempt the learner never asked for. See
+  // DiagnosticService::previousAttempt() on the backend.
+  if (paper && paper.attemptStatus === 'already_attempted' && paper.previousAttempt) {
+    return (
+      <Shell chapterId={chapterId}>
+        <DiagnosticAlreadyAttemptedGate
+          previous={paper.previousAttempt}
+          onRetake={() => load({ retake: true })}
+        />
       </Shell>
     );
   }
@@ -672,17 +697,6 @@ function DiagnosticExam() {
     </PalRailSection>
   );
 
-  const previousAttemptsLink = (
-    <p className="px-1 text-xs text-slate-400">
-      <Link
-        href={`/pal/diagnostic/chapter/${chapterId}/history`}
-        className="hover:text-slate-600 hover:underline"
-      >
-        Previous attempts
-      </Link>
-    </p>
-  );
-
   const rail = selectedStep ? (
     <>
       <SelectedJourneyStepRail
@@ -698,8 +712,6 @@ function DiagnosticExam() {
       {selectedStep === 'diagnostic' && progressSection}
 
       {showClassicJourney && classicJourneySection}
-
-      {previousAttemptsLink}
     </>
   ) : null;
 
@@ -1248,15 +1260,6 @@ function Shell({
       constrainMeasure={constrainMeasure}
     >
       {children}
-
-      <p className={cn("text-xs text-slate-400", rail ? "lg:hidden" : "")}>
-        <Link
-          href={`/pal/diagnostic/chapter/${chapterId}/history`}
-          className="hover:text-slate-600 hover:underline"
-        >
-          Previous attempts
-        </Link>
-      </p>
     </PalWorkspace>
   );
 }

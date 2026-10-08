@@ -142,6 +142,11 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
   // still claim `/pal/frameworks` for New PAL below, and the page would wear
   // New PAL's tab bar while living under Curriculum — see the migration
   // 2026_09_08_100000_move_framework_menu_under_curriculum.php in next_lms_erp.
+  //
+  // Reports (new_pal.reports, 2026_09_08_140000_add_new_pal_reports_submodule_
+  // menu) is also absent, but not deliberately: that migration has not run
+  // against this DB yet, so no tblmenumaster row exists for it and it could
+  // never pass the rights check below. Add it here once that migration runs.
   {
     id: 'pal-content-model',
     label: 'Content structure',
@@ -151,6 +156,11 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
     id: 'pal-ulu',
     label: 'Learning units',
     href: '/pal/ulu',
+  },
+  {
+    id: 'pal-coherence-map',
+    label: 'Coherence Map',
+    href: '/pal/new/coherence-map',
   },
   {
     id: 'pal-pedagogy-engine',
@@ -168,11 +178,38 @@ const NEW_PAL_LEVEL3_ITEMS: Level3Item[] = [
     href: '/pal/new/gamification',
   },
   {
+    id: 'pal-eso',
+    label: 'ESO',
+    href: '/pal/eso',
+  },
+  {
     id: 'pal-ai-stack',
     label: 'AI tools',
     href: '/pal/new/ai-stack',
   },
 ];
+
+/**
+ * `NEW_PAL_LEVEL3_ITEMS[].label` is the UX-facing tab name, and several of
+ * them read nothing like their tblmenumaster `name` ("Content structure" vs.
+ * "Content Model", "Learning units" vs. "Unified Learning Units", "Teaching
+ * methods" vs. "Pedagogy Engine", "AI tools" vs. "AI Stack"). The rights
+ * check below matches by name against the menu tree, so matching on `label`
+ * directly made every one of those items fail the check regardless of
+ * rights — only Administration, Gamification and ESO happened to read the
+ * same both ways. This maps each item back to the exact `tblmenumaster.name`
+ * (parent id 531) it must match instead.
+ */
+const NEW_PAL_LEVEL3_DB_NAMES: Record<string, string> = {
+  'pal-content-model': 'Content Model',
+  'pal-ulu': 'Unified Learning Units',
+  'pal-coherence-map': 'Coherence Map',
+  'pal-pedagogy-engine': 'Pedagogy Engine',
+  'pal-administration': 'Administration',
+  'pal-gamification': 'Gamification',
+  'pal-eso': 'ESO',
+  'pal-ai-stack': 'AI Stack',
+};
 
 /** `href` itself, or a page nested under it — never a sibling that merely shares a prefix. */
 function isUnderRoute(pathname: string, href: string): boolean {
@@ -225,7 +262,9 @@ function newPalLevel3Items(pathname: string, menuItems: MenuItem[]): Level3Item[
   const newPalNode = findNewPalMenuNode(menuItems);
   const allowedLabels = new Set((newPalNode?.submenus ?? []).map((submenu) => normalizeMenuLabel(submenu.label)));
 
-  const items = NEW_PAL_LEVEL3_ITEMS.filter((item) => allowedLabels.has(normalizeMenuLabel(item.label)));
+  const items = NEW_PAL_LEVEL3_ITEMS.filter((item) =>
+    allowedLabels.has(normalizeMenuLabel(NEW_PAL_LEVEL3_DB_NAMES[`${item.id}`] ?? item.label)),
+  );
   return items.length ? items : null;
 }
 

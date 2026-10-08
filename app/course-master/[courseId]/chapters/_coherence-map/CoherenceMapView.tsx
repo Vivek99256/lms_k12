@@ -590,7 +590,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
                     key={year}
                     type="button"
                     onClick={() => viewYear(year)}
-                    className="rounded-lg bg-[#4f46e5] px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+                    className="rounded-full bg-[#4F46E5] px-3.5 py-1.5 text-[13px] font-medium text-white transition-[opacity,transform] duration-150 hover:opacity-85 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:active:scale-100"
                   >
                     Show {year}
                   </button>
@@ -622,7 +622,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
             <div
               role="status"
               className={[
-                'flex items-center gap-2 border-b px-4 py-2 text-[13px]',
+                'animate-in fade-in slide-in-from-top-1 flex items-center gap-2 border-b px-4 py-2 text-[13px] duration-200',
                 notice.tone === 'ok'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                   : notice.tone === 'warn'
@@ -654,11 +654,11 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
           ) : (
             <div className="relative min-h-0 flex-1">
               {walking && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70">
-                  <span className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-600 shadow-sm">
+                <div className="animate-in fade-in absolute inset-0 z-20 flex items-center justify-center bg-white/70 duration-150">
+                  <span className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[13px] text-slate-600 shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
                     <Loader2
                       size={14}
-                      className="animate-spin motion-reduce:animate-none"
+                      className="animate-spin text-[#4F46E5] motion-reduce:animate-none"
                       aria-hidden
                     />
                     Opening that grade&apos;s map...
@@ -698,7 +698,7 @@ function CoherenceMapCanvas({ subjectId, standardId, title, onClose, initialChap
                 nodeClickDistance={4}
                 className="bg-slate-50"
               >
-                {/* Flat dots, no gradient or blur - the DS forbids both. */}
+                {/* Flat dots, no gradient or blur. */}
                 <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#cbd5e1" />
                 <Controls showInteractive={false} className="!shadow-sm" />
               </ReactFlow>
@@ -731,10 +731,10 @@ function Shell({
   crumbs?: React.ReactNode;
 }) {
   return (
-    <div className="flex h-[calc(100vh-180px)] min-h-[560px] flex-col overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-sm">
-      <header className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3">
+    <div className="flex h-[calc(100vh-180px)] min-h-[560px] flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06)]">
+      <header className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#eef2ff] text-[#4f46e5]">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4F46E5]">
             <Network size={16} strokeWidth={1.9} aria-hidden />
           </span>
           <div className="min-w-0">
@@ -751,7 +751,7 @@ function Shell({
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+          className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
           aria-label="Close the coherence map"
         >
           <X size={15} strokeWidth={2} />
@@ -782,7 +782,7 @@ function Legend({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200 bg-white px-4 py-2 text-[11.5px] text-slate-600">
-      <LegendKey colour="#4f46e5" label="Prerequisite - approved" />
+      <LegendKey colour="#4F46E5" label="Prerequisite - approved" />
       <LegendKey colour="#d97706" dashed label="Prerequisite - suggested, not yet approved" />
       <LegendKey colour="#0d9488" dashed label="Related across subjects" />
       <LegendKey colour="#b45309" dashed label="Loop - points backwards" />
@@ -807,7 +807,7 @@ function Legend({
         <span>{stats.approved} approved</span>
         <span>{stats.draft} suggested</span>
         {!stats.acyclic && (
-          <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800">
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
             {stats.cycle_nodes.length} in a loop
           </span>
         )}
@@ -831,10 +831,10 @@ function FilterToggle({
       aria-pressed={pressed}
       onClick={onClick}
       className={[
-        'rounded border px-1.5 py-0.5 text-[11px] font-medium transition-colors',
+        'rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-1',
         pressed
-          ? 'border-[#c7d2fe] bg-[#eef2ff] text-[#4338ca]'
+          ? 'border-transparent bg-[#4F46E5] text-white'
           : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50',
       ].join(' ')}
     >
