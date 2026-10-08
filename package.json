@@ -15,7 +15,6 @@
     "@ai-sdk/react": "^4.0.100",
     "@base-ui/react": "^1.6.0",
     "@craftjs/core": "^0.2.12",
-    "@craftjs/layers": "^0.2.7",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

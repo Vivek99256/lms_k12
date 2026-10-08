@@ -41,9 +41,9 @@ export function ComplianceLibraryFiltersBar({
   ]
 
   return (
-    <div className="flex flex-wrap items-end gap-2 rounded-xl border border-border/70 bg-background/60 p-3">
+    <div className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-card p-3 shadow-sm dark:border-border">
       <div className="relative min-w-[200px] flex-1">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
         <Input
           aria-label="Search compliance records"
           className="pl-8"
@@ -114,7 +114,7 @@ export function ComplianceLibraryFiltersBar({
       </div>
 
       {hasActiveFilters && (
-        <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={onClear}>
+        <Button variant="ghost" size="sm" className="gap-1.5 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700" onClick={onClear}>
           <X className="size-3.5" /> Clear filters
         </Button>
       )}

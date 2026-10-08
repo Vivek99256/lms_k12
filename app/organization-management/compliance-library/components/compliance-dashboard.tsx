@@ -30,26 +30,27 @@ import {
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock, FileWarning, ShieldAlert, TrendingUp, Timer } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/g2g/card'
 import type { ComplianceDashboardResponse } from '../../_lib/compliance-library-api'
+import { StatTile, STATUS_TONE, TONE_HEX, type Tone } from './compliance-theme'
 
-const CHART_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--destructive)']
+const TOOLTIP_STYLE = { borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', boxShadow: '0 4px 12px rgba(15,23,42,.10)' }
 
-const KPI_CONFIG: { key: keyof ComplianceDashboardResponse['kpis']; label: string; icon: typeof TrendingUp }[] = [
-  { key: 'total', label: 'Total Compliance', icon: TrendingUp },
-  { key: 'due_this_month', label: 'Due This Month', icon: CalendarClock },
-  { key: 'due_soon', label: 'Due Soon', icon: Clock },
-  { key: 'overdue', label: 'Overdue', icon: AlertTriangle },
-  { key: 'completed', label: 'Completed', icon: CheckCircle2 },
-  { key: 'critical', label: 'Critical', icon: ShieldAlert },
-  { key: 'pending_verification', label: 'Pending Verification', icon: FileWarning },
-  { key: 'pending_evidence_verification', label: 'Evidence Awaiting Review', icon: Timer },
+const KPI_CONFIG: { key: keyof ComplianceDashboardResponse['kpis']; label: string; icon: typeof TrendingUp; tone: Tone }[] = [
+  { key: 'total', label: 'Total compliance', icon: TrendingUp, tone: 'brand' },
+  { key: 'due_this_month', label: 'Due this month', icon: CalendarClock, tone: 'info' },
+  { key: 'due_soon', label: 'Due soon', icon: Clock, tone: 'warning' },
+  { key: 'overdue', label: 'Overdue', icon: AlertTriangle, tone: 'error' },
+  { key: 'completed', label: 'Completed', icon: CheckCircle2, tone: 'success' },
+  { key: 'critical', label: 'Critical', icon: ShieldAlert, tone: 'error' },
+  { key: 'pending_verification', label: 'Pending verification', icon: FileWarning, tone: 'brand' },
+  { key: 'pending_evidence_verification', label: 'Evidence awaiting review', icon: Timer, tone: 'neutral' },
 ]
 
 export function ComplianceDashboard({ data, loading }: { data: ComplianceDashboardResponse | null; loading: boolean }) {
   if (loading || !data) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
         {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="h-24 animate-pulse rounded-xl border border-border/70 bg-muted/20" />
+          <div key={index} className="h-14 animate-pulse rounded-lg border border-border/70 bg-muted/20" />
         ))}
       </div>
     )
@@ -59,34 +60,28 @@ export function ComplianceDashboard({ data, loading }: { data: ComplianceDashboa
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {KPI_CONFIG.map(({ key, label, icon: Icon }) => (
-          <div key={key} className="rounded-xl border border-border/70 bg-background/80 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">{label}</p>
-              <Icon className="size-4 text-muted-foreground" />
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{data.kpis[key] ?? 0}</p>
-          </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+        {KPI_CONFIG.map(({ key, label, icon: Icon, tone }) => (
+          <StatTile key={key} label={label} tone={tone} value={data.kpis[key] ?? 0} icon={<Icon className="size-4" />} />
         ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Status Distribution</CardTitle>
+            <CardTitle className="text-base">Status distribution</CardTitle>
             <CardDescription>Where every compliance record currently sits in its lifecycle</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={statusData} dataKey="value" nameKey="label" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                    {statusData.map((entry, index) => (
-                      <Cell key={entry.label} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  <Pie data={statusData} dataKey="value" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={3} cornerRadius={6}>
+                    {statusData.map((entry) => (
+                      <Cell key={entry.label} fill={TONE_HEX[STATUS_TONE[entry.label] ?? 'neutral']} stroke="none" />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)' }} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -96,18 +91,18 @@ export function ComplianceDashboard({ data, loading }: { data: ComplianceDashboa
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Department Distribution</CardTitle>
+            <CardTitle className="text-base">Department distribution</CardTitle>
             <CardDescription>Compliance obligations by owning department</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.department_distribution} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} interval={0} angle={-20} textAnchor="end" height={50} fontSize={11} />
                   <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
-                  <Tooltip cursor={{ fill: 'var(--muted)' }} contentStyle={{ borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)' }} />
-                  <Bar dataKey="value" name="Records" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+                  <Tooltip cursor={{ fill: 'rgba(79,70,229,.06)' }} contentStyle={TOOLTIP_STYLE} />
+                  <Bar dataKey="value" name="Records" fill={TONE_HEX.brand} radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -116,18 +111,18 @@ export function ComplianceDashboard({ data, loading }: { data: ComplianceDashboa
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Category Distribution</CardTitle>
+            <CardTitle className="text-base">Category distribution</CardTitle>
             <CardDescription>Compliance obligations by category</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.category_distribution} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} interval={0} angle={-20} textAnchor="end" height={50} fontSize={11} />
                   <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
-                  <Tooltip cursor={{ fill: 'var(--muted)' }} contentStyle={{ borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)' }} />
-                  <Bar dataKey="value" name="Records" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
+                  <Tooltip cursor={{ fill: 'rgba(79,70,229,.06)' }} contentStyle={TOOLTIP_STYLE} />
+                  <Bar dataKey="value" name="Records" fill={TONE_HEX.success} radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
