@@ -7,6 +7,7 @@ import {
   readString,
   type ApiEnvelope,
 } from '@/lib/erp-client';
+import { readPairs } from '@/lib/h5p/question-bank-h5p-map';
 
 /**
  * PAL chapter diagnostic -> adaptive practice -> learning plan.
@@ -158,6 +159,8 @@ export interface DiagnosticQuestionItem {
   assertion: string | null;
   /** The reason stem, for an Assertion & Reason question. Null otherwise. */
   reason: string | null;
+  /** Structured match-the-following pairs; absent / null on any row without them. */
+  pairs?: Array<{ left: string; right: string }> | null;
   /**
    * The question's own curriculum keys (`lms_question_master.standard_id`
    * etc.), off `ServableQuestions::hydrate()`. Required, not cosmetic: the
@@ -451,6 +454,7 @@ export async function startChapterDiagnostic(
         modelAnswer: readString(row.model_answer) || null,
         assertion: readString(row.assertion) || null,
         reason: readString(row.reason) || null,
+        pairs: readPairs(row.pairs),
         standardId: readNullableNumber(row.standard_id),
         subjectId: readNullableNumber(row.subject_id),
         chapterId: readNullableNumber(row.chapter_id),
@@ -697,6 +701,7 @@ export async function fetchAdaptiveQuestions(
         modelAnswer: readString(row.model_answer) || null,
         assertion: readString(row.assertion) || null,
         reason: readString(row.reason) || null,
+        pairs: readPairs(row.pairs),
         standardId: readNullableNumber(row.standard_id),
         subjectId: readNullableNumber(row.subject_id),
         chapterId: readNullableNumber(row.chapter_id),

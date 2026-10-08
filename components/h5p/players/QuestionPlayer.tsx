@@ -5,6 +5,7 @@ import { mapQuestionToPlayerPayload } from '@/lib/h5p/question-bank-runtime';
 import type { BankQuestion } from '@/lib/h5p/question-bank-h5p-map';
 
 import { CoursePresentationPlayer } from './CoursePresentationPlayer';
+import { DragDropPlayer } from './DragDropPlayer';
 import { DragTextPlayer } from './DragTextPlayer';
 import { EssayPlayer } from './EssayPlayer';
 import { FillBlankPlayer } from './FillBlankPlayer';
@@ -80,6 +81,8 @@ export function QuestionPlayer(props: PlayerProps & { as?: H5pTargetKind }) {
       return <CoursePresentationPlayer {...props} />;
     case 'essay':
       return <EssayPlayer {...props} />;
+    case 'drag_drop':
+      return <DragDropPlayer {...props} />;
   }
 }
 

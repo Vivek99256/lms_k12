@@ -18,9 +18,9 @@ import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/g2g/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/g2g/card'
-import { StatusBadge } from '@/components/ui/status-badge'
 import { cn } from '@/lib/utils'
 import { useComplianceCalendar } from '../../_lib/use-compliance-extras'
+import { StatusPill, TONE_BADGE, STATUS_TONE } from './compliance-theme'
 import type { ComplianceCalendarEvent } from '../../_lib/compliance-library-api'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -67,7 +67,7 @@ export function ComplianceCalendarView({ onSelectRecord }: { onSelectRecord: (id
   const monthLabel = new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle className="text-lg">{monthLabel}</CardTitle>
         <div className="flex gap-2">
@@ -85,7 +85,7 @@ export function ComplianceCalendarView({ onSelectRecord }: { onSelectRecord: (id
         ) : (
           <div className="grid grid-cols-7 gap-1 text-xs">
             {WEEKDAYS.map((day) => (
-              <div key={day} className="px-1 py-2 text-center font-medium text-muted-foreground">
+              <div key={day} className="rounded-md bg-slate-100 px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 {day}
               </div>
             ))}
@@ -98,19 +98,22 @@ export function ComplianceCalendarView({ onSelectRecord }: { onSelectRecord: (id
                 <div
                   key={key}
                   className={cn(
-                    'min-h-[86px] rounded-lg border border-border/60 p-1.5',
-                    !inMonth && 'bg-muted/10 opacity-50',
-                    isToday && 'border-primary/60 ring-1 ring-primary/30',
+                    'min-h-[86px] rounded-lg border border-border/60 p-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-white/5',
+                    !inMonth && 'bg-muted/20 opacity-50',
+                    isToday && 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600 dark:bg-indigo-500/10',
                   )}
                 >
-                  <p className="text-right text-[11px] text-muted-foreground">{date.getDate()}</p>
+                  <p className={cn('text-right text-[11px] font-medium text-muted-foreground', isToday && 'font-bold text-indigo-600')}>{date.getDate()}</p>
                   <div className="mt-1 space-y-1">
                     {dayEvents.slice(0, 3).map((event) => (
                       <button
                         key={event.id}
                         type="button"
                         onClick={() => onSelectRecord(String(event.id))}
-                        className="block w-full truncate rounded-md bg-primary/10 px-1.5 py-0.5 text-left text-[11px] font-medium text-primary hover:bg-primary/20"
+                        className={cn(
+                          'block w-full truncate rounded-md px-1.5 py-0.5 text-left text-[11px] font-medium ring-1 ring-inset transition-opacity hover:opacity-80',
+                          TONE_BADGE[STATUS_TONE[event.status ?? ''] ?? 'brand'],
+                        )}
                         title={event.name}
                       >
                         {event.name}
@@ -129,7 +132,7 @@ export function ComplianceCalendarView({ onSelectRecord }: { onSelectRecord: (id
         {!loading && events.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {events.slice(0, 6).map((event) => (
-              <StatusBadge key={event.id} status={event.status} size="sm" />
+              <StatusPill key={event.id} status={event.status} />
             ))}
           </div>
         )}

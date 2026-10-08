@@ -8,6 +8,7 @@ import type { H5pTextActivity } from './h5p';
 import {
   mapQuestionToPlayerPayload,
   type RuntimeActivity,
+  type RuntimeDragDrop,
   type RuntimeEssay,
   type RuntimeFlashcards,
   type RuntimeScope,
@@ -319,6 +320,9 @@ export type PlayableActivity =
   | { kind: 'drag_text'; item: H5pTextActivity }
   | { kind: 'mark_the_words'; item: H5pTextActivity }
   | { kind: 'memory_game'; item: H5pMemoryGame }
+  // Like Essay, the runtime shape IS the shape: a generated question has no
+  // `h5p_drag_drop` row, so there is no table type to narrow it to.
+  | { kind: 'drag_drop'; item: RuntimeDragDrop }
   | { kind: 'flashcards'; item: RuntimeFlashcards }
   | { kind: 'course_presentation'; item: H5pCoursePresentation }
   // The one member with no table behind it: H5P.Essay is not built here, so
@@ -376,6 +380,8 @@ function narrow(activity: RuntimeActivity): PlayableActivity {
     case 'mark_the_words':
       return { kind: activity.kind, item: activity.item as unknown as H5pTextActivity };
     case 'flashcards':
+      return { kind: activity.kind, item: activity.item };
+    case 'drag_drop':
       return { kind: activity.kind, item: activity.item };
     case 'memory_game':
       return { kind: activity.kind, item: activity.item as unknown as H5pMemoryGame };
