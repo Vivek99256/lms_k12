@@ -187,6 +187,18 @@ function readDiagnosticOptions(value: unknown): DiagnosticOption[] {
   });
 }
 
+/** A previously submitted attempt, handed back instead of a fresh paper. */
+export interface PreviousDiagnosticAttempt {
+  attemptId: string;
+  /** Null only for rows submitted before attempt numbering existed. */
+  attemptNumber: number | null;
+  correct: number;
+  totalQuestions: number;
+  percentage: number;
+  level: string;
+  submittedAt: string;
+}
+
 export interface ChapterDiagnosticPaper {
   status: string;
   message: string;
@@ -200,6 +212,17 @@ export interface ChapterDiagnosticPaper {
    * is expected to explain it rather than render an empty exam.
    */
   reason: string | null;
+  /**
+   * 'new' | 'resumed' | 'already_attempted' - distinct from `status` above
+   * (which is the generic success/error envelope). 'already_attempted' means
+   * no paper was drawn at all: a submitted attempt already exists and
+   * `previousAttempt` describes it, and the caller must show the gate
+   * instead of an exam. Widened to `string` because the field is new and an
+   * older cached response may not carry it.
+   */
+  attemptStatus: 'new' | 'resumed' | 'already_attempted' | string;
+  /** Populated only when attemptStatus === 'already_attempted'. */
+  previousAttempt: PreviousDiagnosticAttempt | null;
   /**
    * True when the server handed back an unfinished attempt instead of drawing a
    * new paper, with how many answers were already on it. The exam screen must
@@ -372,25 +395,50 @@ function readResult(data: Record<string, unknown>): ChapterDiagnosticResult {
 
 // --- diagnostic ------------------------------------------------------------
 
-/** Draw a fresh 15-question paper (5 easy / 5 medium / 5 hard) for a chapter. */
+/**
+ * Draw a fresh 15-question paper (5 easy / 5 medium / 5 hard) for a chapter,
+ * resume an unfinished one, or - when a submitted attempt already exists and
+ * `retake` is not set - come back with `attemptStatus: 'already_attempted'`
+ * and no paper at all, so the caller can show the previous result instead of
+ * silently starting over it.
+ */
 export async function startChapterDiagnostic(
   chapterId: string | number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  opts: { retake?: boolean } = {}
 ): Promise<ChapterDiagnosticPaper> {
   const ctx = session();
+  const search = params(ctx);
+  if (opts.retake) search.set('retake', '1');
+
   const response = await fetch(
-    `${ctx.baseUrl}/lms/pal/diagnostic/chapter/${chapterId}?${params(ctx).toString()}`,
+    `${ctx.baseUrl}/lms/pal/diagnostic/chapter/${chapterId}?${search.toString()}`,
     { headers: headers(ctx), signal }
   );
   const payload = await readJson(response, 'start the diagnostic');
 
   const attemptId = payload.attempt_id == null ? '' : readString(payload.attempt_id);
+  const previous = toRecord(payload.previous_attempt);
+  const hasPrevious = Object.keys(previous).length > 0;
 
   return {
     status: normalizeApiStatus(payload as ApiEnvelope),
     message: readString(payload.message),
     attemptId: attemptId || null,
     chapterId: readString(payload.chapter_id) || String(chapterId),
+    attemptStatus:
+      readString(payload.attempt_status) || (payload.resumed === true ? 'resumed' : 'new'),
+    previousAttempt: hasPrevious
+      ? {
+          attemptId: readString(previous.attempt_id),
+          attemptNumber: previous.attempt_number == null ? null : readNumber(previous.attempt_number),
+          correct: readNumber(previous.correct),
+          totalQuestions: readNumber(previous.total_questions),
+          percentage: readNumber(previous.percentage),
+          level: readString(previous.level),
+          submittedAt: readString(previous.submitted_at),
+        }
+      : null,
     questions: toArray(payload.questions).map((entry) => {
       const row = toRecord(entry);
       return {
@@ -471,6 +519,8 @@ export async function fetchChapterDiagnosticResult(
 
 export interface DiagnosticHistoryEntry {
   attemptId: string;
+  /** Null only for rows submitted before this column existed and not yet backfilled. */
+  attemptNumber: number | null;
   percentage: number;
   level: string;
   correct: number;
@@ -497,6 +547,7 @@ export async function fetchChapterDiagnosticHistory(
       const row = toRecord(entry);
       return {
         attemptId: readString(row.id),
+        attemptNumber: row.attempt_number == null ? null : readNumber(row.attempt_number),
         percentage: readNumber(row.percentage),
         level: readString(row.level),
         correct: readNumber(row.correct),

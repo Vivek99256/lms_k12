@@ -357,6 +357,13 @@ const LMS_ENTRY_ROUTE_NAME_MAP: Record<string, string> = {
   // 2026_09_29_100500_add_new_pal_ai_stack_submodule_menu. Same `new_pal.<sub_module>`
   // convention as its siblings above.
   'new_pal.ai_stack': '/pal/new/ai-stack',
+  // Coherence Map — New PAL's own tblmenumaster row (id 604, parent 531), link
+  // `coherence.map` rather than the `new_pal.<sub_module>` convention because
+  // the row predates that convention (see routes/web.php in next_lms_erp).
+  // Without this entry the generic fallback at the end of this function turns
+  // it into '/coherence.map', which is not a route — the real page is under
+  // /pal/new/* with its siblings.
+  'coherence.map': '/pal/new/coherence-map',
   'lmsassignment.index': '/lms/lmsAssignment',
   'lms/lmsassignment': '/lms/lmsAssignment',
   'lmsassignment_submission.index': '/lms/lmsAssignment_submission',

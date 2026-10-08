@@ -75,7 +75,7 @@ export function FocusBreadcrumb({
         <button
           type="button"
           onClick={onBack}
-          className="mr-1 inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11.5px] font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+          className="mr-1 inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-[11.5px] font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
           // The map is a walk, so "back" means the concept you came from — not the
           // browser's history, which would leave the screen entirely.
           title="Back to the previous concept"
@@ -88,10 +88,10 @@ export function FocusBreadcrumb({
       {crumbs.map((crumb) => {
         const body = (
           <>
-            <span className="bg-[#4f46e5] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+            <span className="bg-[#4F46E5] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
               {crumb.label}
             </span>
-            <span className="max-w-[16rem] truncate bg-indigo-50 px-2 py-1 text-[11.5px] font-medium text-indigo-900">
+            <span className="max-w-[16rem] truncate bg-slate-100 px-2 py-1 text-[11.5px] font-medium text-slate-700">
               {crumb.value}
             </span>
           </>
@@ -102,13 +102,13 @@ export function FocusBreadcrumb({
             key={crumb.label}
             type="button"
             onClick={crumb.onClick}
-            className="inline-flex items-stretch overflow-hidden rounded-lg transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
+            className="inline-flex items-stretch overflow-hidden rounded-full transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5] focus-visible:ring-offset-2"
             title={`Back to ${crumb.value}`}
           >
             {body}
           </button>
         ) : (
-          <span key={crumb.label} className="inline-flex items-stretch overflow-hidden rounded-lg">
+          <span key={crumb.label} className="inline-flex items-stretch overflow-hidden rounded-full">
             {body}
           </span>
         );

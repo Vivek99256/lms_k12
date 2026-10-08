@@ -1221,6 +1221,13 @@ export type KnowledgeMapNodeStatus = ChapterSectionStatus | 'not_ready' | 'retai
 
 export type KnowledgeMapEdgeType = 'direct_prerequisite' | 'related';
 
+/**
+ * Where a concept sits relative to the chapter this map was opened for.
+ * 'other' covers both a non-adjacent chapter in the same subject and an
+ * entirely different standard — distinguish those two using `standardId`.
+ */
+export type KnowledgeMapChapterRelation = 'current' | 'previous' | 'next' | 'other';
+
 export interface KnowledgeMapConcept {
   conceptId: number;
   name: string;
@@ -1232,6 +1239,17 @@ export interface KnowledgeMapConcept {
   isCurrent: boolean;
   /** Real prerequisite names not yet mastered — this card's own "why is this locked" reason. Empty unless status is 'locked'. */
   blockingPrerequisiteNames: string[];
+  /** Null when the concept has no topic (topic_id not authored). */
+  topicId: number | null;
+  topicName: string | null;
+  /** The chapter this concept actually belongs to — may differ from `chapterId` on the map itself. */
+  chapterId: number;
+  chapterName: string | null;
+  /** The standard (grade) this concept actually belongs to — may differ from the map's own standard for a cross-grade prerequisite. */
+  standardId: number | null;
+  standardName: string | null;
+  /** How this concept relates to the chapter being viewed — see KnowledgeMapChapterRelation. */
+  chapterRelation: KnowledgeMapChapterRelation;
 }
 
 export interface KnowledgeMapEdge {
@@ -1242,11 +1260,20 @@ export interface KnowledgeMapEdge {
   type: KnowledgeMapEdgeType;
 }
 
+export interface KnowledgeMapAdjacentChapter {
+  id: number;
+  name: string;
+}
+
 export interface KnowledgeMap {
   chapterId: number;
   chapterName: string;
   /** Real chapter_master.chapter_desc, or null when the chapter has none on file — never fabricated. */
   chapterDescription: string | null;
+  /** The chapter right before this one in teaching order, or null at the start of the subject. */
+  previousChapter: KnowledgeMapAdjacentChapter | null;
+  /** The chapter right after this one in teaching order, or null at the end of the subject. */
+  nextChapter: KnowledgeMapAdjacentChapter | null;
   currentConceptId: number;
   concepts: KnowledgeMapConcept[];
   edges: KnowledgeMapEdge[];
@@ -1263,6 +1290,17 @@ export interface KnowledgeMap {
 function knowledgeMapStatus(value: unknown): KnowledgeMapNodeStatus {
   const s = readString(value);
   return s === 'locked' || s === 'in_progress' || s === 'mastered' || s === 'retained' || s === 'not_ready' ? s : 'not_started';
+}
+
+function knowledgeMapChapterRelation(value: unknown): KnowledgeMapChapterRelation {
+  const s = readString(value);
+  return s === 'previous' || s === 'next' || s === 'other' ? s : 'current';
+}
+
+function knowledgeMapAdjacentChapter(value: unknown): KnowledgeMapAdjacentChapter | null {
+  if (value == null) return null;
+  const r = toRecord(value);
+  return { id: num(r.id), name: readString(r.name) };
 }
 
 /**
@@ -1284,6 +1322,8 @@ export async function fetchKnowledgeMap(learnerId: string, conceptId: number, si
     chapterId: num(data.chapter_id),
     chapterName: readString(data.chapter_name),
     chapterDescription: data.chapter_description == null ? null : readString(data.chapter_description),
+    previousChapter: knowledgeMapAdjacentChapter(data.previous_chapter),
+    nextChapter: knowledgeMapAdjacentChapter(data.next_chapter),
     currentConceptId: num(data.current_concept_id),
     concepts: concepts.map((row) => {
       const r = toRecord(row);
@@ -1297,6 +1337,13 @@ export async function fetchKnowledgeMap(learnerId: string, conceptId: number, si
         depth: num(r.depth),
         isCurrent: Boolean(r.is_current),
         blockingPrerequisiteNames: blockingNames.map((name) => readString(name)),
+        topicId: numOrNull(r.topic_id),
+        topicName: r.topic_name == null ? null : readString(r.topic_name),
+        chapterId: num(r.chapter_id),
+        chapterName: r.chapter_name == null ? null : readString(r.chapter_name),
+        standardId: numOrNull(r.standard_id),
+        standardName: r.standard_name == null ? null : readString(r.standard_name),
+        chapterRelation: knowledgeMapChapterRelation(r.chapter_relation),
       };
     }),
     edges: edges.map((row) => {
@@ -1581,4 +1628,25 @@ export async function fetchAttainmentReport(
       };
     }),
   };
+}
+
+/**
+ * One short LLM-generated paragraph grounded in the same numbers
+ * fetchAttainmentReport() returns — a separate call rather than a field on
+ * that one, since the narrative is slower (it calls a model) and a caller
+ * showing the table should not have to wait on it.
+ */
+export async function fetchAttainmentNarrative(
+  standardId: string,
+  syear: string,
+  subjectId?: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const params = new URLSearchParams({ standardId, syear });
+  if (subjectId) params.set('subjectId', subjectId);
+
+  const data = toRecord(
+    await esoGet(`api/pal/eso/reports/attainment/narrative?${params.toString()}`, signal)
+  );
+  return readString(data.narrative);
 }

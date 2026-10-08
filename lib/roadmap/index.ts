@@ -255,6 +255,27 @@ const V1_DEFERRED_ROUTE_PREFIXES = [
   '/bazar',
 ] as const;
 
+/**
+ * New PAL (tblmenumaster parent 531 — Content Model, ULU, Coherence Map,
+ * Pedagogy Engine, Administration, Gamification, ESO, AI Stack) is a real,
+ * pilot-scoped product, not a V1-deferred module. It sits under the generic
+ * `/pal` prefix above, which is otherwise still deferred: the legacy
+ * single-flow screens under `/pal/adaptive`, `/pal/diagnostic`,
+ * `/pal/mastery`, `/pal/intelligence`, etc. are not New PAL's children (see
+ * `tblmenumaster` — they are not under parent 531) and stay hidden. These
+ * prefixes carve the exception out of the `/pal` block above rather than
+ * removing `/pal` from it. `/pal/frameworks` is deliberately left out: that
+ * row hangs off parent 327 (Curriculum), not New PAL, despite the shared
+ * `/pal` path.
+ */
+const V1_DEFERRED_ROUTE_EXCEPTIONS = [
+  '/pal/new', // new_pal.index, .content_model, .administration, .gamification, .ai_stack all resolve under here
+  '/pal/ulu', // new_pal.ulu
+  '/pal/eso', // new_pal.eso
+  '/pal/pedagogy-engine', // new_pal.pedagogy_engine
+  '/pal/reports/attainment', // new_pal.reports
+] as const;
+
 export function showDeferredModules(): boolean {
   return process.env.NEXT_PUBLIC_SHOW_DEFERRED_MODULES === 'true';
 }
@@ -263,6 +284,9 @@ export function showDeferredModules(): boolean {
 export function isDeferredModuleRoute(route: string | null | undefined): boolean {
   if (showDeferredModules()) return false;
   const path = (route || '').toLowerCase().split(/[?#]/)[0].replace(/\/+$/, '');
+  if (V1_DEFERRED_ROUTE_EXCEPTIONS.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
+    return false;
+  }
   return V1_DEFERRED_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 

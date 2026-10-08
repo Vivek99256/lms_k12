@@ -64,7 +64,7 @@ function strokeFor(edge: CoherenceEdge, backward: boolean): { stroke: string; da
   if (edge.kind === 'cross_curricular') return { stroke: '#0d9488', dash: '2 4' };
   if (edge.status !== 'approved') return { stroke: '#d97706', dash: '6 4' };
 
-  return { stroke: '#4f46e5' };
+  return { stroke: '#4F46E5' };
 }
 
 function LaneEdgeInner({
@@ -136,7 +136,7 @@ function LaneEdgeInner({
         strokeDasharray: dash,
         opacity: dimmed ? 0.12 : 1,
       }}
-      className="transition-opacity duration-150 motion-reduce:transition-none"
+      className="animate-in fade-in transition-opacity duration-150 motion-reduce:transition-none motion-reduce:animate-none"
     />
   );
 }

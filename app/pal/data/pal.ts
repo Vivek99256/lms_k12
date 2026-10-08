@@ -159,6 +159,18 @@ export interface PalChapter {
   name: string;
   /** Number of PAL quizzes the student has attempted for this chapter. */
   quizCount: number;
+  /**
+   * The chapter diagnostic (pal_diagnostic_attempt) - a completely separate
+   * feature and table from the legacy PAL quiz above. Optional because the
+   * legacy-catalog fallback path (pal-legacy.ts) has no access to this data
+   * at all; absent/false means the same thing there as "no submitted
+   * diagnostic yet" does on the real workspace path.
+   */
+  hasDiagnostic?: boolean;
+  diagnosticLevel?: string | null;
+  diagnosticPercentage?: number | null;
+  diagnosticAttemptNumber?: number | null;
+  lastDiagnosticAttemptAt?: string | null;
 }
 
 export interface PalAttempt {
@@ -337,6 +349,7 @@ function mapWorkspacePayload(
   const data = toRecord(payload.data);
   const studentRow = toRecord(data.student);
   const perChapterQuiz = toRecord(data.per_chapter_quiz);
+  const diagnosticByChapter = toRecord(data.diagnostic_by_chapter);
 
   const attemptsByChapter: Record<string, PalAttempt[]> = {};
   Object.entries(toRecord(data.attempts_by_chapter)).forEach(([chapterId, entries]) => {
@@ -359,7 +372,19 @@ function mapWorkspacePayload(
       chapters: toArray(subject.chapters).map((chapterEntry) => {
         const chapter = toRecord(chapterEntry);
         const id = readString(chapter.id);
-        return { id, name: readString(chapter.chapter_name), quizCount: readNumber(perChapterQuiz[id]) };
+        const diagnostic = toRecord(diagnosticByChapter[id]);
+        const hasDiagnostic = diagnostic.has_diagnostic === true;
+        return {
+          id,
+          name: readString(chapter.chapter_name),
+          quizCount: readNumber(perChapterQuiz[id]),
+          hasDiagnostic,
+          diagnosticLevel: hasDiagnostic ? readString(diagnostic.level) || null : null,
+          diagnosticPercentage: hasDiagnostic ? readNumber(diagnostic.percentage) : null,
+          diagnosticAttemptNumber:
+            hasDiagnostic && diagnostic.attempt_number != null ? readNumber(diagnostic.attempt_number) : null,
+          lastDiagnosticAttemptAt: hasDiagnostic ? readString(diagnostic.last_attempted_at) || null : null,
+        };
       }),
     };
   });

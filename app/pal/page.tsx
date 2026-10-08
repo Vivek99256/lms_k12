@@ -548,6 +548,17 @@ function ChapterRow({
                 {chapter.quizCount} quiz{chapter.quizCount === 1 ? '' : 'zes'}
               </span>
             )}
+            {/* The chapter diagnostic (pal_diagnostic_attempt) - a separate
+                feature/table from the quiz badge above. Shows the latest
+                submitted attempt so "already attempted" is visible without
+                opening the diagnostic first. */}
+            {chapter.hasDiagnostic && (
+              <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                Already attempted
+                {chapter.diagnosticLevel ? ` · ${chapter.diagnosticLevel}` : ''}
+                {chapter.diagnosticPercentage != null ? ` · ${Math.round(chapter.diagnosticPercentage)}%` : ''}
+              </span>
+            )}
           </div>
 
           {completed && (
