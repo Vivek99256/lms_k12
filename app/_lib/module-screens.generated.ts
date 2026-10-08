@@ -209,7 +209,6 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/general/implementation_management': screen(() => import('@/app/general/implementation_management/page')),
   '/general/individual_rights': screen(() => import('@/app/general/individual_rights/page')),
   '/general/mobile_app_rights': screen(() => import('@/app/general/mobile_app_rights/page')),
-  '/general/mobile_page_builder': screen(() => import('@/app/general/mobile_page_builder/page')),
   '/general/native_dynamic_pages': screen(() => import('@/app/general/native_dynamic_pages/page')),
   '/general/onboarding': screen(() => import('@/app/general/onboarding/page')),
   '/general/template_management': screen(() => import('@/app/general/template_management/page')),

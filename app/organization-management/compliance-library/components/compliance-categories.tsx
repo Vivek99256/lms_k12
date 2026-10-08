@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Compliance Categories management - Compliance Management,
+ * Compliance categories management - Compliance Management,
  * frontend-completion pass. New component; no category management existed
  * before (the register's Category field is new too - see
  * `ComplianceCategoryController`). Global platform-default categories
@@ -13,7 +13,7 @@
 import { useState } from 'react'
 import { Edit3, FolderKanban, Plus, Trash2 } from 'lucide-react'
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/g2g/badge'
+import { IconTile, TABLE_HEADER_CLASS, ToneBadge } from './compliance-theme'
 import { Button } from '@/components/ui/g2g/button'
 import { Card, CardContent, CardHeader, CardDescription, CardTitle } from '@/components/ui/g2g/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -72,7 +72,8 @@ export function ComplianceCategories({ isAdmin }: { isAdmin: boolean }) {
       <CardHeader className="flex-row items-center justify-between gap-4">
         <div>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <FolderKanban className="size-5 text-primary" /> Compliance Categories
+            <IconTile tone="brand"><FolderKanban className="size-5" /></IconTile>
+            Compliance categories
           </CardTitle>
           <CardDescription>Platform defaults apply to every school; your own categories are scoped to this school only.</CardDescription>
         </div>
@@ -83,12 +84,12 @@ export function ComplianceCategories({ isAdmin }: { isAdmin: boolean }) {
         )}
       </CardHeader>
       <CardContent className="p-0">
-        {notice && <div className="mx-4 mb-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">{notice}</div>}
+        {notice && <div className="mx-4 mb-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{notice}</div>}
         {loading ? (
           <TableSkeleton />
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className={TABLE_HEADER_CLASS}>
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
@@ -103,10 +104,10 @@ export function ComplianceCategories({ isAdmin }: { isAdmin: boolean }) {
                   <TableCell className="font-medium text-foreground">{category.name}</TableCell>
                   <TableCell className="max-w-[320px] truncate text-muted-foreground">{category.description || '-'}</TableCell>
                   <TableCell>
-                    <Badge variant={category.is_global ? 'muted' : 'navy'}>{category.is_global ? 'Platform default' : 'This school'}</Badge>
+                    <ToneBadge tone={category.is_global ? 'neutral' : 'brand'}>{category.is_global ? 'Platform default' : 'This school'}</ToneBadge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={category.status ? 'success' : 'muted'}>{category.status ? 'Enabled' : 'Disabled'}</Badge>
+                    <ToneBadge tone={category.status ? 'success' : 'neutral'} dot>{category.status ? 'Enabled' : 'Disabled'}</ToneBadge>
                   </TableCell>
                   <TableCell className="text-right">
                     {isAdmin && !category.is_global && (
