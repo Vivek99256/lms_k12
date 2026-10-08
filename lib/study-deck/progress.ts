@@ -13,6 +13,7 @@
  */
 
 import { activityKey } from './deck';
+import { exampleCards, exampleKey, interactionKey } from './interactions';
 import type { DeckSlide, StudyDeck } from './types';
 
 export interface ActivityRecord {
@@ -89,10 +90,23 @@ export function progressReducer(state: DeckProgress, action: ProgressAction): De
 
 // ---------------------------------------------------------------------------
 // Selectors
+//
+// WHAT COUNTS. A slide's INTERACTION (hotspots, scenario, reveal) is part of the lesson, so exploring
+// it counts toward the slide and the chapter. PRACTICE (an optional question-bank activity) does not
+// hold anything up: it is tracked and shown, but a learner who skips it has still finished the slide.
 // ---------------------------------------------------------------------------
 
-/** The keys of the activities a slide asks the learner to do. */
-export function slideKeys(slide: DeckSlide, playable?: ReadonlySet<string>): string[] {
+/** The keys of what a slide asks the learner to explore: its interaction and its example screen, where it has them. */
+export function slideKeys(slide: DeckSlide): string[] {
+  const keys: string[] = [];
+  if (slide.interaction) keys.push(interactionKey(slide));
+  if (exampleCards(slide).length > 0) keys.push(exampleKey(slide));
+
+  return keys;
+}
+
+/** The keys of a slide's optional practice activities, limited to those that can really be played. */
+export function practiceKeys(slide: DeckSlide, playable?: ReadonlySet<string>): string[] {
   const keys = slide.activities.map((_, index) => activityKey(slide, index));
 
   return playable ? keys.filter((key) => playable.has(key)) : keys;
@@ -100,24 +114,39 @@ export function slideKeys(slide: DeckSlide, playable?: ReadonlySet<string>): str
 
 export interface SlideStatus {
   visited: boolean;
+  /** Interactions to explore on this slide (0 or 1). */
   total: number;
   done: number;
+  /** Opened, and its interaction (if any) explored. Practice is optional and never blocks. */
   complete: boolean;
+  practice: { total: number; done: number };
 }
 
-/** A slide is complete once it was opened and every activity it asked for was done. */
 export function slideStatus(slide: DeckSlide, progress: DeckProgress, playable?: ReadonlySet<string>): SlideStatus {
-  const keys = slideKeys(slide, playable);
+  const keys = slideKeys(slide);
   const done = keys.filter((key) => progress.activities[key]?.done).length;
   const visited = progress.visited.includes(slide.n);
+  const practice = practiceKeys(slide, playable);
 
-  return { visited, total: keys.length, done, complete: visited && done === keys.length };
+  return {
+    visited,
+    total: keys.length,
+    done,
+    complete: visited && done === keys.length,
+    practice: { total: practice.length, done: practice.filter((key) => progress.activities[key]?.done).length },
+  };
 }
 
 export interface ConceptStatus {
   conceptId: number;
   /** Every slide that teaches it has been opened. */
   taught: boolean;
+  /** Interactions on the slides that teach it, and how many were explored. */
+  interactions: number;
+  explored: number;
+  /** Taught, and every interaction on those slides explored. */
+  complete: boolean;
+  /** Optional practice questions for it: asked, done, right. */
   activities: number;
   done: number;
   correct: number;
@@ -127,12 +156,20 @@ export interface ConceptStatus {
 
 export function conceptStatus(deck: StudyDeck, progress: DeckProgress, conceptId: number): ConceptStatus {
   const taughtOn = deck.taught_by[String(conceptId)] ?? [];
+  let interactions = 0;
+  let explored = 0;
   let activities = 0;
   let done = 0;
   let correct = 0;
   let unmarked = 0;
 
-  deck.slides.forEach((slide) =>
+  deck.slides.forEach((slide) => {
+    if (slide.taught_concept_ids.includes(conceptId)) {
+      slideKeys(slide).forEach((key) => {
+        interactions += 1;
+        if (progress.activities[key]?.done) explored += 1;
+      });
+    }
     slide.activities.forEach((activity, index) => {
       if (activity.concept_id !== conceptId) return;
       activities += 1;
@@ -141,57 +178,64 @@ export function conceptStatus(deck: StudyDeck, progress: DeckProgress, conceptId
       done += 1;
       if (record.correct === true) correct += 1;
       if (record.correct === null) unmarked += 1;
-    })
-  );
+    });
+  });
 
-  return {
-    conceptId,
-    taught: taughtOn.length > 0 && taughtOn.every((n) => progress.visited.includes(n)),
-    activities,
-    done,
-    correct,
-    unmarked,
-  };
+  const taught = taughtOn.length > 0 && taughtOn.every((n) => progress.visited.includes(n));
+
+  return { conceptId, taught, interactions, explored, complete: taught && explored === interactions, activities, done, correct, unmarked };
 }
 
 export interface DeckTotals {
   slides: number;
   visited: number;
-  activities: number;
-  done: number;
+  /** Interactions in the deck, and how many were explored. */
+  interactions: number;
+  explored: number;
+  /** Optional practice: asked, done, right, and how many of those were marked. */
+  practice: number;
+  practiceDone: number;
   correct: number;
   marked: number;
   percent: number;
 }
 
 export function deckTotals(deck: StudyDeck, progress: DeckProgress, playable?: ReadonlySet<string>): DeckTotals {
-  let activities = 0;
-  let done = 0;
+  let interactions = 0;
+  let explored = 0;
+  let practice = 0;
+  let practiceDone = 0;
   let correct = 0;
   let marked = 0;
 
-  deck.slides.forEach((slide) =>
-    slideKeys(slide, playable).forEach((key) => {
-      activities += 1;
+  deck.slides.forEach((slide) => {
+    slideKeys(slide).forEach((key) => {
+      interactions += 1;
+      if (progress.activities[key]?.done) explored += 1;
+    });
+    practiceKeys(slide, playable).forEach((key) => {
+      practice += 1;
       const record = progress.activities[key];
       if (!record?.done) return;
-      done += 1;
+      practiceDone += 1;
       if (record.correct !== null) marked += 1;
       if (record.correct === true) correct += 1;
-    })
-  );
+    });
+  });
 
   const visited = deck.slides.filter((slide) => progress.visited.includes(slide.n)).length;
-  const units = deck.slides.length + activities;
+  const units = deck.slides.length + interactions;
 
   return {
     slides: deck.slides.length,
     visited,
-    activities,
-    done,
+    interactions,
+    explored,
+    practice,
+    practiceDone,
     correct,
     marked,
-    percent: units === 0 ? 0 : Math.round(((visited + done) / units) * 100),
+    percent: units === 0 ? 0 : Math.round(((visited + explored) / units) * 100),
   };
 }
 

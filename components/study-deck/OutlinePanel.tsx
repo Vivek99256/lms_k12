@@ -16,7 +16,7 @@ export interface OutlinePanelProps {
 
 /**
  * Chapter -> topic -> concept, with a tick against every concept the learner has been
- * taught and finished the activities for. Selecting a concept goes to the slide that
+ * taught and has explored the interactive part of (practice is optional and does not hold a tick back). Selecting a concept goes to the slide that
  * explains it.
  */
 export function OutlinePanel({ deck, progress, currentSlide, onGoto }: OutlinePanelProps) {
@@ -31,7 +31,7 @@ export function OutlinePanel({ deck, progress, currentSlide, onGoto }: OutlinePa
           <ul className="mt-1 space-y-0.5">
             {topic.concepts.map(({ concept, taughtOn }) => {
               const status = conceptStatus(deck, progress, concept.id);
-              const complete = status.taught && status.done === status.activities;
+              const complete = status.complete;
               const here = taughtOn.includes(currentSlide);
               const target = taughtOn[0];
 
@@ -60,5 +60,43 @@ export function OutlinePanel({ deck, progress, currentSlide, onGoto }: OutlinePa
         </div>
       ))}
     </nav>
+  );
+}
+
+export interface OutlineDrawerProps extends OutlinePanelProps {
+  onClose: () => void;
+}
+
+/**
+ * The outline as a drawer: closed during the lesson so the slide has the whole screen, opened from the header.
+ * It is the one part of the player that may scroll, because it is a list the learner opened.
+ */
+export function OutlineDrawer({ onClose, ...panel }: OutlineDrawerProps) {
+  return (
+    <div className="fixed inset-0 z-[310] flex" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div
+        role="dialog"
+        aria-label="Outline"
+        aria-modal="true"
+        onKeyDown={(event) => event.key === 'Escape' && onClose()}
+        className="flex h-full w-[min(22rem,90vw)] flex-col bg-white shadow-2xl"
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <p className="text-sm font-semibold text-slate-900">Outline</p>
+          <button
+            type="button"
+            onClick={onClose}
+            autoFocus
+            className="rounded-lg px-2 py-1 text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+          >
+            Close
+          </button>
+        </div>
+        <div className="overflow-y-auto p-4">
+          <OutlinePanel {...panel} />
+        </div>
+      </div>
+      <div className="flex-1 bg-slate-900/40" aria-hidden="true" />
+    </div>
   );
 }

@@ -12,6 +12,7 @@
  */
 
 import { mapQuestionToPlayerPayload, type RuntimeScope } from '../h5p/question-bank-runtime';
+import { interactionProblem } from './interactions';
 import type { BankQuestion, H5pTargetKind } from '../h5p/question-bank-h5p-map';
 import {
   ACTIVITY_LABELS,
@@ -39,7 +40,7 @@ export const PLAYABLE_TARGETS: readonly H5pTargetKind[] = [
 export class DeckError extends Error {}
 
 /**
- * Check that a JSON payload really is a v2 study deck, with a reason when it is not.
+ * Check that a JSON payload really is a v3 study deck, with a reason when it is not.
  *
  * Strict about the parts the player cannot render without (slides, concepts, activities)
  * and silent about extra fields, so the backend can add metadata without breaking players.
@@ -59,6 +60,14 @@ export function parseDeck(raw: unknown): StudyDeck {
   deck.slides.forEach((slide, index) => {
     if (typeof slide.n !== 'number' || typeof slide.title !== 'string' || !slide.content || !Array.isArray(slide.activities)) {
       throw new DeckError(`Slide ${index + 1} is malformed.`);
+    }
+    // Plain teaching is a valid slide: no interaction, no discussion prompt.
+    slide.interaction ??= null;
+    slide.interaction_reason ??= '';
+    slide.content.discussion ??= null;
+    if (slide.interaction) {
+      const problem = interactionProblem(slide.interaction, slide.image?.type === 'diagram');
+      if (problem) throw new DeckError(`Slide ${slide.n}'s interaction ${problem}.`);
     }
     slide.activities.forEach((activity) => {
       if (!(PLAYABLE_TARGETS as readonly string[]).includes(activity.as)) {

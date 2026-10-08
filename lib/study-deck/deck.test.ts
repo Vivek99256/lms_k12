@@ -62,7 +62,7 @@ function allActivities(d: StudyDeck): DeckActivity[] {
 test('the golden deck from the backend parses', () => {
   const d = deck();
 
-  assert.equal(d.version, 2);
+  assert.equal(d.version, 3);
   assert.equal(d.slide_count, 7);
   assert.equal(d.chapter.name, 'Ideas in exploration');
   assert.equal(d.slides.length, 7);
@@ -79,13 +79,53 @@ test('a deck the player cannot read is refused with a reason', () => {
   };
 
   assert.throws(() => parseDeck(null), DeckError);
-  assert.throws(() => parseDeck(broken((d) => { d.version = 1; })), /version 1/);
+  assert.throws(() => parseDeck(broken((d) => { d.version = 2; })), /version 2/);
   assert.throws(() => parseDeck(broken((d) => { d.slides = []; })), /no slides/);
   assert.throws(() => parseDeck(broken((d) => { delete d.concepts; })), /no concept list/);
   assert.throws(() => parseDeck(broken((d) => { delete d.chapter; })), /which chapter/);
   assert.throws(() => parseDeck(broken((d) => { activityAt(d, 1).as = 'branching'; })), /"branching", which no player here can render/);
   assert.throws(() => parseDeck(broken((d) => { activityAt(d, 1).label = 'Quiz time'; })), /labelled "Quiz time"/);
-  assert.throws(() => parseDeck(broken((d) => { activityAt(d, 3).question = undefined; })), /authored check with no question/);
+  assert.throws(() => parseDeck(broken((d) => { activityAt(d, 1).source = 'authored'; })), /authored check with no question/);
+
+  // Interactions are checked too: a slide that cannot be drawn is refused, not half-shown.
+  const interactionAt = (d: Json, i: number) => slideAt(d, i).interaction as Json;
+  assert.throws(() => parseDeck(broken((d) => { (slideAt(d, 1)).interaction = interactionAt(d, 2); })), /no drawn diagram/);
+  assert.throws(() => parseDeck(broken((d) => { interactionAt(d, 2).spots = []; })), /fewer than two hotspots/);
+  assert.throws(() => parseDeck(broken((d) => { interactionAt(d, 4).kind = 'puzzle'; })), /unknown kind "puzzle"/);
+  assert.throws(() => parseDeck(broken((d) => { (interactionAt(d, 4).nodes as Json[])[1].choices = [(interactionAt(d, 4).nodes as Json[])[1].choices as unknown as Json]; })), /fewer than two choices/);
+  assert.throws(() => parseDeck(broken((d) => { ((interactionAt(d, 4).nodes as Json[])[1].choices as Json[])[0].next = 'n1'; })), /loops back/);
+  assert.throws(() => parseDeck(broken((d) => { ((interactionAt(d, 4).nodes as Json[])[0].choices as Json[])[0].next = 'ghost'; })), /leads nowhere/);
+  assert.throws(() => parseDeck(broken((d) => { interactionAt(d, 3).items = [{ id: 'i1', label: 'One', text: 'x' }]; })), /fewer than 2 items/);
+});
+
+test('plain teaching is a valid slide: no interaction, no discussion prompt', () => {
+  const d = structuredClone(golden) as { slides: Array<Record<string, unknown> & { content: Record<string, unknown> }> };
+  delete d.slides[5].interaction;
+  delete d.slides[5].interaction_reason;
+  delete d.slides[5].content.discussion;
+
+  const slide = parseDeck(d).slides[5];
+  assert.equal(slide.interaction, null);
+  assert.equal(slide.interaction_reason, '');
+  assert.equal(slide.content.discussion, null);
+});
+
+test('the golden deck carries each kind of interaction on the slide that can hold it', () => {
+  const d = deck();
+
+  assert.deepEqual(d.slides.map((s) => s.interaction?.kind ?? null), [null, 'compare', 'hotspots', 'reveal', 'scenario', 'steps', 'match']);
+  const hot = d.slides[2];
+  assert.equal(hot.image?.type, 'diagram', 'hotspots sit on a drawn diagram');
+  assert.deepEqual(hot.interaction?.kind === 'hotspots' ? hot.interaction.spots.map((s) => s.label) : [], hot.image?.texts?.slice(2));
+  assert.ok(d.slides.every((s) => s.interaction_reason !== undefined));
+});
+
+test('a slide without a practice question has a discussion prompt for the class, with a possible answer', () => {
+  const d = deck();
+
+  assert.deepEqual(d.slides[3].content.discussion, { prompt: 'What does a law describe?', answer: 'A repeated pattern.' });
+  assert.equal(d.slides[1].content.discussion, null, 'the practice question stands in');
+  assert.equal(d.slides[0].content.discussion, null);
 });
 
 test('there is no branching player: the deck can only ask for targets the runtime has', () => {
@@ -123,7 +163,7 @@ test('question to activity mapping: choice questions are single-choice sets, a r
   assert.deepEqual(kinds(2), ['single_choice_set']);
   assert.deepEqual(kinds(3), ['single_choice_set']);
   assert.deepEqual(kinds(5), ['flashcards']); // a recall short answer on a flashcards slide
-  assert.deepEqual(kinds(4), ['essay']);      // authored check
+  assert.deepEqual(kinds(4), []);              // a discussion prompt, not a question
 });
 
 test('each activity keeps its question id, concept id, format and bank levels', () => {
@@ -173,13 +213,20 @@ test('a question deleted from the bank is a clear message, not a crash', () => {
   assert.match(resolved.reason, /no longer in the question bank/);
 });
 
-test('an authored check travels with the deck and needs no bank row', () => {
-  const authored = deck().slides[3].activities[0];
-  const resolved = resolveActivity(authored, new Map());
+test('an authored question (the version 2 shape) still plays and needs no bank row', () => {
+  const authored: DeckActivity = {
+    ...deck().slides[1].activities[0],
+    source: 'authored',
+    question_id: null,
+    as: 'essay',
+    default_as: 'essay',
+    question: {
+      id: -41, question: 'What does a law describe?', question_type_code: 'short', question_type: 'Narrative', marks: 1, options: [],
+      model_answer: 'A repeated pattern.', chapter_id: 1, standard_id: 9, subject_id: 2, concept_id: 3, authored: true,
+    },
+  };
 
-  assert.equal(authored.source, 'authored');
-  assert.ok((authored.question?.id ?? 0) < 0, 'a negative id: it is not a stored question');
-  assert.equal(resolved.ok, true);
+  assert.equal(resolveActivity(authored, new Map()).ok, true);
 });
 
 test('only bank questions are requested from the bank', () => {

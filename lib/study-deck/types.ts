@@ -1,20 +1,23 @@
 /**
- * The study deck as the backend writes it (next_lms_erp StudyDeck\SlideHtmlRenderer, deck v2).
+ * The study deck as the backend writes it (next_lms_erp StudyDeck\SlideHtmlRenderer, deck v3).
  *
- * WHAT IS AND IS NOT IN IT. The deck carries the lesson - slide wording, concept maps,
- * images - and, for every question, an ACTIVITY SPEC: which bank question and which H5P
- * target to ask it as. It does NOT carry the questions. The player reads those rows from
- * the existing question bank and hands them to the existing native players, so a question
- * corrected in the bank is corrected in every deck, and no H5P row is ever created.
+ * WHAT IS IN IT. The deck is a CLASSROOM LESSON: slide wording, concept maps, large pictures
+ * and diagrams, a discussion prompt per slide, and - where a concept earned one - an
+ * INTERACTION written into the slide itself: hotspots laid over a drawn diagram, a short
+ * branching scenario, or click-to-reveal cards. Those are plain data; the player draws them.
  *
- * The one exception is an AUTHORED check: a slide the bank had nothing for gets one short
- * question written for it, carried here as a bank-shaped row with a negative id. It is
- * played by the same player and is never stored.
+ * PRACTICE IS OPTIONAL. A handful of slides also name an existing question-bank question and
+ * which H5P target to ask it as (an ACTIVITY SPEC). The deck never carries the question: the
+ * player reads the row from the question bank and hands it to the existing native players, so
+ * a question corrected in the bank is corrected in every deck, and no H5P row is ever created.
+ *
+ * (Version 2 decks also carried an AUTHORED check, a bank-shaped question with a negative id.
+ * Version 3 writes a discussion prompt instead; the type stays so the runtime can still play one.)
  */
 
 import type { BankQuestion, H5pTargetKind } from '../h5p/question-bank-h5p-map';
 
-export const STUDY_DECK_VERSION = 2;
+export const STUDY_DECK_VERSION = 3;
 
 /** The five labels an activity may carry. */
 export const ACTIVITY_LABELS = ['Try it', 'Apply', 'Explain', 'Check', 'Think about it'] as const;
@@ -58,6 +61,8 @@ export interface DeckImage {
   caption: string | null;
   width: number;
   height: number;
+  /** The labels drawn on a diagram, in reading order. */
+  texts?: string[];
   /** A drawn diagram has no licence, source or creator because nothing was found. */
   licence: string | null;
   source_url: string | null;
@@ -66,6 +71,107 @@ export interface DeckImage {
   attribution_required: boolean;
   title?: string | null;
 }
+
+/** A prompt for the class to talk about, with a possible answer for the teacher. Never marked. */
+export interface DeckDiscussion {
+  prompt: string;
+  answer: string;
+}
+
+/** Hotspots over a drawn diagram. x, y, w, h are shares of the picture (0-100); (x, y) is the box centre. */
+export interface HotspotSpot {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text: string;
+}
+
+export interface HotspotsInteraction {
+  kind: 'hotspots';
+  reason: string;
+  intro: string;
+  spots: HotspotSpot[];
+  wrapup: string;
+}
+
+export interface ScenarioChoice {
+  id: string;
+  text: string;
+  /** What happens as a result. */
+  outcome: string;
+  /** Why it happens: the explanation the learner reads. */
+  why: string;
+  /** Whether this is the sound choice. Shown as a reading of the situation, never a mark. */
+  sound: boolean;
+  /** The next decision, or null when the path ends here. */
+  next: string | null;
+}
+
+export interface ScenarioNode {
+  id: string;
+  prompt: string;
+  choices: ScenarioChoice[];
+}
+
+/** A lightweight branching scenario. Links only go forward, so every path ends. */
+export interface ScenarioInteraction {
+  kind: 'scenario';
+  reason: string;
+  situation: string;
+  start: string;
+  nodes: ScenarioNode[];
+  conclusion: string;
+}
+
+/** One thing in a list that is opened one at a time. `when` is the date of a timeline event. */
+export interface ExploreItem {
+  id: string;
+  label: string;
+  text: string;
+  when?: string;
+}
+
+/**
+ * A list of items, each explained when opened. The kind says how the list is drawn:
+ * reveal = cards, steps = a process opened step by step, timeline = dated events, compare = things side by side
+ * (and `wrapup` then says how they compare).
+ */
+export interface ItemsInteraction {
+  kind: 'reveal' | 'steps' | 'timeline' | 'compare';
+  reason: string;
+  intro: string;
+  items: ExploreItem[];
+  wrapup: string;
+}
+
+export interface MatchPair {
+  id: string;
+  term: string;
+  meaning: string;
+}
+
+/** Pair each term with its meaning. */
+export interface MatchInteraction {
+  kind: 'match';
+  reason: string;
+  intro: string;
+  pairs: MatchPair[];
+  wrapup: string;
+}
+
+/** Put a real sequence in order. `items` are listed in the CORRECT order; the player shuffles them. */
+export interface OrderInteraction {
+  kind: 'order';
+  reason: string;
+  intro: string;
+  items: Array<{ id: string; text: string }>;
+  wrapup: string;
+}
+
+export type DeckInteraction = HotspotsInteraction | ScenarioInteraction | ItemsInteraction | MatchInteraction | OrderInteraction;
 
 export interface DeckExplanation {
   concept_id: number;
@@ -79,6 +185,10 @@ export interface DeckSlideContent {
   example: string | null;
   misconception: { wrong_idea: string; correction: string } | null;
   relationship_note: string | null;
+  /** The one sentence to remember from this slide; shown when its example screen has been explored. */
+  key_idea?: string | null;
+  /** A prompt for the class, shown with a "show a possible answer" reveal. Null where a practice question stands in. */
+  discussion: DeckDiscussion | null;
   bloom: string;
   dok: number;
   minutes: number;
@@ -95,7 +205,12 @@ export interface DeckSlide {
   relationship: { from: number; to: number; kind: string; idea: string } | null;
   content: DeckSlideContent;
   question_ids: number[];
+  /** Optional practice from the question bank: at most one, on a few slides. */
   activities: DeckActivity[];
+  /** What the learner explores or decides on this slide, or null where plain teaching is enough. */
+  interaction: DeckInteraction | null;
+  /** Why this slide has the interaction it has, or why it was left as plain teaching. */
+  interaction_reason: string;
   h5p_pattern: { type: string; reason: string } | null;
   image: DeckImage | null;
   image_missing: string | null;

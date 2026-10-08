@@ -52,7 +52,7 @@ export function StudyDeckEntry({ chapterId }: StudyDeckEntryProps) {
         <div>
           <h3 className="text-base font-semibold text-slate-900">Study lesson</h3>
           <p className="mt-0.5 text-sm text-slate-700">
-            Learn {found.concepts} ideas one at a time, with pictures and questions you answer as you go.
+            Learn {found.concepts} ideas one at a time: explore diagrams, work through short scenarios and talk each idea over, at your own pace.
           </p>
         </div>
       </div>

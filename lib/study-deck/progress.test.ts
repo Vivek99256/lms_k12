@@ -11,6 +11,7 @@ import {
   progressKey,
   progressReducer,
   saveProgress,
+  slideKeys,
   slideStatus,
   type DeckProgress,
   type StorageLike,
@@ -70,59 +71,77 @@ test('a written answer is complete but neither right nor wrong', () => {
   assert.equal(p.activities['4:0'].correct, null);
 });
 
-test('a slide is complete only once it was opened and every activity on it is done', () => {
+const explored = { correct: null, score: null, maxScore: null };
+
+test('a slide is complete once it was opened and its interaction and example screen explored; practice never holds it up', () => {
   const d = deck();
-  const slide = d.slides[2]; // slide 3, one activity
+  const slide = d.slides[2]; // slide 3: hotspots on a diagram, a worked example, and one optional practice question
   let p = initialProgress(1, AT);
 
-  assert.deepEqual(slideStatus(slide, p), { visited: false, total: 1, done: 0, complete: false });
+  assert.deepEqual(slideKeys(slide), ['3:i', '3:e']);
+  assert.deepEqual(slideStatus(slide, p), { visited: false, total: 2, done: 0, complete: false, practice: { total: 1, done: 0 } });
 
   p = progressReducer(p, { type: 'goto', n: 3, at: AT });
-  assert.equal(slideStatus(slide, p).complete, false, 'opened but the activity is not done');
+  assert.equal(slideStatus(slide, p).complete, false, 'opened but nothing explored');
 
-  p = progressReducer(p, { type: 'result', key: '3:0', result: win, conceptId: 2, questionId: 103, at: AT });
-  assert.deepEqual(slideStatus(slide, p), { visited: true, total: 1, done: 1, complete: true });
+  p = progressReducer(p, { type: 'result', key: '3:i', result: explored, conceptId: 2, questionId: null, at: AT });
+  assert.equal(slideStatus(slide, p).complete, false, 'the diagram is explored but the example is not');
+  p = progressReducer(p, { type: 'result', key: '3:e', result: explored, conceptId: 2, questionId: null, at: AT });
+  assert.deepEqual(slideStatus(slide, p), { visited: true, total: 2, done: 2, complete: true, practice: { total: 1, done: 0 } });
 });
 
-test('a slide with no activities is complete once opened; unplayable activities do not block it', () => {
+test('the cover has nothing to explore, so it is complete once opened; unplayable practice is not counted', () => {
   const d = deck();
   let p = progressReducer(initialProgress(1, AT), { type: 'goto', n: 1, at: AT });
 
-  assert.equal(slideStatus(d.slides[0], p).complete, true);
+  assert.equal(slideStatus(d.slides[0], p).complete, true, 'the cover has nothing to explore');
+  assert.equal(slideStatus(d.slides[1], progressReducer(p, { type: 'goto', n: 2, at: AT })).complete, false, 'slide 2 has a comparison to explore');
 
   p = progressReducer(p, { type: 'goto', n: 3, at: AT });
-  const playable = new Set<string>(); // the one activity could not be built
-  assert.deepEqual(slideStatus(d.slides[2], p, playable), { visited: true, total: 0, done: 0, complete: true });
+  const none = new Set<string>(); // the one practice question could not be built
+  assert.deepEqual(slideStatus(d.slides[2], p, none).practice, { total: 0, done: 0 });
 });
 
-test('concept progress counts what was taught, asked, done and right', () => {
+test('concept progress counts what was taught, explored, practised and right', () => {
   const d = deck();
   let p = initialProgress(1, AT);
-  assert.deepEqual(conceptStatus(d, p, 1), { conceptId: 1, taught: false, activities: 1, done: 0, correct: 0, unmarked: 0 });
+  // Concept 1 is taught on slide 2: a comparison and an example screen.
+  assert.deepEqual(conceptStatus(d, p, 1), { conceptId: 1, taught: false, interactions: 2, explored: 0, complete: false, activities: 1, done: 0, correct: 0, unmarked: 0 });
 
   p = progressReducer(p, { type: 'goto', n: 2, at: AT });
+  assert.equal(conceptStatus(d, p, 1).complete, false, 'taught, but not yet explored');
+  p = progressReducer(p, { type: 'result', key: '2:i', result: explored, conceptId: 1, questionId: null, at: AT });
+  p = progressReducer(p, { type: 'result', key: '2:e', result: explored, conceptId: 1, questionId: null, at: AT });
   p = progressReducer(p, { type: 'result', key: '2:0', result: win, conceptId: 1, questionId: 101, at: AT });
+  assert.deepEqual(conceptStatus(d, p, 1), { conceptId: 1, taught: true, interactions: 2, explored: 2, complete: true, activities: 1, done: 1, correct: 1, unmarked: 0 });
 
-  assert.deepEqual(conceptStatus(d, p, 1), { conceptId: 1, taught: true, activities: 1, done: 1, correct: 1, unmarked: 0 });
+  // Concept 3 (Laws) is taught on slide 4: a reveal, and nothing else.
+  p = progressReducer(p, { type: 'goto', n: 4, at: AT });
+  assert.deepEqual([conceptStatus(d, p, 3).interactions, conceptStatus(d, p, 3).complete], [1, false]);
+  p = progressReducer(p, { type: 'result', key: '4:i', result: explored, conceptId: 3, questionId: null, at: AT });
+  assert.deepEqual([conceptStatus(d, p, 3).explored, conceptStatus(d, p, 3).complete], [1, true]);
 });
 
-test('deck totals give a percentage over slides and activities together', () => {
+test('deck totals give a percentage over slides and interactions; practice is counted apart', () => {
   const d = deck();
   let p = initialProgress(1, AT);
   const empty = deckTotals(d, p);
 
   assert.equal(empty.percent, 0);
   assert.equal(empty.slides, 7);
-  assert.equal(empty.activities, 6); // bank questions 101, 103, 104 plus authored checks on slides 4, 6 and 7
+  assert.equal(empty.interactions, 8); // slide 2: comparison + example; slide 3: hotspots + example; then reveal, scenario, steps, match
+  assert.equal(empty.practice, 3); // bank questions 101, 103, 104
 
   for (const slide of d.slides) p = progressReducer(p, { type: 'goto', n: slide.n, at: AT });
-  d.slides.forEach((slide) => slide.activities.forEach((_, i) => {
-    p = progressReducer(p, { type: 'result', key: `${slide.n}:${i}`, result: win, conceptId: null, questionId: null, at: AT });
-  }));
+  assert.equal(deckTotals(d, p).percent, 47, '7 slides opened of 15 units; nothing explored yet');
 
+  for (const slide of d.slides) {
+    for (const key of slideKeys(slide)) p = progressReducer(p, { type: 'result', key, result: explored, conceptId: null, questionId: null, at: AT });
+  }
   const all = deckTotals(d, p);
-  assert.equal(all.percent, 100);
-  assert.equal(all.done, all.activities);
+  assert.equal(all.percent, 100, 'finishing needs no practice answers');
+  assert.equal(all.explored, all.interactions);
+  assert.equal(all.practiceDone, 0);
   assert.equal(all.visited, 7);
 });
 
