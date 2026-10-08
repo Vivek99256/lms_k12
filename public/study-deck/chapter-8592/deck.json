@@ -1,0 +1,3870 @@
+{
+    "version": 2,
+    "chapter": {
+        "id": 8592,
+        "name": "Exploration: Entering the World of Secondary Science",
+        "standard_id": 42,
+        "subject_id": 3975,
+        "standard_name": "9",
+        "subject_name": "Science"
+    },
+    "chapter_id": 8592,
+    "slide_count": 34,
+    "teaching_strategy": "Teach the chapter as one story: science is both what we know and how we know it. Each topic builds on the one before: observe with purpose, simplify with models, speak precisely, explain with laws and theories, predict and test, estimate, then connect disciplines and people. Each slide asks the learner to act, such as predict, classify, decide or estimate. Diagrams appear only where a structure or comparison needs to be seen.",
+    "baseline_review": {
+        "weaknesses": [
+            "Covers only 12 of 32 concepts, so most of the chapter is never taught.",
+            "Heavy on metadata (clusters, DOK, image prompts) and thin on learner activity.",
+            "Ordering is clustered by theme rather than following the chapter and its prerequisites, e.g. models, then language.",
+            "Gives no explicit links between dependent ideas such as ignoring details, question-driven models and added accuracy.",
+            "Prediction, estimation and the human side of science get little or no depth."
+        ],
+        "improvements": [
+            "Teach every concept in textbook order, using the requires chains.",
+            "Add relationship slides for observation and direction, and for law and theory.",
+            "Use the worked examples (cricket, rice, breaths) and the airplane-fuel scenario as decision points.",
+            "Put questions after the teaching and spread them across practice, recall and challenge slides.",
+            "Keep visuals to a few diagrams that make structure visible."
+        ]
+    },
+    "outline": [
+        {
+            "topic_id": 23809,
+            "name": "Purpose of Scientific Exploration",
+            "concept_ids": [
+                7184,
+                7185,
+                7186
+            ]
+        },
+        {
+            "topic_id": 23810,
+            "name": "Scientific Models and Simplification",
+            "concept_ids": [
+                7187,
+                7188,
+                7189,
+                7190
+            ]
+        },
+        {
+            "topic_id": 23811,
+            "name": "Language, Symbols and Units in Science",
+            "concept_ids": [
+                7191,
+                7192,
+                7193,
+                7194,
+                7195
+            ]
+        },
+        {
+            "topic_id": 23812,
+            "name": "Laws, Theories and Principles",
+            "concept_ids": [
+                7196,
+                7197,
+                7198,
+                7199
+            ]
+        },
+        {
+            "topic_id": 23813,
+            "name": "Prediction and Testing in Science",
+            "concept_ids": [
+                7200,
+                7201,
+                7202,
+                7203,
+                7204,
+                7205
+            ]
+        },
+        {
+            "topic_id": 23814,
+            "name": "Estimation and Approximate Reasoning",
+            "concept_ids": [
+                7206,
+                7207,
+                7208,
+                7209
+            ]
+        },
+        {
+            "topic_id": 23815,
+            "name": "Interdisciplinary Nature of Science",
+            "concept_ids": [
+                7210,
+                7211,
+                7212
+            ]
+        },
+        {
+            "topic_id": 23816,
+            "name": "Science as a Human Activity",
+            "concept_ids": [
+                7213,
+                7214,
+                7215
+            ]
+        }
+    ],
+    "concepts": {
+        "7184": {
+            "id": 7184,
+            "name": "Science asks what and how",
+            "topic_id": 23809,
+            "requires": [],
+            "related": [
+                {
+                    "concept_id": 7185,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7186,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "Secondary science focuses not only on established scientific facts but also on the processes through which science knows: observation, measurement, symbols, models and testing."
+        },
+        "7185": {
+            "id": 7185,
+            "name": "Careful observation in exploration",
+            "topic_id": 23809,
+            "requires": [],
+            "related": [
+                {
+                    "concept_id": 7184,
+                    "type": "part_of"
+                },
+                {
+                    "concept_id": 7186,
+                    "type": "depends_on"
+                }
+            ],
+            "definition": "Careful observation is the deliberate act of noticing patterns and details in nature that might otherwise be overlooked; it is a foundational practice of scientific exploration."
+        },
+        "7186": {
+            "id": 7186,
+            "name": "Purposeful direction in exploration",
+            "topic_id": 23809,
+            "requires": [
+                7185
+            ],
+            "related": [
+                {
+                    "concept_id": 7184,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7185,
+                    "type": "uses"
+                }
+            ],
+            "definition": "Purposeful direction is the guiding element of scientific exploration that keeps inquiry focused by choosing appropriate models, asking the right questions, and recognising the limits of ideas."
+        },
+        "7187": {
+            "id": 7187,
+            "name": "Models as simplified representations",
+            "topic_id": 23810,
+            "requires": [],
+            "related": [
+                {
+                    "concept_id": 7188,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "A scientific model is a simplified view of a real system, not an exact copy. It represents a complex thing in a simpler way so that the system can be examined and understood, for example treating a star as a hot gas, a car as a point, or an atom as a sphere."
+        },
+        "7188": {
+            "id": 7188,
+            "name": "Deliberate ignoring of details",
+            "topic_id": 23810,
+            "requires": [
+                7187
+            ],
+            "related": [
+                {
+                    "concept_id": 7187,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7189,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "In scientific modelling, certain details are deliberately ignored on purpose. This is not a mistake but a useful assumption that keeps a problem simple enough to remain answerable, such as neglecting air resistance to study gravity or ignoring individual cells to understand the heart as a pump."
+        },
+        "7189": {
+            "id": 7189,
+            "name": "Question decides relevant details",
+            "topic_id": 23810,
+            "requires": [
+                7188
+            ],
+            "related": [
+                {
+                    "concept_id": 7187,
+                    "type": "uses"
+                },
+                {
+                    "concept_id": 7188,
+                    "type": "depends_on"
+                }
+            ],
+            "definition": "The details that should be included in a scientific model are decided by the question being asked. Details that affect the answer are kept, while details that make no difference are ignored."
+        },
+        "7190": {
+            "id": 7190,
+            "name": "Models gain accuracy with added detail",
+            "topic_id": 23810,
+            "requires": [
+                7189
+            ],
+            "related": [
+                {
+                    "concept_id": 7187,
+                    "type": "extends"
+                },
+                {
+                    "concept_id": 7189,
+                    "type": "uses"
+                }
+            ],
+            "definition": "A simple model can be improved by adding more details when greater accuracy is needed. As a model becomes more complex, it includes extra factors that were earlier ignored, and this added complexity gives more accurate results."
+        },
+        "7191": {
+            "id": 7191,
+            "name": "Scientific terms are precise",
+            "topic_id": 23811,
+            "requires": [],
+            "related": [
+                {
+                    "concept_id": 7192,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7195,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "In science, words are chosen so that they carry specific, unambiguous meanings, enabling scientists across the world to describe observations, compare results and build ideas together."
+        },
+        "7192": {
+            "id": 7192,
+            "name": "Symbols and units for quantities",
+            "topic_id": 23811,
+            "requires": [
+                7191
+            ],
+            "related": [
+                {
+                    "concept_id": 7193,
+                    "type": "uses"
+                },
+                {
+                    "concept_id": 7191,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "Physical quantities such as mass, velocity, force and current are represented by agreed symbols, and each symbol is paired with a defined unit that gives the quantity a clear, measurable meaning."
+        },
+        "7193": {
+            "id": 7193,
+            "name": "International standard units",
+            "topic_id": 23811,
+            "requires": [
+                7192
+            ],
+            "related": [
+                {
+                    "concept_id": 7192,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7195,
+                    "type": "uses"
+                }
+            ],
+            "definition": "International standard units create a common measurement framework, making scientific results comparable worldwide and helping prevent dangerous errors caused by mixing different local units."
+        },
+        "7194": {
+            "id": 7194,
+            "name": "Symbols arise from history and agreement",
+            "topic_id": 23811,
+            "requires": [
+                7193
+            ],
+            "related": [
+                {
+                    "concept_id": 7192,
+                    "type": "part_of"
+                },
+                {
+                    "concept_id": 7193,
+                    "type": "extends"
+                }
+            ],
+            "definition": "Scientific symbols are not chosen just for convenience; they often originate from historical roots and become fixed through international agreements."
+        },
+        "7195": {
+            "id": 7195,
+            "name": "Equations express scientific relationships",
+            "topic_id": 23811,
+            "requires": [
+                7192
+            ],
+            "related": [
+                {
+                    "concept_id": 7192,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7191,
+                    "type": "uses"
+                },
+                {
+                    "concept_id": 7193,
+                    "type": "uses"
+                }
+            ],
+            "definition": "Equations are compact statements expressing how scientific quantities are related, and mathematics is a reasoning language that helps scientists describe and test relationships clearly rather than an obstacle to be memorised."
+        },
+        "7196": {
+            "id": 7196,
+            "name": "Law describes repeated pattern",
+            "topic_id": 23812,
+            "requires": [],
+            "related": [
+                {
+                    "concept_id": 7197,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7198,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7199,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "A law is a statement of a regular, repeatable pattern observed in nature, often expressed in words or mathematical relationships."
+        },
+        "7197": {
+            "id": 7197,
+            "name": "Theory explains observed patterns",
+            "topic_id": 23812,
+            "requires": [
+                7196
+            ],
+            "related": [
+                {
+                    "concept_id": 7196,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7198,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7199,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "A theory is an evidence-based explanation of why observed patterns occur; it is never a guess or an untested idea."
+        },
+        "7198": {
+            "id": 7198,
+            "name": "Principle gives broad guidance",
+            "topic_id": 23812,
+            "requires": [
+                7197
+            ],
+            "related": [
+                {
+                    "concept_id": 7196,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7197,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7199,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "A principle is a broad idea that helps make sense of a given situation by providing general guidance."
+        },
+        "7199": {
+            "id": 7199,
+            "name": "Scientific knowledge is revisable",
+            "topic_id": 23812,
+            "requires": [
+                7197
+            ],
+            "related": [
+                {
+                    "concept_id": 7196,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7197,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7198,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "Scientific laws, theories and principles are always open to improvement and can change when new evidence becomes available; this revisability is a strength of science."
+        },
+        "7200": {
+            "id": 7200,
+            "name": "Predictions based on established science",
+            "topic_id": 23813,
+            "requires": [],
+            "related": [],
+            "definition": "Well-established laws, theories and models allow scientists to anticipate what will happen under new or different conditions, even before an experiment is carried out and often when the experiment cannot be performed."
+        },
+        "7201": {
+            "id": 7201,
+            "name": "Predictions are reasoned expectations",
+            "topic_id": 23813,
+            "requires": [
+                7200
+            ],
+            "related": [],
+            "definition": "A scientific prediction is a reasoned expectation grounded in evidence and careful thinking, not a guess."
+        },
+        "7202": {
+            "id": 7202,
+            "name": "Successful predictions build confidence",
+            "topic_id": 23813,
+            "requires": [
+                7201
+            ],
+            "related": [],
+            "definition": "When predictions match observations, confidence in the underlying scientific idea grows because the confirmed prediction provides positive evidence for that idea."
+        },
+        "7203": {
+            "id": 7203,
+            "name": "Mismatched predictions prompt re-examination",
+            "topic_id": 23813,
+            "requires": [
+                7202
+            ],
+            "related": [],
+            "definition": "When predictions do not match observations, scientists re-examine their assumptions, models, or measurements, and this re-examination drives further exploration and deeper understanding."
+        },
+        "7204": {
+            "id": 7204,
+            "name": "Testable questions seek measurable evidence",
+            "topic_id": 23813,
+            "requires": [
+                7201
+            ],
+            "related": [],
+            "definition": "A prediction becomes scientifically testable when it is expressed through questions that ask for measurable evidence and past patterns instead of relying on vague yes/no impressions such as 'clouds look dark'."
+        },
+        "7205": {
+            "id": 7205,
+            "name": "Complex systems make predictions uncertain",
+            "topic_id": 23813,
+            "requires": [
+                7204
+            ],
+            "related": [],
+            "definition": "In complex systems such as the weather, many changing factors interact and tiny differences in conditions can grow over time, making predictions less certain as the time period increases."
+        },
+        "7206": {
+            "id": 7206,
+            "name": "Estimation begins with understanding",
+            "topic_id": 23814,
+            "requires": [],
+            "related": [
+                {
+                    "concept_id": 7208,
+                    "type": "part_of"
+                },
+                {
+                    "concept_id": 7207,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "Estimation is a purposeful strategy that starts by understanding the situation being studied, identifying the quantities that matter, and only then making a rough estimate to judge an answer."
+        },
+        "7207": {
+            "id": 7207,
+            "name": "Approximate estimates check reasonableness",
+            "topic_id": 23814,
+            "requires": [
+                7206
+            ],
+            "related": [
+                {
+                    "concept_id": 7206,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7208,
+                    "type": "uses"
+                }
+            ],
+            "definition": "Approximate reasoning treats exact values as unnecessary in early reasoning; a rough estimate is often enough to tell whether a result is reasonable or impossible, and estimation builds intuition and confidence."
+        },
+        "7208": {
+            "id": 7208,
+            "name": "Estimate using rates and assumed values",
+            "topic_id": 23814,
+            "requires": [
+                7207
+            ],
+            "related": [
+                {
+                    "concept_id": 7206,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7207,
+                    "type": "uses"
+                }
+            ],
+            "definition": "Estimation can be built by assuming simple rates and quantities, such as breaths per minute or energy requirements per person per day, and combining them over the relevant time or number of persons to obtain an approximate total."
+        },
+        "7209": {
+            "id": 7209,
+            "name": "Cross-check estimates independently",
+            "topic_id": 23814,
+            "requires": [
+                7208
+            ],
+            "related": [
+                {
+                    "concept_id": 7207,
+                    "type": "part_of"
+                },
+                {
+                    "concept_id": 7208,
+                    "type": "uses"
+                }
+            ],
+            "definition": "An estimate gains credibility when it is checked by a second, independent line of reasoning; if the two independent estimates are close, the original estimate is more likely to be reasonable."
+        },
+        "7210": {
+            "id": 7210,
+            "name": "Branches are man-made divisions",
+            "topic_id": 23815,
+            "requires": [],
+            "related": [
+                {
+                    "concept_id": 7211,
+                    "type": "related_to"
+                },
+                {
+                    "concept_id": 7212,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "The separation of science into subjects such as physics, chemistry, biology and earth science is an artificial arrangement made by humans to organise knowledge; nature itself is continuous and has no such boundaries."
+        },
+        "7211": {
+            "id": 7211,
+            "name": "Real problems need multiple disciplines",
+            "topic_id": 23815,
+            "requires": [
+                7210
+            ],
+            "related": [
+                {
+                    "concept_id": 7210,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7212,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "Real-world challenges such as climate change, developing medicines and designing sustainable technologies cannot be handled by any one branch alone; they require the combined ideas of several scientific disciplines."
+        },
+        "7212": {
+            "id": 7212,
+            "name": "Science links with other knowledge domains",
+            "topic_id": 23815,
+            "requires": [
+                7211
+            ],
+            "related": [
+                {
+                    "concept_id": 7211,
+                    "type": "extends"
+                },
+                {
+                    "concept_id": 7210,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "Science is connected to mathematics, technology, the arts and the social sciences; these domains are not isolated because understanding is enriched when scientific and non-scientific ways of knowing are combined."
+        },
+        "7213": {
+            "id": 7213,
+            "name": "Science is a human activity",
+            "topic_id": 23816,
+            "requires": [],
+            "related": [
+                {
+                    "concept_id": 7214,
+                    "type": "causes"
+                },
+                {
+                    "concept_id": 7215,
+                    "type": "extends"
+                }
+            ],
+            "definition": "Science is not just a collection of facts, equations, or experiments; it is a human activity shaped by curiosity, creativity, collaboration, and careful questioning."
+        },
+        "7214": {
+            "id": 7214,
+            "name": "Science grows through collective effort",
+            "topic_id": 23816,
+            "requires": [
+                7213
+            ],
+            "related": [
+                {
+                    "concept_id": 7213,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7215,
+                    "type": "related_to"
+                }
+            ],
+            "definition": "Science develops cumulatively through the questioning, testing, sharing, and correction of ideas by many people across different cultures and generations."
+        },
+        "7215": {
+            "id": 7215,
+            "name": "Scientific thinking applies beyond science",
+            "topic_id": 23816,
+            "requires": [
+                7212
+            ],
+            "related": [
+                {
+                    "concept_id": 7213,
+                    "type": "depends_on"
+                },
+                {
+                    "concept_id": 7214,
+                    "type": "extends"
+                }
+            ],
+            "definition": "Scientific thinking remains valuable even if one does not continue studying science because it helps understand technology, evaluate information critically, and make sense of the world."
+        }
+    },
+    "slides": [
+        {
+            "n": 1,
+            "section": "Introduction",
+            "slide_type": "cover",
+            "title": "Exploration: entering secondary science",
+            "concept_ids": [],
+            "taught_concept_ids": [],
+            "concepts": [],
+            "relationship": null,
+            "content": {
+                "body": "This chapter shows how science explores the world, not only what it has found.",
+                "explanations": [],
+                "bullets": [],
+                "example": null,
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 1,
+                "minutes": 1
+            },
+            "question_ids": [],
+            "activities": [],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": false,
+                "existing_ai_content": true,
+                "question_bank": false,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 2,
+            "section": "Introduction",
+            "slide_type": "hook",
+            "title": "A puddle vanishes: how do we know why?",
+            "concept_ids": [],
+            "taught_concept_ids": [],
+            "concepts": [],
+            "relationship": null,
+            "content": {
+                "body": "Knowing that something happened is one thing; explaining why it happened takes observation, measurement and reasoning.",
+                "explanations": [],
+                "bullets": [
+                    "What did we observe?",
+                    "What could we measure?",
+                    "How could we test an idea?"
+                ],
+                "example": null,
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [],
+            "activities": [
+                {
+                    "source": "authored",
+                    "question_id": null,
+                    "concept_id": null,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "understand",
+                    "difficulty": null,
+                    "dok": 2,
+                    "why": "a quick check written for a slide the question bank has nothing for",
+                    "question": {
+                        "id": -21,
+                        "question": "Why is saying 'the puddle is gone' not yet an explanation?",
+                        "question_type_code": "short",
+                        "question_type": "Narrative",
+                        "marks": 1,
+                        "options": [],
+                        "model_answer": "It states a fact but not how we know why it happened; that needs observation, measurement and testing.",
+                        "chapter_id": 8592,
+                        "standard_id": 42,
+                        "subject_id": 3975,
+                        "concept_id": null,
+                        "authored": true
+                    }
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": false,
+                "existing_ai_content": false,
+                "question_bank": false,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 3,
+            "section": "Introduction",
+            "slide_type": "objectives",
+            "title": "What you will be able to do",
+            "concept_ids": [],
+            "taught_concept_ids": [],
+            "concepts": [],
+            "relationship": null,
+            "content": {
+                "body": "By the end of this chapter, you will be able to do the following.",
+                "explanations": [],
+                "bullets": [
+                    "Observe closely and with purpose",
+                    "Build and judge simple models",
+                    "Use precise terms, symbols and units"
+                ],
+                "example": null,
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "remember",
+                "dok": 1,
+                "minutes": 1
+            },
+            "question_ids": [],
+            "activities": [
+                {
+                    "source": "authored",
+                    "question_id": null,
+                    "concept_id": null,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": null,
+                    "dok": 1,
+                    "why": "a quick check written for a slide the question bank has nothing for",
+                    "question": {
+                        "id": -31,
+                        "question": "Which of these goals is about checking whether an answer is reasonable?",
+                        "question_type_code": "short",
+                        "question_type": "Narrative",
+                        "marks": 1,
+                        "options": [],
+                        "model_answer": "Estimating, which uses a rough calculation to see whether an answer makes sense.",
+                        "chapter_id": 8592,
+                        "standard_id": 42,
+                        "subject_id": 3975,
+                        "concept_id": null,
+                        "authored": true
+                    }
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": false,
+                "existing_ai_content": true,
+                "question_bank": false,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 4,
+            "section": "Purpose of Scientific Exploration",
+            "slide_type": "concept_intro",
+            "title": "Science asks what and how",
+            "concept_ids": [
+                7184
+            ],
+            "taught_concept_ids": [
+                7184
+            ],
+            "concepts": [
+                "Science asks what and how"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7184,
+                        "text": "Science is not only about what we know, but also about how we know it: through observation, measurement, symbols, models and testing."
+                    }
+                ],
+                "bullets": [
+                    "Observation and measurement",
+                    "Symbols, equations and models",
+                    "Testing, revision, discarding"
+                ],
+                "example": null,
+                "misconception": {
+                    "wrong_idea": "Science is only a collection of facts.",
+                    "correction": "The methods of observation, measurement, modelling and testing are part of science. Every claim carries the question 'how is it known?'"
+                },
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                730398,
+                701401
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730398,
+                    "concept_id": 7184,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 701401,
+                    "concept_id": 7184,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Try it",
+                    "bloom": "understand",
+                    "difficulty": "easy",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 5,
+            "section": "Purpose of Scientific Exploration",
+            "slide_type": "relationship",
+            "title": "The magnifying glass and the compass",
+            "concept_ids": [
+                7185,
+                7186
+            ],
+            "taught_concept_ids": [
+                7185,
+                7186
+            ],
+            "concepts": [
+                "Careful observation in exploration",
+                "Purposeful direction in exploration"
+            ],
+            "relationship": {
+                "from": 7185,
+                "to": 7186,
+                "kind": "builds_on",
+                "idea": "Noticing details gives exploration its material; direction (models, questions, limits) keeps it from being aimless."
+            },
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7185,
+                        "text": "Careful observation, symbolised by the magnifying glass, means noticing patterns and details that might otherwise be missed."
+                    },
+                    {
+                        "concept_id": 7186,
+                        "text": "Purposeful direction, symbolised by the compass, means choosing appropriate models, asking the right questions and knowing the limits of our ideas."
+                    }
+                ],
+                "bullets": [],
+                "example": null,
+                "misconception": null,
+                "relationship_note": "Careful observation supplies the details, and purposeful direction keeps exploration from wandering aimlessly.",
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                701402,
+                701403
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 701402,
+                    "concept_id": 7185,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Check",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 701403,
+                    "concept_id": 7186,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7186,
+                    "label": "Think about it",
+                    "bloom": "understand",
+                    "difficulty": "easy",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": {
+                "required": true,
+                "role": "diagram",
+                "query": "magnifying glass compass",
+                "purpose": "Contrast the two symbols of the textbook."
+            },
+            "image": {
+                "type": "diagram",
+                "url": "images/5fdc2ee2a93b955ee659f20c627a62291c8ebbd3.png",
+                "width": 1280,
+                "height": 720,
+                "sha1": "5fdc2ee2a93b955ee659f20c627a62291c8ebbd3",
+                "layout": "compare",
+                "texts": [
+                    "Two symbols of exploration",
+                    "Magnifying glass",
+                    "Careful observation",
+                    "Noticing patterns",
+                    "Details that might be missed",
+                    "Compass",
+                    "Choosing appropriate models",
+                    "Asking the right questions",
+                    "Knowing the limits of ideas"
+                ],
+                "alt": "Diagram: Two symbols of exploration. Magnifying glass: Careful observation; Noticing patterns; Details that might be missed. Compass: Choosing appropriate models; Asking the right questions; Knowing the limits of ideas.",
+                "caption": "Two symbols of exploration",
+                "licence": null,
+                "source_url": null,
+                "creator": null,
+                "attribution_required": false,
+                "attribution": "",
+                "review": {
+                    "relevant": true,
+                    "reason": "drawn from the plan's own diagram spec"
+                },
+                "purpose": "Contrast the two symbols of the textbook."
+            },
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 6,
+            "section": "Scientific Models and Simplification",
+            "slide_type": "concept_visual",
+            "title": "Models are simplified views",
+            "concept_ids": [
+                7187
+            ],
+            "taught_concept_ids": [
+                7187
+            ],
+            "concepts": [
+                "Models as simplified representations"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7187,
+                        "text": "A scientific model is a simplified view of a real system, not an exact copy. It focuses only on what matters for a given question."
+                    }
+                ],
+                "bullets": [
+                    "Car as a point",
+                    "Atom as a sphere",
+                    "Earth as a smooth sphere"
+                ],
+                "example": "Meghnad Saha treated matter in a star as a hot gas and focused on temperature, pressure and ion formation. This explained how star colour is connected to temperature.",
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                730338,
+                730433
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730338,
+                    "concept_id": 7187,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Check",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730433,
+                    "concept_id": 7187,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": {
+                "required": true,
+                "role": "diagram",
+                "query": "scientific models",
+                "purpose": "Show how one idea, a model, appears in each discipline."
+            },
+            "image": {
+                "type": "diagram",
+                "url": "images/e779c69d8d705c5d61d1893f811048c2f62d185b.png",
+                "width": 1280,
+                "height": 720,
+                "sha1": "e779c69d8d705c5d61d1893f811048c2f62d185b",
+                "layout": "hub",
+                "texts": [
+                    "Models across science",
+                    "Model",
+                    "Moving car as a point",
+                    "Atoms as spheres",
+                    "Cells as diagrams",
+                    "Earth as smooth sphere"
+                ],
+                "alt": "Diagram: Models across science. 'Model' connected to Moving car as a point, Atoms as spheres, Cells as diagrams, Earth as smooth sphere.",
+                "caption": "Models across science",
+                "licence": null,
+                "source_url": null,
+                "creator": null,
+                "attribution_required": false,
+                "attribution": "",
+                "review": {
+                    "relevant": true,
+                    "reason": "drawn from the plan's own diagram spec"
+                },
+                "purpose": "Show how one idea, a model, appears in each discipline."
+            },
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 7,
+            "section": "Scientific Models and Simplification",
+            "slide_type": "misconception",
+            "title": "Ignoring details is deliberate",
+            "concept_ids": [
+                7188
+            ],
+            "taught_concept_ids": [
+                7188
+            ],
+            "concepts": [
+                "Deliberate ignoring of details"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7188,
+                        "text": "Scientists leave some details out on purpose. This is an assumption, not a mistake, and it keeps the question simple enough to answer."
+                    }
+                ],
+                "bullets": [],
+                "example": "To study how the heart pumps blood, many individual cells are ignored so the heart can be understood as a functioning system.",
+                "misconception": {
+                    "wrong_idea": "Ignoring details is a mistake or a shortcut.",
+                    "correction": "Ignoring details is a planned choice made on purpose to keep the question answerable."
+                },
+                "relationship_note": null,
+                "bloom": "analyze",
+                "dok": 3,
+                "minutes": 2
+            },
+            "question_ids": [
+                730342,
+                701405
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730342,
+                    "concept_id": 7188,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Check",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 701405,
+                    "concept_id": 7188,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Try it",
+                    "bloom": "understand",
+                    "difficulty": "easy",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 8,
+            "section": "Scientific Models and Simplification",
+            "slide_type": "worked_example",
+            "title": "Cricket six: what to keep, what to drop",
+            "concept_ids": [
+                7189
+            ],
+            "taught_concept_ids": [
+                7189
+            ],
+            "concepts": [
+                "Question decides relevant details"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7189,
+                        "text": "The question being asked decides which details a model keeps. Details that affect the answer stay; details that make no difference are ignored."
+                    }
+                ],
+                "bullets": [
+                    "Keep: mass, speed, direction",
+                    "Drop: bat brand, ball colour, grass"
+                ],
+                "example": "The question is whether the ball crosses the boundary without hitting the ground first. Air resistance, spin and seam stitching are smaller effects and can be ignored in a simple model.",
+                "misconception": {
+                    "wrong_idea": "Obvious visible details are always the important ones.",
+                    "correction": "Relevance is set by the question. Bat brand, ball colour and amount of grass make no difference for a six."
+                },
+                "relationship_note": null,
+                "bloom": "apply",
+                "dok": 2,
+                "minutes": 3
+            },
+            "question_ids": [
+                730402,
+                701406
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730402,
+                    "concept_id": 7189,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 701406,
+                    "concept_id": 7189,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Apply",
+                    "bloom": "apply",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 9,
+            "section": "Scientific Models and Simplification",
+            "slide_type": "concept_intro",
+            "title": "Adding detail adds accuracy",
+            "concept_ids": [
+                7190
+            ],
+            "taught_concept_ids": [
+                7190
+            ],
+            "concepts": [
+                "Models gain accuracy with added detail"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7190,
+                        "text": "As more details are added, a model becomes more complex and gives more accurate results. Extra factors that were earlier ignored are included."
+                    }
+                ],
+                "bullets": [],
+                "example": "The cricket model first keeps the ball's mass, speed and direction. Air resistance, spin and the seam stitching are smaller effects, added later for greater accuracy.",
+                "misconception": {
+                    "wrong_idea": "Any added detail makes a model more accurate",
+                    "correction": "The colour of the ball makes no difference to whether it clears the boundary, so adding it does not help."
+                },
+                "relationship_note": null,
+                "bloom": "evaluate",
+                "dok": 3,
+                "minutes": 3
+            },
+            "question_ids": [
+                701407
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 701407,
+                    "concept_id": 7190,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Check",
+                    "bloom": "understand",
+                    "difficulty": "easy",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 10,
+            "section": "Scientific Models and Simplification",
+            "slide_type": "practice",
+            "title": "Model the ride home",
+            "concept_ids": [
+                7188,
+                7189
+            ],
+            "taught_concept_ids": [],
+            "concepts": [
+                "Deliberate ignoring of details",
+                "Question decides relevant details"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "You ride a bicycle from school to home. Decide which details to keep and which to ignore.",
+                "explanations": [],
+                "bullets": [
+                    "Details you would keep",
+                    "Details you could ignore",
+                    "Why ignoring helps"
+                ],
+                "example": null,
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "apply",
+                "dok": 2,
+                "minutes": 5
+            },
+            "question_ids": [
+                730344,
+                730456
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730344,
+                    "concept_id": 7188,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Apply",
+                    "bloom": "apply",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730456,
+                    "concept_id": 7189,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7189,
+                    "label": "Think about it",
+                    "bloom": "apply",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 11,
+            "section": "Language, Symbols and Units in Science",
+            "slide_type": "concept_intro",
+            "title": "Precise words, agreed symbols",
+            "concept_ids": [
+                7191,
+                7192
+            ],
+            "taught_concept_ids": [
+                7191,
+                7192
+            ],
+            "concepts": [
+                "Scientific terms are precise",
+                "Symbols and units for quantities"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7191,
+                        "text": "Science uses words with specific meanings so ideas are communicated clearly and unambiguously, and scientists across the world can compare results."
+                    },
+                    {
+                        "concept_id": 7192,
+                        "text": "Mass, velocity, force and current are written as m, v, F and I, each associated with a defined unit."
+                    }
+                ],
+                "bullets": [],
+                "example": "Force, work, cell and reaction are everyday words that carry specific meanings in science.",
+                "misconception": {
+                    "wrong_idea": "The symbol alone tells the size of a quantity",
+                    "correction": "A symbol names the quantity. A measurement is complete only when a unit is included."
+                },
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 3
+            },
+            "question_ids": [
+                701355,
+                701356
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 701355,
+                    "concept_id": 7191,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Check",
+                    "bloom": "understand",
+                    "difficulty": "easy",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 701356,
+                    "concept_id": 7192,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7192,
+                    "label": "Think about it",
+                    "bloom": "understand",
+                    "difficulty": "easy",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 12,
+            "section": "Language, Symbols and Units in Science",
+            "slide_type": "scenario",
+            "title": "The airplane that ran short of fuel",
+            "concept_ids": [
+                7193
+            ],
+            "taught_concept_ids": [
+                7193
+            ],
+            "concepts": [
+                "International standard units"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7193,
+                        "text": "Standard SI units give everyone one common measurement framework, so results can be compared and mixing units is avoided."
+                    }
+                ],
+                "bullets": [],
+                "example": "A flight needed 22,300 kg of fuel. The crew used fuel density in pounds per litre instead of kilograms, leaving the aircraft about 15,000 litres short. It glided to an emergency landing with no casualties.",
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "evaluate",
+                "dok": 3,
+                "minutes": 3
+            },
+            "question_ids": [
+                730351,
+                730352
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730351,
+                    "concept_id": 7193,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": "branching",
+                    "decision": true,
+                    "connects_concept": null,
+                    "label": "Check",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "a decision with consequences, answered as a choice"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730352,
+                    "concept_id": 7193,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": "branching",
+                    "decision": true,
+                    "connects_concept": null,
+                    "label": "Try it",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "a decision with consequences, answered as a choice"
+                }
+            ],
+            "h5p_pattern": {
+                "type": "branching",
+                "reason": "The learner picks the unit the ground crew should have used and sees the consequence."
+            },
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": true
+            }
+        },
+        {
+            "n": 13,
+            "section": "Language, Symbols and Units in Science",
+            "slide_type": "concept_intro",
+            "title": "Why the speed of light is c",
+            "concept_ids": [
+                7194
+            ],
+            "taught_concept_ids": [
+                7194
+            ],
+            "concepts": [
+                "Symbols arise from history and agreement"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7194,
+                        "text": "Scientific symbols often come from history and international agreements, not from abbreviations chosen for convenience."
+                    }
+                ],
+                "bullets": [],
+                "example": "The symbol c comes from the Latin word celeritas, meaning speed. The speed of light is defined to be exactly 299792458 m/s.",
+                "misconception": {
+                    "wrong_idea": "Symbols are short forms of English names",
+                    "correction": "The symbol c comes from Latin, not from an English word such as light or speed."
+                },
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                730405,
+                701411
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730405,
+                    "concept_id": 7194,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 701411,
+                    "concept_id": 7194,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Try it",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 14,
+            "section": "Language, Symbols and Units in Science",
+            "slide_type": "concept_intro",
+            "title": "Equations as statements of relationship",
+            "concept_ids": [
+                7195
+            ],
+            "taught_concept_ids": [
+                7195
+            ],
+            "concepts": [
+                "Equations express scientific relationships"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7195,
+                        "text": "An equation is a compact statement about how quantities are related. Mathematics is a language that helps us think clearly, not a hurdle."
+                    }
+                ],
+                "bullets": [
+                    "Understand the situation first",
+                    "Identify the relevant quantities",
+                    "Then reason with the relationship"
+                ],
+                "example": "Describing motion with distance, time and velocity lets us answer where an object will be at a later moment.",
+                "misconception": {
+                    "wrong_idea": "An equation tells you what to punch into a calculator",
+                    "correction": "First understand the situation and identify the quantities, then use the relationship to reason."
+                },
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 3
+            },
+            "question_ids": [
+                701412,
+                730404
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 701412,
+                    "concept_id": 7195,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Check",
+                    "bloom": "understand",
+                    "difficulty": "easy",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730404,
+                    "concept_id": 7195,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 15,
+            "section": "Laws, Theories and Principles",
+            "slide_type": "concept_intro",
+            "title": "A law describes a repeated pattern",
+            "concept_ids": [
+                7196
+            ],
+            "taught_concept_ids": [
+                7196
+            ],
+            "concepts": [
+                "Law describes repeated pattern"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7196,
+                        "text": "A law is a statement of a regular pattern observed in nature, often expressed in words or mathematical relationships."
+                    }
+                ],
+                "bullets": [],
+                "example": "Newton's laws of motion explain the jerk we feel when a bus stops suddenly.",
+                "misconception": {
+                    "wrong_idea": "A law must explain why a pattern occurs",
+                    "correction": "A law states what pattern is observed. Explaining why it occurs is the role of a theory."
+                },
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                730408,
+                730356
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730408,
+                    "concept_id": 7196,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730356,
+                    "concept_id": 7196,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Try it",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": {
+                "type": "fill_blanks",
+                "reason": "no question on this slide can be asked this way (the bank has no question of the form it needs for these concepts)"
+            },
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 16,
+            "section": "Laws, Theories and Principles",
+            "slide_type": "relationship",
+            "title": "Law tells what, theory tells why",
+            "concept_ids": [
+                7196,
+                7197
+            ],
+            "taught_concept_ids": [
+                7197
+            ],
+            "concepts": [
+                "Law describes repeated pattern",
+                "Theory explains observed patterns"
+            ],
+            "relationship": {
+                "from": 7196,
+                "to": 7197,
+                "kind": "builds_on",
+                "idea": "The law gives the observed pattern; the theory gives an evidence-based explanation for it."
+            },
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7197,
+                        "text": "A theory goes a step further than a law and explains why patterns occur, based on evidence and careful testing. It is never a guess."
+                    }
+                ],
+                "bullets": [],
+                "example": "Atomic theory explains how molecules are formed.",
+                "misconception": {
+                    "wrong_idea": "A scientific theory is just a guess",
+                    "correction": "A theory is an explanation based on evidence, careful testing and critical examination."
+                },
+                "relationship_note": "The law gives the observed pattern, and the theory builds on it by giving an evidence-based explanation of why that pattern occurs.",
+                "bloom": "analyze",
+                "dok": 3,
+                "minutes": 3
+            },
+            "question_ids": [
+                730359,
+                701414
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730359,
+                    "concept_id": 7197,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7197,
+                    "label": "Think about it",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 701414,
+                    "concept_id": 7197,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7197,
+                    "label": "Think about it",
+                    "bloom": "analyze",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": {
+                "required": true,
+                "role": "diagram",
+                "query": "law versus theory",
+                "purpose": "Compare the role of a law with that of a theory."
+            },
+            "image": {
+                "type": "diagram",
+                "url": "images/72a29f84f8d8b79b50a31918d61cd7f65469c5f9.png",
+                "width": 1280,
+                "height": 720,
+                "sha1": "72a29f84f8d8b79b50a31918d61cd7f65469c5f9",
+                "layout": "compare",
+                "texts": [
+                    "Law and theory",
+                    "Law",
+                    "Regular pattern observed",
+                    "Words or mathematical relationships",
+                    "Newton's laws of motion",
+                    "Theory",
+                    "Explains why patterns occur",
+                    "Based on evidence",
+                    "Atomic theory"
+                ],
+                "alt": "Diagram: Law and theory. Law: Regular pattern observed; Words or mathematical relationships; Newton's laws of motion. Theory: Explains why patterns occur; Based on evidence; Atomic theory.",
+                "caption": "Law and theory",
+                "licence": null,
+                "source_url": null,
+                "creator": null,
+                "attribution_required": false,
+                "attribution": "",
+                "review": {
+                    "relevant": true,
+                    "reason": "drawn from the plan's own diagram spec"
+                },
+                "purpose": "Compare the role of a law with that of a theory."
+            },
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 17,
+            "section": "Laws, Theories and Principles",
+            "slide_type": "concept_intro",
+            "title": "Principles guide; all ideas can be revised",
+            "concept_ids": [
+                7198,
+                7199
+            ],
+            "taught_concept_ids": [
+                7198,
+                7199
+            ],
+            "concepts": [
+                "Principle gives broad guidance",
+                "Scientific knowledge is revisable"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7198,
+                        "text": "A principle is a broad idea that helps make sense of a given situation."
+                    },
+                    {
+                        "concept_id": 7199,
+                        "text": "Laws, theories and principles are always open to improvement and often change as new evidence becomes available."
+                    }
+                ],
+                "bullets": [],
+                "example": "The principle of conservation of energy is applied when climbing up the stairs.",
+                "misconception": {
+                    "wrong_idea": "Revisability makes science unreliable.",
+                    "correction": "Science changes its ideas when new evidence conflicts with them. This improves accuracy, so revisability is a strength."
+                },
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                730410,
+                730363
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730410,
+                    "concept_id": 7198,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730363,
+                    "concept_id": 7199,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7199,
+                    "label": "Think about it",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 18,
+            "section": "Prediction and Testing in Science",
+            "slide_type": "concept_intro",
+            "title": "Predictions are reasoned, not guessed",
+            "concept_ids": [
+                7200,
+                7201
+            ],
+            "taught_concept_ids": [
+                7200,
+                7201
+            ],
+            "concepts": [
+                "Predictions based on established science",
+                "Predictions are reasoned expectations"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7200,
+                        "text": "Well-established laws, theories and models let us anticipate what will happen under new or different conditions."
+                    },
+                    {
+                        "concept_id": 7201,
+                        "text": "A scientific prediction is a reasoned expectation based on evidence and careful thinking, not a guess."
+                    }
+                ],
+                "bullets": [],
+                "example": "Ideas about motion predict how far a kicked football will travel. Biological principles predict how breathing changes while running.",
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                730358,
+                730333
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730358,
+                    "concept_id": 7200,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Apply",
+                    "bloom": "apply",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730333,
+                    "concept_id": 7201,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7201,
+                    "label": "Think about it",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 19,
+            "section": "Prediction and Testing in Science",
+            "slide_type": "relationship",
+            "title": "When predictions match, and when they miss",
+            "concept_ids": [
+                7202,
+                7203
+            ],
+            "taught_concept_ids": [
+                7202,
+                7203
+            ],
+            "concepts": [
+                "Successful predictions build confidence",
+                "Mismatched predictions prompt re-examination"
+            ],
+            "relationship": {
+                "from": 7202,
+                "to": 7203,
+                "kind": "contrasts_with",
+                "idea": "Both outcomes of a prediction teach something: success builds confidence, failure drives deeper exploration."
+            },
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7202,
+                        "text": "When predictions match observations, confidence in the underlying science grows."
+                    },
+                    {
+                        "concept_id": 7203,
+                        "text": "When predictions do not match, scientists re-examine their assumptions, models or measurements."
+                    }
+                ],
+                "bullets": [],
+                "example": null,
+                "misconception": null,
+                "relationship_note": "Both outcomes teach something: a match builds confidence, while a miss drives deeper exploration.",
+                "bloom": "analyze",
+                "dok": 3,
+                "minutes": 2
+            },
+            "question_ids": [
+                730412,
+                730414
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730412,
+                    "concept_id": 7202,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730414,
+                    "concept_id": 7203,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7203,
+                    "label": "Think about it",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 20,
+            "section": "Prediction and Testing in Science",
+            "slide_type": "worked_example",
+            "title": "Making 'clouds look dark' testable",
+            "concept_ids": [
+                7204
+            ],
+            "taught_concept_ids": [
+                7204
+            ],
+            "concepts": [
+                "Testable questions seek measurable evidence"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7204,
+                        "text": "A testable prediction asks for measurable evidence and past patterns, not vague comments or simple yes/no answers."
+                    }
+                ],
+                "bullets": [],
+                "example": "Varsha says it will rain because the clouds look dark. Meghna asks: Is humidity above 80 per cent, as it was last time it rained? What are today's wind speed and direction? Is the temperature dropping as before the recent rains?",
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "evaluate",
+                "dok": 3,
+                "minutes": 3
+            },
+            "question_ids": [
+                730367,
+                730415
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730367,
+                    "concept_id": 7204,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Check",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730415,
+                    "concept_id": 7204,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 21,
+            "section": "Prediction and Testing in Science",
+            "slide_type": "concept_intro",
+            "title": "Why forecasts weaken with time",
+            "concept_ids": [
+                7205
+            ],
+            "taught_concept_ids": [
+                7205
+            ],
+            "concepts": [
+                "Complex systems make predictions uncertain"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7205,
+                        "text": "Weather has many changing factors, and tiny differences in conditions can grow, so forecasts become less certain over longer periods."
+                    }
+                ],
+                "bullets": [
+                    "Temperature",
+                    "Pressure, humidity",
+                    "Wind"
+                ],
+                "example": "Forecasts are usually reliable for a few hours or even a few days, but less certain further into the future.",
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                730413,
+                730442
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730413,
+                    "concept_id": 7205,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730442,
+                    "concept_id": 7205,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 22,
+            "section": "Estimation and Approximate Reasoning",
+            "slide_type": "concept_visual",
+            "title": "Estimate by understanding first",
+            "concept_ids": [
+                7206,
+                7207
+            ],
+            "taught_concept_ids": [
+                7206,
+                7207
+            ],
+            "concepts": [
+                "Estimation begins with understanding",
+                "Approximate estimates check reasonableness"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7206,
+                        "text": "Estimation begins by understanding the situation, then identifying the quantities that matter, and only then making a rough estimate."
+                    },
+                    {
+                        "concept_id": 7207,
+                        "text": "Often, an approximate estimate is enough to tell us whether a result is reasonable or impossible."
+                    }
+                ],
+                "bullets": [],
+                "example": "For the rice a family of four needs in a month, 100 g is clearly too little, while a few tonnes is far too much.",
+                "misconception": {
+                    "wrong_idea": "Estimating means taking a blind guess as soon as a number problem appears.",
+                    "correction": "A good estimate begins by understanding the situation, identifying the quantities that matter, and only then making a rough calculation."
+                },
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 3
+            },
+            "question_ids": [
+                730418,
+                730375
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730418,
+                    "concept_id": 7206,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730375,
+                    "concept_id": 7207,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7207,
+                    "label": "Think about it",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": {
+                "required": true,
+                "role": "diagram",
+                "query": "estimation steps",
+                "purpose": "Show the order of the estimation strategy."
+            },
+            "image": {
+                "type": "diagram",
+                "url": "images/41cfd87fc8909969efaad58abb64a7ceef77a424.png",
+                "width": 1280,
+                "height": 720,
+                "sha1": "41cfd87fc8909969efaad58abb64a7ceef77a424",
+                "layout": "flow",
+                "texts": [
+                    "Estimating a quantity",
+                    "Understand the situation",
+                    "Identify the quantities",
+                    "Make a rough estimate"
+                ],
+                "alt": "Diagram: Estimating a quantity. Steps in order: Understand the situation, then Identify the quantities, then Make a rough estimate.",
+                "caption": "Estimating a quantity",
+                "licence": null,
+                "source_url": null,
+                "creator": null,
+                "attribution_required": false,
+                "attribution": "",
+                "review": {
+                    "relevant": true,
+                    "reason": "drawn from the plan's own diagram spec"
+                },
+                "purpose": "Show the order of the estimation strategy."
+            },
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 23,
+            "section": "Estimation and Approximate Reasoning",
+            "slide_type": "worked_example",
+            "title": "How much air do we breathe in a day?",
+            "concept_ids": [
+                7208
+            ],
+            "taught_concept_ids": [
+                7208
+            ],
+            "concepts": [
+                "Estimate using rates and assumed values"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7208,
+                        "text": "Assume simple rates, such as breaths per minute and volume per breath, then multiply over the relevant time."
+                    }
+                ],
+                "bullets": [],
+                "example": "At rest we take about 12 to 15 breaths a minute. Over 1440 minutes that is about 20 thousand breaths. Four to five breaths fill a 2-litre balloon, so one breath is about 0.5 litre. Total: about 10,000 litres a day.",
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "apply",
+                "dok": 3,
+                "minutes": 4
+            },
+            "question_ids": [
+                730417,
+                730366
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730417,
+                    "concept_id": 7208,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730366,
+                    "concept_id": 7208,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Apply",
+                    "bloom": "apply",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 24,
+            "section": "Estimation and Approximate Reasoning",
+            "slide_type": "concept_intro",
+            "title": "Cross-check with a second route",
+            "concept_ids": [
+                7209
+            ],
+            "taught_concept_ids": [
+                7209
+            ],
+            "concepts": [
+                "Cross-check estimates independently"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7209,
+                        "text": "An estimate gains credibility when a second, independent line of reasoning gives a close result."
+                    }
+                ],
+                "bullets": [],
+                "example": "Blowing up a balloon takes about 20 s, so about 3 balloons a minute. Then 3 × 2 litres × 1440 minutes gives about 8640 litres, close to the first estimate of 10,000 litres.",
+                "misconception": {
+                    "wrong_idea": "Two independent estimates must match exactly or one of them is wrong.",
+                    "correction": "Cross-checking looks for closeness, not equality. 8640 litres is close to 10,000 litres, so confidence in the first estimate grows."
+                },
+                "relationship_note": null,
+                "bloom": "evaluate",
+                "dok": 3,
+                "minutes": 3
+            },
+            "question_ids": [
+                701341,
+                701373
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 701341,
+                    "concept_id": 7209,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Think about it",
+                    "bloom": "evaluate",
+                    "difficulty": "hard",
+                    "dok": 3,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 701373,
+                    "concept_id": 7209,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Think about it",
+                    "bloom": "analyze",
+                    "difficulty": "hard",
+                    "dok": 3,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 25,
+            "section": "Interdisciplinary Nature of Science",
+            "slide_type": "relationship",
+            "title": "Branches are our divisions, problems need them all",
+            "concept_ids": [
+                7210,
+                7211
+            ],
+            "taught_concept_ids": [
+                7210,
+                7211
+            ],
+            "concepts": [
+                "Branches are man-made divisions",
+                "Real problems need multiple disciplines"
+            ],
+            "relationship": {
+                "from": 7210,
+                "to": 7211,
+                "kind": "depends_on",
+                "idea": "Because nature has no boundaries, real problems need ideas from several branches at once."
+            },
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7210,
+                        "text": "Humans divided science into branches to organise knowledge; nature itself has no such boundaries."
+                    },
+                    {
+                        "concept_id": 7211,
+                        "text": "Real problems like climate change or medicines need ideas from several branches together."
+                    }
+                ],
+                "bullets": [],
+                "example": "How a mask works: physics (particle motion, electrostatic attraction), chemistry (polymer fibres), biology (size of viruses) and mathematics (airflow and filtration efficiency).",
+                "misconception": {
+                    "wrong_idea": "The branches of science are natural, fixed divisions found in nature.",
+                    "correction": "The natural world is continuous; the divisions are made by humans to organise knowledge."
+                },
+                "relationship_note": "Because nature has no boundaries, real problems need ideas from several branches at once.",
+                "bloom": "analyze",
+                "dok": 2,
+                "minutes": 3
+            },
+            "question_ids": [
+                701374,
+                730419
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 701374,
+                    "concept_id": 7210,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Think about it",
+                    "bloom": "analyze",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730419,
+                    "concept_id": 7210,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Think about it",
+                    "bloom": "analyze",
+                    "difficulty": "hard",
+                    "dok": 3,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 26,
+            "section": "Interdisciplinary Nature of Science",
+            "slide_type": "application",
+            "title": "Science meets mathematics, technology and arts",
+            "concept_ids": [
+                7212
+            ],
+            "taught_concept_ids": [
+                7212
+            ],
+            "concepts": [
+                "Science links with other knowledge domains"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7212,
+                        "text": "Science is linked with mathematics, technology, arts and social sciences; combining them enriches our understanding of the world."
+                    }
+                ],
+                "bullets": [],
+                "example": "In explaining a mask, mathematics is used to model airflow and filtration efficiency.",
+                "misconception": {
+                    "wrong_idea": "Mathematics is only a servant of science and does not shape how scientists understand the world.",
+                    "correction": "Mathematics is the language in which scientific relationships are expressed and tested."
+                },
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                730335,
+                730420
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730335,
+                    "concept_id": 7211,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7211,
+                    "label": "Think about it",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730420,
+                    "concept_id": 7211,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7211,
+                    "label": "Think about it",
+                    "bloom": "apply",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 27,
+            "section": "Science as a Human Activity",
+            "slide_type": "concept_intro",
+            "title": "Curiosity and many hands",
+            "concept_ids": [
+                7213,
+                7214
+            ],
+            "taught_concept_ids": [
+                7213,
+                7214
+            ],
+            "concepts": [
+                "Science is a human activity",
+                "Science grows through collective effort"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7213,
+                        "text": "Science is a human activity shaped by curiosity, creativity, collaboration and careful questioning."
+                    },
+                    {
+                        "concept_id": 7214,
+                        "text": "It grows as many people across cultures and generations test ideas, share results and learn from mistakes."
+                    }
+                ],
+                "bullets": [],
+                "example": null,
+                "misconception": {
+                    "wrong_idea": "Science progresses only when there are no errors.",
+                    "correction": "Mistakes and mismatches are important scientific information; scientists learn from them and improve explanations."
+                },
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 2
+            },
+            "question_ids": [
+                730423,
+                730425
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730423,
+                    "concept_id": 7213,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730425,
+                    "concept_id": 7214,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7214,
+                    "label": "Think about it",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 28,
+            "section": "Science as a Human Activity",
+            "slide_type": "application",
+            "title": "Judging a viral claim",
+            "concept_ids": [
+                7215
+            ],
+            "taught_concept_ids": [
+                7215
+            ],
+            "concepts": [
+                "Scientific thinking applies beyond science"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "",
+                "explanations": [
+                    {
+                        "concept_id": 7215,
+                        "text": "Scientific thinking helps us understand technology and evaluate information critically, even if we never study science beyond Grade 10."
+                    }
+                ],
+                "bullets": [],
+                "example": "Claim: food becomes harmful during an eclipse. Ask what physical change occurs, whether temperature changes, and whether food goes bad in a shadow. No physical, chemical or biological mechanism supports the claim.",
+                "misconception": {
+                    "wrong_idea": "Critical evaluation simply means rejecting every claim.",
+                    "correction": "Scientific thinking weighs claims by evidence, sources and logic, and stays open to better evidence."
+                },
+                "relationship_note": null,
+                "bloom": "evaluate",
+                "dok": 3,
+                "minutes": 3
+            },
+            "question_ids": [
+                730437,
+                730455
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730437,
+                    "concept_id": 7215,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "understand",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730455,
+                    "concept_id": 7213,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7213,
+                    "label": "Think about it",
+                    "bloom": "apply",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 29,
+            "section": "Practice",
+            "slide_type": "practice",
+            "title": "How do we know? Practice set",
+            "concept_ids": [
+                7184,
+                7186
+            ],
+            "taught_concept_ids": [],
+            "concepts": [
+                "Science asks what and how",
+                "Purposeful direction in exploration"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "Work in pairs: explain how the evidence was gathered, then say where the model stops working.",
+                "explanations": [],
+                "bullets": [],
+                "example": null,
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "analyze",
+                "dok": 3,
+                "minutes": 6
+            },
+            "question_ids": [
+                701675,
+                701697
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 701675,
+                    "concept_id": 7184,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Think about it",
+                    "bloom": "analyze",
+                    "difficulty": "hard",
+                    "dok": 3,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 701697,
+                    "concept_id": 7186,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7186,
+                    "label": "Think about it",
+                    "bloom": "evaluate",
+                    "difficulty": "hard",
+                    "dok": 3,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 30,
+            "section": "Review",
+            "slide_type": "recall",
+            "title": "Quick recall round",
+            "concept_ids": [
+                7185,
+                7187
+            ],
+            "taught_concept_ids": [],
+            "concepts": [
+                "Careful observation in exploration",
+                "Models as simplified representations"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "Answer from memory first, then check back.",
+                "explanations": [],
+                "bullets": [],
+                "example": null,
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "remember",
+                "dok": 1,
+                "minutes": 4
+            },
+            "question_ids": [
+                701688,
+                730399
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 701688,
+                    "concept_id": 7185,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Apply",
+                    "bloom": "apply",
+                    "difficulty": "medium",
+                    "dok": 2,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730399,
+                    "concept_id": 7187,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7187,
+                    "label": "Think about it",
+                    "bloom": "remember",
+                    "difficulty": "easy",
+                    "dok": 1,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 31,
+            "section": "Review",
+            "slide_type": "concept_map",
+            "title": "Chapter map: how science explores",
+            "concept_ids": [
+                7184
+            ],
+            "taught_concept_ids": [],
+            "concepts": [
+                "Science asks what and how"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "Careful observation and models lead to shared language, laws, prediction and estimation.",
+                "explanations": [],
+                "bullets": [
+                    "Observe and build models",
+                    "Use shared language and laws",
+                    "Predict, check and estimate"
+                ],
+                "example": null,
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 3
+            },
+            "question_ids": [],
+            "activities": [
+                {
+                    "source": "authored",
+                    "question_id": null,
+                    "concept_id": 7184,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "understand",
+                    "difficulty": null,
+                    "dok": 2,
+                    "why": "a quick check written for a slide the question bank has nothing for",
+                    "question": {
+                        "id": -311,
+                        "question": "What do scientists do when a prediction does not match an observation?",
+                        "question_type_code": "short",
+                        "question_type": "Narrative",
+                        "marks": 1,
+                        "options": [],
+                        "model_answer": "They re-examine their assumptions, models or measurements.",
+                        "chapter_id": 8592,
+                        "standard_id": 42,
+                        "subject_id": 3975,
+                        "concept_id": 7184,
+                        "authored": true
+                    }
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": {
+                "required": true,
+                "role": "diagram",
+                "query": "science concept map",
+                "purpose": "Show the chapter as one connected whole."
+            },
+            "image": {
+                "type": "diagram",
+                "url": "images/b71e37d4b73f4e2196d5b8bbe7747e6327bb73b2.png",
+                "width": 1280,
+                "height": 720,
+                "sha1": "b71e37d4b73f4e2196d5b8bbe7747e6327bb73b2",
+                "layout": "hub",
+                "texts": [
+                    "Exploration in science",
+                    "Exploration",
+                    "Careful observation",
+                    "Models",
+                    "Symbols and units",
+                    "Laws and theories",
+                    "Prediction",
+                    "Estimation"
+                ],
+                "alt": "Diagram: Exploration in science. 'Exploration' connected to Careful observation, Models, Symbols and units, Laws and theories, Prediction, Estimation.",
+                "caption": "Exploration in science",
+                "licence": null,
+                "source_url": null,
+                "creator": null,
+                "attribution_required": false,
+                "attribution": "",
+                "review": {
+                    "relevant": true,
+                    "reason": "drawn from the plan's own diagram spec"
+                },
+                "purpose": "Show the chapter as one connected whole."
+            },
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": false,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 32,
+            "section": "Review",
+            "slide_type": "summary",
+            "title": "Chapter summary in your own words",
+            "concept_ids": [
+                7184
+            ],
+            "taught_concept_ids": [],
+            "concepts": [
+                "Science asks what and how"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "Say each idea aloud to a partner, using your own words.",
+                "explanations": [],
+                "bullets": [
+                    "Observe and model",
+                    "Predict and test",
+                    "Revise with evidence"
+                ],
+                "example": null,
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "understand",
+                "dok": 2,
+                "minutes": 4
+            },
+            "question_ids": [],
+            "activities": [
+                {
+                    "source": "authored",
+                    "question_id": null,
+                    "concept_id": 7184,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Explain",
+                    "bloom": "understand",
+                    "difficulty": null,
+                    "dok": 2,
+                    "why": "a quick check written for a slide the question bank has nothing for",
+                    "question": {
+                        "id": -321,
+                        "question": "In one sentence, how is knowing how science knows different from only knowing what it knows?",
+                        "question_type_code": "short",
+                        "question_type": "Narrative",
+                        "marks": 1,
+                        "options": [],
+                        "model_answer": "Science is about how observations lead to measurements, how patterns are written as symbols and equations, how models are built, and how ideas are tested and revised.",
+                        "chapter_id": 8592,
+                        "standard_id": 42,
+                        "subject_id": 3975,
+                        "concept_id": 7184,
+                        "authored": true
+                    }
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": true,
+                "question_bank": false,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 33,
+            "section": "Review",
+            "slide_type": "challenge",
+            "title": "Challenge: design a testable question",
+            "concept_ids": [
+                7211,
+                7197
+            ],
+            "taught_concept_ids": [],
+            "concepts": [
+                "Real problems need multiple disciplines",
+                "Theory explains observed patterns"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "Pick a new situation, match it to the sciences it needs, and sort what is a law and what is a theory.",
+                "explanations": [],
+                "bullets": [
+                    "Which branches of science are needed?",
+                    "What is the law, the pattern observed?",
+                    "What is the theory, the explanation why?"
+                ],
+                "example": "Understanding how a mask works It needs physics (particle motion and electrostatic attraction), chemistry (properties of polymer fibres), biology (size and behaviour of viruses) and mathematics (modelling airflow and filtration efficiency).",
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "evaluate",
+                "dok": 3,
+                "minutes": 6
+            },
+            "question_ids": [
+                730380,
+                730409
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730380,
+                    "concept_id": 7211,
+                    "as": "single_choice_set",
+                    "default_as": "single_choice_set",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Try it",
+                    "bloom": "create",
+                    "difficulty": "medium",
+                    "dok": 4,
+                    "why": "the question's own form"
+                },
+                {
+                    "source": "bank",
+                    "question_id": 730409,
+                    "concept_id": 7197,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": 7197,
+                    "label": "Think about it",
+                    "bloom": "analyze",
+                    "difficulty": "hard",
+                    "dok": 3,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        },
+        {
+            "n": 34,
+            "section": "Review",
+            "slide_type": "exit_ticket",
+            "title": "Exit ticket: can science change?",
+            "concept_ids": [
+                7199
+            ],
+            "taught_concept_ids": [],
+            "concepts": [
+                "Scientific knowledge is revisable"
+            ],
+            "relationship": null,
+            "content": {
+                "body": "Before you leave, say why being open to correction makes science stronger.",
+                "explanations": [],
+                "bullets": [
+                    "Predictions that miss lead to re-examining assumptions",
+                    "Ideas are rejected on evidence, not opinion"
+                ],
+                "example": null,
+                "misconception": null,
+                "relationship_note": null,
+                "bloom": "evaluate",
+                "dok": 3,
+                "minutes": 3
+            },
+            "question_ids": [
+                730431
+            ],
+            "activities": [
+                {
+                    "source": "bank",
+                    "question_id": 730431,
+                    "concept_id": 7199,
+                    "as": "essay",
+                    "default_as": "essay",
+                    "pattern": null,
+                    "decision": false,
+                    "connects_concept": null,
+                    "label": "Think about it",
+                    "bloom": "evaluate",
+                    "difficulty": "hard",
+                    "dok": 3,
+                    "why": "the question's own form"
+                }
+            ],
+            "h5p_pattern": null,
+            "pattern_dropped": null,
+            "visual": null,
+            "image": null,
+            "image_missing": null,
+            "sources": {
+                "concept_intelligence": true,
+                "existing_ai_content": false,
+                "question_bank": true,
+                "h5p_pattern_reference": false
+            }
+        }
+    ],
+    "concept_slides": {
+        "7184": [
+            4,
+            29,
+            31,
+            32
+        ],
+        "7185": [
+            5,
+            30
+        ],
+        "7186": [
+            5,
+            29
+        ],
+        "7187": [
+            6,
+            30
+        ],
+        "7188": [
+            7,
+            10
+        ],
+        "7189": [
+            8,
+            10
+        ],
+        "7190": [
+            9
+        ],
+        "7191": [
+            11
+        ],
+        "7192": [
+            11
+        ],
+        "7193": [
+            12
+        ],
+        "7194": [
+            13
+        ],
+        "7195": [
+            14
+        ],
+        "7196": [
+            15,
+            16
+        ],
+        "7197": [
+            16,
+            33
+        ],
+        "7198": [
+            17
+        ],
+        "7199": [
+            17,
+            34
+        ],
+        "7200": [
+            18
+        ],
+        "7201": [
+            18
+        ],
+        "7202": [
+            19
+        ],
+        "7203": [
+            19
+        ],
+        "7204": [
+            20
+        ],
+        "7205": [
+            21
+        ],
+        "7206": [
+            22
+        ],
+        "7207": [
+            22
+        ],
+        "7208": [
+            23
+        ],
+        "7209": [
+            24
+        ],
+        "7210": [
+            25
+        ],
+        "7211": [
+            25,
+            33
+        ],
+        "7212": [
+            26
+        ],
+        "7213": [
+            27
+        ],
+        "7214": [
+            27
+        ],
+        "7215": [
+            28
+        ]
+    },
+    "taught_by": {
+        "7184": [
+            4
+        ],
+        "7185": [
+            5
+        ],
+        "7186": [
+            5
+        ],
+        "7187": [
+            6
+        ],
+        "7188": [
+            7
+        ],
+        "7189": [
+            8
+        ],
+        "7190": [
+            9
+        ],
+        "7191": [
+            11
+        ],
+        "7192": [
+            11
+        ],
+        "7193": [
+            12
+        ],
+        "7194": [
+            13
+        ],
+        "7195": [
+            14
+        ],
+        "7196": [
+            15
+        ],
+        "7197": [
+            16
+        ],
+        "7198": [
+            17
+        ],
+        "7199": [
+            17
+        ],
+        "7200": [
+            18
+        ],
+        "7201": [
+            18
+        ],
+        "7202": [
+            19
+        ],
+        "7203": [
+            19
+        ],
+        "7204": [
+            20
+        ],
+        "7205": [
+            21
+        ],
+        "7206": [
+            22
+        ],
+        "7207": [
+            22
+        ],
+        "7208": [
+            23
+        ],
+        "7209": [
+            24
+        ],
+        "7210": [
+            25
+        ],
+        "7211": [
+            25
+        ],
+        "7212": [
+            26
+        ],
+        "7213": [
+            27
+        ],
+        "7214": [
+            27
+        ],
+        "7215": [
+            28
+        ]
+    },
+    "concept_questions": {
+        "7184": [
+            730398,
+            701401,
+            701675
+        ],
+        "7185": [
+            701402,
+            701688
+        ],
+        "7186": [
+            701403,
+            701697
+        ],
+        "7187": [
+            730338,
+            730433,
+            730399
+        ],
+        "7188": [
+            730342,
+            701405,
+            730344
+        ],
+        "7189": [
+            730402,
+            701406,
+            730456
+        ],
+        "7190": [
+            701407
+        ],
+        "7191": [
+            701355
+        ],
+        "7192": [
+            701356
+        ],
+        "7193": [
+            730351,
+            730352
+        ],
+        "7194": [
+            730405,
+            701411
+        ],
+        "7195": [
+            701412,
+            730404
+        ],
+        "7196": [
+            730408,
+            730356
+        ],
+        "7197": [
+            730359,
+            701414,
+            730409
+        ],
+        "7198": [
+            730410
+        ],
+        "7199": [
+            730363,
+            730431
+        ],
+        "7200": [
+            730358
+        ],
+        "7201": [
+            730333
+        ],
+        "7202": [
+            730412
+        ],
+        "7203": [
+            730414
+        ],
+        "7204": [
+            730367,
+            730415
+        ],
+        "7205": [
+            730413,
+            730442
+        ],
+        "7206": [
+            730418
+        ],
+        "7207": [
+            730375
+        ],
+        "7208": [
+            730417,
+            730366
+        ],
+        "7209": [
+            701341,
+            701373
+        ],
+        "7210": [
+            701374,
+            730419
+        ],
+        "7211": [
+            730335,
+            730420,
+            730380
+        ],
+        "7213": [
+            730423,
+            730455
+        ],
+        "7214": [
+            730425
+        ],
+        "7215": [
+            730437
+        ]
+    }
+}
