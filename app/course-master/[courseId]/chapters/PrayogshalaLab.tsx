@@ -14,8 +14,22 @@ import {
   type OsmosisState,
   type RelevanceParams,
   type RelevanceState,
+  type ClassifyParams,
+  type ClassifyState,
+  type SequenceParams,
+  type SequenceState,
+  type VariableModelParams,
+  type VariableModelState,
 } from '@/lib/prayogshala/engines';
+import { validateLabConfig } from '@/lib/prayogshala/validate';
 import type { PrayogshalaActivity } from '../../data/prayogshala';
+import {
+  ClassifyWorkspace,
+  LAB_COLORS,
+  SequenceWorkspace,
+  SliderRow,
+  VariableModelWorkspace,
+} from './PrayogshalaWorkspaces';
 
 /**
  * The interactive Prayogshala lab: the eight-step flow (Mission, Predict, Do, Observe, Explain,
@@ -35,27 +49,12 @@ export const LAB_STEPS = ['Mission', 'Predict', 'Do', 'Observe', 'Explain', 'Con
 
 // Light, colourful laboratory palette, scoped to the experiment only (the rest of the LMS keeps
 // its own). White panels on a soft gradient; each of the eight steps has its own hue.
-const C = {
-  bg: '#f5f7ff',
-  panel: '#ffffff',
-  panel2: '#f1f5fb',
-  line: '#dfe6f1',
-  text: '#1b2540',
-  muted: '#5d6b85',
-  accent: '#4f46e5',
-  accentSoft: 'rgba(79,70,229,0.10)',
-  onAccent: '#ffffff',
-  warn: '#b45309',
-  warnSoft: 'rgba(245,158,11,0.14)',
-  bad: '#d6455d',
-  water: '#5bb5e8',
-  sand: '#f0b45a',
-};
+const C = LAB_COLORS;
 
 const STEP_COLORS = ['#4f46e5', '#d946ef', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6'];
 const PAGE_BACKGROUND = 'linear-gradient(135deg, #eef2ff 0%, #fdf2f8 45%, #ecfeff 100%)';
 
-type EngineState = CalculatorState | RelevanceState | OsmosisState;
+type EngineState = CalculatorState | RelevanceState | OsmosisState | VariableModelState | SequenceState | ClassifyState;
 
 // ------------------------------------------------------------------------ workspaces
 
@@ -65,51 +64,6 @@ interface WorkspaceProps<S, P> {
   setState: (next: S) => void;
   result: EngineResult;
   particleView: boolean;
-}
-
-function SliderRow({
-  label,
-  unit,
-  value,
-  min,
-  max,
-  step,
-  note,
-  onChange,
-}: {
-  label: string;
-  unit: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  note?: string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <label className="block">
-      <div className="flex items-baseline justify-between gap-3 text-[13px]">
-        <span style={{ color: C.text }}>
-          {label}
-          {note ? <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide" style={{ background: C.panel2, color: C.muted }}>{note}</span> : null}
-        </span>
-        <span className="font-semibold tabular-nums" style={{ color: C.accent }}>
-          {value} <span style={{ color: C.muted }}>{unit}</span>
-        </span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        aria-label={label}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-1 w-full"
-        style={{ accentColor: C.accent }}
-      />
-    </label>
-  );
 }
 
 function CalculatorWorkspace({ params, state, setState, result }: WorkspaceProps<CalculatorState, CalculatorParams>) {
@@ -337,7 +291,9 @@ interface LabProps {
 }
 
 export function PrayogshalaLab({ activity, lab, onClose }: LabProps) {
-  const engine = getEngine(lab.simulation.type);
+  // Checked before anything touches the parameters: a malformed config must not reach an engine.
+  const configProblems = useMemo(() => validateLabConfig(lab), [lab]);
+  const engine = configProblems.length ? null : getEngine(lab.simulation.type);
   const params = lab.simulation.params;
 
   const [step, setStep] = useState(0);
@@ -373,7 +329,7 @@ export function PrayogshalaLab({ activity, lab, onClose }: LabProps) {
   }, [onClose]);
 
   const result = useMemo(() => (engine && state ? engine.evaluate(params, state) : null), [engine, params, state]);
-  const correctIds = useMemo(() => correctPredictionIds(lab), [lab]);
+  const correctIds = useMemo(() => (configProblems.length ? [] : correctPredictionIds(lab)), [lab, configProblems]);
   const setState = (next: EngineState) => {
     setStateRaw(next);
     setTouched(true);
@@ -396,6 +352,24 @@ export function PrayogshalaLab({ activity, lab, onClose }: LabProps) {
     setStep(step + 1);
     setFurthest(Math.max(furthest, step + 1));
   };
+
+  // A lab that fails its own consistency checks is not run: it could contradict itself.
+  if (configProblems.length > 0) {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto px-6 py-10" style={{ background: PAGE_BACKGROUND, color: C.text }} role="alertdialog" aria-modal="true" aria-label="This activity cannot be run">
+        <div className="max-w-xl rounded-2xl border p-6" style={{ background: C.panel, borderColor: C.warn }}>
+          <h1 className="text-xl font-bold" style={{ color: C.warn }}>This activity cannot be run yet</h1>
+          <p className="mt-2 text-sm" style={{ color: C.muted }}>
+            {activity.title} did not pass the lab&rsquo;s checks, so it is not shown. Ask a teacher to review or regenerate it.
+          </p>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
+            {configProblems.slice(0, 5).map((problem) => <li key={problem}>{problem}</li>)}
+          </ul>
+          <button type="button" onClick={onClose} className="mt-5 rounded-full px-5 py-2 text-sm font-semibold" style={{ background: C.accent, color: C.onAccent }}>Back to chapter</button>
+        </div>
+      </div>
+    );
+  }
 
   const pill = () => ({ background: C.accentSoft, color: C.accent, border: `1px solid ${C.accent}` });
   const card = 'rounded-2xl border p-5 sm:p-6';
@@ -654,6 +628,12 @@ export function PrayogshalaLab({ activity, lab, onClose }: LabProps) {
               <RelevanceWorkspace params={params as unknown as RelevanceParams} state={state as RelevanceState} setState={setState} result={result} particleView={false} />
             ) : lab.simulation.type === 'osmosis' ? (
               <OsmosisWorkspace params={params as unknown as OsmosisParams} state={state as OsmosisState} setState={setState} result={result} particleView={particleView} />
+            ) : lab.simulation.type === 'variable_model' ? (
+              <VariableModelWorkspace params={params as unknown as VariableModelParams} state={state as VariableModelState} setState={setState} result={result} />
+            ) : lab.simulation.type === 'sequence' ? (
+              <SequenceWorkspace params={params as unknown as SequenceParams} state={state as SequenceState} setState={setState} result={result} />
+            ) : lab.simulation.type === 'classify' ? (
+              <ClassifyWorkspace params={params as unknown as ClassifyParams} state={state as ClassifyState} setState={setState} result={result} />
             ) : null}
           </section>
 

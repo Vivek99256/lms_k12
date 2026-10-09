@@ -101,7 +101,9 @@ import {
   PrayogshalaDetailDialog,
   PrayogshalaEditorDialog,
 } from './PrayogshalaDialogs';
+import { filterCardAssets } from '@/lib/prayogshala/cardEligibility';
 import { PrayogshalaLab } from './PrayogshalaLab';
+import { PrayogshalaTopicPanel } from './PrayogshalaTopicPanel';
 import { deletePrayogshalaActivity, type PrayogshalaActivity } from '../../data/prayogshala';
 import { AiFieldAssistant } from '@/components/ai/AiFieldAssistant';
 import { resolveViewableContentUrl } from '@/app/course-master/data/content-links';
@@ -597,7 +599,7 @@ function buildApiChapterContentItems(
   categories: Record<string, ChapterContentAsset[]>
 ): ChapterContentItem[] {
   return Object.entries(categories).flatMap(([category, assets]) =>
-    (assets ?? []).map((asset) => {
+    filterCardAssets(assets, chapter.id).map((asset) => {
       const type = getApiContentType(category, asset);
       const contentUrl = resolveViewableContentUrl(asset);
       const updatedDate = asset.created_at?.split(' ')[0] ?? 'â€”';
@@ -2916,6 +2918,13 @@ export default function ChapterListPage() {
     if (!item.contentUrl) return;
 
     window.open(item.contentUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  /** Open a topic's lab full-screen, addressed by the URL like any other Prayogshala activity. */
+  const openPrayogshalaLab = (activity: PrayogshalaActivity) => {
+    const next = new URLSearchParams(searchParams?.toString());
+    next.set('activityId', String(activity.id));
+    router.push(`/course-master/${courseId}/chapters?${next.toString()}`);
   };
 
   const closePrayogshalaLab = () => {
@@ -6280,6 +6289,17 @@ export default function ChapterListPage() {
             <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {prayogshalaActionError}
             </div>
+          ) : null}
+
+          {activeContentLibraryTab === 'Prayogshala' && activeLibraryChapter && /^\d+$/.test(activeLibraryChapter.id) ? (
+            <PrayogshalaTopicPanel
+              key={activeLibraryChapter.id}
+              chapterId={Number(activeLibraryChapter.id)}
+              canManage={canCreateContent !== false}
+              reloadKey={contentReloadKey}
+              onOpenLab={openPrayogshalaLab}
+              onChanged={reloadChapterContent}
+            />
           ) : null}
 
           {contentError ? (
