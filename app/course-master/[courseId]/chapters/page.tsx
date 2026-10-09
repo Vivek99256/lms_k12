@@ -186,6 +186,9 @@ import {
 } from './GenerationPipeline';
 import { FormatMultiSelect } from './FormatMultiSelect';
 import { getRequestContext, getSyear } from '../../page';
+import { DocumentViewer, type DocumentViewerItem } from '@/components/study-document/DocumentViewer';
+import { documentKindOf } from '@/lib/study-document/document';
+import type { DocumentKind } from '@/lib/study-document/types';
 import { pdfFileNameFromTitle } from '@/lib/study-deck/pdf';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
@@ -537,6 +540,11 @@ interface ChapterContentItem {
   prayogshala: PrayogshalaActivity | null;
   /** The study deck's classroom PDF, reported by the backend. A second file of the same item; Open is unchanged. */
   pdfUrl?: string;
+  /**
+   * Set (by the server) when this row is a study document: revision notes, a remedial class or classroom activities. Its PDF
+   * is its primary file and it opens in place in the document viewer, with an online practice beside the PDF.
+   */
+  studyDocKind?: DocumentKind | null;
   chapterId?: string;
   slides: {
     id: string;
@@ -626,6 +634,7 @@ function buildApiChapterContentItems(
         summary: type === 'Prayogshala' ? (asset.prayogshala?.objective ?? asset.description ?? null) : null,
         prayogshala: asset.prayogshala ?? null,
         pdfUrl: asset.pdf_url,
+        studyDocKind: documentKindOf(asset),
         chapterId: chapter.id,
       };
     })
@@ -1291,6 +1300,8 @@ export default function ChapterListPage() {
   const contentGroupBy: 'Chapter wise' | 'Concept wise' =
     searchParams?.get('resourceType') === 'teacher' ? 'Concept wise' : 'Chapter wise';
   const [selectedContentItem, setSelectedContentItem] = useState<ChapterContentItem | null>(null);
+  // The study document open over the page, if any (revision notes, a remedial class, classroom activities).
+  const [openDocument, setOpenDocument] = useState<DocumentViewerItem | null>(null);
   const [chapterContentCategories, setChapterContentCategories] = useState<
     Record<string, Record<string, ChapterContentAsset[]>>
   >({});
@@ -2893,6 +2904,12 @@ export default function ChapterListPage() {
     // filter value rather than a top-level destination (tracker row 2).
     if (item.deepLink) {
       router.push(item.deepLink);
+      return;
+    }
+
+    // A study document is a PDF with an online practice beside it, and opens in place over this page: no route, no new tab.
+    if (item.studyDocKind && item.chapterId !== undefined && Number.isFinite(Number(item.chapterId)) && Number.isFinite(Number(item.id))) {
+      setOpenDocument({ chapterId: Number(item.chapterId), contentId: Number(item.id), title: item.title, kind: item.studyDocKind });
       return;
     }
 
@@ -6011,6 +6028,21 @@ export default function ChapterListPage() {
     );
   }
 
+  // A study document (revision notes, a remedial class, classroom activities) opens here, over whichever view is showing.
+  const documentViewer = (
+    <DocumentViewer
+      item={openDocument}
+      audience="teacher"
+      instituteId={Number(getRequestContext()?.sub_institute_id ?? NaN)}
+      userKey={(() => {
+        const context = getRequestContext();
+
+        return context ? `${context.sub_institute_id}-${context.user_id}` : 'guest';
+      })()}
+      onClose={() => setOpenDocument(null)}
+    />
+  );
+
   if (view === 'content' && contentChapter) {
     const gradeLabel = getCourseClassroomLabel(course.id, course.classGrade);
     const totalItems = resourceScopedContentItems.length;
@@ -6546,6 +6578,7 @@ export default function ChapterListPage() {
             initialConcept={activeLibraryChapterConcepts?.concepts[0]?.title ?? ''}
             onSuccess={handleGenerateSuccess}
           />
+          {documentViewer}
         </div>
       </div>
     );
@@ -7112,6 +7145,8 @@ export default function ChapterListPage() {
           </div>
         </div>
       )}
+
+      {documentViewer}
     </div>
   );
 }

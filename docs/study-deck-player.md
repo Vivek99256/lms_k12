@@ -75,8 +75,20 @@ marked.
 
 | Piece | Where it comes from |
 |---|---|
-| Deck (slides, concept map, image paths, interactions, discussion prompts, activity specs) | `POST /api/lms-study-deck` - the JSON sidecar stored beside the presentation file (`<filename>.deck.json`). Pilot: `public/study-deck/chapter-<id>/deck.json`. |
+| Deck (slides, concept map, picture references, interactions, discussion prompts, activity specs) | `POST /api/lms-study-deck` - the JSON sidecar stored beside the presentation file (`<filename>.deck.json`). Pilot: `public/study-deck/chapter-<id>/deck.json` (the deck only; see Pictures). |
+| Pictures | **The database** (`study_deck_images`), never a file. A deck names a picture `study-deck-image:<id>`. `POST /api/lms-study-deck` sends each as a signed address for `GET /api/study-deck/images/{id}`; a deck the player holds itself (the pilot copy) gets its addresses from `POST /api/lms-study-deck/image-urls` (`lib/study-deck/images.ts`, called in `app/student/study-deck/data.ts`). |
 | Practice questions | `POST /api/lms-question-bank`, the same rows every other module plays. The deck holds question **ids**, never question text. |
+
+## Pictures
+
+Nothing in `public/study-deck/` is a picture any more: `lms:generate-study-deck --export-player` copies `deck.json` only.
+The pilot deck's `image.url` values are references (`study-deck-image:12`); `loadStudyDeck` swaps them for addresses before the
+player sees the deck, so `VisualFigure` and the hotspot overlay are unchanged. The address is signed for the learner's school and
+the picture endpoint checks the school again, so one school's pictures cannot be opened with another school's address. A picture the
+school may not see stays a reference and shows nothing; the rest of the deck still plays.
+
+Picture files left in `public/study-deck/chapter-<id>/images/` by older runs are moved into the database (and then deleted) by
+`php artisan study-deck:images-migrate` in the Laravel repo (`--dry-run` first, `--cleanup` to delete the verified files).
 
 The contract is pinned by a golden file: `next_lms_erp/tests/Fixtures/study-deck-golden.json`
 (written by `StudyDeckContractFixtureTest`), copied to `lib/study-deck/fixtures/`. The player tests

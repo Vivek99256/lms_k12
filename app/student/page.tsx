@@ -18,6 +18,7 @@ import {
   Info,
   Library,
   Lightbulb,
+  LifeBuoy,
   ListTree,
   Palette,
   PenTool,
@@ -57,6 +58,9 @@ import {
 } from '@/app/course-master/data/chapters';
 import { resolveViewableUrl } from '@/app/course-master/data/content-links';
 import { StudyDeckEntry } from '@/components/study-deck/StudyDeckEntry';
+import { DocumentViewer, type DocumentViewerItem } from '@/components/study-document/DocumentViewer';
+import { KIND_LABEL, documentKindOf } from '@/lib/study-document/document';
+import type { DocumentKind } from '@/lib/study-document/types';
 import {
   fetchMappedQuestionBank,
   groupQuestionBankItems,
@@ -104,6 +108,7 @@ type StudentContentTypeKey =
   | 'presentation'
   | 'video'
   | 'revision_notes'
+  | 'remedial'
   | 'classroom_activity';
 
 type CurriculumSession = {
@@ -201,6 +206,11 @@ type StudentContentItem = {
   typeLabel: string;
   updatedLabel: string;
   url: string;
+  /**
+   * Set (by the server) when this row is a study document: revision notes, a remedial class or classroom activities. It
+   * opens in place in the document viewer instead of in a new tab.
+   */
+  studyDocKind: DocumentKind | null;
 };
 
 const CONTENT_TABS: Array<{ key: StudentContentTypeKey; label: string }> = [
@@ -208,6 +218,7 @@ const CONTENT_TABS: Array<{ key: StudentContentTypeKey; label: string }> = [
   { key: 'presentation', label: 'Presentations' },
   { key: 'video', label: 'Videos' },
   { key: 'revision_notes', label: 'Revision notes' },
+  { key: 'remedial', label: 'Remedial classes' },
   { key: 'classroom_activity', label: 'Classroom activity' },
 ];
 
@@ -239,6 +250,13 @@ function getSyear(): string {
   }
 
   return '';
+}
+
+/** Identifies the learner so a document's online practice keeps its place per learner on a shared browser. */
+function documentUserKey(): string {
+  const context = getRequestContext();
+
+  return context ? `${context.sub_institute_id}-${context.user_id}` : 'guest';
 }
 
 function getRequestContext(): {
@@ -465,7 +483,17 @@ function buildStudentChapters(chapters: Chapter[]): StudentChapterView[] {
   });
 }
 
+const DOCUMENT_TYPE: Record<DocumentKind, { key: StudentContentTypeKey; label: string }> = {
+  revision_notes: { key: 'revision_notes', label: KIND_LABEL.revision_notes },
+  remedial: { key: 'remedial', label: KIND_LABEL.remedial },
+  activities: { key: 'classroom_activity', label: KIND_LABEL.activities },
+};
+
 function normalizeContentType(rawType: string, asset: Record<string, unknown>) {
+  // A study document is whatever kind the server says it is, not what its title happens to contain.
+  const documentKind = documentKindOf(asset);
+  if (documentKind) return DOCUMENT_TYPE[documentKind];
+
   const filename = readString(asset.filename).toLowerCase();
   const combinedLabel = [
     rawType,
@@ -479,6 +507,10 @@ function normalizeContentType(rawType: string, asset: Record<string, unknown>) {
 
   if (combinedLabel.includes('video') || /\.(mp4|mov|webm|m4v)(?:$|\?)/.test(filename)) {
     return { key: 'video' as const, label: 'Video' };
+  }
+
+  if (combinedLabel.includes('remedial')) {
+    return { key: 'remedial' as const, label: 'Remedial class' };
   }
 
   if (
@@ -590,6 +622,7 @@ function normalizeChapterContent(
         statText: getContentStatText(asset),
         updatedLabel: formatUpdatedLabel(asset.updated_at ?? asset.created_at),
         url,
+        studyDocKind: documentKindOf(asset),
         actionLabel: contentType.key === 'video' ? 'Play' : 'Open',
       };
     })
@@ -604,6 +637,8 @@ function getContentIcon(type: StudentContentTypeKey) {
       return Video;
     case 'classroom_activity':
       return ClipboardList;
+    case 'remedial':
+      return LifeBuoy;
     case 'revision_notes':
     default:
       return FileText;
@@ -642,6 +677,8 @@ export default function StudentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedChapter, setSelectedChapter] = useState<StudentChapterView | null>(null);
   const [selectedContentType, setSelectedContentType] = useState<StudentContentTypeKey>('all');
+  // The study document open over the page, if any (revision notes, a remedial class, classroom activities).
+  const [openDocument, setOpenDocument] = useState<DocumentViewerItem | null>(null);
   const [selectedStandard, setSelectedStandard] = useState('all');
   const [selectedSection, setSelectedSection] = useState('all');
   const [search, setSearch] = useState('');
@@ -1142,6 +1179,11 @@ export default function StudentPage() {
   };
 
   const handleOpenContent = (item: StudentContentItem) => {
+    // A study document is a PDF with an online practice beside it, and opens in place over this page: no route, no new tab.
+    if (item.studyDocKind) {
+      setOpenDocument({ chapterId: item.chapterId, contentId: item.id, title: item.title, kind: item.studyDocKind });
+      return;
+    }
     if (!item.url) return;
     window.open(item.url, '_blank', 'noopener,noreferrer');
   };
@@ -2078,6 +2120,14 @@ export default function StudentPage() {
           renderContentView()
         )}
       </div>
+
+      <DocumentViewer
+        item={openDocument}
+        audience="student"
+        instituteId={Number(getRequestContext()?.sub_institute_id ?? menuContext?.sub_institute_id ?? NaN)}
+        userKey={documentUserKey()}
+        onClose={() => setOpenDocument(null)}
+      />
     </div>
   );
 }
