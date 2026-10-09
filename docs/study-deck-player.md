@@ -9,11 +9,18 @@ Route: `/student/study-deck/<chapterId>` (add `?source=pilot` to read a local re
   **Previous** and **Continue** that are always in view) and **nothing on it scrolls**. The slide is drawn on a fixed design
   canvas (1280 x 720 on a wide screen, a narrow flexible one on a tall screen such as a phone) that is scaled to fit; if a
   screen's content cannot fit at full size the text is stepped down (never below 60%) rather than overflowing.
-- A slide is shown **one screen at a time**, in the order a teacher would take it (`lib/study-deck/stage.ts`):
-  1. **Teach**: title, explanation and the large visual, with its hotspots, scenario or cards.
-  2. **Example**: the worked example, and the common mistake as a "not quite / instead" comparison.
-  3. **Discuss**: the question for the class, the possible answer behind a button, framed as Think - Pair - Share.
-  A slide with no example or discussion is one screen.
+- **A slide is ONE screen** (`lib/study-deck/stage.ts`: `stepsOf` is always `['teach']`). The title, the large visual and the
+  slide's interaction (hotspots, scenario, cards...) are on it. Everything that used to follow on extra screens sits behind an
+  **"Explain this concept"** button along the bottom of the same slide (`components/study-deck/ExplainDock.tsx`, logic in
+  `lib/study-deck/explain.ts`): it opens a panel over the lower part of the slide and a second press closes it. The slide number
+  and the address never change. The panel has a tab for each thing the slide has, taken from its own stored content:
+  **Explanation** (each taught concept's explanation, and the key idea), **Worked example**, **Common mistake** (with "Instead"),
+  and **Talk about it** (the question, Think - Pair - Share, and the possible answer behind a button). A slide with none of it has no
+  button; the button reads "Explain this concept", or "See a worked example" / "See a common mistake" / "Talk about it" when the
+  explanation is not the first thing the panel holds. Opening the Worked example and Common mistake tabs counts as exploring the
+  example, exactly as the old example screen did, so progress is unchanged. A bare statement slide (nothing but its explanation)
+  keeps that text on the slide itself. The panel is drawn over the slide, so the teaching content does not shrink when it opens.
+  Older decks need no change: the schema is the same.
 - The first screen's **composition comes from the slide's own data** (`layoutOf`), the same data the PPT is built from:
   cover (chapter + topics), image + text, a diagram with hotspots, a decision, discovery cards, a three-card explanation,
   a statement with the concept's neighbours, a connection between two ideas (cause-and-effect style), a chapter map.

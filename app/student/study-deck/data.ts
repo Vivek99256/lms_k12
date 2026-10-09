@@ -12,8 +12,11 @@ import type { StudyDeck } from '@/lib/study-deck/types';
  * Where the student study deck's data comes from. Everything here is a READ.
  *
  * deck      the JSON the generator stored beside the chapter's presentation file, via
- *           `POST /api/lms-study-deck`. For review before anything is stored, `pilot` reads the
- *           local review bundle from /study-deck/chapter-<id>/ instead (see PILOT_NOTE).
+ *           `POST /api/lms-study-deck`. When the learner came from a specific content item (the Classroom
+ *           Resource list), `contentId` asks for exactly that item. Its pictures are absolute URLs on the
+ *           shared object store, so nothing here depends on a file served by this app. For review before
+ *           anything is stored, `pilot` reads the local review bundle from /study-deck/chapter-<id>/ instead
+ *           (development only, see PILOT_NOTE).
  * questions the existing question bank, `POST /api/lms-question-bank`, the same rows every other
  *           module plays. The deck holds question ids and activity choices, never question text.
  */
@@ -28,7 +31,16 @@ export interface LoadedDeck {
 /** The pilot reads a copy of the local review bundle that `lms:generate-study-deck --export-player` wrote. */
 export const PILOT_NOTE = 'This is a local review copy of the study deck. Nothing has been saved to the school library yet.';
 
-export async function loadStudyDeck(chapterId: number, options: { pilot: boolean; signal?: AbortSignal }): Promise<LoadedDeck> {
+/** The body of `POST /api/lms-study-deck`: the chapter, the school, and the content item when one was chosen. */
+export function studyDeckRequest(chapterId: number, instituteId: number, contentId: number | null): Record<string, number> {
+  return {
+    chapter_id: chapterId,
+    ...(Number.isFinite(instituteId) && instituteId > 0 ? { sub_institute_id: instituteId } : {}),
+    ...(contentId !== null && Number.isFinite(contentId) && contentId > 0 ? { content_id: contentId } : {}),
+  };
+}
+
+export async function loadStudyDeck(chapterId: number, options: { pilot: boolean; contentId?: number | null; signal?: AbortSignal }): Promise<LoadedDeck> {
   if (options.pilot) {
     const base = `/study-deck/chapter-${chapterId}`;
     const res = await fetch(`${base}/deck.json`, { signal: options.signal, cache: 'no-store' });
@@ -44,7 +56,7 @@ export async function loadStudyDeck(chapterId: number, options: { pilot: boolean
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: options.signal,
-    body: JSON.stringify(Number.isFinite(instituteId) && instituteId > 0 ? { chapter_id: chapterId, sub_institute_id: instituteId } : { chapter_id: chapterId }),
+    body: JSON.stringify(studyDeckRequest(chapterId, instituteId, options.contentId ?? null)),
   });
   const raw = await readApiJson(res, 'Couldn’t load the study deck');
 

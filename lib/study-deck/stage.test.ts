@@ -15,16 +15,13 @@ const real = (): StudyDeck | null => {
   }
 };
 
-test('a slide is one screen per thing a teacher would take: teach, then example, then discuss', () => {
+test('a slide is ONE screen: the example, the mistake and the discussion are inline, not screens of their own', () => {
   const d = deck();
 
-  assert.deepEqual(stepsOf(d.slides[0]), ['teach'], 'the cover is one screen');
-  assert.deepEqual(stepsOf(d.slides[1]), ['teach', 'example'], 'a misconception slide gets an example screen');
-  assert.deepEqual(stepsOf(d.slides[2]), ['teach', 'example'], 'slide 3 has an example');
-  assert.deepEqual(stepsOf(d.slides[3]), ['teach', 'discuss'], 'slide 4 has only a discussion prompt');
+  for (const slide of d.slides) assert.deepEqual(stepsOf(slide), ['teach'], `slide ${slide.n}`);
   const both = structuredClone(d.slides[2]) as DeckSlide;
   both.content.discussion = { prompt: 'Why?', answer: 'Because.' };
-  assert.deepEqual(stepsOf(both), ['teach', 'example', 'discuss']);
+  assert.deepEqual(stepsOf(both), ['teach'], 'even a slide with an example AND a discussion');
 });
 
 test('Continue and Previous walk every screen, in order, and stop at the ends', () => {
@@ -48,8 +45,8 @@ test('Continue and Previous walk every screen, in order, and stop at the ends', 
 test('going back from a slide lands on the LAST screen of the one before', () => {
   const d = deck();
 
-  assert.deepEqual(previousPosition(d, { n: 4, step: 0 }), { n: 3, step: stepsOf(d.slides[2]).length - 1 });
-  assert.deepEqual(nextPosition(d, { n: 3, step: 0 }), { n: 3, step: 1 });
+  assert.deepEqual(previousPosition(d, { n: 4, step: 0 }), { n: 3, step: 0 });
+  assert.deepEqual(nextPosition(d, { n: 3, step: 0 }), { n: 4, step: 0 }, 'Continue goes to the next slide, not to a second screen of this one');
   assert.equal(nextPosition(d, { n: 99, step: 0 }), null, 'an unknown slide has no next screen');
 });
 
@@ -110,14 +107,14 @@ test('the example screen asks for its cards too, and the key idea is not one of 
   assert.equal(pendingHint(d.slides[3], 'example', false), null);
 });
 
-test('chapter 8592: every screen fits the rules - at most three, and every layout is one the player draws', () => {
+test('chapter 8592: every screen fits the rules - exactly one, and every layout is one the player draws', () => {
   const d = real();
   if (!d) return; // the review copy is not part of every checkout
 
   const kinds = new Set<string>();
   for (const slide of d.slides) {
     kinds.add(layoutOf(slide));
-    assert.ok(stepsOf(slide).length >= 1 && stepsOf(slide).length <= 3, `slide ${slide.n}`);
+    assert.equal(stepsOf(slide).length, 1, `slide ${slide.n}`);
   }
   for (const kind of kinds) assert.ok(['cover', 'scenario', 'visual-hotspots', 'explore', 'match', 'order', 'image-text', 'summary', 'intro', 'relationship', 'cards', 'statement'].includes(kind));
   assert.ok(kinds.size >= 5, `a varied lesson, not one layout: ${[...kinds].join(', ')}`);

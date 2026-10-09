@@ -23,6 +23,9 @@ export default function StudyDeckPage() {
   const search = useSearchParams();
   const chapterId = Number(params?.chapterId ?? NaN);
   const pilot = search?.get('source') === 'pilot';
+  // The Classroom Resource list opens a specific content item: /student/study-deck/<chapter>?content=<content_master.id>.
+  const contentParam = Number(search?.get('content') ?? NaN);
+  const contentId = Number.isFinite(contentParam) && contentParam > 0 ? contentParam : null;
   const [state, setState] = useState<State>({ phase: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
@@ -36,7 +39,7 @@ export default function StudyDeckPage() {
 
     (async () => {
       try {
-        const loaded = await loadStudyDeck(chapterId, { pilot, signal });
+        const loaded = await loadStudyDeck(chapterId, { pilot, contentId, signal });
         const bank = await loadBank(chapterId, signal);
         if (!signal.aborted) setState({ phase: 'ready', loaded, bank });
       } catch (error) {
@@ -46,7 +49,7 @@ export default function StudyDeckPage() {
     })();
 
     return () => controller.abort();
-  }, [invalid, chapterId, pilot, attempt]);
+  }, [invalid, chapterId, pilot, contentId, attempt]);
 
   if (invalid) {
     return (

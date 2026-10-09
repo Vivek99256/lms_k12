@@ -129,6 +129,7 @@ import {
 import { type Course } from '../../data/courses';
 import {
   fetchChapterContent,
+  downloadStudyDeckPdf,
   fetchGeneratableQuestionFormats,
   fetchSemanticIntelligenceResult,
   generateIntelligenceQuestions,
@@ -178,6 +179,7 @@ import {
 } from './GenerationPipeline';
 import { FormatMultiSelect } from './FormatMultiSelect';
 import { getRequestContext, getSyear } from '../../page';
+import { pdfFileNameFromTitle } from '@/lib/study-deck/pdf';
 import { getChapterKeyConcepts } from '../../data/chapterKeyConcepts';
 import type { ChapterKeyConceptGroup } from '../../data/chapterKeyConcepts';
 import { useCurriculumMeta } from '../../data/curriculum';
@@ -514,6 +516,9 @@ interface ChapterContentItem {
   bodyHtml: string | null;
   /** Route of the existing H5P editor this item opens in. Only set for H5P items. */
   deepLink?: string;
+  /** The study deck's classroom PDF, reported by the backend. A second file of the same item; Open is unchanged. */
+  pdfUrl?: string;
+  chapterId?: string;
   slides: {
     id: string;
     number: number;
@@ -597,6 +602,8 @@ function buildApiChapterContentItems(
         // Where an H5P card opens. The existing /h5p/* editors keep all the CRUD,
         // which is what makes removing the top-level H5P button non-destructive.
         deepLink: asset.deep_link,
+        pdfUrl: asset.pdf_url,
+        chapterId: chapter.id,
       };
     })
   );
@@ -2777,6 +2784,19 @@ export default function ChapterListPage() {
       </div>
     </div>
   );
+
+  const handleDownloadPdf = (item: ChapterContentItem) => {
+    const requestContext = getRequestContext();
+    const chapterId = Number(item.chapterId);
+    const contentId = Number(item.id);
+    if (!requestContext || !Number.isFinite(chapterId) || !Number.isFinite(contentId)) {
+      setContentError('Course master session data is missing.');
+      return;
+    }
+    downloadStudyDeckPdf(chapterId, contentId, Number(requestContext.sub_institute_id), pdfFileNameFromTitle(item.title)).catch((error: unknown) => {
+      setContentError(error instanceof Error ? error.message : 'Couldn’t download the PDF.');
+    });
+  };
 
   const handleOpenContent = (item: ChapterContentItem) => {
     // An H5P item is not a file - it is a route. It opens in its existing editor
@@ -6146,6 +6166,7 @@ export default function ChapterListPage() {
                             key={item.id}
                             item={item}
                             onOpen={() => handleOpenContent(item)}
+                            onDownloadPdf={() => handleDownloadPdf(item)}
                             hideChapter
                           />
                         ))}
@@ -6161,6 +6182,7 @@ export default function ChapterListPage() {
                     key={item.id}
                     item={item}
                     onOpen={() => handleOpenContent(item)}
+                    onDownloadPdf={() => handleDownloadPdf(item)}
                   />
                 ))}
               </div>

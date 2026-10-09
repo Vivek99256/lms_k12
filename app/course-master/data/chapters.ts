@@ -2,6 +2,7 @@
 import { getRequestContext, getSyear } from '../page';
 import { API_BASE_URL } from '@/app/components/utils/api_url';
 import { buildSessionContext } from '@/lib/erp-client';
+import { pdfDownloadName, studyDeckPdfRequest } from '@/lib/study-deck/pdf';
 import {
   normaliseGeneratableFormats,
   type GeneratableFormat,
@@ -583,6 +584,38 @@ export interface ChapterContentAsset {
   h5p_type?: string;
   /** Route of the existing H5P editor this item opens in. */
   deep_link?: string;
+  /** Canonical URL of a study deck's classroom PDF. Only present when the PDF is really stored. */
+  pdf_url?: string;
+}
+
+/**
+ * Download a study deck's classroom PDF. The server finds the file from the content item and checks that the item
+ * belongs to this chapter and school; the browser only receives the bytes.
+ */
+export async function downloadStudyDeckPdf(chapterId: number, contentId: number, subInstituteId: number, fileName?: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/lms-study-deck/pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/pdf' },
+    body: JSON.stringify(studyDeckPdfRequest(chapterId, contentId, subInstituteId)),
+  });
+  if (!res.ok) {
+    let message = 'Couldn’t download the PDF.';
+    try {
+      message = ((await res.json()) as { message?: string }).message || message;
+    } catch {
+      /* keep the default */
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = pdfDownloadName(res.headers.get('Content-Disposition'), fileName);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export interface ChapterContentResponse {

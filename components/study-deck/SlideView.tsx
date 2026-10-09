@@ -1,19 +1,21 @@
 'use client';
 
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Lightbulb, Link2, Lock, MessageCircle, Users } from 'lucide-react';
+import { useCallback, type ReactNode } from 'react';
+import { ArrowLeft, ArrowRight, Link2 } from 'lucide-react';
 
 import { outlineOf, relatedConcepts, stageLabel, topicOfSlide } from '@/lib/study-deck/deck';
-import { exampleCards, exampleKey, exampleProgress, interactionKey, selectItem, type ExampleCardId } from '@/lib/study-deck/interactions';
+import { dockTabs, explanationInline } from '@/lib/study-deck/explain';
+import { exampleKey, interactionKey } from '@/lib/study-deck/interactions';
 import { conceptStatus, type DeckProgress, type ResultInput } from '@/lib/study-deck/progress';
-import { layoutOf, type StepKind } from '@/lib/study-deck/stage';
+import { layoutOf, type LayoutKind, type StepKind } from '@/lib/study-deck/stage';
 import type { DeckSlide, StudyDeck } from '@/lib/study-deck/types';
+import { ExplainDock } from './ExplainDock';
 import { ExploreView } from './ExploreView';
 import { HotspotsView } from './HotspotsView';
 import { MatchView } from './MatchView';
 import { OrderView } from './OrderView';
 import { ScenarioView } from './ScenarioView';
-import { CompletedSlot, Eyebrow, motion, Tag, useRememberedReducer, useStage, VisualFigure } from './stage-ui';
+import { Eyebrow, useStage, VisualFigure } from './stage-ui';
 
 export interface SlideViewProps {
   deck: StudyDeck;
@@ -32,11 +34,34 @@ const EXPLORED: ResultInput = { correct: null, score: null, maxScore: null };
  * One screen of a slide, drawn as a presentation slide. The same slide data the PPT is built from decides the
  * composition (see `layoutOf`): a diagram with its hotspots, a picture beside its explanation, three cards, a
  * statement with the concept's neighbours, a connection between two ideas, a decision, discovery cards - then,
- * on the following screens, the worked example and common mistake, and the question for the class.
+ * and the worked example, common mistake and question for the class, in the panel behind the slide's own button.
  *
  * Everything fits the stage: nothing here scrolls, and the canvas it is drawn on shrinks text before it overflows.
  */
-export function SlideView({ deck, slide, step, progress, assetBase, onResult, onGoto }: SlideViewProps) {
+export function SlideView(props: SlideViewProps) {
+  const { deck, slide, progress, onResult } = props;
+  const layout = layoutOf(slide);
+  const tabs = dockTabs(slide, layout);
+  const dockDone = Boolean(progress.activities[exampleKey(slide)]?.done);
+  const dockDoneNow = useCallback(
+    () => onResult(exampleKey(slide), EXPLORED, slide.taught_concept_ids[0] ?? null, null),
+    [onResult, slide]
+  );
+
+  // No panel when the slide has nothing beyond its main picture (the cover; a slide with no explanation at all).
+  if (tabs.length === 0) return <SlideLayout {...props} layout={layout} />;
+
+  return (
+    <div className="relative flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1">
+        <SlideLayout {...props} layout={layout} />
+      </div>
+      <ExplainDock key={slide.n} deck={deck} slide={slide} layout={layout} tabs={tabs} done={dockDone} onDone={dockDoneNow} />
+    </div>
+  );
+}
+
+function SlideLayout({ deck, slide, progress, assetBase, onResult, onGoto, layout }: SlideViewProps & { layout: LayoutKind }) {
   const exploredKey = interactionKey(slide);
   const memoryKey = exploredKey;
   const exploredDone = Boolean(progress.activities[exploredKey]?.done);
@@ -45,21 +70,8 @@ export function SlideView({ deck, slide, step, progress, assetBase, onResult, on
     [onResult, exploredKey, slide.taught_concept_ids]
   );
 
-  if (step === 'example') {
-    return (
-      <ExampleScreen
-        slide={slide}
-        assetBase={assetBase}
-        done={Boolean(progress.activities[exampleKey(slide)]?.done)}
-        onDone={() => onResult(exampleKey(slide), EXPLORED, slide.taught_concept_ids[0] ?? null, null)}
-      />
-    );
-  }
-  if (step === 'discuss') return <DiscussScreen slide={slide} assetBase={assetBase} />;
-
-  const layout = layoutOf(slide);
   const interaction = slide.interaction;
-  const lead = <Lead deck={deck} slide={slide} large={layout === 'statement'} />;
+  const lead = <Lead deck={deck} slide={slide} large={layout === 'statement'} inline={explanationInline(layout)} />;
 
   switch (layout) {
     case 'cover':
@@ -150,8 +162,12 @@ function Frame({ children }: { children: ReactNode }) {
 // Pieces
 // ---------------------------------------------------------------------------
 
-/** Where this is, the title, and the explanation of every concept the slide teaches. */
-function Lead({ deck, slide, large = false }: { deck: StudyDeck; slide: DeckSlide; large?: boolean }) {
+/**
+ * Where this is and the title. The explanation of each concept the slide teaches is behind the slide's "Explain this
+ * concept" button (see ExplainDock); it stays here only where it IS the slide (a bare statement). A slide that has no
+ * concept explanation (the hook, the objectives) states its own text here.
+ */
+function Lead({ deck, slide, large = false, inline = false }: { deck: StudyDeck; slide: DeckSlide; large?: boolean; inline?: boolean }) {
   const { portrait } = useStage();
   const c = slide.content;
   const topic = topicOfSlide(deck, slide);
@@ -180,6 +196,7 @@ function Lead({ deck, slide, large = false }: { deck: StudyDeck; slide: DeckSlid
         </p>
       ) : null}
       {c.explanations.length > 0 ? (
+        inline ? (
         <div className="space-y-[0.5em]">
           {c.explanations.map((e) => (
             <div key={e.concept_id} className="rounded-[0.8em] border border-slate-200 bg-slate-50 px-[0.9em] py-[0.6em]">
@@ -188,6 +205,7 @@ function Lead({ deck, slide, large = false }: { deck: StudyDeck; slide: DeckSlid
             </div>
           ))}
         </div>
+        ) : null
       ) : c.body ? (
         <p className={`leading-snug text-slate-800 ${large && !portrait ? 'text-[1.4em]' : 'text-[1.15em]'}`}>{c.body}</p>
       ) : null}
@@ -476,177 +494,5 @@ function SummaryScreenSlide({
         ))}
       </ul>
     </Frame>
-  );
-}
-
-const CARD_STYLE: Record<ExampleCardId, { Icon: typeof Lightbulb; tile: string; panel: string; text: string }> = {
-  example: { Icon: Lightbulb, tile: 'border-emerald-300 bg-emerald-50 text-emerald-950', panel: 'border-emerald-200 bg-emerald-50', text: 'text-emerald-950' },
-  mistake: { Icon: AlertTriangle, tile: 'border-amber-300 bg-amber-50 text-amber-950', panel: 'border-amber-200 bg-amber-50', text: 'text-amber-950' },
-  instead: { Icon: CheckCircle2, tile: 'border-emerald-300 bg-emerald-50 text-emerald-950', panel: 'border-emerald-200 bg-emerald-50', text: 'text-emerald-950' },
-  key: { Icon: KeyRound, tile: 'border-indigo-300 bg-indigo-50 text-indigo-950', panel: 'border-indigo-200 bg-indigo-50', text: 'text-indigo-950' },
-};
-
-/**
- * The worked example, the common mistake, what to do instead, and then the key idea: each one a card the learner
- * opens, with its content replacing the panel beside them. The key idea unlocks once the others have been opened. The
- * slide's picture stays in the panel until a card is chosen, so the visual is never lost.
- */
-function ExampleScreen({ slide, assetBase, done, onDone }: { slide: DeckSlide; assetBase: string | null; done: boolean; onDone: () => void }) {
-  const { portrait } = useStage();
-  const cards = exampleCards(slide);
-  const [state, select] = useRememberedReducer(
-    `${slide.n}:e`,
-    (s: { open: string | null; seen: string[] }, id: string) => selectItem(s, id),
-    (): { open: string | null; seen: string[] } => ({ open: null, seen: [] })
-  );
-  const progress = exampleProgress(slide, state.seen);
-  const finished = progress.done || done;
-  const reported = useRef(done);
-  const open = cards.find((card) => card.id === state.open) ?? null;
-
-  useEffect(() => {
-    if (progress.done && !reported.current) {
-      reported.current = true;
-      onDone();
-    }
-  }, [progress.done, onDone]);
-
-  const seen = (id: string) => state.seen.includes(id) || (done && id !== 'key');
-
-  return (
-    <section aria-label="Example" className={`grid h-full min-h-0 gap-[1.2em] p-[1.4em] ${portrait ? 'grid-rows-[auto_minmax(0,1fr)]' : 'grid-cols-[minmax(0,4fr)_minmax(0,8fr)]'}`}>
-      <div className="flex min-h-0 min-w-0 flex-col justify-center gap-[0.8em]">
-        <div className="space-y-[0.4em]">
-          <Tag tone="emerald">Explore the example</Tag>
-          <h2 id={`slide-${slide.n}-example`} tabIndex={-1} className={`font-semibold leading-tight text-slate-900 outline-none ${portrait ? 'text-[1.2em]' : 'text-[1.6em]'}`}>
-            {slide.title}
-          </h2>
-          <p role="status" className="text-[0.75em] font-medium text-slate-600">
-            {finished ? 'All explored' : `Explore ${progress.opened} / ${progress.total}`}
-          </p>
-        </div>
-        <ul className="space-y-[0.5em]" aria-label="Cards to open">
-          {cards.map((card) => {
-            const style = CARD_STYLE[card.id];
-            const locked = card.id === 'key' && !progress.keyUnlocked && !done;
-            const isOpen = state.open === card.id;
-
-            return (
-              <li key={card.id}>
-                <button
-                  type="button"
-                  disabled={locked}
-                  aria-pressed={isOpen}
-                  onClick={() => select(card.id)}
-                  className={`flex min-h-[3em] w-full items-center gap-[0.7em] rounded-[0.9em] border-2 px-[0.9em] py-[0.5em] text-left text-[1em] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 ${
-                    locked ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400' : isOpen ? `${style.tile} shadow-md ring-2 ring-indigo-500` : seen(card.id) ? style.tile : 'border-slate-300 bg-white text-slate-900 hover:border-indigo-400'
-                  }`}
-                >
-                  {locked ? <Lock className="h-[1.1em] w-[1.1em] shrink-0" aria-hidden="true" /> : <style.Icon className="h-[1.1em] w-[1.1em] shrink-0" aria-hidden="true" />}
-                  <span className="flex-1">{card.label}</span>
-                  {seen(card.id) && !isOpen ? <CheckCircle2 className="h-[1em] w-[1em] shrink-0 text-emerald-600" aria-label="Opened" /> : null}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <CompletedSlot show={progress.done}>{state.seen.includes('key') || !cards.some((c) => c.id === 'key') ? null : 'Open the key idea to finish.'}</CompletedSlot>
-      </div>
-
-      <div aria-live="polite" className="flex min-h-0 min-w-0 flex-col justify-center">
-        {open ? (
-          <div key={open.id} className={`flex min-h-0 flex-1 flex-col justify-center gap-[0.6em] rounded-[1.1em] border-2 p-[1.4em] ${CARD_STYLE[open.id].panel} ${motion.fadeUp}`}>
-            <p className={`flex items-center gap-[0.5em] text-[0.9em] font-semibold ${CARD_STYLE[open.id].text}`}>
-              {(() => {
-                const I = CARD_STYLE[open.id].Icon;
-                return <I className="h-[1.2em] w-[1.2em]" aria-hidden="true" />;
-              })()}
-              {open.label}
-            </p>
-            <p className={`leading-snug ${CARD_STYLE[open.id].text} ${open.text.length > 160 ? 'text-[1.35em]' : 'text-[1.7em]'}`}>{open.text}</p>
-          </div>
-        ) : slide.image ? (
-          <div className="min-h-0 flex-1">
-            <VisualFigure image={slide.image} assetBase={assetBase} />
-          </div>
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col justify-center gap-[0.6em] rounded-[1.1em] border-2 border-slate-200 bg-slate-50 p-[1.6em]">
-            <p className="text-[0.8em] font-semibold uppercase tracking-wider text-slate-500">The idea</p>
-            <p className="text-[1.6em] font-medium leading-snug text-slate-900">{slide.content.explanations[0]?.text ?? slide.content.body ?? slide.title}</p>
-            <p className="text-[0.85em] text-slate-500">Open the cards on the left to see it in action.</p>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-/** The question for the class. The possible answer stays behind a button so the class can talk first. */
-function DiscussScreen({ slide, assetBase }: { slide: DeckSlide; assetBase: string | null }) {
-  const { portrait } = useStage();
-  const [shown, toggle] = useRememberedReducer(`${slide.n}:d`, (s: boolean, action: "toggle") => (action === "toggle" ? !s : s), () => false);
-  const d = slide.content.discussion;
-  const answer = useRef<HTMLParagraphElement>(null);
-
-  useEffect(() => {
-    if (shown) answer.current?.focus({ preventScroll: true });
-  }, [shown]);
-
-  if (!d) return null;
-
-  return (
-    <div className={`grid h-full min-h-0 gap-[1.2em] p-[1.4em] ${portrait ? 'grid-rows-[auto_minmax(0,1fr)]' : 'grid-cols-[minmax(0,7fr)_minmax(0,5fr)]'}`}>
-      <aside aria-label="Discussion" className="flex min-h-0 flex-col justify-center gap-[0.9em] rounded-[1.1em] border border-sky-200 bg-sky-50 p-[1.4em]">
-        <div className="flex items-center gap-[0.6em]">
-          <Tag tone="sky">
-            <MessageCircle className="h-[1em] w-[1em]" aria-hidden="true" />
-            Talk about it
-          </Tag>
-          <span className="text-[0.75em] text-sky-900">Discuss with your teacher</span>
-        </div>
-        <p className="text-[1.95em] font-medium leading-snug text-sky-950">{d.prompt}</p>
-        <div>
-          <button
-            type="button"
-            onClick={() => toggle("toggle")}
-            aria-expanded={shown}
-            className="inline-flex items-center gap-[0.5em] rounded-[0.7em] border border-sky-300 bg-white px-[1em] py-[0.45em] text-[0.8em] font-semibold text-sky-900 hover:bg-sky-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
-          >
-            {shown ? <EyeOff className="h-[1.1em] w-[1.1em]" aria-hidden="true" /> : <Eye className="h-[1.1em] w-[1.1em]" aria-hidden="true" />}
-            {shown ? 'Hide the possible answer' : 'Show a possible answer'}
-          </button>
-        </div>
-        <p ref={answer} tabIndex={-1} hidden={!shown} className="rounded-[0.8em] bg-white p-[0.9em] text-[1.05em] leading-snug text-slate-800 outline-none">
-          {d.answer}
-        </p>
-      </aside>
-
-      <div className="flex min-h-0 flex-col gap-[0.8em]">
-        {slide.image && !portrait ? (
-          <div className="min-h-0 flex-1">
-            <VisualFigure image={slide.image} assetBase={assetBase} />
-          </div>
-        ) : null}
-        <ol className="grid min-h-0 flex-1 auto-rows-fr gap-[0.6em]" aria-label="Think, pair, share">
-          {[
-            ['Think', 'On your own for a minute.'],
-            ['Pair', 'Compare with the person next to you.'],
-            ['Share', 'Tell the class what you decided.'],
-          ].map(([name, hint], index) => (
-            <li key={name} className="flex min-h-0 items-center gap-[0.9em] rounded-[1em] border border-sky-100 bg-white px-[1em] py-[0.5em] shadow-sm">
-              <span className="flex h-[2.2em] w-[2.2em] shrink-0 items-center justify-center rounded-full bg-sky-600 text-[0.95em] font-semibold text-white">{index + 1}</span>
-              <span className="text-[1.15em] leading-snug">
-                <span className="font-semibold text-slate-900">{name}. </span>
-                <span className="text-slate-600">{hint}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-        <p className="flex items-center gap-[0.4em] text-[0.65em] text-slate-500">
-          <Users className="h-[1em] w-[1em]" aria-hidden="true" />
-          Nothing is marked: this is for talking.
-        </p>
-      </div>
-    </div>
   );
 }

@@ -54,9 +54,23 @@ export interface DeckActivity {
   question?: AuthoredQuestion;
 }
 
+/** A picture kept in the shared object store. The deck refers to it by this record, never by a local path. */
+export interface DeckAsset {
+  sha1: string;
+  /** The object's key in the store. */
+  path: string;
+  /** The canonical public URL. */
+  url: string;
+  mime: string;
+  filename: string;
+  bytes: number;
+}
+
 export interface DeckImage {
   type: 'photo' | 'diagram';
   url: string;
+  /** Key into the deck's `assets` map, present once the deck has been stored. */
+  asset_id?: string;
   alt: string;
   caption: string | null;
   width: number;
@@ -227,6 +241,8 @@ export interface DeckConcept {
 
 export interface StudyDeck {
   version: number;
+  /** Every stored picture the deck uses, by sha1. Present once the deck has been stored. */
+  assets?: Record<string, DeckAsset>;
   chapter: { id: number; name: string; standard_id: number; subject_id: number; standard_name: string; subject_name: string };
   slide_count: number;
   teaching_strategy: string | null;

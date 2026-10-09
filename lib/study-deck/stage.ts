@@ -3,15 +3,14 @@
  *
  * NO REACT HERE, so every rule is testable with node:test.
  *
- * The student player is a PRESENTATION: each screen fits the viewport and nothing scrolls. A slide's
- * content is therefore split into STEPS, one screen each, in the order a teacher would take them:
+ * The student player is a PRESENTATION: each screen fits the viewport and nothing scrolls. A slide is ONE screen:
+ * the title, the large visual and the interaction the slide carries. Everything that used to follow on extra screens
+ * (the explanation of the concept, the worked example, the common mistake and what to do instead, the question for
+ * the class) is on that same screen, behind the slide's "Explain this concept" button (see ./explain.ts).
  *
- *   teach    the title, the explanation and the large visual, with the interaction the slide carries
- *   example  the worked example, the common mistake and what to do instead, opened one by one, then the key idea
- *   discuss  the question for the class, with a possible answer behind a button
- *
- * A slide that has no example or discussion is one screen. The same slide data the PPT is built from
- * decides all of it; nothing here asks the model for anything.
+ * `example` and `discuss` stay in the type only so that code written for the older three-screen model keeps
+ * compiling; no slide produces them any more. The same slide data the PPT is built from decides all of it; nothing
+ * here asks the model for anything.
  */
 
 import { exampleCards } from './interactions';
@@ -19,12 +18,9 @@ import type { DeckSlide, StudyDeck } from './types';
 
 export type StepKind = 'teach' | 'example' | 'discuss';
 
-export function stepsOf(slide: DeckSlide): StepKind[] {
-  const steps: StepKind[] = ['teach'];
-  if (slide.content.example || slide.content.misconception) steps.push('example');
-  if (slide.content.discussion) steps.push('discuss');
-
-  return steps;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept so callers need not change; every slide is one screen
+export function stepsOf(_slide: DeckSlide): StepKind[] {
+  return ['teach'];
 }
 
 /** Where the learner is: a slide and the screen within it. */
