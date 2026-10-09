@@ -15,7 +15,7 @@ function screen(loader: () => Promise<{ default: ScreenComponent }>): ScreenComp
 
 /**
  * Route -> page component, for every page in this app that can be mounted
- * inside a category tab. 537 entries.
+ * inside a category tab. 539 entries.
  */
 export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/academic_setup/create_batch': screen(() => import('@/app/academic_setup/create_batch/page')),
@@ -152,6 +152,8 @@ export const GENERATED_MODULE_SCREENS: Record<string, ScreenComponent> = {
   '/exam/marks-entry': screen(() => import('@/app/exam/marks-entry/page')),
   '/exam/online': screen(() => import('@/app/exam/online/page')),
   '/exam/progress-report': screen(() => import('@/app/exam/progress-report/page')),
+  '/face_attendance/class_face_attendance': screen(() => import('@/app/face_attendance/class_face_attendance/page')),
+  '/face_attendance/student_face_attendance': screen(() => import('@/app/face_attendance/student_face_attendance/page')),
   '/fees/cancel-refund': screen(() => import('@/app/fees/cancel-refund/page')),
   '/fees/circulars': screen(() => import('@/app/fees/circulars/page')),
   '/fees/collect': screen(() => import('@/app/fees/collect/page')),
