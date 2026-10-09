@@ -46,6 +46,20 @@ export interface PrayogshalaActivity {
   slug: string | null;
   /** draft | review | published. Learners only ever receive 'published'. */
   status: 'draft' | 'review' | 'published';
+  /**
+   * How the content came to exist. null = written by hand or seeded. 'generating' / 'failed' /
+   * 'needs_content' rows have no lab yet and are only ever sent to staff.
+   */
+  generation_status: PrayogshalaGenerationStatus | null;
+  generation_version: number;
+  generated_at: string | null;
+  /** Provider / validation message for staff; always null for learners. */
+  generation_error: string | null;
+  /** Every concept of the topic this one activity covers. */
+  concept_ids: number[];
+  concept_names: string[];
+  /** Staff only: which topic, concepts and chapter extraction it was built from. */
+  source_refs: { topic_id?: number; chapter_id?: number; concept_ids?: number[]; extraction_ids?: number[]; excerpt_chars?: number } | null;
   /** The interactive lab, or null for a plain document activity. */
   lab_config: LabConfig | null;
   /** Set on activities that arrive through the chapter content list. */
@@ -56,6 +70,21 @@ export interface PrayogshalaActivity {
   editable: boolean;
   created_at: string | null;
   updated_at: string | null;
+}
+
+export type PrayogshalaGenerationStatus = 'generating' | 'ready' | 'failed' | 'needs_content';
+
+/** not_generated | generating | ready (awaiting review) | published | failed | needs_content */
+export type PrayogshalaTopicState = 'not_generated' | 'generating' | 'ready' | 'published' | 'failed' | 'needs_content';
+
+/** One topic of the chapter and the single activity filed against it. */
+export interface PrayogshalaTopicEntry {
+  topic_id: number;
+  topic_name: string;
+  concept_count: number;
+  has_description: boolean;
+  state: PrayogshalaTopicState;
+  activity: PrayogshalaActivity | null;
 }
 
 export interface PrayogshalaChapterContext {
@@ -78,6 +107,8 @@ export interface PrayogshalaChapterResponse {
   activity_types: PrayogshalaActivityType[];
   /** The chapter's topics, for the editor's topic picker. */
   topics: { id: number; name: string }[];
+  /** Every topic with its one activity (staff) or only topics with a published one (learners). */
+  topic_coverage: PrayogshalaTopicEntry[];
   can_manage: boolean;
 }
 
@@ -191,4 +222,26 @@ export function updatePrayogshalaActivity(
 
 export async function deletePrayogshalaActivity(id: number): Promise<void> {
   await request<unknown>(`/${id}/delete`, { method: 'POST', body: {} });
+}
+
+export type PrayogshalaGenerateOutcome =
+  | 'created'
+  | 'regenerated'
+  | 'exists'
+  | 'busy'
+  | 'needs_content'
+  | 'queued'
+  | 'failed';
+
+export interface PrayogshalaGenerateResult {
+  outcome: PrayogshalaGenerateOutcome;
+  activity?: PrayogshalaActivity | null;
+}
+
+/**
+ * Generate a topic's one activity. Safe to repeat: a topic that already has one answers
+ * `exists` and nothing is regenerated unless `regenerate` is true.
+ */
+export function generatePrayogshalaActivity(topicId: number, regenerate = false): Promise<PrayogshalaGenerateResult> {
+  return request<PrayogshalaGenerateResult>('/generate', { method: 'POST', body: { topic_id: topicId, regenerate } });
 }

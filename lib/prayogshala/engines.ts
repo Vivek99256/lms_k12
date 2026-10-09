@@ -54,6 +54,14 @@ export interface EngineResult {
   warnings: string[];
   /** Calculator-style engines list their working here. */
   outputs: { id: string; label: string; unit: string; text: string; primary: boolean }[];
+  /** Drawing inputs for engines with an animated visual, already evaluated to numbers. */
+  visual?: VisualState;
+}
+
+export interface VisualState {
+  kind: string;
+  values: Record<string, number>;
+  bars?: { label: string; value: number; max: number }[];
 }
 
 export interface Engine<S> {
@@ -270,12 +278,218 @@ export const osmosisEngine: Engine<OsmosisState> = {
   },
 };
 
+// ------------------------------------------------------------------------ variable model
+
+export const VISUAL_KINDS = ['heating', 'particles', 'ray', 'circuit', 'bars', 'rectangle'] as const;
+export type VisualKind = (typeof VISUAL_KINDS)[number];
+
+export interface ModelControl {
+  id: string;
+  label: string;
+  unit?: string;
+  kind?: 'slider' | 'toggle';
+  min: number;
+  max: number;
+  step: number;
+  default: number;
+}
+export interface ModelDerived {
+  id: string;
+  label: string;
+  unit?: string;
+  formula: string;
+  decimals?: number;
+}
+export interface VariableModelParams {
+  controls: ModelControl[];
+  derived?: ModelDerived[];
+  visual: { kind: VisualKind; bind: Record<string, unknown> };
+  observations: { when: string; text: string }[];
+  warnings?: { when: string; text: string }[];
+}
+export type VariableModelState = { values: Record<string, number> };
+
+function decimalsOf(step: number): number {
+  const text = String(step);
+  return text.includes('.') ? text.split('.')[1].length : 0;
+}
+
+/** Clamp to [min, max] and snap to the control's step so a stored or typed value stays legal. */
+function snap(control: ModelControl, value: number): number {
+  const clamped = Math.min(control.max, Math.max(control.min, value));
+  const snapped = control.min + Math.round((clamped - control.min) / control.step) * control.step;
+  return Number(Math.min(control.max, snapped).toFixed(6));
+}
+
+const VISUAL_BIND_KEYS: Record<string, string[]> = {
+  heating: ['temperature', 'heat', 'boiling_point'],
+  particles: ['energy', 'spacing'],
+  ray: ['incidence', 'reflection'],
+  circuit: ['closed', 'brightness'],
+  rectangle: ['width', 'height'],
+};
+
+export const variableModelEngine: Engine<VariableModelState> = {
+  id: 'variable_model',
+  supportsParticleView: false,
+  initialState(params: VariableModelParams) {
+    return { values: Object.fromEntries(params.controls.map((c) => [c.id, c.default])) };
+  },
+  scenarioState(params, override) {
+    const base = this.initialState(params);
+    const given = (override ?? {}) as Record<string, unknown>;
+    const values = { ...base.values };
+    for (const c of params.controls) {
+      const v = given[c.id];
+      if (typeof v === 'number' && Number.isFinite(v)) values[c.id] = snap(c, v);
+    }
+    return { values };
+  },
+  evaluate(params: VariableModelParams, state) {
+    const scope: Record<string, number> = {};
+    const text: Record<string, string> = {};
+    for (const c of params.controls) {
+      scope[c.id] = snap(c, state.values[c.id] ?? c.default);
+      text[c.id] = formatNumber(scope[c.id], decimalsOf(c.step));
+    }
+    const outputs: EngineResult['outputs'] = [];
+    for (const d of params.derived ?? []) {
+      const value = evaluate(d.formula, scope);
+      if (value === null) {
+        text[d.id] = '?';
+        outputs.push({ id: d.id, label: d.label, unit: d.unit ?? '', text: '?', primary: false });
+        continue;
+      }
+      scope[d.id] = value;
+      text[d.id] = formatNumber(value, d.decimals ?? 0);
+      outputs.push({ id: d.id, label: d.label, unit: d.unit ?? '', text: text[d.id], primary: false });
+    }
+
+    const hit = params.observations.find((o) => isTrue(o.when, scope));
+    const warnings = (params.warnings ?? []).filter((w) => isTrue(w.when, scope)).map((w) => w.text);
+
+    const bind = params.visual.bind as Record<string, unknown>;
+    const visual: VisualState = { kind: params.visual.kind, values: {} };
+    if (params.visual.kind === 'bars') {
+      visual.bars = ((bind.bars as { label: string; value: string; max?: number }[]) ?? []).map((b) => {
+        const v = evaluate(String(b.value), scope) ?? 0;
+        return { label: b.label, value: v, max: typeof b.max === 'number' && b.max > 0 ? b.max : Math.max(Math.abs(v), 1) };
+      });
+    } else {
+      for (const key of VISUAL_BIND_KEYS[params.visual.kind] ?? []) {
+        const raw = bind[key];
+        const v = typeof raw === 'string' ? evaluate(raw, scope) : typeof raw === 'number' ? raw : null;
+        visual.values[key] = v === null ? 0 : v;
+      }
+    }
+
+    return { facts: scope, observation: hit ? fillTemplate(hit.text, text) : '', warnings, outputs, visual };
+  },
+};
+
+// --------------------------------------------------------------------------- sequence
+
+export interface SequenceParams {
+  /** Listed in the CORRECT order. The student sees them scrambled. */
+  items: { id: string; label: string; detail?: string }[];
+  observation_template?: string;
+}
+export type SequenceState = { order: string[] };
+
+/** A fixed, repeatable scramble that is never the answer (for 2+ items). */
+export function scramble(ids: string[]): string[] {
+  const n = ids.length;
+  if (n < 2) return [...ids];
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  let stride = Math.max(2, Math.floor(n / 2) + 1);
+  while (gcd(stride, n) !== 1) stride++;
+  const out = Array.from({ length: n }, (_, i) => ids[(i * stride + 1) % n]);
+  return out.every((id, i) => id === ids[i]) ? [...ids.slice(1), ids[0]] : out;
+}
+
+export const sequenceEngine: Engine<SequenceState> = {
+  id: 'sequence',
+  supportsParticleView: false,
+  initialState(params: SequenceParams) {
+    return { order: scramble(params.items.map((i) => i.id)) };
+  },
+  scenarioState(params, override) {
+    const base = this.initialState(params);
+    const given = (override as Partial<SequenceState> | undefined)?.order;
+    const valid = Array.isArray(given) && given.length === base.order.length && base.order.every((id) => given.includes(id));
+    return { order: valid ? (given as string[]) : base.order };
+  },
+  evaluate(params: SequenceParams, state) {
+    const correct = params.items.filter((item, i) => state.order[i] === item.id).length;
+    const total = params.items.length;
+    return {
+      facts: { correct, total, in_order: correct === total ? 1 : 0 },
+      observation: fillTemplate(params.observation_template ?? '{correct} of {total} steps are in the right place.', {
+        correct: String(correct),
+        total: String(total),
+      }),
+      warnings: [],
+      outputs: [],
+    };
+  },
+};
+
+// --------------------------------------------------------------------------- classify
+
+export interface ClassifyParams {
+  categories: { id: string; label: string }[];
+  items: { id: string; label: string; category: string }[];
+  observation_template?: string;
+}
+export type ClassifyState = { assigned: Record<string, string> };
+
+export const classifyEngine: Engine<ClassifyState> = {
+  id: 'classify',
+  supportsParticleView: false,
+  initialState() {
+    return { assigned: {} };
+  },
+  scenarioState(params: ClassifyParams, override) {
+    const given = (override as Partial<ClassifyState> | undefined)?.assigned;
+    const assigned: Record<string, string> = {};
+    for (const item of params.items) {
+      const choice = given?.[item.id];
+      if (choice && params.categories.some((c) => c.id === choice)) assigned[item.id] = choice;
+    }
+    return { assigned };
+  },
+  evaluate(params: ClassifyParams, state) {
+    let correct = 0;
+    let wrong = 0;
+    for (const item of params.items) {
+      const choice = state.assigned[item.id];
+      if (!choice) continue;
+      if (choice === item.category) correct++;
+      else wrong++;
+    }
+    const total = params.items.length;
+    const unassigned = total - correct - wrong;
+    return {
+      facts: { correct, wrong, unassigned, total, complete: unassigned === 0 && wrong === 0 ? 1 : 0 },
+      observation: fillTemplate(
+        params.observation_template ?? '{correct} of {total} sorted correctly; {wrong} in the wrong group; {unassigned} not sorted yet.',
+        { correct: String(correct), wrong: String(wrong), unassigned: String(unassigned), total: String(total) }
+      ),
+      warnings: [],
+      outputs: [],
+    };
+  },
+};
+
 // ------------------------------------------------------------------------------ registry
 
 export const ENGINES: Record<string, Engine<any>> = {
   [calculatorEngine.id]: calculatorEngine,
   [relevanceEngine.id]: relevanceEngine,
   [osmosisEngine.id]: osmosisEngine,
+  [variableModelEngine.id]: variableModelEngine,
+  [sequenceEngine.id]: sequenceEngine,
+  [classifyEngine.id]: classifyEngine,
 };
 
 export function getEngine(type: string): Engine<any> | null {
