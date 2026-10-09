@@ -5,6 +5,7 @@ import {
   BookOpen,
   Brain,
   ClipboardList,
+  Download,
   Eye,
   FileText,
   FlaskConical,
@@ -66,6 +67,8 @@ export interface ContentCardItem {
   /** Pre-formatted, e.g. 'updated 2025-06-27'. Computed already but never shown. */
   updatedAt: string;
   actionLabel: 'Open' | 'Play';
+  /** Set by the backend for a study deck whose classroom PDF is stored. Open is unaffected. */
+  pdfUrl?: string;
 }
 
 /**
@@ -193,6 +196,8 @@ function isGenerated(source: string): boolean {
 interface ContentCardProps {
   item: ContentCardItem;
   onOpen: (item: ContentCardItem) => void;
+  /** Offered next to Open when the item has a PDF. */
+  onDownloadPdf?: (item: ContentCardItem) => void;
   /**
    * Hide the chapter pill. The grouped view already prints the group heading
    * above the grid, so repeating it on every card is noise.
@@ -200,7 +205,7 @@ interface ContentCardProps {
   hideChapter?: boolean;
 }
 
-export function ContentCard({ item, onOpen, hideChapter = false }: ContentCardProps) {
+export function ContentCard({ item, onOpen, onDownloadPdf, hideChapter = false }: ContentCardProps) {
   const style = styleFor(item.type);
   const TypeIcon = style.icon;
   const fileType = item.statValue?.trim();
@@ -321,6 +326,21 @@ export function ContentCard({ item, onOpen, hideChapter = false }: ContentCardPr
             )}
             {item.actionLabel}
           </Button>
+          {item.pdfUrl && onDownloadPdf ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDownloadPdf(item);
+              }}
+              aria-label={`Download PDF: ${item.title}`}
+              className="h-9 rounded-full px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <Download size={14} className="mr-2" />
+              Download PDF
+            </Button>
+          ) : null}
         </div>
       </div>
     </article>
