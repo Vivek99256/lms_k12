@@ -529,18 +529,15 @@ interface ChapterContentItem {
   bodyHtml: string | null;
   /** Route of the existing H5P editor this item opens in. Only set for H5P items. */
   deepLink?: string;
-<<<<<<< HEAD
   /** topic_master.name - set for Prayogshala items. */
   topicName: string | null;
   /** Short description shown on the card - set for Prayogshala items. */
   summary: string | null;
   /** The whole activity, for the detail view. Only set for Prayogshala items. */
   prayogshala: PrayogshalaActivity | null;
-=======
   /** The study deck's classroom PDF, reported by the backend. A second file of the same item; Open is unchanged. */
   pdfUrl?: string;
   chapterId?: string;
->>>>>>> 93cdcbb9b1b783015b3cdcc1e4b396ba769036e8
   slides: {
     id: string;
     number: number;

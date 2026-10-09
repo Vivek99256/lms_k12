@@ -585,7 +585,6 @@ export interface ChapterContentAsset {
   h5p_type?: string;
   /** Route of the existing H5P editor this item opens in. */
   deep_link?: string;
-<<<<<<< HEAD
   /**
    * Prayogshala items are merged in by the backend like H5P ones: a namespaced string id
    * ("prayogshala:7"), content_category 'Prayogshala', and the whole activity under
@@ -593,7 +592,6 @@ export interface ChapterContentAsset {
    */
   prayogshala?: PrayogshalaActivity;
   topic_name?: string | null;
-=======
   /** Canonical URL of a study deck's classroom PDF. Only present when the PDF is really stored. */
   pdf_url?: string;
 }
@@ -626,7 +624,6 @@ export async function downloadStudyDeckPdf(chapterId: number, contentId: number,
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
->>>>>>> 93cdcbb9b1b783015b3cdcc1e4b396ba769036e8
 }
 
 export interface ChapterContentResponse {
